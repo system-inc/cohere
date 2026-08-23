@@ -97,6 +97,14 @@ func (provenance Provenance) Trustworthy() (bool, []string) {
 		))
 	}
 
+	// No controls at all is its own failure, and it has to be named separately from a control that
+	// ran and missed. Looping over an empty slice finds nothing wrong with it, so a run that never
+	// planted anything would otherwise pass this guard vacuously — the exact shape of bug this
+	// package exists to catch, one level up, inside the catcher. Found by a test, not by reading.
+	if !provenance.ControlsProven() {
+		reasons = append(reasons, "no control fired in both directions, so the harness has not been shown able to detect a difference")
+	}
+
 	for _, control := range provenance.ControlsRun {
 		if !control.Detected {
 			reasons = append(reasons, fmt.Sprintf(
