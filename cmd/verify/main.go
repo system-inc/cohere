@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -346,6 +347,7 @@ func run() error {
 			len(result.Diagnostics), result.Coverage.RulesRun, result.Coverage.FilesWalked,
 			result.Coverage.NodesVisited, round(lintDuration),
 		)
+		printParityCoverage(rules, lintConfig)
 		printRuleCoverage(rules, result.Coverage)
 		printCrashCoverage(result.Coverage)
 		printSuppressionCoverage(result.Coverage)
@@ -683,4 +685,77 @@ func printConfigCoverage(coverage program.Coverage) {
 // anything at.
 func round(duration time.Duration) time.Duration {
 	return duration.Round(time.Millisecond)
+}
+
+// printParityCoverage says how many of the rules the config asks for this binary can actually run.
+//
+// The lint line above reports how many rules ran, which is what this binary contains. It says nothing
+// about how many were wanted, and those are different numbers by a factor that matters: 93 against
+// 205 while this migration is in progress. A reader seeing "93 rules" has no way to learn that the
+// config asked for more than twice that, and the whole argument of this tool is that a run which
+// checked less than it appears to must say so.
+//
+// This is the same omission the differential harness carried until `7b590f6`, in the line a reader
+// trusts most, and it is worth fixing in both places rather than only in the instrument that gets
+// read during a migration review.
+//
+// Names are compared on the `/` boundary the config resolver uses, for the reason stated there:
+// plain suffix matching would let a config entry for `no-enum` claim `consistency-no-enum`, and the
+// count would read better than the truth.
+//
+// **The rules block is not the whole config**, and the first version of this function read only that
+// and reported 166. Forty rules are enforced by the `plugins` declarations and named in no rules
+// block, so a denominator taken from the block alone understates by exactly the rules nobody wrote
+// down. That is the same defect twice in one hour, in two different instruments, which is why the
+// count comes from the registry's own view rather than from a second reading of the config.
+func printParityCoverage(rules []rule.Rule, lintConfig *config.Config) {
+	if lintConfig == nil {
+		return
+	}
+
+	implemented := make(map[string]bool, len(rules))
+	for _, registered := range rules {
+		implemented[registered.Name] = true
+	}
+
+	wanted := map[string]bool{}
+	for _, name := range registry.EnforcedRuleNames() {
+		wanted[name] = true
+	}
+	for name, setting := range lintConfig.Rules {
+		if setting.Severity == config.SeverityOff {
+			// An explicit off wins: the catalog says what the two tools can enforce, the config says
+			// what this tree asked for, and a rule turned off here ran over no files regardless.
+			delete(wanted, name)
+			continue
+		}
+		wanted[name] = true
+	}
+
+	missing := 0
+	for name := range wanted {
+		if !implementsConfiguredRule(name, implemented) {
+			missing++
+		}
+	}
+
+	if missing == 0 {
+		return
+	}
+
+	fmt.Printf(
+		"  parity: %d of %d rules the config asks for, so %d were not checked by anything here\n",
+		len(wanted)-missing, len(wanted), missing,
+	)
+}
+
+// implementsConfiguredRule reports whether a config entry names a rule this binary contains.
+func implementsConfiguredRule(configured string, implemented map[string]bool) bool {
+	if implemented[configured] {
+		return true
+	}
+	if slash := strings.LastIndexByte(configured, '/'); slash >= 0 {
+		return implemented[configured[slash+1:]]
+	}
+	return false
 }
