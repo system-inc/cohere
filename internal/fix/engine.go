@@ -44,9 +44,16 @@ type FileResult struct {
 	Rejected []Rejection
 
 	// Converged is whether the file reached a pass with nothing left to apply. False means the pass
-	// budget ran out, and the text is whatever the last accepted pass produced — never a partial
-	// one, because a refused pass is discarded whole.
+	// budget ran out, and the file is left exactly as it was found: a fixpoint the engine did not
+	// reach is not a result it may write.
 	Converged bool
+
+	// UnconvergedRules names the rules still proposing on the pass that exhausted the budget.
+	//
+	// The file is the symptom and the rule is the defect. A rule proposing a fix that does not
+	// silence its own finding will be re-proposed every pass until the ceiling, so naming the file
+	// alone sends a reader to look at code that is not wrong. Empty whenever Converged is true.
+	UnconvergedRules []string
 
 	// Transformed is whether the whole-text transform changed anything after the fixes converged.
 	//
@@ -113,6 +120,10 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 
 	current := text
 
+	// lastProposals holds the most recent pass's proposals so that a run which exhausts the budget
+	// can name the rules still proposing at the ceiling rather than only the file they landed on.
+	lastProposals := []Proposal{}
+
 	for pass := 1; pass <= maxPasses; pass++ {
 		result.Passes = pass
 
@@ -120,6 +131,7 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 		if err != nil {
 			return result, fmt.Errorf("collecting fixes for %s on pass %d: %w", fileName, pass, err)
 		}
+		lastProposals = proposals
 		if len(proposals) == 0 {
 			result.Converged = true
 			break
@@ -156,16 +168,50 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 	}
 
 	if !result.Converged {
-		// The budget ran out with work still landing. The text is the last pass that parsed, which is
-		// a valid file — just not a finished one.
+		// The budget ran out with work still landing, so the whole run is discarded and the file is
+		// left as it was found.
+		//
+		// The earlier behavior kept the last pass that parsed, on the reasoning that it was a valid
+		// file. Parsing is not the same property as being finished: a rule that does not silence its
+		// own finding gets applied once per pass, and ten passes of a brace-wrapping fix produce
+		// `{ { { { ... } } } }`, which parses cleanly and is nobody's code. Valid was carrying the
+		// weight of acceptable.
+		//
+		// The failure directions are not symmetric, which is what decides it. Refusing costs a run
+		// where autofix did nothing and said why. Writing costs a developer a file worse than they
+		// left it, carrying a rejection line beside it that a hurried review passes over — and a
+		// mangled file that parses survives review far more easily than an unfixed one does.
 		result.Rejected = append(result.Rejected, Rejection{
 			Proposal: Proposal{RuleName: "fix-engine"},
 			Reason:   fmt.Sprintf("%s (%d passes)", ReasonPassesReached, maxPasses),
 		})
+		result.UnconvergedRules = ruleNamesOf(lastProposals)
+		result.Applied = nil
+		result.Changed = false
+		result.Text = text
+		return result, nil
 	}
 
 	result.Text = current
 	return result, nil
+}
+
+// ruleNamesOf reduces proposals to the distinct rules behind them, in first-seen order.
+//
+// Order is deterministic rather than sorted so the rule that proposed first is named first, which
+// is usually the one a reader wants. Distinct because a rule proposing forty fixes on the final
+// pass is one broken rule, not forty.
+func ruleNamesOf(proposals []Proposal) []string {
+	seen := map[string]bool{}
+	names := []string{}
+	for _, proposal := range proposals {
+		if seen[proposal.RuleName] {
+			continue
+		}
+		seen[proposal.RuleName] = true
+		names = append(names, proposal.RuleName)
+	}
+	return names
 }
 
 // FixFile drives a file to a fixpoint and writes it, atomically, only if something landed.
@@ -350,7 +396,17 @@ type Summary struct {
 
 	// FilesNotConverged names the files that hit the pass ceiling. Named rather than counted,
 	// because the answer to "which file needed ten passes" is the only useful next step.
+	//
+	// A file here was left untouched on disk. Hitting the ceiling discards the run for that file.
 	FilesNotConverged []string
+
+	// UnconvergedRules names every rule still proposing when some file hit the ceiling, distinct
+	// across the run.
+	//
+	// This is the actionable half and the file list is not: a rule whose fix does not silence its
+	// own finding will do it on every file it matches, so a reader given only filenames goes and
+	// reads code that is not the problem.
+	UnconvergedRules []string
 
 	// FilesRefused names the files where a pass was discarded because the rewrite did not parse.
 	// These are the interesting failures: a rule proposed something that looked fine and was not.
@@ -375,6 +431,8 @@ func Summarize(results []FileResult) Summary {
 		TransformSkipReasons: map[string]int{},
 	}
 
+	unconvergedRuleSeen := map[string]bool{}
+
 	for _, result := range results {
 		summary.FilesConsidered++
 		if result.Changed {
@@ -396,6 +454,12 @@ func Summarize(results []FileResult) Summary {
 		} else if !result.Converged {
 			// Only a file that actually entered the loop can be said to have not converged.
 			summary.FilesNotConverged = append(summary.FilesNotConverged, result.FileName)
+			for _, ruleName := range result.UnconvergedRules {
+				if !unconvergedRuleSeen[ruleName] {
+					unconvergedRuleSeen[ruleName] = true
+					summary.UnconvergedRules = append(summary.UnconvergedRules, ruleName)
+				}
+			}
 		}
 
 		refusedHere := false

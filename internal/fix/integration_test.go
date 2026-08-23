@@ -291,3 +291,121 @@ func TestARuleProposingBrokenSyntaxIsRefused(t *testing.T) {
 		t.Fatalf("no parse-failure refusal was recorded: %+v", result.Rejected)
 	}
 }
+
+// nonSilencingRule wraps a case clause's statements in braces and never stops proposing it.
+//
+// This is the shape a real rule takes when its fix does not silence its own finding: the finding is
+// re-reported against the rewritten text every pass, so the fix lands again, and again, until the
+// budget runs out. It is written as a probe rather than found in the catalog because no shipped rule
+// does this today — every ReportNodeWithFixes site emits one fix that removes its own trigger. The
+// guard is worth having precisely because it is unreachable now: it costs nothing today and the
+// first rule to get this wrong will be caught by the engine rather than by a developer reading a
+// file full of nested braces.
+var nonSilencingRule = rule.Rule{
+	Name: "probe-never-silences",
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		return rule.Listeners{
+			ast.KindCaseBlock: func(node *ast.Node) {
+				caseBlock := node.AsCaseBlock()
+				if caseBlock == nil || caseBlock.Clauses == nil {
+					return
+				}
+				for _, clauseNode := range caseBlock.Clauses.Nodes {
+					clause := clauseNode.AsCaseOrDefaultClause()
+					if clause == nil || clause.Statements == nil {
+						continue
+					}
+					statements := clause.Statements.Nodes
+					if len(statements) == 0 {
+						continue
+					}
+					ctx.Report(rule.Diagnostic{
+						Range:      clauseNode.Loc,
+						Message:    rule.Message{Id: "wrap"},
+						SourceFile: ctx.SourceFile,
+						Fixes: []rule.Fix{
+							ctx.InsertBefore(statements[0], "{ "),
+							ctx.InsertAfter(statements[len(statements)-1], " }"),
+						},
+					})
+				}
+			},
+		}
+	},
+}
+
+// A file that exhausts the pass budget is left exactly as it was found.
+//
+// The engine used to keep the last pass that parsed, reasoning that it was a valid file. It is: ten
+// passes of this rule produce `{ { { ... } } }`, which parses and is nobody's code. Parsing and
+// being finished are different properties, and only the first one was ever checked.
+func TestAFileThatDoesNotConvergeIsNotWritten(t *testing.T) {
+	directory := t.TempDir()
+	fileName := filepath.Join(directory, "switch.ts")
+	source := "switch (x) {\n\tcase 1:\n\t\tconst a = 1;\n\t\tbreak;\n}\n"
+
+	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := FixFile(fileName, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.Converged {
+		t.Fatalf("the probe rule cannot converge; the test proves nothing if it did")
+	}
+	if result.Changed {
+		t.Fatalf("a file that never reached a fixpoint was reported as changed")
+	}
+	if len(result.Applied) != 0 {
+		t.Fatalf("fixes from a discarded run were reported as applied: %d", len(result.Applied))
+	}
+
+	onDisk, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(onDisk) != source {
+		t.Fatalf("the file was rewritten:\n  want %q\n  got  %q", source, string(onDisk))
+	}
+	if result.Text != source {
+		t.Fatalf("the result text is not the original:\n  want %q\n  got  %q", source, result.Text)
+	}
+}
+
+// The refusal names the rule that would not settle, not only the file it landed on.
+//
+// A reader handed a filename goes and reads code that is not the problem. The rule is the defect.
+func TestNonConvergenceNamesTheRule(t *testing.T) {
+	source := "switch (x) {\n\tcase 1:\n\t\tconst a = 1;\n\t\tbreak;\n}\n"
+
+	result, err := FixText("switch.ts", source, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.UnconvergedRules) != 1 || result.UnconvergedRules[0] != "probe-never-silences" {
+		t.Fatalf("expected the rule named, got %v", result.UnconvergedRules)
+	}
+
+	// The rejection survives the refusal rather than being replaced by it.
+	found := false
+	for _, rejection := range result.Rejected {
+		if strings.Contains(rejection.Reason, ReasonPassesReached) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the pass-budget rejection was dropped: %+v", result.Rejected)
+	}
+
+	summary := Summarize([]FileResult{result})
+	if len(summary.UnconvergedRules) != 1 || summary.UnconvergedRules[0] != "probe-never-silences" {
+		t.Fatalf("the summary does not name the rule: %v", summary.UnconvergedRules)
+	}
+	if len(summary.FilesNotConverged) != 1 {
+		t.Fatalf("the summary does not name the file: %v", summary.FilesNotConverged)
+	}
+}
