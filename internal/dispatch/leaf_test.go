@@ -12,6 +12,11 @@ import (
 // `internal/rule` is the interface a rule codes against, so depending on it is the entire point.
 var allowedRuleImports = map[string]bool{
 	"github.com/system-inc/verify/internal/rule": true,
+
+	// The generated Tailwind collapse table and its gate. Exact rather than a prefix, because a
+	// prefix without a trailing slash would also admit `internal/tailwindanything`, and one with a
+	// trailing slash matches no package at all when the package is the directory itself.
+	"github.com/system-inc/verify/internal/tailwind": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.
@@ -30,6 +35,13 @@ var allowedRuleImports = map[string]bool{
 // parser and editing one that does not both rebuild in 0.30s warm, and a rule edit stays in the
 // ~1.9s band it was in before the import existed. Editing the parser itself costs 3.24s, which is
 // the real depth cost and is paid by whoever edits the parser rather than by rule authors.
+//
+// `internal/tailwind/` is the generated collapse table and its gate. It is regenerated when Tailwind
+// releases and at no other time, which is the movement property this list is about rather than an
+// exception to it. Measured on 2026-08-23, three warm rounds each: editing a tailwind rule that
+// imports it rebuilds in 0.06s against 0.07s for a rule that imports nothing, which is noise. Editing
+// the table itself costs 1.34s for a full binary rebuild, and that is paid by whoever regenerates it
+// rather than by rule authors, which is the same shape as the regex parser above.
 //
 // Widened from `ecmascript/` to `utils/` on 2026-08-23, when the first lift out of a rule package
 // landed and this guard refused it. `jsx/` is our own code rather than vendored, which looked like
