@@ -409,3 +409,71 @@ func TestNonConvergenceNamesTheRule(t *testing.T) {
 		t.Fatalf("the summary does not name the file: %v", summary.FilesNotConverged)
 	}
 }
+
+// siblingOverlapRule reports one diagnostic whose two fixes overlap each other.
+//
+// This is the constructed case for the last unobserved half of the fix contract. ProposalsFrom
+// flattens a diagnostic's fixes into independent proposals, so overlap resolution judges siblings
+// the same way it judges rivals. Nothing shipped can reach this: every ReportNodeWithFixes site
+// emits exactly one fix. It is built because the alternative is a documented property nobody has
+// watched happen, and a property stated by code and never observed is a claim, not a guarantee.
+var siblingOverlapRule = rule.Rule{
+	Name: "probe-sibling-overlap",
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		return rule.Listeners{
+			ast.KindStringLiteral: func(node *ast.Node) {
+				start, end := node.Loc.Pos(), node.Loc.End()
+				ctx.Report(rule.Diagnostic{
+					Range:      node.Loc,
+					Message:    rule.Message{Id: "sib"},
+					SourceFile: ctx.SourceFile,
+					Fixes: []rule.Fix{
+						rule.ReplaceRange(ctx.SourceFile.Loc.WithPos(start).WithEnd(end), `"A"`),
+						rule.ReplaceRange(ctx.SourceFile.Loc.WithPos(start+1).WithEnd(end), `B"`),
+					},
+				})
+			},
+		}
+	},
+}
+
+// Two fixes from one diagnostic are judged separately, and one can land while its sibling is refused.
+//
+// The engine documents this at ProposalsFrom and resolveOverlaps; this is the observation. The file
+// is written with half of an edit that no rule proposed as a whole, and it parses, so the refusal
+// guard has no reason to fire. That combination is the reason the multi-fix hazard is worth a
+// warning rather than a shrug: the failure is silent by construction.
+func TestSiblingFixesFromOneDiagnosticHalfApply(t *testing.T) {
+	source := "const a = \"xy\";\n"
+
+	result, err := FixText("p.ts", source, proposeFromRules(siblingOverlapRule), DefaultMaxPasses)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Applied) != 1 {
+		t.Fatalf("expected exactly one sibling to land, got %d", len(result.Applied))
+	}
+
+	refusedAsOverlap := 0
+	for _, rejection := range result.Rejected {
+		if strings.Contains(rejection.Reason, ReasonOverlap) {
+			refusedAsOverlap++
+		}
+	}
+	if refusedAsOverlap == 0 {
+		t.Fatalf("no sibling was refused as an overlap: %+v", result.Rejected)
+	}
+
+	if !strings.Contains(result.Text, `"A"`) {
+		t.Fatalf("the surviving half did not land: %q", result.Text)
+	}
+	if strings.Contains(result.Text, `B"`) {
+		t.Fatalf("both siblings landed, so this no longer tests a half-application: %q", result.Text)
+	}
+
+	// The half that survived leaves valid syntax, which is exactly why the parse guard cannot help.
+	if parses, reason := Parses("p.ts", result.Text); !parses {
+		t.Fatalf("expected the half-applied result to parse, got %s", reason)
+	}
+}
