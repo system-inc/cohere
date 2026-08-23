@@ -502,11 +502,37 @@ func printRuleCoverage(rules []rule.Rule, coverage program.Coverage) {
 // shape as the rules it guards: a check nobody has proven can fail.
 func writeRuleCoverage(out io.Writer, rules []rule.Rule, coverage program.Coverage) {
 	silent := []string{}
+	watchedAndQuiet := 0
 	for _, subject := range rules {
 		if coverage.RulesListening[subject.Name] == 0 {
 			silent = append(silent, subject.Name)
+			continue
+		}
+		if coverage.RulesReporting[subject.Name] == 0 {
+			watchedAndQuiet++
 		}
 	}
+
+	// A rule that listened to thousands of files and reported nothing is the third case, and it was
+	// invisible until now. The two above are about wiring: nothing offered it files, or it declined
+	// the ones it got. This one looked at real code and had nothing to say, which is either a clean
+	// tree or a rule that cannot see.
+	//
+	// Counted rather than named. On this tree it is 69 of 79 rules, and printing 69 names every run
+	// would bury the two lines above it that a reader must act on. The count is the honest summary:
+	// most of what verify checked was checked against code that already satisfies it, and a reader
+	// deciding whether a zero means anything needs to know how much of the zero is this.
+	//
+	// Two false positives shipped past a full fixture pair tonight and were caught only by running
+	// against the tree. That check was a habit rather than a line of output, and a habit is not a
+	// guard. This is the smallest version of it that survives being forgotten.
+	if watchedAndQuiet > 0 {
+		fmt.Fprintf(out,
+			"  note: %d rules watched files and reported nothing — a clean tree and a rule that cannot see look identical here\n",
+			watchedAndQuiet,
+		)
+	}
+
 	if len(silent) == 0 {
 		return
 	}

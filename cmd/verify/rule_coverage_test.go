@@ -54,15 +54,65 @@ func TestCoverageNoteSeparatesUnwiredFromSatisfied(t *testing.T) {
 // Without this the note could satisfy the test above by naming every rule, which is the
 // flags-everything failure that makes a detector useless in the opposite direction.
 func TestCoverageNoteSaysNothingAboutARuleThatListened(t *testing.T) {
+	// The rule reports findings as well as listening. Leaving RulesReporting empty would make this
+	// a rule that watched and found nothing, which is a real third case with its own line, and the
+	// claim here is narrower: a rule doing its job is not named.
 	rules := []rule.Rule{{Name: "working-rule"}}
 	coverage := program.Coverage{
 		RulesOffered:   map[string]int{"working-rule": 3407},
 		RulesListening: map[string]int{"working-rule": 412},
+		RulesReporting: map[string]int{"working-rule": 7},
 	}
 
 	var out strings.Builder
 	writeRuleCoverage(&out, rules, coverage)
 	if out.String() != "" {
 		t.Fatalf("a rule that listened to files was named in the coverage note: %q", out.String())
+	}
+}
+
+// A rule that watched files and reported nothing is the third case, and it was invisible.
+//
+// The two cases above it are about wiring: nothing offered the rule files, or it declined the ones
+// it got. This one looked at real code and had nothing to say, which is either a clean tree or a
+// rule that cannot see. Two false positives shipped past a full fixture pair tonight and were caught
+// only by running against the tree, so the distinction is worth a line of output rather than a habit.
+func TestARuleThatWatchedAndFoundNothingIsCounted(t *testing.T) {
+	rules := []rule.Rule{{Name: "watched-and-quiet"}, {Name: "found-something"}}
+	coverage := program.Coverage{
+		RulesOffered:   map[string]int{"watched-and-quiet": 3407, "found-something": 3407},
+		RulesListening: map[string]int{"watched-and-quiet": 3407, "found-something": 3407},
+		RulesReporting: map[string]int{"found-something": 12},
+	}
+
+	var out strings.Builder
+	writeRuleCoverage(&out, rules, coverage)
+
+	if !strings.Contains(out.String(), "1 rules watched files and reported nothing") {
+		t.Fatalf("a rule that watched and reported nothing was not counted:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "watched-and-quiet was offered no files") {
+		t.Errorf("a rule that listened was described as unwired:\n%s", out.String())
+	}
+}
+
+// The other direction: a run where every rule reported something says nothing about this case.
+//
+// Without it, a counter that incremented unconditionally would pass the test above while claiming
+// every rule was quiet, which is worse than not counting: it would tell a reader to distrust a run
+// that had nothing wrong with it.
+func TestARunWhereEveryRuleReportedCountsNoQuietRules(t *testing.T) {
+	rules := []rule.Rule{{Name: "found-something"}}
+	coverage := program.Coverage{
+		RulesOffered:   map[string]int{"found-something": 3407},
+		RulesListening: map[string]int{"found-something": 3407},
+		RulesReporting: map[string]int{"found-something": 12},
+	}
+
+	var out strings.Builder
+	writeRuleCoverage(&out, rules, coverage)
+
+	if strings.Contains(out.String(), "watched files and reported nothing") {
+		t.Errorf("a run where every rule reported claimed a quiet rule:\n%s", out.String())
 	}
 }

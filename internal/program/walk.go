@@ -47,6 +47,15 @@ type Coverage struct {
 	// and "never actually looked" — the distinction a bare finding count erases.
 	RulesListening map[string]int
 
+	// RulesReporting counts, per rule name, how many findings that rule produced.
+	//
+	// Listening and reporting are different questions and only together do they say what a zero
+	// means. A rule that listened to no files never looked. A rule that listened to thousands and
+	// reported nothing looked at real code and had nothing to say, which is either a clean tree or a
+	// rule that cannot see. Two false positives shipped past a full fixture pair and were caught
+	// only by running against the tree, so the distinction is worth a counter rather than a habit.
+	RulesReporting map[string]int
+
 	// Suppressed is how many findings a disable comment withheld.
 	//
 	// This is the coverage discipline pointed the other way. Coverage stops a run that checked
@@ -146,6 +155,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	var mutex sync.Mutex
 	diagnostics := []rule.Diagnostic{}
 	listeningCounts := make(map[string]int, len(rules))
+	reportingCounts := make(map[string]int, len(rules))
 	offeredCounts := make(map[string]int, len(rules))
 	nodesVisited := 0
 	suppressed := suppressionTally{}
@@ -177,6 +187,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 			localDiagnostics := []rule.Diagnostic{}
 			localListening := make(map[string]int, len(rules))
+			localReporting := make(map[string]int, len(rules))
 			localOffered := make(map[string]int, len(rules))
 			localNodes := 0
 			localSuppressed := suppressionTally{}
@@ -220,6 +231,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// another rule's name even by accident.
 				visited, silenced, crashed := dispatchFileSafely(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
+					localReporting[diagnostic.RuleName]++
 				}, applicable, g, fileChecker, localListening, localOffered, ruleOptions, localTimings)
 
 				release()
@@ -250,6 +262,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			}
 			for name, count := range localListening {
 				listeningCounts[name] += count
+			}
+			for name, count := range localReporting {
+				reportingCounts[name] += count
 			}
 			nodesVisited += localNodes
 			suppressed.add(localSuppressed)
@@ -284,6 +299,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			RulesRun:       len(rules),
 			RulesOffered:   offeredCounts,
 			RulesListening: listeningCounts,
+			RulesReporting: reportingCounts,
 
 			Suppressed:                      suppressed.applied,
 			SuppressedWithoutReason:         suppressed.appliedNoReason,
