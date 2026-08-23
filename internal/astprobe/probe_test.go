@@ -17,6 +17,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1063,4 +1064,135 @@ func TestProbeGraphSplit(t *testing.T) {
 			ratio, parseMilliseconds, parseMilliseconds/ratio, saved)
 	}
 	fmt.Printf("\n")
+}
+
+// TestProbeParallelParse settles the caveat that #8fbvwnz's saving currently rests on.
+//
+// TestProbeGraphSplit parses single-threaded and finds 308ms, 58% of the 528ms graph phase.
+// But program construction parses across goroutines interleaved with resolution, so some of
+// that parse time is already overlapped with work a cache does not remove. A cache cannot
+// recover wall-clock the parser was not spending in the first place.
+//
+// So the honest question is not "what does parsing cost" but "what does parsing cost when
+// parallelized the way the compiler parallelizes it". That is the number a cache competes
+// against, and if it is much smaller than 308ms, the saving shrinks with it.
+func TestProbeParallelParse(t *testing.T) {
+	buildInfoPath := "/Users/kirkouimet/Projects/ahra/.cache/ts/tsconfig.tsbuildinfo"
+	raw, err := os.ReadFile(buildInfoPath)
+	if err != nil {
+		t.Skipf("no buildinfo to enumerate the program: %v", err)
+	}
+
+	var buildInfo struct {
+		FileNames []string `json:"fileNames"`
+	}
+	if err := json.Unmarshal(raw, &buildInfo); err != nil {
+		t.Fatalf("parse buildinfo: %v", err)
+	}
+
+	buildInfoDirectory := "/Users/kirkouimet/Projects/ahra/.cache/ts"
+	type loaded struct {
+		path string
+		text string
+	}
+	files := make([]loaded, 0, len(buildInfo.FileNames))
+	for _, name := range buildInfo.FileNames {
+		path := name
+		if !strings.HasPrefix(path, "/") {
+			path = tspath.NormalizePath(buildInfoDirectory + "/" + name)
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		files = append(files, loaded{path: path, text: string(content)})
+	}
+	if len(files) < len(buildInfo.FileNames)*9/10 {
+		t.Fatalf("only %d of %d files readable; wrong population", len(files), len(buildInfo.FileNames))
+	}
+
+	scriptKindFor := func(fileName string) core.ScriptKind {
+		switch {
+		case strings.HasSuffix(fileName, ".tsx"):
+			return core.ScriptKindTSX
+		case strings.HasSuffix(fileName, ".jsx"):
+			return core.ScriptKindJSX
+		case strings.HasSuffix(fileName, ".js"), strings.HasSuffix(fileName, ".mjs"):
+			return core.ScriptKindJS
+		case strings.HasSuffix(fileName, ".json"):
+			return core.ScriptKindJSON
+		}
+		return core.ScriptKindTS
+	}
+
+	parseAll := func(workers int) time.Duration {
+		runtime.GC()
+		start := time.Now()
+		queue := make(chan loaded, len(files))
+		for _, file := range files {
+			queue <- file
+		}
+		close(queue)
+
+		var waitGroup sync.WaitGroup
+		for worker := 0; worker < workers; worker++ {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				for file := range queue {
+					fileName := tspath.NormalizePath(file.path)
+					parser.ParseSourceFile(ast.SourceFileParseOptions{
+						FileName: fileName,
+						Path:     tspath.Path(fileName),
+					}, file.text, scriptKindFor(fileName))
+				}
+			}()
+		}
+		waitGroup.Wait()
+		return time.Since(start)
+	}
+
+	const parallelRuns = 3
+	fmt.Printf("\n=== #8fbvwnz: parse cost when parallelized ===\n")
+	fmt.Printf("files %d, cores %d\n\n", len(files), runtime.NumCPU())
+	fmt.Printf("%8s %12s\n", "workers", "median ms")
+
+	results := map[int]time.Duration{}
+	for _, workers := range []int{1, 2, 4, 8, runtime.NumCPU()} {
+		if _, seen := results[workers]; seen {
+			continue
+		}
+		var timings []time.Duration
+		for run := 0; run < parallelRuns; run++ {
+			timings = append(timings, parseAll(workers))
+		}
+		results[workers] = median(timings)
+		fmt.Printf("%8d %12.0f\n", workers, float64(median(timings).Microseconds())/1000)
+	}
+
+	best := results[runtime.NumCPU()]
+	for _, duration := range results {
+		if duration < best {
+			best = duration
+		}
+	}
+	bestMilliseconds := float64(best.Microseconds()) / 1000
+
+	const measuredGraphMilliseconds = 528.0
+	fmt.Printf("\nbest parallel parse   %.0f ms  (%.0f%% of the %.0fms graph phase)\n",
+		bestMilliseconds, 100*bestMilliseconds/measuredGraphMilliseconds, measuredGraphMilliseconds)
+	fmt.Printf("\nthis is what an AST cache actually competes against, since the compiler\n")
+	fmt.Printf("parses in parallel too. saving at the measured read ratios:\n\n")
+	for _, ratio := range []float64{2.25, 3.0, 5.2} {
+		fmt.Printf("  at %.2fx read: %.0fms becomes %.0fms, saves %.0fms\n",
+			ratio, bestMilliseconds, bestMilliseconds/ratio, bestMilliseconds-bestMilliseconds/ratio)
+	}
+	fmt.Printf("\nthe cache read parallelizes too, so these assume it gets the same treatment.\n\n")
+
+	// A parallel run that is not faster than single-threaded means the harness is serializing
+	// something, and every conclusion drawn from it would be wrong in the cache's favor.
+	if results[1] > 0 && best >= results[1] {
+		t.Fatalf("parallel parse (%v best) was not faster than single-threaded (%v); "+
+			"the harness is serializing and this measurement cannot be trusted", best, results[1])
+	}
 }
