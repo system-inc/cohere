@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/utils/ecmascript/module"
+	"github.com/system-inc/verify/internal/utils/jsx"
 )
 
 // messageForbiddenThemeValue names the value, the component, and what is allowed instead.
@@ -174,15 +175,10 @@ func jsxElementNameOf(attribute *ast.Node) string {
 		return ""
 	}
 
-	var tagName *ast.Node
-	switch element.Kind {
-	case ast.KindJsxSelfClosingElement:
-		tagName = element.AsJsxSelfClosingElement().TagName
-	case ast.KindJsxOpeningElement:
-		tagName = element.AsJsxOpeningElement().TagName
-	default:
-		return ""
-	}
+	// The two-kind split is `jsx.ElementParts`, which answers nil for anything that is not an
+	// element and so subsumes the default arm this used to spell out. What stays local is the walk
+	// upward from an attribute, which the shelf does not do and which only this rule wants.
+	tagName, _ := jsx.ElementParts(element)
 	if tagName == nil || tagName.Kind != ast.KindIdentifier {
 		return ""
 	}
