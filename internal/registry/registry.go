@@ -22,6 +22,7 @@ import (
 func All() []rule.Rule {
 	return []rule.Rule{
 		core.NoCaseDeclarations,
+		core.NoCompareNegZero,
 		core.NoDuplicateCase,
 		core.NoUselessCatch,
 		nexus.BoundaryNoInternalImport,
