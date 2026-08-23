@@ -622,3 +622,45 @@ func TestTheTwoMatchersAnswerDifferentQuestions(t *testing.T) {
 		t.Fatal("markPlantedDifferences must claim any finding in a planted file, whatever rule produced it")
 	}
 }
+
+// A local build's own disclaimer must travel with its commit.
+//
+// `verify -version` states, in a `note:` line, that a local build's rules are whatever was on disk
+// when it compiled. Carrying only the commit is worse than carrying nothing: the sha is real, it
+// resolves, and it reads as provenance while saying nothing about uncommitted rules linked in
+// beside it.
+//
+// Three people quoted a rule count from a dev build in one night, each correct about the binary and
+// wrong about what they said it measured, with this note one command away from every invocation
+// they made. A disclosure that has to be sought is a disclosure that gets skipped.
+func TestALocalBuildCarriesItsOwnDisclaimer(t *testing.T) {
+	local := versionLineFrom(
+		"verify dev\n" +
+			"  platform:       darwin/arm64\n" +
+			"  compiler:       unknown (built from verify ad96b871c377)\n" +
+			"  note:           a local build, so the rules are whatever was on disk when it was compiled\n",
+	)
+
+	if !strings.Contains(local, "ad96b871c377") {
+		t.Fatalf("the commit must survive, got %q", local)
+	}
+	if !strings.Contains(local, "whatever was on disk") {
+		t.Fatalf("a local build's disclaimer must travel with its commit, got %q", local)
+	}
+
+	// A build with a commit and no note carries the commit alone rather than inventing a
+	// qualification, so the disclaimer means something when it does appear.
+	quiet := versionLineFrom("verify 1.4.0\n  compiler: unknown (built from verify 107d82cf8568)\n")
+	if !strings.Contains(quiet, "107d82cf8568") {
+		t.Fatalf("the commit must survive without a note, got %q", quiet)
+	}
+	if strings.Contains(quiet, "whatever was on disk") {
+		t.Fatalf("a build that made no such claim must not be given one, got %q", quiet)
+	}
+
+	// A release build naming no commit still falls back to its version line.
+	release := versionLineFrom("verify 1.4.0\n  platform: darwin/arm64\n")
+	if release != "verify 1.4.0" {
+		t.Fatalf("a release build must fall back to its version line, got %q", release)
+	}
+}

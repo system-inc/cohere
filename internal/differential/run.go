@@ -609,10 +609,34 @@ func verifyVersionOf(ctx context.Context, command GateCommand) string {
 // The commit is what identifies which rules are compiled in, so the line naming it is what is kept.
 func versionLineFrom(output string) string {
 	lines := strings.Split(output, "\n")
+
+	commit := ""
+	note := ""
 	for _, line := range lines {
-		if trimmed := strings.TrimSpace(line); strings.Contains(trimmed, "built from") {
-			return trimmed
+		trimmed := strings.TrimSpace(line)
+		if commit == "" && strings.Contains(trimmed, "built from") {
+			commit = trimmed
+			continue
 		}
+		// A local build says so, in a `note:` line stating that its rules are whatever was on disk
+		// when it compiled. That qualification has to travel with the commit, because the commit
+		// alone reads as provenance: it is a real sha, it resolves, and it says nothing about the
+		// uncommitted rules that may have been linked in beside it.
+		//
+		// Three people quoted a rule count from a dev build in one night, each correct about the
+		// binary and wrong about what they said it measured, with this note one command away from
+		// every invocation they made. A disclosure that has to be sought is a disclosure that gets
+		// skipped, so it is carried rather than left to be looked up.
+		if note == "" && strings.HasPrefix(trimmed, "note:") {
+			note = strings.TrimSpace(strings.TrimPrefix(trimmed, "note:"))
+		}
+	}
+
+	if commit != "" {
+		if note != "" {
+			return commit + " — " + note
+		}
+		return commit
 	}
 
 	// A release build states its version on the first line instead of naming a commit, so that is
