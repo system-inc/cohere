@@ -35,6 +35,12 @@ func TestTableContainsTheKnownFamilies(t *testing.T) {
 		// A family this codebase has never written, which is the point of enumerating from the
 		// registry rather than from the corpus. A corpus-derived table missed every scroll family.
 		{First: "scroll-px", Second: "scroll-py", Output: "scroll-p"},
+		// A named scale rather than a numeric one. The generator probed only `4` and `2` at first,
+		// so every rounded family was absent: a root whose values the probe cannot express reports
+		// as having no families, which reads exactly like a root that has none. Found by diffing
+		// the table against the engine over the real corpus, not by a test.
+		{First: "rounded-tl", Second: "rounded-tr", Output: "rounded-t"},
+		{First: "rounded-bl", Second: "rounded-br", Output: "rounded-b"},
 		// Recursion: `mx + my => m` only completes a four-class collapse when `mb + mt => my` and
 		// `ml + mr => mx` are also present, so all three are required together.
 		{First: "mb", Second: "mt", Output: "my"},

@@ -156,14 +156,19 @@ for (const entry of designSystem.getClassList?.() ?? []) {
 const roots = Array.from(functionalRoots).sort();
 
 /*
- * The probe value.
+ * The probe values.
  *
- * Families are value-independent, verified across `0`, `1`, `2`, `4`, `8` and `px`, so one value is
- * enough to discover a family. `4` is used because it exists in the default spacing scale for every
- * spacing-like root; a root whose scale lacks it simply produces no collapse at that value and is
- * caught by the second value below.
+ * Families are value-independent, verified across `0`, `1`, `2`, `4`, `8` and `px`, so one value a
+ * root accepts is enough to discover its family. The catch is that not every root accepts the same
+ * kind of value, and a probe list that misses a root's scale silently omits its families.
+ *
+ * `4` and `2` alone left out every `rounded-*` family, because the radius scale is named (`sm`,
+ * `md`, `lg`) rather than numeric. That was found by diffing the table against the engine over the
+ * real corpus, where `rounded-tl-md + rounded-tr-md => rounded-t-md` is a genuine finding the table
+ * could not reach. A generator whose probe cannot express a root's values reports that root as
+ * having no families, which reads exactly like a root that has none.
  */
-const probeValues = ['4', '2'];
+const probeValues = ['4', '2', 'md', 'sm', 'lg', 'full', 'px'];
 
 /*
  * Whether a class rewrites on its own, with no second class involved.
