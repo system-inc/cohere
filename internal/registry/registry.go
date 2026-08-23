@@ -27,6 +27,7 @@ func All() []rule.Rule {
 		nexus.ConsistencyNoSingleLineJsDoc,
 		nexus.ConsistencyNoStutteringName,
 		nexus.ConsistencyNoUtilsFolder,
+		nexus.ConsistencyRequireTypeSuffix,
 		nexus.ImportRequireNodeNamespace,
 	}
 }
