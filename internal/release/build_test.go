@@ -2,6 +2,7 @@ package release
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -113,4 +114,55 @@ func writeFakeExecutable(t *testing.T, magic []byte) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(t *testing.T) {
+	// Every other test of this table builds its fixtures out of the table, so they pass for any
+	// value in it, including a wrong one. That is the shape where a corpus encodes a misreading:
+	// the suite agrees with the belief that produced it and never touches the thing the belief is
+	// about.
+	//
+	// So this compiles a real program for each operating system we ship and reads the bytes Go
+	// actually wrote. About two seconds for three platforms, which is the entire cost of anchoring
+	// the last constant in this package to something outside it.
+	if testing.Short() {
+		t.Skip("cross-compiles three binaries")
+	}
+
+	directory := t.TempDir()
+	writeFile(t, filepath.Join(directory, "go.mod"), "module magiccheck\n\ngo 1.27\n")
+	writeFile(t, filepath.Join(directory, "main.go"), "package main\n\nfunc main() {}\n")
+
+	// One architecture per operating system: the magic is keyed by GOOS, and this asserts exactly
+	// that scope rather than implying it covers architecture too.
+	for _, target := range []Target{
+		{GoOperatingSystem: "darwin", GoArchitecture: "arm64"},
+		{GoOperatingSystem: "linux", GoArchitecture: "amd64"},
+		{GoOperatingSystem: "windows", GoArchitecture: "amd64"},
+	} {
+		path := filepath.Join(directory, "out-"+target.GoOperatingSystem)
+
+		command := exec.Command("go", "build", "-o", path, ".")
+		command.Dir = directory
+		command.Env = append(os.Environ(),
+			"GOOS="+target.GoOperatingSystem,
+			"GOARCH="+target.GoArchitecture,
+			"CGO_ENABLED=0",
+		)
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("cross-compiling for %s: %v\n%s", target, err, output)
+		}
+
+		if _, err := verifyBinaryFormatOnly(path, target); err != nil {
+			t.Errorf("the magic table rejects a binary Go actually produced for %s: %v", target, err)
+		}
+	}
+}
+
+// verifyBinaryFormatOnly runs the format check without the size floor.
+//
+// A hello-world binary is well under a megabyte, so `verifyBinary` would refuse it for a reason
+// that has nothing to do with what this test is asking.
+func verifyBinaryFormatOnly(path string, target Target) (int64, error) {
+	return 0, requireExecutableFormat(path, target)
 }
