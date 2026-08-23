@@ -291,3 +291,34 @@ func TestLocalizationNoUntranslatedValueProposesNoFix(t *testing.T) {
 		t.Fatalf("expected no suggestions, got %d", len(result.Diagnostics[0].Suggestions))
 	}
 }
+
+// A file outside a translations directory is declined before any node is visited, and until now
+// nothing measured that.
+//
+// Every other fixture in this file sits under a translations path, so the cheapest and most
+// load-bearing guard in the rule was never exercised: making `isTranslationFile` always true left
+// the whole suite green. That guard is what keeps this rule free on the 3,400 files that are not
+// locale data, and a rule that started walking every file in the tree would have looked exactly like
+// this from the outside.
+//
+// The shape generalizes past this rule. 32 of the rules in this repository return early before
+// returning any listener, and each of those guards can silence every fixture written for the
+// behavior behind it. A sweep that returns several survivors at once is the tell: individually they
+// read as several gaps, and they are usually one guard upstream of all of them.
+func TestLocalizationNoUntranslatedValueDeclinesOrdinaryFiles(t *testing.T) {
+	// The subject sits outside any translations directory and carries a value identical to the
+	// English one, so the only reason it reports nothing is the path guard. Placing it inside
+	// `translations/` would make it a locale file by the rule's own definition, which is what the
+	// guard is deciding and not something a fixture gets to assume away.
+	// An English sibling sits beside the subject, so a bypassed path guard would find one and fire.
+	// Without it the run stops at the next guard instead and the clean result would say nothing:
+	// measured by making `isTranslationFile` always true and watching this test still pass, which is
+	// the dead fixture it exists to rule out.
+	result := runOnTranslations(t, map[string]string{
+		"translations/en.ts": englishTranslations,
+		"app/en.ts":          englishTranslations,
+		"app/Probe.ts":       "export default {\n    Greeting: 'Hello there',\n};\n",
+	}, "app/Probe.ts")
+
+	ruletest.ExpectClean(t, result)
+}
