@@ -36,7 +36,16 @@ var messageMissingYield = rule.Message{
 // at every function boundary. That is the whole subtlety here, and a walk that descended would call
 // an empty generator satisfied by a yield it does not own.
 //
-// An empty body is reported. `function* generate() {}` yields nothing and is the clearest case.
+// An empty body is deliberately not reported, matching ESLint, whose implementation reads
+// `countYield === 0 && node.body.body.length > 0`. I had this backwards and shipped it that way for
+// eight minutes: an empty body looked like the clearest case rather than an exemption.
+//
+// The tree taught me otherwise. `const generatorFunction = function*() {}.constructor` reaches the
+// GeneratorFunction constructor, and an empty body is exactly right there, since the function is
+// never called and exists only to be reflected on. That is one real occurrence on this tree and the
+// only finding my version produced, so the exemption is not theoretical: an empty generator is
+// almost always a placeholder or a reflection trick rather than a mistake, while a generator with
+// statements and no yield is a function someone wrote and forgot to finish.
 //
 // No fix. The two repairs are removing the asterisk and adding a yield, and those produce different
 // functions.
@@ -47,6 +56,14 @@ var RequireYield = rule.Rule{
 			if asteriskToken == nil || body == nil {
 				return
 			}
+
+			// An empty body is exempt, matching ESLint. A generator with no statements yields
+			// nothing by construction and is a placeholder or a reflection trick rather than an
+			// unfinished function.
+			if body.Kind == ast.KindBlock && len(body.AsBlock().Statements.Nodes) == 0 {
+				return
+			}
+
 			if bodyContainsYield(body) {
 				return
 			}

@@ -20,7 +20,6 @@ func TestRequireYieldFires(t *testing.T) {
 		{"a class method", "export class Thing {\n    *generate() {\n        return 1;\n    }\n}\n"},
 		{"an object method shorthand", "export const holder = {\n    *generate() {\n        return 1;\n    },\n};\n"},
 		{"a static method", "export class Thing {\n    static *generate() {\n        return 1;\n    }\n}\n"},
-		{"an empty body", "export function* generate() {}\n"},
 		// The subtlety. A yield inside a nested function belongs to that function, so it must not
 		// satisfy the outer generator. A walk that descended would call this one satisfied.
 		{
@@ -54,6 +53,12 @@ func TestRequireYieldStaysSilent(t *testing.T) {
 		{"a plain function expression", "export const generate = function () {\n    return 1;\n};\n"},
 		{"a plain method", "export class Thing {\n    generate() {\n        return 1;\n    }\n}\n"},
 		{"an arrow function", "export const generate = () => 1;\n"},
+		// An empty body is exempt, matching ESLint's own `node.body.body.length > 0` guard. I had
+		// this in the firing set until the real tree produced the counterexample: the tree holds
+		// `function*() {}.constructor`, which reaches the GeneratorFunction constructor and is
+		// never called, so an empty body is exactly right there.
+		{"an empty generator body", "export function* generate() {}\n"},
+		{"an empty generator method", "export class Thing {\n    *generate() {}\n}\n"},
 		// An overload signature and an ambient declaration have no body to search, so there is
 		// nothing to judge and reading a nil body must not report.
 		{"an ambient generator declaration", "declare function generate(): Generator<number>;\nexport const Use = generate;\n"},
