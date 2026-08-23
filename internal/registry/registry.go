@@ -61,6 +61,7 @@ func All() []rule.Rule {
 		nexus.ImportRequirePathAlias,
 		nexus.LocalizationNoUntranslatedValue,
 		structure.NetworkNoDirectFetch,
+		structure.NetworkNoForbiddenImport,
 		structure.NetworkNoInvalidateCacheInOnSuccess,
 		structure.NetworkNoInvalidateCacheLiteralKey,
 		structure.ReactComponentNoMultiplePrimary,
