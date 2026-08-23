@@ -508,7 +508,17 @@ func writeRuleCoverage(out io.Writer, rules []rule.Rule, coverage program.Covera
 			fmt.Fprintf(out, "  note: rule %s was offered no files — nothing wired it, so its silence says nothing about the tree\n", name)
 			continue
 		}
-		fmt.Fprintf(out, "  note: rule %s declined all %d files it was offered — it ran and looked, and nothing matched\n",
+		// "Registered no listener" rather than "declined", because those are not the same thing and
+		// five rules here prove it. A rule whose whole job is answered from the file itself does all
+		// its work in Run and returns nil: network-require-hook-request-suffix inspects every hook
+		// declaration and reports before returning, and next-require-page-default-export is the same
+		// shape. Both were described by the old sentence as having "ran and looked, and nothing
+		// matched", which is true of the walk and false of the rule.
+		//
+		// The distinction matters because the two readings send a reader to different places. "Nothing
+		// matched" says look at the tree. "Registered no listener" says look at what the rule does,
+		// which for these five is where the answer is.
+		fmt.Fprintf(out, "  note: rule %s registered no listener on any of the %d files it was offered — either nothing matched, or it answered eagerly and had nothing to report\n",
 			name, coverage.RulesOffered[name])
 	}
 }

@@ -28,8 +28,11 @@ func TestCoverageNoteSeparatesUnwiredFromSatisfied(t *testing.T) {
 	writeRuleCoverage(&out, rules, coverage)
 	rendered := out.String()
 
-	if !strings.Contains(rendered, "satisfied-rule declined all 3407 files") {
-		t.Fatalf("a satisfied rule did not report the files it declined:\n%s", rendered)
+	// The sentence says "registered no listener" rather than "declined", because five rules here do
+	// all their work in Run and return nil. For those, "it ran and looked, and nothing matched" is
+	// true of the walk and false of the rule, and the two readings send a reader to different places.
+	if !strings.Contains(rendered, "satisfied-rule registered no listener on any of the 3407 files") {
+		t.Fatalf("a satisfied rule did not report the files it was offered:\n%s", rendered)
 	}
 	if !strings.Contains(rendered, "unwired-rule was offered no files") {
 		t.Fatalf("an unwired rule did not report that nothing wired it:\n%s", rendered)
@@ -40,7 +43,7 @@ func TestCoverageNoteSeparatesUnwiredFromSatisfied(t *testing.T) {
 		if strings.Contains(line, "satisfied-rule") && strings.Contains(line, "offered no files") {
 			t.Fatalf("a satisfied rule was described as unwired: %q", line)
 		}
-		if strings.Contains(line, "unwired-rule") && strings.Contains(line, "declined all") {
+		if strings.Contains(line, "unwired-rule") && strings.Contains(line, "registered no listener") {
 			t.Fatalf("an unwired rule was described as satisfied: %q", line)
 		}
 	}
