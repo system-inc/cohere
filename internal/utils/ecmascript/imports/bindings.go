@@ -101,3 +101,69 @@ func LocalNameOfDefaultImport(node *ast.Node, specifier string) (string, bool) {
 	}
 	return defaultBinding.Text(), true
 }
+
+// LocalNameOfNamedImport returns the local name a file binds one of a module's named exports to.
+//
+// This is the aliasing question, and it is a different question from `LocalNameOfDefaultImport`
+// rather than a variant of it. `import { Head } from 'next/document'` and
+// `import { Head as PageHead } from 'next/document'` bind the same export to two different local
+// names, and a rule matching JSX against the imported spelling reports nothing on the second while
+// looking like it works on the first.
+//
+// Three research passes each reported this as missing from every shelf and two of them proposed
+// building it from scratch. It is instead three lines over `BindingsOf`, which already returns the
+// named specifier nodes precisely because they carry both halves of the alias. Recorded because the
+// reports were right that no such function existed and wrong that the data was not already there,
+// and the next pass to want an import question should read `Bindings` before concluding it is absent.
+//
+// `imported` is the name as the source module exports it, never the local alias. Asking for the
+// local name would make the function a no-op.
+//
+// The returned node is the local binding identifier, which is what a caller matches references
+// against, and it is nil when the import is absent. A specifier with no alias carries its local name
+// in `Name()` and a nil `PropertyName`, so the unaliased form falls out of the same read.
+func LocalNameOfNamedImport(node *ast.Node, specifier string, imported string) *ast.Node {
+	if node == nil || node.Kind != ast.KindImportDeclaration {
+		return nil
+	}
+	declaration := node.AsImportDeclaration()
+	if declaration == nil || declaration.ModuleSpecifier == nil {
+		return nil
+	}
+	if !ast.IsStringLiteralLike(declaration.ModuleSpecifier) {
+		return nil
+	}
+	if declaration.ModuleSpecifier.Text() != specifier {
+		return nil
+	}
+
+	// `Named` is populated only from a `KindNamedImports` element list, so every entry is already an
+	// import specifier. A kind check here reads as defensive and is unreachable: a mutation removing
+	// it changed no fixture, which is how it was found rather than assumed.
+	for _, element := range BindingsOf(node).Named {
+		if ImportedNameOf(element) == imported {
+			return element.Name()
+		}
+	}
+	return nil
+}
+
+// ImportedNameOf returns the name a named-import specifier reads from the source module.
+//
+// The alias lives in `PropertyName` and is nil when there is none, so `{ Head }` and
+// `{ Head as PageHead }` both answer `Head` while their local names differ. Reading `Name()` alone
+// answers `Head` and `PageHead`, which is the mistake this exists to stop: it silently matches the
+// unaliased form and misses the aliased one, and the unaliased form is what every fixture is written
+// with.
+func ImportedNameOf(specifier *ast.Node) string {
+	if specifier == nil || specifier.Kind != ast.KindImportSpecifier {
+		return ""
+	}
+	if propertyName := specifier.PropertyName(); propertyName != nil {
+		return propertyName.Text()
+	}
+	if name := specifier.Name(); name != nil {
+		return name.Text()
+	}
+	return ""
+}

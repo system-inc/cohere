@@ -104,3 +104,124 @@ func TestBindingHelpersSurviveWrongInput(t *testing.T) {
 		t.Fatal("want nil to report nothing found")
 	}
 }
+
+// The aliased form is the whole reason this helper exists, so it is the first case rather than an
+// edge case appended after the happy path.
+//
+// Every fixture upstream writes is unaliased, which means a broken implementation that reads the
+// local name instead of the imported one passes every corpus case and fails only in a real codebase.
+// That asymmetry is why the alias case leads here.
+func TestLocalNameOfNamedImportSeesThroughAnAlias(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+		specifier  string
+		imported   string
+		wantLocal  string
+	}{
+		{
+			name:       "an unaliased named import binds its own name",
+			sourceText: "import { Head } from 'next/document';\n",
+			specifier:  "next/document",
+			imported:   "Head",
+			wantLocal:  "Head",
+		},
+		{
+			name:       "an aliased named import binds the alias",
+			sourceText: "import { Head as PageHead } from 'next/document';\n",
+			specifier:  "next/document",
+			imported:   "Head",
+			wantLocal:  "PageHead",
+		},
+		{
+			name:       "the alias is not matched as if it were the imported name",
+			sourceText: "import { Head as PageHead } from 'next/document';\n",
+			specifier:  "next/document",
+			imported:   "PageHead",
+			wantLocal:  "",
+		},
+		{
+			name:       "one specifier among several",
+			sourceText: "import { Html, Head as PageHead, Main } from 'next/document';\n",
+			specifier:  "next/document",
+			imported:   "Head",
+			wantLocal:  "PageHead",
+		},
+		{
+			name:       "a different module does not answer",
+			sourceText: "import { Head } from 'other/document';\n",
+			specifier:  "next/document",
+			imported:   "Head",
+			wantLocal:  "",
+		},
+		{
+			name:       "a default import is not a named one",
+			sourceText: "import Head from 'next/document';\n",
+			specifier:  "next/document",
+			imported:   "Head",
+			wantLocal:  "",
+		},
+		{
+			name:       "a namespace import is not a named one",
+			sourceText: "import * as Head from 'next/document';\n",
+			specifier:  "next/document",
+			imported:   "Head",
+			wantLocal:  "",
+		},
+		{
+			name:       "a side-effect import binds nothing",
+			sourceText: "import 'next/document';\n",
+			specifier:  "next/document",
+			imported:   "Head",
+			wantLocal:  "",
+		},
+		{
+			name:       "an absent name answers nothing rather than the first specifier",
+			sourceText: "import { Html, Main } from 'next/document';\n",
+			specifier:  "next/document",
+			imported:   "Head",
+			wantLocal:  "",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			found := LocalNameOfNamedImport(
+				firstImport(t, testCase.sourceText), testCase.specifier, testCase.imported)
+
+			if testCase.wantLocal == "" {
+				if found != nil {
+					t.Fatalf("wanted no binding, got %q", found.Text())
+				}
+				return
+			}
+			if found == nil {
+				t.Fatalf("wanted local name %q, got no binding", testCase.wantLocal)
+			}
+			if found.Text() != testCase.wantLocal {
+				t.Fatalf("wanted local name %q, got %q", testCase.wantLocal, found.Text())
+			}
+		})
+	}
+}
+
+// Wrong input answers rather than panics, matching every other helper in this package.
+//
+// A rule reaches these off a listener that fires for one kind, so the nil and wrong-kind paths are
+// unreachable from correct callers and are exactly the ones a refactor breaks silently.
+func TestNamedImportHelpersSurviveWrongInput(t *testing.T) {
+	if local := LocalNameOfNamedImport(nil, "m", "X"); local != nil {
+		t.Fatalf("a nil node answered %v", local)
+	}
+	if imported := ImportedNameOf(nil); imported != "" {
+		t.Fatalf("a nil specifier answered %q", imported)
+	}
+
+	statement := firstImport(t, "const value = 1;\n")
+	if local := LocalNameOfNamedImport(statement, "m", "X"); local != nil {
+		t.Fatalf("a non-import statement answered %v", local)
+	}
+	if imported := ImportedNameOf(statement); imported != "" {
+		t.Fatalf("a non-specifier node answered %q", imported)
+	}
+}
