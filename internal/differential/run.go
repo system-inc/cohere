@@ -331,17 +331,58 @@ func runGate(ctx context.Context, command GateCommand) (string, error) {
 	execution := exec.CommandContext(ctx, command.Program, command.Arguments...)
 	execution.Dir = command.Directory
 
+	// Stderr is captured and surfaced rather than discarded. `exec.Output` drops it, and a gate
+	// that crashed mid-run also exits non-zero, so the crash is indistinguishable from a gate that
+	// simply found something. Its explanation would be on stderr and nowhere else.
+	//
+	// This is the same trap that cost three people an evening in a different costume: a probe
+	// whose loud failure was silenced, leaving an empty result that read as an answer. The rule is
+	// to never suppress stderr on something whose empty output you intend to trust, and the gate's
+	// stdout is exactly that.
+	var standardError strings.Builder
+	execution.Stderr = &standardError
+
 	output, err := execution.Output()
 	if err != nil {
 		var exitError *exec.ExitError
 		if !errors.As(err, &exitError) {
-			return "", fmt.Errorf("%s did not run: %w", command, err)
+			return "", fmt.Errorf("%s did not run: %w%s", command, err, stderrTail(standardError.String()))
 		}
-		// It ran and exited non-zero, which is what a gate with findings does.
+
+		// It ran and exited non-zero, which is what a gate with findings does. But a gate that
+		// produced no findings at all and still failed did not find nothing, it broke, and those
+		// two are the same exit code with different stdout.
+		if strings.TrimSpace(string(output)) == "" {
+			return "", fmt.Errorf(
+				"%s exited %d and printed nothing, so it failed rather than found nothing%s",
+				command, exitError.ExitCode(), stderrTail(standardError.String()),
+			)
+		}
 		return string(output), nil
 	}
 	return string(output), nil
 }
+
+// stderrTail renders a failed gate's stderr for an error message, or nothing when it stayed quiet.
+//
+// Trimmed to the last few lines because a crashing linter can emit a great deal, and the part that
+// says what happened is at the end. The whole point is that this text reaches a person: a gate
+// failure diagnosed from an exit code alone sends the reader to the harness rather than to the
+// gate.
+func stderrTail(text string) string {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return ""
+	}
+	lines := strings.Split(trimmed, "\n")
+	if len(lines) > maximumStderrLines {
+		lines = lines[len(lines)-maximumStderrLines:]
+	}
+	return "; its stderr ended with: " + strings.Join(lines, " | ")
+}
+
+// maximumStderrLines is how much of a failed gate's stderr reaches the error message.
+const maximumStderrLines = 5
 
 // verifyCoverageLinePattern reads the population out of verify's own coverage line:
 //

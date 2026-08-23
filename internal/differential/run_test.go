@@ -2,6 +2,7 @@ package differential
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -331,5 +332,88 @@ func TestCleanupLeavesDirectoriesItDidNotCreate(t *testing.T) {
 	}
 	if _, err := os.Stat(preexisting); err != nil {
 		t.Fatalf("a directory that existed before the plant must survive cleanup: %v", err)
+	}
+}
+
+// A gate that broke must not read as a gate that found nothing.
+//
+// Both exit non-zero, which is the whole difficulty: a linter with findings and a linter that
+// crashed are the same exit code, distinguished only by whether stdout carries anything. Treating
+// the crash as findings would hand an empty finding list to the comparison, and an empty list on
+// one side makes every finding on the other look one-sided while the report stays well-formed.
+func TestAGateThatFailedWithNoOutputIsNotAnEmptyResult(t *testing.T) {
+	_, err := runGate(context.Background(), GateCommand{
+		Name:      "crashes",
+		Program:   "/bin/sh",
+		Arguments: []string{"-c", "echo 'cannot find module oxlint' >&2; exit 1"},
+		Directory: t.TempDir(),
+	})
+	if err == nil {
+		t.Fatal("a gate that exited non-zero having printed no findings must be an error, not an empty result")
+	}
+	if !strings.Contains(err.Error(), "failed rather than found nothing") {
+		t.Fatalf("the error must say the gate broke rather than came back clean, got %v", err)
+	}
+
+	// The gate's own explanation has to reach the reader. Diagnosing this from an exit code alone
+	// sends them to the harness instead of to the gate, which is where the fault actually is.
+	//
+	// This assertion does not prove the explicit `execution.Stderr` capture is what carried it:
+	// Go's `Output` also fills `ExitError.Stderr` when `cmd.Stderr` is nil, so both spellings
+	// surface the text and a mutation removing the capture stays green here. Verified by probing
+	// both forms rather than assumed. The assertion is still worth keeping, because what has to
+	// hold is that the text reaches the reader, not which mechanism delivered it.
+	if !strings.Contains(err.Error(), "cannot find module oxlint") {
+		t.Fatalf("the gate's stderr must be surfaced, got %v", err)
+	}
+
+	// The control: the same non-zero exit WITH findings on stdout is normal and must still pass.
+	output, err := runGate(context.Background(), GateCommand{
+		Name:      "finds-something",
+		Program:   "/bin/sh",
+		Arguments: []string{"-c", "echo 'a.ts:1:1: error nexus(consistency-no-enum): found'; exit 1"},
+		Directory: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("a gate with findings exits non-zero and must not be an error: %v", err)
+	}
+	if !strings.Contains(output, "consistency-no-enum") {
+		t.Fatalf("the findings must survive, got %q", output)
+	}
+}
+
+// A gate that could not be launched surfaces its stderr too.
+func TestAGateThatCannotLaunchSurfacesWhatItSaid(t *testing.T) {
+	_, err := runGate(context.Background(), GateCommand{
+		Name:      "missing",
+		Program:   filepath.Join(t.TempDir(), "no-such-binary"),
+		Directory: t.TempDir(),
+	})
+	if err == nil {
+		t.Fatal("a gate that does not exist must be an error")
+	}
+	if !strings.Contains(err.Error(), "did not run") {
+		t.Fatalf("the error must say the gate never ran, got %v", err)
+	}
+}
+
+// stderrTail keeps the end of a long stderr and stays silent when there was none.
+func TestStderrTailReportsOnlyWhatThereIs(t *testing.T) {
+	if tail := stderrTail("   \n  \n"); tail != "" {
+		t.Fatalf("a quiet gate must add nothing to the error, got %q", tail)
+	}
+
+	var many []string
+	for line := 1; line <= maximumStderrLines+4; line++ {
+		many = append(many, fmt.Sprintf("line %d", line))
+	}
+	tail := stderrTail(strings.Join(many, "\n"))
+
+	// The end is what says what happened; the beginning is usually a banner.
+	if !strings.Contains(tail, fmt.Sprintf("line %d", maximumStderrLines+4)) {
+		t.Fatalf("the last line must survive, got %q", tail)
+	}
+	if strings.Contains(tail, "line 1 ") {
+		t.Fatalf("a long stderr must be trimmed from the front, got %q", tail)
 	}
 }
