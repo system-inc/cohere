@@ -55,9 +55,7 @@ export const MyComponent = () => <img src={somePicture.src} alt='foo' />;`,
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := ruletest.Run(t, NoImgElement, "Component.tsx", testCase.source)
-			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
-			}
+			ruletest.ExpectFindings(t, result, messageNoImgElement.Id)
 			if result.Diagnostics[0].Message.Id != "noImgElement" {
 				t.Fatalf("unexpected message id %q", result.Diagnostics[0].Message.Id)
 			}
@@ -127,9 +125,7 @@ export class MyComponent {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := ruletest.Run(t, NoImgElement, "Component.tsx", testCase.source)
-			if len(result.Diagnostics) != 0 {
-				t.Fatalf("want no findings, got %d: %v", len(result.Diagnostics), result.MessageIds())
-			}
+			ruletest.ExpectClean(t, result)
 		})
 	}
 }

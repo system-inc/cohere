@@ -1,0 +1,188 @@
+package registry
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"testing"
+)
+
+// Parity is the acceptance criterion for this whole tool, and until now nothing measured it.
+//
+// `rule-inventory.json` is the superset of every rule the two tools being replaced enforce. It was
+// written once by hand and read by nothing: no test, no gate, no code path referenced it. So the
+// one number the project is judged on was a number somebody recomputed by hand and got wrong at
+// least four times in one night, always in the direction of sounding further along.
+//
+// The failure this closes is the one this tool exists to prevent, arriving through its own front
+// door. A run with every rule ported and a run with a hundred missing look identical: the tree goes
+// green either way, because the tool being replaced has been rejecting those violations for months.
+// A clean result is evidence of enforcement only if something independently states what was
+// supposed to be enforced.
+//
+// This test therefore never fails on an incomplete port. Failing would make the gate red for weeks
+// and get the guard deleted, and an unported rule is a known state rather than a defect. It fails
+// only when the inventory and the registry disagree in ways that mean one of them is wrong: a
+// registered rule the inventory has never heard of, or an inventory that cannot be read at all.
+// The remaining count is reported with `-v` and written to a file the dashboard can read.
+func TestParityAgainstInventory(t *testing.T) {
+	inventory := readInventory(t)
+	registered := registeredRuleNames()
+
+	if len(registered) == 0 {
+		// A sweep with nothing to compare passes for the wrong reason, which is the same shape as
+		// the defect it guards against.
+		t.Fatal("registry.All() returned no rules, so this test compared nothing")
+	}
+
+	var ported, remaining []string
+	claimed := make(map[string]bool, len(registered))
+
+	for _, entry := range inventory {
+		if name, found := matchRegistered(entry, registered); found {
+			claimed[name] = true
+			ported = append(ported, entry)
+			continue
+		}
+		remaining = append(remaining, entry)
+	}
+
+	// A registered rule matching no inventory entry is the one direction that is a real defect. It
+	// means we are enforcing a judgment the gate we are replacing does not enforce, so the
+	// differential would read it as a disagreement and nobody would know which side was right.
+	for _, name := range registered {
+		if claimed[name] {
+			continue
+		}
+		if reason, known := rulesOutsideTheInventory[name]; known {
+			t.Logf("rule %q is registered and outside the inventory on purpose: %s", name, reason)
+			continue
+		}
+		t.Errorf("rule %q is registered and appears in no inventory entry, so nothing states "+
+			"whether the gate being replaced enforces it; either the inventory is stale or "+
+			"this rule enforces something we never agreed to", name)
+	}
+
+	sort.Strings(remaining)
+	t.Logf("parity: %d of %d (%d remaining)", len(ported), len(inventory), len(remaining))
+	for _, namespace := range namespacesOf(remaining) {
+		t.Logf("  %-20s %d left", namespace.name, namespace.count)
+	}
+}
+
+// readInventory returns every rule name the inventory lists.
+//
+// The path is resolved from this file's package directory rather than the working directory,
+// because `go test ./...` runs each package in its own directory and a relative path that works
+// from the repository root silently reads nothing from here.
+func readInventory(t *testing.T) []string {
+	t.Helper()
+
+	path := filepath.Join("..", "..", "rule-inventory.json")
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		// A missing inventory is a hard failure rather than a skip. A skipped parity check reads
+		// exactly like a passing one in a log, and this is the number the project is judged on.
+		t.Fatalf("cannot read %s: %v", path, err)
+	}
+
+	var document struct {
+		Rules []struct {
+			Rule string `json:"rule"`
+		} `json:"rules"`
+	}
+	if err := json.Unmarshal(contents, &document); err != nil {
+		t.Fatalf("cannot parse %s: %v", path, err)
+	}
+	if len(document.Rules) == 0 {
+		t.Fatalf("%s parsed to zero rules, so the comparison would pass by having nothing to compare", path)
+	}
+
+	names := make([]string, 0, len(document.Rules))
+	for _, entry := range document.Rules {
+		names = append(names, entry.Rule)
+	}
+	return names
+}
+
+// registeredRuleNames returns the name of every rule in All().
+func registeredRuleNames() []string {
+	rules := All()
+	names := make([]string, 0, len(rules))
+	for _, registered := range rules {
+		names = append(names, registered.Name)
+	}
+	return names
+}
+
+// matchRegistered reports which registered rule an inventory entry names, if any.
+//
+// The inventory writes `nextjs/no-img-element` and the registry writes `no-img-element`, the same
+// split `config.settingFor` resolves. The suffix must fall on a `/` boundary for the same reason it
+// does there: plain suffix matching would let `no-enum` claim `consistency-no-enum`, which is a rule
+// nobody named, and the count would read one higher than the truth.
+func matchRegistered(entry string, registered []string) (string, bool) {
+	for _, name := range registered {
+		if entry == name {
+			return name, true
+		}
+		if prefix := strings.TrimSuffix(entry, name); prefix != entry && strings.HasSuffix(prefix, "/") {
+			return name, true
+		}
+	}
+	return "", false
+}
+
+// namespaceCount is one namespace and how many of its rules are still unported.
+type namespaceCount struct {
+	name  string
+	count int
+}
+
+// namespacesOf groups unported rule names by their inventory namespace, largest block first.
+//
+// An entry with no `/` is a core rule, which the inventory writes bare and which the byNamespace
+// block of that file calls `(core)`.
+func namespacesOf(remaining []string) []namespaceCount {
+	counts := map[string]int{}
+	for _, entry := range remaining {
+		namespace := "(core)"
+		if index := strings.Index(entry, "/"); index >= 0 {
+			namespace = entry[:index]
+		}
+		counts[namespace]++
+	}
+
+	ordered := make([]namespaceCount, 0, len(counts))
+	for name, count := range counts {
+		ordered = append(ordered, namespaceCount{name: name, count: count})
+	}
+	sort.Slice(ordered, func(first, second int) bool {
+		if ordered[first].count != ordered[second].count {
+			return ordered[first].count > ordered[second].count
+		}
+		return ordered[first].name < ordered[second].name
+	})
+	return ordered
+}
+
+// rulesOutsideTheInventory names every registered rule the gate being replaced does not enforce,
+// and why that is a decision rather than a mistake.
+//
+// It is compiled in rather than read from a file, for the same reason the differential's
+// acknowledged differences are: an exemption that can be supplied at the call site is an exemption
+// nobody reviews, and this map is the one place a rule can be exempt from the project's own
+// acceptance criterion.
+//
+// A reason is required. An entry here says "we looked", and an entry with no reason says only that
+// somebody wanted the test to pass.
+var rulesOutsideTheInventory = map[string]string{
+	// Registered in the nexus plugin map at NexusLintConfiguration.ts:31 and enabled in no rules
+	// block, which that file's own comment names as inert: the plugin knows the name and nothing
+	// turns it on. Confirmed by a whole-tree search returning exactly one occurrence, the plugin
+	// map line. So the rule is real, its judgment is real, and it has never run anywhere. Porting
+	// it was correct and enabling it is a decision for Kirk rather than a parity question.
+	"import-require-path-alias": "in the nexus plugin map, enabled in no config, so it has never run",
+}
