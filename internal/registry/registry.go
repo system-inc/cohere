@@ -10,6 +10,7 @@ package registry
 import (
 	"github.com/system-inc/verify/internal/config"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/rules/core"
 	"github.com/system-inc/verify/internal/rules/nexus"
 	"github.com/system-inc/verify/internal/rules/tailwind"
 )
@@ -20,6 +21,7 @@ import (
 // is what makes a diff between them meaningful.
 func All() []rule.Rule {
 	return []rule.Rule{
+		core.NoDuplicateCase,
 		nexus.BoundaryNoInternalImport,
 		nexus.BoundaryNoNexusOutsideImport,
 		nexus.BoundaryNoProjectImport,
