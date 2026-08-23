@@ -62,10 +62,22 @@ func IsDocumentFile(filePath string) bool {
 
 // IsInApplicationDirectory reports whether a path sits under a Next.js app directory.
 //
-// A substring test rather than a segment test, matching upstream's `is_in_app_dir`. That is looser
-// than it looks: a directory named `application/` contains `app/` as a substring and answers true.
-// Reproduced rather than tightened because the rules gating on it are gating on a routing model, and
-// narrowing it here would make them silent on trees upstream lints.
+// A substring test rather than a segment test, matching upstream's `is_in_app_dir`, and **the
+// looseness has a live cost on our own trees rather than a theoretical one.**
+//
+// `www-connected-app/` contains `app/`, so every file in that project answers true and any rule
+// gating on this is silent across the whole checkout. A research pass found it while measuring
+// `no-before-interactive-script-outside-document`: four checkouts report a real violation and two do
+// not, and the two are the ones whose directory name ends in the word.
+//
+// Reproduced rather than tightened anyway, and that is a decision rather than an oversight.
+// Upstream's rules gate on a routing model, and narrowing this to a path segment would make our
+// rules silent on trees upstream lints. **Fixing it is a divergence that needs its own evidence**,
+// and the evidence a future reader would want is which of the eight gating rules actually changes
+// answer on a real tree.
+//
+// Recorded here so the next person to read this sees a measured cost rather than a theoretical
+// looseness, and does not have to rediscover which projects it silences.
 func IsInApplicationDirectory(filePath string) bool {
 	return strings.Contains(filePath, "app/") || strings.Contains(filePath, "app\\")
 }

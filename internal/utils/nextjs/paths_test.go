@@ -82,6 +82,10 @@ func TestIsInApplicationDirectory(t *testing.T) {
 		// the needle is doing real work.
 		{"a directory whose name merely starts with app", "application/thing.tsx", false},
 		// The looseness that IS real: a segment ending in `app` answers true.
+		// Not theoretical: this is our own project directory, so every file in that checkout
+		// answers true and any rule gating on this is silent across it. Asserted so the cost is
+		// visible rather than rediscovered.
+		{"our own www-connected-app checkout", "www-connected-app/source/Thing.tsx", true},
 		{"a directory ending in app", "src/myapp/thing.tsx", true},
 		{"a pages route", "pages/index.tsx", false},
 		{"an empty path", "", false},
