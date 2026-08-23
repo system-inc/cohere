@@ -261,3 +261,45 @@ func isNetworkServiceHookCall(node *ast.Node) bool {
 	method := access.Name()
 	return method != nil && NetworkServiceHookMethods[method.Text()]
 }
+
+// parameterName returns a parameter's single binding name, or "" when it has none.
+//
+// A destructured parameter has no single name, and the rules built on this treat that as "not the
+// options parameter" rather than guessing at one of the bound names. That is the original's
+// behavior and it is the safe direction: a rule that picked the first destructured property would
+// judge `{ options }` and `{ variables }` as the same parameter.
+func parameterName(parameter *ast.Node) string {
+	if parameter == nil || parameter.Kind != ast.KindParameter {
+		return ""
+	}
+	name := parameter.AsParameterDeclaration().Name()
+	if name == nil || name.Kind != ast.KindIdentifier {
+		return ""
+	}
+	return name.Text()
+}
+
+// parameterTypeNode returns a parameter's type annotation, or nil when it is untyped.
+func parameterTypeNode(parameter *ast.Node) *ast.Node {
+	if parameter == nil || parameter.Kind != ast.KindParameter {
+		return nil
+	}
+	return parameter.AsParameterDeclaration().Type
+}
+
+// typeReferenceName returns the name of a plain type reference, or "" for anything else.
+//
+// Only an identifier-named reference is answered. A qualified name (`Namespace.Type`) or a computed
+// shape returns "", which the callers read as "not the type we asked for" rather than as a match on
+// the last segment. Matching the last segment would let `Wrong.InferUseGraphQlQueryOptions` satisfy
+// a rule that is checking for an import from one specific place.
+func typeReferenceName(typeNode *ast.Node) string {
+	if typeNode == nil || typeNode.Kind != ast.KindTypeReference {
+		return ""
+	}
+	name := typeNode.AsTypeReferenceNode().TypeName
+	if name == nil || name.Kind != ast.KindIdentifier {
+		return ""
+	}
+	return name.Text()
+}
