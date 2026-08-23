@@ -75,3 +75,58 @@ func TestNoNonNullAssertedOptionalChainStaysSilent(t *testing.T) {
 		})
 	}
 }
+
+// What the suggestion removes, which the fixture pair above cannot see.
+//
+// This rule offers a suggestion that deletes a range, and nothing asserted which range. A suggestion
+// removing the wrong span is a rewrite the reader was never shown, and from a fixture that only
+// checks which message fired it reads identically to a correct one.
+//
+// The range is one character wide, the `!` itself, so an off-by-one takes the token before it and
+// leaves source that no longer parses. Asserted by applying the removal and comparing the resulting
+// text rather than by comparing offsets, since an offset expectation is most likely to be wrong in
+// the same direction as the code that produced it.
+//
+// Found by a review sweep rather than by a mutation, and that is worth recording. Every mutant I
+// could construct against the range helper failed to compile, and a mutant that does not compile is
+// neither a catch nor a survival, so this gap stood unmeasured rather than cleared until somebody
+// read the test file and saw only ExpectFindings and ExpectClean in it.
+func TestNoNonNullAssertedOptionalChainSuggestsRemovingTheOperator(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+		wantSource string
+	}{
+		{
+			name:       "a property access",
+			sourceText: "declare const foo: { bar?: string };\nexport const a = foo?.bar!;\n",
+			wantSource: "declare const foo: { bar?: string };\nexport const a = foo?.bar;\n",
+		},
+		{
+			name:       "a call",
+			sourceText: "declare const foo: { bar?: () => string };\nexport const a = foo.bar?.()!;\n",
+			wantSource: "declare const foo: { bar?: () => string };\nexport const a = foo.bar?.();\n",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.Run(t, NoNonNullAssertedOptionalChain,
+				assertedOptionalChainFile, testCase.sourceText)
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+			}
+			suggestions := result.Diagnostics[0].Suggestions
+			if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
+				t.Fatalf("wanted one suggestion carrying one fix, got %d", len(suggestions))
+			}
+
+			fix := suggestions[0].Fixes[0]
+			rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
+				testCase.sourceText[fix.Range.End():]
+			if rewritten != testCase.wantSource {
+				t.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, testCase.wantSource)
+			}
+		})
+	}
+}
