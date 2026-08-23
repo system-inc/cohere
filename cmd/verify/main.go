@@ -65,6 +65,23 @@ func run() error {
 		for _, name := range names {
 			fmt.Println(name)
 		}
+		// The provenance travels with the list rather than waiting behind `-version`.
+		//
+		// A development build implements whatever was on disk when it was compiled, which in a shared
+		// worktree includes another author's uncommitted work. Three of us read a count off this
+		// surface on one night and reported it as the repository's, and `-version` had been saying so
+		// the whole time. A disclosure that has to be sought is a disclosure that will be skipped,
+		// especially when the number it qualifies looks plausible, so the qualification has to travel
+		// with the number a reader carries away rather than sitting one command to the side.
+		//
+		// It goes to stderr so the rule list on stdout stays diffable between two binaries.
+		if provenance := release.Current(); provenance.IsDevelopment() {
+			fmt.Fprintf(
+				os.Stderr,
+				"note: %d rules from a local build, so this is whatever was on disk when it was compiled, not necessarily what is committed\n",
+				len(names),
+			)
+		}
 		return nil
 	}
 
