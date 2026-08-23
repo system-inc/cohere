@@ -25,6 +25,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/system-inc/verify/internal/config"
 )
 
 // defaultCheckerCount matches what the compiler creates when nothing overrides it. It is a fixed
@@ -50,6 +51,13 @@ type Graph struct {
 
 	// ConfigFileName is the absolute path of the tsconfig that produced this graph.
 	ConfigFileName string
+
+	// LintConfig decides which rules apply to which files, and which files are not linted at all.
+	//
+	// Nil means every rule applies to every file, which is what the tests and any caller predating
+	// this layer expect. The command always loads a real one and fails loudly if it cannot, so the
+	// permissive default is reachable only from a caller that chose it deliberately.
+	LintConfig *config.Config
 
 	// checkerCount is how many checkers the program built, and therefore the most files that can be
 	// checked at once. The compiler keeps this private, so we record what we asked for.

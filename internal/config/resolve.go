@@ -23,7 +23,7 @@ func (r Resolved) Enabled(ruleName string) bool {
 	if r.Ignored {
 		return false
 	}
-	setting, configured := r.Rules[ruleName]
+	setting, configured := r.settingFor(ruleName)
 	if !configured {
 		// A rule the config never mentions is not enabled. Defaulting the other way would mean adding
 		// a rule to the registry silently turns it on across the whole tree, which is a decision that
@@ -35,11 +35,38 @@ func (r Resolved) Enabled(ruleName string) bool {
 
 // OptionsFor returns a rule's options for this file, or nil.
 func (r Resolved) OptionsFor(ruleName string) any {
-	setting, configured := r.Rules[ruleName]
+	setting, configured := r.settingFor(ruleName)
 	if !configured || len(setting.Options) == 0 {
 		return nil
 	}
 	return setting.Options
+}
+
+// settingFor looks a rule up by its registry name, reconciling the plugin prefix.
+//
+// The config writes `nexus/consistency-no-enum`; the registry writes `consistency-no-enum`. The
+// prefix names which plugin supplied a rule, which mattered when rules were loaded and means
+// nothing now that they are compiled in.
+//
+// This has to be resolved somewhere, and getting it wrong is not subtle: matching on the exact name
+// alone made every rule unconfigured, therefore disabled, and verify printed 0 findings over 3,408
+// files with exit 0. The coverage line is what caught it, reporting every rule scoped off for every
+// file. A tool without that line would have shipped a green run that checked nothing.
+//
+// The suffix must fall on a `/` boundary. Plain suffix matching would let a config entry for
+// `no-enum` silence `consistency-no-enum`, which is a rule nobody named.
+func (r Resolved) settingFor(ruleName string) (RuleSetting, bool) {
+	if setting, configured := r.Rules[ruleName]; configured {
+		return setting, true
+	}
+	for configuredName, setting := range r.Rules {
+		if prefix := strings.TrimSuffix(configuredName, ruleName); prefix != configuredName {
+			if strings.HasSuffix(prefix, "/") {
+				return setting, true
+			}
+		}
+	}
+	return RuleSetting{}, false
 }
 
 // Resolve computes the effective configuration for one file path.

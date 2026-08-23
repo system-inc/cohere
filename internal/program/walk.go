@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/system-inc/verify/internal/config"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/suppression"
 )
@@ -60,6 +61,21 @@ type Coverage struct {
 	// codebase accumulates permanent exemptions nobody chose. It only means what it says after a
 	// full run with every rule, so a caller running a filtered subset should not report it.
 	UnusedSuppressions int
+
+	// FilesIgnored is how many files an ignorePattern excluded from linting entirely.
+	//
+	// A file skipped by configuration and a file with no findings produce identical output
+	// otherwise, which is the same ambiguity the coverage line exists to destroy. Exclusion is a
+	// decision someone made, and a decision that leaves no trace is indistinguishable from the tool
+	// never having looked.
+	FilesIgnored int
+
+	// RulesScopedOff counts, per rule name, how many files an override turned that rule off for.
+	//
+	// This is the narrower half of the same accounting. A rule can be enabled in the config, run on
+	// the tree, and still be silent across a whole directory because an override scoped it off
+	// there. Without this number that looks identical to a rule with nothing to report.
+	RulesScopedOff map[string]int
 }
 
 // Result is the findings of one walk, and the coverage that produced them.
@@ -93,6 +109,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	listeningCounts := make(map[string]int, len(rules))
 	nodesVisited := 0
 	suppressed := suppressionTally{}
+	filesIgnored := 0
+	scopedOff := map[string]int{}
 
 	// Files are handed out by index stride rather than by a queue: the compiler assigns a file to a
 	// checker by its position in the program's file list, so striding keeps each worker mostly on one
@@ -107,9 +125,22 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			localListening := make(map[string]int, len(rules))
 			localNodes := 0
 			localSuppressed := suppressionTally{}
+			localIgnored := 0
+			localScopedOff := map[string]int{}
 
 			for index := worker; index < len(files); index += workers {
 				sourceFile := files[index]
+
+				// Configuration is consulted before a checker is acquired, because an ignored file
+				// should cost nothing at all rather than cost a checker and then be discarded.
+				applicable, resolution := g.rulesFor(sourceFile, rules, localScopedOff)
+				if resolution.Ignored {
+					localIgnored++
+					continue
+				}
+				if len(applicable) == 0 {
+					continue
+				}
 
 				fileChecker, release := g.CheckerForFile(ctx, sourceFile)
 
@@ -117,7 +148,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// another rule's name even by accident.
 				visited, silenced := dispatchFile(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
-				}, rules, g, fileChecker, localListening)
+				}, applicable, g, fileChecker, localListening, resolution)
 
 				release()
 
@@ -132,6 +163,10 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			}
 			nodesVisited += localNodes
 			suppressed.add(localSuppressed)
+			filesIgnored += localIgnored
+			for name, count := range localScopedOff {
+				scopedOff[name] += count
+			}
 			mutex.Unlock()
 		}()
 	}
@@ -149,6 +184,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			Suppressed:              suppressed.applied,
 			SuppressedWithoutReason: suppressed.appliedNoReason,
 			UnusedSuppressions:      suppressed.unusedDirectives,
+
+			FilesIgnored:   filesIgnored,
+			RulesScopedOff: scopedOff,
 		},
 	}, nil
 }
@@ -166,6 +204,7 @@ func dispatchFile(
 	graph *Graph,
 	fileChecker *checker.Checker,
 	listeningCounts map[string]int,
+	resolution config.Resolved,
 ) (visitedNodes int, silenced suppressionTally) {
 	// A kind may have listeners from several rules, so the merged table maps a kind to a slice rather
 	// than to one function.
@@ -201,7 +240,10 @@ func dispatchFile(
 			},
 		}
 
-		listeners := subject.Run(context, nil)
+		// Options come from the resolved configuration rather than being nil, so a rule that needs
+		// one is handed it. A configurable rule given nil guards either everything or nothing, and
+		// both are silent.
+		listeners := subject.Run(context, resolution.OptionsFor(ruleName))
 		if len(listeners) == 0 {
 			// The rule looked at the file and declined it. That is the cheapest and most valuable thing
 			// a rule can do, and it is counted rather than ignored so a rule that declines *everything*
@@ -273,4 +315,40 @@ func walk(node *ast.Node, listeners map[ast.Kind][]func(node *ast.Node)) int {
 	})
 
 	return visited
+}
+
+// rulesFor narrows the rule set to those the configuration enables for one file.
+//
+// When no configuration is loaded every rule applies, which keeps the existing callers and every
+// test working unchanged: a Graph built without a config behaves exactly as it did before this
+// layer existed. That default is deliberate but it is also the one to be careful with, because
+// "no config" and "config that enables everything" are indistinguishable from inside. The command
+// loads a real config and fails loudly if it cannot, so the permissive default is reachable only
+// from a test that chose it.
+func (g *Graph) rulesFor(
+	sourceFile *ast.SourceFile,
+	rules []rule.Rule,
+	scopedOff map[string]int,
+) ([]rule.Rule, config.Resolved) {
+	if g.LintConfig == nil {
+		return rules, config.Resolved{}
+	}
+
+	resolution := g.LintConfig.Resolve(sourceFile.FileName())
+	if resolution.Ignored {
+		return nil, resolution
+	}
+
+	applicable := make([]rule.Rule, 0, len(rules))
+	for _, subject := range rules {
+		if resolution.Enabled(subject.Name) {
+			applicable = append(applicable, subject)
+			continue
+		}
+		// Counted rather than dropped silently. A rule enabled in the config can still be absent
+		// across a whole directory because an override scoped it off there, and without this number
+		// that is indistinguishable from a rule with nothing to report.
+		scopedOff[subject.Name]++
+	}
+	return applicable, resolution
 }
