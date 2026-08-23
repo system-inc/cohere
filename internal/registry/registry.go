@@ -28,6 +28,7 @@ func All() []rule.Rule {
 		nexus.ConsistencyNoStutteringName,
 		nexus.ConsistencyNoUtilsFolder,
 		nexus.ConsistencyRequireTypeSuffix,
+		nexus.ImportNoForbiddenSource,
 		nexus.ImportRequireNodeNamespace,
 	}
 }
