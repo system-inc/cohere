@@ -24,6 +24,7 @@ func All() []rule.Rule {
 		core.NoCaseDeclarations,
 		core.NoCompareNegZero,
 		core.NoDuplicateCase,
+		core.NoEmpty,
 		core.NoEmptyPattern,
 		core.NoUnsafeFinally,
 		core.NoUselessCatch,
@@ -90,6 +91,7 @@ func Options() config.OptionsRegistry {
 
 		// Not Required. The option only relaxes the rule, and its default is the strict reading, so
 		// a config that says nothing gets the full rule rather than a rule that reads no files.
+		"no-empty":         {Decode: config.DecodeInto[core.NoEmptyOptions]()},
 		"no-empty-pattern": {Decode: config.DecodeInto[core.NoEmptyPatternOptions]()},
 
 		// The rest tune behavior rather than enable it, so they run on their own defaults when the
