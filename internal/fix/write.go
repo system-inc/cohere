@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/parser"
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 // Parses reports whether text parses cleanly as the script kind implied by its file name.
@@ -41,7 +41,7 @@ func Parses(fileName string, text string) (bool, string) {
 	}
 
 	first := diagnostics[0]
-	reason := fmt.Sprintf("TS%d: %s", first.Code(), first.Message())
+	reason := fmt.Sprintf("TS%d: %s", first.Code(), first.MessageText())
 	if len(diagnostics) > 1 {
 		reason = fmt.Sprintf("%s (and %d more)", reason, len(diagnostics)-1)
 	}

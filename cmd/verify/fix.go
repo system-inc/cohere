@@ -6,10 +6,10 @@ import (
 	"os"
 	"sort"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/parser"
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/verify/internal/fix"
 	"github.com/system-inc/verify/internal/program"
 	"github.com/system-inc/verify/internal/rule"
@@ -30,6 +30,7 @@ func applyProposedFixes(
 	graph *program.Graph,
 	projectFiles []*ast.SourceFile,
 	rules []rule.Rule,
+	transform fix.Transform,
 	maxPasses int,
 ) (fix.Summary, error) {
 	// The first walk already happened for reporting; this asks again because the caller does not hand
@@ -56,15 +57,33 @@ func applyProposedFixes(
 		}
 	}
 
-	if len(byFileName) == 0 {
+	// The file set is the union of "something proposed a fix here" and "this file can be formatted",
+	// and the union rather than the intersection is the whole point. Fixing is driven by findings, so
+	// it only visits files a rule complained about. Formatting is not: a file can be perfectly correct
+	// and badly formatted, and a formatter that only ran where a rule had already fired would never
+	// touch most of a tree while reporting a clean run.
+	//
+	// When no transform is configured the union collapses back to the files with proposals, so a
+	// fix-only run costs exactly what it did before.
+	candidates := map[string]struct{}{}
+	for fileName := range byFileName {
+		candidates[fileName] = struct{}{}
+	}
+	if transform != nil {
+		for _, sourceFile := range projectFiles {
+			candidates[sourceFile.FileName()] = struct{}{}
+		}
+	}
+
+	if len(candidates) == 0 {
 		// An empty run still reports its population, so "nothing proposed a fix" cannot be confused
 		// with "the fixer never ran".
 		return fix.Summarize(nil), nil
 	}
 
 	// Sorted so a run is reproducible and a diff of two runs is readable.
-	fileNames := make([]string, 0, len(byFileName))
-	for fileName := range byFileName {
+	fileNames := make([]string, 0, len(candidates))
+	for fileName := range candidates {
 		fileNames = append(fileNames, fileName)
 	}
 	sort.Strings(fileNames)
@@ -85,7 +104,7 @@ func applyProposedFixes(
 			return proposalsForText(fileName, text, graph, rules)
 		}
 
-		fileResult, err := fix.FixFile(fileName, propose, maxPasses)
+		fileResult, err := fix.FixAndTransformFile(fileName, propose, transform, maxPasses)
 		if err != nil {
 			// One file failing must not abandon the rest. The failure is reported rather than
 			// swallowed, and the tree is left in a state where every other fix still landed.
