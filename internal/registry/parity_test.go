@@ -16,6 +16,23 @@ import (
 // one number the project is judged on was a number somebody recomputed by hand and got wrong at
 // least four times in one night, always in the direction of sounding further along.
 //
+// It says *enforce* rather than *list*, and the difference was worth 40 rules. An earlier inventory
+// was built from the rules written down in a config, which cannot see a rule an oxlint `plugins`
+// declaration turns on by default. Forty were firing on this tree and named in no rules block
+// anywhere, proven by planting violations and watching `no-const-assign` and `react/no-children-prop`
+// report. Every count taken before that read configuration and was therefore blind to them by
+// construction.
+//
+// So an entry carries `enabledBy`, which is `rulesBlock` for a rule somebody wrote down and
+// `pluginDefault` for one that arrives without being named. A future pass adding a surface should
+// add a value here rather than quietly folding it into the first.
+//
+// An entry also carries `severity`, and the reason is that all forty are `warn` rather than `error`.
+// A warning does not fail the gate today, and parity is still about what verify must be able to
+// see: severity is a config decision that changes in an afternoon, while whether a rule exists in
+// the catalog is a build decision that takes a day. Recording it means raising those forty to error
+// later is a config change rather than a porting project.
+//
 // The failure this closes is the one this tool exists to prevent, arriving through its own front
 // door. A run with every rule ported and a run with a hundred missing look identical: the tree goes
 // green either way, because the tool being replaced has been rejecting those violations for months.
