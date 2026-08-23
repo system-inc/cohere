@@ -211,8 +211,11 @@ type Rule struct {
 	//
 	// So the question is answered per rule, at the cheapest tier that is correct for that rule:
 	//
-	//	name matching     correct where shadowing is impossible. core.NoExAssign ships this way,
-	//	                  because a catch parameter's scope makes it safe.
+	//	name matching     enough where shadowing is impossible. core.NoExAssign resolves its
+	//	                  binding this way, because a catch clause gives it a subtree to stop at.
+	//	                  That is a claim about the tier and not a warrant for the rule: the same
+	//	                  rule shipped for weeks missing `e++` entirely, which is a write-detection
+	//	                  gap rather than a scope one, and neither corpus tested the shape.
 	//	symbol identity   where shadowing is possible. Resolve the binding once with
 	//	                  GetSymbolAtLocation, resolve each candidate, compare symbols. Declare
 	//	                  NeedsTypeChecker so files with no such rule skip the acquisition.
