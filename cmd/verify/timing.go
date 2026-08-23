@@ -81,16 +81,26 @@ func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
 		return
 	}
 
+	// The rule offered the most nodes is the reference point for every other row, not a warning
+	// about that rule. Registering for a common kind and returning early is cheap, so this row shows
+	// what a well-gated rule costs at maximum node volume. A rule with comparable nodes and much
+	// higher time is doing expensive work per node, and that comparison is what makes the case.
+	//
+	// This started as a warning and was reworded, because the framing was backwards on the first
+	// real run: consistency-no-ambiguous-identifier had the most nodes and was among the cheapest,
+	// while a rule with slightly fewer nodes cost sixty times more.
 	for _, timing := range sorted {
-		// A rule offered nearly every node in the program registered for a very common kind.
-		// Returning early from those is legitimate and common, so this is a note rather than a
-		// finding. It is also exactly how a rule that looks cheap per call becomes expensive at
-		// scale, which is invisible in a total alone.
-		if timing.NodesOffered >= mostOffered && timing.FilesListened > 0 {
-			fmt.Fprintf(out,
-				"  note: %s was offered %d nodes, the most of any rule — it registered for a very common kind\n",
-				timing.Name, timing.NodesOffered)
+		if timing.NodesOffered < mostOffered || timing.FilesListened == 0 {
+			continue
 		}
+
+		perNode := ""
+		if timing.NodesOffered > 0 {
+			perNode = fmt.Sprintf(", %.0fns per node", float64(timing.TotalDuration().Nanoseconds())/float64(timing.NodesOffered))
+		}
+		fmt.Fprintf(out,
+			"  note: %s saw the most nodes of any rule (%d%s) — compare a rule's cost against this one, not against its own node count\n",
+			timing.Name, timing.NodesOffered, perNode)
 	}
 
 	// Duplicated work is invisible per rule and obvious in aggregate: three rules independently
