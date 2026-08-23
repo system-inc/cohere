@@ -1,11 +1,10 @@
 package next
 
 import (
-	"strings"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/utils/jsx"
+	"github.com/system-inc/verify/internal/utils/nextjs"
 )
 
 var messageNoHeadElement = rule.Message{
@@ -46,7 +45,7 @@ var NoHeadElement = rule.Rule{
 		// Answering here rather than inside the listener means a file under an app directory
 		// registers no listener at all, which is also how upstream spells it: `should_run` is asked
 		// before the walk rather than at every element.
-		if isInApplicationDirectory(ctx.SourceFile.FileName()) {
+		if nextjs.IsInApplicationDirectory(ctx.SourceFile.FileName()) {
 			return nil
 		}
 
@@ -63,12 +62,4 @@ var NoHeadElement = rule.Rule{
 			ast.KindJsxSelfClosingElement: report,
 		}
 	},
-}
-
-// isInApplicationDirectory reports whether a path looks like it sits under a Next app directory.
-//
-// A substring test rather than a segment test, matching oxc's `is_in_app_dir`. Both separators are
-// checked because upstream checks both, so a Windows-shaped path answers the same as a POSIX one.
-func isInApplicationDirectory(filePath string) bool {
-	return strings.Contains(filePath, "app/") || strings.Contains(filePath, "app\\")
 }
