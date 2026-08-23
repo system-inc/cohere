@@ -23,6 +23,19 @@ import (
 // Kept as a standing guard rather than deleted after the fix, because the pattern recurs: nearly
 // every rule in this family reaches for an initializer, an argument, or a type annotation that does
 // not have to exist. Add new rules to the list.
+//
+// # What a pass here does and does not mean
+//
+// The shape list below is the measurement, and it is short: a handful of shapes one person thought
+// of in a few minutes. A green run means every listed rule survived those shapes. It is not a claim
+// that the package cannot panic, and the difference matters because the two look identical from
+// here.
+//
+// This guard has found exactly one crash, the one it was built from. Reading "found nothing since"
+// as coverage is the same error as reading a clean probe as safety: a probe that does not reach a
+// line proves nothing about the line, only about the inputs. So when a new rule reaches for
+// something optional in a shape not listed here, the fix is to add the shape, not to trust the
+// green.
 func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 	sources := []string{
 		"declare const memo: unknown;\nexport const value = 1;\n",
