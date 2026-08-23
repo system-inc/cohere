@@ -79,3 +79,49 @@ func renderTimings(timings *program.Timings, wall time.Duration) string {
 	printTimings(builder, timings, wall)
 	return builder.String()
 }
+
+// TestTheNamedRulesAreTheRulesWhoseCostsAreQuoted is the assertion the first version of this file
+// was missing, and the omission let a real bug through.
+//
+// The original note printed names[0] and names[len-1], which are list positions, while the costs
+// came from a scan for the minimum and maximum. With two rules those coincide, so every fixture
+// passed. With three they come apart: the line named a 50ms rule, quoted 400ms, and the rule that
+// actually cost 400ms did not appear at all.
+//
+// A fixture asserting that the note fired is not a fixture asserting the note is right. The earlier
+// tests checked for the substring "differ" and for one rule name, both present in a line that was
+// wrong about everything else. This one requires the quoted numbers to belong to the named rules.
+func TestTheNamedRulesAreTheRulesWhoseCostsAreQuoted(t *testing.T) {
+	timings := program.NewTimings([]string{"aaa-middling", "mmm-dearest", "zzz-cheapest"})
+	setCost(timings, "aaa-middling", 50*time.Millisecond, 3407)
+	setCost(timings, "mmm-dearest", 400*time.Millisecond, 3407)
+	setCost(timings, "zzz-cheapest", time.Millisecond, 3407)
+
+	rendered := renderTimings(timings, time.Second)
+
+	line := ""
+	for _, candidate := range strings.Split(rendered, "\n") {
+		if strings.Contains(candidate, "differ") {
+			line = candidate
+			break
+		}
+	}
+	if line == "" {
+		t.Fatalf("three rules at one node count and 400x apart produced no note:\n%s", rendered)
+	}
+
+	// The dearest rule must be named, because it is the one a reader should go look at.
+	if !strings.Contains(line, "mmm-dearest") {
+		t.Fatalf("the note quotes the dearest cost but does not name the dearest rule:\n  %s", line)
+	}
+	if !strings.Contains(line, "zzz-cheapest") {
+		t.Fatalf("the note does not name the cheapest rule:\n  %s", line)
+	}
+	// And the rule that is neither must not appear, or the line points somewhere misleading.
+	if strings.Contains(line, "aaa-middling") {
+		t.Fatalf("the note names a middling rule as though it were an extreme:\n  %s", line)
+	}
+	if !strings.Contains(line, "400ms") || !strings.Contains(line, "1.0ms") {
+		t.Fatalf("the note does not quote both extremes:\n  %s", line)
+	}
+}

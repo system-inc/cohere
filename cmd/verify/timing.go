@@ -157,42 +157,61 @@ func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
 			continue
 		}
 
-		cheapest, dearest := costRange(sorted, names)
-		if cheapest <= 0 || float64(dearest)/float64(cheapest) < 10 {
+		extremes := costRange(sorted, names)
+		if extremes.cheapestCost <= 0 || float64(extremes.dearestCost)/float64(extremes.cheapestCost) < 10 {
 			continue
 		}
 
 		fmt.Fprintf(out,
 			"  note: %s and %s were each offered %d nodes but differ %.0fx in cost (%s against %s) — if they share work, this table may be billing it to whichever ran first\n",
-			names[0], names[len(names)-1], offered,
-			float64(dearest)/float64(cheapest),
-			formatMilliseconds(dearest), formatMilliseconds(cheapest))
+			extremes.dearestName, extremes.cheapestName, offered,
+			float64(extremes.dearestCost)/float64(extremes.cheapestCost),
+			formatMilliseconds(extremes.dearestCost), formatMilliseconds(extremes.cheapestCost))
 	}
 }
 
-// costRange returns the cheapest and dearest total among the named rules.
+// costExtremes is the cheapest and dearest rule in a group, each with the name it belongs to.
+//
+// Name and cost travel together rather than being looked up separately, because separating them is
+// exactly the bug this replaced: the caller printed names[0] and names[len-1] while the costs came
+// from a scan for the minimum and maximum. With two rules those coincide; with three they come
+// apart, and the note then quotes one rule's cost beside another rule's name.
+//
+// Reproduced before the fix on three rules at 3,407 nodes each: the line named a 50ms rule and
+// quoted 400ms, and the rule that actually cost 400ms did not appear at all. A reader chases the
+// wrong rule, which is the failure this note exists to prevent.
+type costExtremes struct {
+	cheapestName string
+	cheapestCost time.Duration
+	dearestName  string
+	dearestCost  time.Duration
+}
+
+// costRange finds the cheapest and dearest among the named rules.
 //
 // Reported as a spread rather than a total because the spread is the signal: equal node counts with
 // equal cost is a coincidence, and equal node counts an order of magnitude apart is a rule carrying
 // somebody else's work.
-func costRange(sorted []program.RuleTiming, names []string) (cheapest, dearest time.Duration) {
+func costRange(sorted []program.RuleTiming, names []string) costExtremes {
 	named := map[string]bool{}
 	for _, name := range names {
 		named[name] = true
 	}
+
+	extremes := costExtremes{}
 	for _, timing := range sorted {
 		if !named[timing.Name] {
 			continue
 		}
 		total := timing.TotalDuration()
-		if cheapest == 0 || total < cheapest {
-			cheapest = total
+		if extremes.cheapestName == "" || total < extremes.cheapestCost {
+			extremes.cheapestName, extremes.cheapestCost = timing.Name, total
 		}
-		if total > dearest {
-			dearest = total
+		if extremes.dearestName == "" || total > extremes.dearestCost {
+			extremes.dearestName, extremes.dearestCost = timing.Name, total
 		}
 	}
-	return cheapest, dearest
+	return extremes
 }
 
 // formatMilliseconds reads at a glance, which is the resolution any of these numbers means anything
