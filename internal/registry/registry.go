@@ -23,6 +23,7 @@ func All() []rule.Rule {
 	return []rule.Rule{
 		core.NoCaseDeclarations,
 		core.NoDuplicateCase,
+		core.NoUselessCatch,
 		nexus.BoundaryNoInternalImport,
 		nexus.BoundaryNoNexusOutsideImport,
 		nexus.BoundaryNoProjectImport,
