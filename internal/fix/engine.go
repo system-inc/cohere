@@ -1,0 +1,330 @@
+package fix
+
+import (
+	"fmt"
+	"sort"
+)
+
+// DefaultMaxPasses bounds convergence.
+//
+// A fix can expose a violation that was not visible before it landed, so one pass is not enough and
+// a loop with no ceiling is not an option: two rules that undo each other would spin forever, on a
+// tool whose entire premise is finishing in a quarter second. Ten is chosen to be far above what a
+// healthy file needs and far below anything a person would wait through. A file that reaches the
+// ceiling is reported rather than silently left half-fixed, because a file needing ten passes is
+// telling you something about the rules rather than about the file.
+const DefaultMaxPasses = 10
+
+// FileResult is what the engine did to one file.
+//
+// Passes and Applied are separate numbers on purpose. A file fixed in one pass and a file fixed in
+// six have the same diff and very different meanings — the second says two rules are arguing, or a
+// rule proposes one repair at a time where it could propose all of them.
+type FileResult struct {
+	FileName string
+
+	// Text is the file's contents after fixing. Equal to the original when nothing landed.
+	Text string
+
+	// Changed is whether anything actually landed. A file whose every proposal was refused is
+	// unchanged, and that is different from a file that had nothing proposed.
+	Changed bool
+
+	// Passes is how many times the engine re-ran rules against this file, counting the pass that
+	// found nothing left to do.
+	Passes int
+
+	// Applied is every fix that landed, across every pass.
+	Applied []Proposal
+
+	// Rejected is every proposal that did not, with a reason. Refusals are reported rather than
+	// dropped: a fixer that silently declines half its work looks identical to one with less to do.
+	Rejected []Rejection
+
+	// Converged is whether the file reached a pass with nothing left to apply. False means the pass
+	// budget ran out, and the text is whatever the last accepted pass produced — never a partial
+	// one, because a refused pass is discarded whole.
+	Converged bool
+
+	// Failed is set when the engine could not process the file at all — unreadable, unwritable, or
+	// already unparseable before anything was applied.
+	//
+	// Distinct from Changed being false, which is a file the engine looked at and correctly left
+	// alone. A zero-value FileResult is indistinguishable from a clean file, so a caller that
+	// recorded a failure without setting this would report the failure as a success.
+	Failed bool
+}
+
+// Propose is asked for the fixes that apply to a file's current text.
+//
+// The engine re-asks after every pass rather than reusing the first answer, and that is not an
+// optimization to remove later — it is the correctness requirement. Offsets from the previous pass
+// are measured against text that no longer exists, so reusing them is exactly the silent corruption
+// this package exists to prevent. Re-running rules against the rewritten text is how every surviving
+// proposal is guaranteed to be measured against the bytes it will be applied to.
+type Propose func(fileName string, text string) ([]Proposal, error)
+
+// FixText drives one file to a fixpoint in memory, without touching disk.
+//
+// The loop is: ask for proposals against the current text, resolve overlaps, apply back to front,
+// parse the result, and keep it only if it parses. Repeat until a pass proposes nothing that lands
+// or the budget runs out.
+//
+// Refusal is per pass and whole. When the rewritten text does not parse, the entire pass is
+// discarded and the previous text stands — not the subset of fixes that were individually fine.
+// Bisecting to find which fix broke it would be a nicer result and a worse guarantee: it means
+// writing text assembled from a combination no rule proposed and nothing verified. The file is left
+// alone and every proposal in the pass is reported as refused, so the reader learns which file and
+// which rules to look at.
+func FixText(fileName string, text string, propose Propose, maxPasses int) (FileResult, error) {
+	if maxPasses <= 0 {
+		maxPasses = DefaultMaxPasses
+	}
+
+	result := FileResult{FileName: fileName, Text: text}
+
+	// The starting text must parse, or nothing downstream means anything. A file that is already
+	// broken is not this package's problem to report — the types phase does that, loudly — but it is
+	// this package's problem not to make worse, and "the result parses" is a guarantee that says
+	// nothing if the input did not.
+	if parses, reason := Parses(fileName, text); !parses {
+		return result, fmt.Errorf("%s does not parse before any fix is applied (%s)", fileName, reason)
+	}
+
+	current := text
+
+	for pass := 1; pass <= maxPasses; pass++ {
+		result.Passes = pass
+
+		proposals, err := propose(fileName, current)
+		if err != nil {
+			return result, fmt.Errorf("collecting fixes for %s on pass %d: %w", fileName, pass, err)
+		}
+		if len(proposals) == 0 {
+			result.Converged = true
+			break
+		}
+
+		plan := resolveOverlaps(proposals)
+		rewritten, plan := applyToText(current, plan)
+
+		result.Rejected = append(result.Rejected, plan.Rejected...)
+
+		if len(plan.Applied) == 0 {
+			// Everything proposed was refused. Re-running would produce the same refusals forever,
+			// so this is a fixpoint even though findings remain.
+			result.Converged = true
+			break
+		}
+
+		if parses, reason := Parses(fileName, rewritten); !parses {
+			for _, proposal := range plan.Applied {
+				result.Rejected = append(result.Rejected, Rejection{
+					Proposal: proposal,
+					Reason:   fmt.Sprintf("%s (%s)", ReasonParseFailure, reason),
+				})
+			}
+			// The pass is discarded whole and the loop stops. Trying again would re-collect the same
+			// proposals against the same text and refuse them the same way.
+			result.Converged = true
+			break
+		}
+
+		current = rewritten
+		result.Applied = append(result.Applied, plan.Applied...)
+		result.Changed = true
+	}
+
+	if !result.Converged {
+		// The budget ran out with work still landing. The text is the last pass that parsed, which is
+		// a valid file — just not a finished one.
+		result.Rejected = append(result.Rejected, Rejection{
+			Proposal: Proposal{RuleName: "fix-engine"},
+			Reason:   fmt.Sprintf("%s (%d passes)", ReasonPassesReached, maxPasses),
+		})
+	}
+
+	result.Text = current
+	return result, nil
+}
+
+// FixFile drives a file to a fixpoint and writes it, atomically, only if something landed.
+//
+// Reading the file here rather than taking the text from the already-parsed program is deliberate.
+// The program's copy was read when the graph was built, and in a tree where several agents edit at
+// once that copy can be minutes stale — applying offsets from a stale parse to a file that moved
+// underneath is precisely the corruption shape this package exists to refuse. Re-reading costs one
+// syscall and removes the whole class.
+//
+// A file with nothing to apply is not written at all. Rewriting identical bytes would update the
+// modification time, which invalidates every downstream cache keyed on it and makes a run that
+// changed nothing look like a run that changed everything.
+func FixFile(fileName string, propose Propose, maxPasses int) (FileResult, error) {
+	text, err := readFile(fileName)
+	if err != nil {
+		return FileResult{FileName: fileName}, err
+	}
+
+	result, err := FixText(fileName, text, propose, maxPasses)
+	if err != nil {
+		return result, err
+	}
+	if !result.Changed {
+		return result, nil
+	}
+
+	if err := writeAtomically(fileName, result.Text); err != nil {
+		// The file on disk is untouched: the rename is the only step that changes it, and a failure
+		// before it leaves the original intact. Report the fixes as not-applied rather than applied,
+		// so the count matches what a reader would find in the tree.
+		result.Changed = false
+		return result, fmt.Errorf("writing %s: %w", fileName, err)
+	}
+
+	return result, nil
+}
+
+// Summary is what a whole fix run did, across every file.
+//
+// Every field here answers a question a bare "fixed 40 files" cannot. A run that changed forty
+// files must not look like a run that changed none, and a run that refused four hundred fixes must
+// not look like a run that had none to refuse.
+type Summary struct {
+	FilesConsidered int
+	FilesChanged    int
+	FixesApplied    int
+	FixesRefused    int
+
+	// RefusalsByReason counts refusals by their stated reason, so "we refused four hundred fixes"
+	// becomes "three hundred and ninety were overlaps between two rules and ten broke the parse",
+	// which is the difference between a number and a finding.
+	RefusalsByReason map[string]int
+
+	// FilesByPasses counts files by how many passes they took. A tail here is the signal that some
+	// rule proposes one repair where it could propose several, or that two rules are arguing.
+	FilesByPasses map[int]int
+
+	// FilesNotConverged names the files that hit the pass ceiling. Named rather than counted,
+	// because the answer to "which file needed ten passes" is the only useful next step.
+	FilesNotConverged []string
+
+	// FilesRefused names the files where a pass was discarded because the rewrite did not parse.
+	// These are the interesting failures: a rule proposed something that looked fine and was not.
+	FilesRefused []string
+
+	// FilesFailed names the files the engine could not process at all — unreadable, unwritable, or
+	// already unparseable before anything was applied.
+	//
+	// Separate from FilesRefused and FilesNotConverged because the three send a reader somewhere
+	// different. Refused means a rule proposed something wrong. Not converged means two rules are
+	// arguing. Failed means the file never entered the loop, and folding it into either of the
+	// others reports a real number under the wrong heading — which reads as a finding about the
+	// rules when it is actually a finding about the file.
+	FilesFailed []string
+}
+
+// Summarize folds per-file results into a run summary.
+func Summarize(results []FileResult) Summary {
+	summary := Summary{
+		RefusalsByReason: map[string]int{},
+		FilesByPasses:    map[int]int{},
+	}
+
+	for _, result := range results {
+		summary.FilesConsidered++
+		if result.Changed {
+			summary.FilesChanged++
+		}
+		summary.FixesApplied += len(result.Applied)
+		summary.FixesRefused += len(result.Rejected)
+		summary.FilesByPasses[result.Passes]++
+
+		if result.Failed {
+			summary.FilesFailed = append(summary.FilesFailed, result.FileName)
+		} else if !result.Converged {
+			// Only a file that actually entered the loop can be said to have not converged.
+			summary.FilesNotConverged = append(summary.FilesNotConverged, result.FileName)
+		}
+
+		refusedHere := false
+		for _, rejection := range result.Rejected {
+			reason := reasonKey(rejection.Reason)
+			summary.RefusalsByReason[reason]++
+			if reason == ReasonParseFailure && !refusedHere {
+				summary.FilesRefused = append(summary.FilesRefused, result.FileName)
+				refusedHere = true
+			}
+		}
+	}
+
+	sort.Strings(summary.FilesNotConverged)
+	sort.Strings(summary.FilesRefused)
+	sort.Strings(summary.FilesFailed)
+	return summary
+}
+
+// reasonKey collapses a reason that carries detail down to its category.
+//
+// A parse failure reason embeds the compiler's message so a reader can act on it, which makes every
+// one of them a distinct string and would turn a tally into a list of four hundred singletons.
+func reasonKey(reason string) string {
+	for _, known := range []string{ReasonParseFailure, ReasonOverlap, ReasonInvalidRange, ReasonNoProgress, ReasonPassesReached} {
+		if len(reason) >= len(known) && reason[:len(known)] == known {
+			return known
+		}
+	}
+	return reason
+}
+
+// String renders the summary line that follows a fix run.
+//
+// It always prints, and it always prints the population alongside the result. The gate this tool
+// replaces printed a green checkmark over zero files linted for days, because an empty file list is
+// indistinguishable from a clean tree. The same ambiguity is available to a fixer, and this is what
+// closes it.
+func (s Summary) String() string {
+	line := fmt.Sprintf(
+		"fix: %d of %d files rewritten, %d fixes applied, %d refused",
+		s.FilesChanged, s.FilesConsidered, s.FixesApplied, s.FixesRefused,
+	)
+
+	if len(s.RefusalsByReason) > 0 {
+		reasons := make([]string, 0, len(s.RefusalsByReason))
+		for reason := range s.RefusalsByReason {
+			reasons = append(reasons, reason)
+		}
+		sort.Strings(reasons)
+
+		line += " ("
+		for index, reason := range reasons {
+			if index > 0 {
+				line += ", "
+			}
+			line += fmt.Sprintf("%d %s", s.RefusalsByReason[reason], reason)
+		}
+		line += ")"
+	}
+
+	maximumPasses := 0
+	for passes := range s.FilesByPasses {
+		if passes > maximumPasses {
+			maximumPasses = passes
+		}
+	}
+	if maximumPasses > 1 {
+		line += fmt.Sprintf(", up to %d passes", maximumPasses)
+	}
+
+	if len(s.FilesNotConverged) > 0 {
+		line += fmt.Sprintf(", %d files did not converge", len(s.FilesNotConverged))
+	}
+
+	// Failures print even though they were already written to stderr as they happened. A summary
+	// that omits them reads as a clean run to anyone reading only the last line, which is most
+	// readers most of the time.
+	if len(s.FilesFailed) > 0 {
+		line += fmt.Sprintf(", %d files could not be processed", len(s.FilesFailed))
+	}
+
+	return line
+}

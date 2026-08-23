@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/system-inc/verify/internal/config"
+	"github.com/system-inc/verify/internal/fix"
 	"github.com/system-inc/verify/internal/program"
 	"github.com/system-inc/verify/internal/registry"
 	"github.com/system-inc/verify/internal/release"
@@ -36,6 +37,8 @@ func run() error {
 	lintOnly := flag.Bool("lint", false, "run the rules, reporting no type diagnostics")
 	lintConfigFileName := flag.String("lint-config", ".oxlintrc.json", "the config that says which rules apply to which files")
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
+	applyFixes := flag.Bool("fix", false, "apply the repairs rules propose, rewriting files in place")
+	maxFixPasses := flag.Int("fix-passes", fix.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -132,6 +135,25 @@ func run() error {
 		printRuleCoverage(rules, result.Coverage)
 		printSuppressionCoverage(result.Coverage)
 		printConfigCoverage(result.Coverage)
+
+		// Fixing runs after reporting rather than before it, so the findings a reader sees are the
+		// ones that were actually there when the run started. Fixing first and then reporting would
+		// print a shorter list than the tool found, which is the same class of lie as a coverage
+		// number that omits what it skipped.
+		if *applyFixes {
+			fixSummary, err := applyProposedFixes(ctx, graph, projectFiles, rules, *maxFixPasses)
+			if err != nil {
+				return fmt.Errorf("applying fixes: %w", err)
+			}
+			fmt.Println(fixSummary)
+
+			// The findings that were repaired are no longer reasons to fail. Anything left is, which
+			// is why the count is reduced by what landed rather than reset.
+			findings -= fixSummary.FixesApplied
+			if findings < 0 {
+				findings = 0
+			}
+		}
 	}
 
 	if findings > 0 {
