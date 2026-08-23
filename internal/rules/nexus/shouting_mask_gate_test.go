@@ -98,3 +98,74 @@ func TestShoutingMaskGatesActuallySkip(t *testing.T) {
 		}
 	}
 }
+
+// The uppercase gate must not change which tokens are reported, only how fast the answer arrives.
+//
+// Compared token by token rather than by count, for the same reason the comment guard is: a gate
+// that lost one shout and gained another would hold a count stable while silencing a real finding.
+func TestShoutingUppercaseGatePreservesTokens(t *testing.T) {
+	comments := realCommentCorpus(t)
+
+	ungated := func(body string) []string {
+		masked := maskCodeAndCommands(body)
+		var tokens []string
+		seen := map[string]bool{}
+		for _, token := range uppercaseToken.FindAllString(masked, -1) {
+			if seen[token] || !isShoutedToken(token) {
+				continue
+			}
+			seen[token] = true
+			tokens = append(tokens, token)
+		}
+		return tokens
+	}
+
+	for _, comment := range comments {
+		gated := shoutedTokensIn(comment)
+		reference := ungated(comment)
+		if len(gated) != len(reference) {
+			t.Fatalf("gate changed the token count for %q: %v against %v", comment, gated, reference)
+		}
+		for index := range gated {
+			if gated[index] != reference[index] {
+				t.Fatalf("gate changed token %d for %q: %q against %q",
+					index, comment, gated[index], reference[index])
+			}
+		}
+	}
+	t.Logf("uppercase gate preserves every token across %d real comments", len(comments))
+}
+
+// The cases a corpus cannot be relied on to hold, written out because that lesson has now cost twice.
+func TestShoutingUppercaseGateAdmitsRealShouts(t *testing.T) {
+	// Every one of these must reach the expensive path.
+	admitted := []string{
+		"NEVER do this", "this is REALLY bad", "DO NOT EDIT",
+		"a TODO marker", "the API contract", // acronyms: admitted, then declined downstream
+		"MAX_RETRY_COUNT is an identifier", // underscore token
+		"shouting at the very ENDOFLINE",
+	}
+	for _, body := range admitted {
+		if !hasAdjacentUppercaseLetters(body) {
+			t.Fatalf("gate rejects %q, which reaches the token scan", body)
+		}
+	}
+
+	// And these must be skipped, or the gate is not a gate.
+	skipped := []string{
+		"ordinary prose about a thing",
+		"a sentence with One capital",
+		"CamelCase identifiers do not shout",
+		"",
+	}
+	for _, body := range skipped {
+		if hasAdjacentUppercaseLetters(body) {
+			t.Fatalf("gate admits %q, which holds no adjacent uppercase pair", body)
+		}
+	}
+
+	// The boundary: exactly two adjacent uppercase letters is the shortest reportable shape.
+	if !hasAdjacentUppercaseLetters("it IS wrong") {
+		t.Fatalf("gate rejects a two-letter shout")
+	}
+}

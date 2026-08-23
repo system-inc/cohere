@@ -68,3 +68,40 @@ func parseSourceForTest(t *testing.T, sourceText string) *ast.SourceFile {
 	}
 	return sourceFile
 }
+
+// realCommentCorpus collects comment lines from the tree, so a gate over comments is measured
+// against the comments that exist rather than the ones somebody thought to write.
+func realCommentCorpus(t *testing.T) []string {
+	t.Helper()
+
+	var comments []string
+	root := "/Users/kirkouimet/Projects/ahra/libraries/structure/source"
+	fileCount := 0
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || fileCount >= 400 {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".ts") && !strings.HasSuffix(path, ".tsx") {
+			return nil
+		}
+		fileCount++
+		data, readError := os.ReadFile(path)
+		if readError != nil {
+			return nil
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			trimmed := strings.TrimSpace(line)
+			isCommentish := strings.HasPrefix(trimmed, "//") ||
+				strings.HasPrefix(trimmed, "*") || strings.HasPrefix(trimmed, "/*")
+			if isCommentish {
+				comments = append(comments, trimmed)
+			}
+		}
+		return nil
+	})
+
+	if len(comments) < 1000 {
+		t.Skipf("only %d comments available, too few to be a corpus", len(comments))
+	}
+	return comments
+}
