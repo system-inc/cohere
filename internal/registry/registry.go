@@ -8,6 +8,7 @@
 package registry
 
 import (
+	"github.com/system-inc/verify/internal/config"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/rules/nexus"
 )
@@ -21,6 +22,7 @@ func All() []rule.Rule {
 		nexus.BoundaryNoInternalImport,
 		nexus.BoundaryNoNexusOutsideImport,
 		nexus.BoundaryNoProjectImport,
+		nexus.ConsistencyNoAmbiguousIdentifier,
 		nexus.ConsistencyNoBooleanOutcome,
 		nexus.ConsistencyNoEnum,
 		nexus.ConsistencyNoLongLineComment,
@@ -39,4 +41,34 @@ func All() []rule.Rule {
 // Count is how many rules exist, for the coverage line.
 func Count() int {
 	return len(All())
+}
+
+// Options says how to decode each rule's configuration, and which rules cannot run without it.
+//
+// A rule declares its own options struct and only its own package knows that type, while the config
+// layer holds JSON. This map is the seam between them.
+//
+// Required is the field that matters. `boundary-no-project-import` was enabled and inert for months
+// under the gate verify replaces: it declines every file when LibraryDirectory is empty, which is
+// correct behavior for a misconfigured guard and indistinguishable from a rule with nothing to
+// report. A liveness harness reporting `fixtures=54 live=53 dead=1` was the only thing that ever
+// caught it. Marking it Required turns that silence into a failure.
+//
+// A rule absent from this map takes no options, which is the common case and needs no entry.
+func Options() config.OptionsRegistry {
+	return config.OptionsRegistry{
+		// Required: the rule guards one library directory and declines everything without it.
+		"boundary-no-project-import": {
+			Decode:   config.DecodeInto[nexus.BoundaryNoProjectImportOptions](),
+			Required: true,
+		},
+
+		// The rest tune behavior rather than enable it, so they run on their own defaults when the
+		// config says nothing.
+		"consistency-no-boolean-outcome":      {Decode: config.DecodeInto[nexus.ConsistencyNoBooleanOutcomeOptions]()},
+		"consistency-no-long-line-comment":    {Decode: config.DecodeInto[nexus.ConsistencyNoLongLineCommentOptions]()},
+		"consistency-no-screaming-snake-case": {Decode: config.DecodeInto[nexus.ConsistencyNoScreamingSnakeCaseOptions]()},
+		"consistency-no-shouting":             {Decode: config.DecodeInto[nexus.ConsistencyNoShoutingOptions]()},
+		"consistency-no-stuttering-name":      {Decode: config.DecodeInto[nexus.ConsistencyNoStutteringNameOptions]()},
+	}
 }
