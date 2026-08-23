@@ -1,0 +1,109 @@
+package prettier
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/dop251/goja"
+)
+
+/*
+ * Why a Go linter depends on a JavaScript interpreter.
+ *
+ * verify replaces Prettier, and replacing Prettier means matching it byte for byte on a tree that is
+ * already Prettier-formatted. Anything short of that produces a diff nobody asked for and buries
+ * real changes in noise. The alternative was measured rather than assumed: typescript-go ships a
+ * formatter, and its FormatCodeSettings has 21 fields and no printWidth, so it has no line-breaking
+ * engine at all. It leaves a 130-character line at 130 characters. 21.8% of tracked files diverge
+ * from our Prettier after every settings-reachable fix.
+ *
+ * So the only thing that reproduces our formatter is our formatter. goja runs it in-process, which
+ * costs about 9.6 MB in the stripped binary and buys byte-identical output on every file type
+ * Prettier handles, including the four our own fork customizes.
+ */
+
+// bundleDirectory is where the fork's build output is read from.
+//
+// This is the seam the build step replaces. Today it points at a local checkout; the vendoring step
+// will generate the bundles into the package and embed them, the same way typescript-go generates
+// and embeds its lib files rather than committing them. Keeping every path decision inside
+// loadBundles means that change is one function body rather than a rewrite.
+const bundleDirectory = "/Users/kirkouimet/Projects/system/prettier/dist/prettier"
+
+// bundleFiles are the Prettier bundles the engine evaluates, in dependency order.
+//
+// standalone.js first because the plugins register themselves against it. Everything else is one
+// language, and the set is what parserForExtension can ask for.
+var bundleFiles = []string{
+	"standalone.js",
+	"plugins/estree.js",
+	"plugins/typescript.js",
+	"plugins/babel.js",
+	"plugins/postcss.js",
+	"plugins/markdown.js",
+	"plugins/graphql.js",
+	"plugins/yaml.js",
+}
+
+// loadBundles returns each bundle's source, in evaluation order.
+//
+// A missing bundle is a hard error rather than a skipped language. An engine that quietly loaded
+// seven of eight would format the eighth's files by falling through to no parser at all, and the
+// failure would look like a file type nobody formats rather than a broken build.
+func loadBundles() ([]namedSource, error) {
+	sources := make([]namedSource, 0, len(bundleFiles))
+	for _, name := range bundleFiles {
+		text, err := os.ReadFile(filepath.Join(bundleDirectory, name))
+		if err != nil {
+			return nil, fmt.Errorf("reading prettier bundle %s: %w", name, err)
+		}
+		sources = append(sources, namedSource{name: name, text: string(text)})
+	}
+	return sources, nil
+}
+
+// namedSource is one bundle and where it came from, so an evaluation failure can name the file.
+type namedSource struct {
+	name string
+	text string
+}
+
+// drainPromise resolves a value that may be a promise, and this is the least obvious part of the
+// engine.
+//
+// prettier.format returns a promise. goja implements promises but has no event loop, because an
+// event loop is a host concern rather than a language one -- the interpreter has a job queue and
+// nothing that pumps it. So a promise handed back to Go sits Pending forever, and a caller that
+// simply stringifies the result gets the literal text "[object Promise]" written into the file. That
+// is not hypothetical; it is what the first working version of this produced.
+//
+// The pump is goja's own: every RunString drains pending jobs as part of finishing, so evaluating a
+// trivial expression advances the queue. Looping on that is what settles the promise.
+//
+// The iteration cap is a deadlock guard rather than a timeout. Prettier's formatting is synchronous
+// under the hood, so a promise that has not settled after this many pumps is not slow, it is stuck,
+// and returning an error beats hanging a build.
+func drainPromise(vm *goja.Runtime, value goja.Value) (string, error) {
+	promise, isPromise := value.Export().(*goja.Promise)
+	if !isPromise {
+		return value.String(), nil
+	}
+
+	const maxPumps = 100000
+	for pump := 0; pump < maxPumps && promise.State() == goja.PromiseStatePending; pump++ {
+		if _, err := vm.RunString("0"); err != nil {
+			return "", fmt.Errorf("pumping the job queue: %w", err)
+		}
+	}
+
+	switch promise.State() {
+	case goja.PromiseStateFulfilled:
+		return promise.Result().String(), nil
+	case goja.PromiseStateRejected:
+		return "", fmt.Errorf("%s", strings.TrimSpace(promise.Result().String()))
+	default:
+		return "", fmt.Errorf("the formatter's promise never settled after %d pumps", maxPumps)
+	}
+}
