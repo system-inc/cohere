@@ -32,6 +32,8 @@ func All() []rule.Rule {
 		core.NoSparseArrays,
 		core.NoUnsafeFinally,
 		core.NoUselessCatch,
+		core.UseIsNaN,
+		core.ValidTypeof,
 		nexus.BoundaryNoInternalImport,
 		nexus.BoundaryNoNexusOutsideImport,
 		nexus.BoundaryNoProjectImport,
