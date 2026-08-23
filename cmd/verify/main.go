@@ -40,6 +40,10 @@ func run() error {
 	fixOnly := flag.Bool("fix", false, "fix and format only, running no other phase")
 	noFix := flag.Bool("no-fix", false, "mutate nothing: report what would change without writing a byte")
 	formatAll := flag.Bool("format-all", false, "format every file rather than only the ones that changed")
+	// A binary that implements no rule and a binary whose rule found nothing produce the same empty
+	// finding list, and the differential harness cannot tell them apart from the outside. This is how
+	// it asks.
+	listRules := flag.Bool("rules", false, "print the rules this binary implements, one per line, and exit")
 	// Off by default until the engine is shown to agree with the existing gate across the real
 	// corpus. Reformatting the tree away from what the gate produces is worse than not formatting,
 	// so enabling is a separate decision from wiring.
@@ -49,6 +53,20 @@ func run() error {
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+
+	if *listRules {
+		// Sorted so two binaries can be diffed directly. The registry's own order is the order rules
+		// were added, which is meaningful to a reader and useless to `diff`.
+		names := make([]string, 0, len(registry.All()))
+		for _, registered := range registry.All() {
+			names = append(names, registered.Name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			fmt.Println(name)
+		}
+		return nil
+	}
 
 	if *showVersion {
 		// The full provenance rather than a bare number, because the number alone does not identify
