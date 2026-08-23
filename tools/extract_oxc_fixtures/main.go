@@ -74,11 +74,21 @@ func main() {
 		os.Exit(2)
 	}
 
+	// A rule can be a directory rather than a file, and the largest ones are: no-unused-vars is
+	// 10,064 lines across an implementation, an options module, a fixer subtree and a tests
+	// directory. Reading only `<rule>.rs` found nothing there and printed nothing, which is a silent
+	// zero inside the tool built to refuse silent zeros. Found when the option-key check reported
+	// clean on a corpus known to carry a misconfigured case.
 	rulePath := filepath.Join(*rulesDirectory, *rule+".rs")
 	source, err := os.ReadFile(rulePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cannot read %s: %v\n", rulePath, err)
-		os.Exit(1)
+		combined, readErr := readRuleDirectory(filepath.Join(*rulesDirectory, *rule))
+		if readErr != nil {
+			fmt.Fprintf(os.Stderr, "cannot read %s as a file or a directory: %v\n", rulePath, err)
+			os.Exit(1)
+		}
+		source = []byte(combined)
+		fmt.Printf("layout          directory rather than a single file\n")
 	}
 
 	blocks := readTesterBlocks(string(source))
@@ -149,14 +159,123 @@ func main() {
 	}
 
 	withOptions := 0
+	var optionKeys []string
 	for _, block := range blocks {
 		for _, entry := range append(append([]fixtureCase{}, block.pass...), block.fail...) {
-			if entry.options != "" {
-				withOptions++
+			if entry.options == "" {
+				continue
 			}
+			withOptions++
+			optionKeys = append(optionKeys, keysIn(entry.options)...)
 		}
 	}
 	fmt.Printf("with options    %d cases carry a second tuple element\n", withOptions)
+
+	for _, key := range unrecognizedKeys(optionKeys, string(source), rulesDirectoryFor(rulePath)) {
+		// A case configuring a key the rule never reads runs on defaults while wearing the shape of
+		// a case that proves the option works, and it passes. oxc's own no-unused-vars corpus has
+		// one: it writes `reportUnusedIgnorePattern` where the option is `reportUsedIgnorePattern`,
+		// and the rule's `deny_unknown_fields` is decorative, so nothing rejects it.
+		//
+		// Importing faithfully imports the hole. Reported rather than dropped, same as a case absent
+		// from the snapshot.
+		fmt.Printf("                UNRECOGNIZED OPTION KEY %q: it appears in a case and nowhere in "+
+			"the rule's own source, so that case runs on defaults while looking like it tests the "+
+			"option\n", key)
+	}
+}
+
+// optionKeyPattern finds the quoted keys of a serde_json object literal.
+var optionKeyPattern = regexp.MustCompile(`"([A-Za-z][A-Za-z0-9_]*)"\s*:`)
+
+// keysIn returns the option keys a case names, and only those.
+//
+// A case can carry three elements, not two: source, rule options, and lint configuration. The third
+// holds `env`, `globals` and the global names inside them, which are settings for the harness rather
+// than options the rule reads. Scanning the whole tail reported twenty of those as unrecognized
+// across the eslint directory, every one a false positive, and a check that fires on correct rules
+// teaches a reader to skip it.
+//
+// So only the first element is read, and only when it is a serde_json literal. Anything past its
+// closing paren belongs to the harness.
+func keysIn(options string) []string {
+	// Both macro spellings appear in the corpus. The tests directory of a multi-file rule imports
+	// the macro and writes `json!`, while single-file rules write it qualified. Matching only the
+	// qualified form excluded the one case this check exists to catch.
+	trimmed := strings.TrimSpace(options)
+	if !strings.HasPrefix(trimmed, "Some(serde_json::json!") && !strings.HasPrefix(trimmed, "Some(json!") {
+		return nil
+	}
+	body, ok := balancedSlice(trimmed, '(', ')')
+	if !ok {
+		return nil
+	}
+
+	var keys []string
+	for _, match := range optionKeyPattern.FindAllStringSubmatch(body, -1) {
+		keys = append(keys, match[1])
+	}
+	return keys
+}
+
+// rulesDirectoryFor returns the directory holding a rule, so a multi-file rule's siblings are read.
+//
+// A rule can be a directory rather than a file, and no-unused-vars is: its options live in
+// options.rs beside the rule. Reading only the rule file would find no real key there and report
+// every one of them, which is the false-positive direction of this check.
+func rulesDirectoryFor(rulePath string) string {
+	stem := strings.TrimSuffix(rulePath, ".rs")
+	if entries, err := os.ReadDir(stem); err == nil {
+		var combined strings.Builder
+		for _, entry := range entries {
+			if contents, err := os.ReadFile(filepath.Join(stem, entry.Name())); err == nil {
+				combined.Write(contents)
+			}
+		}
+		return combined.String()
+	}
+	return ""
+}
+
+// unrecognizedKeys returns option keys that appear in a case and nowhere in the rule's own source.
+//
+// The discriminator is deliberately weak and that is the point: extracting a rule's real option set
+// would mean parsing several unrelated Rust spellings of key lookup, and one rule in the eslint
+// directory uses a hand-written TryFrom while others use serde. A key present in the implementation
+// text is recognized; a key present only in the tests is not. That catches the typo case without
+// needing to understand how any particular rule parses.
+//
+// It answers nothing about whether a recognized key is handled correctly, and it is not meant to.
+func unrecognizedKeys(keys []string, ruleSource string, siblingSource string) []string {
+	seen := map[string]bool{}
+	var unrecognized []string
+
+	for _, key := range keys {
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+
+		// The test function is where a typo lives, so the implementation half is what counts. Split
+		// on the test attribute rather than trying to find the function's end.
+		implementation := ruleSource
+		if index := strings.Index(ruleSource, "#[test]"); index >= 0 {
+			implementation = ruleSource[:index]
+		}
+		// Both spellings, because Rust names the field in snake_case and the camelCase form appears
+		// only in serde attributes and fixtures. Checking the camelCase form alone reported
+		// `enforceForSwitchCase` as unrecognized while the rule reads it 56 times, which is the
+		// false-positive direction and the worse one: a check that fires on correct rules trains a
+		// reader to skip it.
+		if strings.Contains(implementation, key) ||
+			strings.Contains(implementation, snakeCase(key)) ||
+			strings.Contains(siblingSource, key) ||
+			strings.Contains(siblingSource, snakeCase(key)) {
+			continue
+		}
+		unrecognized = append(unrecognized, key)
+	}
+	return unrecognized
 }
 
 // testerBlockPattern finds each Tester::new invocation and how it is run.
@@ -438,4 +557,51 @@ func countSnapshotDiagnostics(path string) (int, bool) {
 		return 0, false
 	}
 	return strings.Count(string(contents), "⚠"), true
+}
+
+// snakeCase converts a camelCase option key to the Rust field spelling.
+func snakeCase(name string) string {
+	var built strings.Builder
+	for index, character := range name {
+		if character >= 'A' && character <= 'Z' {
+			if index > 0 {
+				built.WriteByte('_')
+			}
+			built.WriteRune(character - 'A' + 'a')
+			continue
+		}
+		built.WriteRune(character)
+	}
+	return built.String()
+}
+
+// readRuleDirectory concatenates every Rust file under a rule that is a directory.
+//
+// Recursive, because the corpus can sit a level down: no-unused-vars keeps its cases in
+// `tests/typescript_eslint.rs` and its option parsing in `options.rs`, and a reader taking only the
+// top level sees the implementation and none of the fixtures.
+func readRuleDirectory(directory string) (string, error) {
+	var combined strings.Builder
+	err := filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".rs") {
+			return nil
+		}
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		combined.Write(contents)
+		combined.WriteString("\n")
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	if combined.Len() == 0 {
+		return "", fmt.Errorf("no .rs files under %s", directory)
+	}
+	return combined.String(), nil
 }
