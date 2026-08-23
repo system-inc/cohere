@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Score one mutation, refusing to score a mutant that changed nothing.
+#
+# A mutation sweep proves a fixture set can see. The failure it cannot see is its own: a replacement
+# that matched nothing produces a mutant identical to the original, the suite passes, and that reads
+# exactly like a surviving mutant that the fixtures are blind to. No error, no empty output, no
+# friction. The probe ran perfectly against the wrong object.
+#
+# That happened twice in this project on one day, in two nodes that had not spoken. A rule file was
+# indented one level deeper than its sibling so a replacement silently matched nothing, and a
+# research pass counted the wrong diagnostic marker across 844 of 867 upstream snapshots and read the
+# silence as a clean corpus.
+#
+# So this refuses to report a score until it has proven the input was real. The byte comparison is
+# the half that a known-dirty control sails straight past, because a control proves the harness can
+# fail while saying nothing about whether this particular edit landed.
+#
+#   tools/sweep.sh <file> <package> <python-expression-rewriting-stdin>
+#
+# The mutant must also compile. A build failure is neither a catch nor a survival, and scoring it as
+# a catch is how a sweep congratulates itself for a syntax error.
+set -uo pipefail
+
+if [ "$#" -ne 3 ]; then
+    echo "usage: tools/sweep.sh <file> <package> <python-rewrite>" >&2
+    exit 2
+fi
+
+file="$1"
+package="$2"
+rewrite="$3"
+
+if [ ! -f "$file" ]; then
+    echo "sweep: no such file: $file" >&2
+    exit 2
+fi
+
+backup="$(mktemp)"
+cp "$file" "$backup"
+restore() { cp "$backup" "$file"; rm -f "$backup"; }
+trap restore EXIT
+
+python3 -c "
+import sys
+source = open('$file').read()
+mutated = $rewrite
+open('$file', 'w').write(mutated)
+" || { echo "sweep: rewrite raised" >&2; exit 2; }
+
+if cmp -s "$backup" "$file"; then
+    echo "REFUSED: the rewrite changed no bytes, so this scores nothing."
+    echo "A no-op mutation is indistinguishable from one the fixtures cannot see."
+    exit 2
+fi
+
+if ! go build ./... >/dev/null 2>&1; then
+    echo "REFUSED: the mutant does not compile, which is neither a catch nor a survival."
+    exit 2
+fi
+
+failures="$(go test -count=1 "$package" 2>&1 | grep -c 'FAIL')"
+if [ "$failures" -gt 0 ]; then
+    echo "CAUGHT: $failures failing line(s) in $package"
+else
+    echo "SURVIVED: the mutant compiles, changed bytes, and no fixture noticed."
+fi
