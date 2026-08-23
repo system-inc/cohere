@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/verify/internal/config"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/rules/core"
+	"github.com/system-inc/verify/internal/rules/next"
 	"github.com/system-inc/verify/internal/rules/nexus"
 	"github.com/system-inc/verify/internal/rules/structure"
 	"github.com/system-inc/verify/internal/rules/tailwind"
@@ -39,6 +40,7 @@ func All() []rule.Rule {
 		core.RequireYield,
 		core.UseIsNaN,
 		core.ValidTypeof,
+		next.NoAssignModuleVariable,
 		nexus.BoundaryNoInternalImport,
 		nexus.BoundaryNoNexusOutsideImport,
 		nexus.BoundaryNoProjectImport,
