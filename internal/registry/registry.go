@@ -26,6 +26,7 @@ func All() []rule.Rule {
 		nexus.ConsistencyNoScreamingSnakeCase,
 		nexus.ConsistencyNoShouting,
 		nexus.ConsistencyNoSingleLineJsDoc,
+		nexus.ConsistencyNoStrictUndefinedAstCheck,
 		nexus.ConsistencyNoStutteringName,
 		nexus.ConsistencyNoUtilsFolder,
 		nexus.ConsistencyRequireTypeSuffix,
