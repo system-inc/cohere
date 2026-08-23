@@ -296,14 +296,25 @@ func classify(ruleName string, onlyOn Side, inputs Inputs) Classification {
 	knownToVerify := inputs.VerifyRules[ruleName]
 	configured := inputs.ConfiguredRules[ruleName]
 
+	// A nil map means the caller never read the lint config, which is not the same as a config that
+	// enables nothing — and Go cannot tell them apart, because reading any key of a nil map returns
+	// false. Without this the not-configured branch would swallow every rule and quietly excuse
+	// every genuine disagreement, producing a clean tree with maximum confidence. So absent
+	// knowledge degrades to the two-way split, which is honest about what the caller actually has.
+	configurationKnown := inputs.ConfiguredRules != nil
+
 	switch {
 	// The gate found it and verify has no such rule. Expected during the migration, and the reason
 	// a raw count of differences is not a measure of disagreement.
 	case onlyOn == SideGate && !knownToVerify:
 		return ClassificationNotPorted
 	// Verify has the rule but nothing turned it on, so it walked no files.
-	case knownToVerify && !configured:
+	case knownToVerify && configurationKnown && !configured:
 		return ClassificationNotConfigured
+	// Both sides have it and we cannot say whether it was enabled. Treating that as a disagreement
+	// is the conservative direction: it surfaces for a human instead of being filed as expected.
+	case knownToVerify && !configurationKnown:
+		return ClassificationBothActive
 	// Both sides had this rule and both had it on. Somebody is wrong.
 	case knownToVerify && configured:
 		return ClassificationBothActive
