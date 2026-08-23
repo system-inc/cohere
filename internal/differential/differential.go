@@ -72,10 +72,29 @@ func NormalizeRuleName(raw string) string {
 		name = name[open+1 : len(name)-1]
 	}
 
-	// `rule-name/messageId` — take what is before the slash. Rule names in both catalogs are
-	// hyphenated and never contain a slash, so the first slash is always the message boundary.
+	// A slash means two opposite things depending on who wrote it, and an earlier version of this
+	// function assumed there was only one meaning:
+	//
+	//	rule-name/messageId          verify's findings   the name is BEFORE the slash
+	//	plugin/rule-name             the config's keys   the name is AFTER the slash
+	//
+	// Taking the first segment unconditionally is right for the first and silently wrong for the
+	// second, and the wrongness does not look like a parse failure. Every config key collapses to
+	// its plugin, so the configured-rule set becomes `{nexus, structure, typescript}` and no real
+	// rule name is in it. Every rule then reads as unconfigured and every genuine disagreement is
+	// filed as not-configured, which is the harness excusing precisely the findings it exists to
+	// surface. It reached a live run and showed up as one wrong word in a table.
+	//
+	// The two are told apart by shape rather than by a plugin list, so a new plugin needs no edit
+	// here: rule names in both catalogs are hyphenated and message ids are camelCase, so a segment
+	// containing a hyphen is a rule name and one without is not.
 	if slash := strings.IndexByte(name, '/'); slash >= 0 {
-		name = name[:slash]
+		before, after := name[:slash], name[slash+1:]
+		if strings.Contains(before, "-") {
+			name = before
+		} else {
+			name = after
+		}
 	}
 
 	return strings.TrimSpace(name)

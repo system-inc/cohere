@@ -333,3 +333,46 @@ func TestUnknownConfigurationDoesNotExcuseEveryRule(t *testing.T) {
 		t.Fatal("a difference on an implemented rule must still block agreement when the config was never read")
 	}
 }
+
+// A slash means two different things depending on which side of it the rule name sits.
+//
+// verify prints `rule-name/messageId`, so the name is before the slash. The lint config keys rules
+// as `plugin/rule-name`, so the name is after it. Taking the first segment unconditionally is
+// correct for the first and silently wrong for the second, and the wrongness does not look like a
+// parse failure: every config key collapses to its plugin, so `nexus/consistency-no-enum` and
+// `nexus/consistency-no-shouting` both become `nexus`.
+//
+// The consequence is not cosmetic. A configured-rule set built that way contains two junk entries
+// and no real rule names, so every rule reads as unconfigured, every genuine disagreement is filed
+// as not-configured, and the harness excuses exactly the findings it exists to surface. It reached
+// a real run and rendered as one wrong word in a table.
+func TestAPluginPrefixedConfigKeyKeepsTheRuleName(t *testing.T) {
+	cases := []struct {
+		raw    string
+		expect string
+	}{
+		// Config keys: plugin first, rule after.
+		{"nexus/consistency-no-enum", "consistency-no-enum"},
+		{"structure/react-component-no-multiple-primary", "react-component-no-multiple-primary"},
+		{"typescript/no-explicit-any", "no-explicit-any"},
+		// verify findings: rule first, message id after.
+		{"consistency-no-enum/noEnum", "consistency-no-enum"},
+		{"consistency-no-abbreviated-identifier/noParams", "consistency-no-abbreviated-identifier"},
+		// Gate findings: plugin in parentheses.
+		{"nexus(consistency-no-enum)", "consistency-no-enum"},
+	}
+	for _, testCase := range cases {
+		if got := NormalizeRuleName(testCase.raw); got != testCase.expect {
+			t.Errorf("NormalizeRuleName(%q) = %q, want %q", testCase.raw, got, testCase.expect)
+		}
+	}
+
+	// The property, stated as a property: all three spellings of one rule must reach the same name,
+	// because a config key and a finding have to meet in the same map for classification to work.
+	fromConfig := NormalizeRuleName("nexus/consistency-no-enum")
+	fromVerify := NormalizeRuleName("consistency-no-enum/noEnum")
+	fromGate := NormalizeRuleName("nexus(consistency-no-enum)")
+	if fromConfig != fromVerify || fromVerify != fromGate {
+		t.Fatalf("one rule normalized three ways: config %q, verify %q, gate %q", fromConfig, fromVerify, fromGate)
+	}
+}

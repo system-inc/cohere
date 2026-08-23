@@ -145,11 +145,16 @@ func TestUnparsedLinesAreSurfacedNotDropped(test *testing.T) {
 // it is the plugin. The two conventions collide, and the collision is silent: the name still
 // parses, still compares, and simply refers to the wrong thing.
 //
-// This test documents the boundary rather than asserting the collision is handled, because it is
-// not handled today. The gate's own output wraps the plugin in parentheses, which is why nothing
-// has broken yet: the slash form appears in .oxlintrc.json, not in the output this harness parses.
-// If a future reader wires rule catalogs from the config into Inputs.ConfiguredRules, that is the
-// moment this bites, and this test is where they will find out.
+// This test used to document the boundary rather than assert the collision was handled, and it
+// named the exact moment it would bite: "if a future reader wires rule catalogs from the config
+// into Inputs.ConfiguredRules." That happened at 01:48 when verify-differential was first pointed
+// at the real tree. Every config key collapsed to its plugin, the configured-rule set became three
+// junk names, and every rule read as unconfigured, so the per-rule table labelled an enabled rule
+// not-configured. It surfaced as one wrong word and would have excused every real disagreement.
+//
+// It is handled now. The two conventions are told apart by shape rather than by a plugin list, so
+// a new plugin needs no edit: rule names are hyphenated and message ids are camelCase, so the
+// segment containing a hyphen is the rule name. The assertions below now pin the fixed behavior.
 func TestPluginSlashRuleNamesSurviveNormalization(test *testing.T) {
 	// The forms that actually appear in gate and verify output today, which must keep working.
 	fromOutput := map[string]string{
@@ -164,10 +169,17 @@ func TestPluginSlashRuleNamesSurviveNormalization(test *testing.T) {
 		}
 	}
 
-	// The config form, which does NOT survive, recorded so the limit is visible rather than
-	// discovered later as a wrong answer.
-	if got := NormalizeRuleName("typescript/no-explicit-any"); got != "typescript" {
-		test.Errorf("NormalizeRuleName(%q) = %q; this test records today's behavior, and a change here means the plugin/rule collision was addressed — update the comment above rather than only this line",
-			"typescript/no-explicit-any", got)
+	// The config form, which now survives. A regression here means the configured-rule set has gone
+	// back to holding plugin names, and every genuine disagreement would be excused as
+	// not-configured.
+	fromConfig := map[string]string{
+		"typescript/no-explicit-any":                    "no-explicit-any",
+		"nexus/consistency-no-enum":                     "consistency-no-enum",
+		"structure/react-component-no-multiple-primary": "react-component-no-multiple-primary",
+	}
+	for raw, want := range fromConfig {
+		if got := NormalizeRuleName(raw); got != want {
+			test.Errorf("NormalizeRuleName(%q) = %q, want %q", raw, got, want)
+		}
 	}
 }

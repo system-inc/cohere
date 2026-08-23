@@ -187,17 +187,37 @@ func (provenance Provenance) Describe() string {
 		return builder.String()
 	}
 
+	directions := map[Side]bool{}
 	for _, control := range provenance.ControlsRun {
 		status := "detected"
 		if !control.Detected {
-			status = "MISSED: " + control.Detail
+			status = "missed: " + control.Detail
 		}
-		fmt.Fprintf(builder, "control %q (%s should see %s): %s\n",
-			control.Name, control.ExpectedSide, control.Rule, status)
+		// A shared control has no expected side, so naming one would be a lie and leaving the field
+		// blank renders as `( should see ...)`. It says what it actually asserts instead.
+		expectation := fmt.Sprintf("%s should see %s", control.ExpectedSide, control.Rule)
+		if control.ExpectedSide == "" {
+			expectation = fmt.Sprintf("both should see %s", control.Rule)
+		} else {
+			directions[control.ExpectedSide] = true
+		}
+		fmt.Fprintf(builder, "control %q (%s): %s\n", control.Name, expectation, status)
 	}
 
+	// The closing line says which proof is missing rather than always claiming one direction ran.
+	// "only one direction exercised" printed over a run with no directional control at all was a
+	// true-sounding sentence about something that had not happened.
 	if !provenance.ControlsProven() {
-		fmt.Fprintf(builder, "controls: only one direction exercised — a defect on the unexercised side would still report clean\n")
+		switch {
+		case len(directions) == 0:
+			fmt.Fprintf(builder, "controls: no directional control ran, so a one-sided difference in either direction would still report clean\n")
+		case len(directions) == 1:
+			for side := range directions {
+				fmt.Fprintf(builder, "controls: only the %s direction was exercised, so a defect on the other side would still report clean\n", side)
+			}
+		default:
+			fmt.Fprintf(builder, "controls: both directions were exercised but not every control fired\n")
+		}
 	}
 
 	return builder.String()
