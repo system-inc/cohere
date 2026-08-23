@@ -63,6 +63,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 		ReactComponentNoDisplayName,
 		ReactComponentNoSeparateNamedExport,
 		ReactComponentRequirePropertiesParameter,
+		ReactComponentRequirePropertiesTypeSuffix,
 		ReactHookNoDestructuring,
 		ReactHookRequireEffectComment,
 		ReactImportNoDestructuring,

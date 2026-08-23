@@ -84,6 +84,7 @@ func All() []rule.Rule {
 		structure.ReactComponentNoDisplayName,
 		structure.ReactComponentNoSeparateNamedExport,
 		structure.ReactComponentRequirePropertiesParameter,
+		structure.ReactComponentRequirePropertiesTypeSuffix,
 		structure.ReactComponentNoForwardRef,
 		structure.ReactComponentNoMultiplePrimary,
 		structure.ReactHookNoDestructuring,
