@@ -302,9 +302,47 @@ function declaredProperties(className) {
      * Custom properties are dropped for the same reason: two classes both setting `--tw-border-style`
      * are not in conflict about anything the author can see.
      */
-    const ruleBody = compiled[0].split('@')[0];
+    /*
+     * Only declarations inside a rule body, and only from a single-rule utility.
+     *
+     * A first version scanned `compiled[0].split('@')[0]` with a `name: value;` regex, which reads
+     * the CSS as though it were one flat block. Two things break that, and a sweep of all 1,145
+     * table entries against the engine found both:
+     *
+     *   `.slide-in-from-end:dir(ltr) { --enter-translate-x: 100%; }` declares only a custom
+     *   property, and the regex matched the SELECTOR `slide-in-from-end` from the `:dir(ltr)` part
+     *   as if it were a property name. So a class declaring nothing was recorded as declaring
+     *   itself, and any two such classes would read as conflicting.
+     *
+     *   `.markdown-content p { ... } .markdown-content code { ... }` is a component class emitting
+     *   several rules, and the regex harvested `p`, `code` and `pre` as property names.
+     *
+     * Braces are the fix: a declaration is inside them and a selector is not. A utility emitting
+     * more than one rule is skipped entirely rather than merged, because the properties it declares
+     * belong to descendants rather than to the element the class sits on, and a conflict rule
+     * comparing them against a sibling's would be comparing different elements.
+     */
+    // At-rule blocks first, then braces. Both guards are needed and each was added after the other
+    // was already there: dropping the at-rule split reintroduced `syntax`, `inherits` and
+    // `initial-value` from `@property`, because braces match inside at-rules too.
+    const beforeAtRules = compiled[0].split('@')[0];
+    const bodies = Array.from(beforeAtRules.matchAll(/\{([^{}]*)\}/g)).map((match) => match[1]);
+    if (bodies.length === 0) return null;
 
-    const properties = Array.from(ruleBody.matchAll(/([-a-zA-Z]+)\s*:\s*[^;]+;/g))
+    /*
+     * A utility emitting several rules is skipped rather than merged.
+     *
+     * `markdown-content`, `prose` and `typing-dots` are component classes whose rules target
+     * descendants: `.markdown-content p`, `.markdown-content code`, `.markdown-content pre`. Their
+     * declarations belong to those children rather than to the element the class sits on, so a
+     * conflict rule comparing them against a sibling class would be comparing different elements.
+     * Recording nothing is the honest answer, and it makes the rule silent about them rather than
+     * wrong about them.
+     */
+    if (bodies.length > 1) return null;
+
+    const properties = bodies
+        .flatMap((body) => Array.from(body.matchAll(/([-a-zA-Z]+)\s*:\s*[^;]+;/g)))
         .map((match) => match[1].trim())
         .filter((property) => !property.startsWith('--'));
 

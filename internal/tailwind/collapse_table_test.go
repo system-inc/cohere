@@ -281,3 +281,72 @@ func TestPropertiesExcludeAtRuleDescriptors(t *testing.T) {
 		}
 	}
 }
+
+// TestPropertyExtractionRejectsSelectorsAndKeyframes guards a defect a fixture set could not see.
+//
+// Twelve entries were pinned by name in this file and 1,132 were not, and the unchecked space is
+// where the bugs lived. A sweep comparing every entry against the engine found eleven wrong, all
+// from one cause: the extraction read the compiled CSS as though it were a single flat block.
+//
+//	`.slide-in-from-end:dir(ltr) { --enter-translate-x: 100%; }`
+//
+// declares only a custom property, and the regex matched the SELECTOR `slide-in-from-end` out of
+// `:dir(ltr)` as if it were a property name. A class declaring nothing was recorded as declaring
+// itself, and any two such classes would have read as conflicting.
+//
+//	`.markdown-content p { ... } .markdown-content code { ... }`
+//
+// is a component class emitting several rules, and the regex harvested `p`, `code` and `pre`.
+//
+// Both are now excluded at the generator: declarations are read only from inside braces, at-rule
+// blocks are cut first, and a utility emitting more than one rule is skipped entirely because its
+// declarations belong to descendants rather than to the element the class sits on.
+//
+// This asserts the outcome rather than the mechanism, because the mechanism has been wrong in three
+// different ways and the outcome is what a rule reads.
+func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
+	// A property name is a CSS property, never a selector, an element name or an animation name.
+	notProperties := []string{
+		"p", "code", "pre", "div", "span", "h1", "li", "table",
+		"slide-in-from-end", "slide-in-from-start", "slide-out-to-end", "slide-out-to-start",
+		"syntax", "inherits", "initial-value",
+	}
+
+	for _, table := range []struct {
+		name    string
+		entries map[string][]string
+	}{
+		{name: "root", entries: RootDeclaredProperties},
+		{name: "static", entries: StaticDeclaredProperties},
+		{name: "color", entries: RootColorProperties},
+	} {
+		if len(table.entries) == 0 {
+			t.Fatalf("the %s table is empty, so this assertion passes for the wrong reason", table.name)
+		}
+		for utility, properties := range table.entries {
+			for _, property := range properties {
+				for _, forbidden := range notProperties {
+					if property == forbidden {
+						t.Errorf("%s table: %q declares %q, which is a selector, element or animation "+
+							"name rather than a CSS property. The extraction is reading outside a rule body.",
+							table.name, utility, forbidden)
+					}
+				}
+			}
+		}
+	}
+
+	// Multi-rule component classes are skipped entirely rather than merged, so they must be absent.
+	for _, componentClass := range []string{"markdown-content", "prose", "typing-dots"} {
+		if properties, isPresent := StaticDeclaredProperties[componentClass]; isPresent {
+			t.Errorf("%q is a component class emitting several rules targeting descendants, so its "+
+				"declarations belong to children rather than to the element. It should be absent, not "+
+				"recorded as %v.", componentClass, properties)
+		}
+	}
+
+	// A class that declares only custom properties records nothing rather than recording itself.
+	if properties, isPresent := StaticDeclaredProperties["slide-in-from-end"]; isPresent {
+		t.Errorf("slide-in-from-end declares only a custom property and should be absent, got %v", properties)
+	}
+}
