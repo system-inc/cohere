@@ -35,8 +35,10 @@ func All() []rule.Rule {
 		nexus.ConsistencyNoUtilsFolder,
 		nexus.ConsistencyRequireTypeSuffix,
 		nexus.ImportNoForbiddenSource,
+		nexus.ImportRequireModuleAlias,
 		nexus.ImportRequireNodeNamespace,
 		nexus.ImportRequirePathAlias,
+		nexus.LocalizationNoUntranslatedValue,
 	}
 }
 
@@ -82,5 +84,6 @@ func Options() config.OptionsRegistry {
 		"consistency-no-screaming-snake-case": {Decode: config.DecodeInto[nexus.ConsistencyNoScreamingSnakeCaseOptions]()},
 		"consistency-no-shouting":             {Decode: config.DecodeInto[nexus.ConsistencyNoShoutingOptions]()},
 		"consistency-no-stuttering-name":      {Decode: config.DecodeInto[nexus.ConsistencyNoStutteringNameOptions]()},
+		"import-require-module-alias":         {Decode: config.DecodeInto[nexus.ImportRequireModuleAliasOptions]()},
 	}
 }
