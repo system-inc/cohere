@@ -42,6 +42,19 @@ type enumeration struct {
 	StaticUtilities int      `json:"staticUtilities"`
 	PairsProbed     int      `json:"pairsProbed"`
 	Families        []family `json:"families"`
+	// RootProperties and StaticProperties are what `no-conflicting-classes` needs: the CSS property
+	// names each utility declares. Measured as a fact about roots rather than about classes, so
+	// `px-4` and `px-8` share an entry and the table does not grow with the theme's scale.
+	RootProperties      []utilityProperties `json:"rootProperties"`
+	RootColorProperties []utilityProperties `json:"rootColorProperties"`
+	ColorNames          []string            `json:"colorNames"`
+	StaticProperties    []utilityProperties `json:"staticProperties"`
+}
+
+// utilityProperties is one utility and the CSS property names it declares.
+type utilityProperties struct {
+	Root       string   `json:"root"`
+	Properties []string `json:"properties"`
 }
 
 // family is one collapse: two roots that merge into a third when everything else about them agrees.
@@ -219,6 +232,61 @@ var CollapseFamilies = []CollapseFamily{
 
 	fmt.Fprintf(&buffer, `}
 
+// RootDeclaredProperties is the CSS property names each functional utility root declares.
+//
+// Two classes conflict when they declare the same property, which is what no-conflicting-classes
+// reports. Property names rather than values, and the distinction inverts both answers: w-8 and
+// h-8 declare the same value under different properties and do not conflict, while px-4 and px-8
+// declare different values under one property and do.
+//
+// Shorthands are deliberately not normalised. padding and padding-inline are different names, and
+// upstream reports no conflict between p-4 and px-8 even though they visually overlap.
+var RootDeclaredProperties = map[string][]string{
+`)
+	for _, entry := range result.RootProperties {
+		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.Root, quotedList(entry.Properties))
+	}
+
+	fmt.Fprintf(&buffer, `}
+
+// RootColorProperties is what a root declares when its value is a color rather than a length.
+//
+// border is border-width plus border-style with a number and border-color with a color, so border
+// and border-neutral-200 declare different things despite sharing a root. Reporting them as
+// conflicting produced 347 findings on a tree whose real count is zero.
+//
+// Recorded per root rather than per class: the exceptions are the color scale multiplied by the
+// roots that accept it, which is 7,854 entries resolving to 14 distinct property sets.
+var RootColorProperties = map[string][]string{
+`)
+	for _, entry := range result.RootColorProperties {
+		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.Root, quotedList(entry.Properties))
+	}
+
+	fmt.Fprintf(&buffer, `}
+
+// ColorNames is every color value the design system defines.
+//
+// Needed because deciding whether a class value is a color requires the theme's palette, which is
+// the theme-dependent knowledge a Go-side table exists to carry. Hardcoding Tailwind's default
+// palette would be wrong for any project that customises it.
+var ColorNames = map[string]bool{
+`)
+	for _, name := range result.ColorNames {
+		fmt.Fprintf(&buffer, "\t%q: true,\n", name)
+	}
+
+	fmt.Fprintf(&buffer, `}
+
+// StaticDeclaredProperties is the same, for utilities whose whole name is their identity.
+var StaticDeclaredProperties = map[string][]string{
+`)
+	for _, entry := range result.StaticProperties {
+		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.Root, quotedList(entry.Properties))
+	}
+
+	fmt.Fprintf(&buffer, `}
+
 // TailwindVersion is the version these families were enumerated from.
 //
 // Recorded so a mismatch between this and the installed Tailwind is greppable, and so a reader of a
@@ -231,6 +299,15 @@ const TailwindVersion = %q
 		return nil, fmt.Errorf("formatting the generated table: %w", err)
 	}
 	return formatted, nil
+}
+
+// quotedList renders a string slice as Go literal elements.
+func quotedList(values []string) string {
+	quoted := make([]string, 0, len(values))
+	for _, value := range values {
+		quoted = append(quoted, fmt.Sprintf("%q", value))
+	}
+	return strings.Join(quoted, ", ")
 }
 
 // exampleFamily names a real entry in the doc comment, so the file explains itself with something

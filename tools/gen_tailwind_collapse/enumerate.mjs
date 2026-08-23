@@ -137,13 +137,20 @@ for (const entry of designSystem.getClassList?.() ?? []) {
     const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
     if (typeof name !== 'string') continue;
 
+    // A name can be BOTH, and choosing one loses the other. `flex` is the static utility
+    // `display: flex` and also the functional root of `flex-4`, which is `flex: 4`; `block` is
+    // `display: block` and the root of `block-4`, which is `block-size`. A first version checked
+    // functional first and returned early, so `flex` and `block` were recorded with the properties
+    // of their functional readings and vanished from the static table entirely. That would have
+    // silently stopped `flex block` being reported as a display conflict, which is the headline
+    // case of the rule this data feeds.
+    const asStatic = parseCandidate(name);
+    if (asStatic?.kind === 'static') staticUtilities.add(name);
+
     const asFunctional = parseCandidate(name + '-4');
     if (asFunctional?.kind === 'functional' && asFunctional.root) {
         functionalRoots.add(asFunctional.root);
-        continue;
     }
-    const asStatic = parseCandidate(name);
-    if (asStatic?.kind === 'static') staticUtilities.add(name);
 }
 
 const roots = Array.from(functionalRoots).sort();
@@ -252,6 +259,140 @@ for (let indexA = 0; indexA < roots.length; indexA++) {
 
 families.sort((left, right) => left.inputs.join(' ').localeCompare(right.inputs.join(' ')));
 
+/*
+ * The CSS properties each root declares, for `no-conflicting-classes`.
+ *
+ * Two classes conflict when they declare the same property, so the rule needs a property set per
+ * class. Measured across `1`, `4`, `8`, `left`, `right` and `center`: every root produces one
+ * distinct property set regardless of value, so this is a fact about roots exactly like the collapse
+ * families are, and the table stays small rather than growing with the theme's scale.
+ *
+ * Property NAMES, not values. `w-8` and `h-8` declare the same value under `width` and `height` and
+ * do not conflict; `px-4` and `px-8` declare different values under one property and do. Keying on
+ * values would invert both answers.
+ *
+ * `p` and `px` are deliberately allowed to differ: `padding` and `padding-inline` are different
+ * property names, and upstream reports no conflict between `p-4` and `px-8` even though they
+ * visually overlap. Normalising shorthands here would invent a finding upstream does not report.
+ */
+function declaredProperties(className) {
+    let compiled;
+    try {
+        compiled = designSystem.candidatesToCss?.([className]);
+    }
+    catch {
+        return null;
+    }
+    if (!compiled || !compiled[0]) return null;
+
+    /*
+     * Only the utility's own rule body, stopping at the first at-rule.
+     *
+     * `border-l-4` compiles to its two declarations followed by an `@property --tw-border-style`
+     * block, and that block's descriptors are `syntax`, `inherits` and `initial-value`. Scanning
+     * the whole output picks those up as if the class declared them, so every class that touches
+     * border style would appear to share three properties with every other one and report a
+     * conflict. The at-rule is Tailwind's plumbing rather than anything the author wrote.
+     *
+     * Custom properties are dropped for the same reason: two classes both setting `--tw-border-style`
+     * are not in conflict about anything the author can see.
+     */
+    const ruleBody = compiled[0].split('@')[0];
+
+    const properties = Array.from(ruleBody.matchAll(/([-a-zA-Z]+)\s*:\s*[^;]+;/g))
+        .map((match) => match[1].trim())
+        .filter((property) => !property.startsWith('--'));
+
+    const distinct = Array.from(new Set(properties)).sort();
+    return distinct.length === 0 ? null : distinct;
+}
+
+/*
+ * Properties per root, split by value when the root needs it.
+ *
+ * A first version recorded one property set per root, having probed only numeric and keyword values.
+ * That is wrong for 23 of 294 roots, and wrong in the direction that reports false conflicts on
+ * correct code: `border` is `border-width` plus `border-style` with a number and `border-color` with
+ * a color, so `border border-neutral-200`, which is idiomatic Tailwind, read as a conflict. It
+ * produced 347 findings on a tree whose real count is zero.
+ *
+ * The split is by value kind rather than by exact value, verified across ten colors, six numbers and
+ * three arbitrary values: every color-valued border gives `border-color`, every numeric one gives
+ * width plus style, and `border-[#fff]` versus `border-[3px]` splits the same way. But deciding
+ * which kind a value is requires knowing the theme's color names, which is precisely the
+ * theme-dependent knowledge a Go-side table exists to carry. So the generator records the property
+ * set per (root, value) for the values the design system actually defines, and the rule looks up the
+ * pair rather than inferring the kind.
+ */
+const rootProperties = [];
+const rootValueProperties = [];
+
+for (const root of roots) {
+    let properties = null;
+    for (const value of probeValues) {
+        properties = declaredProperties(root + '-' + value);
+        if (properties !== null) break;
+    }
+    if (properties === null) continue;
+    rootProperties.push({ root, properties });
+}
+
+/*
+ * Roots whose properties depend on whether the value is a color, and the color names themselves.
+ *
+ * Recording every exception class produced 7,854 entries and a 9,000-line generated file, because
+ * the exceptions are the color scale multiplied by the roots that accept it: 434 roots by 18 shades,
+ * resolving to just 14 distinct property sets. That is a table nobody can read for a distinction
+ * affecting 23 roots.
+ *
+ * The real shape is two small lists. A root that accepts both a length and a color gets a second
+ * property set for its color reading, and the theme's color names are recorded once so the rule can
+ * tell which reading a class is. Deciding that in Go without this list would mean hardcoding
+ * Tailwind's palette, which is exactly the theme-dependent knowledge this table exists to carry.
+ */
+const rootDefault = new Map(rootProperties.map((entry) => [entry.root, entry.properties.join(',')]));
+
+const colorNames = new Set();
+for (const entry of designSystem.getClassList?.() ?? []) {
+    const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
+    if (typeof name !== 'string') continue;
+    if (!name.startsWith('text-')) continue;
+
+    const candidate = parseCandidate(name);
+    if (candidate?.kind !== 'functional' || candidate.root !== 'text') continue;
+
+    const properties = declaredProperties(name);
+    if (properties === null || properties.join(',') !== 'color') continue;
+
+    const value = candidate.value?.value;
+    if (typeof value === 'string' && value !== '') colorNames.add(value);
+}
+
+for (const root of roots) {
+    const defaultProperties = rootDefault.get(root);
+    if (defaultProperties === undefined) continue;
+
+    // Probe the root with a color the theme defines. A root that gives a different answer for a
+    // color than for a number needs both readings recorded.
+    const sampleColor = colorNames.values().next().value;
+    if (sampleColor === undefined) break;
+
+    const colorProperties = declaredProperties(root + '-' + sampleColor);
+    if (colorProperties === null) continue;
+    if (colorProperties.join(',') === defaultProperties) continue;
+
+    rootValueProperties.push({ root, properties: colorProperties });
+}
+
+rootValueProperties.sort((left, right) => left.root.localeCompare(right.root));
+
+const staticProperties = [];
+for (const name of Array.from(staticUtilities).sort()) {
+    const properties = declaredProperties(name);
+    if (properties === null) continue;
+    staticProperties.push({ root: name, properties });
+}
+
 const tailwindVersion = JSON.parse(
     NodeFileSystem.readFileSync(
         NodeModule.createRequire(NodePath.join(entryDirectory, 'noop.js')).resolve('tailwindcss/package.json'),
@@ -268,6 +409,10 @@ process.stdout.write(
             staticUtilities: staticUtilities.size,
             pairsProbed,
             families,
+            rootProperties,
+            rootColorProperties: rootValueProperties,
+            colorNames: Array.from(colorNames).sort(),
+            staticProperties,
         },
         null,
         2,
