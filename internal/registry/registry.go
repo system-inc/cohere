@@ -21,6 +21,7 @@ func All() []rule.Rule {
 		nexus.BoundaryNoInternalImport,
 		nexus.BoundaryNoNexusOutsideImport,
 		nexus.BoundaryNoProjectImport,
+		nexus.ConsistencyNoBooleanOutcome,
 		nexus.ConsistencyNoEnum,
 		nexus.ConsistencyNoLongLineComment,
 		nexus.ConsistencyNoScreamingSnakeCase,
