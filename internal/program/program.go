@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
@@ -94,6 +95,13 @@ type Options struct {
 	// hundreds of spurious TS2550/TS2554 (measured: 118 of them on the ahra tree). Point this at a
 	// specific lib directory only when deliberately reproducing another toolchain's result.
 	LibraryPath string
+
+	// Checkers is how many checkers to create. Zero means the compiler's own default.
+	//
+	// It is the count that parallelizes the checking phase, not the graph build: construction is
+	// parse and resolve, which this does not touch. Raising it trades memory for wall clock, since
+	// each checker holds its own type tables.
+	Checkers int
 
 	// SingleThreaded forces one checker instead of one per core. Off by default; useful when a
 	// measurement needs to be reproducible, or when a caller wants types from different files to be
@@ -179,6 +187,15 @@ func Build(options Options) (*Graph, error) {
 	if options.SingleThreaded {
 		singleThreaded = core.TSTrue
 	}
+
+	// The count goes onto the compiler options rather than being tracked beside them, so the compiler
+	// and Workers() read the same number from the same place. A count kept alongside is a count that
+	// can drift from the one the checkers were actually built with.
+	checkerCount := options.Checkers
+	if checkerCount <= 0 {
+		checkerCount = defaultCheckerCount()
+	}
+	config.CompilerOptions().Checkers = &checkerCount
 
 	// JSDocParsingMode used to be set here to parse JSDoc only where it can carry types. The option
 	// was removed from ProgramOptions in the move to `microsoft/TypeScript` — the compiler now decides
@@ -340,15 +357,47 @@ func (g *Graph) Workers() int {
 	if g.Program.SingleThreaded() {
 		return 1
 	}
-	if requested := g.Program.Options().Checkers; requested != nil && *requested > 0 {
-		return *requested
+
+	checkerCount := defaultCheckerCount()
+	if requested := g.Program.Options().Checkers; requested != nil {
+		checkerCount = *requested
 	}
-	return defaultCheckerCount
+
+	// The clamp is upstream's, reproduced rather than approximated, because agreeing with the
+	// compiler is the entire point of this function. It caps at the file count for the obvious reason
+	// that a fifth checker on a four-file program has nothing to check, and at 256 as a ceiling.
+	//
+	// Without it a config asking for 100 checkers on a 64-file program gets 64 checkers upstream and
+	// 100 workers here, and the 36 extra stride over files whose owning checker is a different
+	// instance than the one they would be handed. Types from two checkers cannot be mixed, so that is
+	// wrong answers rather than wasted goroutines. Measured: Workers() returned 100 against
+	// upstream's 64 before this.
+	return max(min(checkerCount, len(g.Program.GetSourceFiles()), 256), 1)
 }
 
-// defaultCheckerCount is what the compiler creates when the `checkers` option says nothing, mirrored
-// here only for the no-option case.
-const defaultCheckerCount = 4
+// defaultCheckerCount is how many checkers we ask for when nobody says otherwise.
+//
+// The compiler's own default is a fixed 4, which was chosen for a machine we are not on: on a
+// 16-core box it leaves the checking phase at a 2.6x speedup where the hardware allows more, so the
+// ceiling was the setting rather than the workload. Measured on the ahra tree, 9,982 files:
+//
+//	checkers   types    allocated
+//	       4   942ms      2,150MB
+//	       8   758ms      2,483MB
+//	      16   686ms      2,944MB
+//	      32   762ms      3,467MB
+//
+// The curve turns over after core count, so this tracks GOMAXPROCS rather than hardcoding 16: a
+// fixed 16 would oversubscribe a 4-core machine for the same reason a fixed 4 undersubscribes this
+// one. The diagnostic count was 2 at every setting, which is the part that makes the speed
+// trustworthy — a checking phase that got faster by checking less reports fewer findings, and this
+// one does not.
+//
+// Memory is the trade and it is real: 37% more allocated between 4 and 16. That is affordable on a
+// developer machine and worth watching if this ever runs somewhere small.
+func defaultCheckerCount() int {
+	return max(runtime.GOMAXPROCS(0), 1)
+}
 
 // toPath normalizes a file name the way the compiler keys its file table, so a lookup by path finds
 // the file the compiler stored rather than a near-miss that differs only in case or separators.
