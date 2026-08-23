@@ -27,6 +27,7 @@ func All() []rule.Rule {
 		core.ForDirection,
 		core.NoCaseDeclarations,
 		core.NoCompareNegZero,
+		core.NoConstantBinaryExpression,
 		core.NoConstantCondition,
 		core.NoDebugger,
 		core.NoDeleteVar,
@@ -132,6 +133,14 @@ func Options() config.OptionsRegistry {
 		// defaults to allExceptWhileTrue, so a config that says nothing still catches `while(1)`
 		// and `while(a || true)` while exempting the `while(true)` idiom.
 		"no-constant-condition": {Decode: config.DecodeInto[core.NoConstantConditionOptions]()},
+
+		// Not Required, and the default matches ESLint's and this tree's config: the relational arm
+		// is off. Implemented rather than skipped, because a rule that silently lacks an option is
+		// indistinguishable from one whose option is off, and the difference surfaces only when
+		// someone turns it on.
+		"no-constant-binary-expression": {
+			Decode: config.DecodeInto[core.NoConstantBinaryExpressionOptions](),
+		},
 
 		// Not Required, and the default is the strict reading. enforceForSwitchCase defaults to
 		// true, matching ESLint 9 and this tree's config, so a config that says nothing gets the
