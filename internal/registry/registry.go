@@ -21,6 +21,7 @@ import (
 // is what makes a diff between them meaningful.
 func All() []rule.Rule {
 	return []rule.Rule{
+		core.NoCaseDeclarations,
 		core.NoDuplicateCase,
 		nexus.BoundaryNoInternalImport,
 		nexus.BoundaryNoNexusOutsideImport,
@@ -34,7 +35,6 @@ func All() []rule.Rule {
 		nexus.ConsistencyNoScreamingSnakeCase,
 		nexus.ConsistencyNoShouting,
 		nexus.ConsistencyNoSingleLineJsDoc,
-		nexus.ConsistencyNoStrictUndefinedAstCheck,
 		nexus.ConsistencyNoStutteringName,
 		nexus.ConsistencyNoUtilsFolder,
 		nexus.ConsistencyRequireTypeSuffix,
