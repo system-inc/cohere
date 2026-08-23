@@ -402,6 +402,24 @@ func TokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 // buy atomicity. core.NoCaseDeclarations shows this too: its InsertBefore and InsertAfter are an
 // opening and a closing brace, and half of that pair is broken code. It is safe today only because
 // it is a Suggestion and never reaches the engine. See ProposalsFrom in internal/fix.
+//
+// The engine's refusal guard checks that the rewritten file parses, and parsing is necessary rather
+// than sufficient. Anything sayable in valid syntax about a name that no longer exists slips
+// through it: a rename that updates a usage and misses its declaration produces a file that parses
+// and does not compile, and the guard has no reason to fire.
+//
+// That is not hypothetical. structure/react-component-require-properties-type-suffix renames a
+// component's properties type at both the usage and the declaration, using a map that one listener
+// fills and the other reads. Source order decides which listener runs first, so on the conventional
+// declaration-first ordering the declaration is visited against an empty map and skipped: the usage
+// is renamed, the declaration is not, and the file then references a type that does not exist. It
+// parses. Measured: one diagnostic on that ordering against two on the other, and the rewritten
+// source fails to type-check with "cannot find name".
+//
+// So a fix that renames anything carries an obligation the engine cannot discharge for it: every
+// reference to the old name must move in the same pass, and a fixture has to assert it on both
+// orderings, since either one alone passes. The failure also repairs the evidence of itself, because
+// the rule's own fix silences the finding that would have reported the rest of the work.
 
 // ReplaceNode proposes replacing a node's own text, leaving the trivia before it untouched.
 func (c Context) ReplaceNode(node *ast.Node, text string) Fix {
