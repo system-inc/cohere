@@ -611,3 +611,332 @@ func TestProbeArtifactSizeAgainstSource(t *testing.T) {
 			"against ~21 source bytes per node; the size measurement is wrong", multiplier)
 	}
 }
+
+// #nk6hmwp: the 4x in TestProbeAcrossSubjects was measured on an artifact carrying no
+// identifier text, and no rule can run against that. `no-debugger` needs to know the token
+// says "debugger"; every naming rule needs the spelling; every import rule needs the
+// specifier. So that ratio was the read speed of a cache nobody can consume.
+//
+// This measures the same read WITH text, which is the largest single omission. The format
+// question is settled and not reopened: fixed records, little-endian, parent indices. The
+// question is what the artifact must contain.
+
+// textOfNode returns a node's text, or "" for the kinds that carry none.
+//
+// Node.Text() panics rather than returning empty on an unhandled kind (ast.go:307), and most
+// nodes are unhandled kinds — a SourceFile, a Block, a TypeReference. So the walk has to ask
+// only the kinds that answer. This list mirrors the switch in Node.Text; if upstream adds a
+// text-bearing kind, this measurement silently under-counts text rather than crashing, which
+// is worth knowing when the number is re-taken after a bump.
+func textOfNode(node *ast.Node) string {
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindPrivateIdentifier,
+		ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
+		ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindTemplateHead, ast.KindTemplateMiddle, ast.KindTemplateTail,
+		ast.KindRegularExpressionLiteral,
+		ast.KindJsxNamespacedName, ast.KindMetaProperty,
+		ast.KindJSDocText, ast.KindJSDocLink, ast.KindJSDocLinkCode, ast.KindJSDocLinkPlain:
+		return node.Text()
+	}
+	return ""
+}
+
+// textNode extends flatNode with a slot into a string table. Two int32 rather than a Go
+// string, because a string header is a pointer and pointers are what the flat layout exists
+// to avoid.
+type textNode struct {
+	Kind        int32
+	Flags       int32
+	Pos         int32
+	End         int32
+	ParentIndex int32
+	TextOffset  int32 // byte offset into the string blob, -1 when the node carries no text
+	TextLength  int32
+	_           int32
+}
+
+const textNodeSize = 32
+
+// flattenWithText walks the tree recording text for every node that carries any.
+//
+// The string table is interned: a name appearing a thousand times is stored once. That is
+// what a real cache would do and it is the variant most favorable to the cache, so if this
+// loses, the naive variant loses harder. The naive one is measured too, below, because the
+// gap between them is the value of interning and it is worth stating rather than assuming.
+func flattenWithText(sourceFile *ast.SourceFile, intern bool) ([]textNode, []byte) {
+	nodes := make([]textNode, 0, 512*1024)
+	var blob []byte
+	table := make(map[string]int32)
+
+	put := func(text string) (int32, int32) {
+		if text == "" {
+			return -1, 0
+		}
+		if intern {
+			if offset, seen := table[text]; seen {
+				return offset, int32(len(text))
+			}
+		}
+		offset := int32(len(blob))
+		blob = append(blob, text...)
+		if intern {
+			table[text] = offset
+		}
+		return offset, int32(len(text))
+	}
+
+	var visit func(node *ast.Node, parentIndex int32)
+	visit = func(node *ast.Node, parentIndex int32) {
+		selfIndex := int32(len(nodes))
+		offset, length := put(textOfNode(node))
+		nodes = append(nodes, textNode{
+			Kind:        int32(node.Kind),
+			Flags:       int32(node.Flags),
+			Pos:         int32(node.Pos()),
+			End:         int32(node.End()),
+			ParentIndex: parentIndex,
+			TextOffset:  offset,
+			TextLength:  length,
+		})
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child, selfIndex)
+			return false
+		})
+	}
+
+	visit(sourceFile.AsNode(), -1)
+	return nodes, blob
+}
+
+func encodeWithText(nodes []textNode, blob []byte) []byte {
+	// 8 bytes of header carrying the node count, so the reader can split the two regions
+	// without a separate index file.
+	buffer := make([]byte, 8+len(nodes)*textNodeSize+len(blob))
+	binary.LittleEndian.PutUint32(buffer[0:], uint32(len(nodes)))
+	binary.LittleEndian.PutUint32(buffer[4:], uint32(len(blob)))
+	base := 8
+	for index, node := range nodes {
+		offset := base + index*textNodeSize
+		binary.LittleEndian.PutUint32(buffer[offset+0:], uint32(node.Kind))
+		binary.LittleEndian.PutUint32(buffer[offset+4:], uint32(node.Flags))
+		binary.LittleEndian.PutUint32(buffer[offset+8:], uint32(node.Pos))
+		binary.LittleEndian.PutUint32(buffer[offset+12:], uint32(node.End))
+		binary.LittleEndian.PutUint32(buffer[offset+16:], uint32(node.ParentIndex))
+		binary.LittleEndian.PutUint32(buffer[offset+20:], uint32(node.TextOffset))
+		binary.LittleEndian.PutUint32(buffer[offset+24:], uint32(node.TextLength))
+	}
+	copy(buffer[base+len(nodes)*textNodeSize:], blob)
+	return buffer
+}
+
+// readWithText is the honest read: materialize nodes AND hand each one its text as a Go
+// string. The strings are sliced out of the blob rather than copied, which is the fastest
+// correct thing available — a rule comparing node.Text() == "debugger" needs a string, and
+// this produces one without allocating a new backing array.
+func readWithText(buffer []byte) ([]rebuiltNode, []string) {
+	nodeCount := int(binary.LittleEndian.Uint32(buffer[0:]))
+	blobLength := int(binary.LittleEndian.Uint32(buffer[4:]))
+	base := 8
+	blobStart := base + nodeCount*textNodeSize
+	blob := buffer[blobStart : blobStart+blobLength]
+
+	nodes := make([]rebuiltNode, nodeCount)
+	texts := make([]string, nodeCount)
+	for index := range nodes {
+		offset := base + index*textNodeSize
+		nodes[index].Kind = int32(binary.LittleEndian.Uint32(buffer[offset+0:]))
+		nodes[index].Flags = int32(binary.LittleEndian.Uint32(buffer[offset+4:]))
+		nodes[index].Pos = int32(binary.LittleEndian.Uint32(buffer[offset+8:]))
+		nodes[index].End = int32(binary.LittleEndian.Uint32(buffer[offset+12:]))
+		parentIndex := int32(binary.LittleEndian.Uint32(buffer[offset+16:]))
+		textOffset := int32(binary.LittleEndian.Uint32(buffer[offset+20:]))
+		textLength := int32(binary.LittleEndian.Uint32(buffer[offset+24:]))
+		if parentIndex >= 0 {
+			parent := &nodes[parentIndex]
+			nodes[index].Parent = parent
+			parent.Children = append(parent.Children, &nodes[index])
+		}
+		if textOffset >= 0 {
+			texts[index] = string(blob[textOffset : textOffset+textLength])
+		}
+	}
+	return nodes, texts
+}
+
+func TestProbeReadWithIdentifierText(t *testing.T) {
+	subjects := []struct {
+		label string
+		path  string
+	}{
+		{"lib.dom.d.ts", subjectPath},
+		{"csstype", "/Users/kirkouimet/Projects/ahra/node_modules/.pnpm/csstype@3.2.3/node_modules/csstype/index.d.ts"},
+		{"@babel/types", "/Users/kirkouimet/Projects/ahra/node_modules/.pnpm/@babel+types@7.29.8/node_modules/@babel/types/lib/index.d.ts"},
+		{"aws-sdk models_0", "/Users/kirkouimet/Projects/ahra/node_modules/.pnpm/@aws-sdk+client-s3@3.984.0/node_modules/@aws-sdk/client-s3/dist-types/models/models_0.d.ts"},
+	}
+
+	fmt.Printf("\n=== #nk6hmwp: read WITH identifier text ===\n")
+	fmt.Printf("%-18s %8s %9s %10s %9s %8s %8s\n",
+		"subject", "nodes", "withText", "artifact", "parse ms", "read ms", "ratio")
+
+	measured := 0
+	for _, subject := range subjects {
+		raw, err := os.ReadFile(subject.path)
+		if err != nil {
+			t.Logf("skipped, not on disk: %s", subject.path)
+			continue
+		}
+		sourceText := string(raw)
+		fileName := tspath.NormalizePath(subject.path)
+		parse := func() *ast.SourceFile {
+			return parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: fileName,
+				Path:     tspath.Path(fileName),
+			}, sourceText, core.ScriptKindTS)
+		}
+
+		parsed := parse()
+		if parsed == nil {
+			t.Logf("skipped, did not parse: %s", subject.path)
+			continue
+		}
+
+		nodes, blob := flattenWithText(parsed, true)
+		encoded := encodeWithText(nodes, blob)
+
+		withText := 0
+		for index := range nodes {
+			if nodes[index].TextOffset >= 0 {
+				withText++
+			}
+		}
+
+		// Prove the input is real. An artifact whose string blob is empty would read back
+		// beautifully and mean nothing, which is exactly the failure this measurement exists
+		// to correct in the first place.
+		if withText == 0 || len(blob) == 0 {
+			t.Fatalf("%s: %d nodes carry text and the blob is %d bytes; "+
+				"this is measuring a textless artifact again", subject.label, withText, len(blob))
+		}
+
+		temporaryPath := t.TempDir() + "/subject.astbin"
+		if err := os.WriteFile(temporaryPath, encoded, 0o644); err != nil {
+			t.Fatalf("write artifact: %v", err)
+		}
+
+		var parseTimings, readTimings []time.Duration
+		for run := 0; run < runs; run++ {
+			runtime.GC()
+			start := time.Now()
+			parse()
+			parseTimings = append(parseTimings, time.Since(start))
+
+			runtime.GC()
+			start = time.Now()
+			fileBytes, err := os.ReadFile(temporaryPath)
+			if err != nil {
+				t.Fatalf("read artifact: %v", err)
+			}
+			gotNodes, gotTexts := readWithText(fileBytes)
+			readTimings = append(readTimings, time.Since(start))
+
+			if len(gotNodes) != len(nodes) || len(gotTexts) != len(nodes) {
+				t.Fatalf("round trip lost nodes: wrote %d, read %d", len(nodes), len(gotNodes))
+			}
+		}
+
+		parseMedian := median(parseTimings)
+		readMedian := median(readTimings)
+		fmt.Printf("%-18s %8d %9d %9.2fMB %9.2f %8.2f %7.2fx\n",
+			subject.label, len(nodes), withText,
+			float64(len(encoded))/(1024*1024),
+			float64(parseMedian.Microseconds())/1000,
+			float64(readMedian.Microseconds())/1000,
+			float64(parseMedian)/float64(readMedian))
+		measured++
+	}
+	fmt.Printf("\n")
+
+	if measured < 2 {
+		t.Fatalf("only %d subject measured; the ratio needs more than one shape", measured)
+	}
+}
+
+// TestProbeTextRoundTripIsCorrect proves the text actually survives, which the timing test
+// cannot show. A read that returned empty strings for every node would be fast and wrong, and
+// it would look identical to a fast correct one in a table of milliseconds.
+func TestProbeTextRoundTripIsCorrect(t *testing.T) {
+	sourceText := readSource(t)
+	parsed := parseOnce(sourceText)
+
+	nodes, blob := flattenWithText(parsed, true)
+	encoded := encodeWithText(nodes, blob)
+	_, texts := readWithText(encoded)
+
+	// Walk the live tree again and compare every text-bearing node against what came back.
+	index := 0
+	mismatches := 0
+	checked := 0
+	var visit func(node *ast.Node)
+	visit = func(node *ast.Node) {
+		self := index
+		index++
+		if expected := textOfNode(node); expected != "" {
+			checked++
+			if texts[self] != expected {
+				if mismatches < 5 {
+					t.Errorf("node %d kind %v: wrote %q, read %q", self, node.Kind, expected, texts[self])
+				}
+				mismatches++
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(parsed.AsNode())
+
+	if checked == 0 {
+		t.Fatal("zero text-bearing nodes checked; this test cannot detect a text failure")
+	}
+	if mismatches > 0 {
+		t.Fatalf("%d of %d text-bearing nodes round-tripped wrong", mismatches, checked)
+	}
+	t.Logf("text round trip exact across %d text-bearing nodes of %d total", checked, index)
+}
+
+// TestProbeTextDetectorCanFail proves the comparison above can actually fail. A corrupted blob
+// must produce mismatches; if it does not, the check is vacuous and its clean result means
+// nothing.
+func TestProbeTextDetectorCanFail(t *testing.T) {
+	sourceText := readSource(t)
+	parsed := parseOnce(sourceText)
+	nodes, blob := flattenWithText(parsed, true)
+
+	if len(blob) == 0 {
+		t.Fatal("empty blob; nothing to corrupt")
+	}
+	corrupted := append([]byte(nil), blob...)
+	for i := range corrupted {
+		corrupted[i] = 'X'
+	}
+
+	encoded := encodeWithText(nodes, corrupted)
+	_, texts := readWithText(encoded)
+
+	differing := 0
+	for index := range nodes {
+		if nodes[index].TextOffset >= 0 {
+			original := string(blob[nodes[index].TextOffset : nodes[index].TextOffset+nodes[index].TextLength])
+			if texts[index] != original {
+				differing++
+			}
+		}
+	}
+	if differing == 0 {
+		t.Fatal("a fully corrupted string blob produced identical text; " +
+			"the text comparison cannot detect corruption and every clean result from it is vacuous")
+	}
+	t.Logf("control: corrupting the blob changed %d texts, detector fires", differing)
+}
