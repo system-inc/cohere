@@ -370,9 +370,36 @@ function declaredProperties(className) {
 const rootProperties = [];
 const rootValueProperties = [];
 
+const colorNames = new Set();
+for (const entry of designSystem.getClassList?.() ?? []) {
+    const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
+    if (typeof name !== 'string') continue;
+    if (!name.startsWith('text-')) continue;
+
+    const candidate = parseCandidate(name);
+    if (candidate?.kind !== 'functional' || candidate.root !== 'text') continue;
+
+    const properties = declaredProperties(name);
+    if (properties === null || properties.join(',') !== 'color') continue;
+
+    const value = candidate.value?.value;
+    if (typeof value === 'string' && value !== '') colorNames.add(value);
+}
+
 for (const root of roots) {
+    /*
+     * Probed with a color as well as the numeric and named scales.
+     *
+     * `divide` accepts only a color, so a numeric-and-named probe found nothing and left it out of
+     * the properties table entirely. That is the fourth time in this file a probe missed a root
+     * because its value kind was not represented, and this one hid behind a passing fixture: the
+     * `divide-neutral-200` against `border-neutral-200` case read as silent because the class did
+     * not resolve at all, rather than because the selector check separated them.
+     */
+    const propertyProbeValues = [...probeValues, colorNames.values().next().value].filter(Boolean);
+
     let properties = null;
-    for (const value of probeValues) {
+    for (const value of propertyProbeValues) {
         properties = declaredProperties(root + '-' + value);
         if (properties !== null) break;
     }
@@ -393,22 +420,128 @@ for (const root of roots) {
  * tell which reading a class is. Deciding that in Go without this list would mean hardcoding
  * Tailwind's palette, which is exactly the theme-dependent knowledge this table exists to carry.
  */
+/*
+ * The selector a utility emits, with its own class name blanked so two classes are comparable.
+ *
+ * This is what separates `divide-neutral-200` from `border-neutral-200`: both declare `border-color`
+ * and they do not conflict, because divide emits under `:where(.CLASS > :not(:last-child))` and
+ * targets child elements while border emits on the element itself. Upstream groups by compiled
+ * selector path for exactly this reason.
+ *
+ * Measured to be a fact about roots rather than about classes: every `divide-*` and `space-*` emits
+ * the same shape regardless of value, which is what makes it tabulatable at all. A first reading of
+ * this rule concluded it was engine-bound; it is not, and the difference was never testing whether
+ * the shape varied.
+ */
+function selectorShape(className) {
+    let compiled;
+    try {
+        compiled = designSystem.candidatesToCss?.([className]);
+    }
+    catch {
+        return null;
+    }
+    if (!compiled || !compiled[0]) return null;
+
+    const beforeAtRules = compiled[0].split('@')[0];
+    const selectors = Array.from(beforeAtRules.matchAll(/([^{}]+)\{/g)).map((match) => match[1].trim());
+    if (selectors.length !== 1) return null;
+
+    return selectors[0].replace(/\.(?:[\w-]|\\.)+/g, '.CLASS');
+}
+
+const rootSelectorShapes = [];
+const composingRoots = [];
+
+/*
+ * Roots whose utilities all emit the same declaration text regardless of value.
+ *
+ * `shadow-lg` and `ring-1` both declare `box-shadow`, and they do not conflict: every `shadow-*`
+ * and every `ring-*` emits the identical `var(--tw-inset-shadow), var(--tw-ring-shadow), ...` chain
+ * and each contributes through its own custom property, so they layer rather than overwrite. By
+ * contrast `px-4` is `calc(var(--spacing) * 4)` and `px-8` is `* 8`, which genuinely collide.
+ *
+ * Measured to be a root fact rather than a class fact, which is what makes it storable: the test is
+ * whether two different values of the same root produce identical declaration text.
+ */
+function declarationText(className) {
+    let compiled;
+    try {
+        compiled = designSystem.candidatesToCss?.([className]);
+    }
+    catch {
+        return null;
+    }
+    if (!compiled || !compiled[0]) return null;
+
+    const beforeAtRules = compiled[0].split('@')[0];
+    const bodies = Array.from(beforeAtRules.matchAll(/\{([^{}]*)\}/g)).map((match) => match[1]);
+    if (bodies.length !== 1) return null;
+
+    const declarations = Array.from(bodies[0].matchAll(/([-a-zA-Z]+)\s*:\s*([^;]+);/g))
+        .filter((match) => !match[1].startsWith('--'))
+        .map((match) => match[1].trim() + '=' + match[2].trim())
+        .sort();
+    return declarations.length === 0 ? null : declarations.join(';;');
+}
+
+
+
 const rootDefault = new Map(rootProperties.map((entry) => [entry.root, entry.properties.join(',')]));
 
-const colorNames = new Set();
-for (const entry of designSystem.getClassList?.() ?? []) {
-    const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
-    if (typeof name !== 'string') continue;
-    if (!name.startsWith('text-')) continue;
+for (const root of roots) {
+    /*
+     * Probed with a color as well as the numeric and named scales.
+     *
+     * `divide` accepts only a color, so `divide-4` is not a class and a numeric-only probe reports
+     * the root as having no shape at all. That is the same gap that left every `rounded-*` family
+     * out of the collapse table: a probe that cannot express a root's values reports the root as
+     * having nothing, which reads exactly like a root that has nothing.
+     *
+     * `divide` is the case that matters most here, because `divide-neutral-200` against
+     * `border-neutral-200` is the pair that made the whole rule look engine-bound.
+     */
+    const shapeProbeValues = [...probeValues, colorNames.values().next().value].filter(Boolean);
 
-    const candidate = parseCandidate(name);
-    if (candidate?.kind !== 'functional' || candidate.root !== 'text') continue;
+    for (const value of shapeProbeValues) {
+        const shape = selectorShape(root + '-' + value);
+        if (shape === null) continue;
+        if (shape !== '.CLASS') rootSelectorShapes.push({ root, shape });
+        break;
+    }
+}
 
-    const properties = declaredProperties(name);
-    if (properties === null || properties.join(',') !== 'color') continue;
+for (const root of roots) {
+    // Two distinct values of one root producing identical text means the root layers rather than
+    // overwrites, so two of its classes never conflict with each other.
+    /*
+     * Two values the root actually accepts, found by trying several scales.
+     *
+     * This is the third probe in this file to have missed a root because its values were named
+     * rather than numeric. `shadow-4` and `shadow-8` are not classes, so a numeric-only test
+     * reported `shadow` as not composing while recording `ring` correctly, and `shadow-lg ring-1`
+     * is exactly the pair that has to come out silent.
+     */
+    const candidateValues = ['4', '8', 'sm', 'md', 'lg', 'xl', '2', '1'];
 
-    const value = candidate.value?.value;
-    if (typeof value === 'string' && value !== '') colorNames.add(value);
+    let first = null;
+    let firstValue = null;
+    for (const value of candidateValues) {
+        const text = declarationText(root + '-' + value);
+        if (text === null) continue;
+        first = text;
+        firstValue = value;
+        break;
+    }
+    if (first === null) continue;
+
+    for (const value of candidateValues) {
+        if (value === firstValue) continue;
+        const second = declarationText(root + '-' + value);
+        if (second === null) continue;
+        if (first === second) composingRoots.push(root);
+        break;
+    }
 }
 
 for (const root of roots) {
@@ -453,6 +586,8 @@ process.stdout.write(
             pairsProbed,
             families,
             rootProperties,
+            rootSelectorShapes,
+            composingRoots: composingRoots.sort(),
             rootColorProperties: rootValueProperties,
             colorNames: Array.from(colorNames).sort(),
             staticProperties,

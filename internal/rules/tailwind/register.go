@@ -26,6 +26,10 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoConcatenatedClassesOptions](),
 		},
 		rule.Registration{
+			Rule:   NoConflictingClasses,
+			Decode: rule.DecodeOptionsInto[NoConflictingClassesOptions](),
+		},
+		rule.Registration{
 			Rule:   NoDeprecatedClasses,
 			Decode: rule.DecodeOptionsInto[NoDeprecatedClassesOptions](),
 		},

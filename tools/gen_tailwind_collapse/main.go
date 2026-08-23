@@ -47,8 +47,16 @@ type enumeration struct {
 	// `px-4` and `px-8` share an entry and the table does not grow with the theme's scale.
 	RootProperties      []utilityProperties `json:"rootProperties"`
 	RootColorProperties []utilityProperties `json:"rootColorProperties"`
+	RootSelectorShapes  []rootSelectorShape `json:"rootSelectorShapes"`
+	ComposingRoots      []string            `json:"composingRoots"`
 	ColorNames          []string            `json:"colorNames"`
 	StaticProperties    []utilityProperties `json:"staticProperties"`
+}
+
+// rootSelectorShape is a root whose utilities emit under something other than a bare class selector.
+type rootSelectorShape struct {
+	Root  string `json:"root"`
+	Shape string `json:"shape"`
 }
 
 // utilityProperties is one utility and the CSS property names it declares.
@@ -261,6 +269,36 @@ var RootColorProperties = map[string][]string{
 `)
 	for _, entry := range result.RootColorProperties {
 		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.Root, quotedList(entry.Properties))
+	}
+
+	fmt.Fprintf(&buffer, `}
+
+// RootSelectorShapes is the selector a root's utilities emit under, when it is not a bare class.
+//
+// divide-neutral-200 and border-neutral-200 both declare border-color and do not conflict, because
+// divide emits under :where(.CLASS > :not(:last-child)) and targets child elements while border
+// emits on the element itself. Two classes can only collide when they land on the same element.
+//
+// Only non-default shapes are stored: a root absent here emits under a bare .CLASS selector.
+var RootSelectorShapes = map[string]string{
+`)
+	for _, entry := range result.RootSelectorShapes {
+		fmt.Fprintf(&buffer, "\t%q: %q,\n", entry.Root, entry.Shape)
+	}
+
+	fmt.Fprintf(&buffer, `}
+
+// ComposingRoots are roots whose utilities layer rather than overwrite each other.
+//
+// shadow-lg and ring-1 both declare box-shadow and do not conflict: every shadow and every ring
+// emits the same var() chain and each contributes through its own custom property. px-4 and px-8
+// declare different values under one property and genuinely collide.
+//
+// Detected by asking whether two different values of a root produce identical declaration text.
+var ComposingRoots = map[string]bool{
+`)
+	for _, root := range result.ComposingRoots {
+		fmt.Fprintf(&buffer, "\t%q: true,\n", root)
 	}
 
 	fmt.Fprintf(&buffer, `}
