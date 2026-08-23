@@ -24,10 +24,19 @@ var (
 	// version is the published npm version, like "0.3.1".
 	version = "dev"
 
-	// typeScriptGoCommit is the commit of the vendored compiler this binary statically links. It is
+	// compilerCommit is the commit of the vendored compiler this binary statically links. It is
 	// most of the code in the binary and it moves independently of this repository, so a bug that
 	// reproduces on one pin and not another is only diagnosable if the binary carries it.
-	typeScriptGoCommit = "unknown"
+	compilerCommit = "unknown"
+
+	// compilerUpstream is the repository that commit belongs to.
+	//
+	// It is stamped rather than written down because the upstream has already moved once: the
+	// vendored compiler was `microsoft/typescript-go` until that repository was archived, and is
+	// now `microsoft/TypeScript`. A hardcoded label survives a migration like that while silently
+	// becoming false, which is the worst outcome available here — a bug report would name a commit
+	// against a repository it does not exist in, and the reader would have no way to tell.
+	compilerUpstream = "unknown"
 
 	// goToolchain is the toolchain that compiled this binary, like "go1.27.0". The compiler is an
 	// input to the behavior, not just to the build: it is recorded for the same reason the rebuild
@@ -40,8 +49,15 @@ type Provenance struct {
 	// Version is the published version, or "dev" for a local build.
 	Version string
 
-	// TypeScriptGoCommit is the pinned commit of the vendored compiler.
-	TypeScriptGoCommit string
+	// CompilerCommit is the pinned commit of the vendored compiler.
+	CompilerCommit string
+
+	// CompilerUpstream is the repository CompilerCommit belongs to.
+	//
+	// A commit hash means nothing without the repository it lives in, and this one has moved: a
+	// pin recorded before the `microsoft/TypeScript` migration and one recorded after are both
+	// forty hex characters and resolve in different places.
+	CompilerUpstream string
 
 	// GoToolchain is the Go version that compiled this binary.
 	GoToolchain string
@@ -57,10 +73,11 @@ type Provenance struct {
 // Current returns this binary's provenance.
 func Current() Provenance {
 	return Provenance{
-		Version:            version,
-		TypeScriptGoCommit: resolveTypeScriptGoCommit(),
-		GoToolchain:        resolveGoToolchain(),
-		Platform:           runtime.GOOS + "/" + runtime.GOARCH,
+		Version:          version,
+		CompilerCommit:   resolveCompilerCommit(),
+		CompilerUpstream: compilerUpstream,
+		GoToolchain:      resolveGoToolchain(),
+		Platform:         runtime.GOOS + "/" + runtime.GOARCH,
 	}
 }
 
@@ -82,12 +99,25 @@ func (provenance Provenance) String() string {
 		"verify " + provenance.Version,
 		"  platform:       " + provenance.Platform,
 		"  go:             " + provenance.GoToolchain,
-		"  typescript-go:  " + provenance.TypeScriptGoCommit,
+		"  compiler:       " + provenance.describeCompiler(),
 	}
 	if provenance.IsDevelopment() {
 		lines = append(lines, "  note:           a local build, so the rules are whatever was on disk when it was compiled")
 	}
 	return strings.Join(lines, "\n")
+}
+
+// describeCompiler renders the vendored compiler as a repository and a commit in it.
+//
+// The repository is printed alongside the hash rather than assumed, because the vendored compiler
+// has already moved once — `microsoft/typescript-go` was archived and the pin is now against
+// `microsoft/TypeScript`. Two pins from either side of that migration are both forty hex characters
+// and resolve in different places, so a hash alone is not enough to look one up.
+func (provenance Provenance) describeCompiler() string {
+	if provenance.CompilerUpstream == "" || provenance.CompilerUpstream == "unknown" {
+		return provenance.CompilerCommit
+	}
+	return provenance.CompilerUpstream + "@" + provenance.CompilerCommit
 }
 
 // resolveGoToolchain prefers the toolchain recorded in the binary over the stamped value.
@@ -102,15 +132,15 @@ func resolveGoToolchain() string {
 	return goToolchain
 }
 
-// resolveTypeScriptGoCommit prefers the stamped commit, falling back to the module's own VCS data.
+// resolveCompilerCommit prefers the stamped commit, falling back to the module's own VCS data.
 //
 // The stamp is authoritative because the vendored compiler is a git submodule rather than a Go
 // module dependency, so the build info records this repository's revision and never the submodule's.
 // The fallback exists so that a `go build` with no stamping still says something true about which
 // checkout it came from, instead of the flat "unknown" that reads like a packaging failure.
-func resolveTypeScriptGoCommit() string {
-	if typeScriptGoCommit != "unknown" && typeScriptGoCommit != "" {
-		return typeScriptGoCommit
+func resolveCompilerCommit() string {
+	if compilerCommit != "unknown" && compilerCommit != "" {
+		return compilerCommit
 	}
 
 	information, available := debug.ReadBuildInfo()
@@ -120,7 +150,7 @@ func resolveTypeScriptGoCommit() string {
 	for _, setting := range information.Settings {
 		if setting.Key == "vcs.revision" && setting.Value != "" {
 			// Named for what it actually is. Reporting this repository's commit under the
-			// typescript-go label would be a true fact wearing a wrong name, which is worse than
+			// compiler's label would be a true fact wearing a wrong name, which is worse than
 			// the honest "unknown" because a reader would act on it.
 			return fmt.Sprintf("unknown (built from verify %s)", shortCommit(setting.Value))
 		}

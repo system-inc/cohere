@@ -109,9 +109,14 @@ installing one thing. Node is present by construction in an npm install, and `re
 the package manager where a package actually is instead of modeling pnpm, npm, and yarn layouts by
 hand.
 
-`verify --version` reports the version, the platform, the Go toolchain, and the pinned typescript-go
-commit, so a bug report names what was running rather than "latest". The stamps go in at link time;
-an unstamped local build says `dev` and says why.
+`verify --version` reports the version, the platform, the Go toolchain, and the vendored compiler as
+`owner/name@commit`, so a bug report names what was running rather than "latest". The stamps go in
+at link time; an unstamped local build says `dev` and says why.
+
+The compiler's repository is stamped rather than written down, because it has already moved once:
+the pin was against `microsoft/typescript-go` until that repository was archived, and is now against
+`microsoft/TypeScript`. Both spellings are forty hex characters and resolve in different places, so a
+hardcoded label would have survived the migration while quietly becoming false.
 
 `AHRA_VERIFY_BINARY=/path/to/verify` points every `verify` on the machine at a local build. A broken
 override is fatal rather than a fallback, even when a good install is sitting right there: someone

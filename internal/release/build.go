@@ -78,7 +78,7 @@ func Build(options Options) (Result, error) {
 		targets = Targets
 	}
 
-	typeScriptGoCommit, err := readTypeScriptGoCommit(options.ModuleDirectory)
+	pin, err := readCompilerPin(options.ModuleDirectory)
 	if err != nil {
 		return Result{}, err
 	}
@@ -91,14 +91,14 @@ func Build(options Options) (Result, error) {
 	result := Result{}
 
 	for _, target := range targets {
-		staged, err := buildPlatformPackage(options, target, typeScriptGoCommit, goToolchain)
+		staged, err := buildPlatformPackage(options, target, pin, goToolchain)
 		if err != nil {
 			return Result{}, fmt.Errorf("building %s: %w", target, err)
 		}
 		result.Packages = append(result.Packages, staged)
 	}
 
-	dispatcher, err := buildDispatcherPackage(options, typeScriptGoCommit, goToolchain)
+	dispatcher, err := buildDispatcherPackage(options)
 	if err != nil {
 		return Result{}, fmt.Errorf("building the dispatcher package: %w", err)
 	}
@@ -108,7 +108,7 @@ func Build(options Options) (Result, error) {
 }
 
 // buildPlatformPackage cross-compiles one target and writes its package around the binary.
-func buildPlatformPackage(options Options, target Target, typeScriptGoCommit string, goToolchain string) (StagedPackage, error) {
+func buildPlatformPackage(options Options, target Target, pin compilerPin, goToolchain string) (StagedPackage, error) {
 	directory := filepath.Join(options.OutputDirectory, target.DirectoryName())
 	binaryPath := filepath.Join(directory, "bin", target.BinaryFileName())
 
@@ -116,7 +116,7 @@ func buildPlatformPackage(options Options, target Target, typeScriptGoCommit str
 		return StagedPackage{}, fmt.Errorf("creating the package directory: %w", err)
 	}
 
-	if err := compile(options, target, binaryPath, typeScriptGoCommit, goToolchain); err != nil {
+	if err := compile(options, target, binaryPath, pin, goToolchain); err != nil {
 		return StagedPackage{}, err
 	}
 
@@ -157,7 +157,10 @@ func buildPlatformPackage(options Options, target Target, typeScriptGoCommit str
 // package and defeating the single-install premise. It is a Node script instead — Node is present
 // by construction in an npm install — and it resolves the platform package through the package
 // manager rather than by guessing at directory layouts.
-func buildDispatcherPackage(options Options, typeScriptGoCommit string, goToolchain string) (StagedPackage, error) {
+//
+// It takes no compiler pin and no toolchain for that reason: there is nothing here to stamp them
+// into, and threading them in would imply this package carries provenance that it does not.
+func buildDispatcherPackage(options Options) (StagedPackage, error) {
 	directory := filepath.Join(options.OutputDirectory, DispatcherPackageName)
 	if err := os.MkdirAll(filepath.Join(directory, "bin"), 0o755); err != nil {
 		return StagedPackage{}, fmt.Errorf("creating the dispatcher package directory: %w", err)
@@ -186,7 +189,7 @@ func buildDispatcherPackage(options Options, typeScriptGoCommit string, goToolch
 }
 
 // compile cross-compiles one target, stamping the provenance in.
-func compile(options Options, target Target, binaryPath string, typeScriptGoCommit string, goToolchain string) error {
+func compile(options Options, target Target, binaryPath string, pin compilerPin, goToolchain string) error {
 	const packagePath = "github.com/system-inc/verify/internal/release"
 
 	linkerFlags := strings.Join([]string{
@@ -194,7 +197,8 @@ func compile(options Options, target Target, binaryPath string, typeScriptGoComm
 		// link and 29% smaller, with nothing traded away that a released binary needs.
 		"-s", "-w",
 		"-X", packagePath + ".version=" + options.Version,
-		"-X", packagePath + ".typeScriptGoCommit=" + typeScriptGoCommit,
+		"-X", packagePath + ".compilerCommit=" + pin.Commit,
+		"-X", packagePath + ".compilerUpstream=" + pin.Upstream,
 		"-X", packagePath + ".goToolchain=" + goToolchain,
 	}, " ")
 
@@ -243,20 +247,81 @@ func verifyBinary(path string) (int64, error) {
 	return information.Size(), nil
 }
 
-// readTypeScriptGoCommit reads the pinned commit of the vendored compiler.
-func readTypeScriptGoCommit(moduleDirectory string) (string, error) {
-	command := exec.Command("git", "-C", filepath.Join(moduleDirectory, "typescript-go"), "rev-parse", "HEAD")
+// compilerPin is which commit of which repository the vendored compiler is pinned to.
+type compilerPin struct {
+	// Commit is the submodule's HEAD.
+	Commit string
 
-	output, err := command.Output()
+	// Upstream is the repository that commit lives in, as "owner/name".
+	Upstream string
+}
+
+// readCompilerPin reads the pinned commit of the vendored compiler and the repository it came from.
+//
+// Both halves are read from the submodule rather than written down here, because the upstream has
+// already moved once: the compiler was vendored from `microsoft/typescript-go` until that
+// repository was archived, and the pin is now against `microsoft/TypeScript`. A hardcoded label
+// survives a migration like that while quietly becoming false, and a commit reported against the
+// wrong repository is worse than no commit at all — it resolves to nothing and gives a reader no
+// hint why.
+//
+// The directory name stays `typescript-go` through the migration, so it is a path rather than a
+// claim about the upstream and is left alone.
+func readCompilerPin(moduleDirectory string) (compilerPin, error) {
+	submoduleDirectory := filepath.Join(moduleDirectory, "typescript-go")
+
+	output, err := exec.Command("git", "-C", submoduleDirectory, "rev-parse", "HEAD").Output()
 	if err != nil {
-		return "", fmt.Errorf("reading the pinned typescript-go commit: %w", err)
+		return compilerPin{}, fmt.Errorf("reading the pinned compiler commit: %w", err)
 	}
 
 	commit := strings.TrimSpace(string(output))
 	if commit == "" {
-		return "", fmt.Errorf("the pinned typescript-go commit came back empty")
+		return compilerPin{}, fmt.Errorf("the pinned compiler commit came back empty")
 	}
-	return commit, nil
+
+	return compilerPin{Commit: commit, Upstream: readCompilerUpstream(submoduleDirectory)}, nil
+}
+
+// readCompilerUpstream names the repository the vendored compiler is checked out from.
+//
+// A missing remote degrades to "unknown" rather than failing the release. The commit is the fact a
+// bug report needs most, and refusing to build because a submodule has no configured origin would
+// trade a complete release for a slightly better label.
+func readCompilerUpstream(submoduleDirectory string) string {
+	output, err := exec.Command("git", "-C", submoduleDirectory, "remote", "get-url", "origin").Output()
+	if err != nil {
+		return "unknown"
+	}
+
+	return normalizeUpstream(string(output))
+}
+
+// normalizeUpstream reduces a git remote url to "owner/name".
+//
+// The two url shapes git accepts — the ssh `git@github.com:owner/name.git` and the https
+// `https://github.com/owner/name.git` — have to produce the same label, because otherwise the same
+// pin reads differently depending on how the build machine happened to clone, and a reader
+// comparing two reports would see a difference that is not one.
+//
+// It is separate from the command that reads the remote so it can be tested without a git
+// repository: the parsing is where the bugs are, and it should not need a fixture clone to exercise.
+func normalizeUpstream(remoteUrl string) string {
+	url := strings.TrimSpace(remoteUrl)
+	if url == "" {
+		return "unknown"
+	}
+
+	url = strings.TrimSuffix(url, ".git")
+	if _, path, found := strings.Cut(url, ":"); found && !strings.HasPrefix(url, "http") {
+		url = path
+	}
+
+	segments := strings.Split(strings.Trim(url, "/"), "/")
+	if len(segments) < 2 {
+		return "unknown"
+	}
+	return strings.Join(segments[len(segments)-2:], "/")
 }
 
 // readGoToolchain reads the version of the toolchain performing the build.
