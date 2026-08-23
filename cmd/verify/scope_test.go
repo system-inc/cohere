@@ -495,3 +495,126 @@ func TestNarrowingAWholeTreeScopeChangesNothing(t *testing.T) {
 		t.Fatalf("narrowing turned a whole-tree scope into a narrow one")
 	}
 }
+
+// An empty scope must name the directory it asked about.
+//
+// This is the one answer the resolver cannot distinguish from a wrong question. Git exits zero from
+// any directory inside a repository, so a resolver pointed at the wrong tree reports a clean one
+// rather than failing, and "0 changed files" reads identically either way.
+//
+// The rule from `#kjbk9b2`: when the answer you are hoping for is empty, and the command cannot
+// tell empty-because-nothing from empty-because-wrong-question, that is the trap and it needs an
+// existence check beside it. Naming the directory is that check, on the one line where the
+// distinction matters.
+//
+// Not hypothetical. Auditing for this, I ran a probe from the wrong working directory and read its
+// empty output as a result before noticing the binary had failed on a missing tsconfig.
+func TestAnEmptyScopeNamesWhereItLooked(t *testing.T) {
+	directory := t.TempDir()
+
+	run := func(arguments ...string) {
+		t.Helper()
+		command := exec.Command("git", arguments...)
+		command.Dir = directory
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Skipf("git is unavailable or refused (%v): %s", err, output)
+		}
+	}
+
+	run("init", "--quiet")
+	run("config", "user.email", "fixture@example.com")
+	run("config", "user.name", "fixture")
+
+	seed := filepath.Join(directory, "seed.ts")
+	if err := os.WriteFile(seed, []byte("const a = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "seed.ts")
+	run("commit", "--quiet", "-m", "baseline")
+
+	clean, err := changedFilesScope(directory)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(clean.FileNames) != 0 {
+		t.Fatalf("the fixture tree is not clean: %v", clean.FileNames)
+	}
+	if !strings.Contains(clean.Description, directory) {
+		t.Fatalf("an empty scope did not say where it looked: %q", clean.Description)
+	}
+
+	// And a non-empty scope must not carry the directory, since the count already proves it found
+	// the right tree and the path would be noise on every ordinary run.
+	if err := os.WriteFile(filepath.Join(directory, "changed.ts"), []byte("const b = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := changedFilesScope(directory)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(changed.Description, directory) {
+		t.Fatalf("a non-empty scope carries the directory as noise: %q", changed.Description)
+	}
+}
+
+// The empty-scope naming must survive narrowing, which is where it died.
+//
+// `changedFilesScope` names the directory when nothing changed, and `narrowTo` rebuilt the
+// description unconditionally two calls later, discarding it. The guard was present, its fixture
+// passed, and the behavior was gone: the fixture called `changedFilesScope` directly and never the
+// composition the pipeline actually runs.
+//
+// That is the same defect the guard exists to catch, one layer up. A check that verifies a fragment
+// gets read as a check on the behavior, and the gap between them is where this lived. Caught by
+// running the real binary and reading its output, not by any assertion.
+func TestTheEmptyScopeNamingSurvivesNarrowing(t *testing.T) {
+	empty := formatScope{
+		FileNames:   nil,
+		index:       map[string]struct{}{},
+		Description: "0 changed files in /some/where (working tree, staged, and untracked)",
+	}
+
+	narrowed := empty.narrowTo(map[string]struct{}{"/repo/a.ts": {}})
+
+	if !strings.Contains(narrowed.Description, "/some/where") {
+		t.Fatalf("narrowing discarded the directory an empty scope had named: %q", narrowed.Description)
+	}
+}
+
+// And the whole path end to end, since the two halves passing separately is what let the defect
+// through.
+func TestAnEmptyScopeNamesWhereItLookedThroughTheWholePath(t *testing.T) {
+	directory := t.TempDir()
+
+	run := func(arguments ...string) {
+		t.Helper()
+		command := exec.Command("git", arguments...)
+		command.Dir = directory
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Skipf("git is unavailable or refused (%v): %s", err, output)
+		}
+	}
+
+	run("init", "--quiet")
+	run("config", "user.email", "fixture@example.com")
+	run("config", "user.name", "fixture")
+
+	seed := filepath.Join(directory, "seed.ts")
+	if err := os.WriteFile(seed, []byte("const a = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "seed.ts")
+	run("commit", "--quiet", "-m", "baseline")
+
+	scope, err := changedFilesScope(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Exactly what the pipeline does: resolve, then narrow to the program's files.
+	final := scope.narrowTo(map[string]struct{}{seed: {}})
+
+	if !strings.Contains(final.Description, directory) {
+		t.Fatalf("the description a run would print does not say where it looked: %q", final.Description)
+	}
+}

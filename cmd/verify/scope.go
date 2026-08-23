@@ -62,6 +62,19 @@ func (s formatScope) narrowTo(population map[string]struct{}) formatScope {
 		}
 	}
 
+	// An empty scope keeps the description changedFilesScope built, because that one names the
+	// directory it asked about and this one cannot: narrowing knows the population but not where the
+	// question was posed.
+	//
+	// Overwriting it unconditionally is the bug this branch exists to prevent, and it shipped. The
+	// empty-scope naming was correct in changedFilesScope and discarded here two function calls
+	// later, so the guard was present, tested, and dead. Its fixture only ever called
+	// changedFilesScope directly and never the composition, which is a check that verifies a fragment
+	// read as a check on the behavior.
+	if len(s.FileNames) == 0 {
+		return s
+	}
+
 	s.Description = fmt.Sprintf(
 		"%d changed files (working tree, staged, and untracked), %d of them in the program",
 		len(s.FileNames), inPopulation,
@@ -124,10 +137,24 @@ func changedFilesScope(workingDirectory string) (formatScope, error) {
 		index[path] = struct{}{}
 	}
 
+	description := fmt.Sprintf("%d changed files (working tree, staged, and untracked)", len(absolute))
+
+	// An empty result is the one answer this function cannot distinguish from a wrong question.
+	// "Nothing changed" and "we asked somewhere with nothing to find" print the same line, and the
+	// second is silent: git exits zero from any directory inside a repository, so a resolver pointed
+	// at the wrong tree reports a clean one rather than failing.
+	//
+	// So an empty scope names the directory it asked about. That is the existence check beside the
+	// silent-empty command, and it costs one clause on a line nobody reads until the day the number
+	// is wrong.
+	if len(absolute) == 0 {
+		description = fmt.Sprintf("0 changed files in %s (working tree, staged, and untracked)", workingDirectory)
+	}
+
 	return formatScope{
 		FileNames:   absolute,
 		index:       index,
-		Description: fmt.Sprintf("%d changed files (working tree, staged, and untracked)", len(absolute)),
+		Description: description,
 	}, nil
 }
 
