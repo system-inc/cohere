@@ -68,3 +68,45 @@ func TestNoIteratorDeclinesASubstitutingTemplate(t *testing.T) {
 	ruletest.ExpectClean(t, ruletest.Run(t, NoIterator, iteratorFile,
 		"declare const part: string;\nexport const a = test[`__iterator${part}__`];\n"))
 }
+
+// The suggestion's span, which the message-id fixtures above cannot see.
+//
+// A mutation replacing the whole node rather than the tail from the object's end compiled and
+// changed no fixture, because every assertion here checks which message fired and none checked what
+// the repair would do. That is the gap a reviewer named without reproducing, and it was real.
+//
+// Asserted by applying the suggestion rather than by comparing offsets: offsets are the thing most
+// likely to be wrong in the same direction as the code that produced them.
+func TestNoIteratorSuggestsTheRightSpan(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+		wantSource string
+	}{
+		// The dot goes with the property, which is what makes the tail-from-object span right rather
+		// than merely convenient.
+		{"a dotted access", "var a = test.__iterator__;", "var a = test[Symbol.iterator];"},
+		// The brackets go too, and the same span covers it with no second arm.
+		{"a string subscript", "var a = test['__iterator__'];", "var a = test[Symbol.iterator];"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.Run(t, NoIterator, iteratorFile, testCase.sourceText)
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+			}
+			suggestions := result.Diagnostics[0].Suggestions
+			if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
+				t.Fatalf("wanted one suggestion carrying one fix, got %d suggestions", len(suggestions))
+			}
+
+			fix := suggestions[0].Fixes[0]
+			rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
+				testCase.sourceText[fix.Range.End():]
+			if rewritten != testCase.wantSource {
+				t.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, testCase.wantSource)
+			}
+		})
+	}
+}

@@ -68,3 +68,25 @@ func TestNoCallerReadsTheReceiver(t *testing.T) {
 	ruletest.ExpectFindings(t, ruletest.Run(t, NoCaller, callerFile,
 		"export function f() { return (arguments).callee; }\n"), "noCaller")
 }
+
+// Where the finding lands, which the message-id fixtures above cannot see.
+//
+// A mutation reporting the whole `arguments.callee` rather than just `callee` compiled and changed
+// no fixture. Upstream reports the property span specifically, and the difference is not cosmetic:
+// a finding anchored at the start of the access sits one token earlier, and on a wrapped expression
+// that can be a different line from the one an author would suppress.
+//
+// Asserted against the source text the range covers, rather than against offsets, because an offset
+// expectation is most likely to be wrong in the same direction as the code that produced it.
+func TestNoCallerReportsTheProperty(t *testing.T) {
+	const source = "var x = arguments.callee"
+	result := ruletest.Run(t, NoCaller, callerFile, source)
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+	}
+
+	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
+	if reported != "callee" {
+		t.Fatalf("the finding covers %q, wanted just the property name", reported)
+	}
+}
