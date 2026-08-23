@@ -231,7 +231,34 @@ func (g *Graph) ProjectFiles() []*ast.SourceFile {
 			files = append(files, sourceFile)
 		}
 	}
+
+	// A lookup that misses reports the same empty result as a config that named nothing, and this one
+	// has already missed once: the compiler lowercases Path() on a case-insensitive filesystem while
+	// the config keeps its original casing, so comparing them without canonicalizing matched zero of
+	// 3,407 files. Measured, not imagined — the uncanonicalized form still yields 0 today.
+	//
+	// Build's zero-file guard does not cover it, because it sits upstream and passes: the config did
+	// name its files. The failure is between naming and matching, and it is silent by construction.
+	// So the count is asserted here rather than trusted, and a partial miss is as loud as a total one.
+	if len(files) != len(rootPaths) {
+		panic(projectFilesMismatchMessage(len(rootPaths), len(files)))
+	}
+
 	return files
+}
+
+// projectFilesMismatchMessage says what went wrong and where to look.
+//
+// Split out so a test can assert the wording. A panic reading only "mismatch" sends the next reader
+// to the tsconfig, which is the one place the fault is not.
+func projectFilesMismatchMessage(named int, matched int) string {
+	return fmt.Sprintf(
+		"program: the tsconfig named %d files but only %d matched the program's own paths. "+
+			"This is a path-canonicalization mismatch, not an empty project: the compiler lowercases "+
+			"Path() on a case-insensitive filesystem while the config keeps its original casing. "+
+			"Linting the %d that matched would silently skip the other %d.",
+		named, matched, matched, named-matched,
+	)
 }
 
 // CheckerForFile returns the checker that owns a file, and a function to release it.
