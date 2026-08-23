@@ -66,6 +66,7 @@ func main() {
 	rulesDirectory := flag.String("rules", "", "oxc eslint rules directory")
 	snapshotDirectory := flag.String("snapshots", "", "oxc snapshots directory")
 	rule := flag.String("rule", "", "rule file stem, e.g. use_isnan")
+	snapshotPrefix := flag.String("prefix", "", "snapshot filename prefix; defaults to the rules directory's name")
 	flag.Parse()
 
 	if *rulesDirectory == "" || *snapshotDirectory == "" || *rule == "" {
@@ -88,7 +89,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	snapshotPath := filepath.Join(*snapshotDirectory, "eslint_"+*rule+".snap")
+	// The snapshot prefix is the plugin directory's name rather than a constant. It was hardcoded to
+	// `eslint_` while the tool was validated against core rules, where that is correct, and it
+	// reported every snapshot absent the first time it ran against nextjs, react and typescript.
+	// The zero was in the right column and meant nothing, which is this tool's own failure mode
+	// arriving in its own code.
+	plugin := *snapshotPrefix
+	if plugin == "" {
+		plugin = filepath.Base(*rulesDirectory)
+	}
+	snapshotPath := filepath.Join(*snapshotDirectory, plugin+"_"+*rule+".snap")
 	diagnostics, snapshotExists := countSnapshotDiagnostics(snapshotPath)
 
 	fmt.Printf("rule            %s\n", *rule)
