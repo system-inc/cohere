@@ -221,7 +221,15 @@ func resolveClassFacts(className string) (classFacts, bool) {
 	}
 
 	properties := tailwindengine.RootDeclaredProperties[root]
-	if colorProperties, hasColorReading := tailwindengine.RootColorProperties[root]; hasColorReading && valueIsColor(base, root) {
+
+	// A root's entry is the common case, and two kinds of class take a different reading. A color
+	// value, handled per root because the color scale is large and uniform. And a handful of named
+	// values whose properties simply differ: `font-medium` declares `font-weight` while `font-mono`
+	// declares `font-family`, and both parse as root `font`. Taking the root's reading for those
+	// reported `font-medium font-mono` as a conflict on correct code.
+	if classProperties, hasClassReading := tailwindengine.ClassDeclaredProperties[base]; hasClassReading {
+		properties = classProperties
+	} else if colorProperties, hasColorReading := tailwindengine.RootColorProperties[root]; hasColorReading && valueIsColor(base, root) {
 		properties = colorProperties
 	}
 	if len(properties) == 0 {

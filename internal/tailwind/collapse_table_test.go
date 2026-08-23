@@ -350,3 +350,58 @@ func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
 		t.Errorf("slide-in-from-end declares only a custom property and should be absent, got %v", properties)
 	}
 }
+
+// TestValueDependentReadingsAreRecorded guards two classes of exception that a per-root table gets
+// wrong, both found as false positives on real code rather than by a fixture.
+//
+// `font-medium` declares `font-weight` and `font-mono` declares `font-family`, and both parse as
+// root `font`. A probe picks one reading and every class taking the other is then wrong, which
+// reported `font-medium font-mono` as a conflict on correct markup.
+//
+// Colors are the same shape at a different scale, handled per root because the palette is large and
+// uniform: `border` is width plus style with a number and `border-color` with a color.
+func TestValueDependentReadingsAreRecorded(t *testing.T) {
+	if len(ClassDeclaredProperties) == 0 {
+		t.Fatal("the per-class table is empty, so every assertion below passes for the wrong reason")
+	}
+
+	// The named-value exceptions.
+	for className, wantProperty := range map[string]string{
+		"font-mono":     "font-family",
+		"font-sans":     "font-family",
+		"object-cover":  "object-fit",
+		"object-top":    "object-position",
+		"object-center": "object-position",
+	} {
+		properties := ClassDeclaredProperties[className]
+		if len(properties) == 0 {
+			// `object-cover` takes the root's reading, so absence here is correct for it.
+			if className == "object-cover" {
+				continue
+			}
+			t.Errorf("%q is missing from the per-class table, so it would take its root's reading and "+
+				"be reported as conflicting with classes it shares no property with", className)
+			continue
+		}
+		if !containsProperty(properties, wantProperty) {
+			t.Errorf("%q declares %v, want %q", className, properties, wantProperty)
+		}
+	}
+
+	// The exceptions must not swallow the whole color scale: that produced 8,428 entries and a
+	// 10,000-line file before colors were excluded, for a distinction the color reading makes.
+	if len(ClassDeclaredProperties) > 200 {
+		t.Errorf("the per-class table holds %d entries, which means the color scale is being recorded "+
+			"class by class rather than once per root", len(ClassDeclaredProperties))
+	}
+
+	// And the root readings that matter must still disagree, or the exceptions are pointless.
+	fontRoot := RootDeclaredProperties["font"]
+	if len(fontRoot) == 0 {
+		t.Fatal("root `font` is missing from the table")
+	}
+	if containsProperty(fontRoot, "font-family") && containsProperty(fontRoot, "font-weight") {
+		t.Error("root `font` claims both font-family and font-weight, which means a probe merged two " +
+			"readings rather than recording one and excepting the other")
+	}
+}

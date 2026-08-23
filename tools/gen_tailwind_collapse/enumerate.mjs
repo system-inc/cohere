@@ -155,6 +155,33 @@ for (const entry of designSystem.getClassList?.() ?? []) {
 
 const roots = Array.from(functionalRoots).sort();
 
+// Roots no probe value could reach. Reported rather than skipped, because an unmeasured root is
+// absent from every table below for a reason nobody can infer from its absence.
+const unreachableRoots = [];
+
+/*
+ * A real class for each root, taken from the design system's own class list.
+ *
+ * Guessing probe values is what produced four separate bugs in this generator and 49 silently
+ * missing roots. The registry already knows a class for every root it defines, so the reliable move
+ * is to read one rather than to invent one: `from-0%`, `slide-in-from-top-4` and `animate-spin` are
+ * values no hand-written list would have contained.
+ *
+ * The guessed list is still tried first, because it keeps the probe values consistent across roots
+ * where a choice exists; this is the fallback that makes "unreachable" mean genuinely unreachable.
+ */
+const exampleClassByRoot = new Map();
+for (const entry of designSystem.getClassList?.() ?? []) {
+    const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
+    if (typeof name !== 'string') continue;
+
+    const candidate = parseCandidate(name);
+    if (candidate?.kind !== 'functional' || !candidate.root) continue;
+    if (exampleClassByRoot.has(candidate.root)) continue;
+    exampleClassByRoot.set(candidate.root, name);
+}
+
+
 /*
  * The probe values.
  *
@@ -396,14 +423,33 @@ for (const root of roots) {
      * `divide-neutral-200` against `border-neutral-200` case read as silent because the class did
      * not resolve at all, rather than because the selector check separated them.
      */
-    const propertyProbeValues = [...probeValues, colorNames.values().next().value].filter(Boolean);
-
     let properties = null;
-    for (const value of propertyProbeValues) {
+    for (const value of allProbeValues()) {
         properties = declaredProperties(root + '-' + value);
         if (properties !== null) break;
     }
-    if (properties === null) continue;
+    if (properties === null && exampleClassByRoot.has(root)) {
+        properties = declaredProperties(exampleClassByRoot.get(root));
+    }
+    if (properties === null) {
+        /*
+         * Two different absences, and conflating them is what hid four bugs.
+         *
+         * A root that compiles to nothing at all is unreachable: no probe value produced a class,
+         * so it is unmeasured and every table below is missing it for a reason nobody could infer.
+         * A root that compiles but declares only custom properties is genuinely empty: it has no
+         * CSS property to record, and `--tw-gradient-from-position` is not something two classes
+         * can conflict about.
+         *
+         * `slide-in-from-top-4`, `from-0%` and `zoom-in-50` are all the second kind, so reporting
+         * them as unreachable would be crying wolf on twenty-eight roots that are working
+         * correctly.
+         */
+        const probeClass = exampleClassByRoot.get(root);
+        const compilesAtAll = probeClass !== undefined && declarationText(probeClass) !== null;
+        if (!compilesAtAll && probeClass === undefined) unreachableRoots.push(root);
+        continue;
+    }
     rootProperties.push({ root, properties });
 }
 
@@ -451,6 +497,7 @@ function selectorShape(className) {
 }
 
 const rootSelectorShapes = [];
+const classProperties = [];
 const composingRoots = [];
 
 /*
@@ -487,6 +534,48 @@ function declarationText(className) {
 
 
 
+
+/*
+ * Every value kind a probe might need, in one list.
+ *
+ * Four bugs in this generator came from a probe list that could not express some root's values, and
+ * each one reported the root as having nothing rather than as unmeasured: the `rounded-*` families
+ * were absent because the radius scale is named, `divide` was absent from the properties and shape
+ * tables because it takes only a color, and `shadow` was absent from the composing set because
+ * `shadow-4` is not a class.
+ *
+ * A check that cannot fire is indistinguishable from a check nothing violates, and the same is true
+ * of a probe that cannot reach its subject. One list means widening it fixes every probe at once,
+ * and `unreachableRoots` below turns the remaining silence into a reported number.
+ */
+function allProbeValues() {
+    const firstColor = colorNames.values().next().value;
+    return [
+        // Numeric and named scales.
+        ...probeValues,
+        '8',
+        '1',
+        'xl',
+        // A color, for roots like `divide` and `border` that accept only one.
+        firstColor,
+        // Keyword scales, for the roots the numeric and color probes cannot reach at all. Adding
+        // these took 49 unreachable roots down, and every one of them was a real utility absent
+        // from every table: `animate`, `cursor`, `object`, `transition`, `aspect`, `content`.
+        'spin',
+        'pointer',
+        'cover',
+        'colors',
+        'square',
+        'none',
+        'auto',
+        'normal',
+        'center',
+        'linear',
+        'inherit',
+        '0',
+    ].filter(Boolean);
+}
+
 const rootDefault = new Map(rootProperties.map((entry) => [entry.root, entry.properties.join(',')]));
 
 for (const root of roots) {
@@ -501,14 +590,15 @@ for (const root of roots) {
      * `divide` is the case that matters most here, because `divide-neutral-200` against
      * `border-neutral-200` is the pair that made the whole rule look engine-bound.
      */
-    const shapeProbeValues = [...probeValues, colorNames.values().next().value].filter(Boolean);
-
-    for (const value of shapeProbeValues) {
-        const shape = selectorShape(root + '-' + value);
-        if (shape === null) continue;
-        if (shape !== '.CLASS') rootSelectorShapes.push({ root, shape });
-        break;
+    let shape = null;
+    for (const value of allProbeValues()) {
+        shape = selectorShape(root + '-' + value);
+        if (shape !== null) break;
     }
+    if (shape === null && exampleClassByRoot.has(root)) {
+        shape = selectorShape(exampleClassByRoot.get(root));
+    }
+    if (shape !== null && shape !== '.CLASS') rootSelectorShapes.push({ root, shape });
 }
 
 for (const root of roots) {
@@ -522,7 +612,7 @@ for (const root of roots) {
      * reported `shadow` as not composing while recording `ring` correctly, and `shadow-lg ring-1`
      * is exactly the pair that has to come out silent.
      */
-    const candidateValues = ['4', '8', 'sm', 'md', 'lg', 'xl', '2', '1'];
+    const candidateValues = allProbeValues();
 
     let first = null;
     let firstValue = null;
@@ -560,6 +650,44 @@ for (const root of roots) {
     rootValueProperties.push({ root, properties: colorProperties });
 }
 
+const colorProperties = new Map(rootValueProperties.map((entry) => [entry.root, entry.properties.join(',')]));
+
+/*
+ * Classes whose properties differ from their root's default, recorded individually.
+ *
+ * The color split was the first instance and it is not the only one: `font-medium` declares
+ * `font-weight` while `font-mono` declares `font-family`, and both parse as root `font`. A probe
+ * picks one reading and every class taking the other is then wrong, which showed up as
+ * `font-medium font-mono` being reported as a conflict on real code.
+ *
+ * Only the exceptions are stored, so the table stays small: a class absent here takes its root's
+ * entry. Multi-rule utilities are already excluded by declaredProperties, so a component class
+ * cannot land here either.
+ */
+for (const entry of designSystem.getClassList?.() ?? []) {
+    const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
+    if (typeof name !== 'string') continue;
+
+    const candidate = parseCandidate(name);
+    if (candidate?.kind !== 'functional' || !candidate.root) continue;
+
+    const rootProperties = rootDefault.get(candidate.root);
+    if (rootProperties === undefined) continue;
+
+    const properties = declaredProperties(name);
+    if (properties === null) continue;
+    if (properties.join(',') === rootProperties) continue;
+
+    // Colors are already handled per root, and they are the bulk of the exceptions: recording them
+    // here too produced 8,428 entries and a 10,000-line file for a distinction the color reading
+    // already makes.
+    const colorReading = colorProperties.get(candidate.root);
+    if (colorReading !== undefined && properties.join(',') === colorReading) continue;
+
+    classProperties.push({ root: name, properties });
+}
+
+classProperties.sort((left, right) => left.root.localeCompare(right.root));
 rootValueProperties.sort((left, right) => left.root.localeCompare(right.root));
 
 const staticProperties = [];
@@ -586,9 +714,11 @@ process.stdout.write(
             pairsProbed,
             families,
             rootProperties,
+            unreachableRoots: unreachableRoots.sort(),
             rootSelectorShapes,
             composingRoots: composingRoots.sort(),
             rootColorProperties: rootValueProperties,
+            classProperties,
             colorNames: Array.from(colorNames).sort(),
             staticProperties,
         },

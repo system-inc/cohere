@@ -49,6 +49,8 @@ type enumeration struct {
 	RootColorProperties []utilityProperties `json:"rootColorProperties"`
 	RootSelectorShapes  []rootSelectorShape `json:"rootSelectorShapes"`
 	ComposingRoots      []string            `json:"composingRoots"`
+	ClassProperties     []utilityProperties `json:"classProperties"`
+	UnreachableRoots    []string            `json:"unreachableRoots"`
 	ColorNames          []string            `json:"colorNames"`
 	StaticProperties    []utilityProperties `json:"staticProperties"`
 }
@@ -132,6 +134,17 @@ func main() {
 	if err := os.WriteFile(*output, rendered, 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: %v\n", err)
 		os.Exit(1)
+	}
+
+	// A root no probe could reach is unmeasured rather than empty, and every table is missing it for
+	// a reason nobody could infer from its absence. Four bugs in this generator were exactly that,
+	// so the count is printed rather than left for someone to notice.
+	if len(result.UnreachableRoots) > 0 {
+		fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: %d roots were unreachable by every probe value and are absent from the tables:\n", len(result.UnreachableRoots))
+		for _, root := range result.UnreachableRoots {
+			fmt.Fprintf(os.Stderr, "  %s\n", root)
+		}
+		fmt.Fprintln(os.Stderr, "  Each needs a probe value it accepts, or it is silently missing rather than known to have nothing.")
 	}
 
 	fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: wrote %s — Tailwind %s, %d families from %d pairs over %d roots.\n",
@@ -284,6 +297,22 @@ var RootSelectorShapes = map[string]string{
 `)
 	for _, entry := range result.RootSelectorShapes {
 		fmt.Fprintf(&buffer, "\t%q: %q,\n", entry.Root, entry.Shape)
+	}
+
+	fmt.Fprintf(&buffer, `}
+
+// ClassDeclaredProperties overrides a root's entry for classes whose properties depend on their
+// value.
+//
+// font-medium declares font-weight and font-mono declares font-family, and both parse as root
+// font. A per-root table picks one reading and is then wrong about every class taking the other,
+// which showed up as font-medium font-mono being reported as a conflict on correct code.
+//
+// Only exceptions are stored: a class absent here takes its root's entry.
+var ClassDeclaredProperties = map[string][]string{
+`)
+	for _, entry := range result.ClassProperties {
+		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.Root, quotedList(entry.Properties))
 	}
 
 	fmt.Fprintf(&buffer, `}
