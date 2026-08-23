@@ -277,3 +277,25 @@ func TestUnparseableDetectionDiscriminates(t *testing.T) {
 		}
 	}
 }
+
+// The real error strings the goja engine produces must be recognized as parse failures.
+//
+// These four are measured rather than invented: @system_verify_format ran four malformations
+// through the fork and reported what came back. They are Prettier's own errors surfacing through
+// goja unchanged, so the phrasing belongs to upstream and can move, but the `SyntaxError:` prefix is
+// the stable part and is what the matcher keys on.
+//
+// Pinned here because a matcher tested only against strings I wrote myself is a matcher tested
+// against my imagination. The one that matters is the one the engine actually emits.
+func TestTheEnginesRealParseErrorsAreRecognized(t *testing.T) {
+	for _, message := range []string{
+		"SyntaxError: Property assignment expected. (1:12)",
+		"SyntaxError: Expression expected. (1:12)",
+		"SyntaxError: Unexpected token. A constructor, method, accessor, or property was expected.",
+		"SyntaxError: JSX element 'span' has no corresponding closing tag. (1:7)",
+	} {
+		if !isUnparseable(errors.New(message)) {
+			t.Fatalf("a real parse failure was not recognized, so it would be reported as a broken formatter: %q", message)
+		}
+	}
+}
