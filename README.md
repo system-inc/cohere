@@ -81,6 +81,24 @@ assert the repair rather than the id: the id is satisfied by a correct detection
 fixture pair because the fixtures were written from the same wrong belief as the code. The tree is the
 only check that does not share the author's assumptions.
 
+### When the sweep itself is the thing that lied
+
+Four faults have produced a clean sweep from a probe that never ran, and every one reads identically
+to a mutant nothing catches. Three appeared twice, in different members' harnesses, within one night.
+
+- **A mutant that does not compile.** `go test` reports `[build failed]` and zero failing tests. Assert
+  the mutant builds before reading its result.
+- **A mutation that did not apply.** A replacement string that does not match the source changes
+  nothing and fails nothing. Assert the file changed before running tests.
+- **A filter that cannot match.** `grep -c` counts matching lines per file and `grep -o` counts
+  occurrences; a total built from the wrong one reports zero against output that has failures in it.
+- **A restore that silently did not run.** An unset variable in the cleanup leaves the mutant in the
+  tree, and a restore that did nothing looks exactly like one that worked. Verify with `cmp`.
+
+The shape is always the same and it is the same shape the rules themselves fail in: **the probe did not
+run, and nothing said so.** A sweep is what everything else here is trusted on, so it is the one
+instrument whose own failure modes have to be checked rather than assumed.
+
 ### What a fix costs
 
 `ReportNodeWithFixes` rewrites source, and the text is only half of it: a correct replacement over the
