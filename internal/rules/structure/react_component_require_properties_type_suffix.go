@@ -61,6 +61,11 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 		// component visitors and read by the declaration ones.
 		componentPropertyTypes := map[string]bool{}
 
+		// Type names the file already declares. A rename onto one of these produces a duplicate
+		// identifier, and where the taken name is the alias's own right-hand side it also produces a
+		// type that references itself. Both parse, so the fix engine cannot refuse them.
+		declaredTypeNames := map[string]bool{}
+
 		checkParameterType := func(parameters []*ast.Node) {
 			if len(parameters) == 0 {
 				return
@@ -90,6 +95,14 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 			// Reported on the type reference rather than the parameter, so the finding underlines
 			// the name that has to change.
 			typeNode := parameterTypeNode(parameters[0])
+			if declaredTypeNames[propertiesTypeNameFor(typeName)] {
+				// The target name is taken, so renaming onto it would break the file. Reported
+				// without a fix rather than silenced: the name still violates the convention and
+				// the author is the one who can decide which of the two survives.
+				ctx.ReportNode(typeNode.AsTypeReferenceNode().TypeName,
+					messageUseComponentPropertyTypeSuffix)
+				return
+			}
 			ctx.ReportNodeWithFixes(typeNode.AsTypeReferenceNode().TypeName,
 				messageUseComponentPropertyTypeSuffix,
 				ctx.ReplaceNode(typeNode.AsTypeReferenceNode().TypeName, propertiesTypeNameFor(typeName)))
@@ -100,6 +113,10 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 				return
 			}
 			if !componentPropertyTypes[name.Text()] || strings.HasSuffix(name.Text(), "Properties") {
+				return
+			}
+			if declaredTypeNames[propertiesTypeNameFor(name.Text())] {
+				ctx.ReportNode(name, message)
 				return
 			}
 			ctx.ReportNodeWithFixes(name, message, ctx.ReplaceNode(name, propertiesTypeNameFor(name.Text())))
@@ -122,7 +139,7 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 			// `react-component-no-multiple-primary`, which collects in this listener for the same
 			// reason.
 			ast.KindSourceFile: func(node *ast.Node) {
-				collectComponentPropertyTypeNames(node, componentPropertyTypes)
+				collectComponentPropertyTypeNames(node, componentPropertyTypes, declaredTypeNames)
 			},
 
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
@@ -174,11 +191,33 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 // needs the complete set before it judges anything and walk order does not supply that. Reaching
 // every component means walking the whole tree rather than the top level: a component can be
 // declared inside a function, and the original's map was filled from a listener that saw those too.
-func collectComponentPropertyTypeNames(sourceFile *ast.Node, into map[string]bool) {
+func collectComponentPropertyTypeNames(sourceFile *ast.Node, into map[string]bool, declared map[string]bool) {
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
 		if node == nil {
 			return
+		}
+
+		// Every type name the file already declares, so a rename can refuse a target that is
+		// taken. Collected in the same walk rather than a second one, since both questions are
+		// about the whole file and neither is answerable from one node.
+		switch node.Kind {
+		case ast.KindInterfaceDeclaration:
+			if declarationName := node.AsInterfaceDeclaration().Name(); declarationName != nil {
+				declared[declarationName.Text()] = true
+			}
+		case ast.KindTypeAliasDeclaration:
+			if declarationName := node.AsTypeAliasDeclaration().Name(); declarationName != nil {
+				declared[declarationName.Text()] = true
+			}
+		case ast.KindClassDeclaration:
+			if declarationName := node.AsClassDeclaration().Name(); declarationName != nil {
+				declared[declarationName.Text()] = true
+			}
+		case ast.KindEnumDeclaration:
+			if declarationName := node.AsEnumDeclaration().Name(); declarationName != nil {
+				declared[declarationName.Text()] = true
+			}
 		}
 
 		var name *ast.Node

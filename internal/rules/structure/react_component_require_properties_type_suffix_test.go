@@ -240,3 +240,59 @@ func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.
 		})
 	}
 }
+
+// A rename onto a name the file already declares is refused, and the finding stays.
+//
+// Found on Kirk's real tree rather than in a corpus. `MenuItem.tsx` declares both spellings, which
+// is what a codebase mid-migration looks like by definition, and the fix rewrote
+//
+//	export type MenuItemInterface = MenuItemProperties & { ... }
+//
+// into a type alias whose name is its own right-hand side:
+//
+//	TS2300: Duplicate identifier 'MenuItemProperties'
+//	TS2456: Type alias 'MenuItemProperties' circularly references itself
+//
+// Both parse. Same class as the ordering defect this rule shipped an hour earlier: valid syntax,
+// broken program, and a fix engine's refusal guard has nothing to catch.
+//
+// The rule renames toward a fixed convention, so a collision is not an exotic case. Any file
+// holding both spellings has one, and holding both spellings is exactly what migrating looks like.
+//
+// The finding is kept and only the fix is withheld. The name still violates the convention, and
+// which of the two declarations survives is a decision only the author can make.
+func TestReactComponentRequirePropertiesTypeSuffixRefusesATakenName(t *testing.T) {
+	source := "export interface MenuItemProperties { a: string }\n" +
+		"export type MenuItemInterface = MenuItemProperties;\n" +
+		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
+
+	result := ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix, componentFile, source)
+	if len(result.Diagnostics) == 0 {
+		t.Fatal("wanted the convention violation still reported, got no findings")
+	}
+	for index, diagnostic := range result.Diagnostics {
+		if len(diagnostic.Fixes) != 0 {
+			t.Fatalf("finding %d proposes %d fixes onto a name the file already declares, wanted none",
+				index, len(diagnostic.Fixes))
+		}
+	}
+}
+
+// The ordinary case still carries its fix, which is what keeps the guard from being a silencer.
+//
+// Without this, disabling every fix in the rule passes the test above, and a rule that proposes
+// nothing is indistinguishable from one that correctly refuses one collision.
+func TestReactComponentRequirePropertiesTypeSuffixStillFixesWhenTheNameIsFree(t *testing.T) {
+	source := "export interface MenuItemInterface { a: string }\n" +
+		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
+
+	result := ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix, componentFile, source)
+	if len(result.Diagnostics) != 2 {
+		t.Fatalf("wanted two findings, got %d", len(result.Diagnostics))
+	}
+	for index, diagnostic := range result.Diagnostics {
+		if len(diagnostic.Fixes) != 1 {
+			t.Fatalf("finding %d carries %d fixes, wanted one", index, len(diagnostic.Fixes))
+		}
+	}
+}
