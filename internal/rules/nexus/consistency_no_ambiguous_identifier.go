@@ -131,6 +131,19 @@ func isNonBindingIdentifier(node *ast.Node) bool {
 	case ast.KindPropertySignature:
 		signature := parent.AsPropertySignatureDeclaration()
 		return signature != nil && signature.Name() == node
+
+	case ast.KindJsxOpeningElement, ast.KindJsxClosingElement, ast.KindJsxSelfClosingElement,
+		ast.KindJsxAttribute:
+		// A JSX tag and a JSX attribute are identifiers syntactically and neither is a binding. An
+		// intrinsic element is named by HTML, not by us, so `<p>` and `<b>` are not names anyone
+		// chose or has to hold in their head.
+		//
+		// This cost 3,081 false findings on the ahra tree before it was caught. The port visited
+		// every KindIdentifier and reproduced only the exemptions the TypeScript original spells
+		// out; the original never needed a JSX case because its parser gives a JSX name a distinct
+		// node type. That is the general shape of this class of divergence: an exemption the
+		// original gets from its AST for free has to be written down in ours.
+		return true
 	}
 	return false
 }

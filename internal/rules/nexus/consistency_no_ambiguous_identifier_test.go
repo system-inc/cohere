@@ -52,6 +52,14 @@ func TestConsistencyNoAmbiguousIdentifierStaysSilent(t *testing.T) {
 		// An uppercase single letter is a type parameter.
 		{"type parameters", "export function identity<T>(value: T): T {\n    return value;\n}\n"},
 		{"an underscore-prefixed name is fine", "const _event = 1;\n"},
+
+		// JSX names. An intrinsic element is named by HTML rather than by us, so `<p>` and `<b>`
+		// are not names anyone chose. Their absence from the fixtures let this rule report 3,081
+		// false findings on the real tree before it was caught.
+		{"a jsx intrinsic element", "export const Thing = () => <p>hi</p>;\n"},
+		{"a nested jsx element", "export const Thing = () => <p><b>hi</b></p>;\n"},
+		{"a self-closing jsx element", "export const Thing = () => <img src=\"x\" />;\n"},
+		{"a jsx attribute name", "export const Thing = () => <div a=\"1\" />;\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
