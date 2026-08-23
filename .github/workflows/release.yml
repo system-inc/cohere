@@ -74,20 +74,23 @@ jobs:
               run: |
                   # Prove the check looked at something before trusting that it found nothing.
                   #
-                  # `gofmt -l` writes "no such file or directory" to stderr and exits 0, so a typo'd
-                  # or renamed path is captured as an empty string, `test -z` passes, and a tree
-                  # nobody examined reports as clean. Measured: `gofmt -l ./cmd ./internal
-                  # ./nonexistent` exits 0 with empty stdout. The population is asserted first, so
-                  # an empty finding below means "found nothing" rather than "looked nowhere".
-                  formatted=$(gofmt -l ./cmd ./internal ./tools 2>&1)
-                  case "$formatted" in
-                      *"no such file or directory"*)
-                          echo "gofmt could not read a path it was given:"
-                          echo "$formatted"
-                          exit 1
-                          ;;
-                  esac
+                  # The original `test -z "$(gofmt -l ...)"` accepted a typo'd or renamed path: the
+                  # error goes to stderr, so the captured string is empty and `test -z` passes over
+                  # a tree nobody examined.
+                  #
+                  # The mechanism is worth stating exactly, because the obvious explanation is
+                  # wrong. `gofmt` does report the failure — it exits 2 — and `$(...)` preserves
+                  # that status. The defect is that `test -z` never consults it: it tests the
+                  # captured text, and the text is empty. So the fix is to read the status that was
+                  # there all along, not to pattern-match the message.
+                  if ! formatted=$(gofmt -l ./cmd ./internal ./tools); then
+                      echo "gofmt could not read a path it was given (exit above)"
+                      exit 1
+                  fi
 
+                  # And the population is asserted separately, because a readable path that holds no
+                  # Go files is a different failure: gofmt exits 0 with nothing to say, which is
+                  # indistinguishable from a formatted tree.
                   examined=$(find ./cmd ./internal ./tools -name '*.go' | wc -l)
                   echo "gofmt examined $examined Go files (must be > 0)"
                   if [ "$examined" -eq 0 ]; then
