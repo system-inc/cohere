@@ -104,6 +104,7 @@ func All() []rule.Rule {
 		typescript.NoNonNullAssertedOptionalChain,
 		typescript.NoNonNullAssertion,
 		typescript.NoUnsafeFunctionType,
+		typescript.NoWrapperObjectTypes,
 		tailwind.NoConcatenatedClasses,
 		tailwind.NoDuplicateClasses,
 		tailwind.NoPhysicalDirection,
