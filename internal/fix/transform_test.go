@@ -429,7 +429,7 @@ func TestASkipWithNoReasonIsStillCounted(t *testing.T) {
 // them checked that its own clause appeared somewhere in the line, and all of them passed while the
 // line read:
 //
-//	... 0 refused, 2 not formatted (2 markdown ...) (1 overlaps a fix from another rule) ...
+//	... 0 refused, 2 not formatted (2 markdown ...) (1 overlaps another fix) ...
 //
 // The refusal breakdown had been written to sit directly after the refusal count, and adding the
 // reformat and skip clauses pushed it away, so it rendered as a second skip reason. Every number was
@@ -455,7 +455,7 @@ func TestTheWholeSummaryLineReadsCorrectly(t *testing.T) {
 				{FileName: "a.ts", Converged: true, Passes: 1, Rejected: []Rejection{{Reason: ReasonOverlap}}},
 				{FileName: "b.md", Converged: true, Passes: 1, TransformSkipped: true, TransformSkipReason: "markdown doubles a standalone tilde"},
 			},
-			want: "fix: 0 of 2 files rewritten, 0 fixes applied, 1 refused (1 overlaps a fix from another rule), " +
+			want: "fix: 0 of 2 files rewritten, 0 fixes applied, 1 refused (1 overlaps another fix), " +
 				"1 not formatted (1 markdown doubles a standalone tilde)",
 		},
 		{

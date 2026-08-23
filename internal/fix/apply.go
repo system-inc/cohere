@@ -50,13 +50,23 @@ type Rejection struct {
 
 	// ConflictsWith names the rule whose fix won the bytes, when the reason is an overlap. Empty
 	// otherwise.
+	//
+	// It can equal the losing proposal's own RuleName. A diagnostic reporting two fixes has them
+	// flattened into independent proposals, so a rule's fixes compete with each other exactly as
+	// they compete with another rule's, and a reader seeing the same name on both sides is looking
+	// at that case rather than at a bug.
 	ConflictsWith string
 }
 
 // Reasons a proposal is rejected. Stated as constants because they are read by tests and printed
 // in reports, and a reason that drifts between the two stops being checkable.
 const (
-	ReasonOverlap       = "overlaps a fix from another rule"
+	// ReasonOverlap says "another fix" rather than "another rule" because resolveOverlaps is purely
+	// positional: it tracks the span last claimed and never looks at who proposed it. When one
+	// diagnostic reports two fixes, ProposalsFrom has already flattened them into siblings, so the
+	// winner can be the same rule as the loser. Saying "another rule" sent a reader hunting for a
+	// second rule that does not exist. ConflictsWith carries the accurate answer either way.
+	ReasonOverlap       = "overlaps another fix"
 	ReasonInvalidRange  = "range is outside the file or inverted"
 	ReasonParseFailure  = "the rewritten file does not parse"
 	ReasonNoProgress    = "the fix replaces text with itself"

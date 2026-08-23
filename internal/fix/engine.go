@@ -513,7 +513,7 @@ func (s Summary) String() string {
 
 	// The refusal breakdown attaches to the refusal count and must stay adjacent to it. It was
 	// written when nothing sat between the two, and adding the reformat and skip clauses moved it
-	// away — producing "2 not formatted (2 markdown) (1 overlaps a fix from another rule)", where
+	// away — producing "2 not formatted (2 markdown) (1 overlaps another fix)", where
 	// the second parenthetical reads as a second skip reason. A true number under the wrong heading,
 	// found by reading the rendered line rather than by any assertion, because every fixture checked
 	// for the presence of its own substring and none checked what the whole line said.
