@@ -118,6 +118,32 @@ the pin was against `microsoft/typescript-go` until that repository was archived
 `microsoft/TypeScript`. Both spellings are forty hex characters and resolve in different places, so a
 hardcoded label would have survived the migration while quietly becoming false.
 
+### The formatter's bundles
+
+The formatter runs our Prettier fork inside a JavaScript engine, and those bundles are build output
+of `~/Projects/system/prettier` rather than anything this repository pins. `--embed-formatter` pulls
+them in and stamps the fork's `HEAD` beside the compiler pin, so `--version` grows a `formatter:`
+line naming exactly which Prettier a binary formats with.
+
+That stamp exists because the fork is reached by a path on a build machine, not by a version. Without
+it, two binaries built from the same verify commit can format the same file differently and neither
+can say why, and formatting differences are the worst kind to debug from a report: every diff after
+the first one is noise.
+
+The flag is off by default, because the formatter is not wired into verify yet and a release should
+not demand a built fork for a feature nothing reaches. When it is on, the build refuses a fork that
+is absent, unbuilt, missing any required bundle, holding a zero-byte one, or whose bundles are older
+than its tracked source. It refuses before cross-compiling anything, so a stale fork costs a second
+rather than six builds. The subset embedded is `standalone.js`, `plugins/estree.js`, and
+`plugins/typescript.js` — 2.3 MB measured, against 18 MB for the fork's whole `dist/prettier`, which
+would more than double a 14 MB binary to carry formatters for languages this tool does not check.
+
+Staleness is measured by modification time against the fork's newest tracked source file, not by
+recording a commit beside the bundles. A recorded commit only catches a rebuild someone remembered
+to re-record; the case that actually happens is an edited working tree that was never rebuilt, where
+the commit has not moved and the bundles are wrong anyway. `AHRA_VERIFY_PRETTIER_FORK` points at a
+checkout somewhere other than the default path.
+
 `AHRA_VERIFY_BINARY=/path/to/verify` points every `verify` on the machine at a local build. A broken
 override is fatal rather than a fallback, even when a good install is sitting right there: someone
 who sets it has stated which binary they want, and quietly running a different one would hand them

@@ -33,6 +33,7 @@ func run() error {
 	outputDirectory := flag.String("output", "dist", "where to stage the packages")
 	moduleDirectory := flag.String("module", ".", "the root of the verify module")
 	only := flag.String("only", "", "build just these platforms, comma separated, as os/arch")
+	embedFormatter := flag.Bool("embed-formatter", false, "embed the Prettier fork's bundles, failing if the fork is absent, unbuilt, or stale")
 	signingIdentity := flag.String("signing-identity", "", "the macOS codesigning identity; unsigned when empty")
 	keychainProfile := flag.String("notary-profile", "", "the notarytool keychain profile; not notarized when empty")
 	flag.Parse()
@@ -66,6 +67,7 @@ func run() error {
 		OutputDirectory: outputRoot,
 		Version:         *version,
 		Targets:         targets,
+		EmbedFormatter:  *embedFormatter,
 		Signing:         signing,
 	})
 	if err != nil {

@@ -42,6 +42,20 @@ var (
 	// input to the behavior, not just to the build: it is recorded for the same reason the rebuild
 	// cache hashes it.
 	goToolchain = "unknown"
+
+	// formatterCommit is the commit of the Prettier fork whose bundles this binary embeds.
+	//
+	// The formatter is JavaScript built out of a separate repository and pulled in at build time
+	// from a path on the build machine, not a pinned dependency. Nothing else in the binary records
+	// which build that was, so without this stamp two binaries from the same verify commit can
+	// format the same file differently and neither can say why. Formatting differences are the
+	// worst kind to debug from a report, because every diff after the first one is noise.
+	//
+	// It defaults to empty rather than "unknown", unlike every other stamp here, because a binary
+	// that embeds no formatter is a different thing from one whose stamp went missing. Defaulting
+	// to "unknown" would print a lost-stamp signal on every binary built before the formatter
+	// exists, and a warning that fires when nothing is wrong is a warning nobody reads later.
+	formatterCommit = ""
 )
 
 // Provenance is everything a shipped binary knows about where it came from.
@@ -62,6 +76,12 @@ type Provenance struct {
 	// GoToolchain is the Go version that compiled this binary.
 	GoToolchain string
 
+	// FormatterCommit is the commit of the Prettier fork whose bundles this binary embeds.
+	//
+	// Empty for a binary built before the formatter existed. That is distinct from "unknown", which
+	// means a build that should have stamped it and did not, so the two render differently.
+	FormatterCommit string
+
 	// Platform is the operating system and architecture this binary was built for, as "os/arch".
 	//
 	// It is read from the runtime rather than stamped, because the runtime cannot be wrong about it
@@ -77,6 +97,7 @@ func Current() Provenance {
 		CompilerCommit:   resolveCompilerCommit(),
 		CompilerUpstream: compilerUpstream,
 		GoToolchain:      resolveGoToolchain(),
+		FormatterCommit:  formatterCommit,
 		Platform:         runtime.GOOS + "/" + runtime.GOARCH,
 	}
 }
@@ -100,6 +121,11 @@ func (provenance Provenance) String() string {
 		"  platform:       " + provenance.Platform,
 		"  go:             " + provenance.GoToolchain,
 		"  compiler:       " + provenance.describeCompiler(),
+	}
+	// Printed only when the binary carries a formatter, so a build that predates it does not grow a
+	// line reading "unknown" that looks like a lost stamp rather than a feature that did not exist.
+	if provenance.FormatterCommit != "" {
+		lines = append(lines, "  formatter:      "+provenance.FormatterCommit)
 	}
 	if provenance.IsDevelopment() {
 		lines = append(lines, "  note:           a local build, so the rules are whatever was on disk when it was compiled")

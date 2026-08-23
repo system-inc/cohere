@@ -31,6 +31,15 @@ type Options struct {
 	// Targets are the platforms to build. Empty means every target.
 	Targets []Target
 
+	// EmbedFormatter pulls the Prettier fork's bundles into the binary and stamps which commit
+	// built them.
+	//
+	// Off by default because the formatter is not wired into verify yet, and a release that
+	// demanded a built fork before anything could use it would block every build for a feature
+	// nobody reaches. When it is on, a fork that is absent, unbuilt, or stale fails the release
+	// rather than embedding whatever is on disk.
+	EmbedFormatter bool
+
 	// Signing configures macOS codesigning. A zero value stages unsigned binaries, which is a
 	// supported outcome rather than a failure: signing needs credentials a contributor may not
 	// have, and an npm install does not set the quarantine attribute that Gatekeeper checks. What
@@ -88,10 +97,20 @@ func Build(options Options) (Result, error) {
 		return Result{}, err
 	}
 
+	// Resolved once, before any target is built, so a stale or missing fork fails the release
+	// immediately rather than after six cross-compilations.
+	formatter := FormatterSource{}
+	if options.EmbedFormatter {
+		formatter, err = ResolveFormatterSource()
+		if err != nil {
+			return Result{}, err
+		}
+	}
+
 	result := Result{}
 
 	for _, target := range targets {
-		staged, err := buildPlatformPackage(options, target, pin, goToolchain)
+		staged, err := buildPlatformPackage(options, target, pin, goToolchain, formatter)
 		if err != nil {
 			return Result{}, fmt.Errorf("building %s: %w", target, err)
 		}
@@ -108,7 +127,7 @@ func Build(options Options) (Result, error) {
 }
 
 // buildPlatformPackage cross-compiles one target and writes its package around the binary.
-func buildPlatformPackage(options Options, target Target, pin compilerPin, goToolchain string) (StagedPackage, error) {
+func buildPlatformPackage(options Options, target Target, pin compilerPin, goToolchain string, formatter FormatterSource) (StagedPackage, error) {
 	directory := filepath.Join(options.OutputDirectory, target.DirectoryName())
 	binaryPath := filepath.Join(directory, "bin", target.BinaryFileName())
 
@@ -116,7 +135,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		return StagedPackage{}, fmt.Errorf("creating the package directory: %w", err)
 	}
 
-	if err := compile(options, target, binaryPath, pin, goToolchain); err != nil {
+	if err := compile(options, target, binaryPath, pin, goToolchain, formatter); err != nil {
 		return StagedPackage{}, err
 	}
 
@@ -189,10 +208,10 @@ func buildDispatcherPackage(options Options) (StagedPackage, error) {
 }
 
 // compile cross-compiles one target, stamping the provenance in.
-func compile(options Options, target Target, binaryPath string, pin compilerPin, goToolchain string) error {
+func compile(options Options, target Target, binaryPath string, pin compilerPin, goToolchain string, formatter FormatterSource) error {
 	const packagePath = "github.com/system-inc/verify/internal/release"
 
-	linkerFlags := strings.Join([]string{
+	stamps := []string{
 		// Strip the symbol table and DWARF. Measured on a comparable binary: marginally faster to
 		// link and 29% smaller, with nothing traded away that a released binary needs.
 		"-s", "-w",
@@ -200,7 +219,15 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 		"-X", packagePath + ".compilerCommit=" + pin.Commit,
 		"-X", packagePath + ".compilerUpstream=" + pin.Upstream,
 		"-X", packagePath + ".goToolchain=" + goToolchain,
-	}, " ")
+	}
+
+	// Stamped only when a formatter is actually embedded. A binary carrying no formatter must not
+	// report a commit for one, because a reader would take that as the Prettier it formats with.
+	if formatter.Commit != "" {
+		stamps = append(stamps, "-X", packagePath+".formatterCommit="+formatter.Commit)
+	}
+
+	linkerFlags := strings.Join(stamps, " ")
 
 	arguments := append([]string{"build"}, BuildFlags...)
 	arguments = append(arguments, "-ldflags="+linkerFlags, "-o", binaryPath, "./cmd/verify")
