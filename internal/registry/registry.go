@@ -103,6 +103,7 @@ func All() []rule.Rule {
 		typescript.NoUnsafeFunctionType,
 		tailwind.NoConcatenatedClasses,
 		tailwind.NoDuplicateClasses,
+		tailwind.NoPhysicalDirection,
 		tailwind.NoUnnecessaryWhitespace,
 	}
 }
