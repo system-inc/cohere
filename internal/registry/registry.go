@@ -83,6 +83,7 @@ func All() []rule.Rule {
 		structure.ReactComponentNoDestructuring,
 		structure.ReactComponentNoDisplayName,
 		structure.ReactComponentNoSeparateNamedExport,
+		structure.ReactComponentRequirePropertiesParameter,
 		structure.ReactComponentNoForwardRef,
 		structure.ReactComponentNoMultiplePrimary,
 		structure.ReactHookNoDestructuring,
