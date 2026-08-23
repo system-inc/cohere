@@ -25,6 +25,7 @@ func All() []rule.Rule {
 		core.NoCompareNegZero,
 		core.NoDuplicateCase,
 		core.NoEmptyPattern,
+		core.NoUnsafeFinally,
 		core.NoUselessCatch,
 		nexus.BoundaryNoInternalImport,
 		nexus.BoundaryNoNexusOutsideImport,
