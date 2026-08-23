@@ -34,6 +34,7 @@ func All() []rule.Rule {
 		core.NoDupeElseIf,
 		core.NoDuplicateCase,
 		core.NoEmpty,
+		core.NoEmptyCharacterClass,
 		core.NoEmptyPattern,
 		core.NoEmptyStaticBlock,
 		core.NoExAssign,
