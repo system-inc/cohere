@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/module"
 	"github.com/system-inc/verify/internal/utils/react"
 )
 
@@ -87,7 +88,7 @@ var ReactComponentNoConstAssignment = rule.Rule{
 				// ExportNamedDeclaration and VariableDeclaration separately and guards the second
 				// against double-reporting the first; one listener covers both cases here, and the
 				// export status is read from the modifier list.
-				isExported := isExportedByName(statement.Modifiers())
+				isExported := module.IsExportedByName(statement.Modifiers())
 
 				for _, declarationNode := range statement.DeclarationList.AsVariableDeclarationList().Declarations.Nodes {
 					declaration := declarationNode.AsVariableDeclaration()

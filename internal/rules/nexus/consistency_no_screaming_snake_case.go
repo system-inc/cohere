@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/module"
 )
 
 // ConsistencyNoScreamingSnakeCaseOptions names constants that may keep the shouting form because
@@ -88,7 +89,7 @@ var ConsistencyNoScreamingSnakeCase = rule.Rule{
 					return
 				}
 
-				if isExportedDeclaration(declarationList.Parent) {
+				if module.IsExported(declarationList.Parent) {
 					ctx.ReportNode(name, messageScreamingSnakeCaseExported(name.Text(), toPascalCase(name.Text())))
 					return
 				}
@@ -216,21 +217,4 @@ func toPascalCase(name string) string {
 		builder.WriteString(titleCase(part))
 	}
 	return builder.String()
-}
-
-// isExportedDeclaration reports whether a statement carries the export keyword.
-func isExportedDeclaration(statement *ast.Node) bool {
-	if statement == nil {
-		return false
-	}
-	modifiers := statement.Modifiers()
-	if modifiers == nil {
-		return false
-	}
-	for _, modifier := range modifiers.Nodes {
-		if modifier.Kind == ast.KindExportKeyword {
-			return true
-		}
-	}
-	return false
 }

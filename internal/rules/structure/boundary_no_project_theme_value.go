@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/module"
 )
 
 // messageForbiddenThemeValue names the value, the component, and what is allowed instead.
@@ -208,7 +209,7 @@ func themeValuesFromProgram(ctx rule.Context) map[string]map[string][]string {
 			// Exported only, matching the original, which looks for an interface inside an
 			// ExportNamedDeclaration. A theme interface the file keeps to itself is not the
 			// library's published surface.
-			if !isExportedByName(declaration.Modifiers()) {
+			if !module.IsExportedByName(declaration.Modifiers()) {
 				return false
 			}
 			name := declaration.Name()

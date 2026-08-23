@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/module"
 	"github.com/system-inc/verify/internal/utils/react"
 )
 
@@ -139,7 +140,7 @@ func componentsDeclaredInFile(sourceFile *ast.Node) []declaredComponent {
 			if !IsLikelyReactComponent(statement) {
 				return false
 			}
-			record(name, isExportedByName(declaration.Modifiers()))
+			record(name, module.IsExportedByName(declaration.Modifiers()))
 
 		case ast.KindVariableStatement:
 			variableStatement := statement.AsVariableStatement()
@@ -147,7 +148,7 @@ func componentsDeclaredInFile(sourceFile *ast.Node) []declaredComponent {
 			if declarationList == nil {
 				return false
 			}
-			exportedByName := isExportedByName(variableStatement.Modifiers())
+			exportedByName := module.IsExportedByName(variableStatement.Modifiers())
 			for _, declarationNode := range declarationList.AsVariableDeclarationList().Declarations.Nodes {
 				declaration := declarationNode.AsVariableDeclaration()
 				name := declaration.Name()
@@ -221,27 +222,6 @@ func componentsDeclaredInFile(sourceFile *ast.Node) []declaredComponent {
 	})
 
 	return components
-}
-
-// isExportedByName reports an `export` modifier that is not `export default`.
-//
-// The two are one modifier list here, so `export default function Thing()` carries both keywords and
-// must not read as a named export: it is precisely the shape this rule exists to flag.
-func isExportedByName(modifiers *ast.ModifierList) bool {
-	if modifiers == nil {
-		return false
-	}
-	hasExport := false
-	hasDefault := false
-	for _, modifier := range modifiers.Nodes {
-		switch modifier.Kind {
-		case ast.KindExportKeyword:
-			hasExport = true
-		case ast.KindDefaultKeyword:
-			hasDefault = true
-		}
-	}
-	return hasExport && !hasDefault
 }
 
 // isForwardRefCall reports a `React.forwardRef(...)` or bare `forwardRef(...)` initializer.

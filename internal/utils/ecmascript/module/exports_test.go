@@ -73,3 +73,55 @@ func TestBothSpellingsAgree(t *testing.T) {
 		}
 	}
 }
+
+// The three predicates answer three questions, and the pairwise disagreements are the whole reason
+// they are separate functions. This table asserts all three against one corpus so a change to any
+// one of them has to face what it does to the others.
+func TestTheThreeExportQuestionsDisagreeWhereTheyShould(t *testing.T) {
+	cases := []struct {
+		name                string
+		sourceText          string
+		wantExported        bool
+		wantDefaultExported bool
+		wantExportedByName  bool
+	}{
+		{"a named export", "export function run() {}\n", true, false, true},
+		{"a default export", "export default function run() {}\n", true, true, false},
+		{"no export at all", "function run() {}\n", false, false, false},
+		{"an exported class", "export class Thing {}\n", true, false, true},
+		{"a default exported class", "export default class Thing {}\n", true, true, false},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			statement := firstStatement(t, testCase.sourceText)
+			if got := IsExported(statement); got != testCase.wantExported {
+				t.Fatalf("IsExported: want %v, got %v", testCase.wantExported, got)
+			}
+			if got := IsDefaultExported(statement); got != testCase.wantDefaultExported {
+				t.Fatalf("IsDefaultExported: want %v, got %v", testCase.wantDefaultExported, got)
+			}
+			if got := IsExportedByName(statement.Modifiers()); got != testCase.wantExportedByName {
+				t.Fatalf("IsExportedByName: want %v, got %v", testCase.wantExportedByName, got)
+			}
+		})
+	}
+}
+
+// The row that matters most, stated alone because it is the one a future simplification would break:
+// a default export is exported and is not exported by name. Collapsing the two predicates would
+// silence `react-component-require-named-export` on exactly the shape it exists to flag.
+func TestADefaultExportIsExportedAndNotNamed(t *testing.T) {
+	statement := firstStatement(t, "export default function Thing() {}\n")
+	if !IsExported(statement) {
+		t.Fatal("want a default export to count as exported")
+	}
+	if IsExportedByName(statement.Modifiers()) {
+		t.Fatal("want a default export not to count as a named export")
+	}
+}
+
+func TestExportPredicatesSurviveNilInput(t *testing.T) {
+	if IsExported(nil) || HasExportModifier(nil) || IsExportedByName(nil) {
+		t.Fatal("want nil to answer false everywhere")
+	}
+}

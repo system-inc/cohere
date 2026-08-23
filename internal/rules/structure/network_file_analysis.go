@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/module"
 )
 
 // Per-file analysis of the NetworkService hooks a file declares.
@@ -117,7 +118,7 @@ func (analysis *NetworkFileAnalysis) collectFunctionDeclaration(statement *ast.N
 		FunctionNode: statement,
 		Body:         declaration.Body,
 		Parameters:   parameterNodes(declaration.Parameters),
-		IsExported:   isExportedStatement(statement),
+		IsExported:   module.IsExported(statement),
 	})
 }
 
@@ -127,7 +128,7 @@ func (analysis *NetworkFileAnalysis) collectVariableStatement(statement *ast.Nod
 	if declarationList == nil {
 		return
 	}
-	isExported := isExportedStatement(statement)
+	isExported := module.IsExported(statement)
 
 	for _, declarationNode := range declarationList.AsVariableDeclarationList().Declarations.Nodes {
 		declaration := declarationNode.AsVariableDeclaration()

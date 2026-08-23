@@ -152,7 +152,7 @@ func collectComponents(sourceFile *ast.Node) []trackedComponent {
 		case ast.KindVariableStatement:
 			// Only exported ones. A file-local arrow component is a helper by construction: nothing
 			// outside can reach it, so it cannot be the thing an importer came for.
-			if !isExportedStatement(statement) {
+			if !module.IsExported(statement) {
 				break
 			}
 			declarationList := statement.AsVariableStatement().DeclarationList
@@ -293,18 +293,4 @@ func countCodeLines(ctx rule.Context, sourceLines []string, node *ast.Node) int 
 		codeLines++
 	}
 	return codeLines
-}
-
-// isExportedStatement reports the export keyword on a statement.
-func isExportedStatement(node *ast.Node) bool {
-	modifiers := node.Modifiers()
-	if modifiers == nil {
-		return false
-	}
-	for _, modifier := range modifiers.Nodes {
-		if modifier.Kind == ast.KindExportKeyword {
-			return true
-		}
-	}
-	return false
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/module"
 )
 
 // ConsistencyRequireConstantCasingOptions names exported constants a framework or library reads
@@ -223,7 +224,7 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 					return
 				}
 
-				if isExportedDeclaration(statement) {
+				if module.IsExported(statement) {
 					if isPascalCase(declaredName) || frameworkConstantNames[declaredName] {
 						return
 					}
