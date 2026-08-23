@@ -41,8 +41,12 @@ const (
 // finding they agree about, drowning the real disagreements in noise. Line is the granularity a
 // person acts on.
 type Finding struct {
-	File    string
-	Line    int
+	File string
+	Line int
+	// Column is carried for the reader and never compared, for the reason stated above. It is the
+	// difference between "go look at this" and "go find this", and a harness whose output cannot be
+	// navigated to is a harness people stop running.
+	Column  int
 	Rule    string
 	Message string
 	Side    Side
@@ -51,6 +55,30 @@ type Finding struct {
 // Key is the identity two findings must share to be called the same finding.
 func (finding Finding) Key() string {
 	return fmt.Sprintf("%s:%d:%s", finding.File, finding.Line, finding.Rule)
+}
+
+// NormalizeRuleName strips the decoration each gate puts around a rule name.
+//
+// The two formats decorate in opposite directions. The gate prints `structure(rule-name)` or
+// `nexus(rule-name)`, putting the plugin outside. verify prints `rule-name/messageId`, putting the
+// message identifier after. Neither decoration is part of the rule's identity, and comparing
+// decorated names would report every single rule as a disagreement — a total mismatch that still
+// looks like well-formed output, which is the failure this whole package is built to refuse.
+func NormalizeRuleName(raw string) string {
+	name := strings.TrimSpace(raw)
+
+	// `plugin(rule-name)` — take what is inside the parentheses.
+	if open := strings.IndexByte(name, '('); open >= 0 && strings.HasSuffix(name, ")") {
+		name = name[open+1 : len(name)-1]
+	}
+
+	// `rule-name/messageId` — take what is before the slash. Rule names in both catalogs are
+	// hyphenated and never contain a slash, so the first slash is always the message boundary.
+	if slash := strings.IndexByte(name, '/'); slash >= 0 {
+		name = name[:slash]
+	}
+
+	return strings.TrimSpace(name)
 }
 
 // Population is what a run covered, as distinct from what it found.
@@ -124,14 +152,31 @@ type Report struct {
 	Comparable bool
 	// NotComparableReason states which side had nothing and is empty when Comparable is true.
 	NotComparableReason string
+	// Provenance is what actually ran, and whether the harness was ever shown able to detect a
+	// difference at all.
+	//
+	// This does not overlap Comparable and neither substitutes for the other, which is the reason
+	// both are here. Comparable answers "did both sides report coverage" — a property of this run's
+	// population. Provenance answers "has this instrument been demonstrated to work" — a property
+	// of the instrument, which a healthy population says nothing about. A run over 3,407 files by a
+	// harness that parses one side's format wrong is perfectly Comparable and completely blind.
+	Provenance Provenance
 }
 
 // Agreed reports whether every rule active on both sides agreed.
 //
 // Rules the migration has not reached yet do not count against agreement, because a rule verify
 // has never claimed to implement cannot disagree with anything. Only ClassificationBothActive does.
+// Both guards are asked before the findings are, and in this order, because each one describes a
+// way the finding list can be empty for a reason that has nothing to do with the code being clean.
 func (report Report) Agreed() bool {
 	if !report.Comparable {
+		return false
+	}
+	// A run whose population is real but whose controls never fired has not been shown able to
+	// report a difference, so its silence is not evidence. This is the guard that four vacuous
+	// probes in one night got past: every one of them had a plausible population.
+	if trustworthy, _ := report.Provenance.Trustworthy(); !trustworthy {
 		return false
 	}
 	for _, difference := range report.Differences {
@@ -285,9 +330,23 @@ func Write(out *strings.Builder, report Report) {
 		report.GatePopulation.Findings, report.GatePopulation.FilesWalked,
 	)
 
+	// Provenance prints second and unconditionally, next to the population and above the verdict,
+	// because a reader deciding whether to believe a diff needs both halves of the question in one
+	// place: did both sides look, and has this harness ever been shown able to see.
+	fmt.Fprint(out, report.Provenance.Describe())
+
 	if !report.Comparable {
 		fmt.Fprintf(out, "✗ not comparable: %s\n", report.NotComparableReason)
 		return
+	}
+
+	// An untrustworthy run stops here too. It is a different refusal from not-comparable and says
+	// so, rather than printing a difference list that a reader would take as a measurement.
+	if trustworthy, reasons := report.Provenance.Trustworthy(); !trustworthy {
+		fmt.Fprintf(out, "✗ not trustworthy, so the difference list below is not a measurement:\n")
+		for _, reason := range reasons {
+			fmt.Fprintf(out, "    %s\n", reason)
+		}
 	}
 
 	byClassification := map[Classification]int{}
@@ -332,6 +391,15 @@ func Write(out *strings.Builder, report Report) {
 		fmt.Fprintf(out, "\n✓ agrees: every rule active on both sides reported the same findings\n")
 		return
 	}
+
+	// The two ways to fail say different things, and printing the wrong one is its own defect: a
+	// clean tree measured by a blind harness would otherwise read as "0 findings differ", which is
+	// a true number and a false claim.
+	if trustworthy, _ := report.Provenance.Trustworthy(); !trustworthy {
+		fmt.Fprintf(out, "\n✗ no verdict: the harness was not shown able to detect a difference on this run\n")
+		return
+	}
+
 	fmt.Fprintf(out, "\n✗ disagrees: %d findings differ on rules both sides had enabled\n",
 		byClassification[ClassificationBothActive],
 	)
