@@ -279,6 +279,21 @@ export const PlantedUse = PlantedTarget;
 		// react-hooks rules are one 3.9 MB bundle carrying the React Compiler, not a rule set anyone
 		// is porting, so verify cannot produce this finding no matter how far parity goes.
 		//
+		// One honest caveat, measured rather than assumed after the fact. This asymmetry is durable
+		// but not structural: `exhaustive_deps.rs` does exist in oxc at 4,477 lines, and 14 of the 16
+		// react-hooks rules have an oxc implementation. So the argument here is "nobody will port a
+		// 4,477-line rule", which is a judgment about effort rather than a fact about the tools, and
+		// it is the weakest of the three reasons a control can rest on.
+		//
+		// A control resting on a bug expires when the bug is fixed. One resting on the migration
+		// being incomplete expires when the migration succeeds. One resting on a rule being
+		// impractical expires when somebody finds it practical.
+		//
+		// If this ever needs replacing, the sturdier ground is the eight enabled `better-tailwindcss`
+		// rules: the gate produces them through `OxlintTailwindPlugin.mjs`, a JavaScript plugin
+		// bridge verify does not have, which is the same shape as the verify-only control rather than
+		// a file somebody could translate.
+		//
 		// The violation is a hook whose dependency array omits a value it reads.
 		Name:         "gate-only-exhaustive-deps",
 		RelativePath: filepath.Join("code-quality", "differential-control", "PlantedEffect.ts"),
