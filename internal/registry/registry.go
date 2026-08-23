@@ -50,6 +50,7 @@ func All() []rule.Rule {
 		core.UseIsNaN,
 		core.ValidTypeof,
 		next.NoAssignModuleVariable,
+		next.NoImgElement,
 		nexus.BoundaryNoInternalImport,
 		nexus.BoundaryNoNexusOutsideImport,
 		nexus.BoundaryNoProjectImport,
