@@ -145,3 +145,142 @@ func isHookCall(call *ast.CallExpression) bool {
 	}
 	return false
 }
+
+// IsLikelyReactComponent reports whether a function-like node looks like a React component.
+//
+// This is a different question from HasJsxOrReactHookCalls and the two are not interchangeable,
+// which is worth stating plainly because reaching for the wrong one produced a false positive on the
+// live tree. That one asks "does this subtree contain JSX anywhere", walking a bounded property
+// list. This one is the original's `isLikelyReactComponent`, and it asks two much narrower things:
+//
+//	the first parameter is named `properties` or `props`, or
+//	a top-level return in the body returns JSX, or a ternary with a JSX branch
+//
+// The parameter-name arm is the load-bearing half and it is checked first, before any JSX is looked
+// for. A component whose JSX is unreachable to a bounded walk is still a component under this test
+// as long as it takes `properties`, which is exactly the case that caught this: a switch-dispatch
+// component returns JSX only from switch arms, and the property walk cannot reach a switch arm.
+//
+// The consequence differs by which question a rule is asking. A rule asking "is this a component,
+// flag it" loses a finding when detection misses, which is a quiet parity gap. A rule asking "does
+// this file export a component by name" gains a false finding, because the component it failed to
+// see was the exported one. Only the second polarity turns a detection miss into a report.
+func IsLikelyReactComponent(functionLike *ast.Node) bool {
+	if functionLike == nil {
+		return false
+	}
+
+	// The kind check is not defensive, it is reachable, and a fixture found it by crashing.
+	//
+	// Callers pass a variable's initializer, which is any expression at all: `const Colors = {...}`
+	// hands this an object literal. `Parameters()` and `Body()` are switches over function-like
+	// kinds and dereference data that an object literal does not have, so a nil check on their
+	// results is too late. The guard has to be on the kind, before either call.
+	switch functionLike.Kind {
+	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+		ast.KindMethodDeclaration:
+	default:
+		return false
+	}
+
+	// The parameter arm. `function Thing(properties)` is a component by convention here regardless
+	// of what its body does, which is what makes it reach shapes a JSX search cannot.
+	if parameters := functionLike.Parameters(); len(parameters) > 0 {
+		first := parameters[0]
+		if first != nil {
+			name := first.Name()
+			if name != nil && name.Kind == ast.KindIdentifier {
+				if text := name.Text(); text == "properties" || text == "props" {
+					return true
+				}
+			}
+		}
+	}
+
+	body := functionLike.Body()
+	if body == nil {
+		return false
+	}
+
+	// A block body: only statements directly in it are examined, never nested ones. The original
+	// iterates `body.body` and looks at each statement's own kind, so a return inside an if, a loop
+	// or a switch arm is not reached. That bound is behavior rather than an oversight, and widening
+	// it here would find components the gate does not.
+	if body.Kind == ast.KindBlock {
+		found := false
+		for _, statement := range body.AsBlock().Statements.Nodes {
+			if statement.Kind != ast.KindReturnStatement {
+				continue
+			}
+			if returnArgumentLooksLikeJsx(statement.AsReturnStatement().Expression) {
+				found = true
+				break
+			}
+		}
+		return found
+	}
+
+	// An expression-bodied arrow function: the body is the returned value.
+	return returnArgumentLooksLikeJsx(body)
+}
+
+// returnArgumentLooksLikeJsx reports JSX, a fragment, or a ternary with a JSX branch.
+//
+// # Parentheses have to be skipped, and this is not a detail
+//
+// `return (\n    <div />\n);` is how almost every component in this codebase is written, and it
+// parses here as a ParenthesizedExpression wrapping the JSX. ESTree builds no node for parentheses,
+// so the original sees the JSX element directly and never has to think about it.
+//
+// Without the skip, only the unparenthesized single-line form reads as a component. Measured on the
+// live tree before the skip was added: fifteen files reported, every one of them a file that does
+// export its component by name, because the exported component wrapped its JSX in parentheses and
+// therefore did not read as a component at all.
+//
+// The ternary branches are unwrapped for the same reason: `return flag ? (<a />) : (<b />)` is
+// ordinary formatting.
+func returnArgumentLooksLikeJsx(expression *ast.Node) bool {
+	// The nil check comes before SkipParentheses, which dereferences its argument. A bare `return;`
+	// carries no expression, and that is an ordinary shape rather than an exotic one.
+	if expression == nil {
+		return false
+	}
+	expression = ast.SkipParentheses(expression)
+	if expression == nil {
+		return false
+	}
+	if isJsxValue(expression) {
+		return true
+	}
+	if expression.Kind == ast.KindConditionalExpression {
+		conditional := expression.AsConditionalExpression()
+		return jsxAfterParentheses(conditional.WhenTrue) || jsxAfterParentheses(conditional.WhenFalse)
+	}
+	return false
+}
+
+// jsxAfterParentheses reports JSX once any wrapping parentheses are removed, guarding the nil that
+// SkipParentheses would dereference.
+func jsxAfterParentheses(expression *ast.Node) bool {
+	if expression == nil {
+		return false
+	}
+	return isJsxValue(ast.SkipParentheses(expression))
+}
+
+// isJsxValue reports a JSX element or fragment.
+//
+// A self-closing element is included where the original names only JSXElement, because ESTree has no
+// separate self-closing kind: `<div />` is a JSXElement there with no children, and typescript-go
+// gives it its own kind. Omitting it would make `return <div />` not read as a component, which is
+// the single most common component shape there is.
+func isJsxValue(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindJsxElement, ast.KindJsxFragment, ast.KindJsxSelfClosingElement:
+		return true
+	}
+	return false
+}

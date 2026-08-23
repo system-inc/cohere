@@ -58,9 +58,24 @@ func Run(t *testing.T, subject rule.Rule, fileName string, sourceText string) Re
 func RunWithOptions(t *testing.T, subject rule.Rule, fileName string, sourceText string, options any) Result {
 	t.Helper()
 
+	// A `.jsx` fixture has to parse as JSX too, and it did not until a fixture asked it to.
+	//
+	// Parsing `.jsx` as plain TypeScript does not fail: `return <div />;` is read as a type
+	// assertion and the tree simply contains no JSX node. So a React-gated rule that correctly
+	// declines to find a component in it reports nothing, the fixture reads as a rule that does not
+	// fire, and the defect looks like it is in the rule. Measured directly: the same source parsed
+	// as TS finds no JSX element, and as TSX or JSX finds one.
+	//
+	// Both extensions are real. `FileContextFor` treats `.jsx` as a React file, so any rule gated
+	// on that predicate can be reached by one, and a fixture is the only place that gets checked.
 	scriptKind := core.ScriptKindTS
-	if strings.HasSuffix(fileName, ".tsx") {
+	switch {
+	case strings.HasSuffix(fileName, ".tsx"):
 		scriptKind = core.ScriptKindTSX
+	case strings.HasSuffix(fileName, ".jsx"):
+		scriptKind = core.ScriptKindJSX
+	case strings.HasSuffix(fileName, ".js"):
+		scriptKind = core.ScriptKindJS
 	}
 
 	// typescript-go panics on a relative filename: the parser stores it as an identity and expects
