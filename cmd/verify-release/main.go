@@ -128,6 +128,11 @@ func describeTargets(targets []release.Target) string {
 // The sizes print because they are the cheapest available check that the binaries are real. Six
 // platform binaries within a megabyte of each other is a matrix that worked; one that is a fraction
 // of its siblings is a build that failed into something that still packages perfectly.
+//
+// Every size says which build produced it. A stripped release binary and a plain `go build` of the
+// same commit differ by roughly 18 MB — measured at 43.1 against 61.9 — so a bare megabyte figure
+// is not a measurement, it is two possible measurements sharing a label. Two people quoting sizes
+// from different builds spent real time reconciling numbers that were both correct.
 func printSummary(result release.Result, requested []release.Target, signing release.Signing) {
 	fmt.Println()
 	for _, staged := range result.Packages {
@@ -137,6 +142,7 @@ func printSummary(result release.Result, requested []release.Target, signing rel
 		}
 		fmt.Printf("  %-24s %6.1f MB  %s\n", staged.Name, float64(staged.SizeInBytes)/(1<<20), staged.Directory)
 	}
+	fmt.Printf("\nsizes are stripped release builds: %s\n", release.DescribeBuild())
 
 	platformCount := len(requested)
 	if platformCount == 0 {

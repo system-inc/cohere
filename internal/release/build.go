@@ -16,6 +16,25 @@ import (
 // published artifact should not carry.
 var BuildFlags = []string{"-trimpath"}
 
+// StripFlags remove the symbol table and DWARF from a released binary.
+//
+// Named rather than inlined so that DescribeBuild reports the flags a release actually used. A
+// hand-written description drifts from the build it claims to describe, and a size label that names
+// the wrong build is worse than an unlabeled size: it is confidently wrong rather than ambiguous.
+var StripFlags = []string{"-s", "-w"}
+
+// DescribeBuild names the build a released binary comes from, for any size reported about it.
+//
+// A size without its build is not a measurement. The same commit measures 43.1 MB stripped and
+// 61.9 MB from a plain `go build`, an 18 MB spread, so two people quoting sizes from different
+// builds can both be right and still disagree — which is exactly what happened here, and cost two
+// messages to reconcile. The same trap has a sharper form for anyone attributing those bytes:
+// `go tool nm` reports every symbol as size zero on a stripped binary, so an attribution run
+// against a release build sums to zero rather than failing.
+func DescribeBuild() string {
+	return strings.Join(BuildFlags, " ") + " -ldflags=\"" + strings.Join(StripFlags, " ") + " ...\""
+}
+
 // Options configure a release build.
 type Options struct {
 	// ModuleDirectory is the root of the verify module.
@@ -211,15 +230,15 @@ func buildDispatcherPackage(options Options) (StagedPackage, error) {
 func compile(options Options, target Target, binaryPath string, pin compilerPin, goToolchain string, formatter FormatterSource) error {
 	const packagePath = "github.com/system-inc/verify/internal/release"
 
-	stamps := []string{
-		// Strip the symbol table and DWARF. Measured on a comparable binary: marginally faster to
-		// link and 29% smaller, with nothing traded away that a released binary needs.
-		"-s", "-w",
-		"-X", packagePath + ".version=" + options.Version,
-		"-X", packagePath + ".compilerCommit=" + pin.Commit,
-		"-X", packagePath + ".compilerUpstream=" + pin.Upstream,
-		"-X", packagePath + ".goToolchain=" + goToolchain,
-	}
+	// Strip the symbol table and DWARF. Measured on a comparable binary: marginally faster to link
+	// and 29% smaller, with nothing traded away that a released binary needs.
+	stamps := append([]string{}, StripFlags...)
+	stamps = append(stamps,
+		"-X", packagePath+".version="+options.Version,
+		"-X", packagePath+".compilerCommit="+pin.Commit,
+		"-X", packagePath+".compilerUpstream="+pin.Upstream,
+		"-X", packagePath+".goToolchain="+goToolchain,
+	)
 
 	// Stamped only when a formatter is actually embedded. A binary carrying no formatter must not
 	// report a commit for one, because a reader would take that as the Prettier it formats with.
