@@ -1,7 +1,6 @@
 package release
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -154,8 +153,3 @@ if (result.status === null) {
 
 process.exit(result.status);
 `
-
-// LauncherFileName is the launcher's path inside the dispatcher package.
-func LauncherFileName() string {
-	return fmt.Sprintf("bin/%s", DispatcherPackageName)
-}

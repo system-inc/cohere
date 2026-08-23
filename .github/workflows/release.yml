@@ -72,11 +72,35 @@ jobs:
               # same checks the repository is gated by, run first so a bad tree never reaches the
               # signing keys.
               run: |
-                  test -z "$(gofmt -l ./cmd ./internal ./tools)" || {
-                      echo "unformatted files:"
-                      gofmt -l ./cmd ./internal ./tools
+                  # Prove the check looked at something before trusting that it found nothing.
+                  #
+                  # `gofmt -l` writes "no such file or directory" to stderr and exits 0, so a typo'd
+                  # or renamed path is captured as an empty string, `test -z` passes, and a tree
+                  # nobody examined reports as clean. Measured: `gofmt -l ./cmd ./internal
+                  # ./nonexistent` exits 0 with empty stdout. The population is asserted first, so
+                  # an empty finding below means "found nothing" rather than "looked nowhere".
+                  formatted=$(gofmt -l ./cmd ./internal ./tools 2>&1)
+                  case "$formatted" in
+                      *"no such file or directory"*)
+                          echo "gofmt could not read a path it was given:"
+                          echo "$formatted"
+                          exit 1
+                          ;;
+                  esac
+
+                  examined=$(find ./cmd ./internal ./tools -name '*.go' | wc -l)
+                  echo "gofmt examined $examined Go files (must be > 0)"
+                  if [ "$examined" -eq 0 ]; then
+                      echo "no Go files found, so a clean result here would mean nothing"
                       exit 1
-                  }
+                  fi
+
+                  if [ -n "$formatted" ]; then
+                      echo "unformatted files:"
+                      echo "$formatted"
+                      exit 1
+                  fi
+
                   go vet ./cmd/... ./internal/... ./tools/...
                   go test ./cmd/... ./internal/... ./tools/...
 
