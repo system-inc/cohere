@@ -4,9 +4,14 @@
 // uses. Four are rules our gate enforces today, and they are the expensive kind to write correctly:
 // they ask real questions of the type checker rather than matching a node shape.
 //
-// This file is the entire cost of reaching all forty. That is the point worth stating plainly,
-// because it is the number that decides how large the remaining catalog is: adapting a rule is one
-// function call, not a port, so forty rules cost one unit of work rather than forty.
+// This file removes the per-rule interface work, which is the expensive half. It does not remove
+// the per-rule sourcing work, and an earlier version of this comment claimed it did.
+//
+// What is actually proven: the adapter converts a vendored tsgolint rule into one verify can run,
+// and `await_thenable` is the single rule vendored today. Reaching the other 39 means vendoring
+// them from tsgolint's tree first. That is mechanical rather than a port, since no rule logic is
+// edited, but it is not free, and quoting "forty rules for one unit of work" was a number nobody
+// had paid. State the cost as: one function call per rule at the interface, plus sourcing.
 //
 // It is possible because verify's own rule interface was adapted from tsgolint's, and both compile
 // against byte-identical shims over the same typescript-go commit. The two Rule types are the same
