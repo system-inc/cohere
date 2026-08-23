@@ -261,28 +261,40 @@ export const PlantedUse = PlantedTarget;
 		Contents:       "export const PlantedTarget = 'planted';\n",
 		ExpectsNothing: true,
 	}, {
-		// The gate-only control, and the mirror image of the verify-only one. Verified at 03:21
-		// rather than assumed:
+		// The gate-only control, and the mirror image of the verify-only one.
 		//
-		//   registry.go             verify does not implement consistency-organize-imports at all
-		//   .oxlintrc.json          structure/consistency-organize-imports is enabled
+		//   .oxlintrc.json    react/exhaustive-deps is enabled at error
+		//   oxlint plugins    it comes from oxlint's built-in react plugin
+		//   registry          verify implements no react-hooks rule at all
 		//
-		// So the gate reports it and verify structurally cannot, for the same durable reason and in
-		// the opposite direction. Together the two controls exercise both sides, which is what
-		// ControlsProven has been waiting on all night.
+		// This replaced a control keyed on consistency-organize-imports, and the replacement is the
+		// whole point. That rule was unported when the control was written, which made the
+		// asymmetry look structural, and it was temporary: the rule sat on a porting slice, so a
+		// correct port would have made the control stop discriminating and ControlsProven return
+		// false. The differential would have printed "no verdict" and nothing in the porting work
+		// would have looked wrong.
 		//
-		// The violation is import ordering: a local import placed above a node: one, which the
-		// gate's rule flags and verify has no opinion about.
-		Name:         "gate-only-organize-imports",
-		RelativePath: filepath.Join("code-quality", "differential-control", "PlantedOrder.ts"),
+		// A control resting on the migration being incomplete expires on purpose, which is the same
+		// defect as a control resting on a bug somebody might fix. This one does not: the 16
+		// react-hooks rules are one 3.9 MB bundle carrying the React Compiler, not a rule set anyone
+		// is porting, so verify cannot produce this finding no matter how far parity goes.
+		//
+		// The violation is a hook whose dependency array omits a value it reads.
+		Name:         "gate-only-exhaustive-deps",
+		RelativePath: filepath.Join("code-quality", "differential-control", "PlantedEffect.ts"),
 		Contents: `// Planted by verify-differential to prove the harness can see a one-sided
 // difference from the gate. Removed automatically when the run finishes.
-import { PlantedTarget } from './target/PlantedTarget';
-import * as NodePath from 'node:path';
+import * as React from 'react';
 
-export const PlantedOrder = NodePath.join(PlantedTarget);
+export function PlantedEffect(properties: { label: string }) {
+    const [seen, setSeen] = React.useState('');
+    React.useEffect(function () {
+        setSeen(properties.label);
+    }, []);
+    return seen;
+}
 `,
-		Rule:         "consistency-organize-imports",
+		Rule:         "exhaustive-deps",
 		ExpectedSide: differential.SideGate,
 	}}
 }
