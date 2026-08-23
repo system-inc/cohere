@@ -199,6 +199,32 @@ type Rule struct {
 	// it gets when the program fails to build. That is deliberate: a rule silently reading a checker
 	// it did not declare would reintroduce the data race this lock exists to prevent, and a nil
 	// dereference is a loud failure where a race is a quiet one.
+	//
+	// # Why there is no shared references-to-a-binding helper
+	//
+	// Several rules want to know whether an identifier refers to a particular binding, and the
+	// obvious move is a shelf helper that answers it. We decided against one, and the cost above is
+	// the reason: a helper whose cost is a 50% serialization of the file walk is not a helper, it is
+	// a decision, and putting it on the shelf hides the decision behind an import. A helper also has
+	// to be correct for every caller, so it would have to be scope-aware, so it would have to take
+	// the checker, so every caller would pay whether or not its own rule could be shadowed.
+	//
+	// So the question is answered per rule, at the cheapest tier that is correct for that rule:
+	//
+	//	name matching     correct where shadowing is impossible. core.NoExAssign ships this way,
+	//	                  because a catch parameter's scope makes it safe.
+	//	symbol identity   where shadowing is possible. Resolve the binding once with
+	//	                  GetSymbolAtLocation, resolve each candidate, compare symbols. Declare
+	//	                  NeedsTypeChecker so files with no such rule skip the acquisition.
+	//
+	// Note which question that answers. Find-all-references answers "where is this used", and these
+	// rules already know where to look, since they walk one file. They need "is this the same
+	// binding", which is a symbol comparison. Reaching for a reverse index here would be answering a
+	// forward question with the wrong instrument.
+	//
+	// Symbol comparison is unmeasured on our tree. The first rule that needs it times it with
+	// --timing against planted violations, and that number decides whether the rules after it follow
+	// or stay on name matching with the shadowing hazard written at their own site.
 	NeedsTypeChecker bool
 }
 
