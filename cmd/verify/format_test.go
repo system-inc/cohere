@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/fix"
+	"github.com/system-inc/verify/internal/prettier"
 )
 
 // fakeEngine stands in for the real formatter so the seam can be tested before the engine exists.
@@ -15,9 +16,12 @@ import (
 // it, which is what makes these fixtures a test of the mapping rather than a test of goja. The real
 // engine drops in behind the same interface and these keep meaning what they mean.
 type fakeEngine struct {
-	handled  []string
-	format   func(fileName string, text string) (string, error)
-	askedFor []string
+	handled              []string
+	format               func(fileName string, text string) (string, error)
+	enumerate            func(root string) (prettier.Enumeration, error)
+	askedFor             []string
+	enumeratedRoot       string
+	enumeratedIgnorePath string
 }
 
 func (e *fakeEngine) Handles(fileName string) bool {
@@ -27,6 +31,20 @@ func (e *fakeEngine) Handles(fileName string) bool {
 		}
 	}
 	return false
+}
+
+// Enumerate lets the fake stand in for the real engine on the enumeration path too, so the wiring
+// and the coverage line can be tested without a goja runtime or a real tree.
+//
+// It returns whatever the fixture set, including the account of what the walk removed, because the
+// numbers in that account are the thing under test rather than the walk itself.
+func (e *fakeEngine) Enumerate(root string, structureIgnorePath string) (prettier.Enumeration, error) {
+	e.enumeratedRoot = root
+	e.enumeratedIgnorePath = structureIgnorePath
+	if e.enumerate != nil {
+		return e.enumerate(root)
+	}
+	return prettier.Enumeration{Root: root}, nil
 }
 
 func (e *fakeEngine) Format(fileName string, text string) (string, error) {

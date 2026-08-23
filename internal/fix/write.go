@@ -29,7 +29,39 @@ import (
 // TS1109, an unterminated string TS1002, and a line of garbage six diagnostics. Clean source and
 // an empty file report none. The guard has been shown to fire, which is the only way to know it is
 // a guard and not a decoration.
+// TypeScriptParsable reports whether the parse guard can say anything about a file at all.
+//
+// The guard is a TypeScript parser, so it answers a question about TypeScript. Pointed at css, json,
+// markdown or yaml it reports TS1128 and TS1434 and refuses the file, which is a correct answer to
+// a question nobody asked: those files are not malformed, they are not TypeScript.
+//
+// This matters now that the format phase's universe is the working tree rather than the type graph.
+// Before that split every file reaching this package was TypeScript by construction, so the guard's
+// scope was adequate by accident, in exactly the way the type graph was an adequate format universe
+// by accident. Both assumptions were incidental and both looked like architecture.
+//
+// A file this returns false for is passed through unguarded, and that is the honest trade: the
+// engine cannot verify a language it cannot parse, and refusing every such file would mean the
+// formatter can never touch css or markdown. The formatter's own parser is the guard for those, and
+// a transform that produces unparseable output in its own language fails inside the engine rather
+// than here.
+func TypeScriptParsable(fileName string) bool {
+	for _, extension := range []string{".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"} {
+		if strings.HasSuffix(fileName, extension) {
+			return true
+		}
+	}
+	return false
+}
+
 func Parses(fileName string, text string) (bool, string) {
+	// A file the TypeScript parser does not own is not something this guard can judge. Reporting it
+	// as unparseable would refuse every css and markdown file in the tree with a TypeScript syntax
+	// error, which is a true diagnostic about the wrong question.
+	if !TypeScriptParsable(fileName) {
+		return true, ""
+	}
+
 	sourceFile := parseText(fileName, text)
 	if sourceFile == nil {
 		return false, "the parser produced nothing"

@@ -207,3 +207,55 @@ func TestWriteIntoAMissingDirectoryFails(t *testing.T) {
 		t.Fatalf("expected an error writing into a directory that does not exist")
 	}
 }
+
+// The parse guard must only judge files the TypeScript parser owns.
+//
+// The guard is a TypeScript parser, so it answers a question about TypeScript. Pointed at css, json
+// or markdown it reports TS1128 and TS1434 and refuses the file, which is a correct answer to a
+// question nobody asked: those files are not malformed, they are not TypeScript.
+//
+// This was live rather than theoretical. When the format phase's universe became the working tree
+// rather than the type graph, five files in a six-file fixture came back "could not be processed"
+// with TypeScript syntax errors against css, json and markdown. Before that split every file
+// reaching this package was TypeScript by construction, so the guard's scope was adequate by
+// accident, in exactly the way the type graph was an adequate format universe by accident.
+func TestTheParseGuardOnlyJudgesTypeScript(t *testing.T) {
+	// Real content in each language, none of which is valid TypeScript.
+	for _, testCase := range []struct{ fileName, text string }{
+		{"styles.css", ".foo{color:red;background:blue}\n"},
+		{"data.json", "{\"b\":2, \"a\":1}\n"},
+		{"notes.md", "# heading\n\nsome text\n"},
+		{"config.yaml", "key: value\nlist:\n  - one\n"},
+	} {
+		if parses, reason := Parses(testCase.fileName, testCase.text); !parses {
+			t.Fatalf("%s was refused by a TypeScript parser: %s", testCase.fileName, reason)
+		}
+	}
+}
+
+// And the guard must still fire on the languages it does own, or scoping it would have disabled it.
+//
+// This is the half that makes the change safe rather than merely permissive: a broken .ts is still
+// refused, so the discipline that lets autofix write to source at all is intact.
+func TestTheParseGuardStillFiresOnTypeScript(t *testing.T) {
+	for _, fileName := range []string{"a.ts", "b.tsx", "c.js", "d.jsx", "e.mjs", "f.cjs", "g.mts", "h.cts"} {
+		if parses, _ := Parses(fileName, "export function alpha( {\n"); parses {
+			t.Fatalf("%s: a broken file was accepted, so the guard is off for a language it owns", fileName)
+		}
+	}
+}
+
+// TypeScriptParsable must discriminate, not merely answer. A predicate that said yes to everything
+// would restore the bug; one that said no to everything would disable the guard entirely.
+func TestTypeScriptParsableDiscriminates(t *testing.T) {
+	for _, fileName := range []string{"a.ts", "b.tsx", "c.js", "d.mjs"} {
+		if !TypeScriptParsable(fileName) {
+			t.Fatalf("%s is TypeScript-family and was not recognized", fileName)
+		}
+	}
+	for _, fileName := range []string{"a.css", "b.json", "c.md", "d.yaml", "Makefile", "e.rb"} {
+		if TypeScriptParsable(fileName) {
+			t.Fatalf("%s is not TypeScript-family and was claimed", fileName)
+		}
+	}
+}

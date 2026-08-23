@@ -165,15 +165,6 @@ func run() error {
 			scope = resolved
 		}
 
-		// The scope was computed from git, which knows nothing about the tsconfig. Narrowing it to the
-		// files the program actually contains is what lets the output state both numbers, so a reader
-		// is never left doing arithmetic between a git count and a formatter count that cannot match.
-		inProgram := make(map[string]struct{}, len(projectFiles))
-		for _, sourceFile := range projectFiles {
-			inProgram[sourceFile.FileName()] = struct{}{}
-		}
-		scope = scope.narrowTo(inProgram)
-
 		// Built before the fix phase rather than inside it, so a formatter that cannot load its
 		// bundles stops the run here with a reason rather than degrading into the nil that means
 		// nobody asked for one.
@@ -182,10 +173,49 @@ func run() error {
 			return err
 		}
 
+		// The format phase gets its own universe, and this is where the two narrowings part.
+		//
+		// A proposed fix comes from a rule that ran over the program, so its candidate must be in the
+		// program. A format candidate comes from the disk, and intersecting it with the type graph is
+		// what made css, markdown, json and yaml invisible: a tsconfig enumerates TypeScript by
+		// construction. Formatting is the only phase whose subject is not the program.
+		//
+		// The walk is lazy, and the reason is not cost. An enumeration on a run with nothing changed
+		// produces a true number whose only effect is to make a no-op run look like work, which is the
+		// same shape as a count claiming files were reformatted that nobody touched.
+		switch {
+		case formatter == nil:
+			// No formatter means nothing to enumerate for. The scope keeps its type-graph narrowing so
+			// the fix phase's own reporting is unchanged.
+			inProgram := make(map[string]struct{}, len(projectFiles))
+			for _, sourceFile := range projectFiles {
+				inProgram[sourceFile.FileName()] = struct{}{}
+			}
+			scope = scope.narrowTo(inProgram)
+
+		case !scope.Everything && len(scope.FileNames) == 0:
+			// Nothing changed, so the walk cannot affect the outcome. The scope already names where it
+			// looked, which is the honest thing to print here.
+
+		default:
+			enumeration, enumerateError := formatter.Enumerate(
+				graph.Config.GetCurrentDirectory(),
+				resolveStructureIgnorePath(*directory),
+			)
+			if enumerateError != nil {
+				// A failed walk withholds formatting and says why, rather than falling back to a
+				// universe that would format the wrong set. Fixing still runs.
+				scope = formatScope{Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", enumerateError)}
+			} else {
+				scope = scope.narrowToEnumeration(enumeration)
+			}
+		}
+
 		fixStart := time.Now()
 		fixSummary, err := applyProposedFixes(
 			ctx, graph, projectFiles, registry.All(),
 			scopedTransform(formatTransform(formatter), scope),
+			scope.formatCandidates(),
 			*maxFixPasses,
 		)
 		fixDuration := time.Since(fixStart)

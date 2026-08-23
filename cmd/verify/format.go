@@ -39,6 +39,14 @@ type formatEngine interface {
 	// answer before deciding whether a file belongs in the candidate set, and asking by attempting a
 	// format would mean running the formatter to learn it should not have.
 	Handles(fileName string) bool
+
+	// Enumerate walks a project root and returns every file the engine would format, with an account
+	// of what the walk removed at each step.
+	//
+	// It belongs on the engine rather than in the pipeline because it is extension and ignore-file
+	// knowledge, the same knowledge Handles already encodes. The pipeline decides which of those
+	// files are in scope; the engine decides which files are formattable at all.
+	Enumerate(root string, structureIgnorePath string) (prettier.Enumeration, error)
 }
 
 // formatTransform adapts a format engine to the edit engine's whole-text transform.

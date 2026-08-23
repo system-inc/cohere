@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/fix"
+	"github.com/system-inc/verify/internal/prettier"
 )
 
 // A scoped transform must format what is in scope and skip what is not, and the skip must carry the
@@ -616,5 +617,152 @@ func TestAnEmptyScopeNamesWhereItLookedThroughTheWholePath(t *testing.T) {
 
 	if !strings.Contains(final.Description, directory) {
 		t.Fatalf("the description a run would print does not say where it looked: %q", final.Description)
+	}
+}
+
+// enumerationOf builds an Enumeration the way the real walk would report one.
+func enumerationOf(root string, files []string, walked int, declined map[string]int, nested []string, ignored map[string]int) prettier.Enumeration {
+	return prettier.Enumeration{
+		Root:               root,
+		Walked:             walked,
+		Files:              files,
+		DeclinedExtensions: declined,
+		NestedRepositories: nested,
+		IgnoredByLayer:     ignored,
+	}
+}
+
+// A whole-tree scope must become the enumeration, not the type graph.
+//
+// This is the ruling's core: the format phase's universe is what the walk found and the engine
+// handles. Intersecting with the type graph is what made css, markdown, json and yaml invisible,
+// because a tsconfig enumerates TypeScript by construction.
+func TestAWholeTreeScopeBecomesTheEnumeration(t *testing.T) {
+	files := []string{"/repo/a.ts", "/repo/b.css", "/repo/c.md", "/repo/d.json", "/repo/e.yaml"}
+	enumeration := enumerationOf("/repo", files, 12, map[string]int{".rb": 3, "(none)": 4}, nil, nil)
+
+	scope := wholeTreeScope().narrowToEnumeration(enumeration)
+
+	// Every language the engine handles is in scope, which is the thing that was broken.
+	for _, fileName := range files {
+		if !scope.includes(fileName) {
+			t.Fatalf("%s was enumerated and handled but is not in scope: %v", fileName, scope.FileNames)
+		}
+	}
+	if scope.Everything {
+		t.Fatalf("the scope stayed whole-tree instead of becoming the enumeration")
+	}
+
+	// The file set is the enumeration's, exactly. Falling through to the narrow branch would keep
+	// whatever the whole-tree scope had, which is nothing, and every assertion above would still pass
+	// because a whole-tree scope's includes returns true for everything it is asked about.
+	if len(scope.FileNames) != len(files) {
+		t.Fatalf("the scope did not take the enumeration's file set: %v", scope.FileNames)
+	}
+
+	// And a file the walk did not find must not be in scope. This is the assertion that catches a
+	// whole-tree scope that ignored the enumeration: it would answer true here.
+	if scope.includes("/repo/never-walked.ts") {
+		t.Fatalf("a file the enumeration never found is in scope, so the enumeration was ignored")
+	}
+}
+
+// A file the engine cannot handle must be a named zero, not an absence.
+//
+// This is the requirement the ruling attached and the one place in this pipeline where a file could
+// previously go missing without a word: a `.json` in a TypeScript project was never a candidate, so
+// the coverage line could not even report it as skipped.
+func TestDeclinedExtensionsAreNamedRatherThanOmitted(t *testing.T) {
+	enumeration := enumerationOf("/repo", []string{"/repo/a.ts"}, 61, map[string]int{".rb": 3, ".txt": 57, "(none)": 1}, nil, nil)
+
+	description := wholeTreeScope().narrowToEnumeration(enumeration).Description
+
+	for _, want := range []string{"3 .rb", "57 .txt", "1 (none)"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("a declined extension is missing from the coverage line: want %q in %q", want, description)
+		}
+	}
+	if !strings.Contains(description, "declined") {
+		t.Fatalf("declines are not labelled as declines: %q", description)
+	}
+}
+
+// The description must say what it walked, so a small number is distinguishable from a wrong root.
+func TestTheEnumerationDescriptionNamesTheRootAndTheCounts(t *testing.T) {
+	enumeration := enumerationOf("/repo/deep", []string{"/repo/deep/a.ts"}, 900, nil, nil, nil)
+
+	description := wholeTreeScope().narrowToEnumeration(enumeration).Description
+
+	for _, want := range []string{"/repo/deep", "900 files", "1 the formatter handles"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("want %q in %q", want, description)
+		}
+	}
+}
+
+// Ignore layers and nested repositories are reported when they removed something.
+//
+// Nested repositories are named rather than counted because "we skipped a repo" is a fact somebody
+// may want to argue with, and a number gives them nothing to argue with. Tonight a whole-tree run
+// wrote into a submodule; four nested repositories exist on this tree and three had not been
+// mentioned by anyone.
+func TestIgnoreLayersAndNestedRepositoriesAreReported(t *testing.T) {
+	enumeration := enumerationOf(
+		"/repo", []string{"/repo/a.ts"}, 500, nil,
+		[]string{"libraries/structure", "projects/ahraos-macos"},
+		map[string]int{".gitignore": 400, "PrettierIgnoreDefaults": 28, ".prettierignore": 0},
+	)
+
+	description := wholeTreeScope().narrowToEnumeration(enumeration).Description
+
+	for _, want := range []string{"400 by .gitignore", "28 by PrettierIgnoreDefaults", "libraries/structure", "projects/ahraos-macos"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("want %q in %q", want, description)
+		}
+	}
+	// A layer that removed nothing is not printed. Printing a zero every run trains the reader to
+	// stop looking at the line.
+	if strings.Contains(description, "0 by .prettierignore") {
+		t.Fatalf("a layer that removed nothing was printed: %q", description)
+	}
+}
+
+// A changed-files scope keeps its own set and reports how much of it the formatter will see.
+func TestANarrowScopeReportsHowMuchIsFormattable(t *testing.T) {
+	scope := formatScope{
+		FileNames: []string{"/repo/a.ts", "/repo/b.rb", "/repo/c.css"},
+		index: map[string]struct{}{
+			"/repo/a.ts": {}, "/repo/b.rb": {}, "/repo/c.css": {},
+		},
+		Description: "3 changed files (working tree, staged, and untracked)",
+	}
+	// The engine handles the ts and the css; the rb was declined during the walk.
+	enumeration := enumerationOf("/repo", []string{"/repo/a.ts", "/repo/c.css"}, 40, map[string]int{".rb": 1}, nil, nil)
+
+	narrowed := scope.narrowToEnumeration(enumeration)
+
+	if !strings.Contains(narrowed.Description, "3 changed files") {
+		t.Fatalf("the changed count was lost: %q", narrowed.Description)
+	}
+	if !strings.Contains(narrowed.Description, "2 the formatter handles") {
+		t.Fatalf("the formattable count is wrong or missing: %q", narrowed.Description)
+	}
+	// The scope keeps all three, so the two numbers describe two populations rather than collapsing.
+	if len(narrowed.FileNames) != 3 {
+		t.Fatalf("narrowing shrank the scope instead of describing it: %v", narrowed.FileNames)
+	}
+}
+
+// An empty scope keeps the description that names where it looked, exactly as narrowTo does.
+func TestAnEmptyScopeSurvivesEnumerationNarrowing(t *testing.T) {
+	empty := formatScope{
+		index:       map[string]struct{}{},
+		Description: "0 changed files in /some/where (working tree, staged, and untracked)",
+	}
+
+	narrowed := empty.narrowToEnumeration(enumerationOf("/repo", []string{"/repo/a.ts"}, 10, nil, nil, nil))
+
+	if !strings.Contains(narrowed.Description, "/some/where") {
+		t.Fatalf("enumeration narrowing discarded the directory an empty scope had named: %q", narrowed.Description)
 	}
 }

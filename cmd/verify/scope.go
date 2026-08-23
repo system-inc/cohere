@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/system-inc/verify/internal/fix"
+	"github.com/system-inc/verify/internal/prettier"
 )
 
 // formatScope is which files the format phase considers, and how that set was decided.
@@ -255,4 +257,165 @@ func scopedTransform(inner fix.Transform, scope formatScope) fix.Transform {
 		}
 		return inner(fileName, text)
 	}
+}
+
+// narrowToEnumeration replaces the type-graph narrowing for the format phase.
+//
+// The two narrowings answer different questions and the ruling split them. A proposed fix comes from
+// a rule that ran over the program, so its candidate must be in the program: `narrowTo` is correct
+// for that and stays. A format candidate comes from the disk, and intersecting it with the type
+// graph is what made css, markdown, json and yaml invisible, because a tsconfig enumerates
+// TypeScript by construction.
+//
+// The formatter could only speak TypeScript until the goja engine landed, so the type graph was an
+// adequate universe by accident. That constraint was incidental and the pipeline mistook it for the
+// architecture.
+//
+// The description states what the walk enumerated rather than what it intended: the root, the count
+// before and after the engine's filter, and every declined extension by name. A file the engine
+// cannot handle has to be a named zero rather than an absence, which is the one place in this
+// pipeline where a file could previously be silently missing.
+func (s formatScope) narrowToEnumeration(enumeration prettier.Enumeration) formatScope {
+	if s.Everything {
+		// A whole-tree scope becomes the enumeration itself: every file the walk found and the engine
+		// handles, rather than every file in the type graph.
+		index := make(map[string]struct{}, len(enumeration.Files))
+		for _, fileName := range enumeration.Files {
+			index[fileName] = struct{}{}
+		}
+		return formatScope{
+			FileNames:   enumeration.Files,
+			index:       index,
+			Description: describeEnumeration(enumeration, len(enumeration.Files)),
+		}
+	}
+
+	// A narrow scope keeps its own file set, which is the changed set, and reports how much of it the
+	// formatter will actually see.
+	handled := make(map[string]struct{}, len(enumeration.Files))
+	for _, fileName := range enumeration.Files {
+		handled[fileName] = struct{}{}
+	}
+
+	formattable := 0
+	for _, fileName := range s.FileNames {
+		if _, present := handled[fileName]; present {
+			formattable++
+		}
+	}
+
+	// An empty scope keeps the description that names where it looked, for the same reason narrowTo
+	// keeps it: this function knows the population but not where the question was posed.
+	//
+	// The Everything guard is not redundant with the branch above. A whole-tree scope also has zero
+	// FileNames, so without it a whole-tree scope that reached here would take this early return and
+	// come back with Everything still set, and scopedTransform would then bypass filtering entirely
+	// and offer the engine files the walk never found. That is a real hole rather than a hypothetical:
+	// it is what a mutation deleting the branch above produced, and no fixture could see it because
+	// includes is never consulted for a scope that claims to be everything.
+	if !s.Everything && len(s.FileNames) == 0 {
+		return s
+	}
+	if s.Everything {
+		// Unreachable through the branch above, and stated rather than assumed. A whole-tree scope that
+		// arrives here has lost its enumeration, and answering with an empty narrow scope is a loud
+		// wrong answer rather than a silent permissive one.
+		return formatScope{
+			index:       map[string]struct{}{},
+			Description: fmt.Sprintf("nothing (a whole-tree scope reached narrowing without its enumeration, walked %s)", enumeration.Root),
+		}
+	}
+
+	s.Description = fmt.Sprintf(
+		"%d changed files (working tree, staged, and untracked), %d the formatter handles · %s",
+		len(s.FileNames), formattable, describeEnumeration(enumeration, formattable),
+	)
+	return s
+}
+
+// describeEnumeration renders what the walk actually did.
+//
+// Stated rather than summarized, because the requirement is that this line cannot become correct by
+// accident. When the universe changes, this string has to be rewritten deliberately, so it names the
+// root, the ignore layers that removed anything, the nested repositories it refused, and the
+// declined extensions.
+func describeEnumeration(enumeration prettier.Enumeration, formattable int) string {
+	// One format string rather than two. An earlier version branched between a form that named the
+	// formattable count and one that did not, and the branch made the root unobservable: a mutation
+	// deleting the root from one string left the other correct, so no fixture could see it. Two
+	// spellings of one sentence means neither can be shown to work.
+	description := fmt.Sprintf(
+		"walked %s, %d files, %d the formatter handles",
+		enumeration.Root, enumeration.Walked, formattable,
+	)
+
+	// Ignore layers are named in the order they ran, and only when they removed something. A layer
+	// that removed nothing is either correct or broken, and printing a zero for it every run trains
+	// the reader to stop looking.
+	layers := make([]string, 0, len(enumeration.IgnoredByLayer))
+	for layer := range enumeration.IgnoredByLayer {
+		if enumeration.IgnoredByLayer[layer] > 0 {
+			layers = append(layers, fmt.Sprintf("%d by %s", enumeration.IgnoredByLayer[layer], layer))
+		}
+	}
+	sort.Strings(layers)
+	if len(layers) > 0 {
+		description += ", ignored " + strings.Join(layers, ", ")
+	}
+
+	// Nested repositories are named rather than counted. "We skipped a repo" is a fact somebody may
+	// want to argue with, and a number gives them nothing to argue with.
+	if len(enumeration.NestedRepositories) > 0 {
+		names := append([]string(nil), enumeration.NestedRepositories...)
+		sort.Strings(names)
+		description += ", skipped nested repositories " + strings.Join(names, ", ")
+	}
+
+	// Declines are the requirement this whole change exists for: a file the engine cannot handle is a
+	// named zero rather than an absence.
+	if len(enumeration.DeclinedExtensions) > 0 {
+		extensions := make([]string, 0, len(enumeration.DeclinedExtensions))
+		for extension := range enumeration.DeclinedExtensions {
+			extensions = append(extensions, extension)
+		}
+		sort.Strings(extensions)
+
+		declined := make([]string, 0, len(extensions))
+		for _, extension := range extensions {
+			declined = append(declined, fmt.Sprintf("%d %s", enumeration.DeclinedExtensions[extension], extension))
+		}
+		description += ", declined " + strings.Join(declined, ", ")
+	}
+
+	return description
+}
+
+// resolveStructureIgnorePath locates Structure's shared ignore defaults.
+//
+// It is one of three ignore layers the walk applies, and the one that is easiest to get wrong:
+// @system_verify_format under-applied it all night and the omission showed up as a 28-file
+// discrepancy between two independently built corpora. So it is resolved from a path rather than
+// reconstructed from memory, and an absent file is not an error: a project without Structure simply
+// has two layers instead of three, and the enumeration reports what each layer removed.
+func resolveStructureIgnorePath(directory string) string {
+	root := directory
+	if root == "" {
+		if workingDirectory, err := os.Getwd(); err == nil {
+			root = workingDirectory
+		}
+	}
+	return filepath.Join(root, "libraries", "structure", "code-quality", "PrettierIgnoreDefaults.ts")
+}
+
+// formatCandidates is the files the format phase should visit.
+//
+// A whole-tree scope hands back everything the enumeration found; a narrow scope hands back the
+// changed set. Either way these are candidates rather than a promise: a file here still passes
+// through the transform's own Handles check and can still come back declined, which is what keeps a
+// skip visible instead of turning it into an absence.
+//
+// A scope with no formatter configured yields nothing, so a fix-only run visits exactly the files
+// that had proposals and costs what it did before the format phase existed.
+func (s formatScope) formatCandidates() []string {
+	return s.FileNames
 }

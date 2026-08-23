@@ -31,6 +31,7 @@ func applyProposedFixes(
 	projectFiles []*ast.SourceFile,
 	rules []rule.Rule,
 	transform fix.Transform,
+	formatCandidates []string,
 	maxPasses int,
 ) (fix.Summary, error) {
 	// The first walk already happened for reporting; this asks again because the caller does not hand
@@ -69,10 +70,16 @@ func applyProposedFixes(
 	for fileName := range byFileName {
 		candidates[fileName] = struct{}{}
 	}
-	if transform != nil {
-		for _, sourceFile := range projectFiles {
-			candidates[sourceFile.FileName()] = struct{}{}
-		}
+	// The formattable half comes from the scope rather than from the program, and this is the second
+	// half of the split the ruling made. A proposed fix comes from a rule that ran over the program,
+	// so its candidate must be in the program. A format candidate comes from the disk.
+	//
+	// Taking them from projectFiles is what made css, markdown, json and yaml invisible: a tsconfig
+	// enumerates TypeScript by construction, so a `.css` was never a candidate, and the coverage line
+	// could not even report it as skipped. The scope already holds the right set, walked from the
+	// project root with the ignore layers applied and filtered by what the engine handles.
+	for _, fileName := range formatCandidates {
+		candidates[fileName] = struct{}{}
 	}
 
 	if len(candidates) == 0 {
