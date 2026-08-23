@@ -28,6 +28,7 @@ func All() []rule.Rule {
 		core.NoCompareNegZero,
 		core.NoDebugger,
 		core.NoDeleteVar,
+		core.NoDupeElseIf,
 		core.NoDuplicateCase,
 		core.NoEmpty,
 		core.NoEmptyPattern,
