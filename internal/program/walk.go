@@ -81,6 +81,13 @@ type Coverage struct {
 	// full run with every rule, so a caller running a filtered subset should not report it.
 	UnusedSuppressions int
 
+	// FilesCrashed names the files a rule panicked on, with the panic that ended each.
+	//
+	// Named rather than counted, because the panic message is the defect and a count of crashes is
+	// not actionable. A file the linter could not process is not a file with nothing to report, and
+	// keeping those apart is the whole job of this struct.
+	FilesCrashed []FileCrash
+
 	// FilesIgnored is how many files an ignorePattern excluded from linting entirely.
 	//
 	// A file skipped by configuration and a file with no findings produce identical output
@@ -146,6 +153,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	scopedOff := map[string]int{}
 	unconfigured := map[string]int{}
 	configFailures := []error{}
+	fileCrashes := []FileCrash{}
 
 	// Nil unless asked for, and every timing call below is guarded on it, so a run without --timing
 	// does not pay for the instrument at all.
@@ -176,6 +184,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			localScopedOff := map[string]int{}
 			localUnconfigured := map[string]int{}
 			localFailures := []error{}
+			localCrashes := []FileCrash{}
 
 			// Each worker accumulates locally and merges once under the mutex. Timing through a
 			// shared lock would measure contention rather than rule cost.
@@ -209,11 +218,26 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 				// A rule's Report closure captures the rule it belongs to, so a rule cannot report under
 				// another rule's name even by accident.
-				visited, silenced := dispatchFile(sourceFile, func(diagnostic rule.Diagnostic) {
+				visited, silenced, crashed := dispatchFileSafely(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
 				}, applicable, g, fileChecker, localListening, localOffered, ruleOptions, localTimings)
 
 				release()
+
+				if crashed != nil {
+					// One file is lost rather than the run. Without this, a panic in any rule on any
+					// node kills the process: files are walked in goroutines, a panic in a goroutine
+					// cannot be recovered by its parent, and nothing else in this codebase recovers.
+					// Measured before this existed: one panic on the branch producing the tree's 128
+					// findings ended the run at exit 2 with no lint line and no phases line, losing a
+					// completed types phase along with it.
+					//
+					// Named rather than counted, and never swallowed. A file the linter could not
+					// process is not a file with nothing to report, and the whole coverage line exists
+					// to keep those two apart.
+					localCrashes = append(localCrashes, FileCrash{FileName: sourceFile.FileName(), Cause: crashed})
+					continue
+				}
 
 				localNodes += visited
 				localSuppressed.add(silenced)
@@ -237,6 +261,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				unconfigured[name] += count
 			}
 			configFailures = append(configFailures, localFailures...)
+			fileCrashes = append(fileCrashes, localCrashes...)
 			timings.merge(localTimings)
 			mutex.Unlock()
 		}()
@@ -265,6 +290,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			UnusedSuppressions:              suppressed.unusedDirectives,
 			UnusedSuppressionsForUnrunRules: suppressed.unusedForUnrunRule,
 
+			FilesCrashed:      fileCrashes,
 			FilesIgnored:      filesIgnored,
 			RulesScopedOff:    scopedOff,
 			RulesUnconfigured: unconfigured,
@@ -278,6 +304,54 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 // Merging before walking is what makes the cost per node independent of the rule count: the walk
 // does one map lookup per node regardless of whether one rule or five hundred registered for that
 // kind.
+// FileCrash is a file a rule panicked on, and the panic it raised.
+//
+// The cause is carried rather than summarized because the panic message is the only evidence of what
+// went wrong: `Unhandled case in Node.Text: *ast.Token` names the defect precisely, and a count of
+// crashes names nothing.
+type FileCrash struct {
+	FileName string
+	Cause    error
+}
+
+// dispatchFileSafely is dispatchFile with a boundary around it.
+//
+// A rule is ordinary Go code walking a tree it did not build, and the compiler's own accessors panic
+// rather than error on shapes they do not handle. `Node.Text()` panics on any kind outside its
+// switch, and 220 call sites across the rules reach it. Kind-checking every one is the real fix and
+// this is not a substitute for it: this is what keeps the other 3,406 files reportable while that
+// work happens.
+//
+// The recovery is here rather than deeper because the file is the unit the coverage line already
+// speaks in. Recovering per node would leave a half-walked file reported as fully walked, which is
+// worse than losing it: a partial result that claims to be whole is the failure this package exists
+// to prevent.
+func dispatchFileSafely(
+	sourceFile *ast.SourceFile,
+	report func(rule.Diagnostic),
+	applicable []rule.Rule,
+	g *Graph,
+	fileChecker *checker.Checker,
+	listeningCounts map[string]int,
+	offeredCounts map[string]int,
+	ruleOptions map[string]any,
+	timings *Timings,
+) (visited int, silenced suppressionTally, crashed error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			// The visited count is discarded along with the file. A file that crashed halfway
+			// contributed nodes to a total that would then describe a walk nobody completed.
+			visited = 0
+			silenced = suppressionTally{}
+			crashed = fmt.Errorf("%v", recovered)
+		}
+	}()
+
+	visited, silenced = dispatchFile(sourceFile, report, applicable, g, fileChecker,
+		listeningCounts, offeredCounts, ruleOptions, timings)
+	return visited, silenced, nil
+}
+
 func dispatchFile(
 	sourceFile *ast.SourceFile,
 	report func(rule.Diagnostic),

@@ -341,6 +341,7 @@ func run() error {
 			result.Coverage.NodesVisited, round(lintDuration),
 		)
 		printRuleCoverage(rules, result.Coverage)
+		printCrashCoverage(result.Coverage)
 		printSuppressionCoverage(result.Coverage)
 		printConfigCoverage(result.Coverage)
 
@@ -526,6 +527,18 @@ func writeRuleCoverage(out io.Writer, rules []rule.Rule, coverage program.Covera
 // requiring one today turns working code red for no defect. Printing it every run puts the number
 // in front of us, which is what lets the convention be tightened later from evidence rather than
 // from a guess.
+// printCrashCoverage names the files a rule panicked on.
+//
+// Printed before findings rather than after, and named rather than counted. A crashed file produced
+// no findings, and a run that lost a file to a panic must not read as a run that found nothing in it.
+// That is the same rule the ignored, scoped-off and declined lines already follow.
+func printCrashCoverage(coverage program.Coverage) {
+	for _, crash := range coverage.FilesCrashed {
+		fmt.Printf("  crashed: %s could not be linted, so nothing in it was checked: %v\n",
+			crash.FileName, crash.Cause)
+	}
+}
+
 func printSuppressionCoverage(coverage program.Coverage) {
 	if coverage.Suppressed == 0 && coverage.UnusedSuppressions == 0 {
 		return

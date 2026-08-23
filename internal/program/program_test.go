@@ -372,3 +372,89 @@ func codesOf(diagnostics []*ast.Diagnostic) []int32 {
 	}
 	return codes
 }
+
+// A rule that panics loses its file and nothing else.
+//
+// Rules walk a tree they did not build, and the compiler's own accessors panic rather than error on
+// shapes they do not handle: Node.Text() panics on any kind outside its switch, and the rules reach
+// it from 220 call sites. Files are walked in goroutines, a panic in a goroutine cannot be recovered
+// by its parent, and nothing else in this codebase recovers.
+//
+// Measured before the boundary existed: one panic on the branch producing this tree's 128 findings
+// ended the run at exit 2 with no lint line and no phases line, discarding a completed types phase
+// along with everything else.
+func TestAPanickingRuleLosesOnlyItsFile(t *testing.T) {
+	directory := writeProject(t, map[string]string{
+		"tsconfig.json": minimalConfig,
+		"main.ts":       "const counted: number = 41 + 1;\n",
+		"other.ts":      "const named = 'ahra';\n",
+	})
+
+	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if err != nil {
+		t.Fatalf("building: %v", err)
+	}
+
+	panicking := rule.Rule{
+		Name: "test-panics-on-every-declaration",
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			return rule.Listeners{
+				ast.KindVariableDeclaration: func(node *ast.Node) {
+					panic("simulated accessor panic on an unhandled kind")
+				},
+			}
+		},
+	}
+
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{panicking})
+	if err != nil {
+		t.Fatalf("a panic in one rule ended the whole walk: %v", err)
+	}
+
+	if len(result.Coverage.FilesCrashed) == 0 {
+		t.Fatal("the walk survived a panicking rule and reported no crashed file, which is the silent " +
+			"loss this boundary exists to prevent")
+	}
+	for _, crash := range result.Coverage.FilesCrashed {
+		if crash.FileName == "" {
+			t.Error("a crashed file was recorded without its name, so a reader cannot find it")
+		}
+		if crash.Cause == nil {
+			t.Error("a crashed file was recorded without its cause, and the panic message is the defect")
+		}
+	}
+}
+
+// The other direction: a walk with no panic reports no crashed file.
+//
+// Without this, a boundary that recorded a crash for every file would pass the test above while
+// making the crash line meaningless, which is the same vacuous shape as a probe that cannot fail.
+func TestAWalkWithoutAPanicReportsNoCrashedFile(t *testing.T) {
+	directory := writeProject(t, map[string]string{
+		"tsconfig.json": minimalConfig,
+		"main.ts":       "const counted: number = 41 + 1;\n",
+	})
+
+	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if err != nil {
+		t.Fatalf("building: %v", err)
+	}
+
+	quiet := rule.Rule{
+		Name: "test-reports-nothing",
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			return rule.Listeners{
+				ast.KindVariableDeclaration: func(node *ast.Node) {},
+			}
+		},
+	}
+
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{quiet})
+	if err != nil {
+		t.Fatalf("walking: %v", err)
+	}
+
+	if len(result.Coverage.FilesCrashed) != 0 {
+		t.Errorf("a clean walk reported %d crashed files", len(result.Coverage.FilesCrashed))
+	}
+}
