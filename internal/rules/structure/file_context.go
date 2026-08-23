@@ -38,6 +38,10 @@ type FileContext struct {
 	// IsHorizontalRuleComponentFile is the same exemption for <hr> and the HorizontalRule component.
 	IsHorizontalRuleComponentFile bool
 
+	// IsPageFile marks a Next.js page, whose default export is the framework's contract rather
+	// than an authoring choice: Next resolves the route by that export and by nothing else.
+	IsPageFile bool
+
 	// IsLocalStorageServiceFile marks the storage service and its internal utilities, the one place
 	// allowed to reach raw localStorage. Same shape as the two above, and it covers the internal
 	// directory as well as the entry point, because the parsing and quota handling that justify the
@@ -85,6 +89,9 @@ func FileContextFor(fileName string) FileContext {
 
 		IsHorizontalRuleComponentFile: strings.Contains(normalizedPath, "/components/layout/HorizontalRule.tsx") ||
 			strings.Contains(normalizedPath, "/components/layout/HorizontalRule.jsx"),
+
+		IsPageFile: strings.HasSuffix(normalizedPath, "/page.tsx") ||
+			strings.HasSuffix(normalizedPath, "/page.jsx"),
 
 		IsLocalStorageServiceFile: strings.Contains(normalizedPath, "/services/local-storage/LocalStorageService.ts") ||
 			strings.Contains(normalizedPath, "/services/local-storage/internal/LocalStorageServiceUtilities.ts"),

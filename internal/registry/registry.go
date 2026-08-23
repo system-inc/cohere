@@ -77,6 +77,7 @@ func All() []rule.Rule {
 		structure.NetworkRequireHookOptionsParameter,
 		structure.NetworkRequireHookRequestSuffix,
 		structure.NetworkRequireHookVariablesType,
+		structure.NextRequirePageDefaultExport,
 		structure.ReactComponentNoDestructuring,
 		structure.ReactComponentNoDisplayName,
 		structure.ReactComponentNoForwardRef,
