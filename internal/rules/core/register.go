@@ -20,6 +20,7 @@ func init() {
 		rule.Registration{Rule: ForDirection},
 		rule.Registration{Rule: NoCaseDeclarations},
 		rule.Registration{Rule: NoCompareNegZero},
+		rule.Registration{Rule: NoIterator},
 		rule.Registration{
 			Rule:   NoConstantBinaryExpression,
 			Decode: rule.DecodeOptionsInto[NoConstantBinaryExpressionOptions](),
