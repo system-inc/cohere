@@ -304,6 +304,31 @@ func TokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
 }
 
+// The fix helpers come in two families, and picking the wrong one is the most common way a correct
+// rule produces a wrong edit.
+//
+// The node forms below (ReplaceNode, RemoveNode, InsertBefore, InsertAfter) are methods on Context
+// because they trim to the token and trimming needs the SourceFile. Reach for these by default: a
+// rule that says "this node" means the node, not the comment above it. The range forms
+// (ReplaceRange, RemoveRange) are package-level and trim nothing, because a caller that computed its
+// own span already said exactly what it meant. That split is why the safe form is also the
+// convenient one, and why the trivia-eating shape is unreachable rather than merely discouraged.
+//
+// Two properties of the engine that consumes these are worth knowing before writing a fix.
+//
+// A Fix must preserve meaning, because it is applied unattended. When the correct edit requires
+// choosing between alternatives only the author can rank, that is a Suggestion instead, and the
+// engine never applies suggestions. core.NoCaseDeclarations is the shipped example: wrapping a case
+// clause in braces changes what the code means, so it reports a Suggestion even though the edit is
+// mechanical and unambiguous. Mechanical is not the test; meaning-preserving is.
+//
+// Fixes reported together are not applied together. ProposalsFrom flattens a diagnostic's fixes into
+// independent proposals, so overlap resolution may admit one and refuse the other. A pair that only
+// means something jointly needs grouping in the engine first; reporting them side by side does not
+// buy atomicity. core.NoCaseDeclarations shows this too: its InsertBefore and InsertAfter are an
+// opening and a closing brace, and half of that pair is broken code. It is safe today only because
+// it is a Suggestion and never reaches the engine. See ProposalsFrom in internal/fix.
+
 // ReplaceNode proposes replacing a node's own text, leaving the trivia before it untouched.
 func (c Context) ReplaceNode(node *ast.Node, text string) Fix {
 	return Fix{Range: TokenRange(c.SourceFile, node), Text: text}
