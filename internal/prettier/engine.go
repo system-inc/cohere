@@ -32,11 +32,15 @@ import (
 // loadBundles means that change is one function body rather than a rewrite.
 const bundleDirectory = "/Users/kirkouimet/Projects/system/prettier/dist/prettier"
 
-// bundleFiles are the Prettier bundles the engine evaluates, in dependency order.
+// BundleFiles are the Prettier bundles the engine evaluates, in dependency order.
 //
 // standalone.js first because the plugins register themselves against it. Everything else is one
 // language, and the set is what parserForExtension can ask for.
-var bundleFiles = []string{
+//
+// Exported so the vendoring build step can copy exactly what the engine loads rather than keeping a
+// second list that drifts from this one. A bundle vendored but not loaded is dead weight; a bundle
+// loaded but not vendored is a build that fails at runtime on a machine without the fork.
+var BundleFiles = []string{
 	"standalone.js",
 	"plugins/estree.js",
 	"plugins/typescript.js",
@@ -53,8 +57,8 @@ var bundleFiles = []string{
 // seven of eight would format the eighth's files by falling through to no parser at all, and the
 // failure would look like a file type nobody formats rather than a broken build.
 func loadBundles() ([]namedSource, error) {
-	sources := make([]namedSource, 0, len(bundleFiles))
-	for _, name := range bundleFiles {
+	sources := make([]namedSource, 0, len(BundleFiles))
+	for _, name := range BundleFiles {
 		text, err := os.ReadFile(filepath.Join(bundleDirectory, name))
 		if err != nil {
 			return nil, fmt.Errorf("reading prettier bundle %s: %w", name, err)
