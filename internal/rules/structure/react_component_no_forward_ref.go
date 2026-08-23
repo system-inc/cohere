@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
 const forwardRefReasoning = "React 19 passes ref as an ordinary property to a function component, " +
@@ -108,23 +109,13 @@ func reportForwardRefImport(ctx rule.Context, node *ast.Node) {
 		return
 	}
 
-	namedBindings := declaration.ImportClause.AsImportClause().NamedBindings
-	if namedBindings == nil || namedBindings.Kind != ast.KindNamedImports {
-		// A default or namespace import brings in no name to test here. `import React from 'react'`
-		// is how React.forwardRef is reached, and that is the call arm's business.
-		return
-	}
-
-	for _, element := range namedBindings.AsNamedImports().Elements.Nodes {
-		specifier := element.AsImportSpecifier()
-
-		// PropertyName is set only when the import is aliased, in which case it holds the original
-		// name and Name holds the local one. Unaliased, PropertyName is nil and Name is both.
-		importedName := specifier.PropertyName
-		if importedName == nil {
-			importedName = specifier.Name()
-		}
-		if importedName != nil && importedName.Text() == "forwardRef" {
+	// A default or namespace import brings in no name to test here. `import React from 'react'` is
+	// how React.forwardRef is reached, and that is the call arm's business. `BindingsOf` separates
+	// the three shapes, so reading `Named` alone is that distinction rather than an omission.
+	for _, element := range imports.BindingsOf(node).Named {
+		if imports.ImportedNameOf(element) == "forwardRef" {
+			// The specifier node rather than the local name, so an aliased import blames the whole
+			// `forwardRef as forward` rather than just the alias.
 			ctx.ReportNode(element, messageNoForwardRefImport)
 		}
 	}

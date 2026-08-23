@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
 var messageNoDirectTanStackQuery = rule.Message{
@@ -100,21 +101,10 @@ func importsGraphqlSpecifier(declaration *ast.ImportDeclaration) bool {
 	if declaration.ImportClause == nil {
 		return false
 	}
-	bindings := declaration.ImportClause.AsImportClause().NamedBindings
-	if bindings == nil || bindings.Kind != ast.KindNamedImports {
-		return false
-	}
-
-	for _, element := range bindings.AsNamedImports().Elements.Nodes {
-		specifier := element.AsImportSpecifier()
-
-		// `import { graphql as query }` carries the original name in PropertyName and the alias
-		// in Name; a plain `import { graphql }` leaves PropertyName nil.
-		imported := specifier.PropertyName
-		if imported == nil {
-			imported = specifier.Name()
-		}
-		if imported != nil && imported.Text() == "graphql" {
+	// `import { graphql as query }` carries the original name and the alias in two places, which
+	// `ImportedNameOf` reads; asking for the local name would miss the aliased form.
+	for _, element := range imports.BindingsOf(declaration.AsNode()).Named {
+		if imports.ImportedNameOf(element) == "graphql" {
 			return true
 		}
 	}
