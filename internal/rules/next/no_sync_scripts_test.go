@@ -24,6 +24,14 @@ func TestNoSyncScriptsReports(t *testing.T) {
 			name:   "src with an unrelated attribute",
 			source: `export const C = () => <script src="/a.js" type="text/javascript" />;`,
 		},
+		{
+			// oxc's own fail case, and the one a value-reading port gets backwards. There is no
+			// string literal to read here, so a rule that asked for the value of `src` would find
+			// none and silently exempt a script that does block the parser. Presence is the right
+			// question: the attribute is written, so the fetch happens.
+			name:   "src is a computed expression",
+			source: `export const C = (props) => <script src={props.src}></script>;`,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -59,8 +67,11 @@ func TestNoSyncScriptsIsSilent(t *testing.T) {
 			source: `export const C = () => <script>{"var a = 1;"}</script>;`,
 		},
 		{
+			// oxc's paired pass case. A spread carries no readable name, so the rule cannot see a
+			// `src` and must not assume one, which is what keeps the computed-src fail case above
+			// from generalising into reporting every spread.
 			name:   "spread attributes",
-			source: `export const C = (props) => <script {...props} />;`,
+			source: `export const C = (props) => <script {...props}></script>;`,
 		},
 		{
 			name:   "member expression name",
