@@ -61,6 +61,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 		NextRequirePageDefaultExport,
 		ReactComponentNoDestructuring,
 		ReactComponentNoDisplayName,
+		ReactComponentNoSeparateNamedExport,
 		ReactHookNoDestructuring,
 		ReactHookRequireEffectComment,
 		ReactImportNoDestructuring,
