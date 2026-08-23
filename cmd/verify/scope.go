@@ -186,7 +186,71 @@ func gitChangedFiles(workingDirectory string) ([]string, error) {
 		return nil, fmt.Errorf("asking git what changed: %w", err)
 	}
 
-	return parsePorcelain(string(output)), nil
+	changed := parsePorcelain(string(output))
+
+	// A modified submodule arrives here looking exactly like a modified file.
+	//
+	// The trailing-slash guard in parsePorcelain cannot catch it: git reports a submodule whose
+	// checked-out commit moved as ` M libraries/structure`, with no slash, because the entry is a
+	// gitlink rather than a directory listing. The formatter then tries to read a directory as a
+	// file and the run reports a file it could not process, which is a true statement about a
+	// path that was never a file.
+	//
+	// Asked of git rather than answered by stat: a stat call would also reject a path deleted
+	// between the status call and the check, which is a different thing and belongs to the caller
+	// that reads it.
+	submodules, err := gitSubmodulePaths(workingDirectory)
+	if err != nil {
+		return nil, err
+	}
+	if len(submodules) == 0 {
+		return changed, nil
+	}
+
+	kept := make([]string, 0, len(changed))
+	for _, name := range changed {
+		if _, isSubmodule := submodules[name]; !isSubmodule {
+			kept = append(kept, name)
+		}
+	}
+	return kept, nil
+}
+
+// gitSubmodulePaths is the set of paths in this repository that are submodules.
+//
+// Read from the index rather than from .gitmodules, because .gitmodules is a file someone edits and
+// the index is what git actually acts on. A submodule is mode 160000 there, a gitlink, which is the
+// same fact the formatter needs: this path is not a file to read.
+func gitSubmodulePaths(workingDirectory string) (map[string]struct{}, error) {
+	command := exec.Command("git", "ls-files", "--stage")
+	command.Dir = workingDirectory
+
+	output, err := command.Output()
+	if err != nil {
+		return nil, fmt.Errorf("asking git which paths are submodules: %w", err)
+	}
+
+	return parseSubmoduleStage(string(output)), nil
+}
+
+// parseSubmoduleStage picks the gitlinks out of `git ls-files --stage` output.
+//
+// Separated from the subprocess call for the same reason parsePorcelain is: a repository with a
+// submodule is awkward to build in a test, and the mode column is the entire decision.
+func parseSubmoduleStage(output string) map[string]struct{} {
+	submodules := map[string]struct{}{}
+	for _, line := range strings.Split(output, "\n") {
+		// Format is `<mode> <object> <stage>\t<path>`. Mode 160000 is a gitlink.
+		if !strings.HasPrefix(line, "160000 ") {
+			continue
+		}
+		tab := strings.IndexByte(line, '\t')
+		if tab < 0 {
+			continue
+		}
+		submodules[unquoteGitPath(line[tab+1:])] = struct{}{}
+	}
+	return submodules
 }
 
 // parsePorcelain turns git's porcelain v1 output into the paths worth formatting.

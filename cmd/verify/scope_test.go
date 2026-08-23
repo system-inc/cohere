@@ -766,3 +766,39 @@ func TestAnEmptyScopeSurvivesEnumerationNarrowing(t *testing.T) {
 		t.Fatalf("enumeration narrowing discarded the directory an empty scope had named: %q", narrowed.Description)
 	}
 }
+
+// A modified submodule is not a file, and the trailing-slash guard cannot tell.
+//
+// git reports a submodule whose checked-out commit moved as ` M libraries/structure`: two status
+// characters, a space, a path, and no trailing slash, because a gitlink is one index entry rather
+// than a directory listing. Every shape-based guard reads that as a file. The mode in the index is
+// the only place the difference is stated, which is why the exclusion is asked of git rather than
+// inferred from the status line.
+func TestParseSubmoduleStageFindsGitlinks(t *testing.T) {
+	const stage = "100644 a1c38b42a33df6d3e63d862883e5438950d7be41 0\tapp/Probe.tsx\n" +
+		"160000 a1c38b42a33df6d3e63d862883e5438950d7be41 0\tlibraries/structure\n" +
+		"100644 b2d49c53b44ef7e4f74e973994f6549061e8cf52 0\tREADME.md\n"
+
+	submodules := parseSubmoduleStage(stage)
+
+	if _, found := submodules["libraries/structure"]; !found {
+		t.Error("the gitlink was not recognized as a submodule, so it would be read as a file")
+	}
+	if len(submodules) != 1 {
+		t.Errorf("expected exactly the one gitlink, got %d: %v", len(submodules), submodules)
+	}
+}
+
+// The other direction: a tree with no submodules must not have anything removed from its scope.
+//
+// Without this, an exclusion that returned every path would pass the test above and silently empty
+// the format scope, which is the failure this whole layer exists to prevent.
+func TestParseSubmoduleStageIgnoresOrdinaryFiles(t *testing.T) {
+	const stage = "100644 a1c38b42a33df6d3e63d862883e5438950d7be41 0\tapp/Probe.tsx\n" +
+		"100755 b2d49c53b44ef7e4f74e973994f6549061e8cf52 0\tscripts/run.sh\n" +
+		"120000 c3e5ad64c55f08f5085fa84aa5f765a172f9d063 0\tlink.ts\n"
+
+	if submodules := parseSubmoduleStage(stage); len(submodules) != 0 {
+		t.Errorf("a tree with no gitlinks reported %d submodules: %v", len(submodules), submodules)
+	}
+}
