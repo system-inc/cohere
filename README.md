@@ -47,6 +47,12 @@ minutes. They encode the cases a porter does not think of, **by definition**: a 
 of them would have written them. A rule shipped past a twenty-case fixture pair and a three-guard
 mutation sweep, and oxc's own passing case found the false positive in ten minutes.
 
+It is also the thing that tells you what the rule **operates on**, which is what a neighbouring rule
+most easily misleads you about. `no-nonoctal-decimal-escape` looks like a regex rule and is not:
+`/\8/` is a pass in its corpus. Ported by analogy from the rule finished an hour earlier, the code and
+its fixtures would have shared one wrong belief about the rule's surface, and every fixture would have
+passed.
+
 **Port from oxc, not from another implementation.** oxc is what the gate runs, so the differential
 compares against it. A rule ported from `@typescript-eslint` or from rslint can be correct and still
 read as a difference, which makes the harness less meaningful for no gain. Cite the others as a second
@@ -64,6 +70,12 @@ exactly like a passing sweep. A survivor is one of three things and only the fir
 - the fixtures do not measure that branch, so write one
 - the branch cannot change an answer, so delete it
 - one behavior is held redundantly by two guards, so mutate them together
+- the fixtures measure the right branch but assert the wrong layer
+
+The fourth is the expensive one. A rule's flag was forced always-on and thirty fixtures stayed green,
+because every fixture covering that input asserted **which rule fired** and never **what it offered**.
+A finding with a wrong repair reads as a correct finding. For a rule carrying fixes or suggestions,
+assert the repair rather than the id: the id is satisfied by a correct detection with a wrong fix.
 
 **Run against the real tree before committing, not after.** Two false positives shipped past a full
 fixture pair because the fixtures were written from the same wrong belief as the code. The tree is the
