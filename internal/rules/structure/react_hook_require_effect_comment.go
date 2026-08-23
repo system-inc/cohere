@@ -1,0 +1,187 @@
+package structure
+
+import (
+	"strings"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/verify/internal/rule"
+)
+
+var messageMissingEffectComment = rule.Message{
+	Id: "missingEffectComment",
+	Description: "This React.useEffect has no comment above it starting with \"Effect to\". An " +
+		"effect is the one place in a component where the reason for the code is not visible in " +
+		"the code: what a render does is on the screen, and what an effect does happens somewhere " +
+		"else at some other time. The comment is what lets the next reader decide whether a " +
+		"dependency change is safe. Write // Effect to ... immediately above it.",
+}
+
+// effectCommentPrefix is what the first line of the comment must start with.
+//
+// A fixed prefix rather than "any comment", and the strictness is the point: it forces the sentence
+// into the shape "Effect to <do something>", which is a claim about purpose. A free-form comment
+// drifts into restating the code.
+const effectCommentPrefix = "Effect to"
+
+// ReactHookRequireEffectComment flags a React.useEffect with no explanatory comment above it.
+//
+//	valid:   // Effect to sync the title with the route
+//	         React.useEffect(() => { ... }, [route])
+//	invalid: React.useEffect(() => { ... }, [route])
+//	invalid: // sync the title
+//	         React.useEffect(() => { ... }, [route])
+//
+// Only `React.useEffect`, matching the original. A bare `useEffect(...)` is not reported, which
+// looks like a gap and is not: `react-import-no-destructuring` already forbids importing the name,
+// so in this codebase the bare form cannot exist without that rule firing first. Widening this one
+// would produce two findings for one mistake.
+//
+// The comment is looked up on the enclosing statement rather than the call. Comments attach to
+// statements, so asking at the call expression finds nothing for the ordinary
+// `React.useEffect(...)` written as its own statement.
+var ReactHookRequireEffectComment = rule.Rule{
+	Name: "react-hook-require-effect-comment",
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		if !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
+			// An effect outside a React file is not a component's effect. Declining here also skips
+			// the comment scan entirely on the majority of files.
+			return nil
+		}
+
+		return rule.Listeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+				if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
+					return
+				}
+				if !isReactMemberNamed(callee, func(name string) bool { return name == "useEffect" }) {
+					return
+				}
+
+				if !hasEffectCommentAbove(ctx.SourceFile, node) {
+					ctx.ReportNode(callee, messageMissingEffectComment)
+				}
+			},
+		}
+	},
+}
+
+// hasEffectCommentAbove reports whether the run of comments above the call's statement starts with
+// the required prefix.
+//
+// The topmost comment of a contiguous run is what is checked, not the nearest one. A multi-line
+// explanation is several comment nodes, and only its first line has to make the claim: requiring
+// every line to start with "Effect to" would forbid explaining anything in a second sentence.
+func hasEffectCommentAbove(sourceFile *ast.SourceFile, call *ast.Node) bool {
+	statement := enclosingStatement(call)
+	if statement == nil {
+		return false
+	}
+
+	text := sourceFile.Text()
+	var factory ast.NodeFactory
+
+	var comments []commentSpan
+	for commentRange := range scanner.GetLeadingCommentRanges(&factory, text, statement.Pos()) {
+		comments = append(comments, commentSpan{
+			start: commentRange.Pos(),
+			end:   commentRange.End(),
+			text:  text[commentRange.Pos():commentRange.End()],
+		})
+	}
+	if len(comments) == 0 {
+		return false
+	}
+
+	// Walk back from the comment nearest the call through the contiguous run. A line comment run is
+	// several nodes; a block comment holds its whole text in one and so ends any run.
+	index := len(comments) - 1
+	for index > 0 {
+		current := comments[index]
+		previous := comments[index-1]
+		if !current.isLineComment() || !previous.isLineComment() {
+			break
+		}
+		if !areAdjacentLines(text, previous.end, current.start) {
+			break
+		}
+		index--
+	}
+
+	return startsWithEffectPrefix(comments[index])
+}
+
+// commentSpan is one comment's source range and text.
+type commentSpan struct {
+	start int
+	end   int
+	text  string
+}
+
+func (comment commentSpan) isLineComment() bool {
+	return strings.HasPrefix(comment.text, "//")
+}
+
+// areAdjacentLines reports whether two comments sit on consecutive lines with nothing between them.
+//
+// Checked by reading the gap rather than by comparing line numbers, which needs no line map: the
+// two are adjacent exactly when the text between them is whitespace containing one newline. Two
+// newlines means a blank line, which ends the run, and anything else means code between them.
+func areAdjacentLines(text string, previousEnd int, currentStart int) bool {
+	if previousEnd > currentStart || currentStart > len(text) {
+		return false
+	}
+	gap := text[previousEnd:currentStart]
+	if strings.TrimSpace(gap) != "" {
+		return false
+	}
+	return strings.Count(gap, "\n") == 1
+}
+
+// startsWithEffectPrefix reports whether a comment's first meaningful line makes the claim.
+//
+// A block comment's leading asterisks are stripped per line, so the JSDoc shape counts: the run of
+// `*` characters is decoration rather than content, and requiring the prefix immediately after
+// `/**` would reject the multi-line form everyone writes.
+func startsWithEffectPrefix(comment commentSpan) bool {
+	body := comment.text
+
+	switch {
+	case strings.HasPrefix(body, "//"):
+		return strings.HasPrefix(strings.TrimSpace(body[2:]), effectCommentPrefix)
+
+	case strings.HasPrefix(body, "/*"):
+		body = strings.TrimPrefix(body, "/*")
+		body = strings.TrimSuffix(body, "*/")
+		for _, line := range strings.Split(body, "\n") {
+			line = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "*"))
+			if line == "" {
+				continue
+			}
+			return strings.HasPrefix(line, effectCommentPrefix)
+		}
+	}
+
+	return false
+}
+
+// enclosingStatement walks up to the statement the call belongs to.
+//
+// Comments attach to statements rather than to expressions, so the lookup has to happen there. The
+// walk stops at whatever sits directly inside a block or a source file, which is the node a comment
+// above the call would be attached to.
+func enclosingStatement(node *ast.Node) *ast.Node {
+	for current := node; current != nil; current = current.Parent {
+		parent := current.Parent
+		if parent == nil {
+			return current
+		}
+		switch parent.Kind {
+		case ast.KindBlock, ast.KindSourceFile, ast.KindModuleBlock, ast.KindCaseClause,
+			ast.KindDefaultClause:
+			return current
+		}
+	}
+	return nil
+}
