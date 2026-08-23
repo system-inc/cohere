@@ -271,6 +271,12 @@ func controlMatches(control Control, finding Finding) bool {
 func plantControls(options RunOptions) ([]Control, func(), error) {
 	planted := make([]Control, 0, len(options.Controls))
 	written := make([]string, 0, len(options.Controls))
+	// createdDirectories is the directories this plant brought into existence, deepest first, so
+	// cleanup can unwind exactly what it made. Removing the file and leaving its directory behind
+	// is still a mutation of a tree several people are working in, and it shows up in their
+	// `git status` as an unexplained empty directory. An earlier run of this harness did precisely
+	// that and the leftover was found by someone else.
+	createdDirectories := make([]string, 0, len(options.Controls))
 
 	cleanup := func() {
 		for _, path := range written {
@@ -278,6 +284,14 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 			// failure to remove one is worth saying out loud rather than swallowing.
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				fmt.Fprintf(os.Stderr, "differential: could not remove planted control %s: %v\n", path, err)
+			}
+		}
+		// Deepest first, and only the ones this plant created. Remove refuses on a non-empty
+		// directory, which is the guard that matters: if anything else landed in there while the
+		// gates ran, it stays and so does the directory.
+		for index := len(createdDirectories) - 1; index >= 0; index-- {
+			if err := os.Remove(createdDirectories[index]); err != nil && !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "differential: left the directory %s in place: %v\n", createdDirectories[index], err)
 			}
 		}
 	}
@@ -290,9 +304,14 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 				control.Name, control.RelativePath,
 			)
 		}
+		missing, err := missingDirectories(filepath.Dir(absolutePath), options.Root)
+		if err != nil {
+			return planted, cleanup, fmt.Errorf("planning the directory for control %q: %w", control.Name, err)
+		}
 		if err := os.MkdirAll(filepath.Dir(absolutePath), 0o755); err != nil {
 			return planted, cleanup, fmt.Errorf("creating the directory for control %q: %w", control.Name, err)
 		}
+		createdDirectories = append(createdDirectories, missing...)
 		if err := os.WriteFile(absolutePath, []byte(control.Contents), 0o644); err != nil {
 			return planted, cleanup, fmt.Errorf("writing control %q: %w", control.Name, err)
 		}
@@ -347,4 +366,42 @@ func verifyCoverageFrom(summaryLines []string) (int, int) {
 		return filesWalked, rulesRun
 	}
 	return 0, 0
+}
+
+// missingDirectories lists the directories from root down to directory that do not exist yet.
+//
+// Asked before MkdirAll rather than inferred afterward, because afterward every directory on the
+// path exists and there is no way to tell which ones were already there. Removing a directory the
+// tree already had would be a worse mutation than leaving one behind.
+//
+// The walk stops at root and never above it, so a control cannot cause a directory outside the
+// tree being linted to be removed. Ordered shallowest first; the caller unwinds in reverse.
+func missingDirectories(directory string, root string) ([]string, error) {
+	absoluteRoot, err := filepath.Abs(root)
+	if err != nil {
+		return nil, err
+	}
+	absoluteDirectory, err := filepath.Abs(directory)
+	if err != nil {
+		return nil, err
+	}
+
+	var missing []string
+	for current := absoluteDirectory; strings.HasPrefix(current, absoluteRoot) && current != absoluteRoot; {
+		if _, err := os.Stat(current); err == nil {
+			break
+		}
+		missing = append(missing, current)
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+
+	// Reverse into shallowest-first order, which is the order they get created in.
+	for left, right := 0, len(missing)-1; left < right; left, right = left+1, right-1 {
+		missing[left], missing[right] = missing[right], missing[left]
+	}
+	return missing, nil
 }

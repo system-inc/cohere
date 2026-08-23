@@ -255,3 +255,81 @@ func TestASharedControlDoesNotProveDirection(t *testing.T) {
 		t.Fatal("a run carrying only a shared control has not shown it can detect a difference, so it must not be trustworthy")
 	}
 }
+
+// Cleanup must unwind the directories the plant created, and only those.
+//
+// Removing the control file and leaving its directory behind is still a mutation of a tree several
+// people work in, and it shows up in their `git status` as an unexplained empty directory. An
+// earlier run of this harness did exactly that and somebody else found the leftover.
+func TestCleanupRemovesTheDirectoriesItCreated(t *testing.T) {
+	root := t.TempDir()
+	control := Control{
+		Name:         "nested",
+		RelativePath: filepath.Join("code-quality", "differential-control", "Planted.ts"),
+		Contents:     "export enum Planted { A = 'A' }\n",
+		Rule:         "consistency-no-enum",
+	}
+
+	_, cleanup, err := plantControls(RunOptions{Root: root, Controls: []Control{control}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nested := filepath.Join(root, "code-quality", "differential-control")
+	if _, err := os.Stat(nested); err != nil {
+		t.Fatalf("the plant should have created %s: %v", nested, err)
+	}
+
+	cleanup()
+
+	// Both levels go, because the plant created both.
+	if _, err := os.Stat(nested); !os.IsNotExist(err) {
+		t.Fatal("the directory the plant created was left behind")
+	}
+	if _, err := os.Stat(filepath.Join(root, "code-quality")); !os.IsNotExist(err) {
+		t.Fatal("the outer directory the plant created was left behind")
+	}
+	// The tree root is never removed, however far the unwind walks.
+	if _, err := os.Stat(root); err != nil {
+		t.Fatalf("the tree root must survive cleanup: %v", err)
+	}
+}
+
+// A directory that already existed, or that something else wrote into, must survive.
+//
+// The first case would be the harness deleting part of the tree it was asked to measure. The second
+// is the one that matters on a shared worktree: if a sibling's file landed in that directory while
+// the gates ran, removing it would destroy their work.
+func TestCleanupLeavesDirectoriesItDidNotCreate(t *testing.T) {
+	root := t.TempDir()
+	preexisting := filepath.Join(root, "code-quality")
+	if err := os.MkdirAll(preexisting, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	control := Control{
+		Name:         "nested",
+		RelativePath: filepath.Join("code-quality", "differential-control", "Planted.ts"),
+		Contents:     "export enum Planted { A = 'A' }\n",
+		Rule:         "consistency-no-enum",
+	}
+	_, cleanup, err := plantControls(RunOptions{Root: root, Controls: []Control{control}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A sibling writes into the directory the plant created, while the gates would be running.
+	sibling := filepath.Join(root, "code-quality", "differential-control", "SomebodyElse.ts")
+	if err := os.WriteFile(sibling, []byte("export const theirs = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cleanup()
+
+	if _, err := os.Stat(sibling); err != nil {
+		t.Fatalf("a sibling's file inside the planted directory must survive cleanup: %v", err)
+	}
+	if _, err := os.Stat(preexisting); err != nil {
+		t.Fatalf("a directory that existed before the plant must survive cleanup: %v", err)
+	}
+}
