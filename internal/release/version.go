@@ -82,6 +82,20 @@ type Provenance struct {
 	// means a build that should have stamped it and did not, so the two render differently.
 	FormatterCommit string
 
+	// SourceTreeModified reports whether the tree this binary was built from had uncommitted
+	// changes.
+	//
+	// Read from Go's own `vcs.modified` stamp rather than computed, because the linker observes the
+	// tree at build time and nothing later can. It answers the question a version number cannot: a
+	// version identifies what was released, and this says whether that release is reproducible from
+	// a fresh clone at all.
+	//
+	// It matters here more than in most projects because the source lives in a worktree several
+	// members edit at once. A release staged while someone is mid-flight embeds their uncommitted
+	// work, ships, installs, and reports a version that no commit produces. Measured: eight modified
+	// files in the tree at the time this was written.
+	SourceTreeModified bool
+
 	// Platform is the operating system and architecture this binary was built for, as "os/arch".
 	//
 	// It is read from the runtime rather than stamped, because the runtime cannot be wrong about it
@@ -93,12 +107,13 @@ type Provenance struct {
 // Current returns this binary's provenance.
 func Current() Provenance {
 	return Provenance{
-		Version:          version,
-		CompilerCommit:   resolveCompilerCommit(),
-		CompilerUpstream: compilerUpstream,
-		GoToolchain:      resolveGoToolchain(),
-		FormatterCommit:  formatterCommit,
-		Platform:         runtime.GOOS + "/" + runtime.GOARCH,
+		Version:            version,
+		CompilerCommit:     resolveCompilerCommit(),
+		CompilerUpstream:   compilerUpstream,
+		GoToolchain:        resolveGoToolchain(),
+		FormatterCommit:    formatterCommit,
+		SourceTreeModified: resolveSourceTreeModified(),
+		Platform:           runtime.GOOS + "/" + runtime.GOARCH,
 	}
 }
 
@@ -126,6 +141,11 @@ func (provenance Provenance) String() string {
 	// line reading "unknown" that looks like a lost stamp rather than a feature that did not exist.
 	if provenance.FormatterCommit != "" {
 		lines = append(lines, "  formatter:      "+provenance.FormatterCommit)
+	}
+	// Printed only when true, because "built from a clean tree" is the ordinary case and a line
+	// asserting it on every release would be noise that hides the one time it matters.
+	if provenance.SourceTreeModified {
+		lines = append(lines, "  source:         built from a tree with uncommitted changes, so no commit reproduces this binary")
 	}
 	if provenance.IsDevelopment() {
 		lines = append(lines, "  note:           a local build, so the rules are whatever was on disk when it was compiled")
@@ -182,6 +202,25 @@ func resolveCompilerCommit() string {
 		}
 	}
 	return "unknown"
+}
+
+// resolveSourceTreeModified reports whether the build tree carried uncommitted changes.
+//
+// Go's linker writes this stamp itself, so it observes the tree at the moment of the build and
+// cannot be wrong about it the way a value computed afterwards could. A binary with no build info
+// at all reports false rather than true: absent evidence is not evidence of a dirty tree, and
+// claiming otherwise would put a warning on every binary that predates this field.
+func resolveSourceTreeModified() bool {
+	information, available := debug.ReadBuildInfo()
+	if !available {
+		return false
+	}
+	for _, setting := range information.Settings {
+		if setting.Key == "vcs.modified" {
+			return setting.Value == "true"
+		}
+	}
+	return false
 }
 
 // shortCommit trims a full hash to the length people actually read.

@@ -76,6 +76,32 @@ func TestVersionSaysWhenItIsALocalBuild(t *testing.T) {
 	}
 }
 
+func TestVersionSaysWhenTheBuildTreeWasDirty(t *testing.T) {
+	// A version number identifies what was released. It cannot say whether the release is
+	// reproducible, and in a worktree several members edit at once those come apart constantly: a
+	// release staged mid-flight embeds someone's uncommitted work, ships, and reports a version that
+	// no commit produces.
+	dirty := Provenance{
+		Version:            "1.2.3",
+		CompilerCommit:     "abc123",
+		CompilerUpstream:   "microsoft/TypeScript",
+		GoToolchain:        "go1.27.0",
+		SourceTreeModified: true,
+		Platform:           "darwin/arm64",
+	}
+	if !strings.Contains(dirty.String(), "uncommitted changes") {
+		t.Errorf("a binary built from a dirty tree does not say so:\n%s", dirty.String())
+	}
+
+	// And the ordinary case stays quiet. A line asserting "clean" on every release is noise that
+	// hides the one time it matters, which is the same reason the formatter line is conditional.
+	clean := dirty
+	clean.SourceTreeModified = false
+	if strings.Contains(clean.String(), "uncommitted") {
+		t.Errorf("a clean build carries a dirty-tree warning:\n%s", clean.String())
+	}
+}
+
 func TestCompilerUpstreamNormalizesBothUrlShapes(t *testing.T) {
 	// git accepts ssh and https remotes, and a build machine's choice of clone should not change
 	// what a release reports. Otherwise two reports of the same pin look different, and a reader
