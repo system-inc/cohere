@@ -1,0 +1,138 @@
+package structure
+
+import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/verify/internal/rule"
+)
+
+var messageNoDestructuringInHook = rule.Message{
+	Id: "noDestructuringInHook",
+	Description: "This destructures inside a custom hook. Store the value in a variable and read " +
+		"its properties instead. A hook's returned object is the thing callers pass around and " +
+		"log, and destructuring inside the hook breaks the chain between a value and where it came " +
+		"from: a reader seeing a bare name has to find which of several calls produced it.",
+}
+
+// ReactHookNoDestructuring flags object destructuring inside a custom hook's body.
+//
+//	valid:   function useThing() { const result = useQuery(); return result.data; }
+//	invalid: function useThing() { const { data } = useQuery(); return data; }
+//
+// Only object destructuring, matching the original. Array destructuring is exempt and that is the
+// convention rather than an oversight: `const [value, setValue] = React.useState()` has no property
+// names to preserve, so there is nothing for the rule to protect.
+//
+// The enclosing-hook test walks every enclosing function rather than only the nearest, so a
+// destructure inside a callback inside a hook still counts. That is the original's behavior and it
+// is what makes the rule hold: a hook's callbacks are part of the hook.
+//
+// The original gates on `isReactFile || isTypeScriptFile`, which together mean any .ts or .tsx file
+// and so exclude nothing this linter would ever see. Reproduced as no gate at all rather than as
+// two flags whose disjunction is always true, since a guard that cannot fail reads as a guard that
+// might.
+var ReactHookNoDestructuring = rule.Rule{
+	Name: "react-hook-no-destructuring",
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		return rule.Listeners{
+			ast.KindVariableDeclaration: func(node *ast.Node) {
+				declaration := node.AsVariableDeclaration()
+
+				name := declaration.Name()
+				if name == nil || name.Kind != ast.KindObjectBindingPattern {
+					return
+				}
+
+				// No initializer, no report, and this is load-bearing rather than defensive.
+				//
+				// It is what exempts `for(const { data } of items)`, whose declaration has no
+				// initializer because the loop supplies the value. That is a real destructure
+				// inside a hook and the original does not report it either: its check is on a
+				// VariableDeclarator's `init`, which ESTree leaves null in a for-of head.
+				//
+				// Reproduced rather than improved on. Reporting it would be defensible and would
+				// put us one finding ahead of the gate on a shape nobody has decided about, which
+				// is a different thing from the one deliberate divergence already ruled on.
+				// Recorded here so a future reader knows it was seen rather than missed.
+				if declaration.Initializer == nil {
+					return
+				}
+
+				if !isInsideCustomHook(node) {
+					return
+				}
+
+				ctx.ReportNode(name, messageNoDestructuringInHook)
+			},
+		}
+	},
+}
+
+// isInsideCustomHook reports whether any enclosing function is named like a hook.
+//
+// Every enclosing function is tested rather than only the nearest, so a destructure inside a
+// callback inside a hook counts. The nearest function is often an anonymous callback with no name
+// to test at all, and stopping there would silence the rule wherever it matters most.
+func isInsideCustomHook(node *ast.Node) bool {
+	for current := node.Parent; current != nil; current = current.Parent {
+		name := functionLikeName(current)
+		if name != "" && IsHookName(name) {
+			return true
+		}
+	}
+	return false
+}
+
+// functionLikeName returns the name a function-like node is known by, or "" when it has none.
+//
+// A function expression or arrow assigned to a variable takes the variable's name, which is how
+// `const useThing = () => {}` is recognized. Without that, every arrow-bodied hook in the codebase
+// would be anonymous and the rule would see none of them.
+func functionLikeName(node *ast.Node) string {
+	switch node.Kind {
+	case ast.KindFunctionDeclaration:
+		if name := node.AsFunctionDeclaration().Name(); name != nil {
+			return name.Text()
+		}
+
+	case ast.KindMethodDeclaration:
+		if name := node.AsMethodDeclaration().Name(); name != nil && name.Kind == ast.KindIdentifier {
+			return name.Text()
+		}
+
+	case ast.KindFunctionExpression:
+		if name := node.AsFunctionExpression().Name(); name != nil {
+			return name.Text()
+		}
+		return nameFromEnclosingDeclaration(node)
+
+	case ast.KindArrowFunction:
+		return nameFromEnclosingDeclaration(node)
+	}
+	return ""
+}
+
+// nameFromEnclosingDeclaration reads the variable or property name an anonymous function is
+// assigned to.
+//
+// Only the immediate parent is consulted. A function nested inside an object passed to something
+// else does not inherit that thing's name, and walking further would attribute a callback to
+// whatever declaration happened to enclose it.
+func nameFromEnclosingDeclaration(node *ast.Node) string {
+	parent := node.Parent
+	if parent == nil {
+		return ""
+	}
+
+	switch parent.Kind {
+	case ast.KindVariableDeclaration:
+		if name := parent.AsVariableDeclaration().Name(); name != nil && name.Kind == ast.KindIdentifier {
+			return name.Text()
+		}
+
+	case ast.KindPropertyAssignment:
+		if name := parent.AsPropertyAssignment().Name(); name != nil && name.Kind == ast.KindIdentifier {
+			return name.Text()
+		}
+	}
+	return ""
+}
