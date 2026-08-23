@@ -54,6 +54,11 @@ func TestEveryRuleShipsAFixturePair(t *testing.T) {
 				t.Errorf("rule %s never calls ruletest.ExpectClean, so nothing proves it stays quiet; "+
 					"a violation-only corpus proves a rule can detect and never that it can discriminate",
 					name)
+			case proposesAFix(t, path) && !assertions.expectsFixedSource:
+				t.Errorf("rule %s proposes a fix and never calls ruletest.ExpectFixedSource, so nothing "+
+					"proves what it writes; a fix is the one part of a rule that rewrites source, and a "+
+					"wrong range or wrong text changes something else silently",
+					name)
 			}
 		}
 	}
@@ -64,6 +69,13 @@ type harnessAssertions struct {
 	exists          bool
 	expectsFindings bool
 	expectsClean    bool
+	// expectsFixedSource is whether any test says what the rule's fix should write.
+	//
+	// Only meaningful for a rule that proposes fixes, and required for every one of them. Measured
+	// on this repository: corrupting a fix so it wrote `'CORRUPTED:fs'` instead of `'node:fs'` left
+	// the whole suite green, because until ExpectFixedSource existed there was no way for a fixture
+	// to say otherwise.
+	expectsFixedSource bool
 }
 
 // harnessAssertionsIn reads a test file for calls to the two ruletest assertions.
@@ -101,6 +113,8 @@ func harnessAssertionsIn(t *testing.T, path string) harnessAssertions {
 			assertions.expectsFindings = true
 		case "ExpectClean":
 			assertions.expectsClean = true
+		case "ExpectFixedSource":
+			assertions.expectsFixedSource = true
 		}
 		return true
 	})
@@ -149,4 +163,46 @@ func ruleDeclarationsByFile(t *testing.T) map[string][]string {
 		}
 	}
 	return byFile
+}
+
+// proposesAFix reports whether a rule file ever hands fixes to a report.
+//
+// Read from the source rather than from a list, for the same reason the assertion names are: a list
+// of fixable rules is a second place to update and the first place to drift. A rule that gains a fix
+// and forgets the list would be the exact defect this guard exists to catch, arriving through the
+// guard's own bookkeeping.
+//
+// Detected by call name rather than by inspecting what reaches the fix argument. That is coarse on
+// purpose: a rule calling ReportNodeWithFixes with an empty slice would be asked for an assertion it
+// cannot satisfy, and that failure is loud and easy to read. The opposite error, missing a rule that
+// does rewrite source, is the one with a silent blast radius.
+func proposesAFix(t *testing.T, path string) bool {
+	t.Helper()
+
+	fileSet := token.NewFileSet()
+	parsed, err := parser.ParseFile(fileSet, path, nil, 0)
+	if err != nil {
+		return false
+	}
+
+	proposes := false
+	ast.Inspect(parsed, func(node ast.Node) bool {
+		call, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			return true
+		}
+		selector, isSelector := call.Fun.(*ast.SelectorExpr)
+		if !isSelector {
+			return true
+		}
+		// The receiver is the rule context, whose name is the rule author's choice, so the method
+		// name is the whole signal here.
+		switch selector.Sel.Name {
+		case "ReportNodeWithFixes", "ReportRangeWithFixes":
+			proposes = true
+			return false
+		}
+		return true
+	})
+	return proposes
 }

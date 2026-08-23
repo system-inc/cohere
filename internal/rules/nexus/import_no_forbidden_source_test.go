@@ -1,6 +1,7 @@
 package nexus
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
@@ -75,6 +76,17 @@ func TestImportNoForbiddenSourceFires(t *testing.T) {
 			if fixes[0].Text != testCase.wantFix {
 				t.Fatalf("expected fix %q, got %q", testCase.wantFix, fixes[0].Text)
 			}
+
+			// The text alone does not pin the rewrite, because the range is half of it. A correct
+			// replacement over the wrong span writes the right characters into the wrong place, and
+			// every assertion above still passes. Measured elsewhere in this repository: pointing a
+			// deletion at the enclosing node instead of the statement removed a whole function with
+			// the fix text unchanged and the suite green.
+			//
+			// The expectation is derived from the case rather than written out, so a new row cannot
+			// forget it and cannot disagree with itself.
+			ruletest.ExpectFixedSource(t, result,
+				strings.Replace(testCase.sourceText, quotedSourceOf(testCase.sourceText), testCase.wantFix, 1))
 		})
 	}
 }
@@ -124,4 +136,22 @@ func TestImportNoForbiddenSourceStaysSilent(t *testing.T) {
 			ruletest.ExpectClean(t, result)
 		})
 	}
+}
+
+// quotedSourceOf returns the quoted module specifier in a one-import fixture.
+//
+// The fixtures all carry exactly one quoted string, which is the specifier the fix replaces, so the
+// first quoted run is it. Deliberately narrow: this is a test helper for this table and not a
+// parser, and a fixture that broke the assumption would fail loudly here rather than quietly assert
+// the wrong rewrite.
+func quotedSourceOf(sourceText string) string {
+	start := strings.IndexByte(sourceText, '\'')
+	if start < 0 {
+		return ""
+	}
+	end := strings.IndexByte(sourceText[start+1:], '\'')
+	if end < 0 {
+		return ""
+	}
+	return sourceText[start : start+end+2]
 }

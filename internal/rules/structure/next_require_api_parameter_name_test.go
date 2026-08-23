@@ -161,9 +161,16 @@ func TestNextRequireApiParameterNameFixesTheFieldName(t *testing.T) {
 		t.Fatalf("want the fix to write params, got %q", fixes[0].Text)
 	}
 
+	// The text is half the fix and the range is the other half. Writing "params" over the wrong span
+	// produces the right characters in the wrong place, and every assertion above still passes.
+	ruletest.ExpectFixedSource(t, result,
+		"export async function generateMetadata(argument: { params: unknown }) {\n    return argument;\n}\n")
+
 	searchResult := ruletest.Run(t, NextRequireApiParameterName, apiParameterPageFile,
 		"export async function generateMetadata(argument: { searchParameters: unknown }) {\n    return argument;\n}\n")
 	if text := searchResult.Diagnostics[0].Fixes[0].Text; text != "searchParams" {
 		t.Fatalf("want the fix to write searchParams, got %q", text)
 	}
+	ruletest.ExpectFixedSource(t, searchResult,
+		"export async function generateMetadata(argument: { searchParams: unknown }) {\n    return argument;\n}\n")
 }

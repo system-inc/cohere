@@ -62,4 +62,14 @@ func TestNoDebuggerRemovesTheStatement(t *testing.T) {
 	if text := result.Diagnostics[0].Fixes[0].Text; text != "" {
 		t.Fatalf("want a deletion (empty text), got %q", text)
 	}
+
+	// The text alone does not pin the rewrite. An empty replacement over the wrong range is still an
+	// empty replacement, and it deletes whatever that range covers: pointing this fix at the
+	// enclosing function instead of the statement removes the whole function, keeps the text empty,
+	// and passes every assertion above. Asserting the resulting source is what closes that.
+	// The leading indentation survives, because RemoveNode deletes the node and not the trivia
+	// before it. Asserted as it actually is rather than as it reads best: a fixture that states a
+	// tidier result than the engine produces is a fixture that will be "fixed" by making the engine
+	// wrong.
+	ruletest.ExpectFixedSource(t, result, "export function run() {\n    \n}\n")
 }
