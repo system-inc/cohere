@@ -56,6 +56,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 		ReactNoAnchorElement,
 		ReactNoHorizontalRuleElement,
 		ReactComponentNoForwardRef,
+		NextRequireApiParameterName,
 		NextRequirePageDefaultExport,
 		ReactComponentNoDestructuring,
 		ReactComponentNoDisplayName,

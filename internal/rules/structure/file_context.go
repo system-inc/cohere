@@ -42,6 +42,9 @@ type FileContext struct {
 	// than an authoring choice: Next resolves the route by that export and by nothing else.
 	IsPageFile bool
 
+	// IsLayoutFile marks a Next.js layout, which shares the page's framework-named API surface.
+	IsLayoutFile bool
+
 	// IsLocalStorageServiceFile marks the storage service and its internal utilities, the one place
 	// allowed to reach raw localStorage. Same shape as the two above, and it covers the internal
 	// directory as well as the entry point, because the parsing and quota handling that justify the
@@ -92,6 +95,9 @@ func FileContextFor(fileName string) FileContext {
 
 		IsPageFile: strings.HasSuffix(normalizedPath, "/page.tsx") ||
 			strings.HasSuffix(normalizedPath, "/page.jsx"),
+
+		IsLayoutFile: strings.HasSuffix(normalizedPath, "/layout.tsx") ||
+			strings.HasSuffix(normalizedPath, "/layout.jsx"),
 
 		IsLocalStorageServiceFile: strings.Contains(normalizedPath, "/services/local-storage/LocalStorageService.ts") ||
 			strings.Contains(normalizedPath, "/services/local-storage/internal/LocalStorageServiceUtilities.ts"),
