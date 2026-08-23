@@ -14,6 +14,7 @@ package differential
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -58,6 +59,21 @@ type RunOptions struct {
 	// with none is allowed and produces a report that says, in as many words, that it proved
 	// nothing — rather than a clean one.
 	Controls []Control
+	// ExtraVerifyRuleSettings are rules to enable for verify's run only, merged over the tree's own
+	// lint config and handed to verify with `-lint-config`. The gate always runs against the
+	// unmodified config.
+	//
+	// This exists for one narrow purpose and it is worth stating so nobody widens it casually.
+	// A directional control needs a rule verify can report and the gate structurally cannot, and
+	// the shared config does not enable such a rule, so verify would run it over no files and the
+	// control would miss for a configuration reason rather than a harness one.
+	//
+	// Asymmetric configuration is otherwise exactly what this instrument must never do: comparing
+	// two gates under different rule sets manufactures differences that say nothing about either
+	// implementation. So the asymmetry is confined to rules the gate cannot express at all, where
+	// there is no shared setting to diverge from, and every finding it produces is classified
+	// not-ported rather than counted against agreement.
+	ExtraVerifyRuleSettings map[string]any
 }
 
 // Control is a violation planted where the harness knows in advance what should happen to it.
@@ -94,6 +110,14 @@ type Control struct {
 	// match rather than as a difference. Set for a rule both sides implement and the config enables,
 	// where a one-sided result would be the defect rather than the proof.
 	ExpectedShared bool
+	// ExpectsNothing marks a file that is planted only so another control's file has something to
+	// resolve against. It asserts no finding of its own and is not evidence of anything.
+	//
+	// Declared explicitly rather than inferred from an empty Rule, because "asserts nothing" and
+	// "somebody forgot to say what this asserts" are different states that must not share a
+	// spelling. A control that quietly asserts nothing is a control that always passes, which is
+	// the failure this package exists to refuse.
+	ExpectsNothing bool
 }
 
 // Run executes both gates over the tree, plants any controls, and returns the compared report.
@@ -112,7 +136,13 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		return Report{}, err
 	}
 
-	verifyOutput, verifyErr := runGate(ctx, options.Verify)
+	verifyCommand, removeConfig, err := verifyCommandWithExtraRules(options)
+	defer removeConfig()
+	if err != nil {
+		return Report{}, err
+	}
+
+	verifyOutput, verifyErr := runGate(ctx, verifyCommand)
 	if verifyErr != nil {
 		return Report{}, fmt.Errorf("running verify: %w", verifyErr)
 	}
@@ -188,6 +218,14 @@ func checkControls(planted []Control, report Report, verifyFindings []Finding, g
 			Name:         control.Name,
 			ExpectedSide: control.ExpectedSide,
 			Rule:         control.Rule,
+		}
+
+		// A support file is planted, cleaned up, and never counted. It contributes no evidence, so
+		// it is dropped from the results entirely rather than recorded as a passing control: a
+		// result that always says "detected" would inflate the count of controls that fired and
+		// make a run look better proven than it is.
+		if control.ExpectsNothing {
+			continue
 		}
 
 		if control.ExpectedShared {
@@ -445,4 +483,77 @@ func missingDirectories(directory string, root string) ([]string, error) {
 		missing[left], missing[right] = missing[right], missing[left]
 	}
 	return missing, nil
+}
+
+// verifyCommandWithExtraRules gives verify a config carrying the extra rules, when there are any.
+//
+// The merged config is written beside the tree's own rather than over it, and removed afterward, so
+// the gate and every other process in this worktree keep reading the unmodified file. Editing the
+// real config in place would change what a sibling's `s c` does mid-run, which on a tree with
+// several authors is a defect rather than a shortcut.
+//
+// With no extra rules this returns the command untouched, so the ordinary path allocates nothing
+// and writes nothing.
+func verifyCommandWithExtraRules(options RunOptions) (GateCommand, func(), error) {
+	noCleanup := func() {}
+	if len(options.ExtraVerifyRuleSettings) == 0 {
+		return options.Verify, noCleanup, nil
+	}
+
+	configPath := filepath.Join(options.Root, ".oxlintrc.json")
+	existing, err := os.ReadFile(configPath)
+	if err != nil {
+		return options.Verify, noCleanup, fmt.Errorf("reading the lint config to extend it: %w", err)
+	}
+
+	var document map[string]any
+	if err := json.Unmarshal(existing, &document); err != nil {
+		return options.Verify, noCleanup, fmt.Errorf("parsing the lint config to extend it: %w", err)
+	}
+
+	rules, _ := document["rules"].(map[string]any)
+	if rules == nil {
+		rules = map[string]any{}
+	}
+	for name, setting := range options.ExtraVerifyRuleSettings {
+		// Refusing rather than overwriting. A rule the shared config already configures is one the
+		// gate may also run, so overriding it here would compare the two sides under different
+		// settings for a rule they both have, which is the asymmetry this must never introduce.
+		if _, alreadyConfigured := rules[name]; alreadyConfigured {
+			return options.Verify, noCleanup, fmt.Errorf(
+				"rule %q is already configured in the tree's lint config, so enabling it only for verify would compare the two gates under different settings",
+				name,
+			)
+		}
+		rules[name] = setting
+	}
+	document["rules"] = rules
+
+	extended, err := json.Marshal(document)
+	if err != nil {
+		return options.Verify, noCleanup, fmt.Errorf("encoding the extended lint config: %w", err)
+	}
+
+	// Beside the original, because the config's own directory is what relative ignore patterns and
+	// override globs resolve against. A config in a temporary directory elsewhere would silently
+	// change which files those patterns match.
+	extendedPath := filepath.Join(options.Root, ".oxlintrc.differential.json")
+	if _, err := os.Stat(extendedPath); err == nil {
+		return options.Verify, noCleanup, fmt.Errorf(
+			"%s already exists, so a differential run is in flight or one was interrupted; not overwriting it", extendedPath,
+		)
+	}
+	if err := os.WriteFile(extendedPath, extended, 0o644); err != nil {
+		return options.Verify, noCleanup, fmt.Errorf("writing the extended lint config: %w", err)
+	}
+
+	cleanup := func() {
+		if err := os.Remove(extendedPath); err != nil && !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "differential: could not remove %s: %v\n", extendedPath, err)
+		}
+	}
+
+	command := options.Verify
+	command.Arguments = append(append([]string{}, command.Arguments...), "-lint-config", ".oxlintrc.differential.json")
+	return command, cleanup, nil
 }

@@ -417,3 +417,43 @@ func TestStderrTailReportsOnlyWhatThereIs(t *testing.T) {
 		t.Fatalf("a long stderr must be trimmed from the front, got %q", tail)
 	}
 }
+
+// A support file contributes no evidence and must not be counted as a control that fired.
+//
+// The tempting implementation is to record it as detected, since nothing went wrong with it. That
+// would inflate the number of controls reported as firing and make a run look better proven than it
+// is, which is this package's own failure mode: a control that always passes is not a control.
+func TestASupportFileIsNotCountedAsAControl(t *testing.T) {
+	planted := []Control{
+		{Name: "real", RelativePath: "a.ts", Rule: "consistency-no-enum", ExpectedSide: SideVerify},
+		{Name: "support", RelativePath: "target/b.ts", ExpectsNothing: true},
+	}
+
+	results := checkControls(planted, Report{Differences: []Difference{{
+		Finding: Finding{File: "a.ts", Line: 1, Rule: "consistency-no-enum"},
+		OnlyOn:  SideVerify,
+	}}}, nil, nil)
+
+	if len(results) != 1 {
+		t.Fatalf("a support file must produce no control result at all, got %d results: %+v", len(results), results)
+	}
+	if results[0].Name != "real" {
+		t.Fatalf("the surviving result must be the real control, got %q", results[0].Name)
+	}
+
+	// And it must not be reachable as evidence: a run carrying only support files has proven
+	// nothing and must say so.
+	onlySupport := Provenance{
+		VerifyFilesLinted: 3407,
+		GateFilesLinted:   3407,
+		VerifyRulesRun:    23,
+		GateRulesRun:      159,
+		ControlsRun:       checkControls([]Control{planted[1]}, Report{}, nil, nil),
+	}
+	if onlySupport.ControlsProven() {
+		t.Fatal("a run whose only planted files were support files must not count as proven")
+	}
+	if trustworthy, _ := onlySupport.Trustworthy(); trustworthy {
+		t.Fatal("a run whose only planted files were support files must not be trustworthy")
+	}
+}

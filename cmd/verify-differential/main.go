@@ -48,17 +48,18 @@ func run() error {
 		return fmt.Errorf("loading the lint config: %w", err)
 	}
 
-	if err := checkControlsAreLintable(lintConfig, options.controls); err != nil {
+	if err := checkControlsAreLintable(lintConfig, options.controls, verifyOnlyRuleSettings(options.root)); err != nil {
 		return err
 	}
 
 	report, err := differential.Run(context.Background(), differential.RunOptions{
-		Root:            options.root,
-		Verify:          options.verifyCommand,
-		Gate:            options.gateCommand,
-		VerifyRules:     compiledRuleNames(),
-		ConfiguredRules: configuredRuleNames(lintConfig),
-		Controls:        options.controls,
+		Root:                    options.root,
+		Verify:                  options.verifyCommand,
+		Gate:                    options.gateCommand,
+		VerifyRules:             compiledRuleNames(),
+		ConfiguredRules:         configuredRuleNames(lintConfig),
+		Controls:                options.controls,
+		ExtraVerifyRuleSettings: verifyOnlyRuleSettings(options.root),
 	})
 	if err != nil {
 		return err
@@ -216,7 +217,103 @@ func defaultControls() []differential.Control {
 		// the claim being tested; expecting it one-sided would be testing a divergence that does
 		// not exist.
 		ExpectedShared: true,
+	}, {
+		// The verify-only control. Verified against the tree at 03:17 rather than assumed:
+		//
+		//   registry.go:52                 verify has import-require-path-alias compiled in
+		//   NexusLintConfiguration.ts:31   the ESLINT plugin defines it
+		//   OxlintNexusPlugin.mjs          the OXLINT plugin does not, at all
+		//   .oxlintrc.json                 no mention of the rule
+		//
+		// The gate we diff against runs oxlint, so it is structurally incapable of producing this
+		// finding, and no configuration change on that side can make it. That is what makes this a
+		// sturdy directional control rather than one resting on a defect somebody might repair: a
+		// control built on a bug stops discriminating the moment the bug is fixed.
+		//
+		// The rule needs its options, because the shared config does not enable it and verify runs
+		// an unconfigured rule over no files. It is marked Required in the registry, so an
+		// unconfigured run refuses loudly instead of coming back clean, and the harness cannot get
+		// a false pass from forgetting this.
+		Name:         "verify-only-path-alias",
+		RelativePath: filepath.Join("code-quality", "differential-control", "deep", "nested", "PlantedImport.ts"),
+		Contents: `// Planted by verify-differential to prove the harness can see a one-sided
+// difference. Removed automatically when the run finishes.
+import { PlantedTarget } from '../../target/PlantedTarget';
+
+export const PlantedUse = PlantedTarget;
+`,
+		Rule:         "import-require-path-alias",
+		ExpectedSide: differential.SideVerify,
+	}, {
+		// The target of the planted import. It exists so the import resolves and so the rule has an
+		// aliased directory to climb into; it carries no violation of its own and is expected to
+		// produce nothing, which is why it declares no Rule and no side.
+		Name:         "verify-only-path-alias-target",
+		RelativePath: filepath.Join("code-quality", "differential-control", "target", "PlantedTarget.ts"),
+		// PascalCase because it is exported: the tree's own constant-casing rule flags an exported
+		// camelCase constant, and a support file that trips a rule stops being support. The first
+		// version was `plantedTarget` and it produced a real finding of its own, which is exactly
+		// the measurement perturbation these files must not cause.
+		Contents:       "export const PlantedTarget = 'planted';\n",
+		ExpectsNothing: true,
+	}, {
+		// The gate-only control, and the mirror image of the verify-only one. Verified at 03:21
+		// rather than assumed:
+		//
+		//   registry.go             verify does not implement consistency-organize-imports at all
+		//   .oxlintrc.json          structure/consistency-organize-imports is enabled
+		//
+		// So the gate reports it and verify structurally cannot, for the same durable reason and in
+		// the opposite direction. Together the two controls exercise both sides, which is what
+		// ControlsProven has been waiting on all night.
+		//
+		// The violation is import ordering: a local import placed above a node: one, which the
+		// gate's rule flags and verify has no opinion about.
+		Name:         "gate-only-organize-imports",
+		RelativePath: filepath.Join("code-quality", "differential-control", "PlantedOrder.ts"),
+		Contents: `// Planted by verify-differential to prove the harness can see a one-sided
+// difference from the gate. Removed automatically when the run finishes.
+import { PlantedTarget } from './target/PlantedTarget';
+import * as NodePath from 'node:path';
+
+export const PlantedOrder = NodePath.join(PlantedTarget);
+`,
+		Rule:         "consistency-organize-imports",
+		ExpectedSide: differential.SideGate,
 	}}
+}
+
+// verifyOnlyRuleSettings enables, for verify's run alone, the rules the gate cannot express.
+//
+// Only rules absent from the gate's plugin belong here. A rule both sides implement must stay on
+// the shared config, because configuring it differently per side manufactures differences that say
+// nothing about either implementation. `Run` refuses a rule the tree's config already configures,
+// which is the mechanical version of that boundary rather than a comment asking for care.
+func verifyOnlyRuleSettings(root string) map[string]any {
+	// The alias is scoped to the control's own directory rather than to a real source root.
+	//
+	// A first version aliased `modules`, which is a real directory, and the rule fired 95 times
+	// across the tree. Every one of those was a true finding about code nobody has asked this rule
+	// to judge, and they drowned the single finding the control exists to produce. A control must
+	// perturb the measurement by exactly the one finding it plants; anything else is the
+	// instrument changing what it measures.
+	//
+	// Aliasing the control directory means the only relative import that can climb into an aliased
+	// directory is the one in the planted file.
+	return map[string]any{
+		"nexus/import-require-path-alias": []any{
+			"error",
+			map[string]any{
+				"repositoryRoot": root,
+				"aliases": []any{
+					map[string]any{
+						"directory": filepath.Join("code-quality", "differential-control"),
+						"alias":     "@differential-control",
+					},
+				},
+			},
+		},
+	}
 }
 
 // gateRunnerPath is the gate as it actually ships, run through its own cached runner rather than by
@@ -245,8 +342,25 @@ var defaultRoot = filepath.Join(os.Getenv("HOME"), "Projects", "ahra")
 //
 // The check runs before either gate is launched, so a misplaced control costs a second rather than
 // two full lint runs and a misleading verdict.
-func checkControlsAreLintable(lintConfig *config.Config, controls []differential.Control) error {
+func checkControlsAreLintable(lintConfig *config.Config, controls []differential.Control, extraVerifyRules map[string]any) error {
+	// The rules supplied to verify alone, reduced to bare names. A control naming one of these is
+	// enabled for verify's run even though the tree's own config says nothing about it, so the
+	// check below has to know about them or it rejects exactly the directional control it should
+	// be admitting. The ignore check still applies to them: an ignored path is ignored by both
+	// sides regardless of which config names the rule.
+	suppliedToVerify := map[string]bool{}
+	for name := range extraVerifyRules {
+		suppliedToVerify[differential.NormalizeRuleName(name)] = true
+	}
+
 	for _, control := range controls {
+		// A support file asserts no finding, so there is no rule to check it can fire. The ignore
+		// check below would also be meaningless for it: whether the tree lints it changes nothing
+		// about what it proves, which is nothing.
+		if control.ExpectsNothing {
+			continue
+		}
+
 		resolved := lintConfig.Resolve(filepath.Join(lintConfig.Root, control.RelativePath))
 
 		if resolved.Ignored {
@@ -259,7 +373,7 @@ func checkControlsAreLintable(lintConfig *config.Config, controls []differential
 		// The rule has to be enabled for that specific path, not merely present in the config: an
 		// override can scope a rule off for exactly the directory a control was written to, and
 		// that override is invisible from the base rule list.
-		if !resolved.Enabled(pluginQualified(lintConfig, control.Rule)) {
+		if !resolved.Enabled(pluginQualified(lintConfig, control.Rule)) && !suppliedToVerify[control.Rule] {
 			return fmt.Errorf(
 				"control %q expects rule %s to fire at %s, but the lint config does not enable it there, so the control would miss for a reason unrelated to the harness",
 				control.Name, control.Rule, control.RelativePath,

@@ -30,13 +30,13 @@ func TestAControlWhereItsRuleCannotFireIsRefused(t *testing.T) {
 		RelativePath: filepath.Join("linted", "Planted.ts"),
 		Rule:         "consistency-no-enum",
 	}
-	if err := checkControlsAreLintable(lintConfig, []differential.Control{lintable}); err != nil {
+	if err := checkControlsAreLintable(lintConfig, []differential.Control{lintable}, nil); err != nil {
 		t.Fatalf("a control on a linted path with an enabled rule must be accepted: %v", err)
 	}
 
 	ignoredPath := lintable
 	ignoredPath.RelativePath = filepath.Join("ignored-here", "Planted.ts")
-	err := checkControlsAreLintable(lintConfig, []differential.Control{ignoredPath})
+	err := checkControlsAreLintable(lintConfig, []differential.Control{ignoredPath}, nil)
 	if err == nil {
 		t.Fatal("a control on an ignored path must be refused: it would miss for a reason unrelated to the harness")
 	}
@@ -48,7 +48,7 @@ func TestAControlWhereItsRuleCannotFireIsRefused(t *testing.T) {
 
 	unconfiguredRule := lintable
 	unconfiguredRule.Rule = "import-require-path-alias"
-	err = checkControlsAreLintable(lintConfig, []differential.Control{unconfiguredRule})
+	err = checkControlsAreLintable(lintConfig, []differential.Control{unconfiguredRule}, nil)
 	if err == nil {
 		t.Fatal("a control naming a rule the config does not enable must be refused")
 	}
@@ -76,14 +76,14 @@ func TestAnOverrideThatScopesTheRuleOffIsCaught(t *testing.T) {
 		RelativePath: filepath.Join("generated", "Planted.ts"),
 		Rule:         "consistency-no-enum",
 	}
-	if err := checkControlsAreLintable(lintConfig, []differential.Control{control}); err == nil {
+	if err := checkControlsAreLintable(lintConfig, []differential.Control{control}, nil); err == nil {
 		t.Fatal("a control under an override that turns its rule off must be refused, even though the base config enables the rule")
 	}
 
 	// The same rule and the same config, outside the override's scope, must still be accepted.
 	elsewhere := control
 	elsewhere.RelativePath = filepath.Join("source", "Planted.ts")
-	if err := checkControlsAreLintable(lintConfig, []differential.Control{elsewhere}); err != nil {
+	if err := checkControlsAreLintable(lintConfig, []differential.Control{elsewhere}, nil); err != nil {
 		t.Fatalf("the override must not reject a control outside its scope: %v", err)
 	}
 }
