@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 var messageNoSeparateNamedExport = rule.Message{
@@ -93,7 +94,7 @@ func componentNamesDeclaredIn(sourceFile *ast.Node) map[string]bool {
 		switch statement.Kind {
 		case ast.KindFunctionDeclaration:
 			name := statement.AsFunctionDeclaration().Name()
-			if name != nil && IsLikelyComponentName(name.Text()) && HasJsxOrReactHookCalls(statement) {
+			if name != nil && react.IsLikelyComponentName(name.Text()) && HasJsxOrReactHookCalls(statement) {
 				declared[name.Text()] = true
 			}
 
@@ -105,7 +106,7 @@ func componentNamesDeclaredIn(sourceFile *ast.Node) map[string]bool {
 			for _, declarationNode := range declarationList.AsVariableDeclarationList().Declarations.Nodes {
 				declaration := declarationNode.AsVariableDeclaration()
 				name := declaration.Name()
-				if name == nil || name.Kind != ast.KindIdentifier || !IsLikelyComponentName(name.Text()) {
+				if name == nil || name.Kind != ast.KindIdentifier || !react.IsLikelyComponentName(name.Text()) {
 					continue
 				}
 				// The initializer is what has to look like a component, not the statement: a

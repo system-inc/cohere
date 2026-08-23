@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 var messageExtractPropertiesFirst = rule.Message{
@@ -149,7 +150,7 @@ func dependencyArrayArgument(call *ast.CallExpression, hookName string) *ast.Nod
 //
 // # The hook exclusion cannot fire, and it is kept anyway
 //
-// `IsLikelyComponentName` tests the first character for a capital and `IsHookName` tests for a
+// `react.IsLikelyComponentName` tests the first character for a capital and `react.IsHookName` tests for a
 // leading `use` followed by a capital, so the two are mutually exclusive: `useThing` starts with a
 // lowercase `u` and is rejected before the exclusion is consulted. Confirmed by evaluating both
 // predicates over the real names rather than by reading them, and the original has the same
@@ -167,7 +168,7 @@ func dependencyArrayArgument(call *ast.CallExpression, hookName string) *ast.Nod
 func isInsideComponent(node *ast.Node) bool {
 	for current := node.Parent; current != nil; current = current.Parent {
 		name := functionLikeName(current)
-		if name != "" && IsLikelyComponentName(name) && !IsHookName(name) {
+		if name != "" && react.IsLikelyComponentName(name) && !react.IsHookName(name) {
 			return true
 		}
 	}

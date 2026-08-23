@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 const propertiesTypeSuffixReasoning = "A component's property type is the one type a reader looks " +
@@ -108,7 +109,7 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				declaration := node.AsFunctionDeclaration()
 				name := declaration.Name()
-				if name == nil || !IsLikelyComponentName(name.Text()) {
+				if name == nil || !react.IsLikelyComponentName(name.Text()) {
 					return
 				}
 				checkParameterType(parameterNodes(declaration.Parameters))
@@ -117,7 +118,7 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				declaration := node.AsVariableDeclaration()
 				name := declaration.Name()
-				if name == nil || name.Kind != ast.KindIdentifier || !IsLikelyComponentName(name.Text()) {
+				if name == nil || name.Kind != ast.KindIdentifier || !react.IsLikelyComponentName(name.Text()) {
 					return
 				}
 				// The nil check has to precede SkipParentheses, which dereferences its argument.

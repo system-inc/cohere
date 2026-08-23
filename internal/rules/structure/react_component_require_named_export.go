@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 var messageComponentRequiresNamedExport = rule.Message{
@@ -126,7 +127,7 @@ func componentsDeclaredInFile(sourceFile *ast.Node) []declaredComponent {
 		case ast.KindFunctionDeclaration:
 			declaration := statement.AsFunctionDeclaration()
 			name := declaration.Name()
-			if name == nil || !IsLikelyComponentName(name.Text()) {
+			if name == nil || !react.IsLikelyComponentName(name.Text()) {
 				return false
 			}
 			// IsLikelyReactComponent rather than HasJsxOrReactHookCalls, and the difference is not
@@ -150,7 +151,7 @@ func componentsDeclaredInFile(sourceFile *ast.Node) []declaredComponent {
 			for _, declarationNode := range declarationList.AsVariableDeclarationList().Declarations.Nodes {
 				declaration := declarationNode.AsVariableDeclaration()
 				name := declaration.Name()
-				if name == nil || name.Kind != ast.KindIdentifier || !IsLikelyComponentName(name.Text()) {
+				if name == nil || name.Kind != ast.KindIdentifier || !react.IsLikelyComponentName(name.Text()) {
 					continue
 				}
 				if declaration.Initializer == nil {

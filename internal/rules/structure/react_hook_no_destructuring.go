@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 var messageNoDestructuringInHook = rule.Message{
@@ -75,7 +76,7 @@ var ReactHookNoDestructuring = rule.Rule{
 func isInsideCustomHook(node *ast.Node) bool {
 	for current := node.Parent; current != nil; current = current.Parent {
 		name := functionLikeName(current)
-		if name != "" && IsHookName(name) {
+		if name != "" && react.IsHookName(name) {
 			return true
 		}
 	}

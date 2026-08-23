@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 // ReactComponentNoMultiplePrimaryOptions tunes where the thresholds sit.
@@ -143,7 +144,7 @@ func collectComponents(sourceFile *ast.Node) []trackedComponent {
 				if isDefaultExported(statement) && HasJsxOrReactHookCalls(statement) {
 					add(statement)
 				}
-			} else if IsLikelyComponentName(name.Text()) && HasJsxOrReactHookCalls(statement) {
+			} else if react.IsLikelyComponentName(name.Text()) && HasJsxOrReactHookCalls(statement) {
 				add(statement)
 			}
 
@@ -163,7 +164,7 @@ func collectComponents(sourceFile *ast.Node) []trackedComponent {
 				if name == nil || name.Kind != ast.KindIdentifier {
 					continue
 				}
-				if !IsLikelyComponentName(name.Text()) {
+				if !react.IsLikelyComponentName(name.Text()) {
 					continue
 				}
 

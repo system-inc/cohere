@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 const destructuringReasoning = "Reading properties.name at each use keeps the origin of a value " +
@@ -87,7 +88,7 @@ var ReactComponentNoDestructuring = rule.Rule{
 
 		checkParameters := func(node *ast.Node, parameters []*ast.Node) {
 			name := functionLikeName(node)
-			if name == "" || !IsLikelyComponentName(name) {
+			if name == "" || !react.IsLikelyComponentName(name) {
 				return
 			}
 			if !HasJsxOrReactHookCalls(node) {
@@ -143,7 +144,7 @@ var ReactComponentNoDestructuring = rule.Rule{
 				}
 
 				containing := enclosingFunctionLike(node)
-				if containing == nil || !IsLikelyComponentName(functionLikeName(containing)) {
+				if containing == nil || !react.IsLikelyComponentName(functionLikeName(containing)) {
 					return
 				}
 

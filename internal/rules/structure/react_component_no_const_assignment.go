@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 // messageNoConstAssignment names the component and what to write instead.
@@ -94,7 +95,7 @@ var ReactComponentNoConstAssignment = rule.Rule{
 					if name == nil || name.Kind != ast.KindIdentifier {
 						continue
 					}
-					if !IsLikelyComponentName(name.Text()) {
+					if !react.IsLikelyComponentName(name.Text()) {
 						continue
 					}
 					initializer := declaration.Initializer

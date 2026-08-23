@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 var messageNoNamedImport = rule.Message{
@@ -51,7 +52,7 @@ var messageNoTypeReferenceWithoutPrefix = rule.Message{
 // with no import from react is somebody's own function and none of this rule's business.
 //
 // One asymmetry is preserved from the original and is worth naming, because it looks like a bug. The
-// call arm tests IsHookName ("use" plus an uppercase letter) while the type arm tests only a "use"
+// call arm tests react.IsHookName ("use" plus an uppercase letter) while the type arm tests only a "use"
 // prefix. They disagree on a name like `used`: called, it is not treated as a hook; used as a type,
 // it is not treated as a type either. Both arms therefore stay silent on it, which is the
 // conservative direction, and reproducing the two spellings keeps our findings equal to the gate's
@@ -117,7 +118,7 @@ var ReactImportNoDestructuring = rule.Rule{
 				// Only hooks. A destructured type or event-handler name is not something anyone
 				// calls, so testing every imported name here would report on nothing real while
 				// risking a finding on an unrelated call.
-				if importedFromReact[name] && IsHookName(name) {
+				if importedFromReact[name] && react.IsHookName(name) {
 					ctx.ReportNode(node, messageNoCallWithoutPrefix)
 				}
 			},
@@ -130,7 +131,7 @@ var ReactImportNoDestructuring = rule.Rule{
 				}
 				name := typeName.Text()
 
-				// The "use" prefix rather than IsHookName, matching the original. See the rule
+				// The "use" prefix rather than react.IsHookName, matching the original. See the rule
 				// comment: the two arms deliberately spell the hook test differently.
 				if importedFromReact[name] && !strings.HasPrefix(name, "use") {
 					ctx.ReportNode(node, messageNoTypeReferenceWithoutPrefix)

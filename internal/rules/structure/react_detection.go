@@ -1,10 +1,8 @@
 package structure
 
 import (
-	"strings"
-	"unicode"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 // React detection: does this function hold JSX or call a hook?
@@ -15,23 +13,6 @@ import (
 // (commit 02c720b). The lesson generalizes past that rule. An exemption the original gets free from
 // its AST has to be written down explicitly in ours, because the two ASTs disagree about what a JSX
 // name even is.
-
-// IsHookName reports the shape React's own linting recognizes as a hook: "use" followed by an
-// uppercase letter. A function named "used" or "user" is not a hook.
-func IsHookName(name string) bool {
-	if !strings.HasPrefix(name, "use") || len(name) == 3 {
-		return false
-	}
-	return unicode.IsUpper([]rune(name[3:])[0])
-}
-
-// IsLikelyComponentName reports a name starting with a capital, which is the whole test the rule
-// applies. JSX decides between a component and an intrinsic element by that letter, so the capital
-// is the author's claim that this is a component.
-func IsLikelyComponentName(name string) bool {
-	runes := []rune(name)
-	return len(runes) > 0 && unicode.IsUpper(runes[0])
-}
 
 // jsxWalkDepthLimit bounds the search, matching the original's limit of 20.
 //
@@ -130,7 +111,7 @@ func isHookCall(call *ast.CallExpression) bool {
 
 	switch call.Expression.Kind {
 	case ast.KindIdentifier:
-		return IsHookName(call.Expression.Text())
+		return react.IsHookName(call.Expression.Text())
 
 	case ast.KindPropertyAccessExpression:
 		access := call.Expression.AsPropertyAccessExpression()
@@ -141,7 +122,7 @@ func isHookCall(call *ast.CallExpression) bool {
 			return false
 		}
 		name := access.Name()
-		return name != nil && IsHookName(name.Text())
+		return name != nil && react.IsHookName(name.Text())
 	}
 	return false
 }
