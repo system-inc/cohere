@@ -243,3 +243,15 @@ func attributingListener(
 		}
 	}
 }
+
+// SetForTest populates one rule's measured cost, for tests that need a known table without running
+// a program. Not used outside tests.
+func (t *Timings) SetForTest(name string, cost time.Duration, nodesOffered int) {
+	timing := t.forRule(name)
+	if timing == nil {
+		return
+	}
+	timing.ListenerDuration = cost
+	timing.NodesOffered = nodesOffered
+	timing.FilesListened = 1
+}

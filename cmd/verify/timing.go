@@ -138,14 +138,61 @@ func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
 			byOffered[timing.NodesOffered] = append(byOffered[timing.NodesOffered], timing.Name)
 		}
 	}
-	for offered, names := range byOffered {
-		if len(names) < 3 {
+	// A pair counts, not just three or more. The defect that motivated this note was found on a
+	// pair: two rules offered exactly 3,407 nodes and differing 83x in cost, where one had filled a
+	// shared cache the other read for free. Requiring three would have missed it.
+	//
+	// The cost spread is what makes it worth printing. Rules registered for the same kind and
+	// costing about the same are unremarkable; the same rules an order of magnitude apart mean one
+	// of them is carrying work the others are not.
+	offeredCounts := make([]int, 0, len(byOffered))
+	for offered := range byOffered {
+		offeredCounts = append(offeredCounts, offered)
+	}
+	sort.Ints(offeredCounts)
+
+	for _, offered := range offeredCounts {
+		names := byOffered[offered]
+		if len(names) < 2 {
 			continue
 		}
+
+		cheapest, dearest := costRange(sorted, names)
+		if cheapest <= 0 || float64(dearest)/float64(cheapest) < 10 {
+			continue
+		}
+
 		fmt.Fprintf(out,
-			"  note: %d rules were each offered exactly %d nodes (%v) — they registered for the same kinds and may be redoing each other's work\n",
-			len(names), offered, names)
+			"  note: %s and %s were each offered %d nodes but differ %.0fx in cost (%s against %s) — if they share work, this table may be billing it to whichever ran first\n",
+			names[0], names[len(names)-1], offered,
+			float64(dearest)/float64(cheapest),
+			formatMilliseconds(dearest), formatMilliseconds(cheapest))
 	}
+}
+
+// costRange returns the cheapest and dearest total among the named rules.
+//
+// Reported as a spread rather than a total because the spread is the signal: equal node counts with
+// equal cost is a coincidence, and equal node counts an order of magnitude apart is a rule carrying
+// somebody else's work.
+func costRange(sorted []program.RuleTiming, names []string) (cheapest, dearest time.Duration) {
+	named := map[string]bool{}
+	for _, name := range names {
+		named[name] = true
+	}
+	for _, timing := range sorted {
+		if !named[timing.Name] {
+			continue
+		}
+		total := timing.TotalDuration()
+		if cheapest == 0 || total < cheapest {
+			cheapest = total
+		}
+		if total > dearest {
+			dearest = total
+		}
+	}
+	return cheapest, dearest
 }
 
 // formatMilliseconds reads at a glance, which is the resolution any of these numbers means anything
