@@ -22,6 +22,9 @@ func All() []rule.Rule {
 		nexus.BoundaryNoNexusOutsideImport,
 		nexus.BoundaryNoProjectImport,
 		nexus.ConsistencyNoEnum,
+		nexus.ConsistencyNoLongLineComment,
+		nexus.ConsistencyNoShouting,
+		nexus.ConsistencyNoSingleLineJsDoc,
 		nexus.ConsistencyNoUtilsFolder,
 		nexus.ImportRequireNodeNamespace,
 	}

@@ -1,0 +1,251 @@
+package nexus
+
+import (
+	"regexp"
+	"strings"
+)
+
+// What counts as shouting, in one place.
+//
+// All-caps reads as aggression, and it spreads: a reader mirrors the register of what they are
+// answering, so one shouted line ratchets a whole file's comments into block capitals. In a codebase
+// written largely by minds that read their own prose back as context, the volume compounds.
+//
+// The discriminator is shape, and it was bought with a corpus survey rather than guessed. A naive
+// "is it uppercase" test cannot separate shouted English from an acronym, and real prose is full of
+// both: the measured corpus put NOT, THE, IS, AND, ONE right beside SDK, API, DB, and RPC. An
+// acronym is usually a consonant cluster, or carries digits or underscores; a shouted word almost
+// always has a vowel and is a real word. Vowel-plus-allowlist was right across the whole corpus.
+//
+// Backticks are the escape hatch, and they are what keeps the allowlist small: anything that is code
+// wears backticks, and inside them nothing is read as shouting.
+
+// allowedUppercaseTokens are acronyms, identifiers, and protocol names that are legitimately
+// uppercase and must never read as shouting. A token here is always allowed, whatever its shape.
+//
+// Ported from the TypeScript original, which earned each entry against a live corpus. The list is
+// long on purpose: every entry is a word this codebase actually speaks, and a missing one shows up
+// as a false positive that teaches people to disable the rule.
+var allowedUppercaseTokens = map[string]bool{
+	"AAB": true, "AAC": true, "ACH": true, "ACID": true, "AES": true, "AI": true, "AKA": true, "ANN": true,
+	"ANSI": true, "AOV": true, "API": true, "APK": true, "APNS": true, "ARIA": true, "ARN": true,
+	"ARR": true, "ASAP": true, "ASCII": true, "ASIN": true, "ASN": true, "AST": true, "AVI": true,
+	"AVIF": true, "AWS": true, "B2B": true, "BCP": true, "BEL": true, "BEM": true, "BOM": true, "BTC": true,
+	"CAC": true, "CAPI": true, "CCPA": true, "CD": true, "CDN": true, "CDT": true, "CFA": true, "CFO": true,
+	"CGI": true, "CHIPS": true, "CI": true, "CJS": true, "CLI": true, "CMYK": true, "COA": true,
+	"COGS": true, "CORS": true, "CPA": true, "CPM": true, "CPU": true, "CRUD": true, "CSS": true,
+	"CST": true, "CSV": true, "CTA": true, "CTE": true, "CTR": true, "CUSIP": true, "DB": true, "DEL": true,
+	"DER": true, "DKIM": true, "DM": true, "DNA": true, "DNS": true, "DOM": true, "DOS": true, "DRY": true,
+	"DSHEA": true, "DTO": true, "EBML": true, "EBU": true, "ECDH": true, "ECDSA": true, "ECE": true,
+	"ECMA": true, "EDT": true, "EIN": true, "EKG": true, "ENV": true, "EOD": true, "EOF": true, "EOL": true,
+	"ESC": true, "ESM": true, "EST": true, "ETA": true, "ETH": true, "EXIF": true, "FAQ": true,
+	"FBAN": true, "FCM": true, "FDA": true, "FFE": true, "FICA": true, "FIFO": true, "FIXME": true,
+	"FK": true, "FSA": true, "FSI": true, "FTC": true, "FTP": true, "FYI": true, "GA4": true, "GAQL": true,
+	"GCLID": true, "GDPR": true, "GIF": true, "GIT": true, "GPU": true, "GUI": true, "GUID": true,
+	"HAST": true, "HEIC": true, "HEIF": true, "HEVC": true, "HEX": true, "HIPAA": true, "HMAC": true,
+	"HSA": true, "HSLA": true, "HTML": true, "HTTP": true, "HTTPS": true, "IAM": true, "IANA": true,
+	"IAP": true, "ICO": true, "ICU": true, "IDE": true, "IDFA": true, "IDK": true, "IEC": true,
+	"IEEE": true, "IETF": true, "IFD": true, "IIFE": true, "IP": true, "IPA": true, "IPC": true,
+	"IRA": true, "ISIN": true, "ISO": true, "JFIF": true, "JIT": true, "JPEG": true, "JPG": true,
+	"JS": true, "JSON": true, "JSONC": true, "JSONL": true, "JSX": true, "JWT": true, "KPI": true,
+	"LIFO": true, "LLM": true, "LRE": true, "LRI": true, "LRM": true, "LRO": true, "LTV": true,
+	"LUFS": true, "MDAST": true, "MDT": true, "MIME": true, "MIT": true, "MKV": true, "ML": true,
+	"MOV": true, "MPEG": true, "MRR": true, "MST": true, "MTD": true, "MVP": true, "NA": true,
+	"NAICS": true, "NANP": true, "NDJSON": true, "NET": true, "NOTE": true, "NPM": true, "NUL": true,
+	"OAUTH": true, "OCR": true, "OCSP": true, "OFX": true, "OGG": true, "OIDC": true, "OK": true,
+	"OKLCH": true, "ONNX": true, "OOM": true, "ORM": true, "OS": true, "OTA": true, "OTP": true,
+	"PDF": true, "PDI": true, "PDT": true, "PEM": true, "PHP": true, "PI": true, "PID": true, "PII": true,
+	"PK": true, "PKCE": true, "PNG": true, "PNPM": true, "POSIX": true, "PR": true, "PST": true,
+	"PTY": true, "QA": true, "QTD": true, "R2": true, "RAM": true, "REPL": true, "REST": true, "RGBA": true,
+	"RIFF": true, "RLE": true, "RLI": true, "RLM": true, "RLO": true, "ROAS": true, "ROI": true,
+	"RPC": true, "RSA": true, "S3": true, "SAAS": true, "SAFE": true, "SDK": true, "SEO": true, "SES": true,
+	"SGR": true, "SHA": true, "SID": true, "SKU": true, "SLA": true, "SNS": true, "SOI": true, "SPA": true,
+	"SPKI": true, "SQL": true, "SRE": true, "SSD": true, "SSE": true, "SSH": true, "SSL": true, "SSN": true,
+	"SSO": true, "STS": true, "SVG": true, "TIFF": true, "TL": true, "TLS": true, "TODO": true,
+	"TOML": true, "TS": true, "TSX": true, "TTL": true, "TTY": true, "UDID": true, "UGC": true, "UI": true,
+	"UPC": true, "UPS": true, "URI": true, "URL": true, "URN": true, "US": true, "USPS": true, "UTC": true,
+	"UTF": true, "UTM": true, "UUID": true, "UX": true, "VINT": true, "WAL": true, "WASM": true,
+	"WCAG": true, "WEBM": true, "WEBP": true, "WEBVTT": true, "WIP": true, "XML": true, "YAML": true,
+	"YTD": true, "YUV": true, "YYYY": true,
+}
+
+// currencyCodes are ISO 4217 codes, which a sentence names the way it names a protocol: "amounts in
+// KRW have no minor unit" is prose about a currency, not a raised voice.
+//
+// In the original these are read from the live currency table rather than retyped, because two lists
+// of the same facts drift. That drift is not hypothetical: a parenthetical once read
+// "(BIF, DJF, GNF, KMF, RWF, VUV, XPF)" with only some codes backticked, because only the
+// vowel-bearing ones tripped the heuristic. Here they are a generated copy of that table, which is
+// the same bet with a different failure mode: it cannot drift within a sentence, but it can go stale
+// against the source. Regenerate rather than hand-edit.
+var currencyCodes = map[string]bool{
+	"AED": true, "ALL": true, "AMD": true, "AOA": true, "ARS": true, "AUD": true, "AZN": true, "BAM": true,
+	"BDT": true, "BIF": true, "BOB": true, "BRL": true, "CAD": true, "CHF": true, "CLP": true, "CNY": true,
+	"COP": true, "CRC": true, "CZK": true, "DJF": true, "DKK": true, "DOP": true, "DZD": true, "EGP": true,
+	"ETB": true, "EUR": true, "GBP": true, "GEL": true, "GNF": true, "GTQ": true, "HKD": true, "HUF": true,
+	"IDR": true, "ILS": true, "INR": true, "JPY": true, "KES": true, "KHR": true, "KMF": true, "KRW": true,
+	"KZT": true, "LBP": true, "LKR": true, "MAD": true, "MDL": true, "MGA": true, "MKD": true, "MMK": true,
+	"MXN": true, "MYR": true, "NGN": true, "NOK": true, "NPR": true, "NZD": true, "PEN": true, "PHP": true,
+	"PKR": true, "PLN": true, "PYG": true, "QAR": true, "RON": true, "RSD": true, "RUB": true, "RWF": true,
+	"SAR": true, "SEK": true, "SGD": true, "THB": true, "TRY": true, "TTD": true, "TWD": true, "TZS": true,
+	"UAH": true, "UGX": true, "USD": true, "UYU": true, "UZS": true, "VND": true, "VUV": true, "XAF": true,
+	"XOF": true, "XPF": true, "YER": true, "ZAR": true,
+}
+
+// shoutedTwoLetterWords are two-letter words that are shouting when capitalized.
+//
+// At two characters the vowel test cannot help, since IS and IP have the same shape. So the short
+// words are named, and every other two-letter token is assumed to be an abbreviation.
+var shoutedTwoLetterWords = map[string]bool{
+	"AM": true, "AN": true, "AS": true, "AT": true, "BE": true, "BY": true, "DO": true, "GO": true,
+	"HE": true, "IF": true, "IN": true, "IS": true, "IT": true, "ME": true, "MY": true, "NO": true,
+	"OF": true, "ON": true, "OR": true, "SO": true, "TO": true, "UP": true, "US": true, "WE": true,
+}
+
+var (
+	digitOrUnderscore = regexp.MustCompile(`[0-9_]`)
+	vowel             = regexp.MustCompile(`[AEIOUY]`)
+	uppercaseToken    = regexp.MustCompile(`\b[A-Z][A-Z0-9_]*\b`)
+)
+
+// isShoutedToken reports whether an uppercase token is shouting rather than an acronym.
+func isShoutedToken(token string) bool {
+	if allowedUppercaseTokens[token] || currencyCodes[token] {
+		return false
+	}
+	// Digits or underscores mean an identifier, never a shout: C1, H3, DATABASE_URL.
+	if digitOrUnderscore.MatchString(token) {
+		return false
+	}
+	if len(token) < 2 {
+		return false
+	}
+	if len(token) == 2 {
+		return shoutedTwoLetterWords[token]
+	}
+	// A vowel is the tell of a pronounceable word; a consonant cluster is an acronym.
+	return vowel.MatchString(token)
+}
+
+var (
+	// A fence spans lines, so its newlines are preserved rather than collapsed.
+	fencedBlock = regexp.MustCompile("(?s)```.*?```")
+
+	// Inline backticks, including a pair that wraps across a line. A block comment reflows, so a
+	// long snippet often ends up split with the continuation behind an asterisk gutter. Matching a
+	// single line would leave that pair unmasked and read the code inside it as shouting, which is
+	// the opposite of what backticks are for.
+	inlineBackticks = regexp.MustCompile("`[^`]*`")
+
+	// Quoted strings, for the same reason backticks are masked: a quote marks the text inside it as
+	// a literal rather than as the writer's voice. Prose about strings needs to show them, and a
+	// sentence discussing "ORDER STATUS" is about a value, not shouting it.
+	doubleQuoted = regexp.MustCompile(`"[^"\n]*"`)
+
+	// Single-quoted tokens, deliberately narrower than the double-quote rule, because an apostrophe
+	// is the same character as an opening single quote and prose is full of them. A naive pair-match
+	// would start at a possessive and swallow the rest of the sentence, blinding the rule to
+	// whatever followed. So only a pair that looks like a token is masked: no spaces inside.
+	singleQuotedToken = regexp.MustCompile(`'[A-Za-z0-9_.\-/]+'`)
+
+	notNewline  = regexp.MustCompile(`[^\n]`)
+	jsDocGutter = regexp.MustCompile(`^\s*\*?\s?`)
+	exampleTag  = regexp.MustCompile(`^@example\b`)
+	anyJsDocTag = regexp.MustCompile(`^@\w+`)
+	commandLine = regexp.MustCompile(`^\s*(\$|ahra\s|git\s|pnpm\s|npm\s|sqlite3\s|curl\s|s\s+c\b)`)
+)
+
+// maskCodeAndCommands blanks out anything that is code, so nothing inside it is ever read as
+// shouting: fenced blocks, inline backticks, quoted strings, JSDoc examples, and command lines.
+//
+// Replacing with spaces rather than deleting preserves every offset, so a caller reporting positions
+// keeps true line and column numbers. Newlines are preserved for the same reason: collapsing a
+// fence's newlines to spaces keeps character offsets right but destroys the line count, and every
+// line after the fence then reports against the wrong source line.
+func maskCodeAndCommands(text string) string {
+	masked := blankKeepingNewlines(fencedBlock, text)
+	masked = blankKeepingNewlines(inlineBackticks, masked)
+	masked = blankAll(doubleQuoted, masked)
+	masked = blankAll(singleQuotedToken, masked)
+	masked = maskJsDocExamples(masked)
+	masked = maskCommandLines(masked)
+	return masked
+}
+
+// blankKeepingNewlines replaces every match with spaces, leaving its newlines in place.
+func blankKeepingNewlines(pattern *regexp.Regexp, text string) string {
+	return pattern.ReplaceAllStringFunc(text, func(match string) string {
+		return notNewline.ReplaceAllString(match, " ")
+	})
+}
+
+// blankAll replaces every match with spaces of the same length. Used only for single-line patterns,
+// where there is no newline to preserve.
+func blankAll(pattern *regexp.Regexp, text string) string {
+	return pattern.ReplaceAllStringFunc(text, func(match string) string {
+		return strings.Repeat(" ", len(match))
+	})
+}
+
+// maskJsDocExamples blanks the lines under an @example tag, which are code whatever they look like.
+//
+// The lines under it are a call and its result, written the way a reader would type them, so
+// hour24To12(0) with a comment showing 'AM' is a snippet rather than someone shouting. Backticking
+// inside an example is the wrong repair too: the whole block is already code by context. The block
+// runs from the tag to the next tag or the end of the comment, which is how JSDoc delimits it.
+func maskJsDocExamples(text string) string {
+	lines := strings.Split(text, "\n")
+	insideExample := false
+	for index, line := range lines {
+		withoutGutter := jsDocGutter.ReplaceAllString(line, "")
+
+		if exampleTag.MatchString(withoutGutter) {
+			insideExample = true
+			lines[index] = strings.Repeat(" ", len(line))
+			continue
+		}
+		// Any other JSDoc tag closes the example.
+		if insideExample && anyJsDocTag.MatchString(withoutGutter) {
+			insideExample = false
+		}
+		if insideExample {
+			lines[index] = strings.Repeat(" ", len(line))
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// maskCommandLines blanks a line that is plainly a command the reader is meant to run.
+func maskCommandLines(text string) string {
+	lines := strings.Split(text, "\n")
+	for index, line := range lines {
+		// The gutter is stripped before matching, which the TypeScript original does not do. Its
+		// pattern anchors at the start of the line, so a command inside a block comment sits behind
+		// a " * " gutter and never matches, and the rule reads the command as prose. The
+		// example-block masker in this same file already strips the gutter for exactly this reason,
+		// so this follows that convention rather than inventing one.
+		if commandLine.MatchString(jsDocGutter.ReplaceAllString(line, "")) {
+			lines[index] = strings.Repeat(" ", len(line))
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// shoutedTokensIn returns the distinct shouted tokens in a comment body, in first-seen order.
+//
+// The body is masked first, so code is invisible. Order is first-seen rather than sorted because a
+// reader looking for what to fix scans the comment top to bottom.
+func shoutedTokensIn(body string) []string {
+	masked := maskCodeAndCommands(body)
+
+	var tokens []string
+	seen := map[string]bool{}
+	for _, token := range uppercaseToken.FindAllString(masked, -1) {
+		if seen[token] || !isShoutedToken(token) {
+			continue
+		}
+		seen[token] = true
+		tokens = append(tokens, token)
+	}
+	return tokens
+}
