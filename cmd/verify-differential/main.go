@@ -20,6 +20,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -62,12 +63,17 @@ func run() error {
 		return err
 	}
 
+	inventoryRules, err := inventoryRuleNames(options.inventoryPath)
+	if err != nil {
+		return err
+	}
+
 	report, err := differential.Run(context.Background(), differential.RunOptions{
 		Root:                    options.root,
 		Verify:                  options.verifyCommand,
 		Gate:                    options.gateCommand,
 		VerifyRules:             verifyRules,
-		ConfiguredRules:         configuredRuleNames(lintConfig),
+		ConfiguredRules:         configuredRuleNames(lintConfig, inventoryRules),
 		Controls:                options.controls,
 		ExtraVerifyRuleSettings: verifyOnlyRuleSettings(options.root),
 	})
@@ -104,31 +110,60 @@ const ruleListProbeFile = "modules/mcp/McpApi.ts"
 //
 // Rules set to off are excluded rather than counted, because a rule the config turned off ran over
 // no files, which is exactly what not-configured means.
-func configuredRuleNames(lintConfig *config.Config) map[string]bool {
+//
+// **The rules block is not the whole config.** Forty rules are enforced by the `plugins` declarations
+// and named in no rules block, proven with planted violations rather than read from a file. Reading
+// only `lintConfig.Rules` therefore reported a denominator of 159 when the real one is 214, and it
+// did so in the summary line a reader uses to decide whether verify is safe to trust yet.
+//
+// That is worse here than the same defect was in the inventory. An understated inventory made parity
+// read further along than it was; an understated denominator here makes a clean result mean less than
+// it claims, in the one harness the whole migration is judged on.
+//
+// So the inventory is consulted for what it knows and the config for what it knows, and the union is
+// the answer. `TestParityAgainstInventory` derives its denominator from the same file, which is the
+// point rather than a convenience: two instruments disagreeing about how many rules exist is how one
+// of them ends up quietly wrong.
+func configuredRuleNames(lintConfig *config.Config, inventoryRules []string) map[string]bool {
 	names := map[string]bool{}
+	for _, name := range inventoryRules {
+		names[differential.NormalizeRuleName(name)] = true
+	}
 	for name, setting := range lintConfig.Rules {
+		normalized := differential.NormalizeRuleName(name)
 		if setting.Severity == config.SeverityOff {
+			// An explicit off wins over the inventory's record of the rule existing. The inventory
+			// says what the two tools can enforce; the config says what this tree asked for, and a
+			// rule turned off here ran over no files no matter what any catalog knows about it.
+			delete(names, normalized)
 			continue
 		}
-		names[differential.NormalizeRuleName(name)] = true
+		names[normalized] = true
 	}
 	return names
 }
 
 type arguments struct {
 	root          string
+	inventoryPath string
 	verifyCommand differential.GateCommand
 	gateCommand   differential.GateCommand
 	controls      []differential.Control
 }
 
 func parseArguments(rest []string) (arguments, error) {
-	parsed := arguments{root: defaultRoot}
+	parsed := arguments{root: defaultRoot, inventoryPath: defaultInventoryPath}
 	verifyBinary := "verify"
 	plantControls := true
 
 	for index := 0; index < len(rest); index++ {
 		switch rest[index] {
+		case "-inventory", "--inventory":
+			index++
+			if index >= len(rest) {
+				return arguments{}, fmt.Errorf("-inventory needs a path to rule-inventory.json")
+			}
+			parsed.inventoryPath = rest[index]
 		case "-root", "--root":
 			if index+1 >= len(rest) {
 				return parsed, fmt.Errorf("-root needs a directory")
@@ -357,6 +392,14 @@ var gateRunnerPath = filepath.Join(
 // defaultRoot is the tree this instrument was commissioned to measure.
 var defaultRoot = filepath.Join(os.Getenv("HOME"), "Projects", "ahra")
 
+// defaultInventoryPath is where the rule inventory lives in the verify source tree.
+//
+// It records what the two tools enforce rather than anything about a particular consumer, so it sits
+// beside the source rather than in the tree under test. Hardcoded for the same reason `defaultRoot`
+// is: this instrument was commissioned to measure one migration, and a path that has to be supplied
+// on every invocation is a path someone eventually supplies wrong.
+var defaultInventoryPath = filepath.Join(os.Getenv("HOME"), "Projects", "system", "verify", "rule-inventory.json")
+
 // checkControlsAreLintable refuses to run when a control was placed where its rule cannot fire.
 //
 // A control exists to prove the harness can see a difference, so a control that misses is supposed
@@ -432,4 +475,35 @@ func pluginQualified(lintConfig *config.Config, bareRuleName string) string {
 		}
 	}
 	return bareRuleName
+}
+
+// inventoryRuleNames reads every rule the inventory records, or reports why it cannot.
+//
+// A missing or unreadable inventory is a hard failure rather than a fallback to the config alone.
+// Falling back would produce a report that looks identical to a correct one while quietly understating
+// its own scope by 55 rules, and a harness that cannot state what it compared should refuse rather
+// than guess. That is the same rule this whole tool applies to a linter that cannot find its binary.
+func inventoryRuleNames(path string) ([]string, error) {
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s, which states how many rules the two tools enforce: %w", path, err)
+	}
+
+	var document struct {
+		Rules []struct {
+			Rule string `json:"rule"`
+		} `json:"rules"`
+	}
+	if err := json.Unmarshal(contents, &document); err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", path, err)
+	}
+	if len(document.Rules) == 0 {
+		return nil, fmt.Errorf("%s parsed to zero rules, so the denominator would be the config alone", path)
+	}
+
+	names := make([]string, 0, len(document.Rules))
+	for _, entry := range document.Rules {
+		names = append(names, entry.Rule)
+	}
+	return names, nil
 }

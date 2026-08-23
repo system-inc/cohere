@@ -87,14 +87,26 @@ func NormalizeRuleName(raw string) string {
 	// surface. It reached a live run and showed up as one wrong word in a table.
 	//
 	// The two are told apart by shape rather than by a plugin list, so a new plugin needs no edit
-	// here: rule names in both catalogs are hyphenated and message ids are camelCase, so a segment
-	// containing a hyphen is a rule name and one without is not.
+	// here: rule names in both catalogs are hyphenated and message ids are camelCase.
+	//
+	// **A hyphen in the first segment is not enough**, and the one plugin that proves it is
+	// `better-tailwindcss`. Its name is hyphenated, so `better-tailwindcss/no-duplicate-classes`
+	// collapsed to `better-tailwindcss` and all eight of its rules became one entry. That is the
+	// exact failure this comment describes one paragraph above, surviving the fix that was written
+	// for it: every tailwind rule read as unconfigured, so a genuine disagreement in that family
+	// would have been excused as not-configured rather than surfaced.
+	//
+	// The distinguishing shape is the second segment rather than the first. A message id is
+	// camelCase and therefore never hyphenated, so a hyphen *after* the slash means the config's
+	// `plugin/rule-name` form and the name is after; anything else is verify's `rule-name/messageId`
+	// form and the name is before. That reading is correct for both plugins whose names contain a
+	// hyphen and plugins whose names do not.
 	if slash := strings.IndexByte(name, '/'); slash >= 0 {
 		before, after := name[:slash], name[slash+1:]
-		if strings.Contains(before, "-") {
-			name = before
-		} else {
+		if strings.Contains(after, "-") {
 			name = after
+		} else {
+			name = before
 		}
 	}
 
