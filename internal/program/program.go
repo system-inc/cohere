@@ -59,6 +59,10 @@ type Graph struct {
 	// permissive default is reachable only from a caller that chose it deliberately.
 	LintConfig *config.Config
 
+	// RuleOptions says how to decode each rule's configuration, and which rules cannot run without
+	// it. Empty means no rule takes options, which is what a test that did not set one expects.
+	RuleOptions config.OptionsRegistry
+
 	// checkerCount is how many checkers the program built, and therefore the most files that can be
 	// checked at once. The compiler keeps this private, so we record what we asked for.
 	checkerCount int

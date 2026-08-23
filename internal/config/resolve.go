@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"strings"
 )
@@ -20,23 +21,60 @@ type Resolved struct {
 
 // Enabled reports whether a rule runs on this file.
 func (r Resolved) Enabled(ruleName string) bool {
+	status, _ := r.StatusOf(ruleName)
+	return status == StatusEnabled
+}
+
+// Status is why a rule did or did not run on a file.
+type Status int
+
+const (
+	// StatusEnabled means the rule runs.
+	StatusEnabled Status = iota
+
+	// StatusScopedOff means the config configures this rule and turned it off, whether at the base
+	// level or through an override. Someone decided this.
+	StatusScopedOff
+
+	// StatusUnconfigured means the config never mentions the rule at all. Nobody decided anything;
+	// the rule was added to the registry and no one has said whether it should run.
+	//
+	// This is a different fact from StatusScopedOff and reporting them as one is a lie. A rule
+	// nobody has configured is a rule waiting on a decision, and it should read that way rather
+	// than as a deliberate exclusion.
+	StatusUnconfigured
+
+	// StatusFileIgnored means no rule runs on this file.
+	StatusFileIgnored
+)
+
+// StatusOf reports why a rule runs or does not, and its setting when it has one.
+func (r Resolved) StatusOf(ruleName string) (Status, RuleSetting) {
 	if r.Ignored {
-		return false
+		return StatusFileIgnored, RuleSetting{}
 	}
 	setting, configured := r.settingFor(ruleName)
 	if !configured {
-		// A rule the config never mentions is not enabled. Defaulting the other way would mean adding
-		// a rule to the registry silently turns it on across the whole tree, which is a decision that
-		// belongs in the config rather than in a Go file.
-		return false
+		// A rule the config never mentions does not run. Defaulting the other way would mean adding
+		// a rule to the registry silently turns it on across the whole tree, which is a decision
+		// that belongs in the config rather than in a Go file.
+		return StatusUnconfigured, RuleSetting{}
 	}
-	return setting.Severity != SeverityOff
+	if setting.Severity == SeverityOff {
+		return StatusScopedOff, setting
+	}
+	return StatusEnabled, setting
 }
 
-// OptionsFor returns a rule's options for this file, or nil.
-func (r Resolved) OptionsFor(ruleName string) any {
+// RawOptionsFor returns a rule's configured options as JSON, or nil when it has none.
+//
+// Raw rather than decoded, because only the rule's own package knows the struct its options should
+// become. The registry pairs each rule with a decoder; this returns the bytes that decoder reads.
+// Handing a rule this JSON directly would fail its type assertion and make it decline every file,
+// which is the inert-rule defect wearing a different hat.
+func (r Resolved) RawOptionsFor(ruleName string) json.RawMessage {
 	setting, configured := r.settingFor(ruleName)
-	if !configured || len(setting.Options) == 0 {
+	if !configured {
 		return nil
 	}
 	return setting.Options

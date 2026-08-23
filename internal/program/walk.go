@@ -70,12 +70,21 @@ type Coverage struct {
 	// never having looked.
 	FilesIgnored int
 
-	// RulesScopedOff counts, per rule name, how many files an override turned that rule off for.
+	// RulesScopedOff counts, per rule name, how many files the config turned that rule off for.
 	//
 	// This is the narrower half of the same accounting. A rule can be enabled in the config, run on
 	// the tree, and still be silent across a whole directory because an override scoped it off
 	// there. Without this number that looks identical to a rule with nothing to report.
 	RulesScopedOff map[string]int
+
+	// RulesUnconfigured counts, per rule name, how many files a rule skipped because the config
+	// never mentions it.
+	//
+	// Deliberately separate from RulesScopedOff. "Someone turned this off" and "nobody has said
+	// whether this should run" are different facts, and a registered rule missing from the config
+	// is a decision waiting to be made rather than one already made. Reporting them as one number
+	// would describe a new rule as though someone had excluded it.
+	RulesUnconfigured map[string]int
 }
 
 // Result is the findings of one walk, and the coverage that produced them.
@@ -111,6 +120,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	suppressed := suppressionTally{}
 	filesIgnored := 0
 	scopedOff := map[string]int{}
+	unconfigured := map[string]int{}
+	configFailures := []error{}
 
 	// Files are handed out by index stride rather than by a queue: the compiler assigns a file to a
 	// checker by its position in the program's file list, so striding keeps each worker mostly on one
@@ -127,13 +138,22 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			localSuppressed := suppressionTally{}
 			localIgnored := 0
 			localScopedOff := map[string]int{}
+			localUnconfigured := map[string]int{}
+			localFailures := []error{}
 
 			for index := worker; index < len(files); index += workers {
 				sourceFile := files[index]
 
 				// Configuration is consulted before a checker is acquired, because an ignored file
 				// should cost nothing at all rather than cost a checker and then be discarded.
-				applicable, resolution := g.rulesFor(sourceFile, rules, localScopedOff)
+				applicable, ruleOptions, resolution, err := g.rulesFor(sourceFile, rules, localScopedOff, localUnconfigured)
+				if err != nil {
+					// A rule that requires an option and did not get one is a hard failure, never a
+					// quiet decline. Declining is indistinguishable from finding nothing, and that
+					// ambiguity kept a dead rule alive for months.
+					localFailures = append(localFailures, err)
+					continue
+				}
 				if resolution.Ignored {
 					localIgnored++
 					continue
@@ -148,7 +168,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// another rule's name even by accident.
 				visited, silenced := dispatchFile(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
-				}, applicable, g, fileChecker, localListening, resolution)
+				}, applicable, g, fileChecker, localListening, ruleOptions)
 
 				release()
 
@@ -167,10 +187,20 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			for name, count := range localScopedOff {
 				scopedOff[name] += count
 			}
+			for name, count := range localUnconfigured {
+				unconfigured[name] += count
+			}
+			configFailures = append(configFailures, localFailures...)
 			mutex.Unlock()
 		}()
 	}
 	waitGroup.Wait()
+
+	if len(configFailures) > 0 {
+		// One error is enough to stop the run: they are all the same misconfiguration seen once per
+		// file, so reporting the first names the problem without printing it 3,408 times.
+		return Result{}, fmt.Errorf("rule configuration: %w", configFailures[0])
+	}
 
 	return Result{
 		Diagnostics: diagnostics,
@@ -185,8 +215,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			SuppressedWithoutReason: suppressed.appliedNoReason,
 			UnusedSuppressions:      suppressed.unusedDirectives,
 
-			FilesIgnored:   filesIgnored,
-			RulesScopedOff: scopedOff,
+			FilesIgnored:      filesIgnored,
+			RulesScopedOff:    scopedOff,
+			RulesUnconfigured: unconfigured,
 		},
 	}, nil
 }
@@ -204,7 +235,7 @@ func dispatchFile(
 	graph *Graph,
 	fileChecker *checker.Checker,
 	listeningCounts map[string]int,
-	resolution config.Resolved,
+	ruleOptions map[string]any,
 ) (visitedNodes int, silenced suppressionTally) {
 	// A kind may have listeners from several rules, so the merged table maps a kind to a slice rather
 	// than to one function.
@@ -240,10 +271,10 @@ func dispatchFile(
 			},
 		}
 
-		// Options come from the resolved configuration rather than being nil, so a rule that needs
-		// one is handed it. A configurable rule given nil guards either everything or nothing, and
-		// both are silent.
-		listeners := subject.Run(context, resolution.OptionsFor(ruleName))
+		// Options are decoded to the type the rule declares rather than handed through as JSON. A
+		// rule that receives the wrong shape fails its type assertion and declines every file, which
+		// looks exactly like a rule with nothing to report.
+		listeners := subject.Run(context, ruleOptions[ruleName])
 		if len(listeners) == 0 {
 			// The rule looked at the file and declined it. That is the cheapest and most valuable thing
 			// a rule can do, and it is counted rather than ignored so a rule that declines *everything*
@@ -317,38 +348,59 @@ func walk(node *ast.Node, listeners map[ast.Kind][]func(node *ast.Node)) int {
 	return visited
 }
 
-// rulesFor narrows the rule set to those the configuration enables for one file.
+// rulesFor narrows the rule set to those the configuration enables for one file, and decodes each
+// one's options into the type that rule declares.
 //
-// When no configuration is loaded every rule applies, which keeps the existing callers and every
-// test working unchanged: a Graph built without a config behaves exactly as it did before this
-// layer existed. That default is deliberate but it is also the one to be careful with, because
-// "no config" and "config that enables everything" are indistinguishable from inside. The command
-// loads a real config and fails loudly if it cannot, so the permissive default is reachable only
-// from a test that chose it.
+// The error return is the point. A rule that requires an option and does not receive one is a hard
+// failure here rather than a rule that quietly declines every file. Declining is correct behavior
+// for a misconfigured guard and completely indistinguishable from a rule with nothing to report,
+// which is how boundary-no-project-import stayed enabled and inert for months under the previous
+// gate.
+//
+// When no configuration is loaded every rule applies with nil options, which keeps existing callers
+// and tests working unchanged. The command always loads a real config and fails loudly if it
+// cannot, so that permissive path is reachable only from a caller that chose it.
 func (g *Graph) rulesFor(
 	sourceFile *ast.SourceFile,
 	rules []rule.Rule,
 	scopedOff map[string]int,
-) ([]rule.Rule, config.Resolved) {
+	unconfigured map[string]int,
+) ([]rule.Rule, map[string]any, config.Resolved, error) {
 	if g.LintConfig == nil {
-		return rules, config.Resolved{}
+		return rules, nil, config.Resolved{}, nil
 	}
 
 	resolution := g.LintConfig.Resolve(sourceFile.FileName())
 	if resolution.Ignored {
-		return nil, resolution
+		return nil, nil, resolution, nil
 	}
 
 	applicable := make([]rule.Rule, 0, len(rules))
+	options := map[string]any{}
 	for _, subject := range rules {
-		if resolution.Enabled(subject.Name) {
-			applicable = append(applicable, subject)
+		switch status, _ := resolution.StatusOf(subject.Name); status {
+		case config.StatusScopedOff:
+			// Someone configured this rule off, here or tree-wide. Counted rather than dropped
+			// silently, because a rule absent across a directory is otherwise indistinguishable
+			// from a rule with nothing to report.
+			scopedOff[subject.Name]++
+			continue
+		case config.StatusUnconfigured:
+			// Nobody has said whether this rule should run. That is a different fact from a
+			// deliberate exclusion and it is counted separately, or a rule waiting on a decision
+			// reads as one somebody already made.
+			unconfigured[subject.Name]++
 			continue
 		}
-		// Counted rather than dropped silently. A rule enabled in the config can still be absent
-		// across a whole directory because an override scoped it off there, and without this number
-		// that is indistinguishable from a rule with nothing to report.
-		scopedOff[subject.Name]++
+
+		decoded, err := g.RuleOptions.Decode(subject.Name, resolution.RawOptionsFor(subject.Name))
+		if err != nil {
+			return nil, nil, resolution, err
+		}
+		if decoded != nil {
+			options[subject.Name] = decoded
+		}
+		applicable = append(applicable, subject)
 	}
-	return applicable, resolution
+	return applicable, options, resolution, nil
 }

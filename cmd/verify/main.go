@@ -18,11 +18,9 @@ import (
 	"github.com/system-inc/verify/internal/config"
 	"github.com/system-inc/verify/internal/program"
 	"github.com/system-inc/verify/internal/registry"
+	"github.com/system-inc/verify/internal/release"
 	"github.com/system-inc/verify/internal/rule"
 )
-
-// version is stamped at build time by the release pipeline. The zero value means a local build.
-var version = "dev"
 
 func main() {
 	if err := run(); err != nil {
@@ -42,7 +40,10 @@ func run() error {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("verify %s\n", version)
+		// The full provenance rather than a bare number, because the number alone does not identify
+		// what ran: the pinned typescript-go commit is most of the code in this binary and moves
+		// independently of the version. A bug report that names all of it is reproducible.
+		fmt.Println(release.Current())
 		return nil
 	}
 
@@ -106,6 +107,7 @@ func run() error {
 			return fmt.Errorf("loading the lint config: %w", err)
 		}
 		graph.LintConfig = lintConfig
+		graph.RuleOptions = registry.Options()
 
 		lintStart := time.Now()
 		result, err := graph.Walk(ctx, projectFiles, rules)
@@ -282,12 +284,22 @@ func printConfigCoverage(coverage program.Coverage) {
 	for name := range coverage.RulesScopedOff {
 		scopedOff = append(scopedOff, name)
 	}
-	if len(scopedOff) == 0 {
-		return
-	}
 	sort.Strings(scopedOff)
 	for _, name := range scopedOff {
-		fmt.Printf("  config: rule %s scoped off for %d files by an override\n", name, coverage.RulesScopedOff[name])
+		fmt.Printf("  config: rule %s scoped off for %d files by the config\n", name, coverage.RulesScopedOff[name])
+	}
+
+	// Reported separately from scoped-off on purpose. "Someone turned this rule off" and "nobody has
+	// said whether this rule should run" are different facts, and a rule newly added to the registry
+	// is a decision waiting to be made rather than one already made. Collapsing them would describe
+	// a brand-new rule as though it had been deliberately excluded.
+	unconfigured := make([]string, 0, len(coverage.RulesUnconfigured))
+	for name := range coverage.RulesUnconfigured {
+		unconfigured = append(unconfigured, name)
+	}
+	sort.Strings(unconfigured)
+	for _, name := range unconfigured {
+		fmt.Printf("  config: rule %s is not in the config, so it ran on no files — nobody has said whether it should\n", name)
 	}
 }
 
