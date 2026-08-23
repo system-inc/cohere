@@ -90,6 +90,7 @@ func All() []rule.Rule {
 		structure.ReactComponentNoForwardRef,
 		structure.ReactComponentNoMultiplePrimary,
 		structure.ReactHookNoDestructuring,
+		structure.ReactHookNoPropertiesInDependencies,
 		structure.ReactHookRequireEffectComment,
 		structure.ReactHookRequireResultNaming,
 		structure.ReactImportNoDestructuring,
