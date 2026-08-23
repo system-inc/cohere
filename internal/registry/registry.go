@@ -66,6 +66,7 @@ func All() []rule.Rule {
 		structure.NetworkNoForbiddenImport,
 		structure.NetworkNoInvalidateCacheInOnSuccess,
 		structure.NetworkNoInvalidateCacheLiteralKey,
+		structure.NetworkNoStringLiteralQuery,
 		structure.ReactComponentNoMultiplePrimary,
 		tailwind.NoConcatenatedClasses,
 		tailwind.NoDuplicateClasses,
