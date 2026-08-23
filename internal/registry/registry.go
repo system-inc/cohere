@@ -46,6 +46,7 @@ func All() []rule.Rule {
 		nexus.LocalizationNoUntranslatedValue,
 		tailwind.NoConcatenatedClasses,
 		tailwind.NoDuplicateClasses,
+		tailwind.NoUnnecessaryWhitespace,
 	}
 }
 
@@ -100,7 +101,8 @@ func Options() config.OptionsRegistry {
 		// (`class`/`className`, the two merge helpers, the `*ClassName` variable patterns), and a
 		// project that says nothing gets those rather than a rule that reads no files. The option
 		// exists to widen the surface, not to enable the rule.
-		"no-concatenated-classes": {Decode: config.DecodeInto[tailwind.NoConcatenatedClassesOptions]()},
-		"no-duplicate-classes":    {Decode: config.DecodeInto[tailwind.NoDuplicateClassesOptions]()},
+		"no-concatenated-classes":   {Decode: config.DecodeInto[tailwind.NoConcatenatedClassesOptions]()},
+		"no-duplicate-classes":      {Decode: config.DecodeInto[tailwind.NoDuplicateClassesOptions]()},
+		"no-unnecessary-whitespace": {Decode: config.DecodeInto[tailwind.NoUnnecessaryWhitespaceOptions]()},
 	}
 }
