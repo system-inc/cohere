@@ -3,6 +3,7 @@ package nexus
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/jsx"
 )
 
 // The usage-evidence half of consistency-require-constant-casing.
@@ -81,11 +82,13 @@ func (index *fileUsageIndex) collect(node *ast.Node) {
 	}
 
 	switch node.Kind {
-	case ast.KindJsxOpeningElement:
-		index.recordJsxTag(node.AsJsxOpeningElement().TagName)
-	case ast.KindJsxSelfClosingElement:
-		index.recordJsxTag(node.AsJsxSelfClosingElement().TagName)
+	case ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement:
+		tagName, _ := jsx.ElementParts(node)
+		index.recordJsxTag(tagName)
 	case ast.KindJsxClosingElement:
+		// A closing tag is the one element form `jsx.ElementParts` does not answer, because a rule
+		// asking what an element is reads the opening form and a closing tag carries no attributes.
+		// This index wants every mention of the name, including the closing one.
 		index.recordJsxTag(node.AsJsxClosingElement().TagName)
 
 	case ast.KindJsxAttribute:

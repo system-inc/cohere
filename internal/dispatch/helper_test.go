@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -210,4 +211,113 @@ func parseGoFile(t *testing.T, path string) *ast.File {
 		t.Fatalf("parsing %s: %v", path, err)
 	}
 	return parsed
+}
+
+// wrappedAccessor is one raw AST accessor a shared utility exists to answer, and the utility that
+// answers it.
+type wrappedAccessor struct {
+	// call is the source text a rule package writes when it reaches past the shelf.
+	call string
+	// utility names what to call instead, so the failure tells a porter where to go.
+	utility string
+	// decision is what the shelf function decides that the raw accessor does not, so a reader can
+	// judge whether their case is the exception rather than obeying the guard blindly.
+	decision string
+}
+
+// wrappedAccessors are the raw reaches that have already been retrofitted away, and must not return.
+//
+// Every entry here was found in the tree rather than imagined, and each one had been written two or
+// more times independently. That is the bar for adding one: this list is not a style preference
+// about which spelling is prettier, it is a record of decisions that were duplicated in practice.
+var wrappedAccessors = []wrappedAccessor{
+	{
+		call:     "AsNamedImports()",
+		utility:  "imports.BindingsOf",
+		decision: "which of the three shapes one import statement carries, kept separate",
+	},
+	{
+		call:     "AsJsxSelfClosingElement().TagName",
+		utility:  "jsx.ElementParts",
+		decision: "that a self-closing element never produces a JsxOpeningElement",
+	},
+	{
+		call:     "AsJsxOpeningElement().TagName",
+		utility:  "jsx.ElementParts",
+		decision: "that a self-closing element never produces a JsxOpeningElement",
+	},
+}
+
+// TestRulePackagesDoNotReachPastWrappedAccessors refuses a rule package re-deriving a decision the
+// shared layer already made, when the re-derivation is invisible to a name comparison.
+//
+// This is the half `TestRulePackagesDoNotShadowSharedUtilities` cannot see, and the gap was measured
+// rather than predicted. Six retrofits landed today; not one of them would have tripped the name
+// guard, because the local helpers were called `reportForwardRefImport` and `importsGraphqlSpecifier`
+// while the shelf exports `BindingsOf` and `ImportedNameOf`. Nothing collided. The name guard
+// catches a second implementation that admits what it is by its name, and the expensive case is
+// exactly the one that does not.
+//
+// The signal it uses instead is the reach itself. A rule calling `AsNamedImports()` is walking past
+// a function whose whole purpose is that walk, and that is visible in the source without knowing
+// what anybody named their helper.
+//
+// **It deliberately does not try to detect duplicated judgment in general.** A fourth retrofit today
+// fit only halfway: `boundary-no-project-theme-value` had the shelf's two-kind element split spelled
+// locally, wrapped around an upward walk from an attribute that is genuinely its own and lives
+// nowhere else. A guard claiming to find "a local helper that duplicates a shared one" would have to
+// rule on that file, and would be wrong whichever way it ruled. This one asks a narrower question it
+// can answer exactly.
+//
+// An exemption is a comment on the reaching line or the line above it, saying why. That keeps the
+// escape hatch in the file that needs it rather than in a list here that nobody reads, and it accepts
+// the comment where an author naturally writes one: the first exemption this guard demanded was
+// written above the line, and requiring it trailing would have made the guard shape the prose.
+func TestRulePackagesDoNotReachPastWrappedAccessors(t *testing.T) {
+	files, err := filepath.Glob("../rules/*/*.go")
+	if err != nil {
+		t.Fatalf("globbing rule files: %v", err)
+	}
+	if len(files) == 0 {
+		// A sweep with nothing to read passes for the wrong reason, which is the same shape as the
+		// defect it guards against.
+		t.Fatal("found no rule files, so this test read nothing")
+	}
+
+	checked := 0
+	for _, path := range files {
+		if strings.HasSuffix(filepath.Base(path), "_test.go") {
+			continue
+		}
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading %s: %v", path, err)
+		}
+		checked++
+
+		lines := strings.Split(string(contents), "\n")
+		for lineNumber, line := range lines {
+			// A reason on the line itself, or on the line directly above it, is an exemption. Both
+			// are places a reader sees the reason where the reach is rather than three files away.
+			if strings.Contains(line, "//") {
+				continue
+			}
+			if lineNumber > 0 && strings.Contains(strings.TrimSpace(lines[lineNumber-1]), "//") {
+				continue
+			}
+			for _, accessor := range wrappedAccessors {
+				if !strings.Contains(line, accessor.call) {
+					continue
+				}
+				t.Errorf("%s:%d reaches for %s, which %s already answers by deciding %s; "+
+					"call the utility, or write the reason on this line if this case is genuinely "+
+					"different",
+					filepath.Base(path), lineNumber+1, accessor.call, accessor.utility, accessor.decision)
+			}
+		}
+	}
+
+	if checked == 0 {
+		t.Fatal("every rule file was skipped, so this test compared nothing")
+	}
 }

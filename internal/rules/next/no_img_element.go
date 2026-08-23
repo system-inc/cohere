@@ -93,6 +93,8 @@ func enclosedByPictureElement(node *ast.Node) bool {
 		if opening == nil {
 			return false
 		}
+		// The opening form specifically, reached from a JsxElement that already resolved it, so
+		// there is no self-closing case here for `jsx.ElementParts` to disambiguate.
 		name := opening.AsJsxOpeningElement().TagName
 		if name == nil || name.Kind != ast.KindIdentifier {
 			return false
