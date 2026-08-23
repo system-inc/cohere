@@ -212,6 +212,17 @@ func Resolve(proposals []Proposal) Plan {
 // needs a human to agree. Removing an await on a non-promise is a fix; filling in a missing switch
 // case is a suggestion. A fixer that quietly applied suggestions would be changing behavior
 // without anyone choosing it.
+//
+// The fixes of one diagnostic are flattened into independent proposals, and a rule author writing a
+// multi-fix report should know what that costs. Two fixes reported together are not treated as one
+// atomic edit: overlap resolution judges them separately, so it may admit one and refuse the other.
+// For a pair that only makes sense together — wrapping a span in an opening and a closing token, the
+// obvious example — that is a half-application, and the result can be well-formed enough to parse
+// while meaning something nobody proposed.
+//
+// No shipped rule does this today. Every ReportNodeWithFixes site emits exactly one fix, so the
+// hazard has no live caller and this is a warning rather than a bug. A rule that genuinely needs two
+// edits to land together needs grouping here first; it cannot get it by reporting them side by side.
 func ProposalsFrom(diagnostics []rule.Diagnostic) []Proposal {
 	proposals := []Proposal{}
 	for _, diagnostic := range diagnostics {
