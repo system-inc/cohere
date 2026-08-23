@@ -69,7 +69,7 @@ var BoundaryNoProjectImport = rule.Rule{
 
 		return importSourceVisitors(func(source string, node *ast.Node) {
 			if isProjectAlias(source) && !allowed[source] {
-				ctx.ReportNode(node, messageForbiddenProjectImport)
+				ctx.ReportNode(importSpecifierNode(node), messageForbiddenProjectImport)
 			}
 		})
 	},

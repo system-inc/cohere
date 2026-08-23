@@ -3,6 +3,7 @@ package nexus
 import (
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/system-inc/verify/internal/ruletest"
 )
 
@@ -56,5 +57,23 @@ func TestBoundaryNoProjectImportStaysSilent(t *testing.T) {
 			result := ruletest.RunWithOptions(t, BoundaryNoProjectImport, testCase.fileName, testCase.source, testCase.options)
 			ruletest.ExpectClean(t, result)
 		})
+	}
+}
+
+// A finding has to land on the line the author can suppress. A node's Pos() includes its leading
+// trivia, so reporting the declaration anchors the finding at the first comment above the import,
+// where no `eslint-disable-next-line` can reach it.
+func TestBoundaryNoProjectImportReportsAtTheSpecifier(t *testing.T) {
+	sourceText := "// Dependencies\n// a second comment\nimport { helper } from '@project/source/Helper';\\n"
+
+	result := ruletest.RunWithOptions(t, BoundaryNoProjectImport, baseLibraryFile, sourceText, baseLibraryOptions)
+	if len(result.Diagnostics) == 0 {
+		t.Fatalf("expected a finding, got none")
+	}
+
+	line, _ := scanner.GetLineAndCharacterOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
+	const importLine = 2 // zero-based, so the third line
+	if line != importLine {
+		t.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)
 	}
 }

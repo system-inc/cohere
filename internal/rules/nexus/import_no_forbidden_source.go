@@ -75,17 +75,26 @@ var forbiddenSources = []forbiddenSource{
 var ImportNoForbiddenSource = rule.Rule{
 	Name: "import-no-forbidden-source",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		// The specifier node is what gets rewritten, so each shape reports the node a reader has to
-		// change while fixing the string inside it.
-		report := func(node *ast.Node, specifierNode *ast.Node, source string) {
+		// The finding is anchored on the specifier, which is both the thing that gets rewritten and
+		// the thing a reader has to change.
+		//
+		// Anchoring on the enclosing declaration instead is what this rule did first, and it is a
+		// defect that hides in plain sight: a node's Pos() includes its leading trivia, so an import
+		// preceded by comments reports at the first comment rather than at the import. In the Next
+		// wrapper files that put the finding on line 1 while the author's
+		// `eslint-disable-next-line` sat on line 3 covering line 4. A `-next-line` directive can
+		// only match the line after itself, so the finding was unreachable by any suppression that
+		// could be written, and it reads as a real finding in every count. Report the node the
+		// original reports.
+		report := func(specifierNode *ast.Node, source string) {
 			for _, forbidden := range forbiddenSources {
 				if source != forbidden.Specifier {
 					continue
 				}
 				ctx.ReportNodeWithFixes(
-					node,
+					specifierNode,
 					forbidden.Message,
-					rule.ReplaceNode(specifierNode, "'"+forbidden.Replacement+"'"),
+					ctx.ReplaceNode(specifierNode, "'"+forbidden.Replacement+"'"),
 				)
 				return
 			}
@@ -100,7 +109,7 @@ var ImportNoForbiddenSource = rule.Rule{
 				if !ast.IsStringLiteralLike(declaration.ModuleSpecifier) {
 					return
 				}
-				report(node, declaration.ModuleSpecifier, declaration.ModuleSpecifier.Text())
+				report(declaration.ModuleSpecifier, declaration.ModuleSpecifier.Text())
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -112,7 +121,7 @@ var ImportNoForbiddenSource = rule.Rule{
 				if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 					return
 				}
-				report(node, call.Arguments.Nodes[0], source)
+				report(call.Arguments.Nodes[0], source)
 			},
 		}
 	},

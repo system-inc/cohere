@@ -36,6 +36,7 @@ func All() []rule.Rule {
 		nexus.ConsistencyRequireTypeSuffix,
 		nexus.ImportNoForbiddenSource,
 		nexus.ImportRequireNodeNamespace,
+		nexus.ImportRequirePathAlias,
 	}
 }
 
@@ -61,6 +62,16 @@ func Options() config.OptionsRegistry {
 		// Required: the rule guards one library directory and declines everything without it.
 		"boundary-no-project-import": {
 			Decode:   config.DecodeInto[nexus.BoundaryNoProjectImportOptions](),
+			Required: true,
+		},
+
+		// Required for the same reason: without aliases there is nothing to suggest, and without a
+		// repository root no path can be made relative, so the rule declines every file. The
+		// TypeScript original reads process.cwd() for that root, which made its verdict depend on
+		// where the linter was invoked from. Passing it explicitly turns an invisible dependency
+		// into a configuration error.
+		"import-require-path-alias": {
+			Decode:   config.DecodeInto[nexus.ImportRequirePathAliasOptions](),
 			Required: true,
 		},
 

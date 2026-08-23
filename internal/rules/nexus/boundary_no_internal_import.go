@@ -65,7 +65,7 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 	// that can prove it belongs.
 	if !strings.HasPrefix(source, ".") {
 		if hasPathSegment(source, "internal") {
-			ctx.ReportNode(node, messageAliasedInternal)
+			ctx.ReportNode(importSpecifierNode(node), messageAliasedInternal)
 		}
 		return
 	}
@@ -87,7 +87,7 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 
 	owningFolder := strings.Join(segments[:internalIndex], "/")
 	if !strings.HasPrefix(importingFile, owningFolder+"/") {
-		ctx.ReportNode(node, messageOutsideInternal)
+		ctx.ReportNode(importSpecifierNode(node), messageOutsideInternal)
 	}
 }
 
