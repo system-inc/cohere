@@ -57,10 +57,15 @@ func TestParityAgainstInventory(t *testing.T) {
 	var ported, remaining []string
 	claimed := make(map[string]bool, len(registered))
 
+	var declined []string
 	for _, entry := range inventory {
 		if name, found := matchRegistered(entry, registered); found {
 			claimed[name] = true
 			ported = append(ported, entry)
+			continue
+		}
+		if _, known := rulesDeclined[entry]; known {
+			declined = append(declined, entry)
 			continue
 		}
 		remaining = append(remaining, entry)
@@ -83,7 +88,12 @@ func TestParityAgainstInventory(t *testing.T) {
 	}
 
 	sort.Strings(remaining)
-	t.Logf("parity: %d of %d (%d remaining)", len(ported), len(inventory), len(remaining))
+	sort.Strings(declined)
+	for _, entry := range declined {
+		t.Logf("rule %q is declined rather than unported: %s", entry, rulesDeclined[entry])
+	}
+	t.Logf("parity: %d of %d (%d remaining, %d declined)",
+		len(ported), len(inventory), len(remaining), len(declined))
 	for _, namespace := range namespacesOf(remaining) {
 		t.Logf("  %-20s %d left", namespace.name, namespace.count)
 	}
@@ -202,4 +212,68 @@ var rulesOutsideTheInventory = map[string]string{
 	// map line. So the rule is real, its judgment is real, and it has never run anywhere. Porting
 	// it was correct and enabling it is a decision for Kirk rather than a parity question.
 	"import-require-path-alias": "in the nexus plugin map, enabled in no config, so it has never run",
+}
+
+// rulesDeclined names every inventory rule we have decided not to port, and why.
+//
+// This is a fourth state beside ported, remaining, and cancelled, and it exists because the other
+// three cannot say "we looked at this and chose not to". A declined rule counted as remaining reads
+// as work nobody has got to yet, and a declined rule quietly dropped from the inventory reads as a
+// rule that was never enforced. Both lose the decision.
+//
+// The bar for an entry is the same as for `rulesOutsideTheInventory`: a reason a future reader can
+// act on. Specifically, what supersedes the rule, and what the decline costs if that thing ever goes
+// away, because a decline that holds today may not hold for a different consumer.
+var rulesDeclined = map[string]string{
+	// Ruled 2026-08-23 after a research pass found the two upstream implementations are different
+	// rules sharing a name. oxlint's is purely syntactic; @next's reads the pages and app
+	// directories off disk, builds a route regex per file, and disables itself entirely when it
+	// finds neither.
+	//
+	// `react-no-anchor-element` (internal/rules/structure/react_no_intrinsic_element.go) already
+	// flags every raw `<a>` with no href condition at all, which is strictly stronger than oxlint's
+	// spelling, and names our own Link component as the fix rather than leaving the author to infer
+	// one. So porting oxlint's version would emit a subset of findings we already emit, under a
+	// different rule name, pointing at a weaker remedy.
+	//
+	// The cost, stated rather than assumed: a consumer whose codebase does not enable
+	// `react-no-anchor-element` loses this check. If verify ever ships to such a tree, this comes
+	// back, and @next's version is the one to build, because oxlint's would still be duplicating a
+	// rule that tree would not have.
+	"nextjs/no-html-link-for-pages": "superseded by structure/react-no-anchor-element, which flags every raw anchor unconditionally",
+}
+
+// A declined rule must be in the inventory, must not be registered, and must name a reason.
+//
+// Each of those can rot in a different direction and none of them is visible from the decline entry
+// itself. An entry for a rule the inventory does not carry is a decline of nothing, and it silently
+// shrinks the denominator the project is judged on. An entry for a rule somebody later ported reads
+// as a standing decision while the code says otherwise, and the log line would keep asserting a
+// choice nobody is making any more.
+//
+// The reason is required for the same argument the exemption map makes: an entry with no reason says
+// only that somebody wanted a number to move.
+func TestEveryDeclinedRuleIsRealAndUnported(t *testing.T) {
+	inventory := readInventory(t)
+	registered := registeredRuleNames()
+
+	inInventory := make(map[string]bool, len(inventory))
+	for _, entry := range inventory {
+		inInventory[entry] = true
+	}
+
+	for entry, reason := range rulesDeclined {
+		if !inInventory[entry] {
+			t.Errorf("rule %q is declined but is not in the inventory, so it declines nothing and "+
+				"quietly lowers the denominator", entry)
+		}
+		if name, found := matchRegistered(entry, registered); found {
+			t.Errorf("rule %q is declined and also registered as %q, so the decline is stale and "+
+				"the log asserts a decision nobody is making", entry, name)
+		}
+		if strings.TrimSpace(reason) == "" {
+			t.Errorf("rule %q is declined with no reason, which records that somebody wanted a "+
+				"number to move rather than that anybody looked", entry)
+		}
+	}
 }
