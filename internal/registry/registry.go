@@ -24,9 +24,12 @@ func All() []rule.Rule {
 	return []rule.Rule{
 		core.NoCaseDeclarations,
 		core.NoCompareNegZero,
+		core.NoDebugger,
 		core.NoDuplicateCase,
 		core.NoEmpty,
 		core.NoEmptyPattern,
+		core.NoEmptyStaticBlock,
+		core.NoSparseArrays,
 		core.NoUnsafeFinally,
 		core.NoUselessCatch,
 		nexus.BoundaryNoInternalImport,
