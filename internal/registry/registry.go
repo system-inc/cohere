@@ -12,6 +12,7 @@ import (
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/rules/core"
 	"github.com/system-inc/verify/internal/rules/nexus"
+	"github.com/system-inc/verify/internal/rules/structure"
 	"github.com/system-inc/verify/internal/rules/tailwind"
 )
 
@@ -49,6 +50,7 @@ func All() []rule.Rule {
 		nexus.ImportRequireNodeNamespace,
 		nexus.ImportRequirePathAlias,
 		nexus.LocalizationNoUntranslatedValue,
+		structure.ReactComponentNoMultiplePrimary,
 		tailwind.NoConcatenatedClasses,
 		tailwind.NoDuplicateClasses,
 		tailwind.NoUnnecessaryWhitespace,
@@ -105,6 +107,12 @@ func Options() config.OptionsRegistry {
 		"consistency-no-screaming-snake-case": {Decode: config.DecodeInto[nexus.ConsistencyNoScreamingSnakeCaseOptions]()},
 		"consistency-no-shouting":             {Decode: config.DecodeInto[nexus.ConsistencyNoShoutingOptions]()},
 		"consistency-no-stuttering-name":      {Decode: config.DecodeInto[nexus.ConsistencyNoStutteringNameOptions]()},
+
+		// Not Required. Both thresholds have defaults that match the gate verify replaces, so a
+		// config that says nothing gets the real rule rather than a rule that reads no files.
+		"react-component-no-multiple-primary": {
+			Decode: config.DecodeInto[structure.ReactComponentNoMultiplePrimaryOptions](),
+		},
 
 		// Not Required. The option only exempts names a framework reads verbatim, so a config that
 		// says nothing gets the full rule rather than a rule that reads no files.
