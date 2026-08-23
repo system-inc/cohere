@@ -148,7 +148,7 @@ var ImportRequireNodeNamespace = rule.Rule{
 					ctx.ReportNodeWithFixes(
 						declaration.ModuleSpecifier,
 						messageRequireNodePrefix,
-						rule.ReplaceNode(declaration.ModuleSpecifier, "'node:"+bare+"'"),
+						ctx.ReplaceNode(declaration.ModuleSpecifier, "'node:"+bare+"'"),
 					)
 				}
 

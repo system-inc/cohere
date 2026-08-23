@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 )
 
 // Message is what a rule tells a reader when it fires.
@@ -138,27 +139,84 @@ func (c Context) ReportRange(textRange core.TextRange, message Message) {
 	})
 }
 
-// ReplaceNode proposes replacing a node's text.
-func ReplaceNode(node *ast.Node, text string) Fix {
-	return Fix{Range: node.Loc, Text: text}
+// TokenRange is a node's own text, without the trivia that precedes it.
+//
+// This distinction is the single sharpest edge in the fix API, and getting it wrong produces damage
+// that no downstream check can catch.
+//
+// `node.Loc.Pos()` is the position *before* leading trivia, not the start of the node's own text.
+// For `import * as X from 'fs'`, the module specifier's Loc spans `" 'fs'"` — the space is inside
+// the range. A fix built from Loc therefore replaces the whitespace too:
+//
+//	import * as X from 'fs'   ->   import * as X from'node:fs'
+//
+// and `from /* pinned */ 'fs'` loses the comment permanently.
+//
+// The reason this is worse than cosmetic: **the corrupted output still parses.** The edit engine
+// refuses a rewrite that breaks syntax, and that guard never fires here, so the damage sails
+// through with every downstream check green. A range wider than the rule intended is damage that
+// validation downstream is structurally unable to detect. The parse guard is necessary and not
+// sufficient.
+//
+// Trimming needs the SourceFile, because finding where a token actually starts means scanning
+// forward past the trivia. That is why the helpers below hang off Context: a rule always has one,
+// so the safe form is also the convenient one, and the shape that eats trivia is not reachable by
+// accident.
+//
+// Found by @system_verify_lint_fix, running real rules through the engine on three trivia shapes
+// rather than reasoning about the ranges. Upstream tsgolint gets this right via
+// `utils.TrimNodeTextRange`; our port dropped the step, most likely because the signature had no
+// SourceFile to trim with.
+func TokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	if sourceFile == nil || node == nil {
+		return node.Loc
+	}
+	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
+}
+
+// ReplaceNode proposes replacing a node's own text, leaving the trivia before it untouched.
+func (c Context) ReplaceNode(node *ast.Node, text string) Fix {
+	return Fix{Range: TokenRange(c.SourceFile, node), Text: text}
+}
+
+// RemoveNode proposes deleting a node's own text.
+//
+// Leading trivia is deliberately left behind rather than swept up with the node. Removing a node
+// and removing the blank line above it are different intentions, and a helper that guessed would
+// be wrong half the time. A rule wanting the surrounding whitespace gone should say so with
+// ReplaceRange over a range it computed itself.
+func (c Context) RemoveNode(node *ast.Node) Fix {
+	return Fix{Range: TokenRange(c.SourceFile, node), Text: ""}
+}
+
+// InsertBefore proposes inserting text immediately before a node's own text.
+//
+// Before the token rather than before its trivia, which is almost always what a rule means: adding
+// a modifier to a declaration should land next to the declaration, not above the comment that
+// documents it.
+func (c Context) InsertBefore(node *ast.Node, text string) Fix {
+	tokenRange := TokenRange(c.SourceFile, node)
+	return Fix{Range: tokenRange.WithEnd(tokenRange.Pos()), Text: text}
+}
+
+// InsertAfter proposes inserting text immediately after a node, touching no existing bytes.
+//
+// No trimming needed: a node's End is already past its own text, and trailing trivia belongs to
+// whatever comes next.
+func (c Context) InsertAfter(node *ast.Node, text string) Fix {
+	return Fix{Range: node.Loc.WithPos(node.End()), Text: text}
 }
 
 // ReplaceRange proposes replacing an arbitrary span.
+//
+// The escape hatch for a rule that computed its own range: a portion of a string literal, or the
+// gap between two tokens. Nothing is trimmed, because the caller already said exactly what it
+// meant.
 func ReplaceRange(textRange core.TextRange, text string) Fix {
 	return Fix{Range: textRange, Text: text}
 }
 
-// RemoveNode proposes deleting a node.
-func RemoveNode(node *ast.Node) Fix {
-	return Fix{Range: node.Loc, Text: ""}
-}
-
-// InsertBefore proposes inserting text immediately before a node, touching no existing bytes.
-func InsertBefore(node *ast.Node, text string) Fix {
-	return Fix{Range: node.Loc.WithEnd(node.Loc.Pos()), Text: text}
-}
-
-// InsertAfter proposes inserting text immediately after a node, touching no existing bytes.
-func InsertAfter(node *ast.Node, text string) Fix {
-	return Fix{Range: node.Loc.WithPos(node.End()), Text: text}
+// RemoveRange proposes deleting an arbitrary span.
+func RemoveRange(textRange core.TextRange) Fix {
+	return Fix{Range: textRange, Text: ""}
 }
