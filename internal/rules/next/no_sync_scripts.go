@@ -40,10 +40,10 @@ var NoSyncScripts = rule.Rule{
 			// A <script> with no src is inline. It blocks the parser too, but it has no network
 			// fetch to defer, and `async` and `defer` have no meaning on it, so upstream leaves it
 			// alone rather than asking for an attribute that would do nothing.
-			if !hasAttributeNamed(attributes, "src") {
+			if !hasAttributeNamed(attributes, "src", matchExactly) {
 				return
 			}
-			if hasAttributeNamed(attributes, "async") || hasAttributeNamed(attributes, "defer") {
+			if hasAttributeNamed(attributes, "async", matchExactly) || hasAttributeNamed(attributes, "defer", matchExactly) {
 				return
 			}
 			ctx.ReportNode(node, messageNoSyncScripts)

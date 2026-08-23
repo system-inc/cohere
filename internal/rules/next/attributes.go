@@ -1,8 +1,31 @@
 package next
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
+
+// Attribute names are matched two ways because upstream matches them two ways, and which one a
+// rule uses is part of what that rule decides rather than a detail of how it looks things up.
+//
+// `no-css-tags`, `no-sync-scripts` and `no-img-element` compare exactly. `google-font-preconnect`
+// and `google-font-display` go through oxc's `has_jsx_prop_ignore_case`. Both spellings are
+// preserved per rule rather than unified, because unifying would mean choosing for upstream: made
+// case-insensitive everywhere, a rule would start reporting `<link REL="stylesheet">` that its
+// original ignores; made exact everywhere, one would stop reporting what its original catches.
+//
+// JSX itself is case-sensitive, so the insensitive matchers describe upstream's leniency rather
+// than anything the language requires.
+type attributeNameMatch func(candidate string, wanted string) bool
+
+func matchExactly(candidate string, wanted string) bool {
+	return candidate == wanted
+}
+
+func matchIgnoringCase(candidate string, wanted string) bool {
+	return strings.EqualFold(candidate, wanted)
+}
 
 // stringAttributeValue returns the text of a JSX attribute whose value is a plain string literal.
 //
@@ -18,7 +41,7 @@ import (
 // Shared across this package because several `@next/next` rules read an attribute exactly this way,
 // and a second implementation of it would be free to drift on the spread case, which is the one a
 // porter is most likely to miss.
-func stringAttributeValue(attributes *ast.Node, name string) (string, bool) {
+func stringAttributeValue(attributes *ast.Node, name string, matches attributeNameMatch) (string, bool) {
 	if attributes == nil || attributes.Kind != ast.KindJsxAttributes {
 		return "", false
 	}
@@ -40,7 +63,7 @@ func stringAttributeValue(attributes *ast.Node, name string) (string, bool) {
 		if attributeName == nil || attributeName.Kind != ast.KindIdentifier {
 			continue
 		}
-		if attributeName.Text() != name {
+		if !matches(attributeName.Text(), name) {
 			continue
 		}
 		if attribute.Initializer == nil || attribute.Initializer.Kind != ast.KindStringLiteral {
@@ -86,7 +109,7 @@ func isIntrinsicElementNamed(tagName *ast.Node, name string) bool {
 //
 // A spread declines for the same reason as above: it carries no name to match, so an element that
 // spreads its attributes reports nothing rather than falsely reporting the attribute missing.
-func hasAttributeNamed(attributes *ast.Node, name string) bool {
+func hasAttributeNamed(attributes *ast.Node, name string, matches attributeNameMatch) bool {
 	if attributes == nil || attributes.Kind != ast.KindJsxAttributes {
 		return false
 	}
@@ -103,7 +126,7 @@ func hasAttributeNamed(attributes *ast.Node, name string) bool {
 		if attributeName == nil || attributeName.Kind != ast.KindIdentifier {
 			continue
 		}
-		if attributeName.Text() == name {
+		if matches(attributeName.Text(), name) {
 			return true
 		}
 	}

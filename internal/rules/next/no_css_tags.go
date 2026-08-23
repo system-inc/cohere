@@ -44,12 +44,12 @@ var NoCssTags = rule.Rule{
 				return
 			}
 
-			relationship, hasRelationship := stringAttributeValue(attributes, "rel")
+			relationship, hasRelationship := stringAttributeValue(attributes, "rel", matchExactly)
 			if !hasRelationship || relationship != "stylesheet" {
 				return
 			}
 
-			reference, hasReference := stringAttributeValue(attributes, "href")
+			reference, hasReference := stringAttributeValue(attributes, "href", matchExactly)
 			if !hasReference {
 				return
 			}
