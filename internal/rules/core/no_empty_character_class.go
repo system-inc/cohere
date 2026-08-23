@@ -55,15 +55,14 @@ var NoEmptyCharacterClass = rule.Rule{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				text := node.Text()
 
-				// A regex literal's own text is `/pattern/flags`, delimiters and all. Splitting on
-				// the last slash is what separates them; the first slash cannot be it, and an
-				// interior slash is escaped or inside a class.
-				lastSlash := strings.LastIndexByte(text, '/')
-				if lastSlash <= 0 {
+				// A regex literal's own text is `/pattern/flags`, delimiters and all, so the two
+				// have to be separated before either can be used. That split is shared rather than
+				// written here: it lands the same way for every regex rule, and a second copy of it
+				// is a second place for `/a\/b/g` to come apart wrongly.
+				pattern, flags := regexsyntax.PatternAndFlags(text)
+				if pattern == "" {
 					return
 				}
-				pattern := text[1:lastSlash]
-				flags := text[lastSlash+1:]
 
 				// The cheap gate upstream uses too: no bracket, no class, and most patterns in a
 				// real tree have no bracket at all.
