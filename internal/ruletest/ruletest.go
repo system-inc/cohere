@@ -45,6 +45,17 @@ func (r Result) MessageIds() []string {
 // prove in microseconds.
 func Run(t *testing.T, subject rule.Rule, fileName string, sourceText string) Result {
 	t.Helper()
+	return RunWithOptions(t, subject, fileName, sourceText, nil)
+}
+
+// RunWithOptions is Run for a rule that reads configuration.
+//
+// A configurable rule has a failure mode an unconfigured one does not: it can be registered without
+// its required option and then guard either everything or nothing. Which of those it does is a real
+// decision that belongs in fixtures, so the harness has to be able to hand a rule no options at all
+// as deliberately as it hands it good ones.
+func RunWithOptions(t *testing.T, subject rule.Rule, fileName string, sourceText string, options any) Result {
+	t.Helper()
 
 	scriptKind := core.ScriptKindTS
 	if strings.HasSuffix(fileName, ".tsx") {
@@ -76,7 +87,7 @@ func Run(t *testing.T, subject rule.Rule, fileName string, sourceText string) Re
 		},
 	}
 
-	listeners := subject.Run(context, nil)
+	listeners := subject.Run(context, options)
 	if listeners != nil {
 		walk(sourceFile.AsNode(), listeners)
 	}
