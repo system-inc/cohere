@@ -78,10 +78,45 @@ func reportAssignmentsTo(ctx rule.Context, root *ast.Node, targetName string, me
 			}
 		}
 
+		// An update expression is a write too, and upstream's `is_write()` counts it. Its corpus
+		// never exercises one, which is how the gap survived the port: every fixture on both sides
+		// used `=` or a compound operator, and `e++` reported nothing while `e += 1` reported.
+		//
+		// Prefix and postfix both, since `++e` and `e++` differ only in what they evaluate to and
+		// neither leaves the binding alone.
+		if current.Kind == ast.KindPrefixUnaryExpression || current.Kind == ast.KindPostfixUnaryExpression {
+			if operand, operator := updateOperandAndOperator(current); isUpdateOperator(operator) {
+				if operand != nil && operand.Kind == ast.KindIdentifier && operand.Text() == targetName {
+					ctx.ReportNode(operand, message)
+				}
+			}
+		}
+
 		current.ForEachChild(func(child *ast.Node) bool {
 			visit(child)
 			return false
 		})
 	}
 	visit(root)
+}
+
+// updateOperandAndOperator reads the operand and operator of a unary expression, either fixity.
+func updateOperandAndOperator(node *ast.Node) (*ast.Node, ast.Kind) {
+	switch node.Kind {
+	case ast.KindPrefixUnaryExpression:
+		unary := node.AsPrefixUnaryExpression()
+		return ast.SkipParentheses(unary.Operand), unary.Operator
+	case ast.KindPostfixUnaryExpression:
+		unary := node.AsPostfixUnaryExpression()
+		return ast.SkipParentheses(unary.Operand), unary.Operator
+	}
+	return nil, ast.KindUnknown
+}
+
+// isUpdateOperator reports whether an operator writes to its operand.
+//
+// Only `++` and `--`. A `-x` or `!x` reads the binding and leaves it alone, so treating every unary
+// as a write would report on code that never assigns.
+func isUpdateOperator(operator ast.Kind) bool {
+	return operator == ast.KindPlusPlusToken || operator == ast.KindMinusMinusToken
 }

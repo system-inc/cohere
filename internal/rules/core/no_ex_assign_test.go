@@ -53,3 +53,44 @@ func TestNoExAssignStaysSilent(t *testing.T) {
 		})
 	}
 }
+
+// An update expression is a write, and neither corpus tests one.
+//
+// `e++` left the binding rebound and reported nothing, while `e = 1` and `e += 1` both reported.
+// Upstream asks `reference.is_write()`, which counts an update, so this was a divergence rather than
+// a shared limitation, and its own corpus never exercises the shape: every case on both sides uses
+// `=` or a compound operator.
+//
+// Found while measuring whether the four reference-blocked rules could be answered syntactically,
+// not by reviewing this rule. The walker it shares with them was missing a whole category of write.
+func TestNoExAssignSeesUpdateExpressions(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+	}{
+		{"postfix increment", "try {} catch (error) { error++; }"},
+		{"prefix increment", "try {} catch (error) { ++error; }"},
+		{"postfix decrement", "try {} catch (error) { error--; }"},
+		{"prefix decrement", "try {} catch (error) { --error; }"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ruletest.ExpectFindings(t,
+				ruletest.Run(t, NoExAssign, exAssignFile, testCase.sourceText),
+				"unexpectedExceptionAssignment")
+		})
+	}
+}
+
+// A unary that reads its operand is not a write, which is what keeps the arm above from being a
+// blanket rule about unary expressions.
+func TestNoExAssignIgnoresReadingUnaryOperators(t *testing.T) {
+	for _, sourceText := range []string{
+		"try {} catch (error) { const a = -error; }",
+		"try {} catch (error) { const a = !error; }",
+		"try {} catch (error) { const a = typeof error; }",
+	} {
+		ruletest.ExpectClean(t, ruletest.Run(t, NoExAssign, exAssignFile, sourceText))
+	}
+}
