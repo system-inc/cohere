@@ -69,6 +69,7 @@ func All() []rule.Rule {
 		structure.NetworkNoStringLiteralQuery,
 		structure.NetworkRequireHookOptionsParameter,
 		structure.NetworkRequireHookRequestSuffix,
+		structure.NetworkRequireHookVariablesType,
 		structure.ReactComponentNoMultiplePrimary,
 		tailwind.NoConcatenatedClasses,
 		tailwind.NoDuplicateClasses,
