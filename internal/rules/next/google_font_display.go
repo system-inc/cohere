@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/jsx"
 )
 
 var messageGoogleFontDisplayMissing = rule.Message{
@@ -52,12 +53,12 @@ var GoogleFontDisplay = rule.Rule{
 	Name: "google-font-display",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
-			tagName, attributes := jsxElementParts(node)
-			if !isIntrinsicElementNamed(tagName, "link") {
+			tagName, attributes := jsx.ElementParts(node)
+			if !jsx.IsIntrinsicElementNamed(tagName, "link") {
 				return
 			}
 
-			reference, hasReference := stringAttributeValue(attributes, "href", matchIgnoringCase)
+			reference, hasReference := jsx.StringAttributeValue(attributes, "href", jsx.MatchIgnoringCase)
 			if !hasReference {
 				return
 			}

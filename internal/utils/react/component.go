@@ -1,0 +1,211 @@
+// Package react answers the questions a rule asks about React code that are not questions about
+// JSX: is this call constructing an element, is this a component, which component encloses this.
+//
+// It is a sibling of `internal/utils/jsx/` rather than part of it, because none of these touch a
+// JSX node. `createElement` is an ordinary call expression and a class component is an ordinary
+// class; a rule can ask both about a file with no JSX in it at all.
+//
+// Built on measured demand rather than on one caller's word. In oxc's own react rules,
+// `is_create_element_call` has nine callers and the component predicates have twelve, and oxc
+// factored both into `utils/react.rs` for the same reason this package exists. Two independent
+// research passes on `#rulesreact` reached the component predicate from the rule sources without
+// any brief mentioning it, which is what separates a real shared surface from a guess about one.
+package react
+
+import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+)
+
+// reactPragma is the object name the namespaced spellings are checked against.
+//
+// Upstream calls this the pragma because it is configurable there. It is fixed here until a rule
+// needs it otherwise, and that is worth stating: a rule that needs a different pragma should make
+// this an option rather than reach past it.
+const reactPragma = "React"
+
+// IsCreateElementCall reports whether a call constructs a React element.
+//
+// Three things about this are deliberate and each would be easy to get wrong in the safe-looking
+// direction.
+//
+// **The object is not required to be React.** A bare `createElement(...)` counts, and so does
+// `Preact.createElement(...)`. Requiring the React namespace would silence the rule on every
+// codebase that imports the function directly, which is the common modern spelling.
+//
+// **`document.createElement` is rejected by name.** It is the one call that shares the property
+// name and constructs a DOM node rather than a React element, and upstream special-cases it
+// exactly this way.
+//
+// **A computed member counts.** `React['createElement'](...)` is the same call written differently,
+// and a check that read only static members would miss it while looking complete.
+func IsCreateElementCall(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindCallExpression {
+		return false
+	}
+	callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+	if callee == nil {
+		return false
+	}
+
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		return callee.Text() == "createElement"
+
+	case ast.KindPropertyAccessExpression:
+		access := callee.AsPropertyAccessExpression()
+		if isIdentifierNamed(access.Expression, "document") {
+			return false
+		}
+		name := access.Name()
+		return name != nil && name.Kind == ast.KindIdentifier && name.Text() == "createElement"
+
+	case ast.KindElementAccessExpression:
+		access := callee.AsElementAccessExpression()
+		if isIdentifierNamed(access.Expression, "document") {
+			return false
+		}
+		argument := access.ArgumentExpression
+		return argument != nil && argument.Kind == ast.KindStringLiteral &&
+			argument.Text() == "createElement"
+	}
+	return false
+}
+
+// IsEs5ComponentCall reports whether a call creates a component the old way.
+//
+// Both spellings count: `React.createClass(...)` and a bare `createClass(...)`, the second being
+// what a file importing the function directly writes.
+func IsEs5ComponentCall(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindCallExpression {
+		return false
+	}
+	callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+	if callee == nil {
+		return false
+	}
+
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		return isCreateClassName(callee.Text())
+
+	case ast.KindPropertyAccessExpression:
+		access := callee.AsPropertyAccessExpression()
+		if !isIdentifierNamed(access.Expression, reactPragma) {
+			return false
+		}
+		name := access.Name()
+		return name != nil && name.Kind == ast.KindIdentifier && isCreateClassName(name.Text())
+	}
+	return false
+}
+
+// isCreateClassName accepts both names the factory has been called.
+//
+// `createReactClass` is the standalone package and `createClass` is the older method on the React
+// object. Rules meet both, and treating one as the only spelling silences the rule on whichever
+// half of the ecosystem writes the other.
+func isCreateClassName(name string) bool {
+	return name == "createReactClass" || name == "createClass"
+}
+
+// IsEs6ComponentClass reports whether a class extends a React component base.
+//
+// A class expression counts as well as a declaration, because `const Thing = class extends
+// React.Component {}` is the same thing written where a declaration will not fit.
+//
+// The extends clause is what decides, and its absence is the discriminating case rather than an
+// edge one: `class Hello { }` with no heritage is 2 of the 8 passing fixtures upstream ships for
+// `no-direct-mutation-state`, which is to say the gate exists mostly to stay silent on plain
+// classes.
+func IsEs6ComponentClass(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	var heritage *ast.NodeList
+	switch node.Kind {
+	case ast.KindClassDeclaration:
+		heritage = node.AsClassDeclaration().HeritageClauses
+	case ast.KindClassExpression:
+		heritage = node.AsClassExpression().HeritageClauses
+	default:
+		return false
+	}
+	if heritage == nil {
+		return false
+	}
+
+	for _, clause := range heritage.Nodes {
+		if clause.Kind != ast.KindHeritageClause {
+			continue
+		}
+		types := clause.AsHeritageClause().Types
+		if types == nil {
+			continue
+		}
+		for _, typeNode := range types.Nodes {
+			if typeNode.Kind != ast.KindExpressionWithTypeArguments {
+				continue
+			}
+			if isComponentBase(typeNode.AsExpressionWithTypeArguments().Expression) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isComponentBase reports whether an extends target names a React component base class.
+//
+// `React.Component`, `React.PureComponent`, and the bare `Component` and `PureComponent` a file
+// importing them directly writes. The namespaced form checks the object is React specifically,
+// because `Foo.Component` is somebody else's class.
+func isComponentBase(expression *ast.Node) bool {
+	if expression == nil {
+		return false
+	}
+	switch expression.Kind {
+	case ast.KindIdentifier:
+		return isComponentBaseName(expression.Text())
+
+	case ast.KindPropertyAccessExpression:
+		access := expression.AsPropertyAccessExpression()
+		if !isIdentifierNamed(access.Expression, reactPragma) {
+			return false
+		}
+		name := access.Name()
+		return name != nil && name.Kind == ast.KindIdentifier && isComponentBaseName(name.Text())
+	}
+	return false
+}
+
+// isComponentBaseName accepts the two base classes a component may extend.
+func isComponentBaseName(name string) bool {
+	return name == "Component" || name == "PureComponent"
+}
+
+// EnclosingComponent returns the nearest ancestor that is a component by either definition, or nil.
+//
+// Both definitions are searched in one walk rather than in two passes, because a rule asking "am I
+// inside a component" does not care which era wrote it, and two walks would let the answer depend
+// on which ran first.
+//
+// The node itself is considered, so a rule that has already matched a class can ask this without
+// stepping to the parent first.
+func EnclosingComponent(node *ast.Node) *ast.Node {
+	for current := node; current != nil; current = current.Parent {
+		if IsEs6ComponentClass(current) || IsEs5ComponentCall(current) {
+			return current
+		}
+	}
+	return nil
+}
+
+// isIdentifierNamed reports whether an expression is exactly this identifier.
+//
+// Parentheses are skipped because `(React).createElement(...)` is the same call, and a check on the
+// raw node would decline it while looking correct.
+func isIdentifierNamed(expression *ast.Node, name string) bool {
+	expression = ast.SkipParentheses(expression)
+	return expression != nil && expression.Kind == ast.KindIdentifier && expression.Text() == name
+}

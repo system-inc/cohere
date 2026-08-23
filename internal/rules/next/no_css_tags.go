@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/jsx"
 )
 
 var messageNoCssTags = rule.Message{
@@ -39,17 +40,17 @@ var NoCssTags = rule.Rule{
 	Name: "no-css-tags",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
-			tagName, attributes := jsxElementParts(node)
-			if !isIntrinsicElementNamed(tagName, "link") {
+			tagName, attributes := jsx.ElementParts(node)
+			if !jsx.IsIntrinsicElementNamed(tagName, "link") {
 				return
 			}
 
-			relationship, hasRelationship := stringAttributeValue(attributes, "rel", matchExactly)
+			relationship, hasRelationship := jsx.StringAttributeValue(attributes, "rel", jsx.MatchExactly)
 			if !hasRelationship || relationship != "stylesheet" {
 				return
 			}
 
-			reference, hasReference := stringAttributeValue(attributes, "href", matchExactly)
+			reference, hasReference := jsx.StringAttributeValue(attributes, "href", jsx.MatchExactly)
 			if !hasReference {
 				return
 			}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/jsx"
 )
 
 var messageGoogleFontPreconnect = rule.Message{
@@ -41,12 +42,12 @@ var GoogleFontPreconnect = rule.Rule{
 	Name: "google-font-preconnect",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
-			tagName, attributes := jsxElementParts(node)
-			if !isIntrinsicElementNamed(tagName, "link") {
+			tagName, attributes := jsx.ElementParts(node)
+			if !jsx.IsIntrinsicElementNamed(tagName, "link") {
 				return
 			}
 
-			reference, hasReference := stringAttributeValue(attributes, "href", matchIgnoringCase)
+			reference, hasReference := jsx.StringAttributeValue(attributes, "href", jsx.MatchIgnoringCase)
 			if !hasReference {
 				return
 			}
@@ -57,7 +58,7 @@ var GoogleFontPreconnect = rule.Rule{
 			// A `rel` that cannot be read as a string is treated as not saying `preconnect`, which
 			// is oxc's `is_none_or` and is the stricter reading: the rule reports unless it can see
 			// the fix in the source.
-			relationship, hasRelationship := stringAttributeValue(attributes, "rel", matchIgnoringCase)
+			relationship, hasRelationship := jsx.StringAttributeValue(attributes, "rel", jsx.MatchIgnoringCase)
 			if hasRelationship && relationship == "preconnect" {
 				return
 			}

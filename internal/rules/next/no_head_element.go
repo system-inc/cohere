@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/jsx"
 )
 
 var messageNoHeadElement = rule.Message{
@@ -50,8 +51,8 @@ var NoHeadElement = rule.Rule{
 		}
 
 		report := func(node *ast.Node) {
-			tagName, _ := jsxElementParts(node)
-			if !isIntrinsicElementNamed(tagName, "head") {
+			tagName, _ := jsx.ElementParts(node)
+			if !jsx.IsIntrinsicElementNamed(tagName, "head") {
 				return
 			}
 			ctx.ReportNode(node, messageNoHeadElement)

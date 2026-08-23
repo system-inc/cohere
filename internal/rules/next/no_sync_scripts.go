@@ -3,6 +3,7 @@ package next
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/jsx"
 )
 
 var messageNoSyncScripts = rule.Message{
@@ -33,17 +34,17 @@ var NoSyncScripts = rule.Rule{
 	Name: "no-sync-scripts",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
-			tagName, attributes := jsxElementParts(node)
-			if !isIntrinsicElementNamed(tagName, "script") {
+			tagName, attributes := jsx.ElementParts(node)
+			if !jsx.IsIntrinsicElementNamed(tagName, "script") {
 				return
 			}
 			// A <script> with no src is inline. It blocks the parser too, but it has no network
 			// fetch to defer, and `async` and `defer` have no meaning on it, so upstream leaves it
 			// alone rather than asking for an attribute that would do nothing.
-			if !hasAttributeNamed(attributes, "src", matchExactly) {
+			if !jsx.HasAttributeNamed(attributes, "src", jsx.MatchExactly) {
 				return
 			}
-			if hasAttributeNamed(attributes, "async", matchExactly) || hasAttributeNamed(attributes, "defer", matchExactly) {
+			if jsx.HasAttributeNamed(attributes, "async", jsx.MatchExactly) || jsx.HasAttributeNamed(attributes, "defer", jsx.MatchExactly) {
 				return
 			}
 			ctx.ReportNode(node, messageNoSyncScripts)
