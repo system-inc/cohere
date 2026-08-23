@@ -1,0 +1,338 @@
+// Package differential compares what verify found against what the gate it replaces found.
+//
+// The claim this package exists to test is "verify agrees with the gate." That claim is not one
+// claim. With 181 rules configured it is 181 separate claims, and an aggregate agreement can hold
+// while any number of individual rules disagree in ways that cancel: verify missing three findings
+// on one rule and inventing three on another sums to zero and looks like agreement.
+//
+// So a difference is keyed by file, line, and rule, and the report is per rule rather than a count.
+//
+// The harder problem is the empty diff. Two gates that both report nothing produce identical output
+// whether one of them checked the tree or checked no files at all, and that is precisely the failure
+// the gate verify replaces shipped for days. A diff harness inherits that failure mode and makes it
+// worse, because an empty diff over two vacuous runs reads as proof of agreement.
+//
+// The defense is Population, carried on every Report. A comparison states how many findings each
+// side produced and how many files each side says it walked, so a reader can tell "they agree" from
+// "neither of them looked." Compare refuses to call a run comparable when a side reports no coverage
+// at all, and SelfTest proves the detector can detect by planting a violation each side sees alone.
+package differential
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
+// Side names which gate produced a finding.
+type Side string
+
+const (
+	// SideVerify is ours: the Go binary.
+	SideVerify Side = "verify"
+	// SideGate is theirs: oxlint behind RunCachedOxlint.
+	SideGate Side = "gate"
+)
+
+// Finding is one report from one gate, reduced to the parts both gates can express.
+//
+// Column is deliberately absent from the key. The two gates locate a finding at different offsets
+// within the same line often enough that keying on column would report a difference for every
+// finding they agree about, drowning the real disagreements in noise. Line is the granularity a
+// person acts on.
+type Finding struct {
+	File    string
+	Line    int
+	Rule    string
+	Message string
+	Side    Side
+}
+
+// Key is the identity two findings must share to be called the same finding.
+func (finding Finding) Key() string {
+	return fmt.Sprintf("%s:%d:%s", finding.File, finding.Line, finding.Rule)
+}
+
+// Population is what a run covered, as distinct from what it found.
+//
+// Without this a Report cannot distinguish agreement from mutual silence. FilesWalked is what the
+// side says about itself and is therefore a claim rather than proof, but a side claiming zero files
+// is enough on its own to disqualify the comparison, which is the case that matters.
+type Population struct {
+	Findings    int
+	FilesWalked int
+	Rules       int
+}
+
+// Difference is one finding exactly one side reported.
+type Difference struct {
+	Finding Finding
+	// OnlyOn is the side that reported it. The other side saw this file and this rule and said
+	// nothing, which is the fact a reader has to classify.
+	OnlyOn Side
+	// Classification is why the two sides disagree, when it can be determined mechanically.
+	Classification Classification
+}
+
+// Classification is the mechanical part of "why do these disagree."
+//
+// It is deliberately coarse. Most differences are configuration rather than correctness, and the
+// classes below are the ones a program can decide from the two runs alone. Anything requiring a
+// judgment about what a rule ought to do is left Unclassified rather than guessed, because a wrong
+// classification is worse than none: it tells the reader the question has been answered.
+type Classification string
+
+const (
+	// ClassificationNotPorted means verify has no rule by this name, so the gate finding it alone
+	// is expected and says nothing about agreement. This is the largest class during the migration
+	// and the one that must not be mistaken for a defect.
+	ClassificationNotPorted Classification = "not-ported"
+	// ClassificationNotConfigured means the rule exists in verify but the config never enables it,
+	// so verify ran it over no files.
+	ClassificationNotConfigured Classification = "not-configured"
+	// ClassificationBothActive means both sides have this rule and both had it enabled, and they
+	// still disagree on this file and line. This is the class that is always a defect in one of the
+	// two gates, and the only class that blocks the claim.
+	ClassificationBothActive Classification = "both-active"
+	// ClassificationUnclassified is an honest absence rather than a default. It means the harness
+	// could not decide from the evidence it has.
+	ClassificationUnclassified Classification = "unclassified"
+)
+
+// RuleAgreement is the verdict for one rule across the whole tree.
+type RuleAgreement struct {
+	Rule           string
+	Shared         int
+	OnlyVerify     int
+	OnlyGate       int
+	Classification Classification
+}
+
+// Agrees reports whether the two gates said the same thing about this rule everywhere.
+func (agreement RuleAgreement) Agrees() bool {
+	return agreement.OnlyVerify == 0 && agreement.OnlyGate == 0
+}
+
+// Report is a whole comparison: what differed, per rule, over what population.
+type Report struct {
+	VerifyPopulation Population
+	GatePopulation   Population
+	Differences      []Difference
+	Agreements       []RuleAgreement
+	// Comparable is false when a side reported no coverage, which makes the diff meaningless
+	// regardless of how it looks. An empty Differences with Comparable false is the vacuous case.
+	Comparable bool
+	// NotComparableReason states which side had nothing and is empty when Comparable is true.
+	NotComparableReason string
+}
+
+// Agreed reports whether every rule active on both sides agreed.
+//
+// Rules the migration has not reached yet do not count against agreement, because a rule verify
+// has never claimed to implement cannot disagree with anything. Only ClassificationBothActive does.
+func (report Report) Agreed() bool {
+	if !report.Comparable {
+		return false
+	}
+	for _, difference := range report.Differences {
+		if difference.Classification == ClassificationBothActive {
+			return false
+		}
+	}
+	return true
+}
+
+// Inputs is everything Compare needs that it cannot derive from the findings themselves.
+type Inputs struct {
+	VerifyFindings   []Finding
+	GateFindings     []Finding
+	VerifyPopulation Population
+	GatePopulation   Population
+	// VerifyRules is every rule name compiled into verify. A gate finding whose rule is absent here
+	// is not-ported rather than a disagreement.
+	VerifyRules map[string]bool
+	// ConfiguredRules is every rule name the lint config enables. A verify rule absent here ran over
+	// no files by design.
+	ConfiguredRules map[string]bool
+}
+
+// Compare diffs two runs and classifies every difference.
+func Compare(inputs Inputs) Report {
+	report := Report{
+		VerifyPopulation: inputs.VerifyPopulation,
+		GatePopulation:   inputs.GatePopulation,
+		Comparable:       true,
+	}
+
+	// The vacuity guard, before any diffing. A side that walked no files cannot be compared against
+	// one that did, and the diff would look clean rather than broken, so this is a refusal and not a
+	// warning. This is the exact shape of failure the gate verify replaces shipped: green over zero.
+	switch {
+	case inputs.VerifyPopulation.FilesWalked == 0:
+		report.Comparable = false
+		report.NotComparableReason = "verify walked no files, so its silence is not a result"
+	case inputs.GatePopulation.FilesWalked == 0:
+		report.Comparable = false
+		report.NotComparableReason = "the gate walked no files, so its silence is not a result"
+	}
+
+	verifyByKey := indexByKey(inputs.VerifyFindings)
+	gateByKey := indexByKey(inputs.GateFindings)
+
+	perRule := map[string]*RuleAgreement{}
+	agreementFor := func(ruleName string) *RuleAgreement {
+		if existing, found := perRule[ruleName]; found {
+			return existing
+		}
+		created := &RuleAgreement{Rule: ruleName}
+		perRule[ruleName] = created
+		return created
+	}
+
+	for key, finding := range verifyByKey {
+		agreement := agreementFor(finding.Rule)
+		if _, sharedWithGate := gateByKey[key]; sharedWithGate {
+			agreement.Shared++
+			continue
+		}
+		agreement.OnlyVerify++
+		report.Differences = append(report.Differences, Difference{
+			Finding:        finding,
+			OnlyOn:         SideVerify,
+			Classification: classify(finding.Rule, SideVerify, inputs),
+		})
+	}
+
+	for key, finding := range gateByKey {
+		if _, sharedWithVerify := verifyByKey[key]; sharedWithVerify {
+			continue
+		}
+		agreement := agreementFor(finding.Rule)
+		agreement.OnlyGate++
+		report.Differences = append(report.Differences, Difference{
+			Finding:        finding,
+			OnlyOn:         SideGate,
+			Classification: classify(finding.Rule, SideGate, inputs),
+		})
+	}
+
+	// A rule's own classification is asked from the side that actually differed, because
+	// not-ported is only meaningful for a gate finding: verify cannot report a rule it does not
+	// compile. A rule that agreed everywhere is classified from the verify side, where "both sides
+	// had it on" is the true and useful answer.
+	for ruleName, agreement := range perRule {
+		side := SideVerify
+		if agreement.OnlyGate > 0 && agreement.OnlyVerify == 0 {
+			side = SideGate
+		}
+		agreement.Classification = classify(ruleName, side, inputs)
+		report.Agreements = append(report.Agreements, *agreement)
+	}
+
+	sort.Slice(report.Agreements, func(first, second int) bool {
+		return report.Agreements[first].Rule < report.Agreements[second].Rule
+	})
+	sort.Slice(report.Differences, func(first, second int) bool {
+		left, right := report.Differences[first].Finding, report.Differences[second].Finding
+		if left.File != right.File {
+			return left.File < right.File
+		}
+		if left.Line != right.Line {
+			return left.Line < right.Line
+		}
+		return left.Rule < right.Rule
+	})
+
+	return report
+}
+
+// classify decides why a rule's findings differ, from the two runs alone.
+func classify(ruleName string, onlyOn Side, inputs Inputs) Classification {
+	knownToVerify := inputs.VerifyRules[ruleName]
+	configured := inputs.ConfiguredRules[ruleName]
+
+	switch {
+	// The gate found it and verify has no such rule. Expected during the migration, and the reason
+	// a raw count of differences is not a measure of disagreement.
+	case onlyOn == SideGate && !knownToVerify:
+		return ClassificationNotPorted
+	// Verify has the rule but nothing turned it on, so it walked no files.
+	case knownToVerify && !configured:
+		return ClassificationNotConfigured
+	// Both sides had this rule and both had it on. Somebody is wrong.
+	case knownToVerify && configured:
+		return ClassificationBothActive
+	default:
+		return ClassificationUnclassified
+	}
+}
+
+func indexByKey(findings []Finding) map[string]Finding {
+	byKey := make(map[string]Finding, len(findings))
+	for _, finding := range findings {
+		byKey[finding.Key()] = finding
+	}
+	return byKey
+}
+
+// Write renders a whole comparison for a person.
+//
+// The population line comes first and unconditionally, before any verdict, because the question a
+// reader must be able to answer before believing a diff is "did both of these actually run."
+func Write(out *strings.Builder, report Report) {
+	fmt.Fprintf(out, "population: verify %d findings over %d files (%d rules) · gate %d findings over %d files\n",
+		report.VerifyPopulation.Findings, report.VerifyPopulation.FilesWalked, report.VerifyPopulation.Rules,
+		report.GatePopulation.Findings, report.GatePopulation.FilesWalked,
+	)
+
+	if !report.Comparable {
+		fmt.Fprintf(out, "✗ not comparable: %s\n", report.NotComparableReason)
+		return
+	}
+
+	byClassification := map[Classification]int{}
+	for _, difference := range report.Differences {
+		byClassification[difference.Classification]++
+	}
+
+	fmt.Fprintf(out, "\ndifferences: %d total — %d both-active, %d not-ported, %d not-configured, %d unclassified\n",
+		len(report.Differences),
+		byClassification[ClassificationBothActive],
+		byClassification[ClassificationNotPorted],
+		byClassification[ClassificationNotConfigured],
+		byClassification[ClassificationUnclassified],
+	)
+
+	// Both-active differences print in full, individually, because each one is a defect in one of
+	// the two gates and a count alone is not actionable. The other classes print per rule, because
+	// a hundred not-ported findings from one unported rule is one fact, not a hundred.
+	for _, difference := range report.Differences {
+		if difference.Classification != ClassificationBothActive {
+			continue
+		}
+		fmt.Fprintf(out, "\n  %s:%d  %s\n    only on: %s\n    %s\n",
+			difference.Finding.File, difference.Finding.Line, difference.Finding.Rule,
+			difference.OnlyOn, difference.Finding.Message,
+		)
+	}
+
+	fmt.Fprintf(out, "\nper-rule agreement:\n")
+	for _, agreement := range report.Agreements {
+		verdict := "agree"
+		if !agreement.Agrees() {
+			verdict = "DIFFER"
+		}
+		fmt.Fprintf(out, "  %-8s %-52s shared %-5d only-verify %-5d only-gate %-5d  %s\n",
+			verdict, agreement.Rule, agreement.Shared, agreement.OnlyVerify, agreement.OnlyGate,
+			agreement.Classification,
+		)
+	}
+
+	if report.Agreed() {
+		fmt.Fprintf(out, "\n✓ agrees: every rule active on both sides reported the same findings\n")
+		return
+	}
+	fmt.Fprintf(out, "\n✗ disagrees: %d findings differ on rules both sides had enabled\n",
+		byClassification[ClassificationBothActive],
+	)
+}
