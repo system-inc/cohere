@@ -134,6 +134,37 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(t *te
 		}, libraryFilePath))
 	})
 
+	// Two theme files sharing a component prefix, which the tree actually contains: there are two
+	// CalendarTheme.ts files, and the second declares a suffix the first does not.
+	//
+	// Different suffixes accumulate. `themes[prefix]` is created once and each suffix is written
+	// into it, which is what the original's `Object.assign(existing, suffixMap)` does. Verified by
+	// executing the original's merge on both shapes rather than by reading it, because the reading
+	// admits two interpretations and only one of them is what `Object.assign` performs.
+	t.Run("two theme files sharing a prefix both contribute", func(t *testing.T) {
+		files := map[string]string{
+			"/repository/libraries/structure/source/components/calendars/CalendarTheme.ts":     "export interface CalendarVariantsInterface {\n    A: string;\n}\n",
+			"/repository/libraries/structure/source/components/time/calendar/CalendarTheme.ts": "export interface CalendarSizesInterface {\n    Base: string;\n}\n",
+			libraryFilePath: "export const a = <Calendar variant=\"A\" size=\"Base\" />;\n",
+		}
+		ruletest.ExpectClean(t, ruletest.RunTypedFiles(t, BoundaryNoProjectThemeValue, files, libraryFilePath))
+	})
+
+	// The same pair, asking about values neither file defines. Without this the case above passes
+	// even if the whole Calendar entry were missing from the cache, because a rule that finds no
+	// theme declines silently. This is the half that tells a merge apart from a loss.
+	t.Run("both contributed suffixes are actually enforced", func(t *testing.T) {
+		for _, attribute := range []string{"variant=\"Nope\"", "size=\"Nope\""} {
+			files := map[string]string{
+				"/repository/libraries/structure/source/components/calendars/CalendarTheme.ts":     "export interface CalendarVariantsInterface {\n    A: string;\n}\n",
+				"/repository/libraries/structure/source/components/time/calendar/CalendarTheme.ts": "export interface CalendarSizesInterface {\n    Base: string;\n}\n",
+				libraryFilePath: "export const a = <Calendar " + attribute + " />;\n",
+			}
+			ruletest.ExpectFindings(t, ruletest.RunTypedFiles(t, BoundaryNoProjectThemeValue, files, libraryFilePath),
+				"forbiddenThemeValue")
+		}
+	})
+
 	// The filename pattern, which is the one piece of the original's discovery that is reproduced
 	// rather than replaced. A hook named useTheme.ts also ends in Theme.ts and is not a theme; the
 	// leading capital is what separates them. On the real tree that file exists and carries no theme

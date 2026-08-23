@@ -225,6 +225,22 @@ func themeValuesFromProgram(ctx rule.Context) map[string]map[string][]string {
 				if len(keys) == 0 {
 					continue
 				}
+				// Accumulate rather than replace, which matters because the tree has two
+				// `CalendarTheme.ts` files and one declares a suffix the other does not. Creating
+				// the inner map only when absent means a second file contributing `Sizes` does not
+				// discard the first file's `Variants`.
+				//
+				// A same-prefix, same-suffix collision still keeps the last file, and that is the
+				// original's behavior rather than a shortfall: its `Object.assign(existing,
+				// suffixMap)` copies suffix keys onto the existing map, so distinct suffixes
+				// accumulate and a repeated one overwrites. Established by executing the original's
+				// merge on both shapes, not by reading it, because the reading admits two
+				// interpretations and only one is what `Object.assign` does.
+				//
+				// Worth knowing rather than fixing: two files declaring the same suffix for one
+				// component is a duplicate the library should not have, and silently unioning them
+				// would hide that instead of reporting it. Whether the duplicate calendars should
+				// both exist is a question for the library rather than for its linter.
 				if themes[componentPrefix] == nil {
 					themes[componentPrefix] = map[string][]string{}
 				}
