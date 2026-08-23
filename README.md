@@ -79,13 +79,33 @@ binary package, the same shape oxlint and tsgo use:
 
 ```
 verify                  the package you install; a Node launcher, no binary
-@verify/darwin-arm64    ~14 MB Go binary
+@verify/darwin-arm64    ~43 MB Go binary, stripped
 @verify/darwin-x64
 @verify/linux-arm64     for CI and containers
 @verify/linux-x64
 @verify/win32-arm64
 @verify/win32-x64
 ```
+
+Every size here names the build that produced it, because the same commit measures 43.1 MB stripped
+and 61.9 MB from a plain `go build`. An 18 MB spread under one label is not a measurement, it is two
+measurements sharing a name, and two people quoting sizes from different builds will both be right
+and still disagree.
+
+Most of that is architecture rather than catalog. Attributed by symbol on an unstripped build,
+measured at 06:23: 23.2 MB of Go runtime and type metadata, 7.2 MB more of `go:` metadata, 9.1 MB of
+typescript-go, 1.54 MB of goja, and 0.18 MB of our rules. Against the 56 rules the binary reported
+running in that same measurement, that is about 3.3 KB per rule, so porting the remaining hundred
+adds under half a megabyte. Embedding a whole type checker and a whole JavaScript interpreter is what
+costs, and both were decided long before the rules were.
+
+Two traps live in that paragraph, and both cost someone time tonight. `go tool nm` reports every
+symbol as size zero on a stripped binary, so an attribution run against a release build sums to
+nothing rather than failing — the numbers above come from an unstripped build for that reason. And a
+standalone program measures a dependency's marginal cost including everything it drags in, which is a
+different quantity from its share of a binary that already paid for most of that: goja measures
+1.54 MB by attribution and 8.47 MB as the marginal cost of adding it to an empty program. Both
+are correct; quoting one to answer the other's question is not.
 
 The platform packages are `optionalDependencies` pinned to the exact version, and npm picks one by
 matching the `os` and `cpu` fields against the machine. Those fields are generated from the same
@@ -134,9 +154,12 @@ The flag is off by default, because the formatter is not wired into verify yet a
 not demand a built fork for a feature nothing reaches. When it is on, the build refuses a fork that
 is absent, unbuilt, missing any required bundle, holding a zero-byte one, or whose bundles are older
 than its tracked source. It refuses before cross-compiling anything, so a stale fork costs a second
-rather than six builds. The subset embedded is `standalone.js`, `plugins/estree.js`, and
-`plugins/typescript.js` — 2.3 MB measured, against 18 MB for the fork's whole `dist/prettier`, which
-would more than double a 14 MB binary to carry formatters for languages this tool does not check.
+rather than six builds. The bundle list is `prettier.BundleFiles` itself rather than a copy of it —
+eight bundles, 2.0 MB measured, against 12 MB for the fork's whole `dist/prettier`. Keeping a second
+list here was a real defect and not a hypothetical one: this file once named three bundles, chosen as
+the minimal set that formats TypeScript, while the engine hard-errors on any of its eight being
+absent. The guard would have passed a release missing five, and the binary would have died the first
+time anyone formatted markdown.
 
 Staleness is measured by modification time against the fork's newest tracked source file, not by
 recording a commit beside the bundles. A recorded commit only catches a rebuild someone remembered
