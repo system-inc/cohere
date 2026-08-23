@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
 )
 
@@ -38,6 +38,13 @@ type ConsistencyNoAbbreviatedIdentifierOptions struct {
 }
 
 // abbreviationCandidatePattern is every spelling any branch below could possibly match, in one test.
+//
+// **This is no longer the runtime gate.** `isAbbreviationCandidate` in abbreviation_gate.go answers
+// the same question with lookups, 76 times faster, and this pattern is now the specification it is
+// tested against: `abbreviation_gate_test.go` asserts the gate admits every name this matches, over
+// 82,367 identifiers from the ahra tree. Keeping the pattern is what makes that test meaningful, so
+// a branch gaining a new abbreviation still updates this first and the differential test then fails
+// until the gate follows.
 //
 // This exists purely to decide whether a name is worth spending the rest of the rule on, and it is
 // the reason the guards are ordered the way they are. In the TypeScript original the expensive step
@@ -363,7 +370,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 				// Cheapest question first: could this name match any branch at all? Everything below
 				// is a skip or a report keyed on the same spellings, so a name no branch could match
 				// reports nothing whichever order the guards run in. See the pattern's own comment.
-				if !abbreviationCandidatePattern.MatchString(name) {
+				if !isAbbreviationCandidate(name) {
 					return
 				}
 
