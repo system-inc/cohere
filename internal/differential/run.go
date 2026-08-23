@@ -295,11 +295,23 @@ func checkSharedControl(control Control, result ControlResult, verifyFindings []
 	return result
 }
 
-// controlMatches is whether a finding is the one a control planted.
+// controlMatches is whether a finding is the specific one a control planted.
 //
-// Matched on rule and path suffix rather than on an exact path, because the two gates print paths
-// differently and the parser normalizes them against the tree root, so the stored path is relative
-// while the control names a relative path of its own.
+// Suffix rather than exact path, because the two gates print paths differently and the parser
+// normalizes them against the tree root, so the stored path is relative while the control names a
+// relative path of its own.
+//
+// The conjunction is load-bearing and both halves have to stay. Dropping the path check leaves a
+// rule check that answers correctly on this tree only because every rule a control declares happens
+// to appear in no other file. That is a property of today's controls rather than of this function,
+// and it holds until the first planted rule also fires somewhere real, at which point a finding
+// gets attributed to a control that did not plant it. A mutation that removed the path half was
+// read as equivalent because the totals matched; the totals matched for the wrong reason.
+//
+// This is deliberately narrower than markPlantedDifferences, which asks only whether a finding
+// landed in a planted file. The two questions are different: this one verifies a named control
+// fired, and a control that fired somewhere else has not fired. That one asks whether the harness
+// caused a finding at all, where the rule is irrelevant because the file would not exist otherwise.
 func controlMatches(control Control, finding Finding) bool {
 	if finding.Rule != control.Rule {
 		return false

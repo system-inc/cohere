@@ -561,3 +561,64 @@ func TestAPlantedBothActiveDifferenceDoesNotBlockAgreement(t *testing.T) {
 		t.Fatal("once marked as planted, the harness's own control must not count against agreement")
 	}
 }
+
+// Both halves of controlMatches are required, and the rule half alone is not enough.
+//
+// This exists because a mutation dropping the path check was read as equivalent: it produced the
+// same totals on this tree, so it looked like a no-op. It was not. A rule-only check answers
+// correctly here only because every rule a control declares happens to appear in no other file,
+// which is a property of today's controls rather than of the matcher. The moment a planted rule
+// also fires somewhere real, a finding gets attributed to a control that did not plant it.
+//
+// Pinned as a property rather than left to the totals, because the totals agreed while the reason
+// did not, and a test that only checks the total would agree with them.
+func TestControlMatchesNeedsBothTheRuleAndThePath(t *testing.T) {
+	control := Control{
+		Name:         "gate-only",
+		RelativePath: "control/PlantedOrder.ts",
+		Rule:         "consistency-organize-imports",
+		ExpectedSide: SideGate,
+	}
+
+	if !controlMatches(control, Finding{File: "control/PlantedOrder.ts", Line: 3, Rule: "consistency-organize-imports"}) {
+		t.Fatal("the finding this control planted must match")
+	}
+
+	// Same rule, different file. This is the live case: the gate's ordering rule also fires on the
+	// other control's file, and attributing it here would credit a control that did not plant it.
+	if controlMatches(control, Finding{File: "control/PlantedImport.ts", Line: 3, Rule: "consistency-organize-imports"}) {
+		t.Fatal("a finding of the same rule in a different file must not match: the path half is what rejects it")
+	}
+
+	// Same file, different rule. The control did not plant this finding either.
+	if controlMatches(control, Finding{File: "control/PlantedOrder.ts", Line: 1, Rule: "consistency-no-enum"}) {
+		t.Fatal("a different rule in the control's own file must not match: the rule half is what rejects it")
+	}
+}
+
+// markPlantedDifferences asks a deliberately different question from controlMatches.
+//
+// One verifies a named control fired, and a control that fired somewhere else has not fired. The
+// other asks whether the harness caused a finding at all, where the rule is irrelevant because the
+// file would not exist otherwise. Conflating them in either direction is a defect, and both
+// directions have now been written by mistake, so both are pinned.
+func TestTheTwoMatchersAnswerDifferentQuestions(t *testing.T) {
+	control := Control{
+		Name:         "gate-only",
+		RelativePath: "control/PlantedOrder.ts",
+		Rule:         "consistency-organize-imports",
+		ExpectedSide: SideGate,
+	}
+	// A rule the control never declared, in the file the control planted.
+	stray := Finding{File: "control/PlantedOrder.ts", Line: 1, Rule: "consistency-require-constant-casing"}
+
+	if controlMatches(control, stray) {
+		t.Fatal("controlMatches must reject a rule the control did not declare, even in its own file")
+	}
+
+	report := Report{Differences: []Difference{{Finding: stray}}}
+	markPlantedDifferences(&report, []Control{control})
+	if len(report.ObservedDifferences()) != 0 {
+		t.Fatal("markPlantedDifferences must claim any finding in a planted file, whatever rule produced it")
+	}
+}
