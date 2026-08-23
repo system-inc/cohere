@@ -14,6 +14,12 @@ var messageUsePropertiesNotProps = rule.Message{
 		"rules exist to prevent everywhere else.",
 }
 
+var messageRenameToProperties = rule.Message{
+	Id: "renameToProperties",
+	Description: "Rename the parameter to `properties`. The uses in the body have to be updated " +
+		"too, and only you can tell which `props` in there are this parameter.",
+}
+
 // ReactComponentRequirePropertiesParameter flags a component whose first parameter is named `props`.
 //
 //	valid:   function Button(properties: ButtonProperties) { ... }
@@ -23,15 +29,21 @@ var messageUsePropertiesNotProps = rule.Message{
 // Only the name, and only when it is exactly `props`. A destructured parameter has no single name
 // to judge and is another rule's business; a parameter named anything else is the author's choice.
 //
-// Fixable, since renaming a parameter is one identifier with one right answer. The fix rewrites
-// only the declaration, not the uses, which the fixer's convergence check turns into a loud build
-// error rather than a silent one: `props.label` inside a function whose parameter is now
-// `properties` does not compile.
+// A suggestion rather than a fix, and the distinction is the whole of it.
 //
-// That is worth stating plainly because it looks like a defect. The original does the same, and the
-// alternative is a fix that renames every reference and has to decide which `props` in the body are
-// the parameter and which are somebody else's. A rename that stops at the declaration fails
-// immediately and visibly; one that guesses at references fails quietly and in the wrong place.
+// The rename rewrites only the declaration, not the uses, so `props.label` inside a function whose
+// parameter is now `properties` does not compile. That is deliberate: the alternative renames every
+// reference and has to decide which `props` in the body are the parameter and which are somebody
+// else's, and a rename that stops at the declaration fails immediately and visibly where one that
+// guesses at references fails quietly and in the wrong place.
+//
+// **But a deliberate visible break only works if somebody sees it.** This shipped as
+// `ReportNodeWithFixes`, which the engine applies unattended, so the entire argument above rested on
+// a human reading a diff that nothing showed them. The reasoning was right and the verb was wrong:
+// a fix preserves what the code means, and this changes it by design.
+//
+// So the break stays and the automation goes. The author is shown the rename, and is the one who
+// then updates the body, which is the work only they can do correctly anyway.
 var ReactComponentRequirePropertiesParameter = rule.Rule{
 	Name: "react-component-require-properties-parameter",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -53,7 +65,10 @@ var ReactComponentRequirePropertiesParameter = rule.Rule{
 			if name == nil || name.Kind != ast.KindIdentifier || name.Text() != "props" {
 				return
 			}
-			ctx.ReportNodeWithFixes(name, messageUsePropertiesNotProps, ctx.ReplaceNode(name, "properties"))
+			ctx.ReportNodeWithSuggestions(name, messageUsePropertiesNotProps, rule.Suggestion{
+				Message: messageRenameToProperties,
+				Fixes:   []rule.Fix{ctx.ReplaceNode(name, "properties")},
+			})
 		}
 
 		return rule.Listeners{

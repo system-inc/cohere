@@ -124,16 +124,42 @@ func TestReactComponentRequirePropertiesParameterStaysSilent(t *testing.T) {
 	}
 }
 
-// The fix renames the declaration and stops there.
+// The suggestion renames the declaration and stops there.
 //
-// Asserted against the resulting source. The uses inside the body are deliberately not rewritten,
-// which the assertion makes visible rather than leaving to a reader's assumption: the result does
-// not compile, and that is the intended failure mode. A rename that guesses which `props` in a body
-// are the parameter fails quietly and in the wrong place; one that stops at the declaration fails
+// Asserted against the resulting source, and the result deliberately does not compile: the uses
+// inside the body are left alone, because a rename that guesses which `props` in a body are the
+// parameter fails quietly and in the wrong place while one that stops at the declaration fails
 // immediately and says exactly where.
-func TestReactComponentRequirePropertiesParameterFixRenamesTheDeclaration(t *testing.T) {
-	ruletest.ExpectFixedSource(t,
-		ruletest.Run(t, ReactComponentRequirePropertiesParameter, propertiesParameterFile,
-			"export function Button(props: { label: string }) {\n    return <button>{props.label}</button>;\n}\n"),
-		"export function Button(properties: { label: string }) {\n    return <button>{props.label}</button>;\n}\n")
+//
+// It is a suggestion rather than a fix precisely because of that. This shipped as a fix, which the
+// engine applies unattended, so the whole argument for an intentional visible break rested on a
+// human reading a diff nothing showed them. A fix preserves what the code means; this changes it by
+// design, so the author has to be the one who accepts it.
+//
+// Asserted through the suggestion rather than through ExpectFixedSource, which reads only the
+// automatic fixes and correctly refuses to check a rule that proposes none.
+func TestReactComponentRequirePropertiesParameterSuggestsRenamingTheDeclaration(t *testing.T) {
+	const source = "export function Button(props: { label: string }) {\n" +
+		"    return <button>{props.label}</button>;\n}\n"
+	const wanted = "export function Button(properties: { label: string }) {\n" +
+		"    return <button>{props.label}</button>;\n}\n"
+
+	result := ruletest.Run(t, ReactComponentRequirePropertiesParameter, propertiesParameterFile, source)
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+	}
+	if len(result.Diagnostics[0].Fixes) != 0 {
+		t.Fatalf("wanted no automatic fix, got %d", len(result.Diagnostics[0].Fixes))
+	}
+
+	suggestions := result.Diagnostics[0].Suggestions
+	if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
+		t.Fatalf("wanted one suggestion carrying one fix, got %d suggestions", len(suggestions))
+	}
+
+	fix := suggestions[0].Fixes[0]
+	rewritten := source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
+	if rewritten != wanted {
+		t.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, wanted)
+	}
 }
