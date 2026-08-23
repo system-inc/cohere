@@ -36,6 +36,63 @@ go run ./cmd/verify
 `verify` cannot verify itself — it is a Go program and its phases check TypeScript. This repo is
 gated by Go's own toolchain: `gofmt -l .`, `go vet ./...`, `go test ./...`, `go build ./...`.
 
+## Porting a rule
+
+Five things, each of which caught a defect the others could not. They are ordered by what they cost
+and what they find, not by importance.
+
+**Read the upstream corpus first.** oxc ships its pass and fail cases inline in every rule file, sixty
+to eighty per rule, at `~/Projects/system/oxc/crates/oxc_linter/src/rules/`. Reading them costs two
+minutes. They encode the cases a porter does not think of, **by definition**: a porter who had thought
+of them would have written them. A rule shipped past a twenty-case fixture pair and a three-guard
+mutation sweep, and oxc's own passing case found the false positive in ten minutes.
+
+**Port from oxc, not from another implementation.** oxc is what the gate runs, so the differential
+compares against it. A rule ported from `@typescript-eslint` or from rslint can be correct and still
+read as a difference, which makes the harness less meaningful for no gain. Cite the others as a second
+opinion; where they disagree, oxc wins and the disagreement earns a line in the commit.
+
+**Measure the precondition before writing.** Count what the rule is about on the real tree, and prefer
+a two-sided key: "3 violations, each carrying a disable comment" proves far more than a bare zero,
+because a zero is equally satisfied by a rule that cannot see. Re-measure your own count when it moves;
+a number large enough to feel like evidence stops you asking whether you counted the right thing.
+
+**Ship a fixture pair and run a mutation sweep.** Both directions, same commit, and every mutant
+confirmed to compile before it is trusted: a mutant that fails to build emits no failure line and reads
+exactly like a passing sweep. A survivor is one of three things and only the first wants a fixture:
+
+- the fixtures do not measure that branch, so write one
+- the branch cannot change an answer, so delete it
+- one behavior is held redundantly by two guards, so mutate them together
+
+**Run against the real tree before committing, not after.** Two false positives shipped past a full
+fixture pair because the fixtures were written from the same wrong belief as the code. The tree is the
+only check that does not share the author's assumptions.
+
+### What a fix costs
+
+`ReportNodeWithFixes` rewrites source, and the text is only half of it: a correct replacement over the
+wrong range writes the right characters into the wrong place. Pointing one deletion at an enclosing
+node instead of a statement removed an entire function with every existing assertion still passing. So
+`ruletest.ExpectFixedSource` is required for any rule that proposes fixes, and the fixture-pair guard
+enforces it.
+
+A port is not obliged to carry a defect it can see. Two rules here report without the fix their
+original ships, because those fixers drop type annotations, lose `async`, or replace a whole
+`VariableDeclaration` while reporting per declarator, which silently deletes a component. Reporting
+without a fix is the subset you can show correct.
+
+### Fidelity
+
+A port is faithful to what a rule **decides**, not to how it **obtains what it needs**. The originals
+walk the filesystem and read `process.cwd()` because ESLint hands them one file at a time and gives
+them no program. `verify` has the program. Reproducing a workaround for a constraint we do not have is
+not fidelity.
+
+Where a rule has no tree exposure and the upstream gives no reasoning, fidelity is the only available
+authority, and your own sense of what the rule should do is the thing most likely to be wrong. Record
+the intuitive reading beside the actual one so the next reader does not correct it back.
+
 ## The dispatcher
 
 Rules are compiled in rather than loaded, which is what makes them free to run. The cost is that
