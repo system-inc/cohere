@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -46,26 +47,18 @@ func messagesOf(diagnostics []*ast.Diagnostic) []string {
 	return rendered
 }
 
-// TestIncrementalProgramSkipsUnchangedFiles is the baseline the incremental path must match,
-// and it is deliberately NOT yet a test of that path.
+// TestIncrementalProgramSkipsUnchangedFiles is the control, and it is deliberately not a test
+// of the incremental path. TestIncrementalDiagnosticsSurvivesAChange below is that.
 //
-// Read this before trusting it: verify does not currently write a build info. Measured, not
-// assumed — after a full program.Build the project directory holds only the source and the
-// tsconfig. compiler.NewProgram does not emit one; producing a build info is incremental.
-// NewProgram plus an emit step, which is why tsgo writes one and verify does not. So leg one's
-// assertion that ReadBuildInfoProgram returns nil is true on EVERY run here, not only the
-// first, and no leg below is served from a cache.
+// This one never writes a build info, so nothing here is served from a cache: every leg runs
+// the full pass, and leg one's assertion that ReadBuildInfoProgram returns nil holds on every
+// run rather than only the first. That is the point. It establishes what the plant-and-heal
+// harness reports with no cache involved, which is the baseline the cached path has to
+// reproduce exactly.
 //
-// What this test therefore proves today: the plant-and-heal harness works, and these are the
-// findings the incremental path has to reproduce exactly once it is wired. That makes it the
-// control for the real test rather than the real test, and calling it the real test would be
-// the precise shape of failure this domain exists to prevent.
-//
-// The dangerous case, once the wiring lands, is warm-after-a-change: a stale snapshot that
-// silently reports yesterday's findings would be the fastest run we ever measured and would
-// look clean. The three legs below are shaped for that: cold is clean, a planted error is
-// found, removing it clears. A cache that never invalidates fails leg three; a cache that
-// reports nothing regardless fails leg two.
+// Keeping a no-cache control matters more here than it usually would: the failure this domain
+// exists to prevent is a cache that reports a clean tree forever, and a suite where every test
+// runs through the cache cannot tell that from a genuinely clean fixture.
 func TestIncrementalProgramSkipsUnchangedFiles(t *testing.T) {
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": incrementalConfig,
@@ -98,10 +91,8 @@ func TestIncrementalProgramSkipsUnchangedFiles(t *testing.T) {
 	// Leg one: cold. No build info exists, so ReadBuildInfoProgram must return nil, and that
 	// nil means rebuild-everything rather than an error.
 	//
-	// This currently passes for a second reason worth stating: verify never writes a build
-	// info, so nil is what this returns on every run. When the wiring lands and verify starts
-	// writing one, this assertion becomes a real cold-start check and the legs below start
-	// exercising the cache. Until then it is documenting the gap.
+	// Nothing in this test writes one, so this also holds on every later leg, which is what
+	// makes the rest a no-cache baseline.
 	cold := build()
 	if previous := readBuildInfo(cold); previous != nil {
 		t.Fatal("a build info was found before any run wrote one; the temporary project is dirty " +
@@ -171,4 +162,153 @@ func TestBuildInfoReaderReturnsNilBeforeAnyBuild(t *testing.T) {
 	if previous := incremental.ReadBuildInfoProgram(graph.Config, reader, graph.CompilerHost); previous != nil {
 		t.Fatal("ReadBuildInfoProgram returned a program with no build info on disk")
 	}
+}
+
+// TestIncrementalDiagnosticsSurvivesAChange is the real test the control above is a control
+// for, and the only one that can tell a working cache from a permanently-stale one.
+//
+// Four legs, and leg three is the one that matters:
+//
+//	cold          no build info, full pass, clean tree
+//	write         a build info lands on disk
+//	warm dirty    a violation planted AFTER the write is still found
+//	warm clean    removing it clears the findings again
+//
+// A cache that never invalidates passes cold, write, and warm-clean, and fails warm-dirty.
+// That is precisely why cold-equals-warm is not the shape used: a stale cache reporting
+// yesterday's clean tree is the fastest run we would ever measure.
+func TestIncrementalDiagnosticsSurvivesAChange(t *testing.T) {
+	directory := writeProject(t, map[string]string{
+		"tsconfig.json": incrementalConfig,
+		"clean.ts":      "export const value: number = 1;\n",
+	})
+
+	build := func() *program.Graph {
+		t.Helper()
+		graph, err := program.Build(program.Options{
+			ConfigFileName:   "tsconfig.json",
+			CurrentDirectory: directory,
+		})
+		if err != nil {
+			t.Fatalf("building: %v", err)
+		}
+		return graph
+	}
+
+	ctx := context.Background()
+
+	// Leg one: cold. No build info yet, so this is the full pass.
+	cold := build()
+	if findings := messagesOf(cold.IncrementalDiagnostics(ctx)); len(findings) != 0 {
+		t.Fatalf("the clean fixture produced %d findings, so no later leg can distinguish a "+
+			"planted error from existing noise: %v", len(findings), findings)
+	}
+
+	// Leg two: write the build info, and confirm it actually reached disk. Skipping this
+	// check would let every later leg run cold while appearing to test a cache.
+	coldSession := cold.NewIncrementalSession()
+	if coldSession == nil {
+		t.Fatal("NewIncrementalSession returned nil on an incremental config")
+	}
+	coldSession.Diagnostics(ctx)
+	if diagnostics := coldSession.Write(ctx); len(diagnostics) != 0 {
+		t.Fatalf("writing the build info reported %d diagnostics: %v",
+			len(diagnostics), messagesOf(diagnostics))
+	}
+	buildInfoPath := filepath.Join(directory, "tsconfig.tsbuildinfo")
+	written, err := os.Stat(buildInfoPath)
+	if err != nil {
+		t.Fatalf("no build info on disk after WriteBuildInfo, so every warm leg below would "+
+			"silently run cold: %v", err)
+	}
+	if written.Size() == 0 {
+		t.Fatal("the build info is empty, which reads as a successful write and behaves as no cache")
+	}
+	t.Logf("build info written, %d bytes", written.Size())
+
+	// Leg three: plant a violation AFTER the build info was written, then run warm. This is
+	// the case a stale cache fails. The file is new, so the cache has never seen it, and a
+	// cache that trusts its snapshot over the filesystem reports nothing here.
+	plantedPath := filepath.Join(directory, "planted.ts")
+	if err := os.WriteFile(plantedPath, []byte("export const broken: number = \"a string\";\n"), 0o644); err != nil {
+		t.Fatalf("planting: %v", err)
+	}
+
+	warmDirty := build()
+	dirtyFindings := messagesOf(warmDirty.IncrementalDiagnostics(ctx))
+	if len(dirtyFindings) == 0 {
+		t.Fatal("a violation planted after the build info was written was NOT found on a warm " +
+			"run. That is a stale cache reporting a clean tree, which is the exact failure this " +
+			"whole domain exists to prevent")
+	}
+	t.Logf("warm run found the planted violation: %v", dirtyFindings)
+
+	// Leg four: remove it and confirm the findings clear rather than persisting.
+	if err := os.Remove(plantedPath); err != nil {
+		t.Fatalf("removing the planted file: %v", err)
+	}
+	rewriteSession := warmDirty.NewIncrementalSession()
+	if rewriteSession == nil {
+		t.Fatal("NewIncrementalSession returned nil on the rewrite")
+	}
+	rewriteSession.Diagnostics(ctx)
+	if diagnostics := rewriteSession.Write(ctx); len(diagnostics) != 0 {
+		t.Fatalf("rewriting the build info reported diagnostics: %v", messagesOf(diagnostics))
+	}
+
+	warmClean := build()
+	if findings := messagesOf(warmClean.IncrementalDiagnostics(ctx)); len(findings) != 0 {
+		t.Fatalf("after removing the planted error the warm run still reports findings, which "+
+			"is a stale result rather than a clean tree: %v", findings)
+	}
+}
+
+// TestIncrementalMatchesFullPass pins the equivalence the saving is only worth having if it
+// holds: the incremental path must produce the same findings as the full one, not merely
+// fewer of them faster.
+func TestIncrementalMatchesFullPass(t *testing.T) {
+	directory := writeProject(t, map[string]string{
+		"tsconfig.json": incrementalConfig,
+		"clean.ts":      "export const value: number = 1;\n",
+		"broken.ts":     "export const wrong: number = \"text\";\nexport const alsoWrong: string = 5;\n",
+	})
+
+	build := func() *program.Graph {
+		t.Helper()
+		graph, err := program.Build(program.Options{
+			ConfigFileName:   "tsconfig.json",
+			CurrentDirectory: directory,
+		})
+		if err != nil {
+			t.Fatalf("building: %v", err)
+		}
+		return graph
+	}
+
+	ctx := context.Background()
+
+	first := build()
+	full := messagesOf(first.AllDiagnostics(ctx))
+	if len(full) < 2 {
+		t.Fatalf("the fixture was meant to produce at least two findings and produced %d; "+
+			"an equivalence test over an empty set proves nothing: %v", len(full), full)
+	}
+	firstSession := first.NewIncrementalSession()
+	if firstSession == nil {
+		t.Fatal("NewIncrementalSession returned nil on an incremental config")
+	}
+	firstSession.Diagnostics(ctx)
+	if diagnostics := firstSession.Write(ctx); len(diagnostics) != 0 {
+		t.Fatalf("writing the build info reported diagnostics: %v", messagesOf(diagnostics))
+	}
+
+	second := build()
+	warm := messagesOf(second.IncrementalDiagnostics(ctx))
+
+	slices.Sort(full)
+	slices.Sort(warm)
+	if !slices.Equal(full, warm) {
+		t.Fatalf("the incremental path disagrees with the full pass.\n full: %v\n warm: %v", full, warm)
+	}
+	t.Logf("equivalence holds across %d findings", len(full))
 }

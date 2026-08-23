@@ -38,6 +38,8 @@
 package incremental
 
 import (
+	"context"
+
 	"github.com/microsoft/TypeScript/tsc/internal/compiler"
 	"github.com/microsoft/TypeScript/tsc/internal/execute/incremental"
 	"github.com/microsoft/TypeScript/tsc/internal/tsoptions"
@@ -76,4 +78,33 @@ func ReadBuildInfoProgram(
 // CreateHost adapts a compiler host for the incremental machinery.
 func CreateHost(compilerHost compiler.CompilerHost) Host {
 	return incremental.CreateHost(compilerHost)
+}
+
+// NewProgram wraps a built program in the incremental machinery, computing what changed
+// against oldProgram. Pass nil for oldProgram on a cold run.
+//
+// The wrap is where change detection happens: programToSnapshot hashes every file and
+// compares against the old snapshot's versions, so the returned Program already knows its
+// changed set before anything is checked.
+//
+// nestedEmitNow is a clock for project-reference builds and nil is correct for a one-shot
+// check. testing populates an extra diagnostics-inspection struct and should stay false
+// outside upstream's own tests.
+func NewProgram(program *compiler.Program, oldProgram *Program, host Host) *Program {
+	return incremental.NewProgram(program, oldProgram, host, nil, false)
+}
+
+// EmitBuildInfo writes the build info and nothing else.
+//
+// This exists because verify never emits. Under NoEmit, Program.Emit takes a branch that
+// writes only the build info (program.go:248-254), which is exactly the artifact a warm run
+// needs and none of the JavaScript we do not want. Calling Emit directly at the call site
+// would work and would also read like verify had started emitting output, so the intent is
+// named here instead.
+//
+// Returns the emit result so a caller can surface diagnostics from the write itself; a failed
+// build-info write must not pass silently, since the next run would then be cold while
+// reporting success.
+func EmitBuildInfo(ctx context.Context, program *Program) *compiler.EmitResult {
+	return program.Emit(ctx, compiler.EmitOptions{})
 }
