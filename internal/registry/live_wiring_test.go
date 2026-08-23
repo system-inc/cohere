@@ -2,6 +2,7 @@ package registry
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/verify/internal/config"
@@ -52,6 +53,24 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		}
 		if !resolved.Enabled(subject.Name) {
 			unreachable = append(unreachable, subject.Name)
+		}
+	}
+
+	// An exemption is a claim about the world, and the world moves. `import-require-path-alias` is
+	// exempt because the gate's oxlint plugin has no such rule, which is what makes it the
+	// differential's verify-only control. If somebody adds it to that plugin, the exemption becomes
+	// wrong silently: the guard keeps passing and the rule stays unwired for a reason that no longer
+	// exists.
+	//
+	// So the reason gets checked rather than trusted. This is the same discipline as proving a
+	// detector can fail: an allowlist nobody validates is an allowlist that outlives its premise.
+	const gatePluginPath = "/Users/kirkouimet/Projects/ahra/libraries/structure/libraries/nexus/code-quality/oxlint/OxlintNexusPlugin.mjs"
+	if pluginSource, err := os.ReadFile(gatePluginPath); err == nil {
+		if strings.Contains(string(pluginSource), "import-require-path-alias") {
+			t.Errorf(
+				"the gate's oxlint plugin now defines import-require-path-alias, so exempting it here " +
+					"is no longer correct: it was exempt because the gate could not name it",
+			)
 		}
 	}
 
