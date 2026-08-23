@@ -91,6 +91,17 @@ var PreferSpread = rule.Rule{
 					return
 				}
 
+				// `memberAccessObject` returns nil for a callee that is neither a property nor an
+				// element access, and `ast.SkipParentheses` dereferences its argument, so passing
+				// that nil straight in would panic. It cannot happen here: the
+				// `isApplyMemberAccess(callee)` gate above has already excluded every other kind.
+				//
+				// The nil check therefore sits after the call rather than before it, guarding the
+				// unwrapped result rather than the input. That is safe by an invariant established
+				// fifteen lines earlier and by nothing local, so **widening `isApplyMemberAccess`
+				// to accept another callee kind reintroduces a panic here**, at a line the change
+				// does not touch. A panic takes down the walk for the whole file, so every other
+				// rule's verdict on that file is lost with it.
 				appliedFunction := ast.SkipParentheses(memberAccessObject(callee))
 				if appliedFunction == nil {
 					return
