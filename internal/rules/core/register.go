@@ -57,6 +57,7 @@ func init() {
 		rule.Registration{Rule: NoInvalidRegexp},
 		rule.Registration{Rule: NoNonoctalDecimalEscape},
 		rule.Registration{Rule: NoSelfAssign},
+		rule.Registration{Rule: NoSetterReturn},
 		rule.Registration{Rule: NoSparseArrays},
 		rule.Registration{Rule: NoUnsafeFinally},
 		rule.Registration{Rule: NoUselessCatch},
