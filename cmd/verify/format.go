@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/verify/internal/fix"
+	"github.com/system-inc/verify/internal/prettier"
 )
 
 // formatEngine formats one file's text, or says it could not.
@@ -128,6 +129,21 @@ func extensionOf(fileName string) string {
 // A nil engine skips with "no formatter is configured" and that reaches the coverage line, so a run
 // with no formatter reports as a run with no formatter rather than as a perfectly formatted tree.
 // The absence is stated on every run instead of being discovered later.
-func configuredFormatter() formatEngine {
-	return nil
+//
+// The engine has landed, so this now returns it, and the `enabled` flag is what stays off. Wiring
+// and enabling are separate acts: the seam is proven, and whether a bare `verify` should rewrite
+// files is a question about corpus agreement rather than about plumbing.
+func configuredFormatter(enabled bool) (formatEngine, error) {
+	if !enabled {
+		return nil, nil
+	}
+
+	engine, err := prettier.New(prettier.DefaultOptions())
+	if err != nil {
+		// Not a nil engine. Nil already means "nobody asked for a formatter", and the coverage line
+		// reports that as a deliberate absence. An engine that was asked for and could not load its
+		// bundles is a different fact, and collapsing the two would print a failure as a choice.
+		return nil, fmt.Errorf("loading the prettier engine: %w", err)
+	}
+	return engine, nil
 }

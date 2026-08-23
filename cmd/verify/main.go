@@ -40,6 +40,10 @@ func run() error {
 	fixOnly := flag.Bool("fix", false, "fix and format only, running no other phase")
 	noFix := flag.Bool("no-fix", false, "mutate nothing: report what would change without writing a byte")
 	formatAll := flag.Bool("format-all", false, "format every file rather than only the ones that changed")
+	// Off by default until the engine is shown to agree with the existing gate across the real
+	// corpus. Reformatting the tree away from what the gate produces is worse than not formatting,
+	// so enabling is a separate decision from wiring.
+	format := flag.Bool("format", false, "run the formatter over the candidate files")
 	maxFixPasses := flag.Int("fix-passes", fix.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
@@ -152,10 +156,18 @@ func run() error {
 		}
 		scope = scope.narrowTo(inProgram)
 
+		// Built before the fix phase rather than inside it, so a formatter that cannot load its
+		// bundles stops the run here with a reason rather than degrading into the nil that means
+		// nobody asked for one.
+		formatter, err := configuredFormatter(*format)
+		if err != nil {
+			return err
+		}
+
 		fixStart := time.Now()
 		fixSummary, err := applyProposedFixes(
 			ctx, graph, projectFiles, registry.All(),
-			scopedTransform(formatTransform(configuredFormatter()), scope),
+			scopedTransform(formatTransform(formatter), scope),
 			*maxFixPasses,
 		)
 		fixDuration := time.Since(fixStart)
