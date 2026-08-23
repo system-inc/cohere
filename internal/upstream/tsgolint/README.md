@@ -3,10 +3,16 @@
 Upstream: https://github.com/typescript-eslint/tsgolint
 License: MIT, `Copyright (c) 2025 typescript-eslint and other contributors`. Full text in `LICENSE`.
 
+**Vendored commit: unrecorded.** The copy landed in `ea1d334` without capturing which tsgolint
+commit it came from, and it cannot be recovered after the fact. So re-syncing today is a diff
+against nothing, and vendoring further rules means fetching from a tree whose relationship to this
+one is unknown. **Anyone vendoring the next rule records the commit here, in the same act.** That is
+the whole fix and it is one line; leaving the gap is how the second rule inherits the first one's.
+
 ## Why this is here
 
 tsgolint implements 40 type-aware typescript-eslint rules in Go, against the same
-`microsoft/typescript-go` checker verify uses. Four of them are rules our gate enforces today:
+checker verify uses. Four of them are rules our gate enforces today:
 `await-thenable`, `no-floating-promises`, `no-misused-promises`, `switch-exhaustiveness-check`.
 Those are the expensive ones to write correctly, because they ask real questions of the checker.
 
@@ -25,21 +31,26 @@ with upstream a diff rather than a merge.
 
 ## Why it compiles at all
 
-Their generated shims and ours are byte-identical over the same typescript-go commit
-`2b82831a05b6b99da279d12fecbcbc460574a85b`, verified with `diff -q` across `shim/ast`,
-`shim/checker`, `shim/core`, and `shim/scanner`. So `ast.Node` and `checker.Checker` are the same
-nominal types in both trees, not merely the same shape. We carry two patches on that checkout
-(`0001-Parallel-readDirectory-visitor`, `0002-Create-one-checker-per-CPU`); both touch
-`internal/compiler/program.go` and `internal/vfs/utilities.go` only, neither touches a type a rule
-sees.
+The vendored code imports `github.com/microsoft/TypeScript/tsc/shim/...`, and every one of those
+paths is `replace`-directed in our `go.mod` to `./shim/...`. **There is exactly one shim tree in
+this repo and it is ours**, so `ast.Node` and `checker.Checker` are not merely the same shape
+across two trees, they are the same package.
 
-If either side moves off that commit, this stops compiling loudly rather than misbehaving quietly,
-which is the failure mode we want.
+That is a stronger guarantee than an earlier version of this file claimed, and it obsoletes the
+check it described. This used to say the two sides' shims were byte-identical over typescript-go
+commit `2b82831a05b6b99da279d12fecbcbc460574a85b`, verified with `diff -q`. After the migration to
+`microsoft/TypeScript` at `tsc/` there is no second shim tree to diff, and that commit is not the
+live one. **Do not go looking for the second tree; it does not exist.**
+
+A mismatch still fails loudly at compile rather than quietly at runtime, which is the property we
+actually need.
 
 ## The one real gap: exit visits
 
-`rule.ListenerOnExit(kind)` returns `kind + 1000`, and there are further offsets at 2000 and 4000
-for their allow-pattern variants. Those are pseudo-kinds: an upstream rule registers a listener at
+`rule.ListenerOnExit(kind)` returns `kind + 1000`. The allow-pattern variants add further
+offsets, and the constants naming them are ceilings rather than the offsets themselves, which is
+easy to misread: `ListenerOnAllowPattern` adds 2000 and `ListenerOnNotAllowPattern` adds 4000, so
+the five live encodings land at +1000, +2000, +3000, +4000 and +5000. Those are pseudo-kinds: an upstream rule registers a listener at
 an integer that is not a real `ast.Kind`, and their walk knows to call it when leaving a node.
 
 Our walk has no exit-visit concept, so a listener registered at one of those offsets would be
