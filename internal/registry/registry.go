@@ -23,6 +23,7 @@ import (
 // is what makes a diff between them meaningful.
 func All() []rule.Rule {
 	return []rule.Rule{
+		core.ForDirection,
 		core.NoCaseDeclarations,
 		core.NoCompareNegZero,
 		core.NoDebugger,
