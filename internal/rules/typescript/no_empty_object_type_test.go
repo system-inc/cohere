@@ -66,6 +66,30 @@ func TestNoEmptyObjectTypeOffersTwoSuggestions(t *testing.T) {
 	if got := len(result.Diagnostics[0].Fixes); got != 0 {
 		t.Fatalf("expected no automatic fix, got %d", got)
 	}
+
+	// What each suggestion would write, which counting them cannot see.
+	//
+	// A mutation making both suggestions produce `unknown` compiled and changed nothing here, because
+	// this test asserted how many were offered and never what they said. The two are not
+	// interchangeable: `object` means any non-primitive and `unknown` means any value at all, so a
+	// reader choosing between them is choosing between different types, and a suggestion offering
+	// the same one twice is a menu with one item wearing two labels.
+	//
+	// Asserted by applying each fix to the source rather than by comparing its text, so the span is
+	// pinned at the same time: a suggestion writing the right word over the wrong range is the other
+	// half of this defect and reads identically from the text alone.
+	const source = "export let value: {};\n"
+	wanted := []string{"export let value: object;\n", "export let value: unknown;\n"}
+	for index, suggestion := range result.Diagnostics[0].Suggestions {
+		if len(suggestion.Fixes) != 1 {
+			t.Fatalf("suggestion %d carries %d fixes, wanted one", index, len(suggestion.Fixes))
+		}
+		fix := suggestion.Fixes[0]
+		rewritten := source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
+		if rewritten != wanted[index] {
+			t.Fatalf("applying suggestion %d gave %q, wanted %q", index, rewritten, wanted[index])
+		}
+	}
 }
 
 func TestNoEmptyObjectTypeStaysSilent(t *testing.T) {
