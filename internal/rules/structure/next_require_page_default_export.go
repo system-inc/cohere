@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/module"
 )
 
 var messagePageRequireDefaultExport = rule.Message{
@@ -92,7 +93,7 @@ func defaultExportedName(statement *ast.Node) (name string, isInline bool, ok bo
 	switch statement.Kind {
 	case ast.KindFunctionDeclaration:
 		declaration := statement.AsFunctionDeclaration()
-		if !hasDefaultModifier(declaration.Modifiers()) {
+		if !module.HasDefaultModifier(declaration.Modifiers()) {
 			return "", false, false
 		}
 		if declared := declaration.Name(); declared != nil {
@@ -102,7 +103,7 @@ func defaultExportedName(statement *ast.Node) (name string, isInline bool, ok bo
 
 	case ast.KindClassDeclaration:
 		declaration := statement.AsClassDeclaration()
-		if !hasDefaultModifier(declaration.Modifiers()) {
+		if !module.HasDefaultModifier(declaration.Modifiers()) {
 			return "", false, false
 		}
 		if declared := declaration.Name(); declared != nil {
@@ -126,25 +127,4 @@ func defaultExportedName(statement *ast.Node) (name string, isInline bool, ok bo
 	}
 
 	return "", false, false
-}
-
-// hasDefaultModifier reports whether a modifier list carries `export default`.
-//
-// Both are required. `export function X()` is a named export rather than the route's default, and
-// treating it as one would report every helper a page file exports.
-func hasDefaultModifier(modifiers *ast.ModifierList) bool {
-	if modifiers == nil {
-		return false
-	}
-	hasExport := false
-	hasDefault := false
-	for _, modifier := range modifiers.Nodes {
-		switch modifier.Kind {
-		case ast.KindExportKeyword:
-			hasExport = true
-		case ast.KindDefaultKeyword:
-			hasDefault = true
-		}
-	}
-	return hasExport && hasDefault
 }

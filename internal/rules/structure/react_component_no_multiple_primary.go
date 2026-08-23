@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/module"
 	"github.com/system-inc/verify/internal/utils/react"
 )
 
@@ -141,7 +142,7 @@ func collectComponents(sourceFile *ast.Node) []trackedComponent {
 			// An unnamed default export is still a component; the original names it DefaultExport
 			// rather than skipping it.
 			if name == nil {
-				if isDefaultExported(statement) && HasJsxOrReactHookCalls(statement) {
+				if module.IsDefaultExported(statement) && HasJsxOrReactHookCalls(statement) {
 					add(statement)
 				}
 			} else if react.IsLikelyComponentName(name.Text()) && HasJsxOrReactHookCalls(statement) {
@@ -306,24 +307,4 @@ func isExportedStatement(node *ast.Node) bool {
 		}
 	}
 	return false
-}
-
-// isDefaultExported reports the export and default keywords together, which is how an unnamed
-// function declaration reaches the outside.
-func isDefaultExported(node *ast.Node) bool {
-	modifiers := node.Modifiers()
-	if modifiers == nil {
-		return false
-	}
-	sawExport := false
-	sawDefault := false
-	for _, modifier := range modifiers.Nodes {
-		switch modifier.Kind {
-		case ast.KindExportKeyword:
-			sawExport = true
-		case ast.KindDefaultKeyword:
-			sawDefault = true
-		}
-	}
-	return sawExport && sawDefault
 }
