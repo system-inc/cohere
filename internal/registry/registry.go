@@ -18,6 +18,9 @@ import (
 // is what makes a diff between them meaningful.
 func All() []rule.Rule {
 	return []rule.Rule{
+		nexus.BoundaryNoInternalImport,
+		nexus.BoundaryNoNexusOutsideImport,
+		nexus.BoundaryNoProjectImport,
 		nexus.ConsistencyNoEnum,
 		nexus.ConsistencyNoUtilsFolder,
 		nexus.ImportRequireNodeNamespace,
