@@ -27,7 +27,6 @@ import (
 
 	"github.com/system-inc/verify/internal/config"
 	"github.com/system-inc/verify/internal/differential"
-	"github.com/system-inc/verify/internal/registry"
 )
 
 func main() {
@@ -52,11 +51,22 @@ func run() error {
 		return err
 	}
 
+	// Asked of the binary being measured, not of this one. `registry.All()` is the registry linked
+	// into the harness, and when the two builds differ every classification describes the wrong
+	// tool. That produced a real wrong answer: 128 findings reported as both-active, meaning both
+	// sides had the rule and disagreed, when the measured binary had no such rule at all.
+	verifyRules, err := differential.CompiledRulesOf(
+		context.Background(), options.verifyCommand, ruleListProbeFile,
+	)
+	if err != nil {
+		return err
+	}
+
 	report, err := differential.Run(context.Background(), differential.RunOptions{
 		Root:                    options.root,
 		Verify:                  options.verifyCommand,
 		Gate:                    options.gateCommand,
-		VerifyRules:             compiledRuleNames(),
+		VerifyRules:             verifyRules,
 		ConfiguredRules:         configuredRuleNames(lintConfig),
 		Controls:                options.controls,
 		ExtraVerifyRuleSettings: verifyOnlyRuleSettings(options.root),
@@ -78,18 +88,12 @@ func run() error {
 	return nil
 }
 
-// compiledRuleNames is every rule actually linked into this binary.
+// ruleListProbeFile is the file `-explain` is pointed at to enumerate the measured binary's rules.
 //
-// Read from the registry rather than from a list, because a list is a claim about the binary and
-// the registry is the binary. During the migration this tool replaces, three configurations ran
-// successfully having loaded zero plugins.
-func compiledRuleNames() map[string]bool {
-	names := map[string]bool{}
-	for _, compiled := range registry.All() {
-		names[differential.NormalizeRuleName(compiled.Name)] = true
-	}
-	return names
-}
+// Any file in the program works, because every compiled rule is accounted for in that output
+// whether it listened to the file, declined it, or was never configured. This one is chosen for
+// being unremarkable: a file no rule finds interesting still names all of them.
+const ruleListProbeFile = "modules/mcp/McpApi.ts"
 
 // configuredRuleNames is every rule the lint config switches on.
 //
