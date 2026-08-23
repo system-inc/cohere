@@ -42,6 +42,7 @@ func All() []rule.Rule {
 		nexus.ConsistencyNoSingleLineJsDoc,
 		nexus.ConsistencyNoStutteringName,
 		nexus.ConsistencyNoUtilsFolder,
+		nexus.ConsistencyRequireConstantCasing,
 		nexus.ConsistencyRequireTypeSuffix,
 		nexus.ImportNoForbiddenSource,
 		nexus.ImportRequireModuleAlias,
@@ -104,7 +105,13 @@ func Options() config.OptionsRegistry {
 		"consistency-no-screaming-snake-case": {Decode: config.DecodeInto[nexus.ConsistencyNoScreamingSnakeCaseOptions]()},
 		"consistency-no-shouting":             {Decode: config.DecodeInto[nexus.ConsistencyNoShoutingOptions]()},
 		"consistency-no-stuttering-name":      {Decode: config.DecodeInto[nexus.ConsistencyNoStutteringNameOptions]()},
-		"import-require-module-alias":         {Decode: config.DecodeInto[nexus.ImportRequireModuleAliasOptions]()},
+
+		// Not Required. The option only exempts names a framework reads verbatim, so a config that
+		// says nothing gets the full rule rather than a rule that reads no files.
+		"consistency-require-constant-casing": {
+			Decode: config.DecodeInto[nexus.ConsistencyRequireConstantCasingOptions](),
+		},
+		"import-require-module-alias": {Decode: config.DecodeInto[nexus.ImportRequireModuleAliasOptions]()},
 
 		// Not Required, deliberately. The surfaces that carry class strings have sane defaults
 		// (`class`/`className`, the two merge helpers, the `*ClassName` variable patterns), and a
