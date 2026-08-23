@@ -103,6 +103,7 @@ func All() []rule.Rule {
 		typescript.NoExtraNonNullAssertion,
 		typescript.NoNonNullAssertedOptionalChain,
 		typescript.NoNonNullAssertion,
+		typescript.NoEmptyObjectType,
 		typescript.NoUnsafeFunctionType,
 		typescript.NoWrapperObjectTypes,
 		tailwind.NoConcatenatedClasses,
