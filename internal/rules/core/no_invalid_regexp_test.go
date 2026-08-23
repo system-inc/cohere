@@ -37,6 +37,16 @@ func TestNoInvalidRegexpFires(t *testing.T) {
 		// than checked beside it: `\p` is a property escape only under u, and a lone `{` after it
 		// is a syntax error there and a literal brace otherwise.
 		{"a pattern the u flag invalidates", "export const a = new RegExp('\\\\p{', 'u');\n"},
+
+		// The half of the option decision that a fixture can actually hold.
+		//
+		// Upstream takes `allowConstructorFlags`, and under `["a"]` this exact line is clean there.
+		// This port implements no option surface, so it must sit on upstream's default empty
+		// allow-list and report. That choice is invisible to every other case in this file, because
+		// they all exercise flags no allow-list would name; this one names the branch.
+		//
+		// If someone later adds the option and wires its default wrong, this is the case that fails.
+		{"a flag only an allow-list could excuse", "export const a = new RegExp('.', 'a');\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

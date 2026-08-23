@@ -46,6 +46,24 @@ var validRegExpFlags = map[byte]bool{
 // When the flags are not a literal the pattern is only reported if it fails under every flag
 // combination that could reach it. A pattern valid under `u` and invalid without it is not a defect
 // here, because the flags argument may well supply the `u`.
+//
+// # The option we deliberately do not implement
+//
+// Upstream takes `allowConstructorFlags`, a case-sensitive list of flag characters that stop being
+// errors in a constructor call. With `["a"]`, `new RegExp('.', 'a')` becomes clean. It is threaded
+// through the flag walk rather than applied afterwards, because oxc's own comment notes the regex
+// engine cannot take the option.
+//
+// **This port has no option surface and takes the default empty allow-list**, so every flag outside
+// `validRegExpFlags` reports. Nothing in this repository configures the option, and a rule reading a
+// value nobody sets is the inert shape this tool exists to catch. If a consumer needs it, it gets
+// built then, against a real requirement.
+//
+// Matching the default is asserted rather than assumed, because a port with no option surface lands
+// on one branch or the other and a fixture pair cannot tell which: the corpus only ever exercises
+// the default. `new RegExp('.', 'a')` reports here and `new RegExp('.', 'i')` does not, which is
+// upstream's behavior with an empty allow-list. Missing surface is wrong later; a mismatched default
+// would be wrong now.
 var NoInvalidRegexp = rule.Rule{
 	Name: "no-invalid-regexp",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
