@@ -27,6 +27,7 @@ func All() []rule.Rule {
 		core.ForDirection,
 		core.NoCaseDeclarations,
 		core.NoCompareNegZero,
+		core.NoConstantCondition,
 		core.NoDebugger,
 		core.NoDeleteVar,
 		core.NoDupeElseIf,
@@ -35,6 +36,7 @@ func All() []rule.Rule {
 		core.NoEmptyPattern,
 		core.NoEmptyStaticBlock,
 		core.NoExAssign,
+		core.NoInvalidRegexp,
 		core.NoSelfAssign,
 		core.NoSparseArrays,
 		core.NoUnsafeFinally,
@@ -125,6 +127,11 @@ func Options() config.OptionsRegistry {
 		// Not Required. The option only relaxes the rule, and its default is the strict reading, so
 		// a config that says nothing gets the full rule rather than a rule that reads no files.
 		"no-empty": {Decode: config.DecodeInto[core.NoEmptyOptions]()},
+
+		// Not Required, and the default matches both ESLint's and this tree's config. checkLoops
+		// defaults to allExceptWhileTrue, so a config that says nothing still catches `while(1)`
+		// and `while(a || true)` while exempting the `while(true)` idiom.
+		"no-constant-condition": {Decode: config.DecodeInto[core.NoConstantConditionOptions]()},
 
 		// Not Required, and the default is the strict reading. enforceForSwitchCase defaults to
 		// true, matching ESLint 9 and this tree's config, so a config that says nothing gets the
