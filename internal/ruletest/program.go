@@ -141,6 +141,7 @@ func RunTypedFilesWithOptions(
 		SourceFile:  sourceFile,
 		Program:     graph.Program,
 		TypeChecker: fileChecker,
+		FileCache:   rule.NewFileCache(),
 		Report: func(diagnostic rule.Diagnostic) {
 			diagnostic.RuleName = subject.Name
 			if diagnostic.SourceFile == nil {

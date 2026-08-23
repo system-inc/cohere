@@ -272,6 +272,13 @@ func dispatchFile(
 	// a file with no directives costs one pass and then answers every query with an empty slice.
 	directives := suppression.Build(sourceFile.Text())
 
+	// One cache per file, shared by every rule that runs on it. Work a rule derives from the file
+	// outside the walk is paid for by that rule alone, so three rules deriving the same thing pay
+	// three times. Measured: three comment rules at 1,777ms combined, each visiting one node per
+	// file, because each rescanned the same trivia. The walk is shared; this makes the derivations
+	// shared too.
+	fileCache := rule.NewFileCache()
+
 	for _, subject := range rules {
 		ruleName := subject.Name
 
@@ -284,6 +291,7 @@ func dispatchFile(
 			SourceFile:  sourceFile,
 			Program:     graph.Program,
 			TypeChecker: fileChecker,
+			FileCache:   fileCache,
 			Report: func(diagnostic rule.Diagnostic) {
 				diagnostic.RuleName = ruleName
 				if diagnostic.SourceFile == nil {

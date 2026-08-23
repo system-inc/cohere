@@ -64,7 +64,7 @@ var ConsistencyNoLongLineComment = rule.Rule{
 					run = nil
 				}
 
-				for _, comment := range allComments(ctx.SourceFile) {
+				for _, comment := range cachedComments(ctx) {
 					if !isFoldableLineComment(comment, sourceLines) {
 						flush()
 						continue

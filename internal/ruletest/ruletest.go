@@ -81,6 +81,7 @@ func RunWithOptions(t *testing.T, subject rule.Rule, fileName string, sourceText
 	var diagnostics []rule.Diagnostic
 	context := rule.Context{
 		SourceFile: sourceFile,
+		FileCache:  rule.NewFileCache(),
 		Report: func(diagnostic rule.Diagnostic) {
 			diagnostic.RuleName = subject.Name
 			diagnostics = append(diagnostics, diagnostic)

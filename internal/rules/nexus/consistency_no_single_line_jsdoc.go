@@ -37,7 +37,7 @@ var ConsistencyNoSingleLineJsDoc = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				for _, comment := range allComments(ctx.SourceFile) {
+				for _, comment := range cachedComments(ctx) {
 					if !comment.isJsDoc() {
 						continue
 					}

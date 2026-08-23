@@ -80,6 +80,59 @@ type Context struct {
 	// Report emits a finding. Prefer the helpers below, which spare a rule from restating how to
 	// turn a node into a range.
 	Report func(Diagnostic)
+
+	// FileCache holds work that is expensive per file and identical for every rule that wants it.
+	//
+	// One walk serves every rule, which is the whole architecture, but that only covers work the
+	// walk itself does. A rule that derives something from the file outside the walk pays for it
+	// alone, and three rules deriving the same thing pay three times. That is not hypothetical:
+	// `verify --timing` measured three comment rules at 1,777ms combined, each visiting exactly one
+	// node per file, because each rescanned the same comment trivia independently. Flat node counts
+	// with unequal times is the signature.
+	//
+	// Nil is legal and means no caching, so a harness that builds a Context by hand keeps working
+	// and simply recomputes.
+	FileCache *FileCache
+}
+
+// FileCache memoizes per-file derived work across the rules that share it.
+//
+// Deliberately untyped and keyed by string rather than holding named fields. This package must not
+// know what a comment scan is, or a scope table, or whatever the next expensive shared derivation
+// turns out to be. The rule packages own those; this owns only the fact that they are worth
+// computing once.
+//
+// Not safe for concurrent use, and it does not need to be: one cache is created per file and every
+// rule for that file runs on the one goroutine that owns it. Sharing a cache across files or
+// workers would be a bug, which is why nothing here has a mutex to make that look safe.
+type FileCache struct {
+	entries map[string]any
+}
+
+// NewFileCache returns a cache for one file.
+func NewFileCache() *FileCache {
+	return &FileCache{entries: map[string]any{}}
+}
+
+// Cached returns the value stored under key, computing it once on the first ask.
+//
+// A nil cache computes every time rather than failing, so a rule reads the same whether or not the
+// caller supplied one. That keeps the fast path an optimization rather than a requirement.
+func Cached[Value any](cache *FileCache, key string, compute func() Value) Value {
+	if cache == nil || cache.entries == nil {
+		return compute()
+	}
+	if existing, isCached := cache.entries[key]; isCached {
+		if typed, isTyped := existing.(Value); isTyped {
+			return typed
+		}
+		// Two callers used one key for different types. Recomputing is the safe answer, and it is
+		// silent on purpose: the alternative is a rule package crashing a lint run over a cache.
+		return compute()
+	}
+	computed := compute()
+	cache.entries[key] = computed
+	return computed
 }
 
 // Listeners maps an AST node kind to the function a rule wants called when the walk reaches it.
