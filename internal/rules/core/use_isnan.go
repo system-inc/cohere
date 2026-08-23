@@ -63,7 +63,7 @@ var messageSwitchOnNaN = rule.Message{
 //
 //	valid:   Number.isNaN(value)
 //	valid:   value === Number.NaN ? 0 : 1   (still reported; see below)
-//	valid:   const NaN = 1; value === NaN   (a local shadowing the global is not reported)
+//	invalid: const NaN = 1; value === NaN   (a local shadowing the global IS reported; see below)
 //	invalid: value === NaN
 //	invalid: NaN !== value
 //	invalid: value < NaN
@@ -132,9 +132,17 @@ var UseIsNaN = rule.Rule{
 
 // isNaNReference reports whether an expression names NaN, bare or through Number.
 //
-// Matched on spelling rather than through the checker. A local binding named NaN would shadow the
-// global and make this a false report, which is why the fixtures cover that case; it is rare enough,
-// and strange enough, that the trade favors catching the real defect.
+// Matched on spelling rather than through the checker, so a local binding named NaN shadows the
+// global and is reported anyway. That is a known false positive, accepted because declaring a
+// binding called NaN is rare enough and strange enough that the trade favors catching the real
+// defect.
+//
+// This comment previously claimed the opposite in two places: that a shadowed NaN was not reported,
+// and that the fixtures covered the case. Neither was true. No such fixture existed, and a probe
+// against this rule reported `comparisonWithNaN` on `const NaN = 1; value === NaN`. Found by a
+// research pass on `no-regex-spaces`, a sibling asking the same shadowing question and reading this
+// rule for precedent. The fixture below now pins the real behavior, so the next reader takes away
+// what the code does rather than what this comment wished it did.
 func isNaNReference(node *ast.Node) bool {
 	if node == nil {
 		return false

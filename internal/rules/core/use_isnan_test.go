@@ -24,6 +24,16 @@ func TestUseIsNaNFires(t *testing.T) {
 		// The same value reached through the constructor.
 		{"Number.NaN", "declare const value: number;\nexport const Bad = value === Number.NaN;\n"},
 		{"parenthesized", "declare const value: number;\nexport const Bad = value === (NaN);\n"},
+		// A local binding named NaN shadows the global, and this reports anyway. That is a known
+		// false positive rather than an oversight: the rule matches on spelling instead of asking
+		// the checker, and declaring a binding called NaN is rare enough that the trade favors
+		// catching the real defect.
+		//
+		// It is a firing case rather than a clean one, and the rule's own doc claimed the opposite
+		// in two places while asserting this fixture already existed. It did not. Pinned here so the
+		// next reader gets the behavior from a test rather than from prose.
+		{"a local shadowing the global is reported anyway",
+			"declare const value: number;\nconst NaN = 1;\nexport const Bad = value === NaN;\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
