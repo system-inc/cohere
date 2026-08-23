@@ -341,6 +341,13 @@ func FixAndTransformFile(fileName string, propose Propose, transform Transform, 
 		}
 	}
 
+	// Changed alone is the right condition here, and it is deliberately not joined by Converged.
+	//
+	// A run that exhausted the pass budget has already cleared Changed and reverted Text upstream, in
+	// FixText, so a non-converged file cannot reach this line with anything to write. Re-checking
+	// Converged would be a second gate on a decision already made, and two gates on one property is
+	// how they drift apart. Said here because reading this function alone makes the guard look
+	// absent: two readers concluded exactly that from this line, and the guard is one branch above.
 	if !result.Changed {
 		return result, nil
 	}
