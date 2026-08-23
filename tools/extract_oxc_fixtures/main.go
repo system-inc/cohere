@@ -109,6 +109,18 @@ func main() {
 
 	fmt.Printf("cases extracted %d pass, %d fail\n", totalPass, totalFail)
 
+	if totalPass == 0 && totalFail == 0 {
+		// A rule with a Tester block and no extractable cases is not an empty corpus, and saying so
+		// would be the silent zero this tool exists to prevent. Two of 184 eslint rules build their
+		// vectors programmatically — `let mut pass = Vec::<TestCase>::new()` followed by a loop that
+		// pushes generated sources and an `.extend([...])` of written ones. Some of their cases do
+		// not exist as source text at all, so no parser can recover them and a hand copy is the only
+		// honest route.
+		fmt.Printf("                NOT EXTRACTABLE: a Tester block exists and no case could be read " +
+			"from it. Expect a programmatically built vector (Vec::new plus push/extend); such a " +
+			"corpus must be copied by hand, and part of it may be generated rather than written\n")
+	}
+
 	if !snapshotExists {
 		fmt.Printf("snapshot        ABSENT at %s — diagnostic counts unstated\n", snapshotPath)
 	} else {
