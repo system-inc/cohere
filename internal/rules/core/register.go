@@ -22,6 +22,7 @@ func init() {
 		rule.Registration{Rule: NoCompareNegZero},
 		rule.Registration{Rule: NoCaller},
 		rule.Registration{Rule: NoControlRegex},
+		rule.Registration{Rule: NoDupeClassMembers},
 		rule.Registration{Rule: NoIterator},
 		rule.Registration{Rule: NoNewNativeNonconstructor},
 		rule.Registration{
