@@ -402,29 +402,71 @@ func TestConsistencyNoAbbreviatedIdentifierCandidateGateCoversEveryBranch(t *tes
 
 // A finding has to land on the line the author can suppress.
 //
-// ReportNode anchors on node.Loc, and Loc.Pos() sits before the node's leading trivia, so a binding
-// preceded by a comment reports at the comment. That is the one line an `eslint-disable-next-line`
-// above it cannot cover, since the directive matches the line after itself. Measured on the real
-// tree before this was fixed: `params` in McpApi.ts reported at 240 while its suppression sat on 241
-// covering 242, so a correctly-suppressed identifier produced an unsuppressable finding.
+// A node's Pos() sits before its leading trivia, so a binding preceded by a comment anchors at the
+// comment rather than at the name. That is the one line an `eslint-disable-next-line` above it
+// cannot cover, since the directive matches the line after itself. Measured on the real tree:
+// `params` in McpApi.ts reported at line 240 while its suppression sat on 241 covering 242, so a
+// correctly-suppressed identifier still produced a finding nothing could silence.
+//
+// The rule anchors on rule.TokenRange explicitly rather than leaning on ReportNode to do it. Both
+// trim today, so this asserts the position rather than the call: the guarantee that matters is where
+// the finding lands, and a fixture that tested which helper was called would go on passing if the
+// helper changed underneath it.
+//
+// The column is asserted alongside the line because trivia swallowed within a single line moves only
+// the column, and a line-only assertion cannot see it.
 func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(t *testing.T) {
-	sourceText := "function handleRequest(message: M): void {\n" +
-		"    const {\n" +
-		"        id,\n" +
-		"        method,\n" +
-		"        // eslint-disable-next-line nexus/consistency-no-abbreviated-identifier\n" +
-		"        params,\n" +
-		"    } = message;\n" +
-		"}\n"
-
-	result := ruletest.Run(t, ConsistencyNoAbbreviatedIdentifier, "/repository/source/Thing.ts", sourceText)
-	if len(result.Diagnostics) == 0 {
-		t.Fatalf("expected a finding, got none")
+	cases := []struct {
+		name       string
+		sourceText string
+		wantLine   int
+		wantColumn int
+	}{
+		{
+			// The real-tree shape. Leading trivia spans two lines here, so an untrimmed range lands
+			// on `method` two lines above the name.
+			"a destructured binding under a comment",
+			"function handleRequest(message: M): void {\n" +
+				"    const {\n" +
+				"        id,\n" +
+				"        method,\n" +
+				"        // eslint-disable-next-line nexus/consistency-no-abbreviated-identifier\n" +
+				"        params,\n" +
+				"    } = message;\n" +
+				"}\n",
+			6, 9,
+		},
+		{
+			// A parameter's trivia reaches back to the open parenthesis on the signature line.
+			"a parameter under a comment",
+			"function handleRequest(\n    // eslint-disable-next-line\n    params: string,\n) {}\n",
+			3, 5,
+		},
+		{
+			// A class member, whose trivia reaches back past the comment to the previous member.
+			"a class property under a comment",
+			"class Thing {\n    id = 1;\n    // eslint-disable-next-line\n    paramsText = 2;\n}\n",
+			4, 5,
+		},
+		{
+			// Within one line the whitespace after `const` is the trivia, so only the column moves.
+			"a declaration with no comment above it",
+			"const params = 1;\n",
+			1, 7,
+		},
 	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.Run(t, ConsistencyNoAbbreviatedIdentifier, "/repository/source/Thing.ts", testCase.sourceText)
+			if len(result.Diagnostics) == 0 {
+				t.Fatalf("expected a finding, got none")
+			}
 
-	line, _ := scanner.GetLineAndCharacterOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
-	const identifierLine = 5 // zero-based, so the sixth line
-	if line != identifierLine {
-		t.Fatalf("expected the finding on the identifier line (%d), got line %d", identifierLine+1, line+1)
+			line, column := scanner.GetLineAndCharacterOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
+			if line+1 != testCase.wantLine || column+1 != testCase.wantColumn {
+				t.Fatalf("expected the finding at %d:%d, got %d:%d",
+					testCase.wantLine, testCase.wantColumn, line+1, column+1)
+			}
+		})
 	}
 }
