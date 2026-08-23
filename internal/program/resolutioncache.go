@@ -12,25 +12,55 @@ import (
 
 // The resolution cache: what module resolution found last run, replayed instead of re-walked.
 //
+// Built and deliberately not enabled. Nothing wires this into the graph build, and that is a
+// decision rather than unfinished work.
+//
+// The reason is a number. The estimate this was built on was 115 to 220ms, derived by taking
+// a cold-versus-warm difference, subtracting the measured cost of reading source bytes, and
+// attributing the remainder to module-resolution lookups. The remainder was real. Attributing
+// all of it to something a cache could remove was not.
+//
+// Measured properly, by wrapping vfs.FS and counting actual calls, then recording those
+// lookups and replaying them with the resulting program asserted identical:
+//
+//	against a raw filesystem       208ms -> 133ms, saved 75ms
+//	against cachedvfs, what ships  217ms -> 175ms, saved 42ms
+//
+// Both with zero lookup misses and 9,982 files on each side. cachedvfs already memoizes within
+// a run, so a persisted cache only replaces the first occurrence of each distinct lookup, and
+// the repeats were free already. The traffic is 29,050 FileExists, 5,672 DirectoryExists and 750
+// Realpath against 10,814 unavoidable ReadFile.
+//
+// 42ms does not pay for the risk. An invalidation bug in a signature cache costs a stale
+// finding; an invalidation bug here costs a wrong program, because a resolution decides which
+// files are in it at all. The AST cache was killed at 28 to 41ms for the same reason.
+//
+// It stays on disk because the format and its guards are tested and cost nothing sitting here,
+// and because the trade reverses if lookups ever get expensive again: a network filesystem, a
+// container mount, or an upstream change that drops the cachedvfs layer would each move the
+// 42ms figure a lot. Re-run the measurement before enabling it, rather than trusting this note.
+//
 // Module resolution asks the filesystem where a specifier lives, and most of what it asks
 // does not exist. Our build info records 1,959 package.json paths the compiler looked for and
-// did not find, every single run. Measured on the ahra tree, the filesystem half of the graph
-// phase is 274 to 381ms, of which roughly 159ms is reading source bytes that parsing needs
-// regardless. The remainder, about 115 to 220ms, is lookup traffic, and that is what this
-// replaces.
+// did not find, every single run. The filesystem half of the graph phase measures 274 to
+// 381ms, of which roughly 159ms is reading source bytes that parsing needs regardless.
+//
+// The remainder is lookup traffic, and this replaces the part of it that is not already
+// memoized within the run. That distinction is the whole story of the 42ms above, and it is
+// why the residual is not the saving.
 //
 // The replay itself is nearly free: 30,781 resolutions read back and rebuilt into a usable
 // map in 2.3ms from a 2.27 MB artifact.
 //
-// WHY THIS CACHE INVALIDATES DIFFERENTLY FROM THE SIGNATURE CACHE, which is the single thing
-// to understand before touching this file. A resolution depends on the SHAPE of the
+// This cache invalidates differently from the signature cache, and that is the single thing
+// to understand before touching this file. A resolution depends on the shape of the
 // filesystem, not on the contents of any file. Adding a file changes what a specifier
 // resolves to while no existing file's bytes changed at all. So content hashes cannot
 // invalidate this, and a cache keyed on them would serve a stale resolution forever while
 // every content hash still matched.
 //
 // The guard is a directory fingerprint: one stat per directory resolution touches, hashed
-// together. Measured at 2.3ms across 1,699 directories, against the 115 to 220ms it guards.
+// together. Measured at 2.3ms across 1,699 directories, cheap against anything it guards.
 // A listing hash costs 38.3ms and buys only the case where an entry is renamed without the
 // directory's mtime moving, which the probe below could not produce on any filesystem we run
 // on.
