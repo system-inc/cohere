@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/config"
 	"github.com/system-inc/verify/internal/fix"
@@ -441,15 +442,32 @@ func collectTypeDiagnostics(ctx context.Context, graph *program.Graph, files []*
 func printCompilerDiagnostic(diagnostic *ast.Diagnostic) {
 	sourceFile := diagnostic.File()
 	if sourceFile == nil {
-		fmt.Printf("error TS%d: %s\n", diagnostic.Code(), diagnostic.MessageText())
+		fmt.Printf("error TS%d: %s\n", diagnostic.Code(), diagnosticMessage(diagnostic))
 		return
 	}
 
 	line, character := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, diagnostic.Loc().Pos())
 	fmt.Printf(
 		"%s:%d:%d - error TS%d: %s\n",
-		sourceFile.FileName(), line+1, character+1, diagnostic.Code(), diagnostic.MessageText(),
+		sourceFile.FileName(), line+1, character+1, diagnostic.Code(), diagnosticMessage(diagnostic),
 	)
+}
+
+// diagnosticMessage renders a compiler diagnostic's text.
+//
+// `MessageText()` is the wrong accessor and returns the empty string for every diagnostic the
+// checker produces. A compiler diagnostic carries a message template and its arguments separately,
+// and `messageText` is only populated for external diagnostics that arrive pre-localized. So a real
+// type error printed as `error TS2322: ` with nothing after the colon, which is worse than not
+// printing it: the reader is told a file is broken and not told how.
+//
+// `Localize` is what the compiler's own diagnostic writer uses. It renders the template with its
+// arguments, and falls back to `messageText` for the external case, so it is correct for both rather
+// than for the one that happened to be tested.
+//
+// The zero Locale selects the built-in English text, which is what this tool prints everywhere else.
+func diagnosticMessage(diagnostic *ast.Diagnostic) string {
+	return diagnostic.Localize(locale.Locale{})
 }
 
 // printRuleDiagnostic prints one rule finding in the same shape, with the rule name where the error

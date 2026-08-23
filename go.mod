@@ -9,6 +9,7 @@ replace (
 	github.com/microsoft/TypeScript/tsc/shim/compiler => ./shim/compiler
 	github.com/microsoft/TypeScript/tsc/shim/core => ./shim/core
 	github.com/microsoft/TypeScript/tsc/shim/format => ./shim/format
+	github.com/microsoft/TypeScript/tsc/shim/locale => ./shim/locale
 	github.com/microsoft/TypeScript/tsc/shim/parser => ./shim/parser
 	github.com/microsoft/TypeScript/tsc/shim/scanner => ./shim/scanner
 	github.com/microsoft/TypeScript/tsc/shim/tsoptions => ./shim/tsoptions
@@ -25,6 +26,7 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/compiler v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/core v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/format v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/locale v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/parser v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/scanner v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/tsoptions v0.0.0

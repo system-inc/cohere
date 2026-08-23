@@ -2,8 +2,10 @@ package program_test
 
 import (
 	"context"
+	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -456,5 +458,46 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(t *testing.T) {
 
 	if len(result.Coverage.FilesCrashed) != 0 {
 		t.Errorf("a clean walk reported %d crashed files", len(result.Coverage.FilesCrashed))
+	}
+}
+
+// A real compiler diagnostic renders its message through Localize, and not through MessageText.
+//
+// Every diagnostic the checker produces carries a message template and its arguments separately.
+// `messageText` is populated only for external diagnostics that arrive already localized, so reading
+// it printed `error TS2322: ` with nothing after the colon on a genuine type error. That is worse
+// than not printing: the reader is told a file is broken and not told how.
+//
+// This matters more than one format string, because types gate lint. A type error stops the run
+// before any rule looks at anything, so the sentence it prints is the entire output of a failing
+// verification.
+func TestACompilerDiagnosticRendersThroughLocalize(t *testing.T) {
+	directory := writeProject(t, map[string]string{
+		"tsconfig.json": minimalConfig,
+		"main.ts":       "export const counted: string = 41 + 1;\n",
+	})
+
+	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if err != nil {
+		t.Fatalf("building: %v", err)
+	}
+
+	diagnostics := graph.AllDiagnostics(context.Background())
+	if len(diagnostics) == 0 {
+		t.Fatal("the fixture produced no diagnostics, so this test proves nothing about rendering one")
+	}
+
+	diagnostic := diagnostics[0]
+	if text := diagnostic.MessageText(); text != "" {
+		t.Errorf("MessageText is populated for a compiler diagnostic, which would make Localize "+
+			"unnecessary and this test stale: %q", text)
+	}
+
+	rendered := diagnostic.Localize(locale.Locale{})
+	if rendered == "" {
+		t.Fatal("a real compiler diagnostic rendered as the empty string")
+	}
+	if !strings.Contains(rendered, "number") || !strings.Contains(rendered, "string") {
+		t.Errorf("the rendered message did not carry its arguments: %q", rendered)
 	}
 }
