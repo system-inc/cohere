@@ -32,6 +32,17 @@ type Signing struct {
 	// it. Notarization requires a "Developer ID Application" certificate specifically; an "Apple
 	// Development" certificate signs successfully and is then rejected by the notary service, which
 	// is a failure that only appears at the end of a release.
+	//
+	// Measured rather than assumed, by signing a real staged binary with the Apple Development
+	// identity on this machine and assessing it read-only:
+	//
+	//	unsigned            Signature=adhoc                  spctl: rejected
+	//	Apple Development   Authority=Apple Development ...   spctl: rejected
+	//
+	// So signing with the wrong certificate type changes the signature and not the verdict. It is
+	// worth stating because the intermediate state looks like progress: `codesign --verify` passes,
+	// the binary carries a real Apple chain and a TeamIdentifier, and Gatekeeper still refuses it.
+	// A release that signed with what was available and stopped there would read as done.
 	Identity string
 
 	// KeychainProfile is the `notarytool` profile holding the Apple ID credentials, stored with
