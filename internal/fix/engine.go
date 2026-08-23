@@ -1,8 +1,10 @@
 package fix
 
 import (
+	"errors"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // DefaultMaxPasses bounds convergence.
@@ -52,6 +54,17 @@ type FileResult struct {
 	// needed no formatting produce identical output otherwise, which is the same ambiguity the
 	// coverage line exists to destroy.
 	Transformed bool
+
+	// TransformSkipped is whether the transform declined this file on purpose.
+	//
+	// A skip and a file that needed no formatting produce identical output otherwise, and they mean
+	// opposite things: one says the formatter never looked, the other says it looked and approved.
+	// Collapsing them is how a formatter with a known corruption bug on one file type comes to read
+	// as a formatter that had nothing to do.
+	TransformSkipped bool
+
+	// TransformSkipReason is why, in the transform's own words. Empty when it did not say.
+	TransformSkipReason string
 
 	// Failed is set when the engine could not process the file at all — unreadable, unwritable, or
 	// already unparseable before anything was applied.
@@ -189,6 +202,37 @@ func FixFile(fileName string, propose Propose, maxPasses int) (FileResult, error
 // anything was built against it.
 type Transform func(fileName string, text string) (string, error)
 
+// ErrSkipped is what a transform returns to decline a file rather than to fail on it.
+//
+// A transform that cannot handle a file type, or handles it incorrectly today, must be able to say
+// so in a way the engine records rather than swallows. Returning the text unchanged would work and
+// would be wrong: it is indistinguishable from "already correctly formatted", so a formatter with a
+// known corruption bug on markdown would report the whole tree as clean.
+//
+// Wrap it to carry a reason, which is what reaches the coverage line:
+//
+//	if isMarkdown(fileName) {
+//		return "", fmt.Errorf("%w: markdown doubles a standalone tilde", fix.ErrSkipped)
+//	}
+var ErrSkipped = errors.New("the transform skipped this file")
+
+// skipReasonOf pulls a transform's own words out of a skip error, without the sentinel's text.
+//
+// The reason is what a reader acts on. "Skipped" alone tells them a number; "skipped: markdown
+// doubles a standalone tilde" tells them which files and why, which is the difference between a
+// count and a finding.
+func skipReasonOf(err error) string {
+	message := err.Error()
+	prefix := ErrSkipped.Error() + ": "
+	if after, found := strings.CutPrefix(message, prefix); found {
+		return after
+	}
+	if message == ErrSkipped.Error() {
+		return ""
+	}
+	return message
+}
+
 // FixAndTransformFile drives a file to a fixpoint, applies a whole-text transform, and writes the
 // result — once, atomically, behind the same parse guard.
 //
@@ -213,6 +257,15 @@ func FixAndTransformFile(fileName string, propose Propose, transform Transform, 
 	if transform != nil {
 		transformed, transformError := transform(fileName, result.Text)
 		switch {
+		case errors.Is(transformError, ErrSkipped):
+			// The transform declined this file on purpose — a file type it does not handle, or one it
+			// handles incorrectly today. Recorded rather than treated as a failure, because the two
+			// mean different things to a reader: a failure says the formatter broke, a skip says it
+			// chose not to look, and a run where a formatter skipped four hundred files must not read
+			// as a run where four hundred files were already correctly formatted.
+			result.TransformSkipped = true
+			result.TransformSkipReason = skipReasonOf(transformError)
+
 		case transformError != nil:
 			// A transform that failed says nothing about the fixes, which already converged and
 			// already passed the guard. They are kept and the transform is reported as refused, so a
@@ -268,6 +321,16 @@ type Summary struct {
 	FixesApplied    int
 	FixesRefused    int
 
+	// FilesTransformSkipped is how many files the transform declined on purpose.
+	//
+	// Printed alongside the reformat count, because a run where the formatter skipped a whole file
+	// type must not read as a run where that file type was already clean.
+	FilesTransformSkipped int
+
+	// TransformSkipReasons counts skips by the reason the transform gave, so a reader learns which
+	// file types were left alone and why rather than only how many.
+	TransformSkipReasons map[string]int
+
 	// FilesTransformed is how many files the whole-text transform rewrote after fixes converged.
 	//
 	// Counted separately from FilesChanged because the two answer different questions. A run where
@@ -307,8 +370,9 @@ type Summary struct {
 // Summarize folds per-file results into a run summary.
 func Summarize(results []FileResult) Summary {
 	summary := Summary{
-		RefusalsByReason: map[string]int{},
-		FilesByPasses:    map[int]int{},
+		RefusalsByReason:     map[string]int{},
+		FilesByPasses:        map[int]int{},
+		TransformSkipReasons: map[string]int{},
 	}
 
 	for _, result := range results {
@@ -318,6 +382,10 @@ func Summarize(results []FileResult) Summary {
 		}
 		if result.Transformed {
 			summary.FilesTransformed++
+		}
+		if result.TransformSkipped {
+			summary.FilesTransformSkipped++
+			summary.TransformSkipReasons[result.TransformSkipReason]++
 		}
 		summary.FixesApplied += len(result.Applied)
 		summary.FixesRefused += len(result.Rejected)
@@ -372,12 +440,12 @@ func (s Summary) String() string {
 		s.FilesChanged, s.FilesConsidered, s.FixesApplied, s.FixesRefused,
 	)
 
-	// Formatting reports its own number rather than hiding inside the rewrite count, so a run where
-	// the formatter did nothing is distinguishable from one where nothing needed formatting.
-	if s.FilesTransformed > 0 {
-		line += fmt.Sprintf(", %d reformatted", s.FilesTransformed)
-	}
-
+	// The refusal breakdown attaches to the refusal count and must stay adjacent to it. It was
+	// written when nothing sat between the two, and adding the reformat and skip clauses moved it
+	// away — producing "2 not formatted (2 markdown) (1 overlaps a fix from another rule)", where
+	// the second parenthetical reads as a second skip reason. A true number under the wrong heading,
+	// found by reading the rendered line rather than by any assertion, because every fixture checked
+	// for the presence of its own substring and none checked what the whole line said.
 	if len(s.RefusalsByReason) > 0 {
 		reasons := make([]string, 0, len(s.RefusalsByReason))
 		for reason := range s.RefusalsByReason {
@@ -393,6 +461,29 @@ func (s Summary) String() string {
 			line += fmt.Sprintf("%d %s", s.RefusalsByReason[reason], reason)
 		}
 		line += ")"
+	}
+
+	// Formatting reports its own number rather than hiding inside the rewrite count, so a run where
+	// the formatter did nothing is distinguishable from one where nothing needed formatting.
+	if s.FilesTransformed > 0 {
+		line += fmt.Sprintf(", %d reformatted", s.FilesTransformed)
+	}
+
+	// Skips print whenever there are any, and they name the reason. A formatter that declined four
+	// hundred files and one that found four hundred files already correct produce the same reformat
+	// count, and only this line tells them apart.
+	if s.FilesTransformSkipped > 0 {
+		line += fmt.Sprintf(", %d not formatted", s.FilesTransformSkipped)
+		reasons := make([]string, 0, len(s.TransformSkipReasons))
+		for reason := range s.TransformSkipReasons {
+			if reason != "" {
+				reasons = append(reasons, reason)
+			}
+		}
+		sort.Strings(reasons)
+		for _, reason := range reasons {
+			line += fmt.Sprintf(" (%d %s)", s.TransformSkipReasons[reason], reason)
+		}
 	}
 
 	maximumPasses := 0

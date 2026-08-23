@@ -2,6 +2,7 @@ package fix
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -285,5 +286,196 @@ func TestSummaryCountsReformattedFiles(t *testing.T) {
 	}
 	if !strings.Contains(summary.String(), "1 reformatted") {
 		t.Fatalf("the summary hides the reformat count: %s", summary.String())
+	}
+}
+
+// A transform that declines a file must be recorded as a skip, not as a clean pass.
+//
+// Asked for by @system_verify_format: its goja formatter doubles a standalone tilde in markdown,
+// turning approximately-25K into strikethrough, so markdown is scoped out until that is fixed. The
+// engine does not care which files a transform handles, but the coverage line must not report a
+// skipped file the same way it reports a file that was already correctly formatted. Those mean
+// opposite things — one says the formatter never looked, the other says it looked and approved.
+func TestATransformCanSkipAFileAndTheSkipIsRecorded(t *testing.T) {
+	directory := t.TempDir()
+	fileName := filepath.Join(directory, "notes.ts")
+	source := "const a = 1;\n"
+
+	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(fileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	skipping := func(_ string, _ string) (string, error) {
+		return "", fmt.Errorf("%w: markdown doubles a standalone tilde", ErrSkipped)
+	}
+
+	result, err := FixAndTransformFile(fileName, proposeOnce(), skipping, DefaultMaxPasses)
+	if err != nil {
+		t.Fatalf("a skip must not be an error: %v", err)
+	}
+
+	if !result.TransformSkipped {
+		t.Fatalf("the skip was not recorded: %+v", result)
+	}
+	if result.TransformSkipReason != "markdown doubles a standalone tilde" {
+		t.Fatalf("the reason was lost or mangled: %q", result.TransformSkipReason)
+	}
+	if result.Transformed || result.Changed {
+		t.Fatalf("a skipped file was reported as changed")
+	}
+
+	// A skip is not a refusal. Reporting it as one would send a reader looking for a broken fix.
+	for _, rejection := range result.Rejected {
+		if strings.HasPrefix(rejection.Reason, ReasonTransformFailed) {
+			t.Fatalf("a skip was reported as a transform failure: %+v", rejection)
+		}
+	}
+
+	after, err := os.Stat(fileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !after.ModTime().Equal(before.ModTime()) {
+		t.Fatalf("a skipped file was rewritten")
+	}
+}
+
+// A skip must not be confused with a failure. The two send a reader somewhere different: a failure
+// says the formatter broke, a skip says it chose not to look.
+func TestASkipIsNotAFailure(t *testing.T) {
+	skipped := Summarize([]FileResult{
+		{FileName: "a.ts", TransformSkipped: true, TransformSkipReason: "markdown"},
+	})
+	failed := Summarize([]FileResult{
+		{FileName: "a.ts", Rejected: []Rejection{{Reason: ReasonTransformFailed + " (boom)"}}},
+	})
+
+	if skipped.FilesTransformSkipped != 1 {
+		t.Fatalf("the skip was not counted: %+v", skipped)
+	}
+	if skipped.RefusalsByReason[ReasonTransformFailed] != 0 {
+		t.Fatalf("a skip was counted as a transform failure: %+v", skipped.RefusalsByReason)
+	}
+	if failed.FilesTransformSkipped != 0 {
+		t.Fatalf("a failure was counted as a skip: %+v", failed)
+	}
+	if skipped.String() == failed.String() {
+		t.Fatalf("a skipped run and a failed run print the same line: %q", skipped.String())
+	}
+}
+
+// The summary must distinguish a run that skipped every file from a run where every file was
+// already correctly formatted. This is the whole reason the skip channel exists rather than a
+// transform returning its input unchanged.
+func TestSkippedFilesAreNotReportedAsAlreadyFormatted(t *testing.T) {
+	skippedEverything := Summarize([]FileResult{
+		{FileName: "a.ts", TransformSkipped: true, TransformSkipReason: "markdown doubles a standalone tilde"},
+		{FileName: "b.ts", TransformSkipped: true, TransformSkipReason: "markdown doubles a standalone tilde"},
+	})
+	alreadyClean := Summarize([]FileResult{
+		{FileName: "a.ts"},
+		{FileName: "b.ts"},
+	})
+
+	if skippedEverything.String() == alreadyClean.String() {
+		t.Fatalf("skipping every file reads as every file being clean: %q", alreadyClean.String())
+	}
+
+	line := skippedEverything.String()
+	if !strings.Contains(line, "2 not formatted") {
+		t.Fatalf("the skip count is missing: %s", line)
+	}
+	// The reason travels with the count, because "2 not formatted" is a number and
+	// "2 not formatted (2 markdown doubles a standalone tilde)" is a finding.
+	if !strings.Contains(line, "markdown doubles a standalone tilde") {
+		t.Fatalf("the skip reason did not reach the summary: %s", line)
+	}
+}
+
+// A skip with no reason is still recorded. A transform that declines without saying why is worse
+// than one that explains itself, but silently dropping the skip would be worse than both.
+func TestASkipWithNoReasonIsStillCounted(t *testing.T) {
+	directory := t.TempDir()
+	fileName := filepath.Join(directory, "bare.ts")
+
+	if err := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := FixAndTransformFile(fileName, proposeOnce(), func(_ string, _ string) (string, error) {
+		return "", ErrSkipped
+	}, DefaultMaxPasses)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.TransformSkipped {
+		t.Fatalf("a bare skip was not recorded")
+	}
+	if result.TransformSkipReason != "" {
+		t.Fatalf("a reason was invented: %q", result.TransformSkipReason)
+	}
+	if !strings.Contains(Summarize([]FileResult{result}).String(), "1 not formatted") {
+		t.Fatalf("a reasonless skip vanished from the summary")
+	}
+}
+
+// The whole summary line is asserted here, not one substring of it.
+//
+// This fixture exists because a real defect slipped past every other test in this package. Each of
+// them checked that its own clause appeared somewhere in the line, and all of them passed while the
+// line read:
+//
+//	... 0 refused, 2 not formatted (2 markdown ...) (1 overlaps a fix from another rule) ...
+//
+// The refusal breakdown had been written to sit directly after the refusal count, and adding the
+// reformat and skip clauses pushed it away, so it rendered as a second skip reason. Every number was
+// correct and the sentence was wrong, which no substring assertion can see.
+//
+// So this one compares the rendered line exactly. It is more brittle than the others on purpose:
+// the thing being protected is what a person reads, and a change that alters that should have to be
+// stated rather than absorbed.
+func TestTheWholeSummaryLineReadsCorrectly(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		results []FileResult
+		want    string
+	}{
+		{
+			name:    "a run that did nothing states its population",
+			results: nil,
+			want:    "fix: 0 of 0 files rewritten, 0 fixes applied, 0 refused",
+		},
+		{
+			name: "refusals stay attached to the refusal count",
+			results: []FileResult{
+				{FileName: "a.ts", Converged: true, Passes: 1, Rejected: []Rejection{{Reason: ReasonOverlap}}},
+				{FileName: "b.md", Converged: true, Passes: 1, TransformSkipped: true, TransformSkipReason: "markdown doubles a standalone tilde"},
+			},
+			want: "fix: 0 of 2 files rewritten, 0 fixes applied, 1 refused (1 overlaps a fix from another rule), " +
+				"1 not formatted (1 markdown doubles a standalone tilde)",
+		},
+		{
+			name: "a full run reads as one sentence",
+			results: []FileResult{
+				{FileName: "a.ts", Converged: true, Changed: true, Passes: 2, Applied: []Proposal{{RuleName: "r"}, {RuleName: "r"}}, Transformed: true},
+				{FileName: "b.ts", Converged: true, Changed: true, Passes: 1, Applied: []Proposal{{RuleName: "r"}}},
+				{FileName: "c.md", Converged: true, Passes: 1, TransformSkipped: true, TransformSkipReason: "markdown doubles a standalone tilde"},
+				{FileName: "d.ts", Failed: true},
+			},
+			want: "fix: 2 of 4 files rewritten, 3 fixes applied, 0 refused, 1 reformatted, " +
+				"1 not formatted (1 markdown doubles a standalone tilde), up to 2 passes, " +
+				"1 files could not be processed",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := Summarize(testCase.results).String()
+			if got != testCase.want {
+				t.Fatalf("the summary line reads wrong:\n  want %q\n  got  %q", testCase.want, got)
+			}
+		})
 	}
 }
