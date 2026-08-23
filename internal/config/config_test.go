@@ -1,0 +1,277 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+// TestTheThreeHundredThirtySixCase is the finding that produced this package.
+//
+// `consistency-require-type-suffix` fired 336 times across
+// `libraries/structure/source/api/graphql/generated/`, which the gate verify replaces correctly
+// stays silent on. If this test ever passes in the wrong direction, those 336 come back.
+func TestTheThreeHundredThirtySixCase(t *testing.T) {
+	configuration := &Config{
+		Rules: map[string]RuleSetting{
+			"consistency-require-type-suffix": {Severity: SeverityError},
+		},
+		Overrides: []Override{{
+			Files: []string{"**/generated/**/*.{ts,tsx}"},
+			Rules: map[string]RuleSetting{
+				"consistency-require-type-suffix": {Severity: SeverityOff},
+			},
+		}},
+	}
+
+	generated := configuration.Resolve("libraries/structure/source/api/graphql/generated/GraphQlOperations.ts")
+	if generated.Enabled("consistency-require-type-suffix") {
+		t.Fatal("the rule is still enabled inside generated/, which is the 336 findings")
+	}
+
+	// The other half, and the one a too-broad override would break silently: the rule must still run
+	// everywhere else. An override that disabled it globally would pass the assertion above.
+	authored := configuration.Resolve("libraries/structure/source/components/buttons/Button.tsx")
+	if !authored.Enabled("consistency-require-type-suffix") {
+		t.Fatal("the override leaked outside generated/, disabling the rule on authored code")
+	}
+}
+
+// TestDoubleStarCrossesDirectoriesAndStarDoesNot is the distinction that decides whether an
+// approximation loses findings.
+//
+// Treating `**` as `*` makes the generated override miss every nested file. Treating `*` as
+// crossing slashes makes `modules/*` swallow a whole subtree and scope rules off files nobody
+// excluded. The first is loud, the second is invisible.
+func TestDoubleStarCrossesDirectoriesAndStarDoesNot(t *testing.T) {
+	cases := []struct {
+		pattern string
+		path    string
+		want    bool
+	}{
+		{"**/generated/**/*.ts", "a/b/generated/c/d/File.ts", true},
+		{"**/generated/**/*.ts", "generated/File.ts", true},
+		{"**/generated/**/*.ts", "a/generated/File.ts", true},
+		{"**/generated/**/*.ts", "a/b/File.ts", false},
+		{"**/generated/**/*.ts", "a/generated/c/File.tsx", false},
+
+		{"modules/*", "modules/finance", true},
+		{"modules/*", "modules/finance/Deep.ts", false},
+		{"modules/**", "modules/finance/Deep.ts", true},
+		{"modules/**", "modules", true},
+
+		{"*.ts", "File.ts", true},
+		{"*.ts", "nested/File.ts", false},
+	}
+
+	for _, testCase := range cases {
+		if got := Match(testCase.pattern, testCase.path); got != testCase.want {
+			t.Errorf("Match(%q, %q) = %v, want %v", testCase.pattern, testCase.path, got, testCase.want)
+		}
+	}
+}
+
+// TestBraceExpansion covers `*.{ts,tsx}`, which is in the live config. A matcher that ignored braces
+// would match neither extension while looking like it worked.
+func TestBraceExpansion(t *testing.T) {
+	cases := []struct {
+		pattern string
+		path    string
+		want    bool
+	}{
+		{"**/generated/**/*.{ts,tsx}", "a/generated/b/File.ts", true},
+		{"**/generated/**/*.{ts,tsx}", "a/generated/b/File.tsx", true},
+		{"**/generated/**/*.{ts,tsx}", "a/generated/b/File.js", false},
+		{"*.{ts,tsx}", "File.tsx", true},
+		{"{a,b}/*.ts", "b/File.ts", true},
+		{"{a,b}/*.ts", "c/File.ts", false},
+		// Nested alternation, and an unbalanced brace that must not crash.
+		{"{a,{b,c}}/File.ts", "c/File.ts", true},
+		{"{unclosed/File.ts", "{unclosed/File.ts", true},
+	}
+
+	for _, testCase := range cases {
+		if got := Match(testCase.pattern, testCase.path); got != testCase.want {
+			t.Errorf("Match(%q, %q) = %v, want %v", testCase.pattern, testCase.path, got, testCase.want)
+		}
+	}
+}
+
+// TestEveryLivePatternBehaves runs the actual patterns from .oxlintrc.json.
+//
+// Hand-written patterns in a test can drift from the config they claim to model. These are the real
+// strings.
+func TestEveryLivePatternBehaves(t *testing.T) {
+	ignore := []string{
+		"code-quality/fixtures/**", "node_modules/**", "public/**", "**/.next/**",
+		"**/.open-next/**", "**/.worker-next/**", "**/.wrangler/**", "**/build/**",
+		"**/dist/**", "**/*.code.js", ".vscode/**", ".claude/worktrees/**",
+		"data/**", "projects/**",
+	}
+
+	excluded := []string{
+		"node_modules/react/index.d.ts",
+		"code-quality/fixtures/Violation.ts",
+		"libraries/structure/.next/types/route.ts",
+		"apps/web/dist/bundle.ts",
+		"scripts/Worker.code.js",
+		"data/conversations/log.ts",
+		".claude/worktrees/scratch/File.ts",
+	}
+	for _, path := range excluded {
+		if !MatchAny(ignore, path) {
+			t.Errorf("%q should be ignored by the live patterns but is not", path)
+		}
+	}
+
+	// The half that matters more: real source must not be swept up by an ignore pattern.
+	kept := []string{
+		"libraries/structure/source/components/buttons/Button.tsx",
+		"modules/finance/connections/QuickBooksAdapter.ts",
+		"app/(os-layout)/os/wisdom/page.tsx",
+		"libraries/structure/source/utilities/Data.ts",
+	}
+	for _, path := range kept {
+		if MatchAny(ignore, path) {
+			t.Errorf("%q is real source and must not be ignored", path)
+		}
+	}
+}
+
+// TestLaterOverridesWin pins the precedence both ESLint and oxlint use. Getting this backwards makes
+// verify disagree with the gate about which rules were supposed to run, which is the thing that
+// blocks an honest acceptance diff.
+func TestLaterOverridesWin(t *testing.T) {
+	configuration := &Config{
+		Rules: map[string]RuleSetting{"a-rule": {Severity: SeverityError}},
+		Overrides: []Override{
+			{Files: []string{"modules/**"}, Rules: map[string]RuleSetting{"a-rule": {Severity: SeverityOff}}},
+			{Files: []string{"modules/finance/**"}, Rules: map[string]RuleSetting{"a-rule": {Severity: SeverityError}}},
+		},
+	}
+
+	if configuration.Resolve("modules/other/File.ts").Enabled("a-rule") {
+		t.Fatal("the first override should have disabled the rule under modules/")
+	}
+	if !configuration.Resolve("modules/finance/File.ts").Enabled("a-rule") {
+		t.Fatal("the later override should have re-enabled the rule under modules/finance/")
+	}
+}
+
+// TestOneFilesOverridesDoNotLeakIntoTheNext guards a real aliasing bug: sharing the base rule map
+// across files makes the first override permanent for every file resolved afterward.
+func TestOneFilesOverridesDoNotLeakIntoTheNext(t *testing.T) {
+	configuration := &Config{
+		Rules: map[string]RuleSetting{"a-rule": {Severity: SeverityError}},
+		Overrides: []Override{{
+			Files: []string{"**/generated/**"},
+			Rules: map[string]RuleSetting{"a-rule": {Severity: SeverityOff}},
+		}},
+	}
+
+	configuration.Resolve("src/generated/File.ts")
+	if !configuration.Resolve("src/authored/File.ts").Enabled("a-rule") {
+		t.Fatal("resolving a generated file disabled the rule for a later authored file")
+	}
+}
+
+// TestIgnoredFileRunsNoRulesAndSaysWhy proves exclusion is reportable rather than merely silent. A
+// file skipped by ignorePatterns and a file with no findings are identical output otherwise.
+func TestIgnoredFileRunsNoRulesAndSaysWhy(t *testing.T) {
+	configuration := &Config{
+		Rules:          map[string]RuleSetting{"a-rule": {Severity: SeverityError}},
+		IgnorePatterns: []string{"node_modules/**"},
+	}
+
+	resolved := configuration.Resolve("node_modules/thing/index.ts")
+	if !resolved.Ignored {
+		t.Fatal("an ignored path did not resolve as ignored")
+	}
+	if resolved.IgnoredBy != "node_modules/**" {
+		t.Fatalf("the excluding pattern was not reported: %q", resolved.IgnoredBy)
+	}
+	if resolved.Enabled("a-rule") {
+		t.Fatal("a rule ran on an ignored file")
+	}
+}
+
+// TestAnUnconfiguredRuleDoesNotRun keeps adding a rule to the registry from silently enabling it
+// across the whole tree.
+func TestAnUnconfiguredRuleDoesNotRun(t *testing.T) {
+	configuration := &Config{Rules: map[string]RuleSetting{"known": {Severity: SeverityError}}}
+
+	if configuration.Resolve("File.ts").Enabled("never-configured") {
+		t.Fatal("a rule the config never mentions was treated as enabled")
+	}
+}
+
+// TestBothRuleShapesLoad covers the 173 bare severities and the 9 that carry options.
+func TestBothRuleShapesLoad(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, ".oxlintrc.json")
+	contents := `{
+		"rules": {
+			"plain-rule": "error",
+			"disabled-rule": "off",
+			"configured-rule": ["error", {"ignoreRestArgs": true}]
+		},
+		"ignorePatterns": ["dist/**"],
+		"overrides": [{"files": ["**/generated/**/*.{ts,tsx}"], "rules": {"plain-rule": "off"}}]
+	}`
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatalf("writing the config: %v", err)
+	}
+
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("loading: %v", err)
+	}
+
+	if loaded.Rules["plain-rule"].Severity != SeverityError {
+		t.Fatal("a bare severity did not load as error")
+	}
+	if loaded.Rules["disabled-rule"].Severity != SeverityOff {
+		t.Fatal("an off rule did not load as off")
+	}
+	if loaded.Rules["configured-rule"].Severity != SeverityError {
+		t.Fatal("a [severity, options] rule did not load its severity")
+	}
+	if len(loaded.Rules["configured-rule"].Options) == 0 {
+		t.Fatal("a rule's options were dropped, which is how a rule ends up guarding nothing")
+	}
+	if len(loaded.Rules["plain-rule"].Options) != 0 {
+		t.Fatal("a bare rule invented options it was never given")
+	}
+	if len(loaded.Overrides) != 1 || len(loaded.IgnorePatterns) != 1 {
+		t.Fatalf("overrides or ignorePatterns did not load: %+v", loaded)
+	}
+}
+
+// TestAnUnreadableConfigIsAnErrorNotAnEmptyConfig is the loudness guard. An empty config lints
+// everything with nothing configured, which looks exactly like a clean run.
+func TestAnUnreadableConfigIsAnErrorNotAnEmptyConfig(t *testing.T) {
+	if _, err := Load(filepath.Join(t.TempDir(), "absent.json")); err == nil {
+		t.Fatal("a missing config file loaded successfully")
+	}
+
+	directory := t.TempDir()
+	path := filepath.Join(directory, "broken.json")
+	if err := os.WriteFile(path, []byte("{not json"), 0o644); err != nil {
+		t.Fatalf("writing: %v", err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("a malformed config loaded successfully")
+	}
+}
+
+// TestAnUnknownSeverityIsRefused keeps a typo from silently disabling a rule tree-wide.
+func TestAnUnknownSeverityIsRefused(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "config.json")
+	if err := os.WriteFile(path, []byte(`{"rules":{"a-rule":"errrror"}}`), 0o644); err != nil {
+		t.Fatalf("writing: %v", err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("an unknown severity was accepted, which would disable the rule silently")
+	}
+}
