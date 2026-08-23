@@ -26,6 +26,7 @@ func All() []rule.Rule {
 		nexus.ConsistencyNoBooleanOutcome,
 		nexus.ConsistencyNoEnum,
 		nexus.ConsistencyNoLongLineComment,
+		nexus.ConsistencyNoMultilineArrowFunction,
 		nexus.ConsistencyNoScreamingSnakeCase,
 		nexus.ConsistencyNoShouting,
 		nexus.ConsistencyNoSingleLineJsDoc,
