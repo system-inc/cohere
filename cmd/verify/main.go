@@ -424,14 +424,45 @@ func rebuildGraph(
 // does mean the compiler also checks the 6,500 third-party declarations, which is unavoidable — they
 // have to be checked for our files to mean anything — and their findings are dropped here because
 // nobody working in this repo can act on them.
+//
+// When the tsconfig is incremental, the check runs warm: files whose contents have not changed
+// since the last run are not re-checked. Measured on the ahra tree, 1149ms cold against 380ms
+// warm, with the finding set identical in both directions. A tsconfig without `incremental`
+// falls back to the full pass, which is also what happens on the first run, after a toolchain
+// version change, and any time the build info cannot be read.
+//
+// The build info is written even when this run reports findings, and that is deliberate: it
+// records which files were checked, not whether they passed. A file that type-checked and
+// produced a diagnostic was still checked. Discarding that on failure would make the slow path
+// the one a person hits while iterating on an error, which is exactly the loop where the pause
+// costs most.
 func collectTypeDiagnostics(ctx context.Context, graph *program.Graph, files []*ast.SourceFile) []*ast.Diagnostic {
 	ours := make(map[*ast.SourceFile]struct{}, len(files))
 	for _, sourceFile := range files {
 		ours[sourceFile] = struct{}{}
 	}
 
+	// One session across check-then-write. The build info has to be emitted from the same
+	// incremental program that did the checking: that program's snapshot is what records which
+	// files were checked, and emitting from a second one writes a build info that skips nothing
+	// while looking correct. See program.IncrementalSession.
+	var checked []*ast.Diagnostic
+	if session := graph.NewIncrementalSession(); session != nil {
+		checked = session.Diagnostics(ctx)
+		if writeDiagnostics := session.Write(ctx); len(writeDiagnostics) > 0 {
+			// A failed build-info write must not pass silently. The next run would be cold while
+			// this one reported success, and the symptom is a saving that quietly never appears.
+			for _, diagnostic := range writeDiagnostics {
+				fmt.Fprintf(os.Stderr, "verify: writing the incremental cache: %s\n",
+					diagnostic.MessageKey())
+			}
+		}
+	} else {
+		checked = graph.AllDiagnostics(ctx)
+	}
+
 	diagnostics := graph.ConfigDiagnostics(ctx)
-	for _, diagnostic := range graph.AllDiagnostics(ctx) {
+	for _, diagnostic := range checked {
 		// A diagnostic with no file is about the program rather than about any one file, so it is ours
 		// by default: dropping it would hide exactly the configuration errors that matter most.
 		if sourceFile := diagnostic.File(); sourceFile != nil {
