@@ -82,6 +82,7 @@ func All() []rule.Rule {
 		structure.NextNoPageState,
 		structure.NextRequireApiParameterName,
 		structure.NextRequirePageDefaultExport,
+		structure.ReactComponentNoConstAssignment,
 		structure.ReactComponentNoDestructuring,
 		structure.ReactComponentNoDisplayName,
 		structure.ReactComponentNoSeparateNamedExport,
