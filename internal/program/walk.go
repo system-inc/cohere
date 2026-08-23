@@ -3,6 +3,7 @@ package program
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -62,6 +63,16 @@ type Coverage struct {
 	// suppressions red for no defect, so the number is printed every run instead — which is what
 	// lets the convention be tightened later from evidence rather than from a guess.
 	SuppressedWithoutReason int
+
+	// UnusedSuppressionsForUnrunRules is the subset of UnusedSuppressions naming only rules this run
+	// did not run.
+	//
+	// During the migration this is most of the number, and the two mean opposite things. A directive
+	// that silenced nothing while its rule ran is dead scaffolding worth deleting. One naming a rule
+	// verify has not ported yet silenced nothing because nothing looked, and deleting it would strip
+	// a suppression the gate still needs. Collapsing them tells a reader to delete comments that are
+	// load-bearing today.
+	UnusedSuppressionsForUnrunRules int
 
 	// UnusedSuppressions is how many directives never withheld anything.
 	//
@@ -249,9 +260,10 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			RulesOffered:   offeredCounts,
 			RulesListening: listeningCounts,
 
-			Suppressed:              suppressed.applied,
-			SuppressedWithoutReason: suppressed.appliedNoReason,
-			UnusedSuppressions:      suppressed.unusedDirectives,
+			Suppressed:                      suppressed.applied,
+			SuppressedWithoutReason:         suppressed.appliedNoReason,
+			UnusedSuppressions:              suppressed.unusedDirectives,
+			UnusedSuppressionsForUnrunRules: suppressed.unusedForUnrunRule,
 
 			FilesIgnored:      filesIgnored,
 			RulesScopedOff:    scopedOff,
@@ -380,7 +392,18 @@ func dispatchFile(
 		}
 	}
 
-	return visitedNodes, tally(directives)
+	// The rules this run actually ran, so a directive naming only rules verify has not ported can be
+	// told apart from one whose rule ran and found nothing to silence.
+	//
+	// Built from `rules` rather than from listeningCounts: a rule that declined every file in this
+	// one still ran, and counting it as absent would call its directives unportable when they are
+	// simply satisfied.
+	ranRule := make(map[string]bool, len(rules))
+	for _, subject := range rules {
+		ranRule[subject.Name] = true
+	}
+
+	return visitedNodes, tally(directives, ranRule)
 }
 
 // suppressionTally is what one file's directives did, summed across the run.
@@ -388,12 +411,51 @@ type suppressionTally struct {
 	applied          int
 	appliedNoReason  int
 	unusedDirectives int
+
+	// unusedForUnrunRule is the subset of unusedDirectives naming only rules this run did not run.
+	//
+	// Separated because the two mean opposite things to a reader. A directive that silenced nothing
+	// while its rule ran is dead scaffolding worth deleting. A directive naming a rule verify has
+	// not ported yet silenced nothing because nothing looked, and deleting it would remove a
+	// suppression the gate still needs. Reporting them as one number tells a reader to go delete
+	// comments that are load-bearing today.
+	unusedForUnrunRule int
 }
 
 func (t *suppressionTally) add(other suppressionTally) {
 	t.applied += other.applied
 	t.appliedNoReason += other.appliedNoReason
 	t.unusedDirectives += other.unusedDirectives
+	t.unusedForUnrunRule += other.unusedForUnrunRule
+}
+
+// namesOnlyUnrunRules reports whether every rule a directive named is one this run did not run.
+//
+// A blanket directive names no rules and silences everything in its scope, so it is never in this
+// category: something ran, and it still withheld nothing. A directive naming a mix is not either,
+// because at least one rule looked and declined to fire, which is the shape worth deleting.
+func namesOnlyUnrunRules(directive *suppression.Directive, ranRule map[string]bool) bool {
+	if len(directive.Rules) == 0 {
+		return false
+	}
+	for _, named := range directive.Rules {
+		if ranRule[bareRuleName(named)] {
+			return false
+		}
+	}
+	return true
+}
+
+// bareRuleName drops a plugin prefix, so `structure/no-x` and `no-x` compare equal.
+//
+// Directives are written against the gate's names, which carry the plugin that owns the rule, while
+// the registry holds the rule's own name. Comparing them raw would report every prefixed directive
+// as naming an unrun rule.
+func bareRuleName(name string) string {
+	if slash := strings.LastIndexByte(name, '/'); slash >= 0 {
+		return name[slash+1:]
+	}
+	return name
 }
 
 // tally reads what a file's directives actually did, after the walk.
@@ -401,12 +463,15 @@ func (t *suppressionTally) add(other suppressionTally) {
 // The reasonless count is per withheld finding rather than per directive, because that is the
 // number that answers the question being asked: how much of what verify chose not to tell you was
 // silenced by someone who did not say why.
-func tally(directives *suppression.Index) suppressionTally {
+func tally(directives *suppression.Index, ranRule map[string]bool) suppressionTally {
 	counted := suppressionTally{}
 	for index, directive := range directives.Directives() {
 		applied := directives.AppliedCount(index)
 		if applied == 0 {
 			counted.unusedDirectives++
+			if namesOnlyUnrunRules(directive, ranRule) {
+				counted.unusedForUnrunRule++
+			}
 			continue
 		}
 		counted.applied += applied

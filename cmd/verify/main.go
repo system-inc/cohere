@@ -541,10 +541,24 @@ func printSuppressionCoverage(coverage program.Coverage) {
 		// codebase accumulates permanent exemptions nobody chose. It is a note rather than a finding
 		// because a filtered run makes every directive for an unselected rule look unused, and a
 		// number that is wrong under a common flag should not fail a build.
+		//
+		// The two halves are printed apart because they ask for opposite actions. A directive that
+		// silenced nothing while its rule ran is dead scaffolding, and deleting it is the right
+		// response. One naming only rules this run did not run silenced nothing because nothing
+		// looked, and deleting it would strip a suppression the gate still needs. Measured during
+		// the migration at 63 of 171 rules ported: 82 of 100 were the second kind, so the single
+		// number was telling a reader to delete comments that are load-bearing today.
+		dead := coverage.UnusedSuppressions - coverage.UnusedSuppressionsForUnrunRules
 		fmt.Printf(
-			"  note: %d disable comments silenced nothing — they may be scoping off a rule that no longer fires\n",
-			coverage.UnusedSuppressions,
+			"  note: %d disable comments silenced nothing while their rule ran — they may be scoping off a rule that no longer fires\n",
+			dead,
 		)
+		if coverage.UnusedSuppressionsForUnrunRules > 0 {
+			fmt.Printf(
+				"  note: %d more name only rules verify has not ported yet, so nothing looked and they are not dead\n",
+				coverage.UnusedSuppressionsForUnrunRules,
+			)
+		}
 	}
 }
 
