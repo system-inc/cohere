@@ -15,6 +15,7 @@ import (
 	"github.com/system-inc/verify/internal/rules/nexus"
 	"github.com/system-inc/verify/internal/rules/structure"
 	"github.com/system-inc/verify/internal/rules/tailwind"
+	"github.com/system-inc/verify/internal/rules/typescript"
 )
 
 // All returns every rule, in a stable order.
@@ -78,6 +79,7 @@ func All() []rule.Rule {
 		structure.ReactImportNoDestructuring,
 		structure.ReactNoAnchorElement,
 		structure.ReactNoHorizontalRuleElement,
+		typescript.NoUnsafeFunctionType,
 		tailwind.NoConcatenatedClasses,
 		tailwind.NoDuplicateClasses,
 		tailwind.NoUnnecessaryWhitespace,
