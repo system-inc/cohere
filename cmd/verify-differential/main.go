@@ -48,6 +48,10 @@ func run() error {
 		return fmt.Errorf("loading the lint config: %w", err)
 	}
 
+	if err := checkControlsAreLintable(lintConfig, options.controls); err != nil {
+		return err
+	}
+
 	report, err := differential.Run(context.Background(), differential.RunOptions{
 		Root:            options.root,
 		Verify:          options.verifyCommand,
@@ -224,3 +228,63 @@ var gateRunnerPath = filepath.Join(
 
 // defaultRoot is the tree this instrument was commissioned to measure.
 var defaultRoot = filepath.Join(os.Getenv("HOME"), "Projects", "ahra")
+
+// checkControlsAreLintable refuses to run when a control was placed where its rule cannot fire.
+//
+// A control exists to prove the harness can see a difference, so a control that misses is supposed
+// to mean the harness is blind. But a control written to a path the config ignores, or naming a
+// rule the config never enables, misses for a reason that has nothing to do with the harness and
+// produces exactly the same output. The evidence and the defect are indistinguishable, which makes
+// the control worse than no control: it reports a failure the reader will attribute to the wrong
+// thing.
+//
+// So the precondition is checked against the config rather than assumed from the path, and it is a
+// refusal to start rather than a note in the report. The comment on Control.RelativePath already
+// said the path must be one both gates lint. A comment is carefully safe; this is mechanically
+// safe, and mechanical is the kind that survives the next editor.
+//
+// The check runs before either gate is launched, so a misplaced control costs a second rather than
+// two full lint runs and a misleading verdict.
+func checkControlsAreLintable(lintConfig *config.Config, controls []differential.Control) error {
+	for _, control := range controls {
+		resolved := lintConfig.Resolve(filepath.Join(lintConfig.Root, control.RelativePath))
+
+		if resolved.Ignored {
+			return fmt.Errorf(
+				"control %q is placed at %s, which the lint config ignores via %q, so it would miss for a reason unrelated to the harness; move it somewhere both gates lint",
+				control.Name, control.RelativePath, resolved.IgnoredBy,
+			)
+		}
+
+		// The rule has to be enabled for that specific path, not merely present in the config: an
+		// override can scope a rule off for exactly the directory a control was written to, and
+		// that override is invisible from the base rule list.
+		if !resolved.Enabled(pluginQualified(lintConfig, control.Rule)) {
+			return fmt.Errorf(
+				"control %q expects rule %s to fire at %s, but the lint config does not enable it there, so the control would miss for a reason unrelated to the harness",
+				control.Name, control.Rule, control.RelativePath,
+			)
+		}
+	}
+	return nil
+}
+
+// pluginQualified finds the config's own spelling of a bare rule name.
+//
+// The config keys rules as `plugin/rule-name` and a control names the bare rule, so a direct lookup
+// would miss every time and this guard would reject every control. Searching for the key whose
+// normalized form matches keeps the control declarations free of plugin prefixes, which is the
+// right place for that knowledge to live: a rule that moves between plugins should not break a
+// control that never mentioned one.
+//
+// Returning the bare name when nothing matches is deliberate. It makes Enabled report unconfigured,
+// which is the correct answer for a rule the config genuinely does not mention, and it keeps this
+// helper from being the thing that decides a control is valid.
+func pluginQualified(lintConfig *config.Config, bareRuleName string) string {
+	for name := range lintConfig.Rules {
+		if differential.NormalizeRuleName(name) == bareRuleName {
+			return name
+		}
+	}
+	return bareRuleName
+}
