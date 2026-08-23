@@ -71,6 +71,8 @@ func All() []rule.Rule {
 		structure.NetworkRequireHookRequestSuffix,
 		structure.NetworkRequireHookVariablesType,
 		structure.ReactComponentNoMultiplePrimary,
+		structure.ReactNoAnchorElement,
+		structure.ReactNoHorizontalRuleElement,
 		tailwind.NoConcatenatedClasses,
 		tailwind.NoDuplicateClasses,
 		tailwind.NoUnnecessaryWhitespace,

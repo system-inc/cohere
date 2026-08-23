@@ -29,6 +29,14 @@ type FileContext struct {
 	// Every rule routing network access through NetworkService has to exempt NetworkService itself,
 	// or the rule forbids the thing it is asking people to use.
 	IsNetworkServiceFile bool
+
+	// IsLinkComponentFile marks the Link component's own implementation, which is the one place an
+	// <a> element is allowed. Same shape as IsNetworkServiceFile: a rule saying "use Link instead"
+	// has to exempt the file where Link is built, or it forbids the thing it recommends.
+	IsLinkComponentFile bool
+
+	// IsHorizontalRuleComponentFile is the same exemption for <hr> and the HorizontalRule component.
+	IsHorizontalRuleComponentFile bool
 }
 
 // nextJsSpecialFileBaseNames are the files Next.js resolves by name. Both React extensions apply to
@@ -62,5 +70,14 @@ func FileContextFor(fileName string) FileContext {
 		IsSpecialNextJsFile:  isSpecialNextJsFile,
 		IsGeneratedFile:      strings.Contains(normalizedPath, "/generated/"),
 		IsNetworkServiceFile: strings.Contains(normalizedPath, "NetworkService.ts"),
+
+		// Matched on the full path rather than the base name, which is the original's choice and
+		// the load-bearing half: any file named Link.tsx would otherwise exempt itself from a rule
+		// about <a> elements simply by being named after the component it is supposed to use.
+		IsLinkComponentFile: strings.Contains(normalizedPath, "/components/navigation/Link.tsx") ||
+			strings.Contains(normalizedPath, "/components/navigation/Link.jsx"),
+
+		IsHorizontalRuleComponentFile: strings.Contains(normalizedPath, "/components/layout/HorizontalRule.tsx") ||
+			strings.Contains(normalizedPath, "/components/layout/HorizontalRule.jsx"),
 	}
 }
