@@ -249,6 +249,26 @@ func (c Context) ReportRange(textRange core.TextRange, message Message) {
 	})
 }
 
+// ReportRangeWithSuggestions reports a span that is not one node and offers repairs a human chooses.
+//
+// The node helpers came in three shapes and the range helpers in one, so a rule reporting a sub-range
+// of a string literal with suggestions had no helper and had to hand-build a Diagnostic. That works
+// and it is the wrong thing to make a rule author do: `Report` exists for the cases the helpers do not
+// cover, and every hand-rolled Diagnostic is a place the Range can be built from `Loc` instead of
+// `TokenRange` without anything downstream noticing.
+//
+// The shape was already settled elsewhere. The tsgolint adapter has exactly this method, because an
+// adapted rule needed it first. Native rules simply did not have it, which is the kind of asymmetry
+// that is invisible until someone writes the rule that falls in the gap.
+func (c Context) ReportRangeWithSuggestions(textRange core.TextRange, message Message, suggestions ...Suggestion) {
+	c.Report(Diagnostic{
+		Range:       textRange,
+		Message:     message,
+		SourceFile:  c.SourceFile,
+		Suggestions: suggestions,
+	})
+}
+
 // TokenRange is a node's own text, without the trivia that precedes it.
 //
 // This distinction is the single sharpest edge in the fix API, and getting it wrong produces damage

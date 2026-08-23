@@ -68,3 +68,55 @@ func TestRuleMayDeclineAFile(t *testing.T) {
 		t.Fatalf("expected nil listeners from a declining rule, got %d", len(got))
 	}
 }
+
+// A range report carries its suggestions, and the range it was given.
+//
+// The node helpers came in three shapes and the range helpers in one, so a rule reporting a sub-range
+// of a string literal with suggestions had to hand-build a Diagnostic. That works, and it is the
+// wrong thing to make a rule author do: every hand-rolled Diagnostic is a place the Range can be
+// built from `Loc` instead of `TokenRange` without anything downstream noticing.
+func TestReportRangeWithSuggestionsCarriesBoth(t *testing.T) {
+	reported := []Diagnostic{}
+	context := Context{Report: func(diagnostic Diagnostic) {
+		reported = append(reported, diagnostic)
+	}}
+
+	wanted := core.NewTextRange(12, 16)
+	context.ReportRangeWithSuggestions(wanted, Message{Id: "probe"},
+		Suggestion{Message: Message{Id: "repair"}})
+
+	if len(reported) != 1 {
+		t.Fatalf("want one diagnostic, got %d", len(reported))
+	}
+	if reported[0].Range != wanted {
+		t.Errorf("the range was not carried:\n  got  %v\n  want %v", reported[0].Range, wanted)
+	}
+	if len(reported[0].Suggestions) != 1 {
+		t.Fatalf("want one suggestion, got %d", len(reported[0].Suggestions))
+	}
+	if reported[0].Suggestions[0].Message.Id != "repair" {
+		t.Errorf("the suggestion was not carried: %q", reported[0].Suggestions[0].Message.Id)
+	}
+}
+
+// The other direction: it offers no fixes.
+//
+// A suggestion needs a human to choose it and a fix does not, and the fix engine applies only the
+// second. A helper that quietly populated Fixes would make every suggestion an automatic rewrite,
+// which is the one distinction this whole API exists to hold.
+func TestReportRangeWithSuggestionsProposesNoFixes(t *testing.T) {
+	reported := []Diagnostic{}
+	context := Context{Report: func(diagnostic Diagnostic) {
+		reported = append(reported, diagnostic)
+	}}
+
+	context.ReportRangeWithSuggestions(core.NewTextRange(0, 1), Message{Id: "probe"},
+		Suggestion{Message: Message{Id: "repair"}})
+
+	if len(reported) != 1 {
+		t.Fatalf("want one diagnostic, got %d", len(reported))
+	}
+	if len(reported[0].Fixes) != 0 {
+		t.Errorf("a suggestion was carried as an applicable fix: %d fixes", len(reported[0].Fixes))
+	}
+}
