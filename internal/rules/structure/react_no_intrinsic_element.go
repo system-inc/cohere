@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/jsx"
 )
 
 var messageNoAnchorElement = rule.Message{
@@ -76,10 +77,12 @@ func intrinsicElementListeners(ctx rule.Context, tagName string, message rule.Me
 
 	return rule.Listeners{
 		ast.KindJsxOpeningElement: func(node *ast.Node) {
-			report(node, node.AsJsxOpeningElement().TagName)
+			tagName, _ := jsx.ElementParts(node)
+			report(node, tagName)
 		},
 		ast.KindJsxSelfClosingElement: func(node *ast.Node) {
-			report(node, node.AsJsxSelfClosingElement().TagName)
+			tagName, _ := jsx.ElementParts(node)
+			report(node, tagName)
 		},
 	}
 }

@@ -3,6 +3,7 @@ package next
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/jsx"
 )
 
 var messageNoImgElement = rule.Message{
@@ -63,10 +64,12 @@ var NoImgElement = rule.Rule{
 		// so a rule listening only to the latter is silent on the common case.
 		return rule.Listeners{
 			ast.KindJsxOpeningElement: func(node *ast.Node) {
-				report(node, node.AsJsxOpeningElement().TagName)
+				tagName, _ := jsx.ElementParts(node)
+				report(node, tagName)
 			},
 			ast.KindJsxSelfClosingElement: func(node *ast.Node) {
-				report(node, node.AsJsxSelfClosingElement().TagName)
+				tagName, _ := jsx.ElementParts(node)
+				report(node, tagName)
 			},
 		}
 	},
