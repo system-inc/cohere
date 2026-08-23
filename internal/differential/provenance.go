@@ -143,6 +143,10 @@ func (provenance Provenance) Trustworthy() (bool, []string) {
 // whether this run's population was real. This asks whether the harness was shown able to detect a
 // difference at all — and both directions, because a harness that can only see one side's findings
 // reports a clean diff for every defect on the other.
+// A shared control leaves ExpectedSide empty and therefore satisfies neither direction, which is
+// deliberate and load-bearing rather than incidental. A shared control proves the pipeline carries
+// a finding end to end; it says nothing about whether a one-sided finding would survive, and
+// letting it count here would turn the weaker proof into the stronger claim silently.
 func (provenance Provenance) ControlsProven() bool {
 	sawVerifyDirection := false
 	sawGateDirection := false

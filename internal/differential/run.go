@@ -60,12 +60,23 @@ type RunOptions struct {
 	Controls []Control
 }
 
-// Control is a violation planted where exactly one gate can see it.
+// Control is a violation planted where the harness knows in advance what should happen to it.
 //
-// The file is written into the tree, both gates run, and the harness checks that the difference
-// came out the far end attributed to the expected side. That is an end-to-end proof: the process
-// launched, the output parsed, the paths normalized, the rule names collapsed, and the comparison
-// reported. Any one of those failing silently makes the control miss.
+// The file is written into the tree, both gates run, and the harness checks that the expected
+// outcome came out the far end. That is an end-to-end proof: the process launched, the output
+// parsed, the paths normalized, the rule names collapsed across two decoration schemes, and the
+// comparison ran. Any one of those failing silently makes the control miss.
+//
+// There are two shapes, and they prove different things.
+//
+// A one-sided control (ExpectedSide set) proves the harness can report a difference in a named
+// direction. It is the stronger claim and it requires a real divergence to exist between the two
+// gates, which cannot be manufactured on demand.
+//
+// A shared control (ExpectedShared) proves the pipeline carries a finding end to end and that both
+// normalizations worked, without claiming anything about direction. It is the weaker claim, and it
+// is honest about being weaker: ControlsProven ignores shared controls entirely, so a run carrying
+// only these still reports that detection was never demonstrated.
 type Control struct {
 	// Name identifies the control in the report.
 	Name string
@@ -77,8 +88,12 @@ type Control struct {
 	Contents string
 	// Rule is the rule expected to fire.
 	Rule string
-	// ExpectedSide is the gate that should see it alone.
+	// ExpectedSide is the gate that should see it alone. Ignored when ExpectedShared is set.
 	ExpectedSide Side
+	// ExpectedShared says both gates must report this finding at the same place, so it appears as a
+	// match rather than as a difference. Set for a rule both sides implement and the config enables,
+	// where a one-sided result would be the defect rather than the proof.
+	ExpectedShared bool
 }
 
 // Run executes both gates over the tree, plants any controls, and returns the compared report.
@@ -154,7 +169,7 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		GateRulesRun:      len(options.ConfiguredRules),
 		VerifyCommand:     options.Verify.String(),
 		GateCommand:       options.Gate.String(),
-		ControlsRun:       checkControls(planted, report),
+		ControlsRun:       checkControls(planted, report, verifyParsed.Findings, gateParsed.Findings),
 	}
 
 	return report, nil
@@ -166,7 +181,7 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 // report.Differences rather than in either gate's raw findings: a control that one gate found but
 // the comparison dropped is exactly the bug worth catching, and checking the raw output instead
 // would sail straight past it.
-func checkControls(planted []Control, report Report) []ControlResult {
+func checkControls(planted []Control, report Report, verifyFindings []Finding, gateFindings []Finding) []ControlResult {
 	results := make([]ControlResult, 0, len(planted))
 	for _, control := range planted {
 		result := ControlResult{
@@ -175,11 +190,13 @@ func checkControls(planted []Control, report Report) []ControlResult {
 			Rule:         control.Rule,
 		}
 
+		if control.ExpectedShared {
+			results = append(results, checkSharedControl(control, result, verifyFindings, gateFindings))
+			continue
+		}
+
 		for _, difference := range report.Differences {
-			if difference.Finding.Rule != control.Rule {
-				continue
-			}
-			if !strings.HasSuffix(filepath.ToSlash(difference.Finding.File), filepath.ToSlash(control.RelativePath)) {
+			if !controlMatches(control, difference.Finding) {
 				continue
 			}
 			if difference.OnlyOn != control.ExpectedSide {
@@ -197,6 +214,53 @@ func checkControls(planted []Control, report Report) []ControlResult {
 		results = append(results, result)
 	}
 	return results
+}
+
+// checkSharedControl asks whether both gates reported the planted finding.
+//
+// It reads the raw per-side findings rather than the comparison's output, because the property
+// being tested is that the finding survived each side's parse and normalization and then matched.
+// Asking the difference list could only ever say the control was absent from it, which is true both
+// when both sides saw it and when neither did — the two outcomes this control exists to separate.
+func checkSharedControl(control Control, result ControlResult, verifyFindings []Finding, gateFindings []Finding) ControlResult {
+	seenByVerify := false
+	for _, finding := range verifyFindings {
+		if controlMatches(control, finding) {
+			seenByVerify = true
+			break
+		}
+	}
+	seenByGate := false
+	for _, finding := range gateFindings {
+		if controlMatches(control, finding) {
+			seenByGate = true
+			break
+		}
+	}
+
+	switch {
+	case seenByVerify && seenByGate:
+		result.Detected = true
+	case !seenByVerify && !seenByGate:
+		result.Detail = fmt.Sprintf("neither gate reported %s in %s, so the plant never reached either one", control.Rule, control.RelativePath)
+	case seenByVerify:
+		result.Detail = fmt.Sprintf("only verify reported %s in %s, and both were expected to", control.Rule, control.RelativePath)
+	default:
+		result.Detail = fmt.Sprintf("only the gate reported %s in %s, and both were expected to", control.Rule, control.RelativePath)
+	}
+	return result
+}
+
+// controlMatches is whether a finding is the one a control planted.
+//
+// Matched on rule and path suffix rather than on an exact path, because the two gates print paths
+// differently and the parser normalizes them against the tree root, so the stored path is relative
+// while the control names a relative path of its own.
+func controlMatches(control Control, finding Finding) bool {
+	if finding.Rule != control.Rule {
+		return false
+	}
+	return strings.HasSuffix(filepath.ToSlash(finding.File), filepath.ToSlash(control.RelativePath))
 }
 
 // plantControls writes each control into the tree and returns a cleanup that removes them.

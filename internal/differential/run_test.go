@@ -22,7 +22,7 @@ func TestAControlTheComparisonMissedIsReportedMissed(t *testing.T) {
 	}}
 
 	// A report with no differences at all: the pipeline dropped it somewhere.
-	missed := checkControls(planted, Report{})
+	missed := checkControls(planted, Report{}, nil, nil)
 	if len(missed) != 1 {
 		t.Fatalf("expected one control result, got %d", len(missed))
 	}
@@ -38,7 +38,7 @@ func TestAControlTheComparisonMissedIsReportedMissed(t *testing.T) {
 	found := checkControls(planted, Report{Differences: []Difference{{
 		Finding: Finding{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum"},
 		OnlyOn:  SideVerify,
-	}}})
+	}}}, nil, nil)
 	if !found[0].Detected {
 		t.Fatalf("a control present in the differences on the expected side must be detected, got %q", found[0].Detail)
 	}
@@ -60,7 +60,7 @@ func TestAControlOnTheWrongSideIsNotDetected(t *testing.T) {
 	results := checkControls(planted, Report{Differences: []Difference{{
 		Finding: Finding{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum"},
 		OnlyOn:  SideGate,
-	}}})
+	}}}, nil, nil)
 
 	if results[0].Detected {
 		t.Fatal("a control that fired on the opposite side must not count as detected")
@@ -186,5 +186,72 @@ func TestANonZeroExitIsNotAFailure(t *testing.T) {
 	}
 	if !strings.Contains(output, "consistency-no-enum") {
 		t.Fatalf("the gate's stdout must be returned even on a non-zero exit, got %q", output)
+	}
+}
+
+// A shared control passes only when both gates reported it, and each way of failing says which.
+//
+// The three failures are genuinely different diagnoses and collapsing them would waste the control.
+// Neither side means the plant never reached either gate, so the file was written somewhere they do
+// not lint. One side means the plant landed but one gate's parse or normalization dropped it, which
+// is the silent total-mismatch bug this control exists to catch.
+func TestASharedControlNeedsBothGatesToReportIt(t *testing.T) {
+	control := Control{
+		Name:           "shared-enum",
+		RelativePath:   "control/Planted.ts",
+		Rule:           "consistency-no-enum",
+		ExpectedShared: true,
+	}
+	planted := []Control{control}
+	seen := []Finding{{File: "control/Planted.ts", Line: 4, Rule: "consistency-no-enum"}}
+
+	both := checkControls(planted, Report{}, seen, seen)
+	if !both[0].Detected {
+		t.Fatalf("a shared control both gates reported must be detected, got %q", both[0].Detail)
+	}
+
+	neither := checkControls(planted, Report{}, nil, nil)
+	if neither[0].Detected {
+		t.Fatal("a shared control neither gate reported must not be detected")
+	}
+	if !strings.Contains(neither[0].Detail, "neither gate") {
+		t.Fatalf("the detail must say neither gate saw it, got %q", neither[0].Detail)
+	}
+
+	verifyOnly := checkControls(planted, Report{}, seen, nil)
+	if verifyOnly[0].Detected {
+		t.Fatal("a shared control only verify reported must not be detected: one side dropped it")
+	}
+	if !strings.Contains(verifyOnly[0].Detail, "only verify") {
+		t.Fatalf("the detail must name the side that saw it, got %q", verifyOnly[0].Detail)
+	}
+
+	gateOnly := checkControls(planted, Report{}, nil, seen)
+	if !strings.Contains(gateOnly[0].Detail, "only the gate") {
+		t.Fatalf("the detail must name the side that saw it, got %q", gateOnly[0].Detail)
+	}
+}
+
+// A shared control must never satisfy ControlsProven.
+//
+// It proves the pipeline carries a finding; it says nothing about whether a one-sided finding would
+// survive. Letting it count would turn the weaker proof into the stronger claim silently, which is
+// the same class of defect as every other guard in this package.
+func TestASharedControlDoesNotProveDirection(t *testing.T) {
+	provenance := Provenance{
+		VerifyFilesLinted: 3407,
+		GateFilesLinted:   3407,
+		VerifyRulesRun:    23,
+		GateRulesRun:      181,
+		ControlsRun: []ControlResult{
+			{Name: "shared-enum", Rule: "consistency-no-enum", Detected: true},
+		},
+	}
+
+	if provenance.ControlsProven() {
+		t.Fatal("a detected shared control must not count as proving either direction")
+	}
+	if trustworthy, _ := provenance.Trustworthy(); trustworthy {
+		t.Fatal("a run carrying only a shared control has not shown it can detect a difference, so it must not be trustworthy")
 	}
 }

@@ -1,0 +1,226 @@
+// Command verify-differential runs both gates over one tree and reports where they disagree.
+//
+// This is the acceptance instrument for the whole project. verify replaces the gate only when it
+// can be shown to find what the gate finds and stay silent where the gate is silent, and until this
+// command existed that claim was established by a person running two commands and comparing counts
+// by eye — which is not a harness, does not survive that person, and cannot answer the question it
+// appears to answer.
+//
+// The question it appears to answer is "do the two gates agree." The question it has to answer
+// first is "did both gates run, and can this harness see a difference at all." Those are not the
+// same, and an empty diff satisfies the first while proving nothing about the second. So this
+// command plants a known violation on every run and refuses a verdict when the plant did not come
+// out the far end.
+//
+//	verify-differential                          compare, planting the default controls
+//	verify-differential -root ~/Projects/ahra    the tree to compare over
+//	verify-differential -verify-binary <path>    which verify to measure
+//	verify-differential -no-controls             skip planting, and say so in the report
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/system-inc/verify/internal/config"
+	"github.com/system-inc/verify/internal/differential"
+	"github.com/system-inc/verify/internal/registry"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "verify-differential: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	options, err := parseArguments(os.Args[1:])
+	if err != nil {
+		return err
+	}
+
+	lintConfig, err := config.Load(filepath.Join(options.root, ".oxlintrc.json"))
+	if err != nil {
+		return fmt.Errorf("loading the lint config: %w", err)
+	}
+
+	report, err := differential.Run(context.Background(), differential.RunOptions{
+		Root:            options.root,
+		Verify:          options.verifyCommand,
+		Gate:            options.gateCommand,
+		VerifyRules:     compiledRuleNames(),
+		ConfiguredRules: configuredRuleNames(lintConfig),
+		Controls:        options.controls,
+	})
+	if err != nil {
+		return err
+	}
+
+	rendered := &strings.Builder{}
+	differential.Write(rendered, report)
+	fmt.Print(rendered.String())
+
+	// The exit code comes from the same value the reader sees rather than being recomputed, so the
+	// two cannot disagree. Agreed() is false for a disagreement and equally false for a run that
+	// proved nothing, which is correct: neither is a result anyone should build on.
+	if !report.Agreed() {
+		os.Exit(1)
+	}
+	return nil
+}
+
+// compiledRuleNames is every rule actually linked into this binary.
+//
+// Read from the registry rather than from a list, because a list is a claim about the binary and
+// the registry is the binary. During the migration this tool replaces, three configurations ran
+// successfully having loaded zero plugins.
+func compiledRuleNames() map[string]bool {
+	names := map[string]bool{}
+	for _, compiled := range registry.All() {
+		names[differential.NormalizeRuleName(compiled.Name)] = true
+	}
+	return names
+}
+
+// configuredRuleNames is every rule the lint config switches on.
+//
+// The config keys carry their plugin prefix (`nexus/consistency-no-enum`) and verify reports bare
+// names, so both are normalized to the same form here. Skipping that would make every configured
+// rule look unconfigured, and every real disagreement would then be filed as not-configured and
+// silently excused.
+//
+// Rules set to off are excluded rather than counted, because a rule the config turned off ran over
+// no files, which is exactly what not-configured means.
+func configuredRuleNames(lintConfig *config.Config) map[string]bool {
+	names := map[string]bool{}
+	for name, setting := range lintConfig.Rules {
+		if setting.Severity == config.SeverityOff {
+			continue
+		}
+		names[differential.NormalizeRuleName(name)] = true
+	}
+	return names
+}
+
+type arguments struct {
+	root          string
+	verifyCommand differential.GateCommand
+	gateCommand   differential.GateCommand
+	controls      []differential.Control
+}
+
+func parseArguments(rest []string) (arguments, error) {
+	parsed := arguments{root: defaultRoot}
+	verifyBinary := "verify"
+	plantControls := true
+
+	for index := 0; index < len(rest); index++ {
+		switch rest[index] {
+		case "-root", "--root":
+			if index+1 >= len(rest) {
+				return parsed, fmt.Errorf("-root needs a directory")
+			}
+			index++
+			parsed.root = rest[index]
+		case "-verify-binary", "--verify-binary":
+			if index+1 >= len(rest) {
+				return parsed, fmt.Errorf("-verify-binary needs a path")
+			}
+			index++
+			verifyBinary = rest[index]
+		case "-no-controls", "--no-controls":
+			plantControls = false
+		default:
+			return parsed, fmt.Errorf("unknown argument %q", rest[index])
+		}
+	}
+
+	absoluteRoot, err := filepath.Abs(parsed.root)
+	if err != nil {
+		return parsed, fmt.Errorf("resolving the root %s: %w", parsed.root, err)
+	}
+	parsed.root = absoluteRoot
+
+	parsed.verifyCommand = differential.GateCommand{
+		Name:      "verify",
+		Program:   verifyBinary,
+		Arguments: []string{"-lint"},
+		Directory: parsed.root,
+	}
+	parsed.gateCommand = differential.GateCommand{
+		Name:      "gate",
+		Program:   "node",
+		Arguments: []string{gateRunnerPath, "--no-cache"},
+		Directory: parsed.root,
+	}
+
+	if plantControls {
+		parsed.controls = defaultControls()
+	}
+
+	return parsed, nil
+}
+
+// defaultControls are the planted violations that prove the pipeline carries a difference.
+//
+// # Why there is a shared control and not a verify-only one
+//
+// The first version of this planted an enum and expected verify alone to see it. It missed, and the
+// miss was correct: `consistency-no-enum` is implemented on both sides and enabled in the config, so
+// both gates saw the plant and it matched. The control was wrong, not the harness — and the harness
+// caught it, refused a verdict, and printed the difference list as not-a-measurement, which is the
+// behavior it was built for.
+//
+// Chasing that further produced a more useful conclusion than a working control would have. There
+// is no verify-only control available on this tree today, and the reason is structural rather than
+// an oversight:
+//
+//   - Every rule verify implements was ported from the gate, so both sides have it.
+//   - A rule in verify but absent from the config runs over no files in verify either, so it fires
+//     on neither side.
+//   - Verify honors `ignorePatterns` and the config overrides, so a plant in an ignored path or
+//     under a scoping override is correctly silent on both sides.
+//
+// A verify-only difference can therefore only arise from a genuine behavioral divergence, and one
+// cannot be planted to order without first knowing of a real one. That is a good property of a
+// faithful port and a real limit on this instrument, so it is written here rather than worked
+// around with a control that tests something other than what it claims.
+//
+// What is planted instead is a shared control: a violation both gates must see. It does not prove
+// direction, and `ControlsProven` still returns false because of that. It does prove the pipeline
+// end to end — process launched, output parsed, paths normalized, rule names collapsed across two
+// decoration schemes, comparison run — which is the layer where a silent total mismatch lives. A
+// plant that both sides report as one shared finding, rather than as two one-sided ones, is
+// positive evidence that path normalization and rule-name normalization both worked.
+//
+// The gate-only direction needs no plant: the gate reports findings from rules verify has not
+// ported, so that direction has a natural population on this tree.
+func defaultControls() []differential.Control {
+	return []differential.Control{{
+		Name:         "shared-enum",
+		RelativePath: filepath.Join("code-quality", "differential-control", "PlantedEnum.ts"),
+		Contents: "// Planted by verify-differential to prove the harness can see a difference.\n" +
+			"// Removed automatically when the run finishes. If you are reading this in a working\n" +
+			"// tree, a differential run was interrupted and this file is safe to delete.\n" +
+			"export enum PlantedControlOrder {\n    First = 'First',\n}\n",
+		Rule: "consistency-no-enum",
+		// Both gates implement and enable this rule, so both must see it. Expecting it shared is
+		// the claim being tested; expecting it one-sided would be testing a divergence that does
+		// not exist.
+		ExpectedShared: true,
+	}}
+}
+
+// gateRunnerPath is the gate as it actually ships, run through its own cached runner rather than by
+// invoking oxlint directly. Comparing against a hand-rolled oxlint invocation would measure a gate
+// nobody runs.
+var gateRunnerPath = filepath.Join(
+	"libraries", "structure", "libraries", "nexus", "code-quality", "oxlint", "RunCachedOxlint.ts",
+)
+
+// defaultRoot is the tree this instrument was commissioned to measure.
+var defaultRoot = filepath.Join(os.Getenv("HOME"), "Projects", "ahra")

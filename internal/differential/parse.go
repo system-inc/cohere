@@ -160,7 +160,11 @@ func isVerifySummaryLine(line string) bool {
 	if strings.HasPrefix(line, "  ") {
 		return true
 	}
-	for _, prefix := range []string{"graph built in ", "lint: ", "types: ", "fix: ", "format: "} {
+	// `phases:` says which phases ran and which were skipped, so a lint-only run cannot be mistaken
+	// for a full one. Added to verify after this parser was written, and caught by the harness's
+	// refusal to compare when a line does not parse rather than by anyone noticing — which is the
+	// whole argument for that refusal being an error instead of a note.
+	for _, prefix := range []string{"graph built in ", "lint: ", "types: ", "fix: ", "format: ", "phases: "} {
 		if strings.HasPrefix(line, prefix) {
 			return true
 		}
