@@ -18,6 +18,10 @@ import (
 func init() {
 	rule.Register(
 		rule.Registration{
+			Rule:   EnforceCanonicalClasses,
+			Decode: rule.DecodeOptionsInto[EnforceCanonicalClassesOptions](),
+		},
+		rule.Registration{
 			Rule:   NoConcatenatedClasses,
 			Decode: rule.DecodeOptionsInto[NoConcatenatedClassesOptions](),
 		},
