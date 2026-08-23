@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/comments"
 )
 
 // Four or fewer double-slash lines read fine as a stack; the block delimiters would be noise.
@@ -58,13 +59,13 @@ var ConsistencyNoLongLineComment = rule.Rule{
 			ast.KindSourceFile: func(node *ast.Node) {
 				sourceLines := strings.Split(ctx.SourceFile.Text(), "\n")
 
-				var run []Comment
+				var run []comments.Comment
 				flush := func() {
 					reportLineCommentRun(ctx, run, maximumLineCount)
 					run = nil
 				}
 
-				for _, comment := range cachedComments(ctx) {
+				for _, comment := range comments.ForFile(ctx) {
 					if !isFoldableLineComment(comment, sourceLines) {
 						flush()
 						continue
@@ -87,7 +88,7 @@ type ConsistencyNoLongLineCommentOptions struct {
 }
 
 // isFoldableLineComment reports whether a comment can join a run at all.
-func isFoldableLineComment(comment Comment, sourceLines []string) bool {
+func isFoldableLineComment(comment comments.Comment, sourceLines []string) bool {
 	if comment.IsBlock {
 		return false
 	}
@@ -107,7 +108,7 @@ func isFoldableLineComment(comment Comment, sourceLines []string) bool {
 }
 
 // isDirectiveComment reports whether a comment is a pragma rather than prose.
-func isDirectiveComment(comment Comment) bool {
+func isDirectiveComment(comment comments.Comment) bool {
 	body := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
 	for _, prefix := range directivePrefixes {
 		if strings.HasPrefix(body, prefix) {
@@ -121,7 +122,7 @@ func isDirectiveComment(comment Comment) bool {
 //
 // Adjacent lines are not enough: the columns must match too, so a trailing comment sitting at the
 // end of a code line never joins the passage above it.
-func isConsecutiveComment(previous Comment, current Comment) bool {
+func isConsecutiveComment(previous comments.Comment, current comments.Comment) bool {
 	if previous.EndLine+1 != current.StartLine {
 		return false
 	}
@@ -129,7 +130,7 @@ func isConsecutiveComment(previous Comment, current Comment) bool {
 }
 
 // reportLineCommentRun reports a run that is too long, with a fix when one is safe.
-func reportLineCommentRun(ctx rule.Context, run []Comment, maximumLineCount int) {
+func reportLineCommentRun(ctx rule.Context, run []comments.Comment, maximumLineCount int) {
 	if len(run) <= maximumLineCount {
 		return
 	}
@@ -164,7 +165,7 @@ func reportLineCommentRun(ctx rule.Context, run []Comment, maximumLineCount int)
 //
 // The double-slash and its single following space are stripped so the prose lands flush against the
 // star gutter, which is the only reflowing the fix does.
-func blockCommentFromRun(run []Comment) string {
+func blockCommentFromRun(run []comments.Comment) string {
 	indent := strings.Repeat(" ", run[0].StartColumn)
 
 	var builder strings.Builder

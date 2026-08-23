@@ -1,4 +1,4 @@
-package nexus
+package comments
 
 import (
 	"testing"
@@ -14,8 +14,8 @@ func TestCommentGuardFindsTheSameComments(t *testing.T) {
 	files := realSourceFiles(t, 1200)
 
 	for _, file := range files {
-		guarded := allComments(file.sourceFile)
-		reference := allCommentsWithoutGuard(file.sourceFile)
+		guarded := All(file.sourceFile)
+		reference := AllWithoutGuard(file.sourceFile)
 
 		if len(guarded) != len(reference) {
 			t.Fatalf("%s: guard found %d comments, ungated scan found %d",
@@ -74,8 +74,8 @@ func TestCommentGuardHandlesEverySeparator(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceFile := parseSourceForTest(t, testCase.sourceText)
 
-			guarded := allComments(sourceFile)
-			reference := allCommentsWithoutGuard(sourceFile)
+			guarded := All(sourceFile)
+			reference := AllWithoutGuard(sourceFile)
 
 			if len(guarded) != testCase.wantCount {
 				t.Fatalf("expected %d comments, guard found %d", testCase.wantCount, len(guarded))
@@ -96,12 +96,12 @@ func TestCommentGuardHandlesEverySeparator(t *testing.T) {
 // differential test alone would not catch on a corpus with few comments.
 func TestCommentGuardActuallySkips(t *testing.T) {
 	// A run of whitespace with no slash cannot begin a comment.
-	if canCommentBeginAt("const a = 1;    const b = 2;", 12) {
+	if canBeginAt("const a = 1;    const b = 2;", 12) {
 		t.Fatalf("guard admits a position with no slash after it")
 	}
 	// A slash after whitespace must be admitted, whatever the whitespace is.
 	for _, text := range []string{"a; // c", "a;\t// c", "a;\n// c", "a;\r\n// c", "a;// c", "a;/* c */"} {
-		if !canCommentBeginAt(text, 2) {
+		if !canBeginAt(text, 2) {
 			t.Fatalf("guard rejects %q, where a comment does begin", text)
 		}
 	}

@@ -1,4 +1,4 @@
-package nexus
+package comments
 
 import (
 	"strings"
@@ -35,14 +35,14 @@ type Comment struct {
 	EndLine     int
 }
 
-// allComments returns every comment in a file, in source order, without duplicates.
+// All returns every comment in a file, in source order, without duplicates.
 //
 // The parser skips trivia, so there is no list to read; the comments have to be rescanned out of
 // the source text. The scan walks from position zero and from the start of every node, because the
 // scanner's iterator yields the run of comments beginning at a position and stops at the first
 // token. Positions repeat across a walk (a node and its first child usually start at the same
 // place), so the results are deduplicated by range rather than assumed distinct.
-func allComments(sourceFile *ast.SourceFile) []Comment {
+func All(sourceFile *ast.SourceFile) []Comment {
 	if sourceFile == nil {
 		return nil
 	}
@@ -100,7 +100,7 @@ func allComments(sourceFile *ast.SourceFile) []Comment {
 		// It matters because this runs at every node's Pos and End: 1,553 invocations to find 57
 		// comments in one real file, and 96.4% of 463,463 candidate positions across 300 files were
 		// measured to reach the scanner for nothing.
-		if !canCommentBeginAt(text, position) {
+		if !canBeginAt(text, position) {
 			return
 		}
 		if scannedPositions[position] {
@@ -140,15 +140,15 @@ func allComments(sourceFile *ast.SourceFile) []Comment {
 	// because nothing reports a comment it did not see.
 	collectAt(sourceFile.EndOfFileToken.Pos())
 
-	sortCommentsByPosition(comments)
+	sortByPosition(comments)
 	return comments
 }
 
-// sortCommentsByPosition puts comments in source order.
+// sortByPosition puts comments in source order.
 //
 // The walk reaches nodes in tree order, which is close to source order but not equal to it, and a
 // rule reporting findings out of order is a rule whose fixture assertions cannot be written down.
-func sortCommentsByPosition(comments []Comment) {
+func sortByPosition(comments []Comment) {
 	for outerIndex := 1; outerIndex < len(comments); outerIndex++ {
 		current := comments[outerIndex]
 		innerIndex := outerIndex - 1
@@ -160,17 +160,17 @@ func sortCommentsByPosition(comments []Comment) {
 	}
 }
 
-// isJsDoc reports whether a block comment is JSDoc: slash-star-star rather than slash-star.
-func (c Comment) isJsDoc() bool {
+// IsJsDoc reports whether a block comment is JSDoc: slash-star-star rather than slash-star.
+func (c Comment) IsJsDoc() bool {
 	return c.IsBlock && strings.HasPrefix(c.Text, "/**")
 }
 
-// contentLines returns a block comment's inner lines with the delimiters and the leading asterisk
+// ContentLines returns a block comment's inner lines with the delimiters and the leading asterisk
 // of each line removed, dropping lines that hold nothing else.
 //
 // This is what "the comment says one thing" means for the JSDoc rules: the asterisks are furniture,
 // so a comment that is three lines of furniture around one line of prose is a one-line comment.
-func (c Comment) contentLines() []string {
+func (c Comment) ContentLines() []string {
 	inner := c.Text
 	inner = strings.TrimPrefix(inner, "/**")
 	inner = strings.TrimPrefix(inner, "/*")
@@ -188,7 +188,7 @@ func (c Comment) contentLines() []string {
 	return lines
 }
 
-// canCommentBeginAt reports whether a comment could begin at or just after a position.
+// canBeginAt reports whether a comment could begin at or just after a position.
 //
 // A comment starts with `/`, so the question is whether the run of whitespace beginning here reaches
 // one. Everything else declines without touching the scanner.
@@ -199,7 +199,7 @@ func (c Comment) contentLines() []string {
 // comment rule, and the fixtures would still pass, so under-approximating is the failure that cannot
 // be allowed. `comments_guard_test.go` asserts the comment set is identical with and without this,
 // by range rather than by count.
-func canCommentBeginAt(text string, position int) bool {
+func canBeginAt(text string, position int) bool {
 	// A shebang is trivia too, and it is the one non-whitespace thing a comment can sit behind.
 	// `GetLeadingCommentRanges` scans past it, so a guard that stopped at the `#` would hide every
 	// comment in an executable script. Found by the corpus, not by the hand-written cases: a
@@ -222,13 +222,13 @@ func canCommentBeginAt(text string, position int) bool {
 	return false
 }
 
-// allCommentsWithoutGuard is the scan with canCommentBeginAt removed, kept only so the differential
+// AllWithoutGuard is the scan with canBeginAt removed, kept only so the differential
 // test has something to compare against.
 //
-// It is a duplicate of allComments by design: a differential test that shared the implementation it
+// It is a duplicate of All by design: a differential test that shared the implementation it
 // is checking would prove nothing. The two must be edited together, and the test fails loudly if
 // they drift.
-func allCommentsWithoutGuard(sourceFile *ast.SourceFile) []Comment {
+func AllWithoutGuard(sourceFile *ast.SourceFile) []Comment {
 	if sourceFile == nil {
 		return nil
 	}
@@ -289,6 +289,6 @@ func allCommentsWithoutGuard(sourceFile *ast.SourceFile) []Comment {
 	}
 	visit(sourceFile.AsNode())
 
-	sortCommentsByPosition(comments)
+	sortByPosition(comments)
 	return comments
 }

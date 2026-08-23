@@ -1,4 +1,4 @@
-package nexus
+package comments
 
 import (
 	"strings"
@@ -53,7 +53,7 @@ func TestAllCommentsSeesEveryPosition(t *testing.T) {
 		"",
 	}, "\n")
 
-	comments := allComments(parseForComments(t, sourceText))
+	comments := All(parseForComments(t, sourceText))
 
 	wantTexts := []string{
 		"// leading file comment",
@@ -88,7 +88,7 @@ func TestAllCommentsSeesEveryPosition(t *testing.T) {
 func TestAllCommentsDeduplicates(t *testing.T) {
 	sourceText := "// once\nexport const value = { nested: { deeper: 1 } };\n"
 
-	comments := allComments(parseForComments(t, sourceText))
+	comments := All(parseForComments(t, sourceText))
 	if len(comments) != 1 {
 		texts := make([]string, 0, len(comments))
 		for _, comment := range comments {
@@ -101,18 +101,18 @@ func TestAllCommentsDeduplicates(t *testing.T) {
 func TestCommentClassification(t *testing.T) {
 	sourceText := "// line\n/* block */\n/** jsdoc */\nexport const value = 1;\n"
 
-	comments := allComments(parseForComments(t, sourceText))
+	comments := All(parseForComments(t, sourceText))
 	if len(comments) != 3 {
 		t.Fatalf("expected 3 comments, got %d", len(comments))
 	}
 
-	if comments[0].IsBlock || comments[0].isJsDoc() {
+	if comments[0].IsBlock || comments[0].IsJsDoc() {
 		t.Fatalf("a double-slash comment is neither a block nor JSDoc: %+v", comments[0])
 	}
-	if !comments[1].IsBlock || comments[1].isJsDoc() {
+	if !comments[1].IsBlock || comments[1].IsJsDoc() {
 		t.Fatalf("a slash-star comment is a block but not JSDoc: %+v", comments[1])
 	}
-	if !comments[2].IsBlock || !comments[2].isJsDoc() {
+	if !comments[2].IsBlock || !comments[2].IsJsDoc() {
 		t.Fatalf("a slash-star-star comment is both: %+v", comments[2])
 	}
 }
@@ -139,11 +139,11 @@ func TestCommentContentLines(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			comments := allComments(parseForComments(t, testCase.sourceText))
+			comments := All(parseForComments(t, testCase.sourceText))
 			if len(comments) == 0 {
 				t.Fatal("expected a comment")
 			}
-			gotLines := comments[0].contentLines()
+			gotLines := comments[0].ContentLines()
 			if len(gotLines) != len(testCase.wantLines) {
 				t.Fatalf("expected %v, got %v", testCase.wantLines, gotLines)
 			}

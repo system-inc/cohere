@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/comments"
 )
 
 // messageShoutingInComment names the tokens it saw, because a finding that says only "this comment
@@ -63,7 +64,7 @@ var ConsistencyNoShouting = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				for _, comment := range cachedComments(ctx) {
+				for _, comment := range comments.ForFile(ctx) {
 					tokens := shoutedTokensIn(comment.Text)
 
 					kept := tokens[:0]

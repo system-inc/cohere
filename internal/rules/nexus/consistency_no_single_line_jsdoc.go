@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/comments"
 )
 
 var messageUseSimpleComment = rule.Message{
@@ -37,12 +38,12 @@ var ConsistencyNoSingleLineJsDoc = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				for _, comment := range cachedComments(ctx) {
-					if !comment.isJsDoc() {
+				for _, comment := range comments.ForFile(ctx) {
+					if !comment.IsJsDoc() {
 						continue
 					}
 
-					lines := comment.contentLines()
+					lines := comment.ContentLines()
 					// One line, and no tag. A tag is the entire reason JSDoc exists, so a comment
 					// carrying one is a JSDoc comment whatever its length.
 					if len(lines) != 1 || strings.HasPrefix(lines[0], "@") {
