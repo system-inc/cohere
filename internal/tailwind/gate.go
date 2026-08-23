@@ -12,10 +12,42 @@
 // classes are bucketed by everything-but-the-root, and only classes landing in the same bucket are
 // worth a real answer.
 //
-// Measured on the ahra corpus of 2,682 distinct className literals, that takes the number of
-// literals needing an engine answer from 2,682 to a handful, and the number of class pairs from
-// 4,375 to the few that share a bucket. Whatever the answer to the boundary question turns out to
-// be, asking it two orders of magnitude less often changes the arithmetic underneath every option.
+// Measured on the ahra corpus of 2,682 distinct className literals plus 14 planted violations, the
+// gate takes 2,695 engine questions down to 735, losing no finding the ungated engine reports and
+// inventing none. Planted violations rather than the tree alone, because the tree is very nearly
+// canonical and an approach that catches nothing is fast and correct on it.
+//
+// # Why the boundary turned out not to matter
+//
+// This package was built to make a decision: whether to port the collapse logic to Go, keep it in a
+// Node sidecar, or precompute a table. The measurement settled it, and not in the direction the
+// question implied.
+//
+// Shipping the 469 surviving literals to a Node sidecar and reading the answers back costs 0.4 to
+// 1.3ms of transport. The engine costs 3,300 to 4,100ms cold and roughly 500ms warm. The control
+// that makes those numbers mean something is the same batch run in-process in Node, with no
+// boundary at all: 3,834ms cold, 506 to 595ms warm. Statistically identical. So the crossing
+// contributes about a millisecond to a ~3,800ms operation, and the engine costs what it costs
+// whether Go is asking or Node is asking itself.
+//
+// The lever is warmup, not the boundary. A cold run averages 3,909ms and a warm batch on an
+// already-started process averages 534ms, so keeping the process resident across runs is worth
+// about 3,375ms while transport stays under a tenth of a percent. Porting eight to ten thousand
+// lines of collapse logic to Go would buy back the millisecond and inherit a rewrite that changes
+// every Tailwind minor.
+//
+// # Why the reduction is 3.7x and not the 20x on record
+//
+// An earlier measurement put the survivors near 300. The gate is not weaker; the corpus changed.
+// Every survivor is a legitimate over-approximation, and two shapes dominate: 112 collisions from
+// `items-center` and `justify-center`, which both declare `center`, and roughly 380 from this
+// project's own `content--N`, `background--N`, and `border--N` design tokens. Those parse as
+// functional candidates with named values, so `content--2` and `px-2` genuinely share the bucket
+// `||2` and must be asked about. 820 of the 2,682 literals now carry such a token.
+//
+// Teaching the gate that project tokens cannot collapse with Tailwind spacing would recover most of
+// the difference and is exactly the kind of under-approximation named below. It would need its own
+// fixtures and its own measurement before it could be trusted.
 //
 // # The direction of error is not symmetric
 //
@@ -96,10 +128,16 @@ type Variant struct {
 // Candidate is one reading of a class name.
 //
 // One class can have several readings: Tailwind parses `border-b` as both root `border-b` with no
-// value and root `border` with value `b`, and returns both. Fifteen percent of the classes in the
-// real corpus do this. Which reading is used matters, and the answer — verified against the engine
-// over every collapsing pair in the corpus rather than assumed — is that the first reading is the
-// one to key on. See DeclaredValues for the static case.
+// value and root `border` with value `b`, and returns both. 185 of the 1,236 classes in the real
+// corpus do this, and their readings produce *different* bucket keys, so which one is used is a
+// real decision rather than a detail.
+//
+// It is the same ambiguity that lost `border-x` to a hand-written splitter, and the JavaScript gate
+// this package ports resolves it by silently taking the first reading without recording why. That
+// made it worth checking rather than inheriting: over all 4,375 candidate pairs in the corpus, of
+// which 75 collapse, keying on the first reading loses none, and the order is stable across calls.
+// So the choice is safe — but it was verified against the engine, not assumed from the source it
+// was ported from. See DeclaredValues for the static case.
 type Candidate struct {
 	Kind      CandidateKind
 	Root      string
