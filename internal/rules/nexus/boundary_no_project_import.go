@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
 var messageForbiddenProjectImport = rule.Message{
@@ -58,7 +59,7 @@ var BoundaryNoProjectImport = rule.Rule{
 		if !hasSettings || settings.LibraryDirectory == "" {
 			return nil
 		}
-		if !strings.Contains(normalizedFileName(ctx.SourceFile), settings.LibraryDirectory) {
+		if !strings.Contains(imports.NormalizedFileName(ctx.SourceFile), settings.LibraryDirectory) {
 			return nil
 		}
 
@@ -67,9 +68,9 @@ var BoundaryNoProjectImport = rule.Rule{
 			allowed[specifier] = true
 		}
 
-		return importSourceVisitors(func(source string, node *ast.Node) {
+		return imports.SourceVisitors(func(source string, node *ast.Node) {
 			if isProjectAlias(source) && !allowed[source] {
-				ctx.ReportNode(importSpecifierNode(node), messageForbiddenProjectImport)
+				ctx.ReportNode(imports.SpecifierNode(node), messageForbiddenProjectImport)
 			}
 		})
 	},

@@ -3,6 +3,7 @@ package nexus
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
 // forbiddenSource is one package we do not import, and what to import instead.
@@ -113,7 +114,7 @@ var ImportNoForbiddenSource = rule.Rule{
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
-				source, isImport := callExpressionSource(node)
+				source, isImport := imports.CallExpressionSource(node)
 				if !isImport {
 					return
 				}

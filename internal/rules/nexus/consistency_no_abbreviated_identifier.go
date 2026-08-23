@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
 // ConsistencyNoAbbreviatedIdentifierOptions names the files and scopes where a framework owns an
@@ -359,7 +360,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, _ := options.(ConsistencyNoAbbreviatedIdentifierOptions)
 
-		fileName := normalizedFileName(ctx.SourceFile)
+		fileName := imports.NormalizedFileName(ctx.SourceFile)
 		isFrameworkParameterFile := matchesAnyFilePattern(fileName, settings.FrameworkParameterFilePatterns)
 		isFrameworkConstantFile := matchesAnyFilePattern(fileName, settings.FrameworkConstantFilePatterns)
 

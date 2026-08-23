@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
 var (
@@ -46,9 +47,9 @@ var BoundaryNoInternalImport = rule.Rule{
 		if ctx.SourceFile == nil {
 			return nil
 		}
-		importingFile := normalizedFileName(ctx.SourceFile)
+		importingFile := imports.NormalizedFileName(ctx.SourceFile)
 
-		return importSourceVisitors(func(source string, node *ast.Node) {
+		return imports.SourceVisitors(func(source string, node *ast.Node) {
 			checkInternalImport(ctx, node, importingFile, source)
 		})
 	},
@@ -65,7 +66,7 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 	// that can prove it belongs.
 	if !strings.HasPrefix(source, ".") {
 		if hasPathSegment(source, "internal") {
-			ctx.ReportNode(importSpecifierNode(node), messageAliasedInternal)
+			ctx.ReportNode(imports.SpecifierNode(node), messageAliasedInternal)
 		}
 		return
 	}
@@ -87,7 +88,7 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 
 	owningFolder := strings.Join(segments[:internalIndex], "/")
 	if !strings.HasPrefix(importingFile, owningFolder+"/") {
-		ctx.ReportNode(importSpecifierNode(node), messageOutsideInternal)
+		ctx.ReportNode(imports.SpecifierNode(node), messageOutsideInternal)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
 // PathAlias maps a repository-relative directory to the alias that names it.
@@ -97,7 +98,7 @@ var ImportRequirePathAlias = rule.Rule{
 		})
 
 		repositoryRoot := strings.TrimSuffix(normalizedPathText(settings.RepositoryRoot), "/")
-		importingFile := normalizedFileName(ctx.SourceFile)
+		importingFile := imports.NormalizedFileName(ctx.SourceFile)
 		importingRelative, isInsideRepository := repositoryRelative(repositoryRoot, importingFile)
 		if !isInsideRepository {
 			return nil
@@ -151,7 +152,7 @@ var ImportRequirePathAlias = rule.Rule{
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
-				source, isImport := callExpressionSource(node)
+				source, isImport := imports.CallExpressionSource(node)
 				if !isImport {
 					return
 				}

@@ -1,4 +1,9 @@
-package nexus
+// Package imports answers where a file's imports come from, in every shape the language allows.
+//
+// Lifted out of `internal/rules/nexus/` where three boundary rules shared it and four `structure`
+// rules hand-rolled the same concern because they could not see it. Its own doc comment already
+// said several rules share this, which was true and unreachable.
+package imports
 
 import (
 	"strings"
@@ -17,13 +22,13 @@ import (
 // The TypeScript originals learned this the same way, which is why several of them share one
 // visitor factory rather than each writing the static case and forgetting the other two.
 
-// importSourceVisitors builds the listeners that call report for every string specifier in a file,
+// SourceVisitors builds the listeners that call report for every string specifier in a file,
 // whichever of the three shapes it arrives in.
 //
 // report is handed the specifier and the node to blame. The node differs by shape on purpose: a
 // static import blames the whole declaration, while a dynamic or require call blames the call, since
 // that is the expression a reader has to change.
-func importSourceVisitors(report func(source string, node *ast.Node)) rule.Listeners {
+func SourceVisitors(report func(source string, node *ast.Node)) rule.Listeners {
 	return rule.Listeners{
 		ast.KindImportDeclaration: func(node *ast.Node) {
 			declaration := node.AsImportDeclaration()
@@ -36,7 +41,7 @@ func importSourceVisitors(report func(source string, node *ast.Node)) rule.Liste
 			report(declaration.ModuleSpecifier.Text(), node)
 		},
 		ast.KindCallExpression: func(node *ast.Node) {
-			source, isImport := callExpressionSource(node)
+			source, isImport := CallExpressionSource(node)
 			if !isImport {
 				return
 			}
@@ -45,11 +50,21 @@ func importSourceVisitors(report func(source string, node *ast.Node)) rule.Liste
 	}
 }
 
-// callExpressionSource returns the string specifier of a dynamic import or a require call.
+// CallExpressionSource returns the string specifier of a dynamic import or a require call.
 //
 // Both are call expressions, so one listener serves both rather than two listeners on the same kind,
 // which the listener map could not hold anyway.
-func callExpressionSource(node *ast.Node) (string, bool) {
+// A nil node answers rather than panics, and that guard is new with the lift. Inside the rule
+// package this was only ever reached from the visitor, which never hands it nil; on a shared shelf
+// any rule can call it directly, and `ast.IsImportCall` dereferences without checking. A panic in a
+// shared package takes the whole run down rather than one rule's finding.
+//
+// Found by the first fixture written for this file, which is the argument for lifting with tests
+// rather than after: the code was correct for its callers and unsafe for its new ones.
+func CallExpressionSource(node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
 	isDynamicImport := ast.IsImportCall(node)
 	isRequire := ast.IsRequireCall(node, true)
 	if !isDynamicImport && !isRequire {
@@ -70,16 +85,16 @@ func callExpressionSource(node *ast.Node) (string, bool) {
 	return firstArgument.Text(), true
 }
 
-// normalizedFileName returns a path with forward slashes, so a rule matching a path fragment finds
+// NormalizedFileName returns a path with forward slashes, so a rule matching a path fragment finds
 // it on Windows too.
-func normalizedFileName(sourceFile *ast.SourceFile) string {
+func NormalizedFileName(sourceFile *ast.SourceFile) string {
 	if sourceFile == nil {
 		return ""
 	}
 	return strings.ReplaceAll(sourceFile.FileName(), "\\", "/")
 }
 
-// importSpecifierNode returns the string-literal specifier inside an import-shaped node, falling
+// SpecifierNode returns the string-literal specifier inside an import-shaped node, falling
 // back to the node itself when there is none to find.
 //
 // This exists because of where a finding lands rather than what it says. A node's Pos() includes its
@@ -89,9 +104,9 @@ func normalizedFileName(sourceFile *ast.SourceFile) string {
 // match the line after itself. The finding was unreachable by any suppression that could be written,
 // and it read as a real finding in every count.
 //
-// A rule reporting through importSourceVisitors receives the declaration or call, which is the right
+// A rule reporting through SourceVisitors receives the declaration or call, which is the right
 // node to reason about and the wrong node to point at. This turns one into the other.
-func importSpecifierNode(node *ast.Node) *ast.Node {
+func SpecifierNode(node *ast.Node) *ast.Node {
 	if node == nil {
 		return nil
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
 // outcomeFlagNames claim to say how an operation turned out.
@@ -75,7 +76,7 @@ var ConsistencyNoBooleanOutcome = rule.Rule{
 			return nil
 		}
 
-		filePath := normalizedFileName(ctx.SourceFile)
+		filePath := imports.NormalizedFileName(ctx.SourceFile)
 		if strings.Contains(filePath, "/generated/") || strings.Contains(filePath, ".generated.") {
 			return nil
 		}

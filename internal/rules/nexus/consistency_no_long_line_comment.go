@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/utils/comments"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
 // Four or fewer double-slash lines read fine as a stack; the block delimiters would be noise.
@@ -45,7 +46,7 @@ var ConsistencyNoLongLineComment = rule.Rule{
 
 		// A generator rewrites these on its next run, so a fix here is lost and the file churns on
 		// every build.
-		fileName := normalizedFileName(ctx.SourceFile)
+		fileName := imports.NormalizedFileName(ctx.SourceFile)
 		if strings.Contains(fileName, "/generated/") || strings.Contains(fileName, ".generated.") {
 			return nil
 		}

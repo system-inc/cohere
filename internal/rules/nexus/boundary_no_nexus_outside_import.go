@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
 // The aliases that point out of nexus and into the things built on top of it.
@@ -29,11 +30,11 @@ var BoundaryNoNexusOutsideImport = rule.Rule{
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The whole rule is a question about where the file lives, so a file outside nexus declines
 		// before a single node is visited. This is the cheapest a rule gets.
-		if !strings.Contains(normalizedFileName(ctx.SourceFile), "/libraries/nexus/") {
+		if !strings.Contains(imports.NormalizedFileName(ctx.SourceFile), "/libraries/nexus/") {
 			return nil
 		}
 
-		return importSourceVisitors(func(source string, node *ast.Node) {
+		return imports.SourceVisitors(func(source string, node *ast.Node) {
 			if isOutsideNexusAlias(source) {
 				ctx.ReportNode(node, messageForbiddenOutsideImport)
 			}

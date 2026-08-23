@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
 // minimumLengthToFlagAsUntranslated is how long a string must be before matching English is taken
@@ -354,7 +355,7 @@ func unwrapTypeAssertions(expression *ast.Node) *ast.Node {
 // directory named "translations-archive" and, worse, would silently start linting whatever a future
 // directory named that way holds.
 func translationFileInformation(sourceFile *ast.SourceFile) (string, string, bool) {
-	fileName := normalizedFileName(sourceFile)
+	fileName := imports.NormalizedFileName(sourceFile)
 	if !strings.HasSuffix(fileName, ".ts") {
 		return "", "", false
 	}
