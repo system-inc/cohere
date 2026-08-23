@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/verify/internal/prettier"
 )
 
 // The defect these guard is the one the ruling singled out: a release that embeds a stale Prettier
@@ -113,6 +115,23 @@ func TestFormatterSourceAcceptsAFreshBuild(t *testing.T) {
 	}
 	if !strings.HasSuffix(source.Directory, filepath.Join("dist", "prettier")) {
 		t.Errorf("resolved to %s, which is not the fork's bundle directory", source.Directory)
+	}
+}
+
+func TestGuardChecksEveryBundleTheEngineActuallyLoads(t *testing.T) {
+	// The list this guard checks and the list the engine loads must be one list, not two that agree
+	// today. They did not agree: this file once named three bundles chosen as "the minimal set that
+	// formats TypeScript", while the engine hard-errors on any of its eight being absent, so a
+	// release could pass every check and produce a binary that died the first time someone formatted
+	// markdown.
+	//
+	// Asserting identity rather than a count, because a count passes the moment someone adds a
+	// fourth name by hand and reintroduces exactly the drift this is here to prevent.
+	if &FormatterBundleNames[0] != &prettier.BundleFiles[0] {
+		t.Fatalf("the release guard checks its own bundle list rather than the engine's, which will drift")
+	}
+	if len(FormatterBundleNames) != len(prettier.BundleFiles) {
+		t.Fatalf("guard covers %d bundles, engine loads %d", len(FormatterBundleNames), len(prettier.BundleFiles))
 	}
 }
 

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/system-inc/verify/internal/prettier"
 )
 
 // FormatterForkPathVariable overrides where the Prettier fork is read from.
@@ -19,18 +21,21 @@ const FormatterForkPathVariable = "AHRA_VERIFY_PRETTIER_FORK"
 // DefaultFormatterForkPath is where the fork lives on the machine it was built on.
 const DefaultFormatterForkPath = "/Users/kirkouimet/Projects/system/prettier"
 
-// FormatterBundleNames are the JavaScript bundles a release embeds.
+// FormatterBundleNames are the JavaScript bundles a release must provide.
 //
-// This is the minimal set that formats TypeScript, measured rather than assumed: `standalone.js` is
-// 198K, `plugins/typescript.js` is 1.5M, and `plugins/estree.js` is 482K, for 2.3 MB against a
-// 14 MB binary. The fork's whole `dist/prettier` is 18 MB across more than twenty plugins, so this
-// is a chosen subset and not a convenience — embedding everything would more than double the
-// binary to carry formatters for languages this tool does not check.
-var FormatterBundleNames = []string{
-	"standalone.js",
-	"plugins/estree.js",
-	"plugins/typescript.js",
-}
+// It is the engine's own list rather than a copy of it, and that is the entire point. `prettier`
+// exports `BundleFiles` precisely so this step ships exactly what the engine loads: a bundle
+// vendored but not loaded is dead weight, and a bundle loaded but not vendored is a build that
+// fails at runtime on a machine without the fork. A second list here would drift, and the drift
+// would be invisible — a release would pass every check and produce a binary that dies the first
+// time someone formats the language whose plugin went missing.
+//
+// This was a real defect and not a hypothetical one. This file previously named three bundles,
+// chosen as "the minimal set that formats TypeScript", while the engine hard-errors on any of eight
+// being absent. The guard would have passed a release missing five of them.
+//
+// Measured at 05:43: the eight bundles total 2.1 MB, against a binary that is now 45 MB.
+var FormatterBundleNames = prettier.BundleFiles
 
 // FormatterSource is a built Prettier fork on disk, and which commit built it.
 type FormatterSource struct {
