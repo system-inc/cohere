@@ -35,6 +35,21 @@ if [ ! -f "$file" ]; then
     exit 2
 fi
 
+# The baseline has to be green before a mutation means anything. In a shared package another
+# agent's in-flight file can make the suite fail for reasons unrelated to the mutant, and every
+# verdict after that reports the package's state rather than the mutation's effect. This is the
+# tool's own documented failure mode arriving one level up: a probe running perfectly against
+# the wrong object. It scored a comment-only edit as caught by 32 lines before this existed.
+if ! go vet "$package" >/dev/null 2>&1; then
+    echo "REFUSED: $package does not compile before any mutation, so nothing can be scored." >&2
+    exit 2
+fi
+if [ "$(go test -count=1 "$package" 2>&1 | grep -c 'FAIL')" -gt 0 ]; then
+    echo "REFUSED: $package is already failing before any mutation, so every mutant would score" >&2
+    echo "as caught. Establish a green baseline first, or wait for the other agent to land." >&2
+    exit 2
+fi
+
 backup="$(mktemp)"
 cp "$file" "$backup"
 restore() { cp "$backup" "$file"; rm -f "$backup"; }
