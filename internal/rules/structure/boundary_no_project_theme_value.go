@@ -93,6 +93,10 @@ const interfaceNameSuffix = "Interface"
 // library may not reach into the project, and the project may extend the library freely.
 var BoundaryNoProjectThemeValue = rule.Rule{
 	Name: "boundary-no-project-theme-value",
+
+	// Scans every theme file in the program, so a findings cache keyed on the linted file alone
+	// would go stale when a theme changes and this file does not.
+	ReadsProgram: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName()).IsInLibrariesStructure {
 			return nil

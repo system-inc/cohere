@@ -71,6 +71,14 @@ func Adapt(subject upstreamrule.Rule) (rule.Rule, error) {
 		// second is a measured cost, the first is a crash.
 		NeedsTypeChecker: true,
 
+		// Same asymmetry, same reason, for the program. The adapter hands context.Program to a rule
+		// whose body it does not own, so it cannot see whether that rule reads across files.
+		//
+		// Under-declaring here is worse than under-declaring the checker: a findings cache keyed on
+		// the linted file would serve a stale result forever when the other file changes, which
+		// reads as a clean tree rather than as a crash. Over-declaring costs a cache miss.
+		ReadsProgram: true,
+
 		Run: func(context rule.Context, options any) rule.Listeners {
 			upstreamListeners := subject.Run(upstreamContext(context, subject.Name), options)
 			if len(upstreamListeners) == 0 {

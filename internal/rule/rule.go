@@ -226,6 +226,30 @@ type Rule struct {
 	// --timing against planted violations, and that number decides whether the rules after it follow
 	// or stay on name matching with the shadowing hazard written at their own site.
 	NeedsTypeChecker bool
+
+	// ReadsProgram declares that this rule reads something outside the file it was handed.
+	//
+	// `ctx.Program` reaches every source file in the run, so a rule that touches it is not pure
+	// per-file even when it declares NeedsTypeChecker false. Two rules do this today:
+	// localization-no-untranslated-value reads the English translation table, and
+	// boundary-no-project-theme-value scans every theme file.
+	//
+	// The flag exists for the findings cache, and the failure it prevents is the one this tool
+	// exists to catch. A cache keyed on one file's hash serves a stale result when a file the rule
+	// also read has changed and the linted file has not: zero findings, forever, indistinguishable
+	// from a clean tree. Nothing else notices.
+	//
+	// So this cannot live in a convention. A future rule author reaching for ctx.Program has no
+	// reason to know they broke caching, exactly as NeedsTypeChecker exists because the analogous
+	// property could not live in discipline either. The failure is worse here: a nil checker is a
+	// loud crash, a stale cache is silence.
+	//
+	// The declaration is asymmetric on purpose, the same way NeedsTypeChecker is, and the adapter
+	// in internal/rules/upstream states the reasoning: under-declaring serves stale findings
+	// forever, over-declaring costs a cache miss. Those are not comparable, so anything that cannot
+	// see whether it reads the program declares true. The adapter hands ctx.Program to a rule whose
+	// body it does not own, so every adapted rule is cross-file by assumption.
+	ReadsProgram bool
 }
 
 // ReportNode is the common case: this node is wrong, here is why.
