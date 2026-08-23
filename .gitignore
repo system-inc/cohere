@@ -1,5 +1,12 @@
 # Build output
+#
+# One entry per command in cmd/, because `go build ./cmd/<name>` drops the binary at the repo root
+# by default. A command whose binary is not listed here shows up as a large untracked file, and the
+# next `git add -A` commits a platform-specific executable into history. Add a line when you add a
+# command; `for c in cmd/*; do grep -q "^/$(basename $c)$" .gitignore; done` says which are missing.
+/formatdiff
 /verify
+/verify-differential
 /verify-dispatch
 /verify-release
 /dist/
