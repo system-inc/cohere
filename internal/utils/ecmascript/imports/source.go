@@ -25,6 +25,16 @@ import (
 // SourceVisitors builds the listeners that call report for every string specifier in a file,
 // whichever of the three shapes it arrives in.
 //
+// **Not every rule that reads an import wants this, and reaching for it by default would widen rules
+// that are correctly narrow.** Four `structure` rules watch `KindImportDeclaration` alone and are
+// right to: `react-import-no-destructuring` asks about the binding form of a static import, and a
+// dynamic `import('react')` has no destructuring to flag. A rule guarding a *boundary* needs all
+// three shapes because the missed one routes around it; a rule asking about how a static import is
+// *written* needs exactly one.
+//
+// The test is whether the rule is about where a module comes from or about the syntax that brings it
+// in. Only the first wants this.
+//
 // report is handed the specifier and the node to blame. The node differs by shape on purpose: a
 // static import blames the whole declaration, while a dynamic or require call blames the call, since
 // that is the expression a reader has to change.
