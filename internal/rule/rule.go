@@ -297,6 +297,12 @@ func (c Context) ReportRangeWithSuggestions(textRange core.TextRange, message Me
 // rather than reasoning about the ranges. Upstream tsgolint gets this right via
 // `utils.TrimNodeTextRange`; our port dropped the step, most likely because the signature had no
 // SourceFile to trim with.
+//
+// This is also why vendoring tsgolint's `rule/` package is declined while its `utils/` is taken.
+// Its builders are correct and do trim, but they take the SourceFile as a parameter rather than a
+// receiver (`RuleFixReplace(file, node, text)`), so the call that forgets it is available. Ours is
+// not. Exposing both would give a rule author two reachable spellings of one act, one of them
+// unsafe, and two helpers that almost agree drift permanently.
 func TokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	if sourceFile == nil || node == nil {
 		return node.Loc
