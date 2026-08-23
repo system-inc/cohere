@@ -12,9 +12,11 @@ package astprobe
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -939,4 +941,126 @@ func TestProbeTextDetectorCanFail(t *testing.T) {
 			"the text comparison cannot detect corruption and every clean result from it is vacuous")
 	}
 	t.Logf("control: corrupting the blob changed %d texts, detector fires", differing)
+}
+
+// TestProbeGraphSplit answers the question every saving estimate on #8fbvwnz currently hedges:
+// the graph phase is parse PLUS module resolution, and only the parse half is cacheable by an
+// AST cache. Every figure I have reported so far said "parse is 60 to 80% of graph" as a band
+// because nobody had split it.
+//
+// The method: parse every file the program contains, standalone, with no resolution and no
+// program construction, and compare that total against the measured graph phase. Parsing is
+// the one phase that depends on exactly one file's bytes, so parsing every file in isolation
+// is a faithful lower bound on the parse share.
+//
+// This is a lower bound rather than an exact split, and the reason is worth stating: the real
+// program construction also parses, but it does so interleaved with resolution and across
+// several goroutines, so wall-clock attribution inside it is not separable without upstream
+// instrumentation. What this measures is "what does parsing all of it cost on its own", which
+// is exactly the quantity an AST cache replaces.
+func TestProbeGraphSplit(t *testing.T) {
+	// The file list comes from the buildinfo, which names every file the program contains.
+	// Reading it is cheaper than constructing a program here, and it is the same population:
+	// fileNames is 9,982 on both artifacts I have inspected.
+	buildInfoPath := "/Users/kirkouimet/Projects/ahra/.cache/ts/tsconfig.tsbuildinfo"
+	raw, err := os.ReadFile(buildInfoPath)
+	if err != nil {
+		t.Skipf("no buildinfo to enumerate the program: %v", err)
+	}
+
+	var buildInfo struct {
+		FileNames []string `json:"fileNames"`
+	}
+	if err := json.Unmarshal(raw, &buildInfo); err != nil {
+		t.Fatalf("parse buildinfo: %v", err)
+	}
+	if len(buildInfo.FileNames) < 1000 {
+		t.Fatalf("buildinfo named %d files; that is not this program and the split would be "+
+			"measured against the wrong population", len(buildInfo.FileNames))
+	}
+
+	// Paths in the buildinfo are relative to its own directory.
+	buildInfoDirectory := "/Users/kirkouimet/Projects/ahra/.cache/ts"
+
+	type loaded struct {
+		path string
+		text string
+	}
+	files := make([]loaded, 0, len(buildInfo.FileNames))
+	totalBytes := 0
+	missing := 0
+	for _, name := range buildInfo.FileNames {
+		path := name
+		if !strings.HasPrefix(path, "/") {
+			path = tspath.NormalizePath(buildInfoDirectory + "/" + name)
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			missing++
+			continue
+		}
+		files = append(files, loaded{path: path, text: string(content)})
+		totalBytes += len(content)
+	}
+
+	// A split measured over a fraction of the program is not the split. Say so rather than
+	// printing a confident number for the wrong population.
+	if len(files) < len(buildInfo.FileNames)*9/10 {
+		t.Fatalf("only %d of %d files readable; the parse share would be measured against a "+
+			"different program than the one graph builds", len(files), len(buildInfo.FileNames))
+	}
+
+	// Read all files first, above, so this measures parsing rather than disk. An AST cache
+	// replaces the parse, not the read, and conflating them would inflate the saving.
+	const splitRuns = 3
+	var parseTimings []time.Duration
+	for run := 0; run < splitRuns; run++ {
+		runtime.GC()
+		start := time.Now()
+		for _, file := range files {
+			fileName := tspath.NormalizePath(file.path)
+			kind := core.ScriptKindTS
+			if strings.HasSuffix(fileName, ".tsx") {
+				kind = core.ScriptKindTSX
+			} else if strings.HasSuffix(fileName, ".js") || strings.HasSuffix(fileName, ".mjs") {
+				kind = core.ScriptKindJS
+			} else if strings.HasSuffix(fileName, ".jsx") {
+				kind = core.ScriptKindJSX
+			} else if strings.HasSuffix(fileName, ".json") {
+				kind = core.ScriptKindJSON
+			}
+			parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: fileName,
+				Path:     tspath.Path(fileName),
+			}, file.text, kind)
+		}
+		parseTimings = append(parseTimings, time.Since(start))
+	}
+
+	parseMedian := median(parseTimings)
+
+	// The graph phase measured on this tree, five runs of `verify --no-fix`, median. Stated as
+	// a constant with its provenance rather than re-measured here, because running the full
+	// binary from a test would measure a different process under different load.
+	const measuredGraphMilliseconds = 528.0
+	parseMilliseconds := float64(parseMedian.Microseconds()) / 1000
+
+	fmt.Printf("\n=== #8fbvwnz: what fraction of graph is parse ===\n")
+	fmt.Printf("files parsed          %d of %d named (%d unreadable)\n",
+		len(files), len(buildInfo.FileNames), missing)
+	fmt.Printf("source                %.1f MB\n", float64(totalBytes)/(1024*1024))
+	fmt.Printf("parse, standalone     %.0f ms   median of %d\n", parseMilliseconds, splitRuns)
+	fmt.Printf("graph phase           %.0f ms   measured, verify --no-fix, median of 5\n",
+		measuredGraphMilliseconds)
+	fmt.Printf("parse share           %.0f%% of graph\n",
+		100*parseMilliseconds/measuredGraphMilliseconds)
+	fmt.Printf("\nsingle-threaded here against a parallel program construction, so this is an\n")
+	fmt.Printf("UPPER bound on parse time and the share is indicative rather than exact.\n\n")
+
+	for _, ratio := range []float64{2.25, 3.0, 5.2} {
+		saved := parseMilliseconds - parseMilliseconds/ratio
+		fmt.Printf("  at %.2fx read: parse %.0fms becomes %.0fms, saves %.0fms\n",
+			ratio, parseMilliseconds, parseMilliseconds/ratio, saved)
+	}
+	fmt.Printf("\n")
 }
