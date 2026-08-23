@@ -345,9 +345,14 @@ func requireExecutableFormat(path string, target Target) error {
 	}
 
 	if !bytes.Equal(header, magic) {
+		// The observation and the likely cause are stated as separate claims, because they are: the
+		// bytes are measured and the cause is a guess. A message that asserts one explanation sends
+		// a reader hunting that bug, and several things produce these bytes — another target's
+		// build staged here, a truncated write that kept the path, a file that was never a program.
+		// Naming the most likely one while marking it a guess costs nothing and misdirects nobody.
 		return fmt.Errorf(
-			"the binary at %s does not begin like a %s executable (found %x, expected %x) — the wrong target's build may have been staged here",
-			path, target.GoOperatingSystem, header, magic,
+			"the binary at %s begins with %x, and a %s executable begins with %x.\nMost often this is another target's build staged into this package, but a truncated write or a non-executable file at that path produce it too",
+			path, header, target.GoOperatingSystem, magic,
 		)
 	}
 	return nil

@@ -170,7 +170,14 @@ func requireExecutable(path string, information os.FileInfo) error {
 		return nil
 	}
 	if information.Mode()&0o111 == 0 {
-		return fmt.Errorf("the verify binary at %s is not executable (mode %s) — its permissions were probably lost in packaging", path, information.Mode())
+		// The mode is measured; the cause is not. Packaging that dropped the bit is the common one,
+		// but a restrictive umask on this machine, a noexec mount, or an extraction that ignored
+		// modes all land here identically. Asserting the first would send a reader to inspect a
+		// tarball that is fine.
+		return fmt.Errorf(
+			"the verify binary at %s has mode %s, so it cannot be executed.\nMost often the mode was lost in packaging or extraction; a restrictive umask or a noexec mount produce it too",
+			path, information.Mode(),
+		)
 	}
 	return nil
 }
