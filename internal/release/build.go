@@ -432,7 +432,16 @@ func normalizeUpstream(remoteUrl string) string {
 	if len(segments) < 2 {
 		return "unknown"
 	}
-	return strings.Join(segments[len(segments)-2:], "/")
+
+	// Both halves have to be non-empty, not just present. A count alone passes for
+	// `https://github.com/`, whose segments are ["https:", "", "github.com", ""], and the last two
+	// join to "/github.com" — a label that is not a repository, printed by `--version` as though it
+	// were one. A guard on position says the pieces exist; this says they mean something.
+	owner, name := segments[len(segments)-2], segments[len(segments)-1]
+	if owner == "" || name == "" {
+		return "unknown"
+	}
+	return owner + "/" + name
 }
 
 // readGoToolchain reads the version of the toolchain performing the build.

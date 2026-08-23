@@ -93,9 +93,25 @@ func TestCompilerUpstreamNormalizesBothUrlShapes(t *testing.T) {
 	}
 
 	// Anything that is not a recognizable owner/name pair degrades rather than inventing a label.
-	for _, unusable := range []string{"", "   ", "not-a-url"} {
+	//
+	// `https://github.com/` is the case a length check alone gets wrong, and it was wrong here: its
+	// segments are ["https:", "", "github.com", ""], four of them, so a guard on count passes and
+	// the last two join to "/github.com". That is not a repository, and `--version` printed it as
+	// though it were one. Both halves have to be non-empty, not merely present.
+	for _, unusable := range []string{"", "   ", "not-a-url", "https://github.com/", "https://github.com", "/"} {
 		if got := normalizeUpstream(unusable); got != "unknown" {
 			t.Errorf("%q normalized to %q rather than unknown", unusable, got)
+		}
+	}
+
+	// Shapes git accepts that are not the two obvious ones. A scheme-prefixed ssh url and a plain
+	// local path both reach this function on a real machine, and neither should degrade.
+	for url, expected := range map[string]string{
+		"ssh://git@github.com/microsoft/TypeScript.git": "microsoft/TypeScript",
+		"/Users/someone/local/prettier":                 "local/prettier",
+	} {
+		if got := normalizeUpstream(url); got != expected {
+			t.Errorf("%s normalized to %q, wanted %q", url, got, expected)
 		}
 	}
 }
