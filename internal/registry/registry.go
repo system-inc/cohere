@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/verify/internal/config"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/rules/nexus"
+	"github.com/system-inc/verify/internal/rules/tailwind"
 )
 
 // All returns every rule, in a stable order.
@@ -22,6 +23,7 @@ func All() []rule.Rule {
 		nexus.BoundaryNoInternalImport,
 		nexus.BoundaryNoNexusOutsideImport,
 		nexus.BoundaryNoProjectImport,
+		nexus.ConsistencyNoAbbreviatedIdentifier,
 		nexus.ConsistencyNoAmbiguousIdentifier,
 		nexus.ConsistencyNoBooleanOutcome,
 		nexus.ConsistencyNoEnum,
@@ -39,6 +41,7 @@ func All() []rule.Rule {
 		nexus.ImportRequireNodeNamespace,
 		nexus.ImportRequirePathAlias,
 		nexus.LocalizationNoUntranslatedValue,
+		tailwind.NoDuplicateClasses,
 	}
 }
 
@@ -79,11 +82,20 @@ func Options() config.OptionsRegistry {
 
 		// The rest tune behavior rather than enable it, so they run on their own defaults when the
 		// config says nothing.
+		"consistency-no-abbreviated-identifier": {
+			Decode: config.DecodeInto[nexus.ConsistencyNoAbbreviatedIdentifierOptions](),
+		},
 		"consistency-no-boolean-outcome":      {Decode: config.DecodeInto[nexus.ConsistencyNoBooleanOutcomeOptions]()},
 		"consistency-no-long-line-comment":    {Decode: config.DecodeInto[nexus.ConsistencyNoLongLineCommentOptions]()},
 		"consistency-no-screaming-snake-case": {Decode: config.DecodeInto[nexus.ConsistencyNoScreamingSnakeCaseOptions]()},
 		"consistency-no-shouting":             {Decode: config.DecodeInto[nexus.ConsistencyNoShoutingOptions]()},
 		"consistency-no-stuttering-name":      {Decode: config.DecodeInto[nexus.ConsistencyNoStutteringNameOptions]()},
 		"import-require-module-alias":         {Decode: config.DecodeInto[nexus.ImportRequireModuleAliasOptions]()},
+
+		// Not Required, deliberately. The surfaces that carry class strings have sane defaults
+		// (`class`/`className`, the two merge helpers, the `*ClassName` variable patterns), and a
+		// project that says nothing gets those rather than a rule that reads no files. The option
+		// exists to widen the surface, not to enable the rule.
+		"no-duplicate-classes": {Decode: config.DecodeInto[tailwind.NoDuplicateClassesOptions]()},
 	}
 }
