@@ -16,14 +16,25 @@
 // reading the build info (tsc.go:304-310). The build info is a change-detection input, not a
 // graph you load instead of building.
 //
-// One thing that will mislead whoever wires this up. The build info our tree produces carries
-// NO semanticDiagnosticsPerFile, and neither does one written by a fresh --noEmit
-// --incremental run: verified on two artifacts, both with fileNames 9,982 matching program
-// size. The field exists in the format (buildInfo.go:483) and setSemanticDiagnostics runs
-// unconditionally beside setReferencedMap, which does populate. So the 1.26s above is earned
-// by fileInfos signatures plus referencedMap, and code that expects to replay cached
-// diagnostics out of the build info will read an empty list and decide it is cold on every
-// single run. That failure is silent and it looks exactly like a working cache.
+// One thing that looks alarming and is not, because the first version of this comment got it
+// backwards and a reader deserves the corrected form rather than the scary one.
+//
+// The build info our tree produces carries no semanticDiagnosticsPerFile at all, and neither
+// does one from a fresh --noEmit --incremental run: verified on two artifacts, both with
+// fileNames 9,982 matching program size. That is normal, and it does not mean the cache is
+// inert.
+//
+// The skip does not replay stored diagnostics. It runs on content hashes. On load,
+// setSemanticDiagnostics (buildinfotosnapshot.go:152-159) seeds an empty "no diagnostics"
+// entry for every file NOT in changedFilesSet, and changedFilesSet is computed by comparing
+// each file's hash against oldFileInfo.version (programtosnapshot.go:104-110). Then
+// collectSemanticDiagnosticsOfAffectedFiles (program.go:290-303) checks only files missing
+// from that map. So an unchanged file is seeded clean and never re-checked, which is where
+// the 2.11s to 0.85s comes from.
+//
+// The practical consequence for a caller: do not treat an empty semanticDiagnosticsPerFile as
+// a cold cache, and do not go looking for stored diagnostics to replay. Hand the machinery a
+// build info and a freshly built program, and the signatures do the work.
 package incremental
 
 import (
