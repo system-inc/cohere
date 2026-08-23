@@ -143,6 +143,15 @@ func run() error {
 			scope = resolved
 		}
 
+		// The scope was computed from git, which knows nothing about the tsconfig. Narrowing it to the
+		// files the program actually contains is what lets the output state both numbers, so a reader
+		// is never left doing arithmetic between a git count and a formatter count that cannot match.
+		inProgram := make(map[string]struct{}, len(projectFiles))
+		for _, sourceFile := range projectFiles {
+			inProgram[sourceFile.FileName()] = struct{}{}
+		}
+		scope = scope.narrowTo(inProgram)
+
 		fixStart := time.Now()
 		fixSummary, err := applyProposedFixes(
 			ctx, graph, projectFiles, registry.All(),

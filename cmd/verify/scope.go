@@ -40,7 +40,35 @@ type formatScope struct {
 	Everything bool
 }
 
-// includes reports whether a file is in scope. A whole-tree scope includes everything.
+// narrowTo reports how many of the scope's files are in a given population, and re-describes the
+// scope to say both numbers.
+//
+// The scope is computed from git and the population is the files the program actually contains, and
+// those differ: a changed file can be excluded by the tsconfig or by ignorePatterns and never reach
+// the format phase. Reporting only the git number leaves a reader doing arithmetic that does not
+// work out, which is what happened when 72 changed files produced 3 formatter candidates and the
+// output explained neither.
+//
+// Both numbers, in one clause, so nobody has to reconstruct the difference.
+func (s formatScope) narrowTo(population map[string]struct{}) formatScope {
+	if s.Everything {
+		return s
+	}
+
+	inPopulation := 0
+	for _, fileName := range s.FileNames {
+		if _, present := population[fileName]; present {
+			inPopulation++
+		}
+	}
+
+	s.Description = fmt.Sprintf(
+		"%d changed files (working tree, staged, and untracked), %d of them in the program",
+		len(s.FileNames), inPopulation,
+	)
+	return s
+}
+
 // includes reports whether a file is in a narrow scope.
 //
 // It deliberately does not consult Everything. That check lives in scopedTransform, which returns
@@ -109,7 +137,19 @@ func changedFilesScope(workingDirectory string) (formatScope, error) {
 // and untracked. Three separate commands would be three chances for the sets to disagree if a file
 // changed between them, which on a tree with nine writers is not hypothetical.
 func gitChangedFiles(workingDirectory string) ([]string, error) {
-	command := exec.Command("git", "status", "--porcelain=v1", "--no-renames")
+	// --untracked-files=all is load-bearing rather than a detail. By default git collapses an
+	// untracked directory to a single entry ending in a slash, so `code-quality/` arrives as one
+	// "changed file" that matches no real path and every file inside it silently leaves the scope.
+	//
+	// Measured on the ahra tree: 11 reported entries, three of which were directories hiding 1,958
+	// formattable files. Those files would never be formatted, and the coverage line would report
+	// them as outside the scope, which is technically true and structurally wrong. With this flag the
+	// same tree reports 72 real paths.
+	//
+	// This is the failure this whole scope layer exists to prevent, arriving through the tool that
+	// computes the scope: a subset that looks deliberate and was actually an accident of output
+	// formatting.
+	command := exec.Command("git", "status", "--porcelain=v1", "--no-renames", "--untracked-files=all")
 	command.Dir = workingDirectory
 
 	output, err := command.Output()
@@ -117,8 +157,17 @@ func gitChangedFiles(workingDirectory string) ([]string, error) {
 		return nil, fmt.Errorf("asking git what changed: %w", err)
 	}
 
+	return parsePorcelain(string(output)), nil
+}
+
+// parsePorcelain turns git's porcelain v1 output into the paths worth formatting.
+//
+// Separated from the subprocess call so the parsing can be tested against input the subprocess
+// cannot easily be made to produce, which is the only way to prove the directory guard does
+// anything: the --untracked-files=all flag stops git from ever emitting the line the guard rejects.
+func parsePorcelain(output string) []string {
 	names := []string{}
-	for _, line := range strings.Split(string(output), "\n") {
+	for _, line := range strings.Split(output, "\n") {
 		// Porcelain v1 is two status characters, a space, then the path. A line shorter than that is
 		// not a record.
 		if len(line) < 4 {
@@ -129,9 +178,19 @@ func gitChangedFiles(workingDirectory string) ([]string, error) {
 		if line[0] == 'D' || line[1] == 'D' {
 			continue
 		}
-		names = append(names, unquoteGitPath(strings.TrimSpace(line[3:])))
+		name := unquoteGitPath(strings.TrimSpace(line[3:]))
+
+		// A trailing slash means git handed back a directory rather than a file, which happens when
+		// the untracked-files mode collapses one. The flag above prevents it, and this refuses the
+		// entry rather than trusting the flag: a directory in the scope matches no real path, so every
+		// file under it leaves the scope without anything saying so.
+		if strings.HasSuffix(name, "/") {
+			continue
+		}
+
+		names = append(names, name)
 	}
-	return names, nil
+	return names
 }
 
 // unquoteGitPath undoes the quoting git applies to paths with unusual characters.

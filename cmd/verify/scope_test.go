@@ -329,3 +329,169 @@ func TestAFailedGitCallIsAnErrorNotAnEmptyScope(t *testing.T) {
 		t.Fatalf("the error does not say what failed: %v", err)
 	}
 }
+
+// An untracked directory must not enter the scope as a single entry.
+//
+// This fixture exists because the bug shipped. Git collapses an untracked directory to one porcelain
+// line ending in a slash, so `code-quality/` arrived as one "changed file" that matches no real
+// path, and every file under it left the scope with nothing saying so. Measured on the ahra tree at
+// 01:54: 11 reported entries, three of them directories, hiding 1,958 formattable files. The
+// coverage line called them "outside the format scope", which was true and structurally wrong.
+//
+// Caught by @system_verify_lint doing arithmetic on the output rather than by any assertion here:
+// 11 in scope against a reported split of 3,406 outside and 1 blocked does not reconcile, and the
+// ten missing files were the contents of collapsed directories.
+func TestAnUntrackedDirectoryDoesNotEnterTheScopeWhole(t *testing.T) {
+	directory := t.TempDir()
+
+	run := func(arguments ...string) {
+		t.Helper()
+		command := exec.Command("git", arguments...)
+		command.Dir = directory
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Skipf("git is unavailable or refused (%v): %s", err, output)
+		}
+	}
+
+	run("init", "--quiet")
+	run("config", "user.email", "fixture@example.com")
+	run("config", "user.name", "fixture")
+
+	seed := filepath.Join(directory, "seed.ts")
+	if err := os.WriteFile(seed, []byte("const a = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "seed.ts")
+	run("commit", "--quiet", "-m", "baseline")
+
+	// A wholly untracked directory with files at two depths, which is what git collapses.
+	nested := filepath.Join(directory, "fresh", "deeper")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	shallow := filepath.Join(directory, "fresh", "one.ts")
+	deep := filepath.Join(nested, "two.ts")
+	for _, name := range []string{shallow, deep} {
+		if err := os.WriteFile(name, []byte("const b = 1;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	scope, err := changedFilesScope(directory)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Both real files must be in scope, at any depth.
+	for _, want := range []string{shallow, deep} {
+		if !scope.includes(want) {
+			t.Fatalf("a file inside an untracked directory is not in scope: %v", scope.FileNames)
+		}
+	}
+
+	// And no entry may be a directory. A directory in the scope matches nothing and hides everything
+	// beneath it.
+	for _, name := range scope.FileNames {
+		if strings.HasSuffix(name, "/") {
+			t.Fatalf("a directory entered the scope: %q", name)
+		}
+		info, statError := os.Stat(name)
+		if statError == nil && info.IsDir() {
+			t.Fatalf("a directory entered the scope: %q", name)
+		}
+	}
+}
+
+// The trailing-slash guard is tested directly, because the flag above it makes the guard
+// unobservable through behavior.
+//
+// `--untracked-files=all` already stops git from emitting a directory entry, so deleting the guard
+// changes nothing any end-to-end fixture can see. That is exactly the redundancy trap that let a
+// deleted fast path survive earlier tonight: two guards where one is load-bearing means neither can
+// be shown to work.
+//
+// The guard is kept rather than deleted, because unlike that case the two are not equivalent. The
+// flag is an argument to a subprocess whose behavior is git's to change, and porcelain v1 is a
+// stable format precisely so tools can rely on parsing it rather than on invocation flags. So the
+// guard stays and is proven here against the input it exists for, rather than proven through a path
+// that cannot produce that input.
+func TestPorcelainDirectoryEntriesAreRefused(t *testing.T) {
+	for _, testCase := range []struct {
+		name      string
+		porcelain string
+		want      []string
+	}{
+		{
+			name:      "a collapsed untracked directory is dropped",
+			porcelain: "?? fresh/\n M real.ts\n",
+			want:      []string{"real.ts"},
+		},
+		{
+			name:      "a quoted directory is dropped after unquoting",
+			porcelain: "?? \"with space/\"\n M real.ts\n",
+			want:      []string{"real.ts"},
+		},
+		{
+			name:      "files at depth survive",
+			porcelain: "?? fresh/deeper/two.ts\n?? fresh/one.ts\n",
+			want:      []string{"fresh/deeper/two.ts", "fresh/one.ts"},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := parsePorcelain(testCase.porcelain)
+			if len(got) != len(testCase.want) {
+				t.Fatalf("expected %v, got %v", testCase.want, got)
+			}
+			for index := range testCase.want {
+				if got[index] != testCase.want[index] {
+					t.Fatalf("expected %v, got %v", testCase.want, got)
+				}
+			}
+		})
+	}
+}
+
+// The scope must state both counts: what git reported and how many of those the program contains.
+//
+// The two differ because git knows nothing about the tsconfig, so a changed file can be excluded and
+// never reach the format phase. Reporting only the git number left a reader doing arithmetic that
+// does not work out: 72 changed files producing 3 formatter candidates, with the output explaining
+// neither. That is the same shape as the summary-line defect from earlier tonight, where every
+// number was right and the composition was misleading.
+func TestTheScopeStatesBothCounts(t *testing.T) {
+	scope := formatScope{
+		FileNames: []string{"/repo/a.ts", "/repo/b.ts", "/repo/excluded.ts"},
+		index: map[string]struct{}{
+			"/repo/a.ts": {}, "/repo/b.ts": {}, "/repo/excluded.ts": {},
+		},
+		Description: "3 changed files (working tree, staged, and untracked)",
+	}
+
+	narrowed := scope.narrowTo(map[string]struct{}{
+		"/repo/a.ts": {}, "/repo/b.ts": {}, "/repo/never-changed.ts": {},
+	})
+
+	want := "3 changed files (working tree, staged, and untracked), 2 of them in the program"
+	if narrowed.Description != want {
+		t.Fatalf("the scope description does not state both counts:\n  want %q\n  got  %q", want, narrowed.Description)
+	}
+
+	// Narrowing describes; it must not silently shrink what is in scope, or the two numbers would
+	// describe the same population and the distinction would be lost.
+	if len(narrowed.FileNames) != 3 {
+		t.Fatalf("narrowing changed the scope rather than describing it: %v", narrowed.FileNames)
+	}
+}
+
+// A whole-tree scope has no git count to reconcile, so narrowing must leave it alone.
+func TestNarrowingAWholeTreeScopeChangesNothing(t *testing.T) {
+	before := wholeTreeScope()
+	after := before.narrowTo(map[string]struct{}{"/repo/a.ts": {}})
+
+	if after.Description != before.Description {
+		t.Fatalf("a whole-tree scope was re-described: %q", after.Description)
+	}
+	if !after.Everything {
+		t.Fatalf("narrowing turned a whole-tree scope into a narrow one")
+	}
+}
