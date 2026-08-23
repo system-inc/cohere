@@ -154,6 +154,17 @@ func adaptMessage(message upstreamrule.RuleMessage) rule.Message {
 	return rule.Message{Id: message.Id, Description: message.Description}
 }
 
+// adaptFixes carries an upstream fix slice of any length into one diagnostic, which makes this the
+// live path to the edit engine's multi-fix hazard.
+//
+// The engine flattens a diagnostic's fixes into independent proposals, so two fixes reported
+// together are judged separately and one may be refused while the other lands. For a pair that only
+// means something jointly that is a half-application, and it can still parse. See ProposalsFrom in
+// internal/fix for the full statement.
+//
+// The reason it is worth saying here rather than only there: an adapted rule reaches that path
+// without anyone writing one of our rules. No vendored rule emits two fixes in one report today,
+// and the first one that does arrives through this function.
 func adaptFixes(fixes []upstreamrule.RuleFix) []rule.Fix {
 	if len(fixes) == 0 {
 		return nil

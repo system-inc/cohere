@@ -223,6 +223,10 @@ func Resolve(proposals []Proposal) Plan {
 // No shipped rule does this today. Every ReportNodeWithFixes site emits exactly one fix, so the
 // hazard has no live caller and this is a warning rather than a bug. A rule that genuinely needs two
 // edits to land together needs grouping here first; it cannot get it by reporting them side by side.
+//
+// The path to watch is not a hand-written rule. adaptFixes in internal/rules/upstream carries an
+// upstream fix slice of any length into one diagnostic, so an adapted rule reaches this without
+// anyone writing one of ours. No vendored rule emits two today; that is the door it comes through.
 func ProposalsFrom(diagnostics []rule.Diagnostic) []Proposal {
 	proposals := []Proposal{}
 	for _, diagnostic := range diagnostics {
