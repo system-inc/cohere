@@ -30,6 +30,35 @@ var comparisonOperators = map[ast.Kind]bool{
 	ast.KindExclamationEqualsEqualsToken: true,
 }
 
+// UseIsNaNOptions mirrors the two switches ESLint's rule carries.
+//
+// EnforceForSwitchCase defaults to true, matching both ESLint 9 and the live config for this tree.
+// A `case NaN:` never matches for the same reason `=== NaN` is never true, so the default is the
+// one that catches the defect rather than the one that is quieter.
+//
+// EnforceForIndexOf is present because the config sets it and a decoded option that silently
+// vanishes is worse than one that is read: `list.indexOf(NaN)` always returns -1, since indexOf uses
+// strict equality. It is false here, matching the config.
+type UseIsNaNOptions struct {
+	EnforceForSwitchCase *bool
+	EnforceForIndexOf    bool
+}
+
+var messageCaseWithNaN = rule.Message{
+	Id: "caseWithNaN",
+	Description: "This `case NaN:` can never match. A switch compares with strict equality, and " +
+		"NaN is not equal to itself, so the branch is dead exactly as `value === NaN` would be. " +
+		"Test for it before the switch with Number.isNaN(value), since there is no case label " +
+		"that can catch it.",
+}
+
+var messageSwitchOnNaN = rule.Message{
+	Id: "switchOnNaN",
+	Description: "This switch tests NaN against each case, and NaN equals nothing including " +
+		"itself, so every case is dead and only the default runs. Whatever this switch was " +
+		"written to dispatch on, it dispatches on nothing.",
+}
+
 // UseIsNaN flags a comparison against NaN.
 //
 //	valid:   Number.isNaN(value)
@@ -52,7 +81,42 @@ var comparisonOperators = map[ast.Kind]bool{
 var UseIsNaN = rule.Rule{
 	Name: "use-isnan",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
+		// Defaults to on, matching ESLint 9 and this tree's config. An option that only relaxes the
+		// rule gets the strict reading when the config says nothing, so a misconfiguration cannot
+		// quietly disable half the rule.
+		enforceForSwitchCase := true
+		if settings, hasSettings := options.(UseIsNaNOptions); hasSettings && settings.EnforceForSwitchCase != nil {
+			enforceForSwitchCase = *settings.EnforceForSwitchCase
+		}
+
 		return rule.Listeners{
+			ast.KindSwitchStatement: func(node *ast.Node) {
+				if !enforceForSwitchCase {
+					return
+				}
+
+				statement := node.AsSwitchStatement()
+
+				// Switching on NaN kills every case at once, so it is reported on the discriminant
+				// rather than once per clause.
+				if isNaNReference(statement.Expression) {
+					ctx.ReportNode(statement.Expression, messageSwitchOnNaN)
+					return
+				}
+
+				if statement.CaseBlock == nil {
+					return
+				}
+				for _, clause := range statement.CaseBlock.AsCaseBlock().Clauses.Nodes {
+					if clause.Kind != ast.KindCaseClause {
+						continue
+					}
+					if label := clause.AsCaseOrDefaultClause().Expression; isNaNReference(label) {
+						ctx.ReportNode(label, messageCaseWithNaN)
+					}
+				}
+			},
+
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
 				if binary.OperatorToken == nil || !comparisonOperators[binary.OperatorToken.Kind] {

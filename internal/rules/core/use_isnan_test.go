@@ -33,6 +33,60 @@ func TestUseIsNaNFires(t *testing.T) {
 	}
 }
 
+// The switch half, which the live config enables (enforceForSwitchCase: true) and which the first
+// version of this rule did not implement at all.
+//
+// Found by applying a finding from no-var to this rule: enumerate the shapes a construct takes
+// before writing the listener. A NaN comparison reaches the tree as a binary expression and as a
+// switch, and the binary listener alone is silent on the second.
+func TestUseIsNaNFiresOnSwitches(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+		wantId     string
+	}{
+		{
+			"a case label of NaN",
+			"declare const value: number;\nexport function run() {\n    switch(value) {\n        case NaN: return 1;\n    }\n    return 0;\n}\n",
+			"caseWithNaN",
+		},
+		{
+			"a case label of Number.NaN",
+			"declare const value: number;\nexport function run() {\n    switch(value) {\n        case Number.NaN: return 1;\n    }\n    return 0;\n}\n",
+			"caseWithNaN",
+		},
+		// Switching on NaN kills every case at once, so it reports on the discriminant rather than
+		// once per clause. A rule reporting per-clause would produce a pile of findings for one
+		// defect and miss the switch that has no cases at all.
+		{
+			"switching on NaN",
+			"declare const other: number;\nexport function run() {\n    switch(NaN) {\n        case other: return 1;\n    }\n    return 0;\n}\n",
+			"switchOnNaN",
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ruletest.ExpectFindings(t, ruletest.Run(t, UseIsNaN, isNaNFile, testCase.sourceText), testCase.wantId)
+		})
+	}
+}
+
+// The option is read rather than ignored, in both directions.
+func TestUseIsNaNSwitchOption(t *testing.T) {
+	source := "declare const value: number;\nexport function run() {\n    switch(value) {\n        case NaN: return 1;\n    }\n    return 0;\n}\n"
+
+	// Default is on, so a config that says nothing gets the rule rather than half of it.
+	ruletest.ExpectFindings(t, ruletest.Run(t, UseIsNaN, isNaNFile, source), "caseWithNaN")
+
+	disabled := false
+	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, UseIsNaN, isNaNFile, source,
+		UseIsNaNOptions{EnforceForSwitchCase: &disabled}))
+
+	enabled := true
+	ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, UseIsNaN, isNaNFile, source,
+		UseIsNaNOptions{EnforceForSwitchCase: &enabled}), "caseWithNaN")
+}
+
 func TestUseIsNaNStaysSilent(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -48,6 +102,10 @@ func TestUseIsNaNStaysSilent(t *testing.T) {
 		// rule's business; only comparisons are always-constant.
 		{"arithmetic rather than comparison", "declare const value: number;\nexport const Ok = value + NaN;\n"},
 		{"a plain comparison", "declare const value: number;\nexport const Ok = value === 0;\n"},
+		// A switch with no NaN anywhere. The boundary for the switch half is "does a label or the
+		// discriminant name NaN", not "is this a switch".
+		{"a switch without NaN", "declare const value: number;\nexport function run() {\n    switch(value) {\n        case 0: return 1;\n    }\n    return 0;\n}\n"},
+		{"a default clause", "declare const value: number;\nexport function run() {\n    switch(value) {\n        default: return 1;\n    }\n}\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
