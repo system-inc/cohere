@@ -376,3 +376,50 @@ func TestAPluginPrefixedConfigKeyKeepsTheRuleName(t *testing.T) {
 		t.Fatalf("one rule normalized three ways: config %q, verify %q, gate %q", fromConfig, fromVerify, fromGate)
 	}
 }
+
+// The verdict must state its own scope when it covers less than the config.
+//
+// A comparison can only speak about rules verify implements. The rest of the config is enabled in
+// the gate, unported, and never compared, so a bare "agrees" reads as broader than the test. On
+// this tree that gap is most of the catalog, and the reason those rules find nothing is that the
+// gate has been enforcing them for months rather than that they are worthless. A clean diff
+// therefore cannot be the signal to remove the old tool.
+func TestTheVerdictNamesTheRulesItDidNotCompare(t *testing.T) {
+	partial := Compare(Inputs{
+		VerifyPopulation: Population{FilesWalked: 3407, Rules: 33},
+		GatePopulation:   Population{FilesWalked: 3407},
+		VerifyRules:      map[string]bool{"consistency-no-enum": true},
+		ConfiguredRules:  map[string]bool{"consistency-no-enum": true, "unported-one": true, "unported-two": true},
+	})
+	partial.Provenance = provenProvenance()
+
+	rendered := &strings.Builder{}
+	Write(rendered, partial)
+	text := rendered.String()
+
+	if !strings.Contains(text, "✓") {
+		t.Fatalf("a clean partial comparison still agrees about what it compared: %q", text)
+	}
+	if !strings.Contains(text, "not a verdict about them") {
+		t.Fatalf("the verdict must disclaim the rules it could not compare: %q", text)
+	}
+	if !strings.Contains(text, "the other 2 are unported") {
+		t.Fatalf("the verdict must count the uncompared rules, got: %q", text)
+	}
+
+	// The control: full coverage must not carry the disclaimer, or it becomes noise a reader learns
+	// to skip and stops meaning anything on the run where it matters.
+	full := Compare(Inputs{
+		VerifyPopulation: Population{FilesWalked: 3407, Rules: 1},
+		GatePopulation:   Population{FilesWalked: 3407},
+		VerifyRules:      map[string]bool{"consistency-no-enum": true},
+		ConfiguredRules:  map[string]bool{"consistency-no-enum": true},
+	})
+	full.Provenance = provenProvenance()
+
+	rendered = &strings.Builder{}
+	Write(rendered, full)
+	if strings.Contains(rendered.String(), "not a verdict about them") {
+		t.Fatalf("a comparison covering the whole config must not disclaim anything: %q", rendered.String())
+	}
+}

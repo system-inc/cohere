@@ -183,6 +183,11 @@ type Report struct {
 	Comparable bool
 	// NotComparableReason states which side had nothing and is empty when Comparable is true.
 	NotComparableReason string
+	// ComparedRules and ConfiguredRules are how many rules the comparison could speak about and
+	// how many the config enables. When they differ, the verdict covers a subset of the gate and
+	// must say so.
+	ComparedRules   int
+	ConfiguredRules int
 	// Provenance is what actually ran, and whether the harness was ever shown able to detect a
 	// difference at all.
 	//
@@ -242,6 +247,8 @@ func Compare(inputs Inputs) Report {
 		VerifyPopulation: inputs.VerifyPopulation,
 		GatePopulation:   inputs.GatePopulation,
 		Comparable:       true,
+		ComparedRules:    len(inputs.VerifyRules),
+		ConfiguredRules:  len(inputs.ConfiguredRules),
 	}
 
 	// The vacuity guard, before any diffing. A side that walked no files cannot be compared against
@@ -445,6 +452,25 @@ func Write(out *strings.Builder, report Report) {
 	}
 
 	if report.Agreed() {
+		// The verdict states its own scope, because the sentence a reader carries away is this one
+		// and it is easy to read as broader than the test. A comparison can only speak about rules
+		// verify implements: the rest of the config is enabled in the gate, unported, and was never
+		// compared. Silence about them reads as coverage.
+		//
+		// This matters more than it looks. Every finding the gate produces on this tree today comes
+		// from a rule verify already has, and the 138 unported rules find nothing — not because
+		// they are worthless, but because the gate has been enforcing them for months and the tree
+		// is clean of what they prevent. A clean diff therefore cannot be the signal to remove the
+		// old tool: it would keep reading clean right up until somebody wrote a violation of an
+		// unported rule, and then keep reading clean while the tree got worse.
+		if report.ConfiguredRules > report.ComparedRules {
+			fmt.Fprintf(out,
+				"\n✓ agrees on the %d rules verify implements, of %d the config enables\n"+
+					"  the other %d are unported and were not compared, so this is not a verdict about them\n",
+				report.ComparedRules, report.ConfiguredRules, report.ConfiguredRules-report.ComparedRules,
+			)
+			return
+		}
 		fmt.Fprintf(out, "\n✓ agrees: every rule active on both sides reported the same findings\n")
 		return
 	}
