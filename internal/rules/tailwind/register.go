@@ -22,6 +22,10 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoConcatenatedClassesOptions](),
 		},
 		rule.Registration{
+			Rule:   NoDeprecatedClasses,
+			Decode: rule.DecodeOptionsInto[NoDeprecatedClassesOptions](),
+		},
+		rule.Registration{
 			Rule:   NoDuplicateClasses,
 			Decode: rule.DecodeOptionsInto[NoDuplicateClassesOptions](),
 		},
