@@ -207,6 +207,11 @@ func isSameNamedReadOff(property *ast.Node, variablesName string) bool {
 	}
 	assignment := property.AsPropertyAssignment()
 
+	// A shorthand property (`{ identifier }`) has no initializer, and SkipParentheses dereferences
+	// its argument, so the nil check has to come first.
+	if assignment.Initializer == nil {
+		return false
+	}
 	value := ast.SkipParentheses(assignment.Initializer)
 	if value == nil || value.Kind != ast.KindPropertyAccessExpression {
 		return false

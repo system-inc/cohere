@@ -46,6 +46,23 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 		"import { networkService } from './NetworkService.ts';\nexport function useThingRequest() { return networkService.useGraphQlQuery(); }\n",
 		"declare const Field: { displayName: string };\nlet other;\nexport const value = other;\n",
 		"export function Page() { return null; }\n",
+
+		// A declaration with no initializer inside a component, which is what crashed
+		// react-hook-require-result-naming on 42 real files. `let x;` is ordinary code and every
+		// rule walking variable declarations reaches it.
+		"export function Panel() {\n    let pending;\n    return pending;\n}\n",
+		"export function Panel() {\n    declare const value: unknown;\n    return value;\n}\n",
+		"export default function ThingPageRoute() {\n    let pending;\n    return pending;\n}\n",
+
+		// A binding pattern with no initializer. A syntax error, and it reaches the walk while
+		// someone is mid-edit, which is exactly when a crash is least welcome.
+		"export function Panel() {\n    let { label };\n    return label;\n}\n",
+
+		// A shorthand property, whose initializer is nil where a longhand one is not.
+		"import { networkService } from './NetworkService.ts';\ndeclare const Document: unknown;\n" +
+			"declare const identifier: string;\n" +
+			"export function useThingRequest(variables: { identifier: string }) {\n" +
+			"    return networkService.useGraphQlQuery(Document, { identifier });\n}\n",
 	}
 
 	rules := []rule.Rule{
@@ -66,6 +83,8 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 		ReactComponentRequirePropertiesTypeSuffix,
 		ReactHookNoDestructuring,
 		ReactHookRequireEffectComment,
+		ReactHookRequireResultNaming,
+		ReactHookRequireResultNaming,
 		ReactImportNoDestructuring,
 		StorageNoDirectLocalStorage,
 	}
@@ -77,7 +96,22 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 				// findings are deliberately not checked: what each rule concludes about these
 				// shapes belongs in its own pair, and asserting it here would make this guard
 				// fail for reasons that are not crashes.
-				ruletest.Run(t, currentRule, "/repository/source/api/ThingRequest.ts", source)
+				// Both extensions, because a React-gated rule declines a .ts file before reaching
+				// any shape below it. Running only .ts made this guard silent for every rule with
+				// an IsReactFile check, which is most of this package, and it is why the guard
+				// missed a nil dereference in react-hook-require-result-naming that crashed 42
+				// real files. The guard had the right shape in its list and never delivered it.
+				//
+				// That is the shared-guard failure appearing inside the thing built to catch it: a
+				// gate upstream of the fixture silences the fixture, and from a green run the two
+				// are indistinguishable.
+				for _, fileName := range []string{
+					"/repository/source/api/ThingRequest.ts",
+					"/repository/source/components/ThingRequest.tsx",
+					"/repository/app/thing/page.tsx",
+				} {
+					ruletest.Run(t, currentRule, fileName, source)
+				}
 			})
 		}
 	}

@@ -127,6 +127,13 @@ var ReactComponentNoDestructuring = rule.Rule{
 				if pattern == nil || pattern.Kind != ast.KindObjectBindingPattern {
 					return
 				}
+				// SkipParentheses dereferences its argument, so the nil check precedes it. A
+				// binding pattern with no initializer is a syntax error but reaches the walk
+				// while someone is mid-edit, and a linter that panics on a half-written file is
+				// worse than one that says nothing about it.
+				if declaration.Initializer == nil {
+					return
+				}
 				initializer := ast.SkipParentheses(declaration.Initializer)
 				if initializer == nil || initializer.Kind != ast.KindIdentifier {
 					return

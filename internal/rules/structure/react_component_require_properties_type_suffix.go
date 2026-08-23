@@ -120,6 +120,11 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 				if name == nil || name.Kind != ast.KindIdentifier || !IsLikelyComponentName(name.Text()) {
 					return
 				}
+				// The nil check has to precede SkipParentheses, which dereferences its argument.
+				// `let Button;` is ordinary code and reaches this listener.
+				if declaration.Initializer == nil {
+					return
+				}
 				initializer := ast.SkipParentheses(declaration.Initializer)
 				if initializer == nil {
 					return
