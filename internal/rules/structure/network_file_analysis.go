@@ -182,30 +182,63 @@ func parameterNodes(parameters *ast.NodeList) []*ast.Node {
 // hook to the gate, and an unbounded walk would find it and produce findings the gate does not have.
 const networkServiceCallDepthLimit = 40
 
+// NetworkServiceCall is one `networkService.<hookMethod>(...)` call site inside a hook body.
+//
+// The two rules that judge a hook's shape both need the method name and the argument list, because
+// what they require depends on which method was called: a query takes its options in a different
+// position from a mutation, and a hook calling two methods is judged once per call rather than once
+// per hook.
+type NetworkServiceCall struct {
+	Node       *ast.Node
+	MethodName string
+	Arguments  []*ast.Node
+}
+
 // bodyCallsNetworkService reports a `networkService.<hookMethod>(...)` anywhere in a function body.
+func bodyCallsNetworkService(body *ast.Node) bool {
+	return len(findNetworkServiceCalls(body)) > 0
+}
+
+// findNetworkServiceCalls collects every NetworkService hook call inside a function body.
 //
 // Unlike the JSX walk, this one does not stop at nested function boundaries, matching the original:
 // a call inside a callback inside the hook is still the hook using NetworkService, since the hook is
 // what the caller sees.
-func bodyCallsNetworkService(body *ast.Node) bool {
-	found := false
+//
+// The original walks an allowlist of AST property names; this walks every child. That is an
+// over-approximation, and the direction is chosen rather than incidental. An over-approximation
+// costs a finding on a call the original would not have reached, which a reader sees and can argue
+// with. An under-approximation is a rule that goes quiet on a shape nobody enumerated, and the
+// reader sees nothing at all. The same asymmetry decided the Tailwind gate.
+func findNetworkServiceCalls(body *ast.Node) []NetworkServiceCall {
+	var calls []NetworkServiceCall
 
 	var visit func(*ast.Node, int)
 	visit = func(current *ast.Node, depth int) {
-		if current == nil || found || depth > networkServiceCallDepthLimit {
+		if current == nil || depth > networkServiceCallDepthLimit {
 			return
 		}
 		if current.Kind == ast.KindCallExpression && isNetworkServiceHookCall(current) {
-			found = true
-			return
+			call := current.AsCallExpression()
+			access := ast.SkipParentheses(call.Expression).AsPropertyAccessExpression()
+
+			var arguments []*ast.Node
+			if call.Arguments != nil {
+				arguments = call.Arguments.Nodes
+			}
+			calls = append(calls, NetworkServiceCall{
+				Node:       current,
+				MethodName: access.Name().Text(),
+				Arguments:  arguments,
+			})
 		}
 		current.ForEachChild(func(child *ast.Node) bool {
 			visit(child, depth+1)
-			return found
+			return false
 		})
 	}
 	visit(body, 0)
-	return found
+	return calls
 }
 
 // isNetworkServiceHookCall reports a call on the `networkService` binding to one of the hook methods.
