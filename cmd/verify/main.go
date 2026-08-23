@@ -8,6 +8,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -473,6 +474,14 @@ func printRuleDiagnostic(diagnostic rule.Diagnostic) {
 // and found nothing — and four rules in the gate this replaces were silently dead for months
 // underneath exactly that ambiguity. Naming them is the cheapest possible guard.
 func printRuleCoverage(rules []rule.Rule, coverage program.Coverage) {
+	writeRuleCoverage(os.Stdout, rules, coverage)
+}
+
+// writeRuleCoverage is printRuleCoverage against an arbitrary writer, so the note can be tested.
+//
+// This note has caught two dead rules tonight and had no fixture of its own, which is the same
+// shape as the rules it guards: a check nobody has proven can fail.
+func writeRuleCoverage(out io.Writer, rules []rule.Rule, coverage program.Coverage) {
 	silent := []string{}
 	for _, subject := range rules {
 		if coverage.RulesListening[subject.Name] == 0 {
@@ -485,7 +494,21 @@ func printRuleCoverage(rules []rule.Rule, coverage program.Coverage) {
 
 	sort.Strings(silent)
 	for _, name := range silent {
-		fmt.Printf("  note: rule %s listened to no files — it ran, but it never looked\n", name)
+		// Two opposite defects wore one sentence until now. A rule offered files that declined every
+		// one of them is configured and satisfied: nothing in the tree matches it, which is the
+		// result a passing rule produces. A rule offered nothing was never wired, and its silence
+		// says nothing about the tree at all.
+		//
+		// Both printed as "listened to no files", so a satisfied rule read exactly like a dead one.
+		// The pair was separable only because a second line about missing config happened to print
+		// for one of them, and that line does not always appear. A guard that works by accident of
+		// which sentence prints is not a guard.
+		if coverage.RulesOffered[name] == 0 {
+			fmt.Fprintf(out, "  note: rule %s was offered no files — nothing wired it, so its silence says nothing about the tree\n", name)
+			continue
+		}
+		fmt.Fprintf(out, "  note: rule %s declined all %d files it was offered — it ran and looked, and nothing matched\n",
+			name, coverage.RulesOffered[name])
 	}
 }
 

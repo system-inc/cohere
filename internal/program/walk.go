@@ -34,6 +34,13 @@ type Coverage struct {
 	// RulesRun is how many rules were dispatched.
 	RulesRun int
 
+	// RulesOffered counts, per rule name, how many files the rule was actually handed. A rule that
+	// was never wired is offered zero; a rule that was offered files and declined all of them is
+	// offered many and listens to none. Those are opposite defects — nobody configured it, against
+	// it is configured and satisfied — and before this existed the coverage note described both with
+	// one sentence, so a satisfied rule read exactly like a dead one.
+	RulesOffered map[string]int
+
 	// RulesListening counts, per rule name, how many files that rule chose to listen to. A rule that
 	// declined every file reads as zero here, which is the difference between "ran and found nothing"
 	// and "never actually looked" — the distinction a bare finding count erases.
@@ -121,6 +128,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	var mutex sync.Mutex
 	diagnostics := []rule.Diagnostic{}
 	listeningCounts := make(map[string]int, len(rules))
+	offeredCounts := make(map[string]int, len(rules))
 	nodesVisited := 0
 	suppressed := suppressionTally{}
 	filesIgnored := 0
@@ -150,6 +158,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 			localDiagnostics := []rule.Diagnostic{}
 			localListening := make(map[string]int, len(rules))
+			localOffered := make(map[string]int, len(rules))
 			localNodes := 0
 			localSuppressed := suppressionTally{}
 			localIgnored := 0
@@ -191,7 +200,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// another rule's name even by accident.
 				visited, silenced := dispatchFile(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
-				}, applicable, g, fileChecker, localListening, ruleOptions, localTimings)
+				}, applicable, g, fileChecker, localListening, localOffered, ruleOptions, localTimings)
 
 				release()
 
@@ -201,6 +210,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 			mutex.Lock()
 			diagnostics = append(diagnostics, localDiagnostics...)
+			for name, count := range localOffered {
+				offeredCounts[name] += count
+			}
 			for name, count := range localListening {
 				listeningCounts[name] += count
 			}
@@ -234,6 +246,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			FilesWalked:    len(files),
 			NodesVisited:   nodesVisited,
 			RulesRun:       len(rules),
+			RulesOffered:   offeredCounts,
 			RulesListening: listeningCounts,
 
 			Suppressed:              suppressed.applied,
@@ -260,6 +273,7 @@ func dispatchFile(
 	graph *Graph,
 	fileChecker *checker.Checker,
 	listeningCounts map[string]int,
+	offeredCounts map[string]int,
 	ruleOptions map[string]any,
 	timings *Timings,
 ) (visitedNodes int, silenced suppressionTally) {
@@ -321,6 +335,11 @@ func dispatchFile(
 		// Options are decoded to the type the rule declares rather than handed through as JSON. A
 		// rule that receives the wrong shape fails its type assertion and declines every file, which
 		// looks exactly like a rule with nothing to report.
+		// Counted before Run rather than after, because the question this answers is whether anything
+		// ever handed this rule a file. A rule that panics or declines has still been offered one; a
+		// rule nobody wired never reaches this line at all.
+		offeredCounts[ruleName]++
+
 		setupStart := timingNow(timing)
 		listeners := subject.Run(context, ruleOptions[ruleName])
 		if timing != nil {
