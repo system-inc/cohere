@@ -48,6 +48,16 @@ type Graph struct {
 	// ConfigFileName is the absolute path of the tsconfig that produced this graph.
 	ConfigFileName string
 
+	// CompilerHost is the filesystem view the program was built through, kept because the
+	// incremental machinery needs the same one.
+	//
+	// ReadBuildInfoProgram takes a host and a ParsedCommandLine, and it has to be the host the
+	// program was built with rather than a fresh one: the build info's file paths are resolved
+	// relative to it, and a second host with a different current directory or a cold cache
+	// would resolve them somewhere else and report every file as changed. Silently, and in the
+	// direction that looks like a cold cache rather than like a bug.
+	CompilerHost compiler.CompilerHost
+
 	// LintConfig decides which rules apply to which files, and which files are not linted at all.
 	//
 	// Nil means every rule applies to every file, which is what the tests and any caller predating
@@ -220,6 +230,7 @@ func Build(options Options) (*Graph, error) {
 		Program:        builtProgram,
 		Config:         config,
 		ConfigFileName: configFileName,
+		CompilerHost:   compilerHost,
 	}, nil
 }
 
