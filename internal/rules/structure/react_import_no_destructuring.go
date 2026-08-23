@@ -66,6 +66,17 @@ var ReactImportNoDestructuring = rule.Rule{
 		importedFromReact := map[string]bool{}
 
 		return rule.Listeners{
+			// This rule registers three listeners and only this one is an import-shape concern.
+			// A commit declining to convert it to the shared import visitor said it "watches
+			// KindImportDeclaration alone", which is checkable and false: KindCallExpression at
+			// :110 reads call sites of destructured hooks and KindTypeReference at :125 reads type
+			// positions. Neither treats a call as an import, and the rule never reaches for
+			// IsImportCall, IsRequireCall or CallExpressionSource, so the decision was right for
+			// the reason it gave.
+			//
+			// Recorded here because a true conclusion resting on a checkable falsehood fails
+			// inspection rather than failing in production: the next reader counts the listeners,
+			// finds three, and concludes the analysis was wrong when it was right.
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				declaration := node.AsImportDeclaration()
 				if declaration.ModuleSpecifier == nil || !ast.IsStringLiteralLike(declaration.ModuleSpecifier) {
