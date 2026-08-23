@@ -39,6 +39,7 @@ func run() error {
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
 	fixOnly := flag.Bool("fix", false, "fix and format only, running no other phase")
 	noFix := flag.Bool("no-fix", false, "mutate nothing: report what would change without writing a byte")
+	formatAll := flag.Bool("format-all", false, "format every file rather than only the ones that changed")
 	maxFixPasses := flag.Int("fix-passes", fix.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
@@ -122,8 +123,32 @@ func run() error {
 	case !mutate:
 		report.record(phaseFix, outcomeSkipped, 0, "--no-fix")
 	default:
+		// Formatting is scoped to changed files by default, and the scope is resolved before the phase
+		// runs so its description can be reported whether or not anything was formatted.
+		//
+		// Measured: the formatter is 83 to 100ms per file with no warm-up, so the whole tree is 4.7 to
+		// 5.7 minutes against a lint phase of 392ms. That is not a tuning problem, it is a different
+		// tool, and a gate nobody waits for is a gate that does not exist. Real churn here is one file
+		// per commit and 35 across five, so changed-files puts the common case in the tens of
+		// milliseconds.
+		scope := wholeTreeScope()
+		if !*formatAll {
+			resolved, scopeError := changedFilesScope(graph.Config.GetCurrentDirectory())
+			if scopeError != nil {
+				// Falling back to the whole tree would turn a failed subprocess into a five-minute
+				// surprise, so the scope becomes empty and says why. Fixing still runs; only formatting
+				// is withheld, and the reason reaches the coverage line.
+				resolved = formatScope{Description: fmt.Sprintf("nothing (could not determine what changed: %v)", scopeError)}
+			}
+			scope = resolved
+		}
+
 		fixStart := time.Now()
-		fixSummary, err := applyProposedFixes(ctx, graph, projectFiles, registry.All(), formatTransform(configuredFormatter()), *maxFixPasses)
+		fixSummary, err := applyProposedFixes(
+			ctx, graph, projectFiles, registry.All(),
+			scopedTransform(formatTransform(configuredFormatter()), scope),
+			*maxFixPasses,
+		)
 		fixDuration := time.Since(fixStart)
 		if err != nil {
 			// The bail condition here is a failure to produce valid output, never a finding. A fixer
@@ -135,6 +160,11 @@ func run() error {
 			return fmt.Errorf("fix: %w", err)
 		}
 		fmt.Println(fixSummary)
+
+		// The scope is stated on every run rather than inferred from a file count. Working-tree
+		// changes, staged changes, and a base-branch diff are three different answers to "what
+		// changed", and a reader cannot tell which one they got from a number alone.
+		fmt.Printf("format scope: %s\n", scope.Description)
 		report.record(phaseFix, outcomeRan, fixDuration, "")
 
 		// Files were rewritten, so the graph built from the old bytes no longer describes the tree.
