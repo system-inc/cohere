@@ -31,6 +31,7 @@ func All() []rule.Rule {
 		core.NoEmptyStaticBlock,
 		core.NoSparseArrays,
 		core.NoUnsafeFinally,
+		core.NoVar,
 		core.NoUselessCatch,
 		core.UseIsNaN,
 		core.ValidTypeof,
