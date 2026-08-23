@@ -14,8 +14,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 // ClassLiteral is one string in the source that holds Tailwind class names.

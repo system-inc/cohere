@@ -3,37 +3,55 @@
 
 package compiler
 
-import "github.com/microsoft/typescript-go/internal/ast"
-import "github.com/microsoft/typescript-go/internal/compiler"
-import "github.com/microsoft/typescript-go/internal/vfs"
+import "context"
+import "github.com/microsoft/TypeScript/tsc/internal/ast"
+import "github.com/microsoft/TypeScript/tsc/internal/compiler"
+import "github.com/microsoft/TypeScript/tsc/internal/contentmapper"
+import "github.com/microsoft/TypeScript/tsc/internal/core"
+import "github.com/microsoft/TypeScript/tsc/internal/diagnostics"
+import "github.com/microsoft/TypeScript/tsc/internal/tsoptions"
+import "github.com/microsoft/TypeScript/tsc/internal/vfs"
 import _ "unsafe"
 
 type CheckerPool = compiler.CheckerPool
+//go:linkname CombineEmitResults github.com/microsoft/TypeScript/tsc/internal/compiler.CombineEmitResults
+func CombineEmitResults(results []*compiler.EmitResult) *compiler.EmitResult
 type CompilerHost = compiler.CompilerHost
+//go:linkname ContentMapperInitializationDiagnostic github.com/microsoft/TypeScript/tsc/internal/compiler.ContentMapperInitializationDiagnostic
+func ContentMapperInitializationDiagnostic(label string, err error) *ast.Diagnostic
+//go:linkname ContentMapperProjectDiagnostic github.com/microsoft/TypeScript/tsc/internal/compiler.ContentMapperProjectDiagnostic
+func ContentMapperProjectDiagnostic(err error) *ast.Diagnostic
+//go:linkname ContentMapperProjectErrorDiagnostic github.com/microsoft/TypeScript/tsc/internal/compiler.ContentMapperProjectErrorDiagnostic
+func ContentMapperProjectErrorDiagnostic(err error) *diagnostics.Message
+type DuplicateSourceFile = compiler.DuplicateSourceFile
+const EmitAll = compiler.EmitAll
 type EmitHost = compiler.EmitHost
+type EmitOnly = compiler.EmitOnly
+const EmitOnlyBuilderSignature = compiler.EmitOnlyBuilderSignature
+const EmitOnlyDts = compiler.EmitOnlyDts
+const EmitOnlyJs = compiler.EmitOnlyJs
 type EmitOptions = compiler.EmitOptions
 type EmitResult = compiler.EmitResult
-type FileIncludeKind = compiler.FileIncludeKind
-const FileIncludeKindAutomaticTypeDirectiveFile = compiler.FileIncludeKindAutomaticTypeDirectiveFile
-const FileIncludeKindImport = compiler.FileIncludeKindImport
-const FileIncludeKindLibFile = compiler.FileIncludeKindLibFile
-const FileIncludeKindLibReferenceDirective = compiler.FileIncludeKindLibReferenceDirective
-const FileIncludeKindOutputFromProjectReference = compiler.FileIncludeKindOutputFromProjectReference
-const FileIncludeKindReferenceFile = compiler.FileIncludeKindReferenceFile
-const FileIncludeKindRootFile = compiler.FileIncludeKindRootFile
-const FileIncludeKindSourceFromProjectReference = compiler.FileIncludeKindSourceFromProjectReference
-const FileIncludeKindTypeReferenceDirective = compiler.FileIncludeKindTypeReferenceDirective
 type FileIncludeReason = compiler.FileIncludeReason
-//go:linkname NewCachedFSCompilerHost github.com/microsoft/typescript-go/internal/compiler.NewCachedFSCompilerHost
-func NewCachedFSCompilerHost(currentDirectory string, fs vfs.FS, defaultLibraryPath string) compiler.CompilerHost
-//go:linkname NewCompilerHost github.com/microsoft/typescript-go/internal/compiler.NewCompilerHost
-func NewCompilerHost(currentDirectory string, fs vfs.FS, defaultLibraryPath string) compiler.CompilerHost
-//go:linkname NewProgram github.com/microsoft/typescript-go/internal/compiler.NewProgram
+//go:linkname FilterNoEmitSemanticDiagnostics github.com/microsoft/TypeScript/tsc/internal/compiler.FilterNoEmitSemanticDiagnostics
+func FilterNoEmitSemanticDiagnostics(diagnostics []*ast.Diagnostic, options *core.CompilerOptions) []*ast.Diagnostic
+//go:linkname GetDiagnosticsOfAnyProgram github.com/microsoft/TypeScript/tsc/internal/compiler.GetDiagnosticsOfAnyProgram
+func GetDiagnosticsOfAnyProgram(ctx context.Context, program compiler.ProgramLike, files []*ast.SourceFile, skipNoEmitCheckForDtsDiagnostics bool, getBindDiagnostics func(context.Context, *ast.SourceFile) []*ast.Diagnostic, getSemanticDiagnostics func(context.Context, *ast.SourceFile) []*ast.Diagnostic) []*ast.Diagnostic
+//go:linkname HandleNoEmitOptions github.com/microsoft/TypeScript/tsc/internal/compiler.HandleNoEmitOptions
+func HandleNoEmitOptions(ctx context.Context, program compiler.ProgramLike, files []*ast.SourceFile, emitBuildInfo func() *compiler.EmitResult) *compiler.EmitResult
+type LibFile = compiler.LibFile
+//go:linkname NewCachedFSCompilerHost github.com/microsoft/TypeScript/tsc/internal/compiler.NewCachedFSCompilerHost
+func NewCachedFSCompilerHost(currentDirectory string, fs vfs.FS, defaultLibraryPath string, extendedConfigCache tsoptions.ExtendedConfigCache, trace func(msg *diagnostics.Message, args ...any), contentMapperProject contentmapper.Project) compiler.CompilerHost
+//go:linkname NewCompilerHost github.com/microsoft/TypeScript/tsc/internal/compiler.NewCompilerHost
+func NewCompilerHost(currentDirectory string, fs vfs.FS, defaultLibraryPath string, extendedConfigCache tsoptions.ExtendedConfigCache, trace func(msg *diagnostics.Message, args ...any), contentMapperProject contentmapper.Project) compiler.CompilerHost
+//go:linkname NewProgram github.com/microsoft/TypeScript/tsc/internal/compiler.NewProgram
 func NewProgram(opts compiler.ProgramOptions) *compiler.Program
 type Program = compiler.Program
+type ProgramLike = compiler.ProgramLike
 type ProgramOptions = compiler.ProgramOptions
-//go:linkname SortAndDeduplicateDiagnostics github.com/microsoft/typescript-go/internal/compiler.SortAndDeduplicateDiagnostics
+//go:linkname SortAndDeduplicateDiagnostics github.com/microsoft/TypeScript/tsc/internal/compiler.SortAndDeduplicateDiagnostics
 func SortAndDeduplicateDiagnostics(diagnostics []*ast.Diagnostic) []*ast.Diagnostic
 type SourceFileMayBeEmittedHost = compiler.SourceFileMayBeEmittedHost
 type SourceMapEmitResult = compiler.SourceMapEmitResult
+type WriteFile = compiler.WriteFile
 type WriteFileData = compiler.WriteFileData

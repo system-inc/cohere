@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 )
 
 type OverlayVFS struct {
@@ -139,11 +139,29 @@ func (vfs *OverlayVFS) Realpath(path string) string {
 	return vfs.fs.Realpath(path)
 }
 
-func (vfs *OverlayVFS) WriteFile(path string, data string, writeByteOrderMark bool) error {
+func (vfs *OverlayVFS) WriteFile(path string, data string) error {
 	if _, ok := vfs.VirtualFiles[path]; ok {
 		panic("not implemented: cannot write to overlay file system")
 	}
-	return vfs.fs.WriteFile(path, data, writeByteOrderMark)
+	return vfs.fs.WriteFile(path, data)
+}
+
+// Chtimes is new on vfs.FS alongside AppendFile. Same reasoning: an overlay file is not on disk, so
+// there are no timestamps to change.
+func (vfs *OverlayVFS) Chtimes(path string, accessTime time.Time, modificationTime time.Time) error {
+	if _, ok := vfs.VirtualFiles[path]; ok {
+		panic("not implemented: cannot change times on the overlay file system")
+	}
+	return vfs.fs.Chtimes(path, accessTime, modificationTime)
+}
+
+// AppendFile is new on vfs.FS in microsoft/TypeScript. It refuses an overlay file for the same reason
+// WriteFile does: a virtual file has no disk behind it to append to.
+func (vfs *OverlayVFS) AppendFile(path string, data string) error {
+	if _, ok := vfs.VirtualFiles[path]; ok {
+		panic("not implemented: cannot append to overlay file system")
+	}
+	return vfs.fs.AppendFile(path, data)
 }
 
 func (vfs *OverlayVFS) Remove(path string) error {

@@ -1,7 +1,6 @@
 {
   "ExtraFunctions": [
-    "isNonDeferredTypeReference",
-    "getFunctionFlags"
+    "isNonDeferredTypeReference"
   ],
   "ExtraMethods": {
     "Checker": [
@@ -54,5 +53,11 @@
     "InterfaceType": [
       "thisType"
     ]
+  },
+  "TypeSubstitutions": {
+    "checker.thisAssignmentDeclarationKind": "int32",
+    "checker.symbolTableID": "uint64",
+    "checker.nodeLinkStore": "core.PagedLinkStore",
+    "checker.symbolArenaLinkStore": "core.PagedLinkStore"
   }
 }

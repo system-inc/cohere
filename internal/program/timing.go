@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
 // RuleTiming is what one rule cost over a run.

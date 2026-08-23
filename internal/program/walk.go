@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/config"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/suppression"

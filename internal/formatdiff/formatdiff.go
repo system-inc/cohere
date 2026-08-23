@@ -18,11 +18,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/format"
-	"github.com/microsoft/typescript-go/shim/parser"
-	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/format"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 // Settings returns the FormatCodeSettings tuned as close to our Prettier fork as the settings can
@@ -33,12 +33,13 @@ import (
 // printWidth 120. Two of those five have no field to map onto at all: `printWidth`, because
 // FormatCodeSettings has no width of any kind, and `singleQuote`, because the formatter never
 // rewrites a string literal. Those are the structural gaps, not omissions here.
-func Settings(newLine string) *format.FormatCodeSettings {
-	settings := format.GetDefaultFormatCodeSettings(newLine)
+func Settings(newLine string) format.FormatCodeSettings {
+	settings := format.GetDefaultFormatCodeSettings()
+	settings.NewLineCharacter = newLine
 
 	settings.TabSize = 4
 	settings.IndentSize = 4
-	settings.ConvertTabsToSpaces = true
+	settings.ConvertTabsToSpaces = core.TSTrue
 
 	// Our house style is `if(x)`, not `if (x)`. This is the single largest divergence class in the
 	// corpus by file count, and it is one boolean.
@@ -48,7 +49,7 @@ func Settings(newLine string) *format.FormatCodeSettings {
 	// `{ a: number; }`, which our Prettier does not do. It is also the setting that reaches the ASI
 	// path that panics on some real files. "ignore" leaves existing semicolons alone, which is what
 	// an already-semicolon-correct codebase wants.
-	settings.Semicolons = "ignore"
+	settings.Semicolons = format.SemicolonPreferenceIgnore
 
 	// `function() {}` and `const x = {}` keep their empty braces tight rather than becoming `{ }`.
 	settings.InsertSpaceAfterOpeningAndBeforeClosingEmptyBraces = core.TSFalse

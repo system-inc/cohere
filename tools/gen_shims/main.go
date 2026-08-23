@@ -16,13 +16,24 @@ import (
 	"strings"
 )
 
-const tsgoInternalPrefix = "github.com/microsoft/typescript-go/internal/"
+const tsgoInternalPrefix = "github.com/microsoft/TypeScript/tsc/internal/"
 
 type ExtraShim struct {
 	ExtraFunctions  []string
 	ExtraMethods    map[string]([]string)
 	ExtraFields     map[string]([]string)
 	IgnoreFunctions []string
+
+	// TypeSubstitutions rewrites a type expression in a mirrored struct body.
+	//
+	// A mirror exists to reproduce a struct's memory layout so `unsafe` can reach a field by offset;
+	// it never calls anything on these types. So a field whose type is unexported cannot be named
+	// across the module boundary, but any type with identical size and alignment stands in perfectly.
+	//
+	// This is configuration rather than a code change because the substitutions are upstream's private
+	// vocabulary, and it drifts. Four were needed for the move from typescript-go to
+	// microsoft/TypeScript alone.
+	TypeSubstitutions map[string]string
 }
 
 func main() {
@@ -76,6 +87,9 @@ func main() {
 		}
 		if extraShim.ExtraFields == nil {
 			extraShim.ExtraFields = map[string]([]string){}
+		}
+		if extraShim.TypeSubstitutions == nil {
+			extraShim.TypeSubstitutions = map[string]string{}
 		}
 		if extraShim.IgnoreFunctions == nil {
 			extraShim.IgnoreFunctions = []string{}
@@ -294,10 +308,11 @@ func main() {
 								}
 							}
 
-							shimBuilder.WriteString(
-								// TODO: move to extra-shim.json
-								strings.ReplaceAll(types.TypeString(field.Type(), qualifierOnlyPackageName), "checker.thisAssignmentDeclarationKind", "int32"),
-							)
+							fieldType := types.TypeString(field.Type(), qualifierOnlyPackageName)
+							for from, to := range extraShim.TypeSubstitutions {
+								fieldType = strings.ReplaceAll(fieldType, from, to)
+							}
+							shimBuilder.WriteString(fieldType)
 						}
 						shimBuilder.WriteString("\n}\n")
 

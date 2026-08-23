@@ -15,23 +15,18 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/tsoptions"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/system-inc/verify/internal/config"
 )
-
-// defaultCheckerCount matches what the compiler creates when nothing overrides it. It is a fixed
-// four rather than one-per-core: each checker holds its own type tables, so the memory cost grows
-// with the count while the benefit flattens once the walk is no longer the bottleneck.
-const defaultCheckerCount = 4
 
 // Graph is a built type graph: the program, and the checkers that answer questions about it.
 //
@@ -68,10 +63,6 @@ type Graph struct {
 	// Off by default and guarded at every timing site, so an ordinary run reads no clocks and
 	// allocates no accumulators. The instrument should cost nothing when nobody asked for it.
 	CollectTimings bool
-
-	// checkerCount is how many checkers the program built, and therefore the most files that can be
-	// checked at once. The compiler keeps this private, so we record what we asked for.
-	checkerCount int
 }
 
 // configHost adapts a filesystem and a working directory to what tsconfig parsing wants.
@@ -150,7 +141,7 @@ func Build(options Options) (*Graph, error) {
 
 	// A nil extended-config cache is supported upstream and correct for a one-shot build: the cache
 	// only pays off across repeated parses of the same `extends` chain within one process.
-	config, configErrors := tsoptions.GetParsedCommandLineOfConfigFile(configFileName, &core.CompilerOptions{}, host, nil)
+	config, configErrors := tsoptions.GetParsedCommandLineOfConfigFile(configFileName, &core.CompilerOptions{}, nil, host, nil)
 	if len(configErrors) > 0 {
 		return nil, fmt.Errorf("reading %s: %w", configFileName, joinDiagnostics(configErrors))
 	}
@@ -178,24 +169,25 @@ func Build(options Options) (*Graph, error) {
 	if libraryPath == "" {
 		libraryPath = bundled.LibPath()
 	}
-	compilerHost := compiler.NewCachedFSCompilerHost(currentDirectory, fileSystem, libraryPath)
+	// The last three arguments arrived with the move to `microsoft/TypeScript`. Nil is correct for all
+	// three here: the extended-config cache only pays off across repeated parses of the same `extends`
+	// chain within one process, `trace` is nil-guarded upstream and we have nowhere to route compiler
+	// tracing, and the content mapper serves the language server rather than a one-shot check.
+	compilerHost := compiler.NewCachedFSCompilerHost(currentDirectory, fileSystem, libraryPath, nil, nil, nil)
 
 	singleThreaded := core.TSUnknown
-	checkerCount := defaultCheckerCount
 	if options.SingleThreaded {
 		singleThreaded = core.TSTrue
-		checkerCount = 1
 	}
 
-	// JSDocParsingModeParseForTypeErrors is what `tsc` itself uses for a non-emitting check: JSDoc is
-	// parsed only where it can carry types, rather than everywhere. On a tree that is 70%
-	// node_modules declarations this is the difference between parsing comments that matter and
-	// parsing all of them.
+	// JSDocParsingMode used to be set here to parse JSDoc only where it can carry types. The option
+	// was removed from ProgramOptions in the move to `microsoft/TypeScript` — the compiler now decides
+	// per file rather than taking a program-wide mode — so there is nothing to pass and nothing to
+	// preserve.
 	builtProgram := compiler.NewProgram(compiler.ProgramOptions{
-		Config:           config,
-		Host:             compilerHost,
-		SingleThreaded:   singleThreaded,
-		JSDocParsingMode: ast.JSDocParsingModeParseForTypeErrors,
+		Config:         config,
+		Host:           compilerHost,
+		SingleThreaded: singleThreaded,
 	})
 	if builtProgram == nil {
 		return nil, fmt.Errorf("building a program from %s produced nothing", configFileName)
@@ -211,7 +203,6 @@ func Build(options Options) (*Graph, error) {
 		Program:        builtProgram,
 		Config:         config,
 		ConfigFileName: configFileName,
-		checkerCount:   checkerCount,
 	}, nil
 }
 
@@ -298,8 +289,11 @@ func (g *Graph) AllDiagnostics(ctx context.Context) []*ast.Diagnostic {
 // ConfigDiagnostics returns findings about the configuration itself rather than about any file —
 // contradictory options, an unreachable lib, a target that does not exist.
 func (g *Graph) ConfigDiagnostics(ctx context.Context) []*ast.Diagnostic {
+	// GetOptionsDiagnostics was folded into GetProgramDiagnostics upstream: an option that contradicts
+	// another is now reported with the rest of the program's own findings rather than through its own
+	// accessor. The set is the same; only the door changed.
 	diagnostics := g.Program.GetConfigFileParsingDiagnostics()
-	diagnostics = append(diagnostics, g.Program.GetOptionsDiagnostics(ctx)...)
+	diagnostics = append(diagnostics, g.Program.GetProgramDiagnostics()...)
 	diagnostics = append(diagnostics, g.Program.GetGlobalDiagnostics(ctx)...)
 	return diagnostics
 }
@@ -308,9 +302,26 @@ func (g *Graph) ConfigDiagnostics(ctx context.Context) []*ast.Diagnostic {
 //
 // It matches the checker count the program built, because a file must be visited by the checker that
 // owns it and there is no benefit to more goroutines than there are checkers to serve them.
+//
+// This asks the program rather than remembering what we requested. Until the move to
+// `microsoft/TypeScript`, `Program.SingleThreaded()` was unexported and the checker count was a
+// private constant, so this had to mirror the compiler's own arithmetic and hope the two stayed in
+// step. Both are reachable now, so the mirror is gone: a count that disagreed with the compiler's
+// would hand files to a worker whose checker does not own them, and types from two checkers cannot
+// be mixed.
 func (g *Graph) Workers() int {
-	return g.checkerCount
+	if g.Program.SingleThreaded() {
+		return 1
+	}
+	if requested := g.Program.Options().Checkers; requested != nil && *requested > 0 {
+		return *requested
+	}
+	return defaultCheckerCount
 }
+
+// defaultCheckerCount is what the compiler creates when the `checkers` option says nothing, mirrored
+// here only for the no-option case.
+const defaultCheckerCount = 4
 
 // toPath normalizes a file name the way the compiler keys its file table, so a lookup by path finds
 // the file the compiler stored rather than a near-miss that differs only in case or separators.
@@ -329,7 +340,7 @@ func joinDiagnostics(diagnostics []*ast.Diagnostic) error {
 			messages = append(messages, fmt.Errorf("and %d more", len(diagnostics)-shown))
 			break
 		}
-		messages = append(messages, fmt.Errorf("TS%d: %s", diagnostic.Code(), diagnostic.Message()))
+		messages = append(messages, fmt.Errorf("TS%d: %s", diagnostic.Code(), diagnostic.MessageText()))
 	}
 	return errors.Join(messages...)
 }

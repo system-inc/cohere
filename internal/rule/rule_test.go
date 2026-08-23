@@ -3,7 +3,7 @@ package rule
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 // The fix helpers are pure range arithmetic, and getting one off by a byte silently corrupts source

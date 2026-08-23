@@ -3,35 +3,35 @@ module github.com/system-inc/verify
 go 1.27
 
 replace (
-	github.com/microsoft/typescript-go/shim/ast => ./shim/ast
-	github.com/microsoft/typescript-go/shim/bundled => ./shim/bundled
-	github.com/microsoft/typescript-go/shim/checker => ./shim/checker
-	github.com/microsoft/typescript-go/shim/compiler => ./shim/compiler
-	github.com/microsoft/typescript-go/shim/core => ./shim/core
-	github.com/microsoft/typescript-go/shim/format => ./shim/format
-	github.com/microsoft/typescript-go/shim/parser => ./shim/parser
-	github.com/microsoft/typescript-go/shim/scanner => ./shim/scanner
-	github.com/microsoft/typescript-go/shim/tsoptions => ./shim/tsoptions
-	github.com/microsoft/typescript-go/shim/tspath => ./shim/tspath
-	github.com/microsoft/typescript-go/shim/vfs => ./shim/vfs
-	github.com/microsoft/typescript-go/shim/vfs/cachedvfs => ./shim/vfs/cachedvfs
-	github.com/microsoft/typescript-go/shim/vfs/osvfs => ./shim/vfs/osvfs
+	github.com/microsoft/TypeScript/tsc/shim/ast => ./shim/ast
+	github.com/microsoft/TypeScript/tsc/shim/bundled => ./shim/bundled
+	github.com/microsoft/TypeScript/tsc/shim/checker => ./shim/checker
+	github.com/microsoft/TypeScript/tsc/shim/compiler => ./shim/compiler
+	github.com/microsoft/TypeScript/tsc/shim/core => ./shim/core
+	github.com/microsoft/TypeScript/tsc/shim/format => ./shim/format
+	github.com/microsoft/TypeScript/tsc/shim/parser => ./shim/parser
+	github.com/microsoft/TypeScript/tsc/shim/scanner => ./shim/scanner
+	github.com/microsoft/TypeScript/tsc/shim/tsoptions => ./shim/tsoptions
+	github.com/microsoft/TypeScript/tsc/shim/tspath => ./shim/tspath
+	github.com/microsoft/TypeScript/tsc/shim/vfs => ./shim/vfs
+	github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs => ./shim/vfs/cachedvfs
+	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs => ./shim/vfs/osvfs
 )
 
 require (
-	github.com/microsoft/typescript-go/shim/ast v0.0.0
-	github.com/microsoft/typescript-go/shim/bundled v0.0.0
-	github.com/microsoft/typescript-go/shim/checker v0.0.0
-	github.com/microsoft/typescript-go/shim/compiler v0.0.0
-	github.com/microsoft/typescript-go/shim/core v0.0.0
-	github.com/microsoft/typescript-go/shim/format v0.0.0
-	github.com/microsoft/typescript-go/shim/parser v0.0.0
-	github.com/microsoft/typescript-go/shim/scanner v0.0.0
-	github.com/microsoft/typescript-go/shim/tsoptions v0.0.0
-	github.com/microsoft/typescript-go/shim/tspath v0.0.0
-	github.com/microsoft/typescript-go/shim/vfs v0.0.0
-	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
-	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/ast v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/bundled v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/checker v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/compiler v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/core v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/format v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/parser v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/scanner v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/tsoptions v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/tspath v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/vfs v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs v0.0.0
 )
 
 require (
