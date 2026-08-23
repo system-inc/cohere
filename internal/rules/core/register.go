@@ -18,6 +18,7 @@ import (
 func init() {
 	rule.Register(
 		rule.Registration{Rule: ForDirection},
+		rule.Registration{Rule: NoArrayConstructor},
 		rule.Registration{Rule: NoCaseDeclarations},
 		rule.Registration{Rule: NoCompareNegZero},
 		rule.Registration{Rule: NoCaller},
