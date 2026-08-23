@@ -244,6 +244,24 @@ func stringLiteralOf(node *ast.Node) *ast.Node {
 			return nil
 		}
 		return stringLiteralOf(expression.Expression)
+
+	// `className={('flex flex')}` is legal and means exactly what the unparenthesized form means.
+	//
+	// typescript-go keeps parentheses as real nodes rather than discarding them, so a reader that
+	// unwraps only by the kinds it expects walks straight past them and finds nothing. That is a
+	// silent under-report on valid code: the rule stays green, the tree looks clean, and the
+	// finding never existed. All three rules in this package had it until a probe went looking.
+	//
+	// Recursive rather than a single unwrap, because `(('a'))` nests and the depth is the author's
+	// choice. Stripping is correct here precisely because these rules read a string's contents and
+	// parentheses cannot change them; it is not correct everywhere, and a rule whose verdict
+	// depends on the parse shape must not copy this.
+	case ast.KindParenthesizedExpression:
+		parenthesized := node.AsParenthesizedExpression()
+		if parenthesized == nil {
+			return nil
+		}
+		return stringLiteralOf(parenthesized.Expression)
 	}
 
 	return nil
