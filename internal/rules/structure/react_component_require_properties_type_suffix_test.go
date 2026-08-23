@@ -138,29 +138,27 @@ func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
 	}
 }
 
-// Declaration order decides whether the declaration itself is reported.
+// Declaration order used to decide whether the declaration itself was reported, and that was wrong.
 //
-// The declaration visitors read a set the parameter visitor fills, so an interface declared before
-// the component that uses it is not in the set when its own visitor runs. That is the original's
-// behavior, reproduced rather than corrected, since the use site is reported either way and the
-// alternative walks the file twice for a second finding about the same rename.
+// The previous version of this test pinned the order dependence deliberately, reasoning that the
+// use site is reported either way and that fixing it costs a second walk of the file for a second
+// finding about the same rename. Both halves of that were true. The conclusion was still wrong,
+// and the reason is the fix rather than the finding.
 //
-// Pinned as a test rather than left as a comment because it is the one behavior depending on
-// traversal order rather than on any single node.
-func TestReactComponentRequirePropertiesTypeSuffixDependsOnDeclarationOrder(t *testing.T) {
-	after := "export function Button(properties: ButtonInterface) {\n" +
-		"    return <button>{properties.label}</button>;\n}\n" +
-		"interface ButtonInterface { label: string }\n"
-	ruletest.ExpectFindings(t, ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile, after),
-		"useComponentPropertyTypeSuffix", "useInterfaceSuffix")
-
-	before := "interface ButtonInterface { label: string }\n" +
-		"export function Button(properties: ButtonInterface) {\n" +
-		"    return <button>{properties.label}</button>;\n}\n"
-	ruletest.ExpectFindings(t, ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile, before),
-		"useComponentPropertyTypeSuffix")
-}
-
+// On the declaration-first ordering the rule emitted one finding carrying one fix, and that fix
+// renamed the *usage*. So `CardProps` became `CardProperties` at the call site while the
+// declaration kept its old name, and the result parses and does not compile:
+//
+//	dangling.ts(2,34): error TS2304: Cannot find name 'CardProperties'
+//
+// A fix engine's parse guard structurally cannot refuse that, because the output is syntactically
+// valid. And declaration-first is the conventional ordering, so it was the common case.
+//
+// The trade was priced as "a second finding about the same rename" when what it actually bought was
+// "the fix does not break the file". Recorded at length because the reasoning was careful and still
+// reached the wrong answer: it weighed the cost of the walk against the value of the finding, and
+// the finding was not the thing at stake.
+//
 // The fix derives the corrected name rather than appending to the wrong one.
 func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T) {
 	ruletest.ExpectFixedSource(t,
@@ -186,4 +184,59 @@ func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T
 				"export function Button(properties: ButtonBag) {\n    return <button />;\n}\n"),
 		"import type { ButtonBag } from './Types';\n"+
 			"export function Button(properties: ButtonBagProperties) {\n    return <button />;\n}\n")
+}
+
+// Both orderings, asserted separately, because either alone passes a broken rule.
+//
+// This is the fixture the original pair could not supply. The rule filled its map of
+// component property types from the component listener and read it from the declaration listener,
+// one walk in source order, so an interface declared above its component was visited first, saw an
+// empty map, and was skipped.
+//
+// The failure was silent and it produced uncompilable source. The usage still got its fix, so
+// `CardProps` became `CardProperties` at the call site while the declaration kept its old name, and
+// the result parses. A fix engine's parse guard structurally cannot refuse that.
+//
+// Declaration-first is the conventional ordering, so this was the common case rather than an edge,
+// and the existing fixtures passed because on that ordering the rule emits one finding rather than
+// two. `ExpectFindings` asserts a count and cannot tell a missing second finding from correct
+// behavior.
+func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+	}{
+		{
+			name: "the declaration comes first",
+			sourceText: "interface CardProps { a: string }\n" +
+				"export function Card(properties: CardProps) { return null; }\n",
+		},
+		{
+			name: "the component comes first",
+			sourceText: "export function Card(properties: CardProps) { return null; }\n" +
+				"interface CardProps { a: string }\n",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix,
+				componentFile, testCase.sourceText)
+
+			// Both halves have to be renamed or the file stops compiling, so the count is the
+			// assertion rather than a detail of it.
+			if len(result.Diagnostics) != 2 {
+				t.Fatalf("wanted two findings, one for the usage and one for the declaration, got %d",
+					len(result.Diagnostics))
+			}
+
+			// And both have to carry a fix. A finding with no fix leaves the same broken half
+			// behind while looking like the rule saw it.
+			for index, diagnostic := range result.Diagnostics {
+				if len(diagnostic.Fixes) != 1 {
+					t.Fatalf("finding %d carries %d fixes, wanted one", index, len(diagnostic.Fixes))
+				}
+			}
+		})
+	}
 }

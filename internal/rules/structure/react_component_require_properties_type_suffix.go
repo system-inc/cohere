@@ -106,6 +106,25 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 		}
 
 		return rule.Listeners{
+			// The map has to be complete before any declaration is judged, and a single walk in
+			// source order does not guarantee that: an interface declared above the component that
+			// uses it is visited first, sees an empty map, and is skipped.
+			//
+			// That silence was the defect. The usage still got its fix, so the rule renamed
+			// `CardProps` to `CardProperties` at the call site and left the declaration named
+			// `CardProps`, producing a file that parses and does not compile. Declaration-first is
+			// the conventional ordering, so it was the common case rather than an edge, and the
+			// fixtures passed because on that ordering the rule emits one finding instead of two,
+			// which `ExpectFindings` cannot distinguish from correct behavior.
+			//
+			// The source-file listener fires before its children, so filling the map here removes
+			// the ordering assumption rather than reversing it. Same shape as
+			// `react-component-no-multiple-primary`, which collects in this listener for the same
+			// reason.
+			ast.KindSourceFile: func(node *ast.Node) {
+				collectComponentPropertyTypeNames(node, componentPropertyTypes)
+			},
+
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				declaration := node.AsFunctionDeclaration()
 				name := declaration.Name()
@@ -147,6 +166,62 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 			},
 		}
 	},
+}
+
+// collectComponentPropertyTypeNames records every type a component in this file takes as properties.
+//
+// A pre-pass rather than a side effect of the component listener, because the declaration listener
+// needs the complete set before it judges anything and walk order does not supply that. Reaching
+// every component means walking the whole tree rather than the top level: a component can be
+// declared inside a function, and the original's map was filled from a listener that saw those too.
+func collectComponentPropertyTypeNames(sourceFile *ast.Node, into map[string]bool) {
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+
+		var name *ast.Node
+		var parameters []*ast.Node
+
+		switch node.Kind {
+		case ast.KindFunctionDeclaration:
+			declaration := node.AsFunctionDeclaration()
+			name = declaration.Name()
+			parameters = parameterNodes(declaration.Parameters)
+
+		case ast.KindVariableDeclaration:
+			declaration := node.AsVariableDeclaration()
+			name = declaration.Name()
+			if name == nil || name.Kind != ast.KindIdentifier || declaration.Initializer == nil {
+				break
+			}
+			initializer := ast.SkipParentheses(declaration.Initializer)
+			if initializer == nil {
+				break
+			}
+			switch initializer.Kind {
+			case ast.KindArrowFunction:
+				parameters = parameterNodes(initializer.AsArrowFunction().Parameters)
+			case ast.KindFunctionExpression:
+				parameters = parameterNodes(initializer.AsFunctionExpression().Parameters)
+			}
+		}
+
+		if name != nil && name.Kind == ast.KindIdentifier &&
+			react.IsLikelyComponentName(name.Text()) && len(parameters) == 1 {
+			if typeName := typeReferenceName(parameterTypeNode(parameters[0])); typeName != "" &&
+				!strings.HasSuffix(typeName, "Properties") {
+				into[typeName] = true
+			}
+		}
+
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(sourceFile)
 }
 
 // propertiesTypeNameFor derives the corrected name rather than appending to the wrong one.
