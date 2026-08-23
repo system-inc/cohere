@@ -24,6 +24,7 @@ func All() []rule.Rule {
 		core.NoCaseDeclarations,
 		core.NoCompareNegZero,
 		core.NoDuplicateCase,
+		core.NoEmptyPattern,
 		core.NoUselessCatch,
 		nexus.BoundaryNoInternalImport,
 		nexus.BoundaryNoNexusOutsideImport,
@@ -85,6 +86,10 @@ func Options() config.OptionsRegistry {
 			Decode:   config.DecodeInto[nexus.ImportRequirePathAliasOptions](),
 			Required: true,
 		},
+
+		// Not Required. The option only relaxes the rule, and its default is the strict reading, so
+		// a config that says nothing gets the full rule rather than a rule that reads no files.
+		"no-empty-pattern": {Decode: config.DecodeInto[core.NoEmptyPatternOptions]()},
 
 		// The rest tune behavior rather than enable it, so they run on their own defaults when the
 		// config says nothing.
