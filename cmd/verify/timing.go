@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"sort"
 	"time"
 
 	"github.com/system-inc/verify/internal/program"
@@ -63,7 +64,32 @@ func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Dur
 		)
 	}
 
+	printSharedFills(out, timings)
 	printTimingNotes(out, sorted)
+}
+
+// printSharedFills reports work that several rules share, which belongs to none of them.
+//
+// Without this the first rule to ask for a cached derivation carries its whole cost, and since
+// files are walked in parallel that rule is arbitrary. Measured before this existed: three comment
+// rules doing identical work reported 171ms, 132ms, and 1.0ms, and the cheap one had simply asked
+// last. A reader would have concluded the 171ms rule was expensive and optimized the wrong thing.
+func printSharedFills(out io.Writer, timings *program.Timings) {
+	fills := timings.SharedFills()
+	if len(fills) == 0 {
+		return
+	}
+
+	keys := make([]string, 0, len(fills))
+	for key := range fills {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		fmt.Fprintf(out, "  shared: %s cost %s, paid once per file and used by several rules\n",
+			key, formatMilliseconds(fills[key]))
+	}
 }
 
 // printTimingNotes names the two shapes a per-rule table does not make obvious on its own.

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/verify/internal/rule"
 )
 
 // RuleTiming is what one rule cost over a run.
@@ -57,6 +58,15 @@ func (r RuleTiming) TotalDuration() time.Duration {
 // finer one belongs to --explain on a single file where the overhead no longer matters.
 type Timings struct {
 	byRule map[string]*RuleTiming
+
+	// sharedFills is what each cached derivation cost, summed across files, keyed by the cache key.
+	//
+	// Kept apart from any rule's total because it belongs to no rule. Whichever rule asks for a
+	// derivation first pays for it, and files are walked in parallel, so that identity varies. Three
+	// comment rules sharing one scan measured 171ms, 132ms, and 1.0ms for identical work; the cheap
+	// one had simply asked last. Attributing shared cost to a rule is the instrument lying, and
+	// reporting it separately is the only reading that survives a change in order.
+	sharedFills map[string]time.Duration
 }
 
 // NewTimings returns a collector ready for a run.
@@ -65,7 +75,7 @@ func NewTimings(ruleNames []string) *Timings {
 	for _, name := range ruleNames {
 		byRule[name] = &RuleTiming{Name: name}
 	}
-	return &Timings{byRule: byRule}
+	return &Timings{byRule: byRule, sharedFills: map[string]time.Duration{}}
 }
 
 // forRule returns the accumulator for a rule, creating it if the run added one late.
@@ -89,6 +99,9 @@ func (t *Timings) forRule(name string) *RuleTiming {
 func (t *Timings) merge(other *Timings) {
 	if t == nil || other == nil {
 		return
+	}
+	for key, cost := range other.sharedFills {
+		t.sharedFills[key] += cost
 	}
 	for name, source := range other.byRule {
 		target := t.forRule(name)
@@ -120,6 +133,32 @@ func (t *Timings) Sorted() []RuleTiming {
 		return sorted[first].Name < sorted[second].Name
 	})
 	return sorted
+}
+
+// RecordSharedFill notes what a cached derivation cost on one file, and subtracts it from the rule
+// that happened to trigger it.
+//
+// The subtraction is the point. Without it the first rule to ask carries a cost that belongs to
+// every rule sharing the derivation, and the table names an arbitrary victim.
+func (t *Timings) RecordSharedFill(ruleName string, key string, cost time.Duration) {
+	if t == nil || cost <= 0 {
+		return
+	}
+	t.sharedFills[key] += cost
+	if timing := t.forRule(ruleName); timing != nil {
+		timing.ListenerDuration -= cost
+		if timing.ListenerDuration < 0 {
+			timing.ListenerDuration = 0
+		}
+	}
+}
+
+// SharedFills is what each cached derivation cost across the run, keyed by cache key.
+func (t *Timings) SharedFills() map[string]time.Duration {
+	if t == nil {
+		return nil
+	}
+	return t.sharedFills
 }
 
 // TotalDuration is the summed cost of every rule.
@@ -170,5 +209,37 @@ func measuringListener(timing *RuleTiming, listener func(node *ast.Node)) func(n
 		start := time.Now()
 		listener(node)
 		timing.ListenerDuration += time.Since(start)
+	}
+}
+
+// attributingListener is measuringListener plus a note of which rule triggered a cache fill.
+//
+// The attribution has to happen at the listener boundary rather than after Run, because a rule
+// derives shared work inside its listener, not while deciding what to listen to. Checking after Run
+// finds an empty cache and attributes nothing, which is a silent no-op: the table looks the same as
+// before and the correction never fires.
+func attributingListener(
+	timing *RuleTiming,
+	listener func(node *ast.Node),
+	ruleName string,
+	fileCache *rule.FileCache,
+	seenFills map[string]bool,
+	fillPayer map[string]string,
+) func(node *ast.Node) {
+	if timing == nil {
+		return listener
+	}
+	return func(node *ast.Node) {
+		timing.NodesOffered++
+		start := time.Now()
+		listener(node)
+		timing.ListenerDuration += time.Since(start)
+
+		for key := range fileCache.FillDurations() {
+			if !seenFills[key] {
+				seenFills[key] = true
+				fillPayer[key] = ruleName
+			}
+		}
 	}
 }

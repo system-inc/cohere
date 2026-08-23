@@ -279,6 +279,10 @@ func dispatchFile(
 	// shared too.
 	fileCache := rule.NewFileCache()
 
+	// Which rule triggered each cache fill, so its cost can be moved off that rule's total.
+	fillPayer := map[string]string{}
+	seenFills := map[string]bool{}
+
 	for _, subject := range rules {
 		ruleName := subject.Name
 
@@ -340,12 +344,21 @@ func dispatchFile(
 			timing.FilesListened++
 		}
 		for kind, listener := range listeners {
-			merged[kind] = append(merged[kind], measuringListener(timing, listener))
+			merged[kind] = append(merged[kind], attributingListener(timing, listener, ruleName, fileCache, seenFills, fillPayer))
 		}
 	}
 
 	if len(merged) > 0 {
 		visitedNodes = walk(sourceFile.AsNode(), merged)
+	}
+
+	// A cached derivation is paid for by whichever rule asked first, and files are walked in
+	// parallel, so that identity is arbitrary. Move the cost off that rule and onto the derivation,
+	// or the table names a victim rather than a cause.
+	if timings != nil {
+		for key, cost := range fileCache.FillDurations() {
+			timings.RecordSharedFill(fillPayer[key], key, cost)
+		}
 	}
 
 	return visitedNodes, tally(directives)

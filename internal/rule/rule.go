@@ -11,6 +11,8 @@
 package rule
 
 import (
+	"time"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
@@ -107,11 +109,37 @@ type Context struct {
 // workers would be a bug, which is why nothing here has a mutex to make that look safe.
 type FileCache struct {
 	entries map[string]any
+
+	// fillDurations records what each derivation cost to compute, keyed the same way the entries
+	// are.
+	//
+	// This exists because per-rule timing lies about shared work. Whichever rule asks for a
+	// derivation first pays for it, and since files are walked in parallel the identity of that
+	// rule varies per file. Measured on three comment rules sharing one scan: 171ms, 132ms, and
+	// 1.0ms for identical work, where the 1.0ms rule was simply the one that asked last.
+	//
+	// Attributing the cost here rather than to a rule is the only reading that stays true as the
+	// order changes.
+	fillDurations map[string]time.Duration
 }
 
 // NewFileCache returns a cache for one file.
 func NewFileCache() *FileCache {
-	return &FileCache{entries: map[string]any{}}
+	return &FileCache{
+		entries:       map[string]any{},
+		fillDurations: map[string]time.Duration{},
+	}
+}
+
+// FillDurations reports what each derivation cost to compute in this file, by key.
+//
+// Empty for a cache that was never filled, which is the common case for a file no comment rule
+// looked at.
+func (c *FileCache) FillDurations() map[string]time.Duration {
+	if c == nil {
+		return nil
+	}
+	return c.fillDurations
 }
 
 // Cached returns the value stored under key, computing it once on the first ask.
@@ -130,7 +158,10 @@ func Cached[Value any](cache *FileCache, key string, compute func() Value) Value
 		// silent on purpose: the alternative is a rule package crashing a lint run over a cache.
 		return compute()
 	}
+	start := time.Now()
 	computed := compute()
+	cache.fillDurations[key] += time.Since(start)
+
 	cache.entries[key] = computed
 	return computed
 }

@@ -142,3 +142,66 @@ func TestMeasuringListenerIsPassThroughWhenNotTiming(t *testing.T) {
 		t.Fatal("the listener was not called through")
 	}
 }
+
+// TestSharedFillIsBilledToTheCacheNotAVictimRule is the fix for an instrument that lied.
+//
+// A cached derivation is computed by whichever rule asks first, and files are walked in parallel,
+// so that rule is arbitrary. Measured on three comment rules sharing one scan before this existed:
+// 171ms, 132ms, and 1.0ms for identical work. The cheap one had simply asked last, and a reader
+// would have concluded the 171ms rule was expensive and optimized the wrong thing.
+//
+// The number that made it visible: two rules offered exactly the same 3,407 nodes differed by 83x.
+// Equal nodes with wildly unequal time is the signature of cost that belongs to neither.
+func TestSharedFillIsBilledToTheCacheNotAVictimRule(t *testing.T) {
+	timings := NewTimings([]string{"asked-first", "asked-second"})
+
+	// Both rules did 10ms of their own work; the first also paid 100ms to fill a shared cache.
+	timings.forRule("asked-first").ListenerDuration = 110 * time.Millisecond
+	timings.forRule("asked-second").ListenerDuration = 10 * time.Millisecond
+
+	timings.RecordSharedFill("asked-first", "a.derivation", 100*time.Millisecond)
+
+	first := timings.forRule("asked-first")
+	if first.ListenerDuration != 10*time.Millisecond {
+		t.Fatalf("the shared cost stayed on the rule that paid it: %v", first.ListenerDuration)
+	}
+	if timings.forRule("asked-second").ListenerDuration != 10*time.Millisecond {
+		t.Fatal("the rule that did not pay was altered")
+	}
+	if timings.SharedFills()["a.derivation"] != 100*time.Millisecond {
+		t.Fatalf("the shared cost was not recorded against the derivation: %v", timings.SharedFills())
+	}
+}
+
+// TestSharedFillCannotDriveARuleNegative guards the subtraction.
+//
+// A fill recorded larger than the rule's measured time would otherwise produce a negative duration,
+// which formats as a nonsense number rather than failing. Clamping is the honest floor: the rule
+// did at least zero work.
+func TestSharedFillCannotDriveARuleNegative(t *testing.T) {
+	timings := NewTimings([]string{"a-rule"})
+	timings.forRule("a-rule").ListenerDuration = time.Millisecond
+
+	timings.RecordSharedFill("a-rule", "a.derivation", time.Second)
+
+	if got := timings.forRule("a-rule").ListenerDuration; got < 0 {
+		t.Fatalf("a rule's time went negative: %v", got)
+	}
+}
+
+// TestSharedFillsMergeAcrossWorkers covers the path a real run takes, where each worker fills its
+// own files' caches and the totals have to add up.
+func TestSharedFillsMergeAcrossWorkers(t *testing.T) {
+	shared := NewTimings([]string{"a-rule"})
+
+	for worker := 0; worker < 4; worker++ {
+		local := NewTimings(nil)
+		local.forRule("a-rule").ListenerDuration = 50 * time.Millisecond
+		local.RecordSharedFill("a-rule", "a.derivation", 25*time.Millisecond)
+		shared.merge(local)
+	}
+
+	if got := shared.SharedFills()["a.derivation"]; got != 100*time.Millisecond {
+		t.Fatalf("shared fills did not accumulate across workers: %v", got)
+	}
+}
