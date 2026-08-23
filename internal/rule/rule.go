@@ -154,18 +154,44 @@ type Rule struct {
 }
 
 // ReportNode is the common case: this node is wrong, here is why.
+//
+// The finding is anchored on the node's own text rather than on node.Loc, and that is the whole
+// difference between a usable finding and an unsuppressable one.
+//
+// Loc.Pos() sits before leading trivia, so a node preceded by a comment reports at the comment. A
+// real case from the tree this gates: in modules/mcp/McpApi.ts the binding `params` is on line 242
+// with its `eslint-disable-next-line` on 241, correctly covering it. Anchored on Loc the rule
+// reported 240, swallowing both the comment and the indentation. **A `-next-line` directive only
+// matches the line after itself, so that finding could not be suppressed by anything the author was
+// able to write.**
+//
+// It is worse than a cosmetic offset because it is invisible in every count. A finding at the wrong
+// line still reads as a real finding, costs nothing observable, and surfaces only as a suppression
+// that mysteriously does not work. This root cause produced five distinct symptoms in one night: a
+// fix that ate whitespace, an exemption that failed to fire, a line span measured from the wrong
+// end, three findings reported at the wrong node, and this.
+//
+// So it is fixed here rather than at 30 call sites across 16 rule files. Same argument as the fix
+// builders taking a Context: a rule should not be able to get this wrong by writing the obvious
+// thing.
+//
+// A rule that genuinely wants the trivia included says so with ReportRange.
 func (c Context) ReportNode(node *ast.Node, message Message) {
 	c.Report(Diagnostic{
-		Range:      node.Loc,
+		Range:      TokenRange(c.SourceFile, node),
 		Message:    message,
 		SourceFile: c.SourceFile,
 	})
 }
 
 // ReportNodeWithFixes reports a node and proposes repairs the edit engine may apply unattended.
+//
+// Anchored on the node's own text, for the reason spelled out on ReportNode. This one matters twice
+// over: a finding reported at the wrong line while carrying a fix means the fix is applied at a
+// location the reader was never shown.
 func (c Context) ReportNodeWithFixes(node *ast.Node, message Message, fixes ...Fix) {
 	c.Report(Diagnostic{
-		Range:      node.Loc,
+		Range:      TokenRange(c.SourceFile, node),
 		Message:    message,
 		SourceFile: c.SourceFile,
 		Fixes:      fixes,
@@ -175,7 +201,7 @@ func (c Context) ReportNodeWithFixes(node *ast.Node, message Message, fixes ...F
 // ReportNodeWithSuggestions reports a node and offers repairs that need a human to choose them.
 func (c Context) ReportNodeWithSuggestions(node *ast.Node, message Message, suggestions ...Suggestion) {
 	c.Report(Diagnostic{
-		Range:       node.Loc,
+		Range:       TokenRange(c.SourceFile, node),
 		Message:     message,
 		SourceFile:  c.SourceFile,
 		Suggestions: suggestions,

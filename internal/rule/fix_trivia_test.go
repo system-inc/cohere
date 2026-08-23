@@ -1,6 +1,7 @@
 package rule
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -138,4 +139,100 @@ func parseModuleSpecifier(t *testing.T, source string) (*ast.SourceFile, *ast.No
 		t.Fatalf("no module specifier in %q", source)
 	}
 	return sourceFile, specifier
+}
+
+// TestReportNodeAnchorsOnTheTokenNotItsComment is the fifth symptom of one root cause, and the one
+// that makes a finding unsuppressable.
+//
+// The case is real, from modules/mcp/McpApi.ts in the tree this tool gates:
+//
+//	const {
+//	    method,
+//	    // eslint-disable-next-line nexus/consistency-no-abbreviated-identifier
+//	    params,
+//	} = message;
+//
+// The suppression sits on the line directly above `params` and correctly covers it. Anchored on
+// node.Loc the finding lands on the comment's line or earlier, and a `-next-line` directive only
+// matches the line after itself, so no suppression the author could write would silence it.
+//
+// This is worse than an offset because it is invisible in a count. A finding at the wrong line
+// still reads as a real finding.
+func TestReportNodeAnchorsOnTheTokenNotItsComment(t *testing.T) {
+	source := strings.Join([]string{
+		"const {",
+		"    method,",
+		"    // a comment above the binding",
+		"    params,",
+		"} = message;",
+	}, "\n")
+
+	sourceFile, binding := parseNamedBinding(t, source, "params")
+	context := Context{SourceFile: sourceFile}
+
+	var reported Diagnostic
+	context.Report = func(diagnostic Diagnostic) { reported = diagnostic }
+	context.ReportNode(binding, Message{Id: "probe", Description: "probe"})
+
+	line := 1 + strings.Count(source[:reported.Range.Pos()], "\n")
+	if line != 4 {
+		t.Fatalf("the finding anchored on line %d, want 4 (the binding). Anchoring earlier puts it on or above the suppression comment, where no -next-line directive can reach it", line)
+	}
+}
+
+// TestReportNodeWithFixesAnchorsOnTheToken covers the variant that matters twice over: a finding at
+// the wrong line carrying a fix means the repair lands somewhere the reader was never shown.
+func TestReportNodeWithFixesAnchorsOnTheToken(t *testing.T) {
+	source := "const {\n    // a comment\n    params,\n} = message;"
+
+	sourceFile, binding := parseNamedBinding(t, source, "params")
+	context := Context{SourceFile: sourceFile}
+
+	var reported Diagnostic
+	context.Report = func(diagnostic Diagnostic) { reported = diagnostic }
+	context.ReportNodeWithFixes(binding, Message{Id: "probe", Description: "probe"},
+		context.ReplaceNode(binding, "parameters"))
+
+	if got := source[reported.Range.Pos():reported.Range.End()]; got != "params" {
+		t.Fatalf("the finding covers %q, want exactly the token", got)
+	}
+	if len(reported.Fixes) != 1 {
+		t.Fatalf("expected one fix, got %d", len(reported.Fixes))
+	}
+	if got := source[reported.Fixes[0].Range.Pos():reported.Fixes[0].Range.End()]; got != "params" {
+		t.Fatalf("the fix covers %q, want exactly the token", got)
+	}
+}
+
+// parseNamedBinding finds an identifier by text, which is how these fixtures name a subject without
+// depending on the shape of the tree around it.
+func parseNamedBinding(t *testing.T, source string, want string) (*ast.SourceFile, *ast.Node) {
+	t.Helper()
+
+	fileName := tspath.NormalizePath("/Fixture.ts")
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: fileName, Path: tspath.Path(fileName),
+	}, source, core.ScriptKindTS)
+	if sourceFile == nil {
+		t.Fatalf("could not parse %q", source)
+	}
+
+	var found *ast.Node
+	var walk func(*ast.Node)
+	walk = func(node *ast.Node) {
+		if node == nil || found != nil {
+			return
+		}
+		if node.Kind == ast.KindIdentifier && node.Text() == want {
+			found = node
+			return
+		}
+		node.ForEachChild(func(child *ast.Node) bool { walk(child); return false })
+	}
+	walk(sourceFile.AsNode())
+
+	if found == nil {
+		t.Fatalf("no identifier %q in %q", want, source)
+	}
+	return sourceFile, found
 }
