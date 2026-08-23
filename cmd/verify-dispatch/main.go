@@ -28,12 +28,13 @@ func main() {
 }
 
 func run() error {
-	// The dispatcher owns exactly two flags and forwards everything else. They are matched
+	// The dispatcher owns exactly three flags and forwards everything else. They are matched
 	// positionally at the front rather than with the flag package, because flag.Parse would stop at
 	// the first argument it does not recognize and swallow flags meant for the real binary.
 	arguments := os.Args[1:]
 	development := false
 	verbose := false
+	frozen := false
 
 	for len(arguments) > 0 {
 		switch arguments[0] {
@@ -43,26 +44,68 @@ func run() error {
 		case "--dispatch-verbose":
 			verbose = true
 			arguments = arguments[1:]
+		case "--frozen":
+			frozen = true
+			arguments = arguments[1:]
 		default:
 			goto parsed
 		}
 	}
 parsed:
 
+	if frozen {
+		binaryPath, err := resolveFrozenBinary()
+		if err != nil {
+			return err
+		}
+		return execute(binaryPath, arguments)
+	}
+
 	binaryPath, err := resolveBinary(development, verbose)
 	if err != nil {
 		return err
 	}
 
-	// exec rather than spawn-and-wait: the real binary replaces this process, so it inherits the
-	// terminal directly and its exit code is the one the caller sees. A wrapper that forwarded the
-	// status would be one more layer able to lose a non-zero exit, and losing a non-zero exit is
-	// how a gate goes quietly green.
-	arguments = append([]string{binaryPath}, arguments...)
-	if err := syscall.Exec(binaryPath, arguments, os.Environ()); err != nil {
+	return execute(binaryPath, arguments)
+}
+
+// execute replaces this process with the verify binary.
+//
+// exec rather than spawn-and-wait: the real binary takes over, so it inherits the terminal directly
+// and its exit code is the one the caller sees. A wrapper that forwarded the status would be one
+// more layer able to lose a non-zero exit, and losing a non-zero exit is how a gate goes quietly
+// green.
+func execute(binaryPath string, arguments []string) error {
+	if err := syscall.Exec(binaryPath, append([]string{binaryPath}, arguments...), os.Environ()); err != nil {
 		return fmt.Errorf("running %s: %w", binaryPath, err)
 	}
 	return nil
+}
+
+// resolveFrozenBinary picks the newest cached binary and announces that it did.
+//
+// The announcement is the feature, not decoration. Freezing runs a binary whose inputs were never
+// compared against the rules on disk, so the one thing that separates it from the stale-binary
+// defect is that the operator is told: which binary, when it was built, and that it may not match.
+// A stated limitation is not a lie; silence would be. This prints to stderr so it survives a caller
+// piping stdout, and it prints before the exec because after the exec there is no "after".
+func resolveFrozenBinary() (string, error) {
+	moduleDirectory, err := findModuleDirectory()
+	if err != nil {
+		return "", err
+	}
+
+	frozen, err := dispatch.ResolveFrozen(dispatch.DefaultPaths(moduleDirectory))
+	if err != nil {
+		return "", err
+	}
+
+	fmt.Fprintf(os.Stderr, "verify: --frozen, so the rules on disk were never checked against this binary.\n")
+	fmt.Fprintf(os.Stderr, "  running: %s\n", filepath.Base(frozen.Path))
+	fmt.Fprintf(os.Stderr, "  hash:    %s\n", frozen.Hash)
+	fmt.Fprintf(os.Stderr, "  built:   %s\n", frozen.ModifiedAt)
+
+	return frozen.Path, nil
 }
 
 // resolveBinary picks the binary to run.
