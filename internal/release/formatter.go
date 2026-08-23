@@ -101,6 +101,23 @@ func readForkCommit(forkPath string) (string, error) {
 // recording a commit beside the bundles. A recorded commit only detects a rebuild that someone
 // remembered to re-record, and the case that actually happens is an edited working tree that was
 // never rebuilt at all — where the commit has not moved and the bundles are wrong anyway.
+//
+// **This test runs in one direction only, and the name of this function overstates it.** Source
+// newer than bundles proves the bundles are stale. Bundles newer than source proves nothing: any
+// operation that bumps an mtime without rebuilding — a `touch`, a copy that preserves nothing, a
+// checkout that rewrites the working tree — makes stale bundles pass. Verified by constructing
+// exactly that case, and it passes today.
+//
+// It is stated rather than closed because closing it properly is a different check than this one.
+// Comparing bundle contents to a recorded hash would catch a touch, and would still not answer
+// "were these built from this source", which is the question the name implies and which nothing
+// short of rebuilding can answer. Hashing the eight bundles costs about 1ms, so the cost is not
+// what stopped this; the reason is that a check upgraded from "catches the common case" to
+// "catches one more case" while still not deciding the question is worth less than an accurate
+// description of what it does catch.
+//
+// What it catches is the case that actually happens: someone edits the fork and forgets to rebuild.
+// What it does not catch is someone defeating it, and nobody is adversarial here.
 func requireFreshBundles(bundleDirectory string, forkPath string) error {
 	if _, err := os.Stat(bundleDirectory); err != nil {
 		return fmt.Errorf(

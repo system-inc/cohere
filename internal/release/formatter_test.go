@@ -118,6 +118,39 @@ func TestFormatterSourceAcceptsAFreshBuild(t *testing.T) {
 	}
 }
 
+func TestStalenessTestRunsInOneDirectionOnly(t *testing.T) {
+	// This asserts a limitation rather than a guarantee, and it is here so the limitation is a
+	// measured fact instead of an assumption nobody checked.
+	//
+	// Source newer than bundles proves staleness. Bundles newer than source proves nothing: any
+	// operation that bumps an mtime without rebuilding makes stale bundles pass. The function is
+	// named `requireFreshBundles`, which reads as though it decides both directions, and it does
+	// not.
+	//
+	// If someone later closes this — by hashing bundle contents, or by recording what built them —
+	// this test fails, and the right response is to delete it and update the comment it guards. A
+	// test that pins a weakness must be easy to retire on purpose and impossible to lose by
+	// accident.
+	fork := newFork(t)
+	buildBundles(t, fork, time.Now().Add(-2*time.Hour))
+	touch(t, filepath.Join(fork, "src", "index.js"), time.Now().Add(-time.Hour))
+
+	// The bundles are genuinely stale at this point, and the guard says so.
+	t.Setenv(FormatterForkPathVariable, fork)
+	if _, err := ResolveFormatterSource(); err == nil {
+		t.Fatalf("the guard failed to catch bundles older than the source, which is the direction it does decide")
+	}
+
+	// Bumping their mtime without rebuilding changes nothing about the bundles and everything about
+	// the verdict.
+	for _, name := range FormatterBundleNames {
+		touch(t, filepath.Join(fork, "dist", "prettier", filepath.FromSlash(name)), time.Now())
+	}
+	if _, err := ResolveFormatterSource(); err != nil {
+		t.Fatalf("touched-but-unrebuilt bundles were refused, so this limitation has been closed — delete this test and update the comment on requireFreshBundles: %v", err)
+	}
+}
+
 func TestGuardChecksEveryBundleTheEngineActuallyLoads(t *testing.T) {
 	// The list this guard checks and the list the engine loads must be one list, not two that agree
 	// today. They did not agree: this file once named three bundles chosen as "the minimal set that
