@@ -66,6 +66,14 @@ const (
 	// diagnostic reports two fixes, ProposalsFrom has already flattened them into siblings, so the
 	// winner can be the same rule as the loser. Saying "another rule" sent a reader hunting for a
 	// second rule that does not exist. ConflictsWith carries the accurate answer either way.
+	//
+	// It stays a bare constant rather than naming the winner inline, and the reason is not that a
+	// longer string would break the tally: reasonKey prefix-matches, so `ReasonOverlap + " from X"`
+	// would collapse correctly. ReasonParseFailure is the precedent for when detail belongs in the
+	// string, and its comment says why — the compiler's message is actionable and has nowhere else
+	// to live. An overlap has no such payload. ConflictsWith is already a structured field holding
+	// the identity, so assembling it into the prose would duplicate a field into a string that a
+	// prefix-matcher then strips back off. Detail belongs in the reason only when no field carries it.
 	ReasonOverlap       = "overlaps another fix"
 	ReasonInvalidRange  = "range is outside the file or inverted"
 	ReasonParseFailure  = "the rewritten file does not parse"
