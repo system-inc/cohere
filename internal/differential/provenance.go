@@ -19,6 +19,26 @@ import (
 // past, because a control file is itself a file and a harness linting only that one file would
 // still flag it. ControlDetected catches a detector that cannot detect at all, which a healthy
 // file count says nothing about.
+//
+// # What is proven today, and what is not
+//
+// The two directions of detection are not in the same state, and the asymmetry is a fact about the
+// codebase rather than an oversight, so it is written here rather than left for a reader to infer
+// from an empty ControlsRun.
+//
+// Gate-only detection has a natural population. Measured cold on ~/Projects/ahra at 01:10 on
+// 2026-08-23, the gate reported 129 findings where verify reported 1, so a difference in that
+// direction occurs without anyone planting anything.
+//
+// Verify-only detection has no natural population at all, and cannot be proven without planting a
+// violation only verify can see. Until that has fired once, ControlsProven returns false and the
+// report prints no verdict rather than a clean result — which is the correct answer to a question
+// the harness has not earned, not a defect to be tuned away.
+//
+// The controls that exist today are unit-level: they prove Compare and the parsers surface a
+// planted difference. Nothing yet runs both gates end to end against a real file, and the command
+// that would drive that does not exist. So this package is proven as a library and unproven as an
+// instrument, and a reader should not mistake a green test suite for the second thing.
 type Provenance struct {
 	// VerifyFilesLinted and GateFilesLinted are how many files each side actually walked. A zero
 	// here means the run proved nothing regardless of what the diff says.
