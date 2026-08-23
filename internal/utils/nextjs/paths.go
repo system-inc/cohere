@@ -36,6 +36,19 @@ import (
 // rules do not, and requiring it would make this narrower than three of the eight rules it serves.
 // A file named `_document.tsx` outside a pages directory is still a custom document by name, and a
 // rule that ignored it would be silent on a real misplacement.
+//
+// So this predicate is wider than the shared helper on two paths and narrower on one, which is worth
+// stating because a reader checking only one direction will conclude it drifts:
+//
+//	components/_document.tsx     wider   the basename spellings accept it, is_document_page does not
+//	pages/_document/index.tsx    wider   only the widest spelling accepts it
+//	pages/_documentation.tsx     NARROWER  is_document_page accepts it, this does not
+//
+// The last one is the trailing dot doing its work, and it is the direction that matters most: the
+// shared helper tests `starts_with("/_document")` with no dot, so a file merely beginning with the
+// word reads as the document. A research pass reported this comparison with the direction inverted,
+// claiming we report that path and upstream exempts it. Checked at the source: the opposite is true,
+// and the fixture asserting our answer was already correct.
 func IsDocumentFile(filePath string) bool {
 	baseName, parentName := splitPath(filePath)
 
