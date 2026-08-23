@@ -125,3 +125,96 @@ func TestTheNamedRulesAreTheRulesWhoseCostsAreQuoted(t *testing.T) {
 		t.Fatalf("the note does not quote both extremes:\n  %s", line)
 	}
 }
+
+// TestCoverageStatesWhatTheTableDoesNotMeasure guards the line that keeps the table honest.
+//
+// The rows measure rule listeners and per-file setup. Nothing measures the walk that offers nodes
+// to them, and on the ahra tree that walk is the majority of the phase: 285ms of rule time against
+// 1,024ms wall clock single-threaded, so the table covers roughly 28 percent. A reader who sums the
+// share column gets 100 percent and concludes the phase is explained.
+//
+// Unlike the notes above, this takes only two durations and has no ordering invariant, so calling
+// it directly is the real path rather than a bypass of one.
+func TestCoverageStatesWhatTheTableDoesNotMeasure(t *testing.T) {
+	var out strings.Builder
+	printCoverage(&out, 285*time.Millisecond, 1024*time.Millisecond)
+	rendered := out.String()
+
+	if !strings.Contains(rendered, "28%") {
+		t.Fatalf("coverage did not state the share the rows account for: %q", rendered)
+	}
+	if !strings.Contains(rendered, "72%") {
+		t.Fatalf("coverage did not state the share nothing measures: %q", rendered)
+	}
+	if !strings.Contains(rendered, "traversal") {
+		t.Fatalf("coverage did not name what the unmeasured remainder is: %q", rendered)
+	}
+}
+
+// TestCoverageRefusesToQuoteAShareWhenTimeIsSummedAcrossWorkers is the half that matters more,
+// because parallel is the default mode.
+//
+// Attributed time is summed across workers while wall clock overlaps them, so in a parallel run
+// rule time slightly exceeds wall clock. Printing that as a coverage percentage would say the table
+// accounts for 104 percent of the phase, which reads as "rules are everything and traversal is
+// free." Traversal is not free; it parallelizes almost perfectly and so collapses out of wall clock
+// rather than being cheap. A ratio that cannot mean what it appears to mean must not be printed as
+// though it does.
+func TestCoverageRefusesToQuoteAShareWhenTimeIsSummedAcrossWorkers(t *testing.T) {
+	var out strings.Builder
+	printCoverage(&out, 314*time.Millisecond, 301*time.Millisecond)
+	rendered := out.String()
+
+	if strings.Contains(rendered, "%") {
+		t.Fatalf("a share was quoted for a run whose time is summed across workers: %q", rendered)
+	}
+	if !strings.Contains(rendered, "single-threaded") {
+		t.Fatalf("coverage did not point at the mode that can answer the question: %q", rendered)
+	}
+	if !strings.Contains(rendered, "traversal") {
+		t.Fatalf("coverage did not say traversal is unmeasured: %q", rendered)
+	}
+}
+
+// TestCoverageSaysNothingRatherThanComputingFromZero covers the degenerate input.
+//
+// A zero phase duration has no ratio to state. Printing a coverage claim derived from it would be
+// worse than the silence it replaced, since a fabricated number is harder to notice than a missing
+// line.
+func TestCoverageSaysNothingRatherThanComputingFromZero(t *testing.T) {
+	var out strings.Builder
+	printCoverage(&out, 285*time.Millisecond, 0)
+	if out.String() != "" {
+		t.Fatalf("coverage printed a claim computed from a zero phase duration: %q", out.String())
+	}
+
+	out.Reset()
+	printCoverage(&out, 0, 1024*time.Millisecond)
+	if out.String() != "" {
+		t.Fatalf("coverage printed a claim with no attributed time to divide: %q", out.String())
+	}
+}
+
+// TestTheTableItselfCarriesTheCoverageLine pins the wiring, not just the function.
+//
+// The three tests above call printCoverage directly, which verifies a fragment and reads as though
+// it verifies the behavior. It does not: deleting the call from printTimings leaves all three green
+// while the table goes back to implying it explains the whole phase. Guard present, fixtures
+// passing, behavior gone.
+//
+// That failure shape was reported by @system_verify_lint_fix an hour before this was written, in
+// their own package and against their own fixtures, so it is a measured pattern in this codebase
+// rather than a hypothetical. It costs one test to exclude, driven through the same renderTimings
+// seam the other table assertions use.
+func TestTheTableItselfCarriesTheCoverageLine(t *testing.T) {
+	timings := program.NewTimings([]string{"a-rule"})
+	setCost(timings, "a-rule", 285*time.Millisecond, 100)
+
+	rendered := renderTimings(timings, 1024*time.Millisecond)
+	if !strings.Contains(rendered, "coverage:") {
+		t.Fatalf("the table did not carry a coverage line:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "traversal") {
+		t.Fatalf("the table's coverage line did not name the unmeasured remainder:\n%s", rendered)
+	}
+}

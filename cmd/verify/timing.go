@@ -43,6 +43,7 @@ func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Dur
 	// other and never for quoting as the tool's speed.
 	fmt.Fprintf(out, "  (a --timing run is slower than a real one: every listener call is timed. "+
 		"Compare rules to each other, not these totals to a normal run.)\n")
+	printCoverage(out, attributed, lintDuration)
 	fmt.Fprintf(out, "  %-42s %9s %9s %9s %8s %8s %8s\n",
 		"rule", "total", "setup", "listen", "files", "nodes", "found")
 
@@ -226,4 +227,57 @@ func formatMilliseconds(duration time.Duration) string {
 		return fmt.Sprintf("%.1fms", milliseconds)
 	}
 	return fmt.Sprintf("%.2fms", milliseconds)
+}
+
+// printCoverage says what fraction of the lint phase this table actually accounts for.
+//
+// Every number in the table is true and the table implies something false about what it covers.
+// The rows are rule listeners and per-file setup; the walk that offers nodes to those listeners is
+// not timed by anything. A reader sums the share column, gets 100 percent, and concludes the phase
+// is explained. It is not: the shares are of rule time, and rule time is a minority of the phase.
+//
+// Measured on the ahra tree at 02:31, load 4.92:
+//
+//	single-threaded    285ms rule time    1,024ms wall    the table covers ~28%
+//	parallel           314ms rule time      301ms wall    the table appears to cover ~104%
+//
+// The parallel reading is the dangerous one, and it is the default mode. Rule time slightly
+// exceeding wall clock reads as "rules are the entire phase and traversal is free." Traversal is
+// not free; it parallelizes almost perfectly across files, so roughly 700ms of walking collapses
+// into a few tens of milliseconds of wall clock and disappears underneath the rule time rather
+// than being cheap. Only single-threaded shows the shape of the real work.
+//
+// So this prints the ratio rather than a traversal row. A traversal row would be wall clock minus
+// attributed time, which is a number produced by subtraction rather than by measurement, and it
+// would absorb scheduling, contention, and anything else unaccounted for under a label claiming to
+// name one thing. Quoting an unmeasured residual as if it were measured is the failure this whole
+// instrument exists to prevent. A ratio makes the gap visible and stays honest about its size
+// without inventing an attribution for it.
+func printCoverage(out io.Writer, attributed time.Duration, lintDuration time.Duration) {
+	if lintDuration <= 0 || attributed <= 0 {
+		// No phase duration means no ratio to state. Saying nothing is correct here; printing a
+		// coverage claim computed from a zero would be worse than the silence it replaces.
+		return
+	}
+
+	coverage := 100 * float64(attributed) / float64(lintDuration)
+
+	if coverage > 95 {
+		// Attributed time at or above wall clock means the run was parallel: listener time summed
+		// across workers, against wall clock that overlapped them. The ratio is not a coverage
+		// figure at all here, and printing it as one would be the exact misreading this line was
+		// added to prevent.
+		fmt.Fprintf(out,
+			"  coverage: rule time is summed across workers, so it exceeds wall clock and is not a share of this phase. "+
+				"Tree traversal is not timed by any row here. Run --single-threaded to see what the phase actually costs.\n")
+		return
+	}
+
+	fmt.Fprintf(out,
+		"  coverage: these rows account for %.0f%% of the %s lint phase. "+
+			"The remaining %.0f%% is tree traversal, which no row here measures.\n",
+		coverage,
+		formatMilliseconds(lintDuration),
+		100-coverage,
+	)
 }
