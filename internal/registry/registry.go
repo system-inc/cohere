@@ -62,6 +62,7 @@ func All() []rule.Rule {
 		nexus.LocalizationNoUntranslatedValue,
 		structure.NetworkNoDirectFetch,
 		structure.NetworkNoInvalidateCacheInOnSuccess,
+		structure.NetworkNoInvalidateCacheLiteralKey,
 		structure.ReactComponentNoMultiplePrimary,
 		tailwind.NoConcatenatedClasses,
 		tailwind.NoDuplicateClasses,

@@ -99,31 +99,23 @@ func isNamedOnSuccess(name *ast.Node) bool {
 // isServiceCacheInvalidate reports a `<something>.cache.invalidate(...)` whose receiver reads as a
 // service.
 //
+// The shape half is shared with network-no-invalidate-cache-literal-key, since both rules are about
+// the same call and two matchers that almost agree would drift. What is not shared is the receiver
+// test, and the difference is deliberate: this rule is about where an invalidation lives, so it has
+// to know it is looking at the network's cache; that rule is about how a key is written, and a
+// typo'd key is a defect whatever the cache belongs to.
+//
 // The name test is the original's and it is deliberately loose: `networkService` exactly, or any
 // name containing "service" in either casing. Tightening it would be a different rule, and loosening
 // it further would catch caches that have nothing to do with the network layer.
 func isServiceCacheInvalidate(call *ast.Node) bool {
-	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
-	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
+	callee := callExpressionCallee(call.AsCallExpression())
+	if !isCacheInvalidateCall(callee) {
 		return false
 	}
 
-	invalidate := callee.AsPropertyAccessExpression()
-	if name := invalidate.Name(); name == nil || name.Text() != "invalidate" {
-		return false
-	}
-
-	cacheAccess := ast.SkipParentheses(invalidate.Expression)
-	if cacheAccess == nil || cacheAccess.Kind != ast.KindPropertyAccessExpression {
-		return false
-	}
-
-	cache := cacheAccess.AsPropertyAccessExpression()
-	if name := cache.Name(); name == nil || name.Text() != "cache" {
-		return false
-	}
-
-	receiver := ast.SkipParentheses(cache.Expression)
+	cacheAccess := ast.SkipParentheses(callee.AsPropertyAccessExpression().Expression)
+	receiver := ast.SkipParentheses(cacheAccess.AsPropertyAccessExpression().Expression)
 	if receiver == nil || receiver.Kind != ast.KindIdentifier {
 		return false
 	}
