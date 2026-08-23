@@ -94,15 +94,33 @@ func TestDispatcherDependsOnEveryPlatformExactly(t *testing.T) {
 	}
 }
 
-func TestDispatcherOwnsTheCommandName(t *testing.T) {
+// Both command names must be installed, and both must reach the same launcher.
+//
+// Two entries rather than one because `v` is what gets typed on the loop and `verify` is what reads
+// in a script, and because a single letter is short enough to collide with something already on a
+// machine. A consumer who hits that keeps a working command instead of a broken install.
+//
+// Asserted per name rather than by counting. An earlier version of this test checked only `verify`,
+// which would have passed unchanged if `v` had silently stopped being declared: the guarantee it
+// stated was true and the guarantee anyone reading it believed was not.
+func TestDispatcherOwnsBothCommandNames(t *testing.T) {
 	manifest := decodeManifest(t, mustDispatcherManifest(t, "1.2.3"))
 
 	binaries, ok := manifest["bin"].(map[string]any)
 	if !ok {
-		t.Fatalf("the dispatcher declares no bin, so installing it would create no verify command")
+		t.Fatalf("the dispatcher declares no bin, so installing it would create no command at all")
 	}
-	if binaries["verify"] != "bin/verify" {
-		t.Errorf("the verify command points at %v, wanted bin/verify", binaries["verify"])
+
+	for _, name := range []string{ShortCommandName, FullCommandName} {
+		if binaries[name] != launcherRelativePath {
+			t.Errorf("the %q command points at %v, wanted %s", name, binaries[name], launcherRelativePath)
+		}
+	}
+
+	if len(binaries) != 2 {
+		// A third name would be a command nobody documented, installed on every consumer's machine.
+		t.Errorf("the dispatcher declares %d commands, wanted exactly the two named ones: %v",
+			len(binaries), binaries)
 	}
 }
 

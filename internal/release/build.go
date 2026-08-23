@@ -213,7 +213,7 @@ func buildDispatcherPackage(options Options) (StagedPackage, error) {
 	}
 
 	launcher := DispatcherLauncher()
-	launcherPath := filepath.Join(directory, "bin", "verify")
+	launcherPath := filepath.Join(directory, "bin", FullCommandName)
 	if err := os.WriteFile(launcherPath, []byte(launcher), 0o755); err != nil {
 		return StagedPackage{}, fmt.Errorf("writing the dispatcher launcher: %w", err)
 	}

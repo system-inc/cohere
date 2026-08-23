@@ -1,5 +1,5 @@
 #!/bin/sh
-# sv runs verify without booting Node.
+# v runs verify without booting Node.
 #
 # `s v` reaches verify through `pnpm tsx` evaluating a TypeScript CLI, which costs 0.58s of a 2.67s
 # run: measured five warm runs at each layer, raw binary 1.84s, plus dispatcher 2.09s, plus tsx

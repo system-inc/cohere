@@ -8,6 +8,38 @@ import (
 // DispatcherPackageName is the package a consumer actually installs.
 const DispatcherPackageName = "verify"
 
+// ShortCommandName is what a consumer types on the loop they sit in all day.
+//
+// One letter, because the whole argument of this tool is that verification stops being a thing you
+// do and becomes a property the codebase has. A command run after every edit should cost as little
+// to type as it costs to run, and six keystrokes charged on that loop is a real toll.
+const ShortCommandName = "v"
+
+// FullCommandName is the same command under the name that reads in a script.
+//
+// Both names are installed, pointing at the same launcher, which costs nothing: npm's `bin` is a
+// map from command name to file, so two entries are two symlinks onto one entry point rather than
+// one command wrapping another. There is no extra process and no measurable difference between
+// them.
+//
+// Having both retires the one real objection to a single letter. `v` is short enough to collide
+// with something already on a given machine, and a consumer who hits that keeps a working command
+// rather than a broken install. It is also the name that belongs in continuous integration, in
+// documentation, and in a script somebody reads a year from now, where brevity buys nothing and
+// saying what it does buys everything.
+const FullCommandName = "verify"
+
+// launcherRelativePath is where the launcher sits inside the dispatcher package.
+//
+// Declared once because the manifest's `bin` entries and the build that writes the file have to
+// agree exactly. A package whose bin points at a path the build never wrote installs successfully
+// and produces a command that does not exist, which is a failure the install itself will not
+// report.
+//
+// Named for the full command rather than the short one: the file is the thing, and `v` is a name
+// for it.
+const launcherRelativePath = "bin/" + FullCommandName
+
 // RepositoryURL is where the source lives, recorded in every published package.
 const RepositoryURL = "https://github.com/system-inc/verify"
 
@@ -63,7 +95,10 @@ func DispatcherManifest(version string) ([]byte, error) {
 		"license":     "MIT",
 		"repository":  map[string]string{"type": "git", "url": RepositoryURL},
 
-		"bin":   map[string]string{"verify": "bin/verify"},
+		"bin": map[string]string{
+			ShortCommandName: launcherRelativePath,
+			FullCommandName:  launcherRelativePath,
+		},
 		"files": []string{"bin/"},
 
 		"optionalDependencies": optionalDependencies,
