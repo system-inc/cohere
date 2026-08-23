@@ -65,6 +65,11 @@ func TestNoUnsafeFunctionTypeStaysSilent(t *testing.T) {
 		{"a locally declared interface", "interface Function {\n    tag: string;\n}\nexport let handler: Function;\n"},
 		{"a locally declared type alias", "type Function = (input: string) => void;\nexport let handler: Function;\n"},
 		{"a locally declared class", "class Function {\n    tag = 'x';\n}\nexport let handler: Function;\n"},
+		// oxc's own passing test case, and it was a false positive here until oxc's fixtures were
+		// read. A top-level scan misses a declaration nested inside a block, so the shadow check has
+		// to walk the whole file.
+		{"a block-scoped type alias", "{\n    type Function = () => void;\n    let value: Function;\n}\n"},
+		{"a generic signature", "export let value: <T>(input: T) => T;\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

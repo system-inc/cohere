@@ -94,26 +94,46 @@ var NoUnsafeFunctionType = rule.Rule{
 	},
 }
 
-// declaresOwnFunctionType reports whether this file declares a type named `Function`.
+// declaresOwnFunctionType reports whether this file declares a type named `Function` anywhere.
+//
+// The walk is whole-file rather than top-level, and that is not thoroughness for its own sake: oxc's
+// own passing test case is a block-scoped `type Function = () => void;` inside braces, and a scan of
+// top-level statements alone reports it as a violation. That was a real false positive in this rule
+// before oxc's fixtures were read.
+//
+// This is deliberately coarser than real scope analysis. A declaration anywhere in the file
+// suppresses the rule for the whole file, where oxc suppresses it only within the declaring scope.
+// The direction is chosen: a missed finding in a file that defines its own `Function` costs nothing,
+// and a false positive on a type the author owns costs trust in the rule. Narrowing this correctly
+// needs the scope information the checker shim does not expose.
 //
 // Only declarations that introduce a *type* count. A variable or function named `Function` does not
 // shadow the type in a type position, so a file containing one is still linted.
 func declaresOwnFunctionType(sourceFile *ast.SourceFile) bool {
-	for _, statement := range sourceFile.Statements.Nodes {
+	found := false
+	var visit func(node *ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil || found {
+			return
+		}
 		var name *ast.Node
-		switch statement.Kind {
+		switch node.Kind {
 		case ast.KindInterfaceDeclaration:
-			name = statement.AsInterfaceDeclaration().Name()
+			name = node.AsInterfaceDeclaration().Name()
 		case ast.KindTypeAliasDeclaration:
-			name = statement.AsTypeAliasDeclaration().Name()
+			name = node.AsTypeAliasDeclaration().Name()
 		case ast.KindClassDeclaration:
-			name = statement.AsClassDeclaration().Name()
-		default:
-			continue
+			name = node.AsClassDeclaration().Name()
 		}
 		if name != nil && name.Kind == ast.KindIdentifier && name.Text() == "Function" {
-			return true
+			found = true
+			return
 		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return found
+		})
 	}
-	return false
+	visit(sourceFile.AsNode())
+	return found
 }
