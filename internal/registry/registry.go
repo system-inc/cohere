@@ -84,6 +84,7 @@ func All() []rule.Rule {
 		structure.ReactImportNoDestructuring,
 		structure.ReactNoAnchorElement,
 		structure.ReactNoHorizontalRuleElement,
+		structure.StorageNoDirectLocalStorage,
 		typescript.NoUnsafeFunctionType,
 		tailwind.NoConcatenatedClasses,
 		tailwind.NoDuplicateClasses,

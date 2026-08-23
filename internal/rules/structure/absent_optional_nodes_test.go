@@ -59,6 +59,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 		ReactComponentNoDisplayName,
 		ReactHookRequireEffectComment,
 		ReactImportNoDestructuring,
+		StorageNoDirectLocalStorage,
 	}
 
 	for _, currentRule := range rules {

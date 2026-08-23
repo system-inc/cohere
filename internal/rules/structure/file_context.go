@@ -37,6 +37,12 @@ type FileContext struct {
 
 	// IsHorizontalRuleComponentFile is the same exemption for <hr> and the HorizontalRule component.
 	IsHorizontalRuleComponentFile bool
+
+	// IsLocalStorageServiceFile marks the storage service and its internal utilities, the one place
+	// allowed to reach raw localStorage. Same shape as the two above, and it covers the internal
+	// directory as well as the entry point, because the parsing and quota handling that justify the
+	// service live there rather than in the file that re-exports them.
+	IsLocalStorageServiceFile bool
 }
 
 // nextJsSpecialFileBaseNames are the files Next.js resolves by name. Both React extensions apply to
@@ -79,5 +85,8 @@ func FileContextFor(fileName string) FileContext {
 
 		IsHorizontalRuleComponentFile: strings.Contains(normalizedPath, "/components/layout/HorizontalRule.tsx") ||
 			strings.Contains(normalizedPath, "/components/layout/HorizontalRule.jsx"),
+
+		IsLocalStorageServiceFile: strings.Contains(normalizedPath, "/services/local-storage/LocalStorageService.ts") ||
+			strings.Contains(normalizedPath, "/services/local-storage/internal/LocalStorageServiceUtilities.ts"),
 	}
 }
