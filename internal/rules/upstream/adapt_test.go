@@ -147,3 +147,59 @@ func describe(findings []rule.Diagnostic) []string {
 	}
 	return described
 }
+
+// TestUsesExitListenersCoversEveryPseudoKindVariant is the half the original guard was missing.
+//
+// `TestAdaptRefusesRatherThanRunsBlind` proves the detector recognizes `ListenerOnExit`, which adds
+// 1000. But upstream encodes four more variants on top of it, and rslint uses the higher tiers
+// heavily: `ListenerOnAllowPattern` adds 2000 and `ListenerOnNotAllowPattern` adds 4000, each of
+// which also has an on-exit form a further 1000 up. A detector keyed to the 1000 tier alone would
+// pass two thirds of the encoding straight through.
+//
+// The detector is a `>=` threshold rather than an equality, so it already covers all of them. That
+// is exactly why this test exists: nothing said so, and a later editor narrowing the comparison to
+// the tier it happened to be thinking about would break the higher variants silently. These rules
+// run, cost time, and enforce nothing, and a clean tree is the expected result for most of them, so
+// there is no downstream symptom to notice.
+//
+// Seven of the 79 rules we intend to source are affected, including both spellings of
+// `no-unused-vars` and `prefer-const`.
+func TestUsesExitListenersCoversEveryPseudoKindVariant(t *testing.T) {
+	variants := map[string]ast.Kind{
+		"on exit":                   upstreamrule.ListenerOnExit(ast.KindCallExpression),
+		"on allow pattern":          upstreamrule.ListenerOnAllowPattern(ast.KindCallExpression),
+		"on allow pattern exit":     upstreamrule.ListenerOnExit(upstreamrule.ListenerOnAllowPattern(ast.KindCallExpression)),
+		"on not allow pattern":      upstreamrule.ListenerOnNotAllowPattern(ast.KindCallExpression),
+		"on not allow pattern exit": upstreamrule.ListenerOnExit(upstreamrule.ListenerOnNotAllowPattern(ast.KindCallExpression)),
+	}
+
+	for name, kind := range variants {
+		t.Run(name, func(t *testing.T) {
+			listeners := upstreamrule.RuleListeners{kind: func(node *ast.Node) {}}
+			if !UsesExitListeners(listeners) {
+				t.Fatalf("a %s listener (kind %d) was not recognized as a pseudo-kind", name, kind)
+			}
+		})
+	}
+}
+
+// TestRealNodeKindsStayBelowThePseudoKindFloor pins the assumption the threshold rests on.
+//
+// `UsesExitListeners` screens by comparing against a floor rather than by enumerating the five
+// encodings, which is the right shape: it cannot be outgrown by upstream adding a sixth variant.
+// But it is only safe while no real `ast.Kind` reaches that floor. If the TypeScript AST ever grew
+// past 1000 kinds, a legitimate listener would be misread as a pseudo-kind and `Adapt` would start
+// refusing rules that are perfectly adaptable.
+//
+// Upstream declares the same bound as `lastTokenKind`, so this is their invariant as much as ours.
+// It is checked here rather than trusted because the failure is a refusal we would have to debug
+// from the far end, and the check costs one comparison.
+func TestRealNodeKindsStayBelowThePseudoKindFloor(t *testing.T) {
+	if ast.KindCount >= exitListenerOffset {
+		t.Fatalf(
+			"real AST kinds now reach %d, at or past the pseudo-kind floor of %d: the screening threshold in UsesExitListeners is no longer safe",
+			ast.KindCount,
+			exitListenerOffset,
+		)
+	}
+}
