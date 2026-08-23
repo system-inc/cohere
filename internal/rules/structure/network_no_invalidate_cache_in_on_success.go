@@ -1,0 +1,133 @@
+package structure
+
+import (
+	"strings"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/verify/internal/rule"
+)
+
+var messageNoInvalidateCacheInOnSuccess = rule.Message{
+	Id: "noInvalidateCacheInOnSuccess",
+	Description: "This invalidates the cache from inside an `onSuccess` handler. Use the " +
+		"`invalidateOnSuccess` option instead, which puts the invalidation list next to the " +
+		"request that makes it necessary and runs it automatically. Hand-written invalidation in a " +
+		"handler drifts from the request over time: somebody adds a field the request now affects " +
+		"and the handler does not know about it, so the stale read appears somewhere unrelated and " +
+		"nobody connects it back to this line.",
+}
+
+// NetworkNoInvalidateCacheInOnSuccess flags a cache invalidation inside an onSuccess handler.
+//
+//	valid:   useMutation({ invalidateOnSuccess: ['users'] })
+//	valid:   networkService.cache.invalidate(key)                (outside onSuccess)
+//	invalid: useMutation({ onSuccess: () => networkService.cache.invalidate(key) })
+//	invalid: useMutation({ onSuccess() { apiService.cache.invalidate(key); } })
+//
+// Three things must line up before this reports: an `onSuccess` property, a `.cache.invalidate(...)`
+// call somewhere inside it, and a receiver that reads as a service. The original matches the
+// receiver by name, accepting `networkService` exactly or anything containing "service" or
+// "Service", and this reproduces that rather than tightening it, since a rule that reported every
+// `.cache.invalidate` inside an `onSuccess` would catch caches that are not the network's.
+//
+// The property is matched in both spellings, `onSuccess: () => {}` and the method shorthand
+// `onSuccess() {}`, which reach different node kinds. Enumerated before the listener: the original's
+// ESLint selector matches a Property, and the shorthand is a Property in ESTree while it is a method
+// declaration here, so a port reading only the assignment form would miss half the call sites.
+//
+// No fix. Moving an invalidation into the option means deciding which keys belong there and whether
+// anything else in the handler depended on running at that moment.
+var NetworkNoInvalidateCacheInOnSuccess = rule.Rule{
+	Name: "network-no-invalidate-cache-in-on-success",
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		reportInvalidations := func(body *ast.Node) {
+			if body == nil {
+				return
+			}
+			var visit func(*ast.Node)
+			visit = func(current *ast.Node) {
+				if current == nil {
+					return
+				}
+				if current.Kind == ast.KindCallExpression && isServiceCacheInvalidate(current) {
+					ctx.ReportNode(current, messageNoInvalidateCacheInOnSuccess)
+				}
+				current.ForEachChild(func(child *ast.Node) bool {
+					visit(child)
+					return false
+				})
+			}
+			visit(body)
+		}
+
+		return rule.Listeners{
+			// `onSuccess: () => { ... }` and `onSuccess: function () { ... }`.
+			ast.KindPropertyAssignment: func(node *ast.Node) {
+				assignment := node.AsPropertyAssignment()
+				if !isNamedOnSuccess(assignment.Name()) {
+					return
+				}
+				reportInvalidations(assignment.Initializer)
+			},
+
+			// The method shorthand `onSuccess() { ... }`, which is a Property in ESTree and a
+			// method declaration here, so it needs its own listener rather than falling out of the
+			// one above.
+			ast.KindMethodDeclaration: func(node *ast.Node) {
+				method := node.AsMethodDeclaration()
+				if !isNamedOnSuccess(method.Name()) {
+					return
+				}
+				reportInvalidations(method.Body)
+			},
+		}
+	},
+}
+
+// isNamedOnSuccess reports a property named onSuccess, in either the identifier or string spelling.
+func isNamedOnSuccess(name *ast.Node) bool {
+	if name == nil {
+		return false
+	}
+	switch name.Kind {
+	case ast.KindIdentifier, ast.KindStringLiteral:
+		return name.Text() == "onSuccess"
+	}
+	return false
+}
+
+// isServiceCacheInvalidate reports a `<something>.cache.invalidate(...)` whose receiver reads as a
+// service.
+//
+// The name test is the original's and it is deliberately loose: `networkService` exactly, or any
+// name containing "service" in either casing. Tightening it would be a different rule, and loosening
+// it further would catch caches that have nothing to do with the network layer.
+func isServiceCacheInvalidate(call *ast.Node) bool {
+	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
+	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
+		return false
+	}
+
+	invalidate := callee.AsPropertyAccessExpression()
+	if name := invalidate.Name(); name == nil || name.Text() != "invalidate" {
+		return false
+	}
+
+	cacheAccess := ast.SkipParentheses(invalidate.Expression)
+	if cacheAccess == nil || cacheAccess.Kind != ast.KindPropertyAccessExpression {
+		return false
+	}
+
+	cache := cacheAccess.AsPropertyAccessExpression()
+	if name := cache.Name(); name == nil || name.Text() != "cache" {
+		return false
+	}
+
+	receiver := ast.SkipParentheses(cache.Expression)
+	if receiver == nil || receiver.Kind != ast.KindIdentifier {
+		return false
+	}
+
+	receiverName := receiver.Text()
+	return receiverName == "networkService" || strings.Contains(strings.ToLower(receiverName), "service")
+}

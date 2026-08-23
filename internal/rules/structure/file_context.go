@@ -8,7 +8,7 @@ import "strings"
 // before a single node is visited.
 //
 // The TypeScript original computes eighteen flags and memoizes them in a module-level map. Only the
-// three below have a consumer here, and the rest are ported when a rule needs them: a flag nobody
+// four below have a consumer here, and the rest are ported when a rule needs them: a flag nobody
 // reads is a claim nobody checks, and this file is the wrong place to keep a shadow copy of the
 // original's whole surface.
 type FileContext struct {
@@ -24,6 +24,11 @@ type FileContext struct {
 	// IsGeneratedFile marks output nobody edits by hand, where a finding asks for a change that the
 	// next generation would undo.
 	IsGeneratedFile bool
+
+	// IsNetworkServiceFile marks the one implementation allowed to touch the raw fetch primitive.
+	// Every rule routing network access through NetworkService has to exempt NetworkService itself,
+	// or the rule forbids the thing it is asking people to use.
+	IsNetworkServiceFile bool
 }
 
 // nextJsSpecialFileBaseNames are the files Next.js resolves by name. Both React extensions apply to
@@ -53,8 +58,9 @@ func FileContextFor(fileName string) FileContext {
 	}
 
 	return FileContext{
-		IsReactFile:         isReactFile,
-		IsSpecialNextJsFile: isSpecialNextJsFile,
-		IsGeneratedFile:     strings.Contains(normalizedPath, "/generated/"),
+		IsReactFile:          isReactFile,
+		IsSpecialNextJsFile:  isSpecialNextJsFile,
+		IsGeneratedFile:      strings.Contains(normalizedPath, "/generated/"),
+		IsNetworkServiceFile: strings.Contains(normalizedPath, "NetworkService.ts"),
 	}
 }

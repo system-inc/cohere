@@ -60,6 +60,8 @@ func All() []rule.Rule {
 		nexus.ImportRequireNodeNamespace,
 		nexus.ImportRequirePathAlias,
 		nexus.LocalizationNoUntranslatedValue,
+		structure.NetworkNoDirectFetch,
+		structure.NetworkNoInvalidateCacheInOnSuccess,
 		structure.ReactComponentNoMultiplePrimary,
 		tailwind.NoConcatenatedClasses,
 		tailwind.NoDuplicateClasses,
