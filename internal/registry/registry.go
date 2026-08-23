@@ -73,6 +73,7 @@ func All() []rule.Rule {
 		structure.ReactComponentNoDisplayName,
 		structure.ReactComponentNoForwardRef,
 		structure.ReactComponentNoMultiplePrimary,
+		structure.ReactImportNoDestructuring,
 		structure.ReactNoAnchorElement,
 		structure.ReactNoHorizontalRuleElement,
 		tailwind.NoConcatenatedClasses,

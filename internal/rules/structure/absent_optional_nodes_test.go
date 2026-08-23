@@ -44,6 +44,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 		ReactNoHorizontalRuleElement,
 		ReactComponentNoForwardRef,
 		ReactComponentNoDisplayName,
+		ReactImportNoDestructuring,
 	}
 
 	for _, currentRule := range rules {
