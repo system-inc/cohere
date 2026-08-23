@@ -3,8 +3,8 @@ package nexus
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
 )
 
@@ -172,8 +172,8 @@ func usesThis(node *ast.Node) bool {
 // and it produced the one false finding this rule had on the ahra tree.
 func spansOneLine(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	tokenRange := rule.TokenRange(sourceFile, node)
-	startLine, _ := scanner.GetLineAndCharacterOfPosition(sourceFile, tokenRange.Pos())
-	endLine, _ := scanner.GetLineAndCharacterOfPosition(sourceFile, tokenRange.End())
+	startLine, _ := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, tokenRange.Pos())
+	endLine, _ := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, tokenRange.End())
 	return startLine == endLine
 }
 

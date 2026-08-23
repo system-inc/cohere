@@ -1,7 +1,5 @@
 package nexus
 
-import "strings"
-
 // The candidate gate, expressed as lookups rather than as a regular expression.
 //
 // This decides whether a name is worth spending the rest of the rule on, and it runs once per
@@ -25,10 +23,10 @@ import "strings"
 // it: two earlier attempts at this gate both lost `elapsedMs`, and a hand-written list does not
 // contain the case its author misread.
 
-// wholeWordAbbreviations are names that are an abbreviation entire.
+// gateWholeWordNames are names that are an abbreviation entire.
 //
 // From the pattern's first arm, which anchors both ends.
-var wholeWordAbbreviations = map[string]bool{
+var gateWholeWordNames = map[string]bool{
 	"prop": true, "props": true, "param": true, "params": true, "ref": true, "config": true,
 	"idx": true, "arg": true, "args": true, "acc": true, "char": true, "fn": true, "str": true,
 	"val": true, "arr": true, "obj": true, "num": true, "res": true, "err": true, "req": true,
@@ -36,12 +34,12 @@ var wholeWordAbbreviations = map[string]bool{
 	"ctx": true, "db": true, "tx": true, "queryFn": true, "mutationFn": true,
 }
 
-// prefixAbbreviations begin a camelCase name, so the next character is uppercase.
+// gatePrefixNames begin a camelCase name, so the next character is uppercase.
 //
 // From the pattern's second arm. Deliberately not the same set as the whole-word arm: `acc` and the
 // two TanStack names appear only as whole words in the pattern, and widening here would be a change
 // in behavior rather than a change in representation.
-var prefixAbbreviations = map[string]bool{
+var gatePrefixNames = map[string]bool{
 	"ctx": true, "db": true, "tx": true, "opts": true, "cur": true, "pct": true, "prev": true,
 	"idx": true, "config": true, "prop": true, "props": true, "param": true, "params": true,
 	"ref": true, "arg": true, "args": true, "char": true, "fn": true, "str": true, "val": true,
@@ -49,22 +47,22 @@ var prefixAbbreviations = map[string]bool{
 	"min": true, "max": true,
 }
 
-// suffixAbbreviations end a camelCase name, so they are capitalized and reach the end.
+// gateSuffixNames end a camelCase name, so they are capitalized and reach the end.
 //
 // From the pattern's third arm.
-var suffixAbbreviations = map[string]bool{
+var gateSuffixNames = map[string]bool{
 	"Prop": true, "Props": true, "Param": true, "Params": true, "Ref": true, "Config": true,
 	"Idx": true, "Arg": true, "Args": true, "Char": true, "Fn": true, "Str": true, "Val": true,
 	"Arr": true, "Obj": true, "Num": true, "Res": true, "Err": true, "Req": true, "Msg": true,
 	"Min": true, "Max": true,
 }
 
-// segmentAbbreviations appear as a camelCase word anywhere in a name, followed by the end, another
+// gateSegmentNames appear as a camelCase word anywhere in a name, followed by the end, another
 // word, or a digit.
 //
 // From the pattern's fifth arm. `Ms` is handled separately because its arm tests the character
 // *before* it as well.
-var segmentAbbreviations = map[string]bool{
+var gateSegmentNames = map[string]bool{
 	"Cwd": true, "Dir": true, "Env": true, "Cli": true, "Len": true, "Seq": true,
 	"Db": true, "Tx": true, "Vars": true, "Var": true,
 }
@@ -83,7 +81,7 @@ func isAbbreviationCandidate(name string) bool {
 	}
 
 	// First arm: the whole name is an abbreviation.
-	if wholeWordAbbreviations[name] {
+	if gateWholeWordNames[name] {
 		return true
 	}
 
@@ -93,7 +91,7 @@ func isAbbreviationCandidate(name string) bool {
 	// prefix in the pattern is anchored at the start and is entirely lowercase.
 	for index := 1; index < len(name) && index <= longestAbbreviationLength; index++ {
 		if isUppercaseAsciiLetter(name[index]) {
-			if prefixAbbreviations[name[:index]] {
+			if gatePrefixNames[name[:index]] {
 				return true
 			}
 			break
@@ -106,7 +104,7 @@ func isAbbreviationCandidate(name string) bool {
 	// three silently loses every name ending in it. The corpus caught that, on `accessorFn`,
 	// `LanguageFn`, `noFn`, and a bare `Fn`.
 	for length := 2; length <= 6 && length <= len(name); length++ {
-		if suffixAbbreviations[name[len(name)-length:]] {
+		if gateSuffixNames[name[len(name)-length:]] {
 			return true
 		}
 	}
@@ -140,7 +138,7 @@ func isAbbreviationCandidate(name string) bool {
 			continue
 		}
 		for length := 2; length <= 4 && index+length <= len(name); length++ {
-			if !segmentAbbreviations[name[index:index+length]] {
+			if !gateSegmentNames[name[index:index+length]] {
 				continue
 			}
 			after := index + length

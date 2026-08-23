@@ -3,9 +3,9 @@ package nexus
 import (
 	"strings"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 )
 
 // Three rules judge comments rather than nodes, and a comment is not a node: it is trivia the
@@ -62,8 +62,8 @@ func allComments(sourceFile *ast.SourceFile) []Comment {
 		if start < 0 || end > len(text) || start >= end {
 			return
 		}
-		startLine, startColumn := scanner.GetLineAndCharacterOfPosition(sourceFile, start)
-		endLine, _ := scanner.GetLineAndCharacterOfPosition(sourceFile, end)
+		startLine, startColumn := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, start)
+		endLine, _ := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, end)
 
 		comments = append(comments, Comment{
 			Range:       commentRange.TextRange,

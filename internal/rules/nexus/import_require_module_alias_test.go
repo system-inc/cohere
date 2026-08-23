@@ -3,7 +3,7 @@ package nexus
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/ruletest"
 )
 
@@ -81,7 +81,7 @@ func TestImportRequireModuleAliasReportsAtTheBinding(t *testing.T) {
 	result := ruletest.Run(t, ImportRequireModuleAlias, moduleAliasFile, sourceText)
 	ruletest.ExpectFindings(t, result, "requireAliasName")
 
-	line, _ := scanner.GetLineAndCharacterOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
+	line, _ := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
 	const importLine = 3 // zero-based, so the fourth line
 	if line != importLine {
 		t.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)

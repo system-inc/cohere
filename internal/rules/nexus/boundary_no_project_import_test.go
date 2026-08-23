@@ -3,7 +3,7 @@ package nexus
 import (
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/ruletest"
 )
 
@@ -71,7 +71,7 @@ func TestBoundaryNoProjectImportReportsAtTheSpecifier(t *testing.T) {
 		t.Fatalf("expected a finding, got none")
 	}
 
-	line, _ := scanner.GetLineAndCharacterOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
+	line, _ := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
 	const importLine = 2 // zero-based, so the third line
 	if line != importLine {
 		t.Fatalf("expected the finding on the import line (%d), got line %d", importLine+1, line+1)

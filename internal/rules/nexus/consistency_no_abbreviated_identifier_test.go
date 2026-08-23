@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/ruletest"
 )
 
@@ -462,7 +462,7 @@ func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(t *testing.T) 
 				t.Fatalf("expected a finding, got none")
 			}
 
-			line, column := scanner.GetLineAndCharacterOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
+			line, column := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
 			if line+1 != testCase.wantLine || column+1 != testCase.wantColumn {
 				t.Fatalf("expected the finding at %d:%d, got %d:%d",
 					testCase.wantLine, testCase.wantColumn, line+1, column+1)
