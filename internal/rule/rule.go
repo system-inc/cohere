@@ -182,6 +182,24 @@ type Listeners map[ast.Kind]func(node *ast.Node)
 type Rule struct {
 	Name string
 	Run  func(ctx Context, options any) Listeners
+
+	// NeedsTypeChecker declares that this rule reads ctx.TypeChecker.
+	//
+	// The checker is handed out under an exclusive per-file lock, so acquiring it serializes the
+	// whole walk of that file against every other file's walk. Declaring the need lets the walk skip
+	// the acquisition entirely on files where no applicable rule wants types, which is every file in
+	// the current catalog: of 112 rule files exactly one reads the checker, and it is the tsgolint
+	// adapter, which registers no rules yet.
+	//
+	// Measured before this field existed: the exclusive lock cost the lint phase about 50%, 366-417ms
+	// against 557-575ms on the same tree, paid on every file for rules that never asked a type
+	// question.
+	//
+	// A rule that leaves this false and then reads ctx.TypeChecker gets nil, which is the same thing
+	// it gets when the program fails to build. That is deliberate: a rule silently reading a checker
+	// it did not declare would reintroduce the data race this lock exists to prevent, and a nil
+	// dereference is a loud failure where a race is a quiet one.
+	NeedsTypeChecker bool
 }
 
 // ReportNode is the common case: this node is wrong, here is why.

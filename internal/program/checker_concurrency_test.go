@@ -65,6 +65,12 @@ func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
 	queries := 0
 	probe := rule.Rule{
 		Name: "test-checker-under-concurrency",
+
+		// Declared, because the walk hands out a checker only to rules that ask for one. Without
+		// this the probe is dispatched with a nil checker and the test fails on its own first
+		// assertion — which is the guard working, and is why that assertion is worth keeping.
+		NeedsTypeChecker: true,
+
 		Run: func(ctx rule.Context, options any) rule.Listeners {
 			if ctx.TypeChecker == nil {
 				t.Error("a rule was dispatched without a checker")

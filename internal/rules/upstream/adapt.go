@@ -61,6 +61,16 @@ func Adapt(subject upstreamrule.Rule) (rule.Rule, error) {
 
 	adapted := rule.Rule{
 		Name: subject.Name,
+
+		// Every adapted rule is assumed to read the checker, because the adapter hands
+		// context.TypeChecker to upstream below and cannot see whether the rule it wraps uses it.
+		//
+		// Declaring this per-rule from upstream metadata would be more precise and is not worth the
+		// risk: the failure mode of under-declaring is a nil checker inside a type-aware rule, and
+		// the failure mode of over-declaring is that a file pays for a lock it did not need. The
+		// second is a measured cost, the first is a crash.
+		NeedsTypeChecker: true,
+
 		Run: func(context rule.Context, options any) rule.Listeners {
 			upstreamListeners := subject.Run(upstreamContext(context, subject.Name), options)
 			if len(upstreamListeners) == 0 {

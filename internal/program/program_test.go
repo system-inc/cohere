@@ -127,6 +127,11 @@ func TestWalkDispatchesRulesWithALiveChecker(t *testing.T) {
 	typeNames := []string{}
 	typeReporter := rule.Rule{
 		Name: "test-report-initializer-type",
+
+		// Declared, because the walk acquires a checker only for rules that ask. The nil assertion
+		// below is what catches an undeclared rule, and it caught this one.
+		NeedsTypeChecker: true,
+
 		Run: func(ctx rule.Context, options any) rule.Listeners {
 			if ctx.TypeChecker == nil {
 				t.Error("a rule was dispatched without a checker")
