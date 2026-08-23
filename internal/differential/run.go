@@ -190,6 +190,10 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		GatePopulation:   Population{Findings: len(gateParsed.Findings), FilesWalked: gateFilesWalked},
 		VerifyRules:      options.VerifyRules,
 		ConfiguredRules:  options.ConfiguredRules,
+		// The known gate defects are compiled in rather than passed at the command line: an
+		// acknowledgement that can be supplied per-run can be supplied by whoever wants a green
+		// result, and this list is reviewed like any other code.
+		Acknowledged: KnownGateDefects,
 	})
 
 	report.Provenance = Provenance{

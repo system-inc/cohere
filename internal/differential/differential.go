@@ -20,6 +20,7 @@ package differential
 
 import (
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 )
@@ -133,6 +134,20 @@ type Difference struct {
 	Planted bool
 }
 
+// printAcknowledgedCaveat states that a green verdict rested on an acknowledgement.
+//
+// Factored out because there is more than one way to pass, and a caveat attached to only some of
+// them is worse than none: it reads as absent on exactly the paths nobody checked. That is the same
+// failure the scoped verdict above exists to prevent, arriving through the fix for it.
+func printAcknowledgedCaveat(out io.Writer, byClassification map[Classification]int) {
+	if acknowledgedCount := byClassification[ClassificationAcknowledged]; acknowledgedCount > 0 {
+		fmt.Fprintf(out,
+			"  %d differences were acknowledged rather than absent, each with a recorded reason\n",
+			acknowledgedCount,
+		)
+	}
+}
+
 // Classification is the mechanical part of "why do these disagree."
 //
 // It is deliberately coarse. Most differences are configuration rather than correctness, and the
@@ -153,6 +168,13 @@ const (
 	// still disagree on this file and line. This is the class that is always a defect in one of the
 	// two gates, and the only class that blocks the claim.
 	ClassificationBothActive Classification = "both-active"
+	// ClassificationAcknowledged means somebody looked at this exact finding and decided the
+	// difference is correct, with a reason recorded in KnownGateDefects.
+	//
+	// It is a class rather than a deletion so the difference still appears in the report. A
+	// difference that stops being printed stops being reviewed, and an acknowledgement nobody
+	// re-reads is how a known bug becomes a permanent one.
+	ClassificationAcknowledged Classification = "acknowledged"
 	// ClassificationUnclassified is an honest absence rather than a default. It means the harness
 	// could not decide from the evidence it has.
 	ClassificationUnclassified Classification = "unclassified"
@@ -239,10 +261,31 @@ type Inputs struct {
 	// ConfiguredRules is every rule name the lint config enables. A verify rule absent here ran over
 	// no files by design.
 	ConfiguredRules map[string]bool
+	// Acknowledged are differences someone decided are correct, each with a reason. Nil means none,
+	// which is the honest default: an empty list excuses nothing.
+	Acknowledged []AcknowledgedDifference
 }
 
 // Compare diffs two runs and classifies every difference.
 func Compare(inputs Inputs) Report {
+	acknowledged := acknowledgedIndex(inputs.Acknowledged)
+
+	// Per-rule tallies of how many differences were acknowledged, so a rule whose differences are
+	// all accounted for is not reported as an open disagreement.
+	type ruleDifferenceCounts struct{ total, acknowledged int }
+	differencesForRule := map[string]*ruleDifferenceCounts{}
+	countDifference := func(ruleName string, classification Classification) {
+		counts := differencesForRule[ruleName]
+		if counts == nil {
+			counts = &ruleDifferenceCounts{}
+			differencesForRule[ruleName] = counts
+		}
+		counts.total++
+		if classification == ClassificationAcknowledged {
+			counts.acknowledged++
+		}
+	}
+
 	report := Report{
 		VerifyPopulation: inputs.VerifyPopulation,
 		GatePopulation:   inputs.GatePopulation,
@@ -283,10 +326,12 @@ func Compare(inputs Inputs) Report {
 			continue
 		}
 		agreement.OnlyVerify++
+		classification := classifyFinding(finding, SideVerify, inputs, acknowledged)
+		countDifference(finding.Rule, classification)
 		report.Differences = append(report.Differences, Difference{
 			Finding:        finding,
 			OnlyOn:         SideVerify,
-			Classification: classify(finding.Rule, SideVerify, inputs),
+			Classification: classification,
 		})
 	}
 
@@ -296,10 +341,12 @@ func Compare(inputs Inputs) Report {
 		}
 		agreement := agreementFor(finding.Rule)
 		agreement.OnlyGate++
+		classification := classifyFinding(finding, SideGate, inputs, acknowledged)
+		countDifference(finding.Rule, classification)
 		report.Differences = append(report.Differences, Difference{
 			Finding:        finding,
 			OnlyOn:         SideGate,
-			Classification: classify(finding.Rule, SideGate, inputs),
+			Classification: classification,
 		})
 	}
 
@@ -313,6 +360,13 @@ func Compare(inputs Inputs) Report {
 			side = SideGate
 		}
 		agreement.Classification = classify(ruleName, side, inputs)
+
+		// A rule whose every difference was acknowledged is acknowledged, not both-active. Leaving
+		// it both-active would print the rule as an unresolved defect beside a per-finding line
+		// saying it is resolved, and a reader trusts the summary over the detail.
+		if differences := differencesForRule[ruleName]; differences != nil && differences.total == differences.acknowledged {
+			agreement.Classification = ClassificationAcknowledged
+		}
 		report.Agreements = append(report.Agreements, *agreement)
 	}
 
@@ -331,6 +385,20 @@ func Compare(inputs Inputs) Report {
 	})
 
 	return report
+}
+
+// classifyFinding is classify plus the acknowledgement check, which needs the finding rather than
+// only its rule name.
+//
+// The acknowledgement is consulted first and matched on file, line, rule and side together. Anything
+// looser would excuse the next drift in the same rule, and the point of writing the reason down is
+// that it stays attached to the one case it was written about.
+func classifyFinding(finding Finding, onlyOn Side, inputs Inputs, acknowledged map[string]AcknowledgedDifference) Classification {
+	key := AcknowledgedDifference{File: finding.File, Line: finding.Line, Rule: finding.Rule, Side: onlyOn}.Key()
+	if _, known := acknowledged[key]; known {
+		return ClassificationAcknowledged
+	}
+	return classify(finding.Rule, onlyOn, inputs)
 }
 
 // classify decides why a rule's findings differ, from the two runs alone.
@@ -469,9 +537,11 @@ func Write(out *strings.Builder, report Report) {
 					"  the other %d are unported and were not compared, so this is not a verdict about them\n",
 				report.ComparedRules, report.ConfiguredRules, report.ConfiguredRules-report.ComparedRules,
 			)
+			printAcknowledgedCaveat(out, byClassification)
 			return
 		}
 		fmt.Fprintf(out, "\n✓ agrees: every rule active on both sides reported the same findings\n")
+		printAcknowledgedCaveat(out, byClassification)
 		return
 	}
 
@@ -486,4 +556,7 @@ func Write(out *strings.Builder, report Report) {
 	fmt.Fprintf(out, "\n✗ disagrees: %d findings differ on rules both sides had enabled\n",
 		byClassification[ClassificationBothActive],
 	)
+	if acknowledgedCount := byClassification[ClassificationAcknowledged]; acknowledgedCount > 0 {
+		fmt.Fprintf(out, "  %d further differences were acknowledged and are not counted above\n", acknowledgedCount)
+	}
 }
