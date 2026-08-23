@@ -38,6 +38,15 @@ type FileContext struct {
 	// IsHorizontalRuleComponentFile is the same exemption for <hr> and the HorizontalRule component.
 	IsHorizontalRuleComponentFile bool
 
+	// IsInLibrariesStructure marks a file inside the shared component library.
+	//
+	// The direction of the boundary is what makes this different from the exemptions above. Those
+	// name one file that is allowed to do what a rule forbids everywhere else; this names the side
+	// of the tree where a stricter rule applies. Library code may only use values the library itself
+	// defines, because a project-specific value compiled into a shared component is a dependency
+	// pointing the wrong way: the library would need the project to build.
+	IsInLibrariesStructure bool
+
 	// IsPageFile marks a Next.js page, whose default export is the framework's contract rather
 	// than an authoring choice: Next resolves the route by that export and by nothing else.
 	IsPageFile bool
@@ -92,6 +101,11 @@ func FileContextFor(fileName string) FileContext {
 
 		IsHorizontalRuleComponentFile: strings.Contains(normalizedPath, "/components/layout/HorizontalRule.tsx") ||
 			strings.Contains(normalizedPath, "/components/layout/HorizontalRule.jsx"),
+
+		// A substring rather than a prefix, matching the original. The library is a submodule and
+		// sits at a different depth depending on which project checked it out, so anchoring at the
+		// repository root would make the boundary depend on the consumer's layout.
+		IsInLibrariesStructure: strings.Contains(normalizedPath, "/libraries/structure/"),
 
 		IsPageFile: strings.HasSuffix(normalizedPath, "/page.tsx") ||
 			strings.HasSuffix(normalizedPath, "/page.jsx"),

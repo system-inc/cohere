@@ -27,8 +27,17 @@ const defaultTsConfig = `{
 		"moduleDetection": "force",
 		"types": []
 	},
-	"include": ["*.ts", "*.tsx"]
+	"include": ["**/*.ts", "**/*.tsx"]
 }`
+
+// The include pattern recurses, and it did not until a fixture needed a nested path.
+//
+// `*.ts` matches only the temp root, so a multi-file fixture laying its files out on realistic
+// paths silently produced a program with no inputs. That surfaced as `TS18003` from the config
+// reader rather than as a wrong finding, which is the good direction, but it also meant any rule
+// deciding on directory structure could only be fixtured against flat filenames it would never see
+// in the tree. `boundary-no-project-theme-value` gates on `/libraries/structure/source/` and cannot
+// be proven at all without real paths.
 
 // RunTyped runs a rule against a real type graph, so a rule that asks the checker questions can
 // actually be proven.

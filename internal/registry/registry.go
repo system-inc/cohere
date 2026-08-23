@@ -70,6 +70,7 @@ func All() []rule.Rule {
 		nexus.ImportRequireNodeNamespace,
 		nexus.ImportRequirePathAlias,
 		nexus.LocalizationNoUntranslatedValue,
+		structure.BoundaryNoProjectThemeValue,
 		structure.NetworkNoDirectFetch,
 		structure.NetworkNoForbiddenImport,
 		structure.NetworkNoInvalidateCacheInOnSuccess,
