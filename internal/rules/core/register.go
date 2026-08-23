@@ -21,6 +21,7 @@ func init() {
 		rule.Registration{Rule: NoCaseDeclarations},
 		rule.Registration{Rule: NoCompareNegZero},
 		rule.Registration{Rule: NoCaller},
+		rule.Registration{Rule: NoControlRegex},
 		rule.Registration{Rule: NoIterator},
 		rule.Registration{Rule: NoNewNativeNonconstructor},
 		rule.Registration{
