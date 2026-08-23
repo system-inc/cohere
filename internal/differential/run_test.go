@@ -486,3 +486,78 @@ func TestTheCapturedVersionDistinguishesTwoBuilds(t *testing.T) {
 		t.Fatalf("a binary that printed nothing must say so, got %q", quiet)
 	}
 }
+
+// A finding in a planted file is the harness looking at itself, whatever rule produced it.
+//
+// The first version of this matched on the control's declared rule, which left any other rule
+// firing on the same planted file counted as observed. One did: a control file written for an
+// import-alias rule also tripped the gate's import-ordering rule, and the summary read
+// "1 observed, 2 planted" when all three were this harness's footprint.
+//
+// The number in that summary is what a reader trusts, and overstating it by the harness's own
+// perturbation is how a tree with a real gap of zero gets reported as having one.
+func TestAnyFindingInAPlantedFileIsPlanted(t *testing.T) {
+	planted := []Control{
+		{Name: "declared", RelativePath: "control/Planted.ts", Rule: "consistency-no-enum", ExpectedSide: SideVerify},
+		{Name: "support", RelativePath: "control/Target.ts", ExpectsNothing: true},
+	}
+
+	report := Report{Differences: []Difference{
+		// The rule the control was written for.
+		{Finding: Finding{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum"}, OnlyOn: SideVerify},
+		// A different rule, same planted file. Still the harness's own footprint.
+		{Finding: Finding{File: "control/Planted.ts", Line: 1, Rule: "consistency-organize-imports"}, OnlyOn: SideGate},
+		// A support file asserts nothing but a rule may still fire on it.
+		{Finding: Finding{File: "control/Target.ts", Line: 1, Rule: "consistency-require-constant-casing"}, OnlyOn: SideGate},
+		// A real file the harness never touched.
+		{Finding: Finding{File: "app/Real.tsx", Line: 9, Rule: "react-component-no-multiple-primary"}, OnlyOn: SideGate},
+	}}
+
+	markPlantedDifferences(&report, planted)
+
+	observed := report.ObservedDifferences()
+	if len(observed) != 1 {
+		t.Fatalf("only the untouched file's finding is observed, got %d: %+v", len(observed), observed)
+	}
+	if observed[0].Finding.File != "app/Real.tsx" {
+		t.Fatalf("the observed difference must be the one in a file the harness did not write, got %q", observed[0].Finding.File)
+	}
+
+	// The control: a report with no planted files must leave everything observed, so this cannot
+	// pass against a marker that flags indiscriminately.
+	untouched := Report{Differences: []Difference{
+		{Finding: Finding{File: "app/Real.tsx", Line: 9, Rule: "react-component-no-multiple-primary"}},
+	}}
+	markPlantedDifferences(&untouched, nil)
+	if len(untouched.ObservedDifferences()) != 1 {
+		t.Fatal("with nothing planted, every difference must remain observed")
+	}
+}
+
+// A planted control must not block agreement.
+//
+// Proving detection requires creating a difference, so counting a control against the verdict would
+// mean the harness could never agree with itself: the very run that demonstrates the instrument
+// works would fail on the evidence that it does.
+func TestAPlantedBothActiveDifferenceDoesNotBlockAgreement(t *testing.T) {
+	report := Compare(Inputs{
+		VerifyFindings:   []Finding{{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum", Side: SideVerify}},
+		VerifyPopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 23},
+		GatePopulation:   Population{FilesWalked: 3407},
+		VerifyRules:      map[string]bool{"consistency-no-enum": true},
+		ConfiguredRules:  map[string]bool{"consistency-no-enum": true},
+	})
+	report.Provenance = provenProvenance()
+
+	if report.Agreed() {
+		t.Fatal("before marking, a both-active difference must block agreement")
+	}
+
+	markPlantedDifferences(&report, []Control{
+		{Name: "planted", RelativePath: "control/Planted.ts", Rule: "consistency-no-enum", ExpectedSide: SideVerify},
+	})
+
+	if !report.Agreed() {
+		t.Fatal("once marked as planted, the harness's own control must not count against agreement")
+	}
+}

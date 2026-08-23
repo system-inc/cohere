@@ -203,6 +203,11 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		ControlsRun:       checkControls(planted, report, verifyParsed.Findings, gateParsed.Findings),
 	}
 
+	// Marked after the comparison rather than during it, because Compare must stay unaware of
+	// controls: a comparison that knew which findings were planted could special-case them, and the
+	// controls exist precisely to test the path a real finding takes.
+	markPlantedDifferences(&report, planted)
+
 	return report, nil
 }
 
@@ -606,4 +611,44 @@ func versionLineFrom(output string) string {
 		}
 	}
 	return "version unknown: the binary printed nothing"
+}
+
+// markPlantedDifferences flags the differences this run caused rather than observed.
+//
+// Matched by file rather than by rule, and that distinction was a defect for one revision. Matching
+// on the control's declared rule leaves any OTHER rule that fires on the same planted file counted
+// as observed, and one did: the verify-only control's file trips the gate's import-ordering rule as
+// well as the rule it was written for, so the summary read "1 observed, 2 planted" when both were
+// this harness's own footprint.
+//
+// A file this run wrote did not exist a moment ago, so every finding in it is the harness looking
+// at itself, whatever rule produced it. Support files are included for exactly that reason: they
+// assert nothing, but a rule may still fire on them, and such a finding is no more observed than
+// any other.
+func markPlantedDifferences(report *Report, planted []Control) {
+	for index := range report.Differences {
+		for _, control := range planted {
+			if sharesPath(control.RelativePath, report.Differences[index].Finding.File) {
+				report.Differences[index].Planted = true
+				break
+			}
+		}
+	}
+}
+
+// sharesPath reports whether a finding landed in the file a control planted.
+func sharesPath(controlPath string, findingPath string) bool {
+	return strings.HasSuffix(filepath.ToSlash(findingPath), filepath.ToSlash(controlPath))
+}
+
+// ObservedDifferences returns the differences that are about the codebase rather than about the
+// harness, which is the number a reader means when they ask how far apart the two gates are.
+func (report Report) ObservedDifferences() []Difference {
+	observed := make([]Difference, 0, len(report.Differences))
+	for _, difference := range report.Differences {
+		if !difference.Planted {
+			observed = append(observed, difference)
+		}
+	}
+	return observed
 }

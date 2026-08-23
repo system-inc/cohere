@@ -119,6 +119,18 @@ type Difference struct {
 	OnlyOn Side
 	// Classification is why the two sides disagree, when it can be determined mechanically.
 	Classification Classification
+	// Planted marks a difference the harness caused by planting a control, as distinct from one it
+	// observed in the codebase.
+	//
+	// A planted finding and an observed finding are the same shape in a difference table, and the
+	// summary count is what a reader trusts. So a run with three controls reported "differences: 3
+	// total" on a tree whose real gap was zero, and that number was read as the remaining exposure
+	// and nearly published. Three problems and zero problems plus three proofs the instrument works
+	// are not the same sentence.
+	//
+	// The controls still appear, because hiding them would make the evidence of detection invisible
+	// in the place a reader is looking. They are separated instead of removed.
+	Planted bool
 }
 
 // Classification is the mechanical part of "why do these disagree."
@@ -198,7 +210,11 @@ func (report Report) Agreed() bool {
 	if trustworthy, _ := report.Provenance.Trustworthy(); !trustworthy {
 		return false
 	}
-	for _, difference := range report.Differences {
+	// Observed only. A planted control is a difference this run caused on purpose, and counting it
+	// against agreement would mean the harness could never agree with itself: proving detection
+	// requires creating a difference, so a control that classified both-active would fail the very
+	// run that demonstrated the instrument works.
+	for _, difference := range report.ObservedDifferences() {
 		if difference.Classification == ClassificationBothActive {
 			return false
 		}
@@ -379,13 +395,20 @@ func Write(out *strings.Builder, report Report) {
 		}
 	}
 
+	// Counted over observed differences only. The planted controls are differences in the same
+	// sense and appear in the table below, but a reader trusting this line is asking how far apart
+	// the two gates are, and the controls are the harness's own footprint rather than an answer to
+	// that. A run reporting "differences: 3 total" on a tree with a real gap of zero was read as
+	// three problems and nearly published as the remaining exposure.
+	observed := report.ObservedDifferences()
 	byClassification := map[Classification]int{}
-	for _, difference := range report.Differences {
+	for _, difference := range observed {
 		byClassification[difference.Classification]++
 	}
 
-	fmt.Fprintf(out, "\ndifferences: %d total — %d both-active, %d not-ported, %d not-configured, %d unclassified\n",
-		len(report.Differences),
+	plantedCount := len(report.Differences) - len(observed)
+	fmt.Fprintf(out, "\ndifferences: %d observed, %d planted by this harness — %d both-active, %d not-ported, %d not-configured, %d unclassified\n",
+		len(observed), plantedCount,
 		byClassification[ClassificationBothActive],
 		byClassification[ClassificationNotPorted],
 		byClassification[ClassificationNotConfigured],
@@ -399,8 +422,12 @@ func Write(out *strings.Builder, report Report) {
 		if difference.Classification != ClassificationBothActive {
 			continue
 		}
-		fmt.Fprintf(out, "\n  %s:%d  %s\n    only on: %s\n    %s\n",
-			difference.Finding.File, difference.Finding.Line, difference.Finding.Rule,
+		planted := ""
+		if difference.Planted {
+			planted = "  [planted control, not an observed difference]"
+		}
+		fmt.Fprintf(out, "\n  %s:%d  %s%s\n    only on: %s\n    %s\n",
+			difference.Finding.File, difference.Finding.Line, difference.Finding.Rule, planted,
 			difference.OnlyOn, difference.Finding.Message,
 		)
 	}
