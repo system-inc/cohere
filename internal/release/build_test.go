@@ -1,6 +1,8 @@
 package release
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -39,4 +41,76 @@ func TestDescribeBuildNamesTheFlagsActuallyUsed(t *testing.T) {
 			t.Errorf("the build description %q omits %s, which the build actually passes", description, flag)
 		}
 	}
+}
+
+// A binary that exists and is the right size still says nothing about which machine it runs on.
+// That distinction is the whole point of these: "verified to exist" answers a narrower question
+// than its name implies, and a mis-staged binary passes every check that stops at existence.
+
+func TestVerifyBinaryRefusesTheWrongPlatformsExecutable(t *testing.T) {
+	// The reachable failure: a staging bug writes one target's binary into another's package. It
+	// publishes cleanly, installs cleanly, and fails at exec on a user's machine with a format
+	// error that reads as a broken install rather than as our mistake.
+	darwin := Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
+
+	elf := writeFakeExecutable(t, []byte{0x7f, 'E', 'L', 'F'})
+	if _, err := verifyBinary(elf, darwin); err == nil {
+		t.Fatalf("a Linux binary passed verification as a darwin package's contents")
+	}
+
+	windows := writeFakeExecutable(t, []byte{'M', 'Z'})
+	if _, err := verifyBinary(windows, darwin); err == nil {
+		t.Fatalf("a Windows binary passed verification as a darwin package's contents")
+	}
+}
+
+func TestVerifyBinaryRefusesSomethingThatIsNotAnExecutable(t *testing.T) {
+	// Large enough to clear the size floor and still not a program.
+	notABinary := writeFakeExecutable(t, []byte("#!/bin/sh\necho nope\n"))
+	if _, err := verifyBinary(notABinary, Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"}); err == nil {
+		t.Fatalf("plain text passed verification as a Linux binary")
+	}
+}
+
+func TestVerifyBinaryAcceptsTheRightFormat(t *testing.T) {
+	// A guard that refuses everything is as useless as one that refuses nothing, and it is the
+	// version that gets deleted rather than fixed.
+	cases := map[string][]byte{
+		"darwin":  {0xcf, 0xfa, 0xed, 0xfe},
+		"linux":   {0x7f, 'E', 'L', 'F'},
+		"windows": {'M', 'Z'},
+	}
+	for operatingSystem, magic := range cases {
+		path := writeFakeExecutable(t, magic)
+		target := Target{GoOperatingSystem: operatingSystem, GoArchitecture: "amd64"}
+		if _, err := verifyBinary(path, target); err != nil {
+			t.Errorf("a correct %s binary was refused: %v", operatingSystem, err)
+		}
+	}
+}
+
+func TestEveryTargetHasAKnownExecutableFormat(t *testing.T) {
+	// The guard skips an operating system it has no magic for, so that adding a target never blocks
+	// a release on a missing table entry. That is the right runtime behavior and the wrong thing to
+	// discover silently, so the omission fails here instead.
+	for _, target := range Targets {
+		if _, known := executableMagic[target.GoOperatingSystem]; !known {
+			t.Errorf("%s ships with no executable-format check, so a mis-staged binary would pass", target)
+		}
+	}
+}
+
+// writeFakeExecutable writes a file that clears the size floor and begins with the given bytes.
+func writeFakeExecutable(t *testing.T, magic []byte) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "verify")
+
+	const clearsTheSizeFloor = 2 << 20
+	contents := make([]byte, clearsTheSizeFloor)
+	copy(contents, magic)
+
+	if err := os.WriteFile(path, contents, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

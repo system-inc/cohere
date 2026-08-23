@@ -1,7 +1,9 @@
 package release
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -158,7 +160,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		return StagedPackage{}, err
 	}
 
-	size, err := verifyBinary(binaryPath)
+	size, err := verifyBinary(binaryPath, target)
 	if err != nil {
 		return StagedPackage{}, err
 	}
@@ -270,13 +272,19 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 	return nil
 }
 
-// verifyBinary confirms the build actually produced a runnable file, returning its size.
+// verifyBinary confirms the build produced an executable for the platform it claims, returning its
+// size.
 //
-// Go reports success by exit code, but the artifact is the file. This closes the gap between "the
-// build said it worked" and "there is a binary here", which is the same gap the rebuild cache
-// checks for and the same reason: a missing or empty binary that reaches packaging becomes a
-// published package that resolves to nothing.
-func verifyBinary(path string) (int64, error) {
+// Three questions, because the first two answer something narrower than the name suggests. Go
+// reports success by exit code, but the artifact is the file. A file that exists says nothing about
+// whether it holds a program. And a program says nothing about which machine it runs on.
+//
+// The third check is the one with a reachable failure behind it: a staging bug that wrote one
+// target's binary into another's package would pass existence and size perfectly, publish cleanly,
+// install cleanly, and fail at exec with a format error on a user's machine, reported as a broken
+// install rather than as the packaging mistake it is. Magic bytes separate all three families we
+// ship, so the check costs four bytes of read.
+func verifyBinary(path string, target Target) (int64, error) {
 	information, err := os.Stat(path)
 	if err != nil {
 		return 0, fmt.Errorf("go build reported success but produced no binary at %s: %w", path, err)
@@ -290,7 +298,59 @@ func verifyBinary(path string) (int64, error) {
 		return 0, fmt.Errorf("the binary at %s is %d bytes, which is far too small to be a real build", path, information.Size())
 	}
 
+	if err := requireExecutableFormat(path, target); err != nil {
+		return 0, err
+	}
+
 	return information.Size(), nil
+}
+
+// executableMagic is the leading byte sequence of each executable format we ship.
+//
+// Keyed by GOOS because that is what decides the format: both darwin targets are Mach-O and both
+// windows targets are PE, so the architecture is carried inside the file rather than in its first
+// bytes. That means this catches a binary built for the wrong operating system and not one built
+// for the wrong architecture of the right system, which is a real limit and is stated in the test
+// rather than implied away here.
+var executableMagic = map[string][]byte{
+	// Mach-O 64-bit, little-endian. Go emits this for both darwin targets.
+	"darwin": {0xcf, 0xfa, 0xed, 0xfe},
+	// ELF.
+	"linux": {0x7f, 'E', 'L', 'F'},
+	// PE, which still begins with the DOS stub's "MZ".
+	"windows": {'M', 'Z'},
+}
+
+// requireExecutableFormat reports whether a file is an executable of the format its target expects.
+//
+// An unknown operating system passes rather than failing, because this is a guard against a
+// mis-staged binary and not a gate on which platforms may exist. A new target added to `Targets`
+// without a magic entry should not block a release; `TestEveryTargetHasAKnownExecutableFormat`
+// catches the omission at test time, which is where it belongs.
+func requireExecutableFormat(path string, target Target) error {
+	magic, known := executableMagic[target.GoOperatingSystem]
+	if !known {
+		return nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("reading the binary at %s: %w", path, err)
+	}
+	defer file.Close()
+
+	header := make([]byte, len(magic))
+	if _, err := io.ReadFull(file, header); err != nil {
+		return fmt.Errorf("reading the header of %s: %w", path, err)
+	}
+
+	if !bytes.Equal(header, magic) {
+		return fmt.Errorf(
+			"the binary at %s does not begin like a %s executable (found %x, expected %x) — the wrong target's build may have been staged here",
+			path, target.GoOperatingSystem, header, magic,
+		)
+	}
+	return nil
 }
 
 // compilerPin is which commit of which repository the vendored compiler is pinned to.
