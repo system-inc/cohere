@@ -20,25 +20,27 @@ import (
 // still flag it. ControlDetected catches a detector that cannot detect at all, which a healthy
 // file count says nothing about.
 //
-// # What is proven today, and what is not
+// # What is proven, and how it got there
 //
-// The two directions of detection are not in the same state, and the asymmetry is a fact about the
-// codebase rather than an oversight, so it is written here rather than left for a reader to infer
-// from an empty ControlsRun.
+// Both directions now fire, against ~/Projects/ahra, through `cmd/verify-differential`. Each rests
+// on a structural asymmetry rather than a configurable one, which is what keeps a control from
+// quietly ceasing to discriminate:
 //
-// Gate-only detection has a natural population. Measured cold on ~/Projects/ahra at 01:10 on
-// 2026-08-23, the gate reported 129 findings where verify reported 1, so a difference in that
-// direction occurs without anyone planting anything.
+//	import-require-path-alias      verify has it; the oxlint plugin does not define it at all
+//	consistency-organize-imports   the gate has it; verify does not implement it
 //
-// Verify-only detection has no natural population at all, and cannot be proven without planting a
-// violation only verify can see. Until that has fired once, ControlsProven returns false and the
-// report prints no verdict rather than a clean result — which is the correct answer to a question
-// the harness has not earned, not a defect to be tuned away.
+// A third, shared control asserts a finding both sides must report. It proves the pipeline end to
+// end without claiming direction, and ControlsProven ignores it deliberately so the weaker proof
+// cannot pass as the stronger claim.
 //
-// The controls that exist today are unit-level: they prove Compare and the parsers surface a
-// planted difference. Nothing yet runs both gates end to end against a real file, and the command
-// that would drive that does not exist. So this package is proven as a library and unproven as an
-// instrument, and a reader should not mistake a green test suite for the second thing.
+// This took a while to reach, and the history is worth keeping because the intermediate states all
+// looked like completion. A run with a shared control alone reported a confident population and an
+// empty diff; a run with the verify-only control alone would have been half-blind in a way nothing
+// in the output revealed, since it could miss everything the gate sees and verify does not.
+//
+// The verdict itself has been shown able to go negative, which a clean result cannot establish: the
+// react rule's line threshold was skewed from 60 to 90 in a throwaway build, and the report flipped
+// to `disagrees` with the new differences classified both-active rather than not-ported.
 type Provenance struct {
 	// VerifyFilesLinted and GateFilesLinted are how many files each side actually walked. A zero
 	// here means the run proved nothing regardless of what the diff says.
@@ -52,6 +54,20 @@ type Provenance struct {
 	// VerifyCommand and GateCommand are the exact invocations, so a reader can rerun them.
 	VerifyCommand string
 	GateCommand   string
+
+	// VerifyVersion is what the verify binary says it is, captured from the binary that actually
+	// ran rather than from the source tree beside it.
+	//
+	// This exists because of a real wrong answer. A run at 03:22 reported 128 disagreements on
+	// `react-component-no-multiple-primary`; the rule had landed at 02:46 and the binary being
+	// measured was built at 01:18, so the differences were a stale binary lacking a rule that had
+	// already shipped. The same comparison against a binary built from head reported agreement on
+	// all 128. Nothing in the output distinguished those two runs, because the invocation string is
+	// a path and a path says nothing about what is inside it.
+	//
+	// A binary is the one input to this instrument that changes without leaving a trace in the
+	// report, so its identity is recorded next to the numbers it produced.
+	VerifyVersion string
 
 	// ControlsRun records the planted-violation controls that were exercised this run, if any.
 	// Empty means the harness's ability to detect a difference was not demonstrated, which is a
@@ -179,6 +195,9 @@ func (provenance Provenance) Describe() string {
 
 	fmt.Fprintf(builder, "verify: %d files, %d rules — %s\n",
 		provenance.VerifyFilesLinted, provenance.VerifyRulesRun, provenance.VerifyCommand)
+	if provenance.VerifyVersion != "" {
+		fmt.Fprintf(builder, "        %s\n", provenance.VerifyVersion)
+	}
 	fmt.Fprintf(builder, "gate:   %d files, %d rules — %s\n",
 		provenance.GateFilesLinted, provenance.GateRulesRun, provenance.GateCommand)
 

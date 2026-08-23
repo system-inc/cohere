@@ -198,6 +198,7 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		VerifyRulesRun:    verifyRulesRun,
 		GateRulesRun:      len(options.ConfiguredRules),
 		VerifyCommand:     options.Verify.String(),
+		VerifyVersion:     verifyVersionOf(ctx, options.Verify),
 		GateCommand:       options.Gate.String(),
 		ControlsRun:       checkControls(planted, report, verifyParsed.Findings, gateParsed.Findings),
 	}
@@ -556,4 +557,53 @@ func verifyCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 	command := options.Verify
 	command.Arguments = append(append([]string{}, command.Arguments...), "-lint-config", ".oxlintrc.differential.json")
 	return command, cleanup, nil
+}
+
+// verifyVersionOf asks the binary that ran what it is.
+//
+// Asked of the binary rather than derived from the source tree beside it, because those are exactly
+// the two things that drift apart: a cached or previously-built binary sits at a path whose name
+// says nothing about which rules are compiled into it. A run at 03:22 reported 128 disagreements
+// that were entirely a binary predating the rule they were about.
+//
+// A failure here is recorded as unknown rather than raised. The version is context for a reader,
+// not an input to any verdict, and refusing to compare because a binary declined to introduce
+// itself would be the harness failing over something that changes nothing about the comparison.
+func verifyVersionOf(ctx context.Context, command GateCommand) string {
+	probe := command
+	probe.Arguments = []string{"-version"}
+
+	output, err := runGate(ctx, probe)
+	if err != nil {
+		return "version unknown: " + err.Error()
+	}
+
+	return versionLineFrom(output)
+}
+
+// versionLineFrom picks the line of `verify -version` output that identifies the build.
+//
+// The first line is the version name, and on a local build it is the constant "verify dev" for
+// every binary ever compiled from this tree. Taking it produces a field that is always populated,
+// always plausible, and never distinguishes anything, which is worse than an empty one because it
+// looks like provenance. The first attempt at this did exactly that, and two binaries eleven
+// commits apart rendered identically while producing different results.
+//
+// The commit is what identifies which rules are compiled in, so the line naming it is what is kept.
+func versionLineFrom(output string) string {
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		if trimmed := strings.TrimSpace(line); strings.Contains(trimmed, "built from") {
+			return trimmed
+		}
+	}
+
+	// A release build states its version on the first line instead of naming a commit, so that is
+	// the fallback rather than the preference.
+	for _, line := range lines {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			return trimmed
+		}
+	}
+	return "version unknown: the binary printed nothing"
 }

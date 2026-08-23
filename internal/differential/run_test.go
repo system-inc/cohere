@@ -457,3 +457,32 @@ func TestASupportFileIsNotCountedAsAControl(t *testing.T) {
 		t.Fatal("a run whose only planted files were support files must not be trustworthy")
 	}
 }
+
+// The captured version must be the part that distinguishes two binaries.
+//
+// A local build's first line is the constant "verify dev" for every binary ever compiled from this
+// tree, so keeping it produces a field that is always populated, always plausible, and never
+// distinguishes anything. That is worse than an empty field, because it looks like provenance. The
+// first implementation did exactly that, and two binaries eleven commits apart both rendered
+// identically while producing different results.
+func TestTheCapturedVersionDistinguishesTwoBuilds(t *testing.T) {
+	older := versionLineFrom("verify dev\n  platform:       darwin/arm64\n  typescript-go:  unknown (built from verify bd344fc70555)\n")
+	newer := versionLineFrom("verify dev\n  platform:       darwin/arm64\n  compiler:       unknown (built from verify 107d82cf8568)\n")
+
+	if older == newer {
+		t.Fatalf("two builds from different commits rendered identically as %q, so the field proves nothing", older)
+	}
+	if !strings.Contains(older, "bd344fc70555") || !strings.Contains(newer, "107d82cf8568") {
+		t.Fatalf("the commit must survive: got %q and %q", older, newer)
+	}
+
+	// A release build names no commit and states its version first, so that is the fallback.
+	release := versionLineFrom("verify 1.4.0\n  platform: darwin/arm64\n")
+	if release != "verify 1.4.0" {
+		t.Fatalf("a release build must fall back to its version line, got %q", release)
+	}
+
+	if quiet := versionLineFrom("   \n\n"); !strings.Contains(quiet, "unknown") {
+		t.Fatalf("a binary that printed nothing must say so, got %q", quiet)
+	}
+}
