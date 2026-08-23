@@ -38,6 +38,22 @@ const reactPragma = "React"
 //
 // **A computed member counts.** `React['createElement'](...)` is the same call written differently,
 // and a check that read only static members would miss it while looking complete.
+//
+// **Not every upstream rule asks this question the same way, so check before reaching for this.**
+// oxc has one shared `is_create_element_call` and also rules that test the callee themselves, and
+// the two disagree in three directions at once. `no_danger_with_children.rs:76` destructures a
+// `StaticMemberExpression` and returns early otherwise, so it never sees a bare `createElement(...)`,
+// does not reject `document.`, and does not accept a computed member.
+//
+// A port of that rule calling this helper starts reporting where upstream is silent, and its own
+// corpus cannot catch the difference because none of its fixtures writes a bare call. Verified at
+// both sources rather than inferred, after `@system_verify_format` found it while researching the
+// react ports.
+//
+// This function matches `no-children-prop`, which is the shape oxc factored out. A rule that reads
+// its callee inline upstream should read it inline here too, or this needs a parameter rather than
+// a second copy. Nobody has read the remaining seven callers, so that decision is deliberately open
+// rather than guessed.
 func IsCreateElementCall(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return false
