@@ -1,0 +1,187 @@
+package release
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
+
+// The defect these guard is quiet by construction. A manifest whose `os` or `cpu` disagrees with
+// the binary beside it installs on the wrong machine or on none, and either way what a user sees is
+// "no binary for this platform" — the same message a genuinely unsupported platform produces. So
+// the fields are asserted against the same target that builds the binary, which is the only way the
+// two cannot drift.
+
+func TestPlatformManifestDeclaresTheOperatingSystemAndArchitectureNpmResolvesBy(t *testing.T) {
+	cases := []struct {
+		target                  Target
+		expectedName            string
+		expectedOperatingSystem string
+		expectedArchitecture    string
+	}{
+		{Target{"darwin", "arm64"}, "@verify/darwin-arm64", "darwin", "arm64"},
+		{Target{"darwin", "amd64"}, "@verify/darwin-x64", "darwin", "x64"},
+		{Target{"linux", "amd64"}, "@verify/linux-x64", "linux", "x64"},
+		{Target{"windows", "amd64"}, "@verify/win32-x64", "win32", "x64"},
+		{Target{"windows", "arm64"}, "@verify/win32-arm64", "win32", "arm64"},
+	}
+
+	for _, testCase := range cases {
+		manifest := decodeManifest(t, mustPlatformManifest(t, testCase.target, "1.2.3"))
+
+		if manifest["name"] != testCase.expectedName {
+			t.Errorf("%s published as %v, wanted %s", testCase.target, manifest["name"], testCase.expectedName)
+		}
+		if got := singleString(t, manifest["os"]); got != testCase.expectedOperatingSystem {
+			t.Errorf("%s declared os %q, wanted %q — npm would install it on the wrong machine", testCase.target, got, testCase.expectedOperatingSystem)
+		}
+		if got := singleString(t, manifest["cpu"]); got != testCase.expectedArchitecture {
+			t.Errorf("%s declared cpu %q, wanted %q — npm would install it on the wrong machine", testCase.target, got, testCase.expectedArchitecture)
+		}
+	}
+}
+
+func TestPlatformManifestMatchesWhatTheLauncherLooksFor(t *testing.T) {
+	// The launcher builds the package name from Node's process.platform and process.arch, which are
+	// npm's spelling. This asserts the published name is the one it will ask for, for every target
+	// we ship. A mismatch here is a package that publishes, installs, and is never found.
+	for _, target := range Targets {
+		manifest := decodeManifest(t, mustPlatformManifest(t, target, "1.2.3"))
+
+		expected := PlatformPackageScope + "/" + singleString(t, manifest["os"]) + "-" + singleString(t, manifest["cpu"])
+		if manifest["name"] != expected {
+			t.Errorf(
+				"%s publishes as %v, but the launcher on that machine asks for %s",
+				target, manifest["name"], expected,
+			)
+		}
+	}
+}
+
+func TestPlatformManifestClaimsNoCommand(t *testing.T) {
+	// Only the dispatcher owns the `verify` name. A platform package with a `bin` field would race
+	// it for the same link in node_modules/.bin, and which one wins depends on install order.
+	for _, target := range Targets {
+		manifest := decodeManifest(t, mustPlatformManifest(t, target, "1.2.3"))
+		if _, claimed := manifest["bin"]; claimed {
+			t.Errorf("%s declares a bin field, which would fight the dispatcher for node_modules/.bin/verify", target)
+		}
+	}
+}
+
+func TestDispatcherDependsOnEveryPlatformExactly(t *testing.T) {
+	manifest := decodeManifest(t, mustDispatcherManifest(t, "1.2.3"))
+
+	optional, ok := manifest["optionalDependencies"].(map[string]any)
+	if !ok {
+		t.Fatalf("the dispatcher declares no optionalDependencies, so no binary would ever install")
+	}
+
+	for _, target := range Targets {
+		pinned, listed := optional[target.PackageName()]
+		if !listed {
+			t.Errorf("%s is built but never depended on, so it would never install", target.PackageName())
+			continue
+		}
+		// A range would let a resolver pair this dispatcher with a binary built from other rules.
+		if pinned != "1.2.3" {
+			t.Errorf("%s pinned as %v rather than the exact version", target.PackageName(), pinned)
+		}
+	}
+
+	if len(optional) != len(Targets) {
+		t.Errorf("the dispatcher depends on %d platform packages but %d are built", len(optional), len(Targets))
+	}
+}
+
+func TestDispatcherOwnsTheCommandName(t *testing.T) {
+	manifest := decodeManifest(t, mustDispatcherManifest(t, "1.2.3"))
+
+	binaries, ok := manifest["bin"].(map[string]any)
+	if !ok {
+		t.Fatalf("the dispatcher declares no bin, so installing it would create no verify command")
+	}
+	if binaries["verify"] != "bin/verify" {
+		t.Errorf("the verify command points at %v, wanted bin/verify", binaries["verify"])
+	}
+}
+
+func TestLauncherHoldsTheNoFallbackRule(t *testing.T) {
+	// The launcher is generated as a string, so a compiler cannot check it. These assert the
+	// substance rather than the wording: that it exits non-zero on a missing binary, and that no
+	// bare command name appears as something it could run instead.
+	launcher := DispatcherLauncher()
+
+	if strings.Contains(launcher, "__SCOPE__") || strings.Contains(launcher, "__OVERRIDE_VARIABLE__") {
+		t.Fatalf("the launcher shipped with an unreplaced placeholder, so it would resolve nothing")
+	}
+	if !strings.Contains(launcher, PlatformPackageScope) {
+		t.Errorf("the launcher never names the %s scope, so it cannot find a platform package", PlatformPackageScope)
+	}
+	if !strings.Contains(launcher, BinaryOverrideVariable) {
+		t.Errorf("the launcher never reads %s, so a local build cannot be pointed at", BinaryOverrideVariable)
+	}
+	if !strings.Contains(launcher, "process.exit(1)") {
+		t.Errorf("the launcher has no non-zero exit, so a missing binary could report success")
+	}
+
+	// The historical defect, spelled out: resolving to a bare name and letting the shell find
+	// something. If this ever appears, the launcher can spawn a stranger.
+	for _, forbidden := range []string{"spawnSync('verify'", `spawnSync("verify"`, "PATH"} {
+		if strings.Contains(launcher, forbidden) {
+			t.Errorf("the launcher contains %q, which is the fallback-to-PATH bug this rule forbids", forbidden)
+		}
+	}
+}
+
+func TestLauncherDoesNotReportSuccessForASignalledRun(t *testing.T) {
+	// spawnSync reports a null status when the child is killed by a signal, and null is falsy — so
+	// the obvious implementation exits zero for a run that was terminated. That is a green gate over
+	// a killed process.
+	launcher := DispatcherLauncher()
+	if !strings.Contains(launcher, "result.status === null") {
+		t.Errorf("the launcher never checks for a null status, so a signalled run would exit zero")
+	}
+}
+
+func mustPlatformManifest(t *testing.T, target Target, version string) []byte {
+	t.Helper()
+	encoded, err := PlatformManifest(target, version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
+}
+
+func mustDispatcherManifest(t *testing.T, version string) []byte {
+	t.Helper()
+	encoded, err := DispatcherManifest(version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
+}
+
+// decodeManifest parses generated JSON, failing the test if it is not valid.
+func decodeManifest(t *testing.T, encoded []byte) map[string]any {
+	t.Helper()
+	manifest := map[string]any{}
+	if err := json.Unmarshal(encoded, &manifest); err != nil {
+		t.Fatalf("the generated manifest is not valid JSON, so npm would reject the package: %v", err)
+	}
+	return manifest
+}
+
+// singleString reads a JSON array that should hold exactly one string.
+func singleString(t *testing.T, value any) string {
+	t.Helper()
+	values, ok := value.([]any)
+	if !ok || len(values) != 1 {
+		t.Fatalf("expected a one-element array, got %#v", value)
+	}
+	text, ok := values[0].(string)
+	if !ok {
+		t.Fatalf("expected a string, got %#v", values[0])
+	}
+	return text
+}

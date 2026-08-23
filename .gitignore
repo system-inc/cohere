@@ -1,5 +1,7 @@
 # Build output
 /verify
+/verify-dispatch
+/verify-release
 /dist/
 
 # Local caches — the graph snapshot and the rebuild cache both live here

@@ -17,6 +17,7 @@ import (
 	"syscall"
 
 	"github.com/system-inc/verify/internal/dispatch"
+	"github.com/system-inc/verify/internal/release"
 )
 
 func main() {
@@ -48,12 +49,7 @@ func run() error {
 	}
 parsed:
 
-	moduleDirectory, err := findModuleDirectory()
-	if err != nil {
-		return err
-	}
-
-	binaryPath, err := resolveBinary(moduleDirectory, development, verbose)
+	binaryPath, err := resolveBinary(development, verbose)
 	if err != nil {
 		return err
 	}
@@ -69,14 +65,35 @@ parsed:
 	return nil
 }
 
-// resolveBinary picks the binary to run: a locally built one when there is a toolchain, the shipped
-// one when there is not.
-func resolveBinary(moduleDirectory string, development bool, verbose bool) (string, error) {
+// resolveBinary picks the binary to run.
+//
+// There are two worlds and the seam between them is the whole risk. In a source checkout with a Go
+// toolchain, the rules on disk are the truth and a stale binary is the defect, so the rebuild cache
+// decides. On an installed machine there is no source and no toolchain, so the shipped platform
+// binary is the only answer. Both halves are loud on failure; neither falls through to the other,
+// because "rebuild what I cannot see" and "ship a binary I did not build" are each a way of running
+// something other than what was asked for.
+//
+// The order is deliberate. An explicit override wins everywhere, including inside a source
+// checkout, because someone who names a binary has stated what they want to run and a rebuild that
+// quietly overrode them would produce results they would read as their build's.
+func resolveBinary(development bool, verbose bool) (string, error) {
+	if os.Getenv(release.BinaryOverrideVariable) != "" {
+		return release.Resolve(nil)
+	}
+
+	moduleDirectory, moduleErr := findModuleDirectory()
+
+	// No module means an installed package: there is no source to build from, so the shipped
+	// binary is the only option, and a missing one is an error naming the platform.
+	if moduleErr != nil {
+		return resolveInstalled(moduleErr)
+	}
+
 	if !dispatch.HasToolchain() {
-		// No toolchain means no rebuild is possible, so the shipped binary is the only option. If
-		// there is none for this platform, that is a loud error naming the platform. It is never a
-		// fallback to something that might do nothing.
-		return dispatch.ResolvePrebuilt(moduleDirectory)
+		// Source is present but nothing can compile it. The shipped binary is still the right
+		// answer, and it is still never a fallback to something that might do nothing.
+		return resolveInstalled(dispatch.ErrNoToolchain)
 	}
 
 	paths := dispatch.DefaultPaths(moduleDirectory)
@@ -88,6 +105,31 @@ func resolveBinary(moduleDirectory string, development bool, verbose bool) (stri
 
 	if built && verbose {
 		fmt.Fprintf(os.Stderr, "verify: rules changed, rebuilt %s\n", filepath.Base(binaryPath))
+	}
+	return binaryPath, nil
+}
+
+// resolveInstalled finds the shipped platform binary, reporting why building was not an option.
+//
+// The reason is carried into the failure because the two ways of arriving here call for different
+// fixes: no module means the install is incomplete, while no toolchain in a real checkout means the
+// developer needs Go. A single message covering both would send half its readers the wrong way.
+func resolveInstalled(reason error) (string, error) {
+	workingDirectory, _ := os.Getwd()
+
+	executablePath := ""
+	if executable, err := os.Executable(); err == nil {
+		// Symlinks are resolved because `node_modules/.bin/verify` is one, and the package holding
+		// the platform binary sits beside the real file rather than beside the link.
+		if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+			executable = resolved
+		}
+		executablePath = executable
+	}
+
+	binaryPath, err := release.Resolve(release.SearchRoots(workingDirectory, executablePath))
+	if err != nil {
+		return "", fmt.Errorf("%w\n(no local build was possible: %s)", err, reason)
 	}
 	return binaryPath, nil
 }

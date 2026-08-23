@@ -1,0 +1,194 @@
+# Builds every platform binary and stages the npm packages for one version.
+#
+# There is no build matrix, which is the whole point of writing verify in Go: one machine
+# cross-compiles all six targets in a couple of minutes, so there is no fan-out to keep in sync and
+# no chance of six jobs disagreeing about the version they stamped. The single job also means the
+# release is atomic by construction — a target that fails to build fails the job rather than leaving
+# five published packages and one missing platform.
+#
+# It runs on macOS rather than Linux for one reason: codesigning needs `codesign` and the Apple
+# toolchain, and a signature applied on a machine other than the one that built the binary is one
+# more seam. Everything else about the build is platform-independent.
+name: release
+
+on:
+    workflow_dispatch:
+        inputs:
+            version:
+                description: The version to stamp and publish, like 0.3.1
+                required: true
+                type: string
+            publish:
+                description: Publish to npm rather than only staging the packages
+                required: false
+                default: false
+                type: boolean
+
+# A release writes to the registry, so two of them running at once could interleave and publish a
+# half-matched set. Concurrency is serialized rather than cancelled: cancelling a release mid-publish
+# is worse than making the second one wait.
+concurrency:
+    group: release
+    cancel-in-progress: false
+
+jobs:
+    release:
+        runs-on: macos-15
+        timeout-minutes: 45
+
+        # Secrets are lifted to job-level environment variables because the `secrets` context is not
+        # available in an `if:` conditional — referencing it there is a parse-time error
+        # ("Unrecognized named-value: 'secrets'"), not a condition that evaluates false. Mapping to
+        # `env` and testing that is the documented way to make a step conditional on a secret
+        # existing, which is what lets an unsigned staging run work for someone without credentials.
+        env:
+            MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+            MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+            MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+            KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+            APPLE_ID: ${{ secrets.APPLE_ID }}
+            APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+            APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  # The vendored compiler is most of the code in the binary, and the version stamp
+                  # records which commit it was. Without the submodule the build fails outright,
+                  # which is the correct outcome but a confusing one to debug from a clone error.
+                  submodules: true
+                  # `--version` reports the pinned typescript-go commit, read with `git rev-parse`.
+                  # A shallow submodule still resolves HEAD, so depth is left at the default only
+                  # for the outer repository.
+                  fetch-depth: 0
+
+            - uses: actions/setup-go@v5
+              with:
+                  go-version-file: go.mod
+                  cache: true
+
+            - name: Check the module before building anything
+              # A release is not the place to discover a formatting or vet failure. These are the
+              # same checks the repository is gated by, run first so a bad tree never reaches the
+              # signing keys.
+              run: |
+                  test -z "$(gofmt -l ./cmd ./internal ./tools)" || {
+                      echo "unformatted files:"
+                      gofmt -l ./cmd ./internal ./tools
+                      exit 1
+                  }
+                  go vet ./cmd/... ./internal/... ./tools/...
+                  go test ./cmd/... ./internal/... ./tools/...
+
+            - name: Import the signing certificate
+              # Skipped when the secret is absent, so a fork or a contributor without credentials
+              # still gets a working staged release. What it must never do is appear to sign and
+              # not sign, which is why the build reports its own signing state at the end.
+              if: env.MACOS_CERTIFICATE != ''
+              run: |
+                  # A dedicated keychain rather than the login one: it is created for this run and
+                  # dies with the runner, so the certificate never persists anywhere.
+                  security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+                  security default-keychain -s build.keychain
+                  security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+                  # Without a timeout the keychain relocks partway through a long build and
+                  # codesign starts failing halfway down the target list.
+                  security set-keychain-settings -t 3600 -u build.keychain
+
+                  echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+                  security import certificate.p12 \
+                      -k build.keychain \
+                      -P "$MACOS_CERTIFICATE_PASSWORD" \
+                      -T /usr/bin/codesign
+                  rm certificate.p12
+
+                  # Without this, codesign prompts for keychain access and hangs a headless runner
+                  # until the job times out.
+                  security set-key-partition-list \
+                      -S apple-tool:,apple:,codesign: \
+                      -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+            - name: Store the notarization credentials
+              if: env.APPLE_ID != ''
+              run: |
+                  # Stored as a profile rather than passed on the command line, because a command
+                  # line is visible to every process on the machine and lands in the run log.
+                  xcrun notarytool store-credentials verify-notary \
+                      --apple-id "$APPLE_ID" \
+                      --team-id "$APPLE_TEAM_ID" \
+                      --password "$APPLE_APP_PASSWORD" \
+                      --keychain build.keychain
+
+            - name: Stage every platform package
+              run: |
+                  # The notary profile name is only meaningful if the credentials step actually ran,
+                  # and that is decided in the shell rather than in an expression because `secrets`
+                  # cannot appear in a workflow conditional at all.
+                  notary_profile=""
+                  if [ -n "$APPLE_ID" ]; then
+                      notary_profile="verify-notary"
+                  fi
+
+                  go run ./cmd/verify-release \
+                      --version "${{ inputs.version }}" \
+                      --output dist \
+                      --signing-identity "$MACOS_SIGNING_IDENTITY" \
+                      --notary-profile "$notary_profile"
+
+            - name: Prove the binary this run produced actually runs
+              # The build already checks that a file exists and is a plausible size. This checks
+              # that the artifact for this machine executes and reports the version that was asked
+              # for. A binary that builds, packages, and cannot run is the failure that reaches
+              # users, and it is invisible to every check that does not execute it.
+              run: |
+                  ./dist/darwin-arm64/bin/verify --version
+                  reported=$(./dist/darwin-arm64/bin/verify --version | head -1 | awk '{print $2}')
+                  if [ "$reported" != "${{ inputs.version }}" ]; then
+                      echo "the binary reports $reported but this release is ${{ inputs.version }}"
+                      exit 1
+                  fi
+
+            - name: Prove a missing platform binary fails loudly
+              # The rule this whole package exists to hold, checked on every release rather than
+              # trusted. A dispatcher that resolves nothing must exit non-zero; the failure that
+              # cost days was a resolver that exited zero having run nothing.
+              run: |
+                  mkdir -p /tmp/no-platform && cd /tmp/no-platform
+                  echo '{"name":"no-platform","version":"1.0.0","private":true}' > package.json
+                  npm install --no-audit --no-fund --omit=optional \
+                      "$GITHUB_WORKSPACE/dist/verify"
+
+                  if ./node_modules/.bin/verify --version; then
+                      echo "the dispatcher exited zero with no platform binary installed"
+                      echo "that is the green-over-nothing failure this tool exists to prevent"
+                      exit 1
+                  fi
+                  echo "a missing platform binary correctly failed"
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: verify-${{ inputs.version }}
+                  path: dist/
+                  # Long enough to investigate a bad release without keeping six 15 MB binaries
+                  # per run forever.
+                  retention-days: 14
+
+            - name: Publish to npm
+              # Publishing is opt-in per run rather than automatic on a tag, because it cannot be
+              # undone. The platform packages go first: the dispatcher depends on them, so
+              # publishing it first opens a window where an install resolves a dispatcher whose
+              # binaries do not exist yet.
+              if: ${{ inputs.publish }}
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: |
+                  echo "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN" > ~/.npmrc
+
+                  for package in dist/*/; do
+                      if [ "$(basename "$package")" = "verify" ]; then
+                          continue
+                      fi
+                      npm publish "$package" --access public
+                  done
+
+                  npm publish dist/verify --access public

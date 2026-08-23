@@ -66,11 +66,77 @@ other Go work neither shares it nor evicts it — Go's default cache trims entri
 five days, which would quietly turn a warm rebuild into a cold one.
 
 **A missing binary is a loud error, never a fallback.** With no Go toolchain the dispatcher runs the
-prebuilt binary shipped for the platform, and if there is none it exits non-zero naming the platform
-and the path it looked for. There is deliberately no path where it execs something that might do
-nothing: the gate this tool replaces printed green over zero files for days because a resolver found
-no binary, fell through to a bare command name, and an empty file list is indistinguishable from a
+binary shipped for the platform, and if there is none it exits non-zero naming the platform and
+everywhere it looked. There is deliberately no path where it execs something that might do nothing:
+the gate this tool replaces printed green over zero files for days because a resolver found no
+binary, fell through to a bare command name, and an empty file list is indistinguishable from a
 clean tree.
 
-Packaging that binary into `node_modules/.bin/verify` belongs to the release domain. The contract it
-needs: ship `prebuilt/verify-<goos>-<goarch>` next to the module root, executable.
+## Releasing
+
+`verify` reaches a machine as an npm install. One thin dispatcher package resolves a per-platform
+binary package, the same shape oxlint and tsgo use:
+
+```
+verify                  the package you install; a Node launcher, no binary
+@verify/darwin-arm64    ~14 MB Go binary
+@verify/darwin-x64
+@verify/linux-arm64     for CI and containers
+@verify/linux-x64
+@verify/win32-arm64
+@verify/win32-x64
+```
+
+The platform packages are `optionalDependencies` pinned to the exact version, and npm picks one by
+matching the `os` and `cpu` fields against the machine. Those fields are generated from the same
+target that cross-compiles the binary, because npm's spelling and Go's disagree in two places —
+`win32` against `windows`, `x64` against `amd64` — and a package published under the Go spelling
+installs correctly and is never found, which on the machine is indistinguishable from a platform we
+never shipped.
+
+```sh
+go run ./cmd/verify-release --version 0.1.0 --output dist
+```
+
+One command builds all six from one machine, in about two minutes, and it stages rather than
+publishes. It refuses a release it cannot complete: a target that fails to build fails the whole
+run, because a version missing one platform resolves to nothing there and gets reported as a bug
+against a release that looked fine everywhere else.
+
+The launcher is Node rather than Go, which is the one surprising choice. A Go dispatcher would have
+to be cross-compiled per platform, making it a seventh platform package and defeating the point of
+installing one thing. Node is present by construction in an npm install, and `require.resolve` asks
+the package manager where a package actually is instead of modeling pnpm, npm, and yarn layouts by
+hand.
+
+`verify --version` reports the version, the platform, the Go toolchain, and the pinned typescript-go
+commit, so a bug report names what was running rather than "latest". The stamps go in at link time;
+an unstamped local build says `dev` and says why.
+
+`AHRA_VERIFY_BINARY=/path/to/verify` points every `verify` on the machine at a local build. A broken
+override is fatal rather than a fallback, even when a good install is sitting right there: someone
+who sets it has stated which binary they want, and quietly running a different one would hand them
+results they would read as their own build's.
+
+### macOS signing
+
+Measured, because the answer decides how much this matters. An unsigned binary with no quarantine
+attribute runs normally, and that is what an `npm install` produces — package managers extract
+tarballs without setting `com.apple.quarantine`, so consumers installing from the registry are not
+blocked. The same binary *with* quarantine set is killed by the kernel: exit 137, SIGKILL, and zero
+bytes on both stdout and stderr.
+
+That silent kill is the reason to sign. It is reached whenever the binary travels as a file rather
+than as a package — a release asset from a browser, a binary copied out of CI — and it fails in the
+worst available way, with no output to explain it. The launcher's signal handling turns it into a
+loud 137 rather than a green nothing, and signing removes it entirely.
+
+Signing is wired and credential-gated. It needs a **Developer ID Application** certificate
+specifically; an Apple Development certificate signs successfully and is then rejected by the notary
+service at the end of a release. Staging without credentials is supported and says so in its own
+summary, because an unsigned release is fine and an unsigned release that looks signed is not.
+
+Note that a notarization ticket cannot be stapled to a bare executable — only to a bundle, a disk
+image, or an installer package — so a notarized Mach-O is validated by an online check on first
+launch. A machine that is entirely offline the first time it runs a quarantined `verify` is still
+blocked. The npm path does not set quarantine, so this does not affect it.
