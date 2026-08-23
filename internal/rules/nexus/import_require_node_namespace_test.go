@@ -122,3 +122,19 @@ func TestExpectedAlias(t *testing.T) {
 		}
 	}
 }
+
+// The fix rewrites the module specifier, and until now nothing checked what it wrote.
+//
+// This rule was the first one ported and it carries an autofix, but every fixture asserted message
+// ids alone. Corrupting the replacement text so the fix produced `'CORRUPTED:fs'` instead of
+// `'node:fs'` left the whole suite green: a rewrite that breaks every import it touches, invisible
+// to the tests. A fix is the one part of a rule that changes source, so it is the one part where an
+// id assertion proves the least.
+func TestTheNodePrefixFixWritesTheSpecifierItPromises(t *testing.T) {
+	result := ruletest.Run(t, ImportRequireNodeNamespace, "app/Probe.ts",
+		"import * as NodeFileSystem from 'fs';\n")
+
+	ruletest.ExpectFindings(t, result, "requireNodePrefix")
+	ruletest.ExpectFixedSource(t, result,
+		"import * as NodeFileSystem from 'node:fs';\n")
+}

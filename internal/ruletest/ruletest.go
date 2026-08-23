@@ -13,6 +13,7 @@
 package ruletest
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
@@ -140,5 +141,65 @@ func ExpectClean(t *testing.T, result Result) {
 
 	if len(result.Diagnostics) != 0 {
 		t.Fatalf("expected no findings, got %d: %v", len(result.Diagnostics), result.MessageIds())
+	}
+}
+
+// ExpectFixedSource applies every fix the rule proposed and asserts the resulting source text.
+//
+// A fix is the one part of a rule that rewrites source, and a fixture checking only message ids
+// cannot see it. Measured on this repository: corrupting the replacement text in
+// `import-require-node-namespace` so its fix writes `'CORRUPTED:fs'` instead of `'node:fs'` leaves
+// the whole suite green. That rule shipped as the first rule ported, and the gap sat there for the
+// entire migration, because until now the harness had no way to say what a fix should produce.
+//
+// Fixes are applied back to front so that an earlier fix's replacement cannot move the offsets a
+// later one was computed against. That is the same ordering the fix engine uses, for the same
+// reason, and doing it differently here would test a rewrite nobody performs.
+//
+// Overlapping fixes are refused rather than resolved. The engine has an overlap policy and this is
+// not the place to reimplement it: a fixture that silently applied one of two conflicting fixes
+// would assert a result the real pipeline never produces.
+func ExpectFixedSource(t *testing.T, result Result, wantSource string) {
+	t.Helper()
+
+	type pending struct {
+		start, end int
+		text       string
+	}
+	fixes := []pending{}
+	for _, diagnostic := range result.Diagnostics {
+		for _, fix := range diagnostic.Fixes {
+			fixes = append(fixes, pending{start: fix.Range.Pos(), end: fix.Range.End(), text: fix.Text})
+		}
+	}
+
+	if len(fixes) == 0 {
+		// A rule that proposed no fix cannot have its rewrite asserted, and passing here would make
+		// this function agree with any expectation at all. That is the vacuous shape the fixture
+		// pair exists to refuse, arriving through the assertion meant to close it.
+		t.Fatalf("the rule proposed no fixes, so there is no rewrite to check against %q", wantSource)
+	}
+
+	sort.Slice(fixes, func(first, second int) bool {
+		return fixes[first].start > fixes[second].start
+	})
+
+	source := result.SourceFile.Text()
+	previousStart := len(source)
+	for _, fix := range fixes {
+		if fix.end > previousStart {
+			t.Fatalf("fixes overlap at [%d,%d): the engine resolves overlaps and a fixture must not guess which one wins",
+				fix.start, fix.end)
+		}
+		if fix.start < 0 || fix.end > len(source) || fix.start > fix.end {
+			t.Fatalf("fix range [%d,%d) is outside the source, which is a defect in the rule rather than in the test",
+				fix.start, fix.end)
+		}
+		source = source[:fix.start] + fix.text + source[fix.end:]
+		previousStart = fix.start
+	}
+
+	if source != wantSource {
+		t.Errorf("the applied fixes produced:\n  %q\nwant:\n  %q", source, wantSource)
 	}
 }
