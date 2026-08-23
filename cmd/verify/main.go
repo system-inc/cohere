@@ -13,8 +13,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/config"
 	"github.com/system-inc/verify/internal/fix"
 	"github.com/system-inc/verify/internal/program"
@@ -41,6 +41,7 @@ func run() error {
 	noFix := flag.Bool("no-fix", false, "mutate nothing: report what would change without writing a byte")
 	maxFixPasses := flag.Int("fix-passes", fix.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
+	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -122,7 +123,7 @@ func run() error {
 		report.record(phaseFix, outcomeSkipped, 0, "--no-fix")
 	default:
 		fixStart := time.Now()
-		fixSummary, err := applyProposedFixes(ctx, graph, projectFiles, registry.All(), *maxFixPasses)
+		fixSummary, err := applyProposedFixes(ctx, graph, projectFiles, registry.All(), formatTransform(configuredFormatter()), *maxFixPasses)
 		fixDuration := time.Since(fixStart)
 		if err != nil {
 			// The bail condition here is a failure to produce valid output, never a finding. A fixer
@@ -230,6 +231,24 @@ func run() error {
 			printTimings(os.Stdout, result.Timings, lintDuration)
 		}
 
+		if *explainFile != "" {
+			// Explained after the run rather than instead of it, so the reader sees the whole-tree
+			// verdict and the single-file account together. Asking why one file behaved the way it
+			// did is usually a question about a run that already happened.
+			subject := findExplainSubject(projectFiles, *explainFile)
+			if subject == nil {
+				// Naming the file that was not found rather than explaining nothing, because an
+				// empty explanation reads as a file with nothing to say.
+				fmt.Printf("\nexplain: %s is not in the program, so there is nothing to explain\n", *explainFile)
+			} else {
+				explanation, err := graph.Explain(ctx, subject, rules)
+				if err != nil {
+					return fmt.Errorf("explaining %s: %w", *explainFile, err)
+				}
+				printExplanation(os.Stdout, explanation)
+			}
+		}
+
 		report.record(phaseLint, outcomeRan, lintDuration, "")
 	}
 
@@ -304,14 +323,14 @@ func collectTypeDiagnostics(ctx context.Context, graph *program.Graph, files []*
 func printCompilerDiagnostic(diagnostic *ast.Diagnostic) {
 	sourceFile := diagnostic.File()
 	if sourceFile == nil {
-		fmt.Printf("error TS%d: %s\n", diagnostic.Code(), diagnostic.Message())
+		fmt.Printf("error TS%d: %s\n", diagnostic.Code(), diagnostic.MessageText())
 		return
 	}
 
-	line, character := scanner.GetLineAndCharacterOfPosition(sourceFile, diagnostic.Loc().Pos())
+	line, character := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, diagnostic.Loc().Pos())
 	fmt.Printf(
 		"%s:%d:%d - error TS%d: %s\n",
-		sourceFile.FileName(), line+1, character+1, diagnostic.Code(), diagnostic.Message(),
+		sourceFile.FileName(), line+1, character+1, diagnostic.Code(), diagnostic.MessageText(),
 	)
 }
 
@@ -324,7 +343,7 @@ func printRuleDiagnostic(diagnostic rule.Diagnostic) {
 		return
 	}
 
-	line, character := scanner.GetLineAndCharacterOfPosition(sourceFile, diagnostic.Range.Pos())
+	line, character := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, diagnostic.Range.Pos())
 	fmt.Printf(
 		"%s:%d:%d - %s [%s/%s]\n",
 		sourceFile.FileName(), line+1, character+1,

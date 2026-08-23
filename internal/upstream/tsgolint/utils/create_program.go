@@ -4,17 +4,19 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/tsoptions"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 func CreateCompilerHost(cwd string, fs vfs.FS) compiler.CompilerHost {
 	defaultLibraryPath := bundled.LibPath()
-	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath)
+	// Three arguments added upstream in the move to `microsoft/TypeScript`: an extended-config cache,
+	// a trace sink, and a content mapper. All three are optional and nil is the one-shot answer.
+	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath, nil, nil, nil)
 }
 
 func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost) (*compiler.Program, error) {
@@ -23,7 +25,7 @@ func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 		return nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
 	}
 
-	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, host, nil)
+	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)
 
 	opts := compiler.ProgramOptions{
 		Config:         configParseResult,
