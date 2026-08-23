@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/suppression"
 )
 
 // Coverage is what a run actually looked at.
@@ -35,6 +36,30 @@ type Coverage struct {
 	// declined every file reads as zero here, which is the difference between "ran and found nothing"
 	// and "never actually looked" — the distinction a bare finding count erases.
 	RulesListening map[string]int
+
+	// Suppressed is how many findings a disable comment withheld.
+	//
+	// This is the coverage discipline pointed the other way. Coverage stops a run that checked
+	// nothing from printing the same green as a run that found nothing; this stops a run that hid
+	// forty findings from printing the same green as a run that had none to hide. A suppression is
+	// a decision, and a decision that leaves no trace in the output is indistinguishable from the
+	// tool being blind.
+	Suppressed int
+
+	// SuppressedWithoutReason is how many of those withheld findings were silenced by a directive
+	// that never said why.
+	//
+	// Measured rather than enforced, deliberately. Requiring a reason today would turn 281 working
+	// suppressions red for no defect, so the number is printed every run instead — which is what
+	// lets the convention be tightened later from evidence rather than from a guess.
+	SuppressedWithoutReason int
+
+	// UnusedSuppressions is how many directives never withheld anything.
+	//
+	// An unused suppression is a rule scoped off a file that no longer needs it, and it is how a
+	// codebase accumulates permanent exemptions nobody chose. It only means what it says after a
+	// full run with every rule, so a caller running a filtered subset should not report it.
+	UnusedSuppressions int
 }
 
 // Result is the findings of one walk, and the coverage that produced them.
@@ -67,6 +92,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	diagnostics := []rule.Diagnostic{}
 	listeningCounts := make(map[string]int, len(rules))
 	nodesVisited := 0
+	suppressed := suppressionTally{}
 
 	// Files are handed out by index stride rather than by a queue: the compiler assigns a file to a
 	// checker by its position in the program's file list, so striding keeps each worker mostly on one
@@ -80,6 +106,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			localDiagnostics := []rule.Diagnostic{}
 			localListening := make(map[string]int, len(rules))
 			localNodes := 0
+			localSuppressed := suppressionTally{}
 
 			for index := worker; index < len(files); index += workers {
 				sourceFile := files[index]
@@ -88,13 +115,14 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 				// A rule's Report closure captures the rule it belongs to, so a rule cannot report under
 				// another rule's name even by accident.
-				visited := dispatchFile(sourceFile, func(diagnostic rule.Diagnostic) {
+				visited, silenced := dispatchFile(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
 				}, rules, g, fileChecker, localListening)
 
 				release()
 
 				localNodes += visited
+				localSuppressed.add(silenced)
 			}
 
 			mutex.Lock()
@@ -103,6 +131,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				listeningCounts[name] += count
 			}
 			nodesVisited += localNodes
+			suppressed.add(localSuppressed)
 			mutex.Unlock()
 		}()
 	}
@@ -116,6 +145,10 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			NodesVisited:   nodesVisited,
 			RulesRun:       len(rules),
 			RulesListening: listeningCounts,
+
+			Suppressed:              suppressed.applied,
+			SuppressedWithoutReason: suppressed.appliedNoReason,
+			UnusedSuppressions:      suppressed.unusedDirectives,
 		},
 	}, nil
 }
@@ -133,10 +166,15 @@ func dispatchFile(
 	graph *Graph,
 	fileChecker *checker.Checker,
 	listeningCounts map[string]int,
-) int {
+) (visitedNodes int, silenced suppressionTally) {
 	// A kind may have listeners from several rules, so the merged table maps a kind to a slice rather
 	// than to one function.
 	merged := map[ast.Kind][]func(node *ast.Node){}
+
+	// Directives are read once per file, before any rule runs, because every rule's findings filter
+	// through the same index. Scanning is proportional to the file rather than to the rule count, so
+	// a file with no directives costs one pass and then answers every query with an empty slice.
+	directives := suppression.Build(sourceFile.Text())
 
 	for _, subject := range rules {
 		ruleName := subject.Name
@@ -150,6 +188,15 @@ func dispatchFile(
 				if diagnostic.SourceFile == nil {
 					diagnostic.SourceFile = sourceFile
 				}
+
+				// Filtering here rather than after the walk is what keeps a suppressed finding from
+				// ever existing as a finding. The alternative — collect everything, drop some later —
+				// leaves a window where a caller can read the unfiltered slice and report a number the
+				// user will never see explained.
+				if directives.Suppresses(diagnostic.RuleName, diagnostic.Range.Pos()) {
+					return
+				}
+
 				report(diagnostic)
 			},
 		}
@@ -168,11 +215,45 @@ func dispatchFile(
 		}
 	}
 
-	if len(merged) == 0 {
-		return 0
+	if len(merged) > 0 {
+		visitedNodes = walk(sourceFile.AsNode(), merged)
 	}
 
-	return walk(sourceFile.AsNode(), merged)
+	return visitedNodes, tally(directives)
+}
+
+// suppressionTally is what one file's directives did, summed across the run.
+type suppressionTally struct {
+	applied          int
+	appliedNoReason  int
+	unusedDirectives int
+}
+
+func (t *suppressionTally) add(other suppressionTally) {
+	t.applied += other.applied
+	t.appliedNoReason += other.appliedNoReason
+	t.unusedDirectives += other.unusedDirectives
+}
+
+// tally reads what a file's directives actually did, after the walk.
+//
+// The reasonless count is per withheld finding rather than per directive, because that is the
+// number that answers the question being asked: how much of what verify chose not to tell you was
+// silenced by someone who did not say why.
+func tally(directives *suppression.Index) suppressionTally {
+	counted := suppressionTally{}
+	for index, directive := range directives.Directives() {
+		applied := directives.AppliedCount(index)
+		if applied == 0 {
+			counted.unusedDirectives++
+			continue
+		}
+		counted.applied += applied
+		if !directive.HasReason() {
+			counted.appliedNoReason += applied
+		}
+	}
+	return counted
 }
 
 // walk visits every node once, calling whatever listeners registered for its kind.
