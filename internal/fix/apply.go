@@ -61,7 +61,18 @@ const (
 	ReasonParseFailure  = "the rewritten file does not parse"
 	ReasonNoProgress    = "the fix replaces text with itself"
 	ReasonPassesReached = "the pass budget was exhausted before the file converged"
+
+	// ReasonTransformFailed is the whole-text transform erroring rather than producing bad output.
+	// Distinct from a parse failure: one means the formatter broke, the other means it produced
+	// something that is not a program.
+	ReasonTransformFailed = "the whole-text transform failed"
 )
+
+// transformRuleName is what a transform's refusals are attributed to.
+//
+// A transform has no rule behind it, and an empty name in a refusal reads as a bug in the reporting
+// rather than as a fact about the run.
+const transformRuleName = "format"
 
 // Plan is a resolved set of edits: what will be applied to a file, and what was refused.
 //

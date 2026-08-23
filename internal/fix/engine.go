@@ -46,6 +46,13 @@ type FileResult struct {
 	// one, because a refused pass is discarded whole.
 	Converged bool
 
+	// Transformed is whether the whole-text transform changed anything after the fixes converged.
+	//
+	// Reported separately from Changed because a formatter that silently did nothing and a file that
+	// needed no formatting produce identical output otherwise, which is the same ambiguity the
+	// coverage line exists to destroy.
+	Transformed bool
+
 	// Failed is set when the engine could not process the file at all — unreadable, unwritable, or
 	// already unparseable before anything was applied.
 	//
@@ -160,6 +167,39 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 // modification time, which invalidates every downstream cache keyed on it and makes a run that
 // changed nothing look like a run that changed everything.
 func FixFile(fileName string, propose Propose, maxPasses int) (FileResult, error) {
+	return FixAndTransformFile(fileName, propose, nil, maxPasses)
+}
+
+// Transform is a whole-text rewrite applied after fixes have converged — formatting, in practice.
+//
+// It is deliberately not a Propose. A proposal is a claim to some bytes, and the engine arbitrates
+// between competing claims; a transform is the new value of all of them, and there is nothing to
+// arbitrate. Feeding a whole-document rewrite through resolveOverlaps asks that machinery a question
+// it was not built to answer, and both available answers are wrong: either a correctness fix loses
+// to a whitespace change because the rule names sort that way, or the formatting is silently skipped
+// wherever a fix touched. Neither is a tradeoff anyone would choose, and a priority field would only
+// pick the wrong one on purpose.
+//
+// Order is fix-then-transform and it is not arbitrary. Fixes are semantic and change what the
+// correct formatting is, so formatting first would leave every later fix mis-formatted and want a
+// re-format, which is a loop. A total, idempotent transform running last converges in one shot
+// regardless of what the fixes did.
+//
+// Identified by @system_verify_format, which read this package and found the failure mode before
+// anything was built against it.
+type Transform func(fileName string, text string) (string, error)
+
+// FixAndTransformFile drives a file to a fixpoint, applies a whole-text transform, and writes the
+// result — once, atomically, behind the same parse guard.
+//
+// One phase, one parse guard, one write. Two components that both wrote the same file in one run is
+// precisely the failure this package exists to prevent, so formatting arrives here rather than
+// writing on its own.
+//
+// The transform runs even when no fix landed, because a file can be correctly written and badly
+// formatted. It is guarded exactly as a fix pass is: a transform that errors, or whose output does
+// not parse, is discarded whole and the file is left alone.
+func FixAndTransformFile(fileName string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
 	text, err := readFile(fileName)
 	if err != nil {
 		return FileResult{FileName: fileName}, err
@@ -169,6 +209,39 @@ func FixFile(fileName string, propose Propose, maxPasses int) (FileResult, error
 	if err != nil {
 		return result, err
 	}
+
+	if transform != nil {
+		transformed, transformError := transform(fileName, result.Text)
+		switch {
+		case transformError != nil:
+			// A transform that failed says nothing about the fixes, which already converged and
+			// already passed the guard. They are kept and the transform is reported as refused, so a
+			// formatter that is broken today does not also block every correctness fix in the tree.
+			result.Rejected = append(result.Rejected, Rejection{
+				Proposal: Proposal{RuleName: transformRuleName},
+				Reason:   fmt.Sprintf("%s (%s)", ReasonTransformFailed, transformError),
+			})
+
+		case transformed == result.Text:
+			// Already in the shape the transform wants. Not an error and not a change.
+
+		default:
+			// The guard applies to the transform exactly as it applies to a fix pass. A whole-text
+			// rewrite has a wider blast radius than any single fix, so it earns the check more, not
+			// less.
+			if parses, reason := Parses(fileName, transformed); !parses {
+				result.Rejected = append(result.Rejected, Rejection{
+					Proposal: Proposal{RuleName: transformRuleName},
+					Reason:   fmt.Sprintf("%s (%s)", ReasonParseFailure, reason),
+				})
+			} else {
+				result.Text = transformed
+				result.Transformed = true
+				result.Changed = true
+			}
+		}
+	}
+
 	if !result.Changed {
 		return result, nil
 	}
@@ -194,6 +267,14 @@ type Summary struct {
 	FilesChanged    int
 	FixesApplied    int
 	FixesRefused    int
+
+	// FilesTransformed is how many files the whole-text transform rewrote after fixes converged.
+	//
+	// Counted separately from FilesChanged because the two answer different questions. A run where
+	// formatting silently did nothing and a run where nothing needed formatting produce the same
+	// FilesChanged, and telling those apart is the same discipline that makes the coverage line
+	// worth printing at all.
+	FilesTransformed int
 
 	// RefusalsByReason counts refusals by their stated reason, so "we refused four hundred fixes"
 	// becomes "three hundred and ninety were overlaps between two rules and ten broke the parse",
@@ -234,6 +315,9 @@ func Summarize(results []FileResult) Summary {
 		summary.FilesConsidered++
 		if result.Changed {
 			summary.FilesChanged++
+		}
+		if result.Transformed {
+			summary.FilesTransformed++
 		}
 		summary.FixesApplied += len(result.Applied)
 		summary.FixesRefused += len(result.Rejected)
@@ -287,6 +371,12 @@ func (s Summary) String() string {
 		"fix: %d of %d files rewritten, %d fixes applied, %d refused",
 		s.FilesChanged, s.FilesConsidered, s.FixesApplied, s.FixesRefused,
 	)
+
+	// Formatting reports its own number rather than hiding inside the rewrite count, so a run where
+	// the formatter did nothing is distinguishable from one where nothing needed formatting.
+	if s.FilesTransformed > 0 {
+		line += fmt.Sprintf(", %d reformatted", s.FilesTransformed)
+	}
 
 	if len(s.RefusalsByReason) > 0 {
 		reasons := make([]string, 0, len(s.RefusalsByReason))
