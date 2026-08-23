@@ -4,6 +4,18 @@
 // itself behaves, so rewriting the reasoning here would substitute our interpretation of a framework
 // we do not own for the framework author's own. Where a rule's wording is expanded it is to say why
 // rather than to change what fires.
+//
+// # Naming
+//
+// A rule here is named for itself and never for its family: `no-img-element`, not
+// `next-no-img-element`. The config writes `nextjs/no-img-element` and the matcher strips the
+// namespace on a `/` boundary, so a family prefix in the rule's own name means the config entry
+// cannot match it. The rule then runs on zero files while every one of its tests passes, because a
+// fixture exercises the rule directly and never reads the config.
+//
+// The first rule in this package shipped with a `next-` prefix and was inert. Nothing caught it
+// except the coverage line, and only because someone planted a violation and noticed it did not
+// fire. Twenty-two rules named the wrong way would have been twenty-two silent passes.
 package next
 
 import (
@@ -33,7 +45,12 @@ var messageNoAssignModuleVariable = rule.Message{
 // against the offending name. Reporting per declarator would be a narrower range and a different
 // rule, and choosing it here would be us overriding the upstream judgment on a rule we ported.
 var NoAssignModuleVariable = rule.Rule{
-	Name: "next-no-assign-module-variable",
+	// The name carries no family prefix, and that is load-bearing rather than stylistic. The config
+	// writes `nextjs/no-assign-module-variable`, and matching strips the namespace on a `/` boundary,
+	// so a rule named `next-no-assign-module-variable` matches nothing and runs on no files while its
+	// own tests pass. That is not hypothetical: this rule shipped that way and was inert until a
+	// planted violation failed to fire.
+	Name: "no-assign-module-variable",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableStatement: func(node *ast.Node) {
