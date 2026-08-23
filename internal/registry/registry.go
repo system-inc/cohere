@@ -33,6 +33,7 @@ func All() []rule.Rule {
 		core.NoUnsafeFinally,
 		core.NoVar,
 		core.NoUselessCatch,
+		core.PreferSpread,
 		core.UseIsNaN,
 		core.ValidTypeof,
 		nexus.BoundaryNoInternalImport,
