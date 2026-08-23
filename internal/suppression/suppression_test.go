@@ -1,0 +1,389 @@
+package suppression
+
+import (
+	"strings"
+	"testing"
+)
+
+// TestNextLineSuppressesTheLineBelow covers 372 of the 387 suppressions in the codebase this was
+// built against. If only one form works, it has to be this one.
+func TestNextLineSuppressesTheLineBelow(t *testing.T) {
+	source := strings.Join([]string{
+		"const before = 1;",
+		"// eslint-disable-next-line nexus/consistency-no-enum -- the fixture has to be a real enum.",
+		"enum Suppressed {}",
+		"enum Reported {}",
+	}, "\n")
+
+	index := Build(source)
+
+	if !index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 2)) {
+		t.Fatal("the line below the directive should be suppressed")
+	}
+	if index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 3)) {
+		t.Fatal("a -next-line directive must not reach two lines down")
+	}
+	if index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 0)) {
+		t.Fatal("a -next-line directive must not reach backward")
+	}
+}
+
+// TestUnsuppressedFires is the half a violation-only corpus never has. A suppression index that
+// returned true for everything would pass every test above this one.
+func TestUnsuppressedFires(t *testing.T) {
+	index := Build("enum Reported {}\n")
+
+	if index.Suppresses("nexus/consistency-no-enum", 0) {
+		t.Fatal("a file with no directives must suppress nothing")
+	}
+}
+
+// TestDirectiveNamingAnotherRuleDoesNotSilenceThisOne is the guard the task names explicitly. A
+// directive that silenced every rule regardless of the name written would look correct on every
+// single-rule fixture.
+func TestDirectiveNamingAnotherRuleDoesNotSilenceThisOne(t *testing.T) {
+	source := strings.Join([]string{
+		"// eslint-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire contract.",
+		"enum Reported {}",
+	}, "\n")
+
+	index := Build(source)
+
+	if index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 1)) {
+		t.Fatal("a directive naming a different rule must not silence this one")
+	}
+	if !index.Suppresses("nexus/consistency-no-abbreviated-identifier", offsetOfLine(source, 1)) {
+		t.Fatal("the directive should still silence the rule it does name")
+	}
+}
+
+func TestSameLineSuppressesItsOwnLine(t *testing.T) {
+	source := strings.Join([]string{
+		"const first = 1;",
+		"const value = 2; // eslint-disable-line nexus/consistency-no-ambiguous-identifier",
+	}, "\n")
+
+	index := Build(source)
+
+	if !index.Suppresses("nexus/consistency-no-ambiguous-identifier", offsetOfLine(source, 1)) {
+		t.Fatal("a -line directive should suppress its own line")
+	}
+	if index.Suppresses("nexus/consistency-no-ambiguous-identifier", offsetOfLine(source, 0)) {
+		t.Fatal("a -line directive must not reach the line above")
+	}
+}
+
+// TestFileScopeCoversFromItsOwnLineDown proves the file-level form does not reach backward. A
+// directive that covered the whole file regardless of position would silence findings written above
+// the decision to suppress them.
+func TestFileScopeCoversFromItsOwnLineDown(t *testing.T) {
+	source := strings.Join([]string{
+		"enum Above {}",
+		"/* eslint-disable nexus/consistency-no-enum */",
+		"enum Below {}",
+		"enum FurtherBelow {}",
+	}, "\n")
+
+	index := Build(source)
+
+	if index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 0)) {
+		t.Fatal("a file-level directive must not reach above itself")
+	}
+	if !index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 2)) {
+		t.Fatal("a file-level directive should cover the line below it")
+	}
+	if !index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 3)) {
+		t.Fatal("a file-level directive should cover every later line")
+	}
+}
+
+// TestScopeSuffixesAreMatchedLongestFirst is the highest-consequence parse bug available here.
+// Testing the bare `-disable` prefix before `-disable-next-line` reads every one of the 372
+// next-line directives as a file-level disable, silencing the rest of each file with no output
+// saying so.
+func TestScopeSuffixesAreMatchedLongestFirst(t *testing.T) {
+	source := strings.Join([]string{
+		"// eslint-disable-next-line nexus/consistency-no-enum -- one line only.",
+		"enum Suppressed {}",
+		"enum MustStillFire {}",
+	}, "\n")
+
+	index := Build(source)
+
+	if directives := index.Directives(); len(directives) != 1 || directives[0].Kind != KindNextLine {
+		t.Fatalf("expected one next-line directive, got %+v", directives)
+	}
+	if index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 2)) {
+		t.Fatal("a -next-line directive read as file-level would silence the rest of the file")
+	}
+}
+
+func TestCommaSeparatedRuleListsAreHonored(t *testing.T) {
+	// The real line, from libraries/structure/GlobalDeclarations.d.ts:13.
+	source := strings.Join([]string{
+		"// eslint-disable-next-line nexus/consistency-require-type-suffix, nexus/consistency-no-abbreviated-identifier",
+		"type Thing = string;",
+	}, "\n")
+
+	index := Build(source)
+
+	position := offsetOfLine(source, 1)
+	if !index.Suppresses("nexus/consistency-require-type-suffix", position) {
+		t.Fatal("the first name in the list should be honored")
+	}
+	if !index.Suppresses("nexus/consistency-no-abbreviated-identifier", position) {
+		t.Fatal("the second name in the list should be honored")
+	}
+	if index.Suppresses("nexus/consistency-no-enum", position) {
+		t.Fatal("a rule not in the list must not be silenced")
+	}
+}
+
+func TestDirectiveWithNoRuleNameCoversEveryRule(t *testing.T) {
+	source := strings.Join([]string{
+		"// eslint-disable-next-line",
+		"enum Suppressed {}",
+	}, "\n")
+
+	index := Build(source)
+
+	if !index.Suppresses("any/rule-at-all", offsetOfLine(source, 1)) {
+		t.Fatal("a directive naming no rule should cover every rule")
+	}
+}
+
+func TestReasonIsParsedAndItsAbsenceIsVisible(t *testing.T) {
+	source := strings.Join([]string{
+		"// eslint-disable-next-line nexus/consistency-no-enum -- EnumLike describes a real enum.",
+		"enum WithReason {}",
+		"// eslint-disable-next-line nexus/consistency-no-enum",
+		"enum WithoutReason {}",
+	}, "\n")
+
+	directives := Build(source).Directives()
+	if len(directives) != 2 {
+		t.Fatalf("expected 2 directives, got %d", len(directives))
+	}
+
+	if directives[0].Reason != "EnumLike describes a real enum." {
+		t.Fatalf("reason not parsed: %q", directives[0].Reason)
+	}
+	if !directives[0].HasReason() {
+		t.Fatal("a directive with a reason should report having one")
+	}
+	if directives[1].HasReason() {
+		t.Fatalf("a directive with no reason reported one: %q", directives[1].Reason)
+	}
+}
+
+// TestSuppressionStillAppliesWithoutAReason is the decision this package makes deliberately. The
+// missing reason is reported as its own finding elsewhere; it does not resurrect the suppressed one.
+// Measured against the codebase verify gates: 281 of the 306 suppressions naming one of our own
+// rules state no reason, and refusing to honor them would turn one missing convention into hundreds
+// of unrelated failures.
+func TestSuppressionStillAppliesWithoutAReason(t *testing.T) {
+	source := strings.Join([]string{
+		"// eslint-disable-next-line nexus/consistency-no-enum",
+		"enum Suppressed {}",
+	}, "\n")
+
+	if !Build(source).Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 1)) {
+		t.Fatal("a reasonless suppression must still suppress")
+	}
+}
+
+// TestAppliedCountSeparatesSilencedFromAbsent is what makes the coverage line honest. A run that
+// suppressed forty findings and a run that found none print the same green otherwise.
+func TestAppliedCountSeparatesSilencedFromAbsent(t *testing.T) {
+	source := strings.Join([]string{
+		"// eslint-disable-next-line nexus/consistency-no-enum -- deliberate.",
+		"enum Suppressed {}",
+		"// eslint-disable-next-line nexus/consistency-no-enum -- guards nothing.",
+		"const clean = 1;",
+	}, "\n")
+
+	index := Build(source)
+	index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 1))
+
+	if index.AppliedCount(0) != 1 {
+		t.Fatalf("expected the first directive to have silenced 1 finding, got %d", index.AppliedCount(0))
+	}
+	if index.AppliedCount(1) != 0 {
+		t.Fatalf("a directive that silenced nothing should count 0, got %d", index.AppliedCount(1))
+	}
+}
+
+// TestCommentTextInsideStringsIsNotADirective is the scanner's real job. A scan that read string
+// contents would invent suppressions out of test data and documentation.
+func TestCommentTextInsideStringsIsNotADirective(t *testing.T) {
+	cases := map[string]string{
+		"double quotes": "const sample = \"// eslint-disable-next-line nexus/consistency-no-enum\";\nenum Reported {}",
+		"single quotes": "const sample = '// eslint-disable-next-line nexus/consistency-no-enum';\nenum Reported {}",
+		"template":      "const sample = `// eslint-disable-next-line nexus/consistency-no-enum`;\nenum Reported {}",
+		"regex class":   "const pattern = /[/]\\/\\/ eslint-disable-next-line nexus\\/consistency-no-enum/;\nenum Reported {}",
+	}
+
+	for name, source := range cases {
+		t.Run(name, func(t *testing.T) {
+			index := Build(source)
+			if directives := index.Directives(); len(directives) != 0 {
+				t.Fatalf("found a directive inside a literal: %+v", directives)
+			}
+		})
+	}
+}
+
+// TestDivisionIsNotARegularExpression guards the other side of the same scan. Reading `a / b` as a
+// pattern would swallow source up to the next slash, hiding every directive in between.
+func TestDivisionIsNotARegularExpression(t *testing.T) {
+	source := strings.Join([]string{
+		"const ratio = width / height;",
+		"const other = total / count;",
+		"// eslint-disable-next-line nexus/consistency-no-enum -- still visible.",
+		"enum Suppressed {}",
+	}, "\n")
+
+	index := Build(source)
+
+	if len(index.Directives()) != 1 {
+		t.Fatalf("division swallowed the directive: %+v", index.Directives())
+	}
+	if !index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 3)) {
+		t.Fatal("the directive after two divisions should still apply")
+	}
+}
+
+func TestJsxCommentFormIsHonored(t *testing.T) {
+	// The shape 14 next/no-img-element suppressions take in .tsx files.
+	source := strings.Join([]string{
+		"const element = (",
+		"  <div>",
+		"    {/* eslint-disable-next-line @next/next/no-img-element -- served-route bytes */}",
+		"    <img src={source} />",
+		"  </div>",
+		");",
+	}, "\n")
+
+	index := Build(source)
+
+	directives := index.Directives()
+	if len(directives) != 1 {
+		t.Fatalf("expected 1 directive, got %+v", directives)
+	}
+	if directives[0].Reason != "served-route bytes" {
+		t.Fatalf("reason not parsed from a JSX comment: %q", directives[0].Reason)
+	}
+	if !index.Suppresses("@next/next/no-img-element", offsetOfLine(source, 3)) {
+		t.Fatal("a JSX-wrapped directive should suppress the line below it")
+	}
+}
+
+func TestBlockCommentNextLineFormIsHonored(t *testing.T) {
+	source := strings.Join([]string{
+		"/* eslint-disable-next-line @next/next/no-img-element -- served-route bytes */",
+		"const element = 1;",
+	}, "\n")
+
+	index := Build(source)
+
+	directives := index.Directives()
+	if len(directives) != 1 || directives[0].Kind != KindNextLine {
+		t.Fatalf("block-comment next-line form not recognized: %+v", directives)
+	}
+	if directives[0].Reason != "served-route bytes" {
+		t.Fatalf("reason not parsed: %q", directives[0].Reason)
+	}
+}
+
+// TestNearMissesAreNotDirectives keeps the parser from claiming comments that merely talk about
+// suppression. Documentation mentioning the syntax is common and must not become a suppression.
+func TestNearMissesAreNotDirectives(t *testing.T) {
+	sources := []string{
+		"// eslint-disable-nonsense nexus/consistency-no-enum\nenum Reported {}",
+		"// prettier-ignore\nenum Reported {}",
+		"// this line explains eslint-disable-next-line without being one\nenum Reported {}",
+	}
+
+	for _, source := range sources {
+		index := Build(source)
+		if directives := index.Directives(); len(directives) != 0 {
+			t.Fatalf("near miss claimed as a directive in %q: %+v", source, directives)
+		}
+	}
+}
+
+func TestStackedDirectivesBothApply(t *testing.T) {
+	source := strings.Join([]string{
+		"// eslint-disable-next-line nexus/consistency-no-enum -- first.",
+		"// eslint-disable-next-line nexus/consistency-no-abbreviated-identifier -- second.",
+		"enum Thing {}",
+	}, "\n")
+
+	index := Build(source)
+
+	// The first directive covers line 1, which is the second comment rather than the code. Only the
+	// second directive reaches the declaration, and that is the behavior eslint has: a stacked pair
+	// does not both reach past an intervening comment line.
+	position := offsetOfLine(source, 2)
+	if !index.Suppresses("nexus/consistency-no-abbreviated-identifier", position) {
+		t.Fatal("the directive directly above the code should apply")
+	}
+	if index.Suppresses("nexus/consistency-no-enum", position) {
+		t.Fatal("a directive separated from the code by another comment must not reach it")
+	}
+}
+
+func TestEmptyFileHasNoDirectives(t *testing.T) {
+	index := Build("")
+
+	if len(index.Directives()) != 0 {
+		t.Fatal("an empty file should produce no directives")
+	}
+	if index.Suppresses("any/rule", 0) {
+		t.Fatal("an empty file should suppress nothing")
+	}
+}
+
+func TestUnterminatedBlockCommentDoesNotHang(t *testing.T) {
+	index := Build("/* eslint-disable nexus/consistency-no-enum\nenum Thing {}")
+
+	if len(index.Directives()) != 1 {
+		t.Fatalf("an unterminated block comment should still parse as one directive: %+v", index.Directives())
+	}
+}
+
+func TestOxlintAndVerifySpellingsAreAccepted(t *testing.T) {
+	for _, tool := range []string{"eslint", "oxlint", "verify"} {
+		source := "// " + tool + "-disable-next-line nexus/consistency-no-enum -- accepted.\nenum Thing {}"
+		if !Build(source).Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 1)) {
+			t.Fatalf("%s-disable-next-line was not honored", tool)
+		}
+	}
+}
+
+func TestLineOfHandlesBoundaries(t *testing.T) {
+	source := "a\nb\nc"
+
+	index := Build(source)
+
+	// Keyed by byte offset, valued by the zero-based line that offset falls on. In "a\nb\nc" the
+	// three characters sit at offsets 0, 2, and 4.
+	for offset, expectedLine := range map[int]int{0: 0, 2: 1, 4: 2} {
+		if got := index.LineOf(offset); got != expectedLine {
+			t.Fatalf("offset %d: expected line %d, got %d", offset, expectedLine, got)
+		}
+	}
+}
+
+// offsetOfLine returns the byte offset a zero-based line begins at.
+func offsetOfLine(source string, line int) int {
+	offset := 0
+	for current := 0; current < line; current++ {
+		next := strings.IndexByte(source[offset:], '\n')
+		if next < 0 {
+			return len(source)
+		}
+		offset += next + 1
+	}
+	return offset
+}
