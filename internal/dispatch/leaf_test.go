@@ -23,15 +23,31 @@ var allowedRuleImports = map[string]bool{
 //
 // `internal/upstream/` is vendored third-party code pinned to a commit.
 //
-// `internal/utils/ecmascript/` is ported third-party code — an ECMAScript regex parser the regex
-// rules read patterns with. It moves when we resync upstream, not when a rule is written. Measured
+// `internal/utils/` is the shared utility layer, which is the thing rules are supposed to reach
+// for. `ecmascript/` is ported third-party code, an ECMAScript regex parser the regex rules read
+// patterns with, and it moves when we resync upstream rather than when a rule is written. Measured
 // twice, independently, when `no-invalid-regexp` first reached it: editing a rule that imports the
 // parser and editing one that does not both rebuild in 0.30s warm, and a rule edit stays in the
 // ~1.9s band it was in before the import existed. Editing the parser itself costs 3.24s, which is
 // the real depth cost and is paid by whoever edits the parser rather than by rule authors.
+//
+// Widened from `ecmascript/` to `utils/` on 2026-08-23, when the first lift out of a rule package
+// landed and this guard refused it. `jsx/` is our own code rather than vendored, which looked like
+// the distinction that mattered and is not: the rationale above is movement rather than provenance,
+// and a shared helper moves when someone changes a shared decision, which is exactly the event a
+// rebuild should follow. Measured on the same tree, three warm rounds:
+//
+//	editing a rule that imports jsx/     1.24s
+//	editing a rule that imports nothing  1.20s
+//	editing jsx/ itself                  0.42s
+//
+// A 0.04s difference is noise, and there is no cliff to protect against. Refusing the import would
+// have pushed every lifted helper back into one rule package, which is the drift the retrofit guard
+// in this same file exists to prevent. Two guards of ours would have been pulling against each
+// other, and the measurement is what says which one was wrong.
 var allowedRuleImportPrefixes = []string{
 	"github.com/system-inc/verify/internal/upstream/",
-	"github.com/system-inc/verify/internal/utils/ecmascript/",
+	"github.com/system-inc/verify/internal/utils/",
 }
 
 // A rule edit must not trigger a deep rebuild, and this is a build-time check rather than a review
