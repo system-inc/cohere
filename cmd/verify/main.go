@@ -37,7 +37,8 @@ func run() error {
 	lintOnly := flag.Bool("lint", false, "run the rules, reporting no type diagnostics")
 	lintConfigFileName := flag.String("lint-config", ".oxlintrc.json", "the config that says which rules apply to which files")
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
-	applyFixes := flag.Bool("fix", false, "apply the repairs rules propose, rewriting files in place")
+	fixOnly := flag.Bool("fix", false, "fix and format only, running no other phase")
+	noFix := flag.Bool("no-fix", false, "mutate nothing: report what would change without writing a byte")
 	maxFixPasses := flag.Int("fix-passes", fix.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
 	showVersion := flag.Bool("version", false, "print the version and exit")
@@ -51,9 +52,23 @@ func run() error {
 		return nil
 	}
 
-	// Neither flag means both phases, which is what a bare `verify` should do.
-	runTypes := *typesOnly || !*lintOnly
-	runLint := *lintOnly || !*typesOnly
+	// A bare `verify` runs the whole pipeline. The phase flags isolate one phase for someone
+	// debugging it; they are not the default path, and nothing about running the tool with no
+	// arguments should be a partial check.
+	anyPhaseNamed := *typesOnly || *lintOnly || *fixOnly
+	runFix := *fixOnly || !anyPhaseNamed
+	runTypes := *typesOnly || !anyPhaseNamed
+	runLint := *lintOnly || !anyPhaseNamed
+
+	// `--no-fix` mutates nothing, which is what continuous integration needs and what anyone asking
+	// "what would this change" needs. It wins over `--fix` rather than erroring, because the safe
+	// reading of a contradictory pair is the one that does not write to disk.
+	mutate := runFix && !*noFix
+	if *noFix && *fixOnly {
+		// Naming both is a contradiction the user should hear about rather than have silently
+		// resolved, since one of the two was certainly not what they meant.
+		return fmt.Errorf("--fix and --no-fix contradict each other: --fix runs only the mutating phase, --no-fix mutates nothing")
+	}
 
 	ctx := context.Background()
 
@@ -79,8 +94,72 @@ func run() error {
 	)
 
 	findings := 0
+	report := &pipelineReport{}
 
-	if runTypes {
+	// Phase 2: fix and format. Mutation runs before anything reports, so every phase downstream sees
+	// the repaired tree rather than findings a fixer would have silently repaired.
+	//
+	// The lint config is loaded here because fixing needs to know which rules apply to which files,
+	// and loading it once serves both this phase and lint below.
+	var lintConfig *config.Config
+	if runFix || runLint {
+		// A config that cannot be read is a hard failure and never a permissive default. Linting
+		// everything with nothing configured produces output indistinguishable from a clean run, and
+		// that exact confusion is what this tool exists to make impossible.
+		loaded, err := config.Load(resolveLintConfigPath(*lintConfigFileName, *directory))
+		if err != nil {
+			return fmt.Errorf("loading the lint config: %w", err)
+		}
+		lintConfig = loaded
+		graph.LintConfig = lintConfig
+		graph.RuleOptions = registry.Options()
+	}
+
+	switch {
+	case !runFix:
+		report.record(phaseFix, outcomeSkipped, 0, "not requested")
+	case !mutate:
+		report.record(phaseFix, outcomeSkipped, 0, "--no-fix")
+	default:
+		fixStart := time.Now()
+		fixSummary, err := applyProposedFixes(ctx, graph, projectFiles, registry.All(), *maxFixPasses)
+		fixDuration := time.Since(fixStart)
+		if err != nil {
+			// The bail condition here is a failure to produce valid output, never a finding. A fixer
+			// that cannot write a parseable file means the edit was malformed and everything after it
+			// is meaningless, so the pipeline stops and says which phases never ran.
+			report.record(phaseFix, outcomeRan, fixDuration, "")
+			report.markRemainingNotReached(phaseFix, err.Error())
+			report.Write(os.Stdout)
+			return fmt.Errorf("fix: %w", err)
+		}
+		fmt.Println(fixSummary)
+		report.record(phaseFix, outcomeRan, fixDuration, "")
+
+		// Files were rewritten, so the graph built from the old bytes no longer describes the tree.
+		// Every phase after this must read the new text or it reports findings against source that no
+		// longer exists — which is the same stale-read corruption the edit engine refuses internally,
+		// one level up.
+		if fixSummary.FilesChanged > 0 && (runTypes || runLint) {
+			rebuiltGraph, rebuildDuration, err := rebuildGraph(*configFileName, *directory, *singleThreaded, lintConfig)
+			if err != nil {
+				report.markRemainingNotReached(phaseFix, fmt.Sprintf("the graph could not be rebuilt after fixing: %v", err))
+				report.Write(os.Stdout)
+				return fmt.Errorf("rebuilding the type graph after fixing: %w", err)
+			}
+			graph = rebuiltGraph
+			projectFiles = graph.ProjectFiles()
+			fmt.Printf(
+				"graph rebuilt in %s — %d files changed, so every later phase reads the new text\n",
+				round(rebuildDuration), fixSummary.FilesChanged,
+			)
+		}
+	}
+
+	// Phase 3: types. This is the phase that bails alone and loudly.
+	if !runTypes {
+		report.record(phaseTypes, outcomeSkipped, 0, "not requested")
+	} else {
 		typesStart := time.Now()
 		typeDiagnostics := collectTypeDiagnostics(ctx, graph, projectFiles)
 		typesDuration := time.Since(typesStart)
@@ -94,24 +173,33 @@ func run() error {
 			"types: %d diagnostics over %d files in %s\n",
 			len(typeDiagnostics), len(projectFiles), round(typesDuration),
 		)
+		report.record(phaseTypes, outcomeRan, typesDuration, "")
+
+		// Types gate lint. Rule findings against code whose semantics are wrong are noise the reader
+		// has to re-read after fixing the real problem, so one type error alone at the top beats one
+		// type error buried under a hundred style findings in a file that does not compile.
+		//
+		// Bailing here is only honest because the phase line says lint did not run. Without it, a
+		// bailed run and a clean lint print the same absence of findings.
+		if len(typeDiagnostics) > 0 && runLint {
+			report.markRemainingNotReached(
+				phaseTypes,
+				fmt.Sprintf("%d type diagnostics — lint findings against wrong semantics are noise", len(typeDiagnostics)),
+			)
+			report.Write(os.Stdout)
+			os.Exit(1)
+		}
+	}
+
+	if !runLint {
+		report.record(phaseLint, outcomeSkipped, 0, "not requested")
 	}
 
 	if runLint {
 		rules := registry.All()
 
-		// The lint config decides which rules apply to which files, and it is loaded rather than
-		// assumed. Without it every rule is all-or-nothing across the tree, which is how verify came
-		// to report 336 findings inside a generated directory the gate correctly scopes off.
-		//
-		// A config that cannot be read is a hard failure and never a permissive default. Linting
-		// everything with nothing configured produces output indistinguishable from a clean run, and
-		// that exact confusion is what this tool exists to make impossible.
-		lintConfig, err := config.Load(resolveLintConfigPath(*lintConfigFileName, *directory))
-		if err != nil {
-			return fmt.Errorf("loading the lint config: %w", err)
-		}
-		graph.LintConfig = lintConfig
-		graph.RuleOptions = registry.Options()
+		// The config was loaded above, before the fix phase, because fixing needs to know which rules
+		// apply to which files. Only the timing switch is per-phase.
 		graph.CollectTimings = *showTiming
 
 		lintStart := time.Now()
@@ -142,30 +230,46 @@ func run() error {
 			printTimings(os.Stdout, result.Timings, lintDuration)
 		}
 
-		// Fixing runs after reporting rather than before it, so the findings a reader sees are the
-		// ones that were actually there when the run started. Fixing first and then reporting would
-		// print a shorter list than the tool found, which is the same class of lie as a coverage
-		// number that omits what it skipped.
-		if *applyFixes {
-			fixSummary, err := applyProposedFixes(ctx, graph, projectFiles, rules, *maxFixPasses)
-			if err != nil {
-				return fmt.Errorf("applying fixes: %w", err)
-			}
-			fmt.Println(fixSummary)
-
-			// The findings that were repaired are no longer reasons to fail. Anything left is, which
-			// is why the count is reduced by what landed rather than reset.
-			findings -= fixSummary.FixesApplied
-			if findings < 0 {
-				findings = 0
-			}
-		}
+		report.record(phaseLint, outcomeRan, lintDuration, "")
 	}
+
+	// The phase line prints on every run, success included. A run that checked nothing must not be
+	// able to print like a run that checked everything and found it clean, and a phase summary that
+	// only appeared on failure would reintroduce exactly that ambiguity for the successful case.
+	report.Write(os.Stdout)
 
 	if findings > 0 {
 		os.Exit(1)
 	}
 	return nil
+}
+
+// rebuildGraph reconstructs the type graph after files on disk have changed.
+//
+// The graph is a snapshot of the bytes as they were when it was built. Once the fix phase rewrites
+// a file, every later phase reading that graph is reading source that no longer exists — the same
+// stale-read corruption the edit engine refuses internally, one level up and with a wider blast
+// radius, because a type diagnostic against deleted text points at a line nobody can find.
+//
+// It costs a full rebuild, which is why it only happens when something actually changed.
+func rebuildGraph(
+	configFileName string,
+	directory string,
+	singleThreaded bool,
+	lintConfig *config.Config,
+) (*program.Graph, time.Duration, error) {
+	start := time.Now()
+	rebuilt, err := program.Build(program.Options{
+		ConfigFileName:   configFileName,
+		CurrentDirectory: directory,
+		SingleThreaded:   singleThreaded,
+	})
+	if err != nil {
+		return nil, time.Since(start), err
+	}
+	rebuilt.LintConfig = lintConfig
+	rebuilt.RuleOptions = registry.Options()
+	return rebuilt, time.Since(start), nil
 }
 
 // collectTypeDiagnostics gathers the compiler's own findings for our files.
