@@ -25,6 +25,11 @@ import (
 	"github.com/system-inc/verify/internal/rule"
 )
 
+// processStart is stamped before anything else runs, so the phase line can say how much of the run
+// its own numbers explain. A package-level variable rather than a parameter because `run` already
+// takes none, and the value has exactly one writer, at initialization.
+var processStart = time.Now()
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "verify: %v\n", err)
@@ -137,7 +142,7 @@ func run() error {
 	)
 
 	findings := 0
-	report := &pipelineReport{}
+	report := &pipelineReport{graph: buildDuration, processStart: processStart}
 
 	// Phase 2: fix and format. Mutation runs before anything reports, so every phase downstream sees
 	// the repaired tree rather than findings a fixer would have silently repaired.

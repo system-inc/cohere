@@ -67,6 +67,18 @@ type phaseRecord struct {
 // prints on every run, including the successful ones, and a bail is never silent.
 type pipelineReport struct {
 	records []phaseRecord
+	// graph is how long the type graph took to build, which is a phase in every sense that matters
+	// to a reader deciding where the time went, and is not one of the records because nothing can
+	// skip it.
+	graph time.Duration
+	// processStart is when the process began, as close to it as a Go program can observe.
+	//
+	// Recorded so the phase line can state its own completeness. Summing the phases and calling it
+	// the run time is the same error as summing the rules and calling it coverage: it reports what
+	// was measured as though it were everything that happened. On this tree the phases account for
+	// about two thirds of the wall clock, and the missing third was invisible until this field
+	// existed.
+	processStart time.Time
 }
 
 // record notes what a phase did. Called once per phase, in order.
@@ -162,6 +174,8 @@ func (r *pipelineReport) Write(out io.Writer) {
 
 	fmt.Fprintf(out, "phases: %s\n", strings.Join(parts, " · "))
 
+	r.writeAccounting(out)
+
 	// The explicit sentence for the case that matters most. A reader who takes only the last line
 	// away from a bailed run must not take away a clean bill of health.
 	//
@@ -172,4 +186,41 @@ func (r *pipelineReport) Write(out io.Writer) {
 	if !r.checkedEverything() {
 		fmt.Fprintf(out, "  this run did not check everything — the phases above say what was not checked\n")
 	}
+}
+
+// writeAccounting states how much of the run the phases above actually explain.
+//
+// A timing line that reports only its own phases invites the reader to add them up and treat the
+// total as the run, which is wrong here by roughly a third. The gap is real work — process start,
+// configuration, walking the file scope, printing findings, exit — and none of it is attributable
+// to a phase, so leaving it unnamed makes it unownable. Naming it is the same discipline as the
+// coverage line: report what was not measured, rather than let a partial account read as a full one.
+//
+// It prints nothing when the process start was never recorded, because a computed total that is
+// silently measuring from the zero time would be worse than no line at all.
+func (r *pipelineReport) writeAccounting(out io.Writer) {
+	if r.processStart.IsZero() {
+		return
+	}
+
+	total := time.Since(r.processStart)
+	accounted := r.graph
+	for _, record := range r.records {
+		if record.Outcome == outcomeRan {
+			accounted += record.Elapsed
+		}
+	}
+
+	unaccounted := total - accounted
+	if unaccounted < 0 {
+		// The phases run concurrently with each other in places, so a sum can exceed the wall
+		// clock. Reporting a negative remainder would be nonsense; reporting the overlap honestly
+		// is the useful reading.
+		fmt.Fprintf(out, "  total %s — graph %s plus phases, overlapping by %s\n",
+			round(total), round(r.graph), round(-unaccounted))
+		return
+	}
+
+	fmt.Fprintf(out, "  total %s — graph %s, phases %s, %s outside any phase\n",
+		round(total), round(r.graph), round(accounted-r.graph), round(unaccounted))
 }

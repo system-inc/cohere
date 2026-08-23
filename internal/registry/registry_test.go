@@ -9,17 +9,24 @@ import (
 	"testing"
 )
 
-// Every rule declared in the rules packages must appear in the registry.
+// Every rule declared in the rules packages must be in the live catalog.
 //
-// A rule that exists on disk and is absent from the registry compiles, tests green in its own
-// package, and never runs. That is the worst defect this tool can carry: the file says the rule is
-// enforced, the gate says the tree is clean, and neither is lying about what it knows.
+// A rule that exists on disk and never registers compiles, tests green in its own package, and
+// never runs. That is the worst defect this tool can carry: the file says the rule is enforced, the
+// gate says the tree is clean, and neither is lying about what it knows.
 //
 // This was not hypothetical. Two boundary rules were written, tested, and left out of the registry;
 // nothing failed until this test existed.
+//
+// The comparison is against `rule.Registered()` rather than against the text of `registry.go`. It
+// used to read that file for the identifiers a hand-maintained list mentioned, which was the only
+// thing available when the list was written by hand. Reading the live catalog is strictly stronger:
+// a mention proved a name appeared in a file, while a registration proves the rule is loaded into
+// the process that will run it. It also catches the failure mode self-registration introduces,
+// where a rule package nothing imports contributes nothing and does not fail to compile.
 func TestEveryRuleIsRegistered(t *testing.T) {
 	declared := declaredRules(t)
-	registered := registeredRules(t)
+	registered := registeredRuleNames()
 
 	if len(declared) == 0 {
 		// A test that finds nothing to check passes for the wrong reason, which is the same shape
@@ -27,21 +34,37 @@ func TestEveryRuleIsRegistered(t *testing.T) {
 		t.Fatal("found no rule declarations to check, so this test proved nothing")
 	}
 
-	for _, name := range declared {
-		if !registered[name] {
-			t.Errorf("rule %s is declared but not in the registry, so it would never run", name)
+	live := make(map[string]bool, len(registered))
+	for _, name := range registered {
+		live[name] = true
+	}
+
+	for _, declaration := range declared {
+		if !live[declaration.ruleName] {
+			t.Errorf("rule %s declares the name %q and nothing registered it, so it would never run",
+				declaration.identifier, declaration.ruleName)
 		}
 	}
 }
 
+// ruleDeclaration is one `var Name = rule.Rule{...}` found on disk.
+//
+// Both halves are needed. The identifier is what a reader greps for when the test fails, and the
+// declared Name is the only thing the catalog can be checked against, since registration keys on
+// the rule's name rather than on the Go identifier that happens to hold it.
+type ruleDeclaration struct {
+	identifier string
+	ruleName   string
+}
+
 // declaredRules parses the rules packages for `var Name = rule.Rule{...}` declarations.
 //
-// Parsing rather than reflecting: a rule absent from the registry is also absent from anything the
-// registry could reflect over, so reflection would see exactly the rules that are already fine.
-func declaredRules(t *testing.T) []string {
+// Parsing rather than reflecting: a rule that never registers is also absent from anything the
+// catalog could reflect over, so reflection would see exactly the rules that are already fine.
+func declaredRules(t *testing.T) []ruleDeclaration {
 	t.Helper()
 
-	var names []string
+	var declarations []ruleDeclaration
 	matches, err := filepath.Glob("../rules/*/*.go")
 	if err != nil {
 		t.Fatalf("globbing rule files: %v", err)
@@ -75,11 +98,46 @@ func declaredRules(t *testing.T) []string {
 				if !ast.IsExported(name) {
 					continue
 				}
-				names = append(names, parsed.Name.Name+"."+name)
+				declaredName, named := ruleNameIn(value.Values[0])
+				if !named {
+					// A rule literal with no Name field cannot be addressed by the config at all,
+					// which is a different defect and one the compiler will not catch either.
+					t.Errorf("rule %s.%s declares no Name, so no configuration could address it",
+						parsed.Name.Name, name)
+					continue
+				}
+				declarations = append(declarations, ruleDeclaration{
+					identifier: parsed.Name.Name + "." + name,
+					ruleName:   declaredName,
+				})
 			}
 		}
 	}
-	return names
+	return declarations
+}
+
+// ruleNameIn reads the Name field out of a `rule.Rule{...}` literal.
+func ruleNameIn(expression ast.Expr) (string, bool) {
+	composite, isComposite := expression.(*ast.CompositeLit)
+	if !isComposite {
+		return "", false
+	}
+	for _, element := range composite.Elts {
+		keyed, isKeyed := element.(*ast.KeyValueExpr)
+		if !isKeyed {
+			continue
+		}
+		key, isIdentifier := keyed.Key.(*ast.Ident)
+		if !isIdentifier || key.Name != "Name" {
+			continue
+		}
+		literal, isLiteral := keyed.Value.(*ast.BasicLit)
+		if !isLiteral || literal.Kind != token.STRING {
+			return "", false
+		}
+		return strings.Trim(literal.Value, `"`), true
+	}
+	return "", false
 }
 
 // isRuleLiteral reports whether an expression is a `rule.Rule{...}` composite literal.
@@ -94,32 +152,6 @@ func isRuleLiteral(expression ast.Expr) bool {
 	}
 	packageIdentifier, isIdentifier := selector.X.(*ast.Ident)
 	return isIdentifier && packageIdentifier.Name == "rule" && selector.Sel.Name == "Rule"
-}
-
-// registeredRules reads the registry source for the rules All() returns.
-func registeredRules(t *testing.T) map[string]bool {
-	t.Helper()
-
-	fileSet := token.NewFileSet()
-	parsed, err := parser.ParseFile(fileSet, "registry.go", nil, 0)
-	if err != nil {
-		t.Fatalf("parsing registry.go: %v", err)
-	}
-
-	registered := make(map[string]bool)
-	ast.Inspect(parsed, func(node ast.Node) bool {
-		selector, isSelector := node.(*ast.SelectorExpr)
-		if !isSelector {
-			return true
-		}
-		packageIdentifier, isIdentifier := selector.X.(*ast.Ident)
-		if !isIdentifier {
-			return true
-		}
-		registered[packageIdentifier.Name+"."+selector.Sel.Name] = true
-		return true
-	})
-	return registered
 }
 
 // The registry must not contain duplicates: a rule listed twice reports every finding twice.
