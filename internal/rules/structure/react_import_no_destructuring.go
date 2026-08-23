@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 	"github.com/system-inc/verify/internal/utils/react"
 )
 
@@ -77,28 +78,26 @@ var ReactImportNoDestructuring = rule.Rule{
 					return
 				}
 
-				clause := declaration.ImportClause.AsImportClause()
+				// `BindingsOf` separates the three shapes one statement can carry, which this rule
+				// needs all of: the default decides whether the namespace is available, the named
+				// ones are the violation, and the namespace arm is deliberately left alone below.
+				bindings := imports.BindingsOf(node)
 
 				// The default import has to be named React specifically. `import Reakt from 'react'`
 				// provides a namespace nobody will write, so it does not satisfy the rule.
-				defaultName := clause.Name()
-				hasReactDefault := defaultName != nil && defaultName.Text() == "React"
+				hasReactDefault := bindings.Default != nil && bindings.Default.Text() == "React"
 
 				namedCount := 0
-				if clause.NamedBindings != nil && clause.NamedBindings.Kind == ast.KindNamedImports {
-					for _, element := range clause.NamedBindings.AsNamedImports().Elements.Nodes {
-						specifier := element.AsImportSpecifier()
-
-						// The local name is what later uses are matched against, and it is the
-						// alias when there is one.
-						localName := specifier.Name()
-						if localName != nil {
-							importedFromReact[localName.Text()] = true
-						}
-
-						namedCount++
-						ctx.ReportNode(element, messageNoNamedImport)
+				for _, element := range bindings.Named {
+					// The local name is what later uses are matched against, and it is the alias
+					// when there is one, so this reads `Name` where the sibling rules that ask
+					// which export was bound read `ImportedNameOf`.
+					if localName := element.Name(); localName != nil {
+						importedFromReact[localName.Text()] = true
 					}
+
+					namedCount++
+					ctx.ReportNode(element, messageNoNamedImport)
 				}
 
 				// A namespace import (`import * as React from 'react'`) provides the namespace and
