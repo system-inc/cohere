@@ -77,4 +77,3 @@ func (o OptionsRegistry) Decode(ruleName string, raw json.RawMessage) (any, erro
 	}
 	return decoded, nil
 }
-// probe 8237
