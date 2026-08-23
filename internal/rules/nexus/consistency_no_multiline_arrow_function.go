@@ -163,10 +163,17 @@ func usesThis(node *ast.Node) bool {
 	return found
 }
 
-// spansOneLine reports whether a node begins and ends on the same source line.
+// spansOneLine reports whether a node's own text begins and ends on the same source line.
+//
+// The span is measured from the token range rather than from Pos(), because Pos() sits before the
+// node's leading trivia. An arrow written inside a multi-line array literal is preceded by a newline
+// and indentation, so measuring from Pos() puts its start on the previous line and a genuinely
+// single-line `() => {}` reads as spanning two. That is the exact case this exemption exists for,
+// and it produced the one false finding this rule had on the ahra tree.
 func spansOneLine(sourceFile *ast.SourceFile, node *ast.Node) bool {
-	startLine, _ := scanner.GetLineAndCharacterOfPosition(sourceFile, node.Pos())
-	endLine, _ := scanner.GetLineAndCharacterOfPosition(sourceFile, node.End())
+	tokenRange := rule.TokenRange(sourceFile, node)
+	startLine, _ := scanner.GetLineAndCharacterOfPosition(sourceFile, tokenRange.Pos())
+	endLine, _ := scanner.GetLineAndCharacterOfPosition(sourceFile, tokenRange.End())
 	return startLine == endLine
 }
 

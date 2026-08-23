@@ -67,6 +67,15 @@ func TestConsistencyNoMultilineArrowFunctionStaysSilent(t *testing.T) {
 		{"a function declaration is already the target shape", "function compute(input) {\n    return input * 2;\n}\n"},
 		{"a function expression", "const compute = function (input) {\n    return input * 2;\n};\n"},
 		{"multi-line implicit return is still an implicit return", "const compute = (input) =>\n    input * 2;\n"},
+
+		// An arrow indented inside a multi-line literal. Pos() sits before the leading newline and
+		// indentation, so measuring the span from it puts the start on the previous line and this
+		// genuinely single-line arrow reads as multi-line. This exact shape was the rule's one
+		// false finding on the ahra tree, in a fixture list of non-constructible values where
+		// converting it to a function expression would have given it a prototype and flipped the
+		// assertion it exists to make.
+		{"single-line arrow inside a multi-line array", "const values = [\n    SimpleClass,\n    () => {},\n    42,\n];\n"},
+		{"single-line arrow as a multi-line call argument", "register(\n    'name',\n    () => {},\n);\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
