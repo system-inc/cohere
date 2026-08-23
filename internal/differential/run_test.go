@@ -664,3 +664,36 @@ func TestALocalBuildCarriesItsOwnDisclaimer(t *testing.T) {
 		t.Fatalf("a release build must fall back to its version line, got %q", release)
 	}
 }
+
+// The `-rules` contract is bare names on stdout, and the guard must reject anything else.
+//
+// This is pinned because the contract was tested by accident rather than by design. `verify -rules`
+// gained a provenance note, and the parser kept working only because the note goes to stderr while
+// the names go to stdout. Had it landed on stdout the guard would have rejected the whole list and
+// the harness would have fallen back to the slower path, or failed, on correct output.
+//
+// The guard stays strict rather than learning to skip prose, because a line the parser does not
+// understand is a contract change, and silently tolerating it is how a format drift becomes a short
+// rule list. A short list is the dangerous failure: every missing name becomes a rule the harness
+// believes verify lacks, which turns real disagreements into excused coverage gaps.
+func TestTheRulesContractIsBareNamesOnly(t *testing.T) {
+	bare := "consistency-no-enum\nreact-component-no-multiple-primary\n"
+	names, err := namesFromRuleLines(bare)
+	if err != nil {
+		t.Fatalf("bare names must parse: %v", err)
+	}
+	if len(names) != 2 {
+		t.Fatalf("expected 2 names, got %d", len(names))
+	}
+
+	// The exact note `verify -rules` emits, which lives on stderr today. If it ever reaches stdout
+	// this must fail loudly rather than be absorbed.
+	withNote := bare + "note: 39 rules from a local build, so this is whatever was on disk when it was compiled\n"
+	if _, err := namesFromRuleLines(withNote); err == nil {
+		t.Fatal("a line carrying prose must be rejected: the contract is bare names, and absorbing prose hides a format change")
+	}
+
+	if _, err := namesFromRuleLines("   \n\n"); err == nil {
+		t.Fatal("an empty list must be rejected: a harness believing verify implements nothing excuses every disagreement")
+	}
+}

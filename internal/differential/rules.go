@@ -73,22 +73,39 @@ func rulesFromRulesFlag(ctx context.Context, command GateCommand) (map[string]bo
 		return nil, fmt.Errorf("%s does not answer -rules: %w", command.Program, err)
 	}
 
+	names, err := namesFromRuleLines(output)
+	if err != nil {
+		return nil, fmt.Errorf("%s %w", command.Program, err)
+	}
+	return names, nil
+}
+
+// namesFromRuleLines parses `-rules` stdout, which is bare rule names one per line.
+//
+// Split out from the invocation so the contract can be tested without a binary, because it was
+// being tested by accident: `verify -rules` gained a provenance note and this kept working only
+// because the note goes to stderr while the names go to stdout. Had it landed on stdout, the guard
+// would have rejected correct output.
+//
+// The guard stays strict rather than learning to skip prose. A line this does not understand is a
+// contract change, and absorbing it quietly is how a format drift becomes a short rule list, where
+// every missing name becomes a rule the harness believes verify lacks and every real disagreement
+// on it gets excused as a coverage gap.
+func namesFromRuleLines(output string) (map[string]bool, error) {
 	names := map[string]bool{}
 	for _, line := range strings.Split(output, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
 		}
-		// One bare rule name per line is the whole contract, so anything carrying spaces is some
-		// other output that arrived on this stream and the contract no longer holds.
 		if strings.ContainsAny(trimmed, " \t") {
-			return nil, fmt.Errorf("%s -rules printed %q, which is not a bare rule name", command.Program, trimmed)
+			return nil, fmt.Errorf("-rules printed %q, which is not a bare rule name", trimmed)
 		}
 		names[NormalizeRuleName(trimmed)] = true
 	}
 
 	if len(names) == 0 {
-		return nil, fmt.Errorf("%s -rules printed no rule names", command.Program)
+		return nil, fmt.Errorf("-rules printed no rule names")
 	}
 	return names, nil
 }
