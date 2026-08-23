@@ -208,6 +208,22 @@ func isComponentBaseName(name string) bool {
 //
 // The node itself is considered, so a rule that has already matched a class can ask this without
 // stepping to the parent first.
+//
+// **Confirm the rule you are porting actually asks about component membership before reaching for
+// this, because several react rules test syntactic containment instead and look identical from
+// here.** `no_is_mounted.rs:69` walks ancestors for an `ObjectProperty` or a `MethodDefinition` and
+// stops there: it never asks what the enclosing object was constructed by, and never asks what the
+// enclosing class extends. So `class Whatever { m() { this.isMounted(); } }` with no heritage
+// reports upstream, and `IsEs6ComponentClass` answers false for exactly that shape. A port reaching
+// for this narrows the rule and drops findings.
+//
+// The corpus will not catch it. All three of that rule's fail cases are written inside
+// `createReactClass`, so a port narrowed to real components passes every one of them. Verified at
+// the source after `@system_verify_format` found it, and it is the second time a react helper has
+// been correct for the rule that motivated it and wrong for a neighbour that looks the same.
+//
+// The distinction to hold: *is this inside a component* and *is this inside a method-like thing*
+// are different questions, and upstream asks both under names that do not distinguish them.
 func EnclosingComponent(node *ast.Node) *ast.Node {
 	for current := node; current != nil; current = current.Parent {
 		if IsEs6ComponentClass(current) || IsEs5ComponentCall(current) {
