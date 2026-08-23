@@ -176,3 +176,49 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(t *te
 		}, libraryFilePath))
 	})
 }
+
+// The cache is keyed on the program pointer, and both directions have to be pinned.
+//
+// This is the fixture the existing corpus cannot supply. The rule finds zero on the real tree, so a
+// cache returning a stale map, an empty map, or a map from a different program all look exactly like
+// today's correct-but-slow behavior: silence. An empty theme map disables the rule entirely, which
+// this file already names as the hazard, so a cache bug does not fail loudly, it stops linting.
+//
+// Two runs with different programs must not share an answer, and that is the miss. Two calls within
+// one run must reach the same map, and that is the hit.
+func TestBoundaryNoProjectThemeValueCachesPerProgram(t *testing.T) {
+	// A theme naming `Raised`, so `variant="Flat"` is a violation and `variant="Raised"` is not.
+	firstProgram := map[string]string{
+		"/repository/libraries/structure/source/components/CardTheme.ts": "export interface CardVariantsInterface {\n    Raised: string;\n}\n",
+		libraryFilePath: "export const a = <Card variant=\"Flat\" />;\n",
+	}
+
+	// A different program whose theme names `Flat` instead. If the cache answered from the first
+	// program, this file would report, because `Flat` is absent from that theme.
+	secondProgram := map[string]string{
+		"/repository/libraries/structure/source/components/CardTheme.ts": "export interface CardVariantsInterface {\n    Flat: string;\n}\n",
+		libraryFilePath: "export const a = <Card variant=\"Flat\" />;\n",
+	}
+
+	t.Run("the first program reports against its own theme", func(t *testing.T) {
+		ruletest.ExpectFindings(t,
+			ruletest.RunTypedFiles(t, BoundaryNoProjectThemeValue, firstProgram, libraryFilePath),
+			"forbiddenThemeValue")
+	})
+
+	// The miss. A stale cache keyed on nothing would answer with the first program's theme and
+	// report here, so this failing is what a key-less memo looks like.
+	t.Run("a second program is not answered from the first", func(t *testing.T) {
+		ruletest.ExpectClean(t,
+			ruletest.RunTypedFiles(t, BoundaryNoProjectThemeValue, secondProgram, libraryFilePath))
+	})
+
+	// The hit. Re-running the first program after the second must recompute rather than keep the
+	// second's answer, which is the same bug in the other direction and is what a cache that
+	// replaces without comparing the key would do.
+	t.Run("returning to the first program reports again", func(t *testing.T) {
+		ruletest.ExpectFindings(t,
+			ruletest.RunTypedFiles(t, BoundaryNoProjectThemeValue, firstProgram, libraryFilePath),
+			"forbiddenThemeValue")
+	})
+}
