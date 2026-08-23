@@ -151,6 +151,60 @@ func TestStalenessTestRunsInOneDirectionOnly(t *testing.T) {
 	}
 }
 
+func TestStalenessSeesFilesOutsideTheObviousSourceDirectories(t *testing.T) {
+	// The probe this replaces named three paths and saw 677 of the fork's 9,343 tracked files. It
+	// could not see `bin/`, `_system/`, `.yarn/`, or any root build configuration, so an edit to
+	// the build itself produced different bundles while the check reported fresh.
+	//
+	// A probe that enumerates what to look at is silent about whatever nobody thought to list, and
+	// the silence looks exactly like an answer. So this edits a file in none of the three original
+	// directories and asserts the guard notices.
+	fork := newFork(t)
+	writeFile(t, filepath.Join(fork, "bin", "prettier.cjs"), "#!/usr/bin/env node\n")
+	run(t, fork, "git", "add", ".")
+	run(t, fork, "git", "commit", "--quiet", "-m", "add a build entry point")
+
+	buildBundles(t, fork, time.Now().Add(-time.Hour))
+	touch(t, filepath.Join(fork, "bin", "prettier.cjs"), time.Now())
+	t.Setenv(FormatterForkPathVariable, fork)
+
+	_, err := ResolveFormatterSource()
+	if err == nil {
+		t.Fatalf("an edit to bin/ left the bundles looking fresh, so the probe cannot see the build's own source")
+	}
+	if !strings.Contains(err.Error(), "bin/prettier.cjs") {
+		t.Errorf("the failure does not name the file that changed: %v", err)
+	}
+}
+
+func TestStalenessIgnoresPathsThatCannotReachTheBundles(t *testing.T) {
+	// The other half, and the reason this is an exclusion list rather than "watch everything".
+	// `tests` is 8,274 of the fork's 9,343 tracked files; watching it would make an ordinary test
+	// edit look like a stale build, and a warning that fires when nothing is wrong is one nobody
+	// reads later.
+	fork := newFork(t)
+	writeFile(t, filepath.Join(fork, "tests", "format.js"), "// a test\n")
+	run(t, fork, "git", "add", ".")
+	run(t, fork, "git", "commit", "--quiet", "-m", "add a test")
+
+	// Every watched file is aged behind the bundles, so the only thing newer is the test edit. Aging
+	// them individually rather than trusting the fixture's creation time: `newFork` writes
+	// `scripts/build.js` at the moment it runs, which is newer than any bundle built "an hour ago",
+	// and that alone fails this test for a reason unrelated to what it asks.
+	aged := time.Now().Add(-time.Hour)
+	for _, watched := range []string{"src/index.js", "scripts/build.js", "package.json"} {
+		touch(t, filepath.Join(fork, filepath.FromSlash(watched)), aged)
+	}
+	buildBundles(t, fork, time.Now().Add(-30*time.Minute))
+	touch(t, filepath.Join(fork, "tests", "format.js"), time.Now())
+	t.Setenv(FormatterForkPathVariable, fork)
+
+	if _, err := ResolveFormatterSource(); err != nil {
+		_, path, _ := newestSourceTime(fork)
+		t.Fatalf("a test edit was read as a stale build; the guard flagged %s: %v", path, err)
+	}
+}
+
 func TestGuardChecksEveryBundleTheEngineActuallyLoads(t *testing.T) {
 	// The list this guard checks and the list the engine loads must be one list, not two that agree
 	// today. They did not agree: this file once named three bundles chosen as "the minimal set that

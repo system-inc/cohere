@@ -37,6 +37,27 @@ const DefaultFormatterForkPath = "/Users/kirkouimet/Projects/system/prettier"
 // Measured at 05:43: the eight bundles total 2.1 MB, against a binary that is now 45 MB.
 var FormatterBundleNames = prettier.BundleFiles
 
+// unwatchedForkPaths are tracked paths whose changes cannot reach the built bundles.
+//
+// This is an exclusion list rather than an inclusion list on purpose, and the difference is the
+// whole point: an inclusion list is silent about what it never named, while an exclusion list is
+// wrong only about things somebody wrote down and can be argued with. Everything tracked is watched
+// unless it appears here with a reason.
+//
+// `tests` is 8,274 of the fork's 9,343 tracked files, so watching it would make a test edit look
+// like a stale build and train everyone to ignore the warning. `dist` is the build output being
+// judged, and including it would compare the bundles against themselves.
+var unwatchedForkPaths = []string{
+	"dist",
+	"dist*",
+	"tests",
+	"website",
+	"changelog_unreleased",
+	"benchmarks",
+	".vscode",
+	".github",
+}
+
 // FormatterSource is a built Prettier fork on disk, and which commit built it.
 type FormatterSource struct {
 	// Directory holds the built bundles, the fork's `dist/prettier`.
@@ -186,7 +207,19 @@ func checkBundlesPresent(bundleDirectory string) (newest time.Time, err error) {
 // every release look stale. `dist` is excluded because it is the build output being judged, and
 // including it would compare the bundles against themselves.
 func newestSourceTime(forkPath string) (newest time.Time, path string, err error) {
-	output, err := exec.Command("git", "-C", forkPath, "ls-files", "src", "scripts", "package.json").Output()
+	// Everything tracked, minus what is excluded by name, rather than an allowlist of directories.
+	//
+	// The allowlist this replaces named `src`, `scripts`, and `package.json`, and saw 677 of the
+	// fork's 9,343 tracked files. It could not see `bin/`, `_system/`, `.yarn/`, or any root build
+	// configuration, so an edit to the build itself produced different bundles and the staleness
+	// check reported fresh. A probe that enumerates what to look at cannot see what nobody thought
+	// to list, and the omission is invisible because the result still looks like an answer.
+	arguments := []string{"-C", forkPath, "ls-files"}
+	for _, excluded := range unwatchedForkPaths {
+		arguments = append(arguments, ":!:"+excluded)
+	}
+
+	output, err := exec.Command("git", arguments...).Output()
 	if err != nil {
 		return newest, "", fmt.Errorf("listing the Prettier fork's source: %w", err)
 	}
