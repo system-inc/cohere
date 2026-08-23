@@ -10,19 +10,33 @@ import (
 // allowedRuleImports are the packages of ours a rule package may depend on.
 //
 // `internal/rule` is the interface a rule codes against, so depending on it is the entire point.
-// Anything else pulls the rules package deeper into the import graph.
 var allowedRuleImports = map[string]bool{
 	"github.com/system-inc/verify/internal/rule": true,
 }
 
-// The rules package must stay a leaf, and this is a build-time check rather than a review
+// allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.
+//
+// `internal/upstream/` is vendored third-party code pinned to a commit. What makes an import
+// expensive is not depth but movement: a rebuild is triggered by a dependency changing, and
+// vendored upstream does not change when someone edits a rule. So it costs a rule edit nothing,
+// and refusing it would push a legitimate dependency into a worse shape for no measured gain.
+var allowedRuleImportPrefixes = []string{
+	"github.com/system-inc/verify/internal/upstream/",
+}
+
+// A rule edit must not trigger a deep rebuild, and this is a build-time check rather than a review
 // convention because the cost of losing it is measured and large.
 //
-// Measured on a comparable Go binary: editing a leaf file rebuilds in 2.03s, while editing
-// something deep in the import graph costs 8.52s — a 4.2x cliff on the loop a rule author sits in
-// all day. The depth that causes it is invisible in review, because the import that does it looks
-// completely reasonable in the file that adds it. So it is asserted here, where it fails loudly the
-// moment it stops being true.
+// Measured on this tree: editing a rule package rebuilds in about 1.8s, while editing something
+// deep in the import graph costs 8.52s — a 4.2x cliff on the loop a rule author sits in all day.
+// The depth that causes it is invisible in review, because the import that does it looks completely
+// reasonable in the file that adds it. So it is asserted here, where it fails loudly the moment it
+// stops being true.
+//
+// The constraint is deliberately "do not depend on things that move" rather than the simpler "do
+// not depend on anything." Those came apart the first time a rule package legitimately needed
+// vendored upstream: the simpler rule would have rejected an import that costs nothing, which is
+// how a guard stops being trusted and starts being worked around.
 func TestRulePackagesStayLeaves(t *testing.T) {
 	rulePackages := listPackages(t, "./internal/rules/...")
 	if len(rulePackages) == 0 {
@@ -38,16 +52,26 @@ func TestRulePackagesStayLeaves(t *testing.T) {
 				// shim is most of what a rule touches, and it is not ours to be deep in.
 				continue
 			}
-			if allowedRuleImports[imported] {
+			if allowedRuleImports[imported] || hasAllowedPrefix(imported) {
 				continue
 			}
 
 			t.Errorf(
-				"rule package %s imports %s, which pushes rules off the leaf — a leaf edit rebuilds in about 2s, a deep one in about 8.5s",
+				"rule package %s imports %s, which pushes rules off the leaf — a leaf edit rebuilds in about 1.8s, a deep one in about 8.5s",
 				rulePackage, imported,
 			)
 		}
 	}
+}
+
+// hasAllowedPrefix reports whether an import sits in a subtree rules may depend on wholesale.
+func hasAllowedPrefix(imported string) bool {
+	for _, prefix := range allowedRuleImportPrefixes {
+		if strings.HasPrefix(imported, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // listPackages returns the import paths matching a pattern.
