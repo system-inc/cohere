@@ -35,6 +35,7 @@ func All() []rule.Rule {
 		core.NoEmptyPattern,
 		core.NoEmptyStaticBlock,
 		core.NoExAssign,
+		core.NoSelfAssign,
 		core.NoSparseArrays,
 		core.NoUnsafeFinally,
 		core.NoVar,
