@@ -288,7 +288,7 @@ func projectFilesMismatchMessage(named int, matched int) string {
 //
 // The release function must be called, conventionally by defer.
 func (g *Graph) CheckerForFile(ctx context.Context, sourceFile *ast.SourceFile) (*checker.Checker, func()) {
-	return g.Program.GetTypeCheckerForFile(ctx, sourceFile)
+	return g.Program.GetTypeCheckerForFileExclusive(ctx, sourceFile)
 }
 
 // Diagnostics returns TypeScript's own findings for one file: syntax, then binding, then semantics.
