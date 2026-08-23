@@ -63,6 +63,12 @@ type Graph struct {
 	// it. Empty means no rule takes options, which is what a test that did not set one expects.
 	RuleOptions config.OptionsRegistry
 
+	// CollectTimings turns on per-rule cost measurement for the next Walk.
+	//
+	// Off by default and guarded at every timing site, so an ordinary run reads no clocks and
+	// allocates no accumulators. The instrument should cost nothing when nobody asked for it.
+	CollectTimings bool
+
 	// checkerCount is how many checkers the program built, and therefore the most files that can be
 	// checked at once. The compiler keeps this private, so we record what we asked for.
 	checkerCount int

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -91,6 +92,10 @@ type Coverage struct {
 type Result struct {
 	Diagnostics []rule.Diagnostic
 	Coverage    Coverage
+
+	// Timings is per-rule cost, populated only when the caller asked for it by setting
+	// Graph.CollectTimings. Nil otherwise, so an ordinary run pays nothing for the instrument.
+	Timings *Timings
 }
 
 // Walk visits every file in the given set once, dispatching every rule's listeners as it goes.
@@ -123,6 +128,17 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	unconfigured := map[string]int{}
 	configFailures := []error{}
 
+	// Nil unless asked for, and every timing call below is guarded on it, so a run without --timing
+	// does not pay for the instrument at all.
+	var timings *Timings
+	if g.CollectTimings {
+		ruleNames := make([]string, 0, len(rules))
+		for _, subject := range rules {
+			ruleNames = append(ruleNames, subject.Name)
+		}
+		timings = NewTimings(ruleNames)
+	}
+
 	// Files are handed out by index stride rather than by a queue: the compiler assigns a file to a
 	// checker by its position in the program's file list, so striding keeps each worker mostly on one
 	// checker instead of contending across all of them.
@@ -140,6 +156,13 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			localScopedOff := map[string]int{}
 			localUnconfigured := map[string]int{}
 			localFailures := []error{}
+
+			// Each worker accumulates locally and merges once under the mutex. Timing through a
+			// shared lock would measure contention rather than rule cost.
+			var localTimings *Timings
+			if timings != nil {
+				localTimings = NewTimings(nil)
+			}
 
 			for index := worker; index < len(files); index += workers {
 				sourceFile := files[index]
@@ -168,7 +191,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// another rule's name even by accident.
 				visited, silenced := dispatchFile(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
-				}, applicable, g, fileChecker, localListening, ruleOptions)
+				}, applicable, g, fileChecker, localListening, ruleOptions, localTimings)
 
 				release()
 
@@ -191,6 +214,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				unconfigured[name] += count
 			}
 			configFailures = append(configFailures, localFailures...)
+			timings.merge(localTimings)
 			mutex.Unlock()
 		}()
 	}
@@ -204,6 +228,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 	return Result{
 		Diagnostics: diagnostics,
+		Timings:     timings,
 		Coverage: Coverage{
 			FilesInProgram: len(g.Program.GetSourceFiles()),
 			FilesWalked:    len(files),
@@ -236,6 +261,7 @@ func dispatchFile(
 	fileChecker *checker.Checker,
 	listeningCounts map[string]int,
 	ruleOptions map[string]any,
+	timings *Timings,
 ) (visitedNodes int, silenced suppressionTally) {
 	// A kind may have listeners from several rules, so the merged table maps a kind to a slice rather
 	// than to one function.
@@ -248,6 +274,11 @@ func dispatchFile(
 
 	for _, subject := range rules {
 		ruleName := subject.Name
+
+		var timing *RuleTiming
+		if timings != nil {
+			timing = timings.forRule(ruleName)
+		}
 
 		context := rule.Context{
 			SourceFile:  sourceFile,
@@ -263,6 +294,10 @@ func dispatchFile(
 				// ever existing as a finding. The alternative — collect everything, drop some later —
 				// leaves a window where a caller can read the unfiltered slice and report a number the
 				// user will never see explained.
+				if timing != nil {
+					timing.Findings++
+				}
+
 				if directives.Suppresses(diagnostic.RuleName, diagnostic.Range.Pos()) {
 					return
 				}
@@ -274,8 +309,18 @@ func dispatchFile(
 		// Options are decoded to the type the rule declares rather than handed through as JSON. A
 		// rule that receives the wrong shape fails its type assertion and declines every file, which
 		// looks exactly like a rule with nothing to report.
+		setupStart := timingNow(timing)
 		listeners := subject.Run(context, ruleOptions[ruleName])
+		if timing != nil {
+			timing.SetupDuration += time.Since(setupStart)
+		}
+
 		if len(listeners) == 0 {
+			if timing != nil {
+				// A rule that declined. Counted so that a rule doing expensive setup and then
+				// declining every file is visible as exactly that, rather than as a cheap rule.
+				timing.FilesDeclined++
+			}
 			// The rule looked at the file and declined it. That is the cheapest and most valuable thing
 			// a rule can do, and it is counted rather than ignored so a rule that declines *everything*
 			// is visible as a rule that never ran.
@@ -283,8 +328,11 @@ func dispatchFile(
 		}
 
 		listeningCounts[ruleName]++
+		if timing != nil {
+			timing.FilesListened++
+		}
 		for kind, listener := range listeners {
-			merged[kind] = append(merged[kind], listener)
+			merged[kind] = append(merged[kind], measuringListener(timing, listener))
 		}
 	}
 

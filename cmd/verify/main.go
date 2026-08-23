@@ -39,6 +39,7 @@ func run() error {
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
 	applyFixes := flag.Bool("fix", false, "apply the repairs rules propose, rewriting files in place")
 	maxFixPasses := flag.Int("fix-passes", fix.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
+	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -111,6 +112,7 @@ func run() error {
 		}
 		graph.LintConfig = lintConfig
 		graph.RuleOptions = registry.Options()
+		graph.CollectTimings = *showTiming
 
 		lintStart := time.Now()
 		result, err := graph.Walk(ctx, projectFiles, rules)
@@ -135,6 +137,10 @@ func run() error {
 		printRuleCoverage(rules, result.Coverage)
 		printSuppressionCoverage(result.Coverage)
 		printConfigCoverage(result.Coverage)
+
+		if *showTiming {
+			printTimings(os.Stdout, result.Timings, lintDuration)
+		}
 
 		// Fixing runs after reporting rather than before it, so the findings a reader sees are the
 		// ones that were actually there when the run started. Fixing first and then reporting would
