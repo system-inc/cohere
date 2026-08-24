@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/comments"
 )
 
 // NoFallthroughOptions configures which comments excuse a fallthrough and which clauses are exempt.
@@ -107,7 +107,7 @@ var NoFallthrough = rule.Rule{
 						// behavior the code does not have. Only reported when asked for, since a
 						// comment left behind by a later `break` is a nuisance rather than a bug.
 						if parsed.ReportUnusedFallthroughComment {
-							if commentRange, found := fallthroughCommentBetween(sourceText, clause,
+							if commentRange, found := fallthroughCommentBetween(ctx, clause,
 								nextClauseStart, matchesFallthroughComment); found {
 								ctx.ReportRange(commentRange, rule.Message{
 									Id: "unusedFallthroughComment",
@@ -131,7 +131,7 @@ var NoFallthrough = rule.Rule{
 						}
 					}
 
-					if _, found := fallthroughCommentBetween(sourceText, clause, nextClauseStart,
+					if _, found := fallthroughCommentBetween(ctx, clause, nextClauseStart,
 						matchesFallthroughComment); found {
 						continue
 					}
@@ -193,9 +193,10 @@ func fallthroughCommentMatcher(pattern string) func(string) bool {
 // `{ a(); /* falls through */ } /* comment */` from its failing
 // `/* no break */ /* todo: fix readability */`: in the first the matching comment is last in the
 // block window, in the second a non-matching comment follows it in the only window there is.
-func fallthroughCommentBetween(sourceText string, clause *ast.Node, nextClauseStart int,
+func fallthroughCommentBetween(ctx rule.Context, clause *ast.Node, nextClauseStart int,
 	matches func(string) bool) (core.TextRange, bool) {
 	statements := clause.AsCaseOrDefaultClause().Statements.Nodes
+	fileComments := comments.ForFile(ctx)
 
 	// The window's start is the clause's end, which is also its last statement's end.
 	//
@@ -215,71 +216,47 @@ func fallthroughCommentBetween(sourceText string, clause *ast.Node, nextClauseSt
 		if len(blockStatements) > 0 {
 			blockWindowStart = blockStatements[len(blockStatements)-1].End()
 		}
-		if commentRange, found := lastCommentIn(sourceText, blockWindowStart, block.End(),
+		if commentRange, found := lastCommentIn(fileComments, blockWindowStart, block.End(),
 			matches); found {
 			return commentRange, true
 		}
 	}
 
-	return lastCommentIn(sourceText, windowStart, nextClauseStart, matches)
+	return lastCommentIn(fileComments, windowStart, nextClauseStart, matches)
 }
 
 // lastCommentIn returns the last comment fully inside a range, when it matches.
 //
-// This scan is written here rather than taken from `internal/utils/comments` because that shelf
-// cannot see the comments this rule needs, which was measured rather than assumed. `comments.All`
-// scans at every node's `Pos()` and `End()`, and a comment that is the *only* content of a block
-// sits at neither: the block's `Pos()` is the trivia before its opening brace and its `End()` is
-// past the closing one, and an empty statement list yields no child to anchor a third position on.
-// Probed on this rule's own corpus, `switch(foo) { case 0: { /* falls through */ } case 1: b(); }`
-// returns zero comments from both `All` and `AllWithoutGuard`, and it is one of upstream's clean
-// cases. Fixing the shelf would mean changing `AllWithoutGuard` in lockstep, since the differential
-// guard compares them, and perturbing four rules that depend on the current scan, so the scan is
-// kept local and the finding is written down here for whoever fixes the shelf later.
+// This used to carry its own scanner sweep, because `internal/utils/comments` could not see a
+// comment that was the only content of a block and this rule's corpus contains exactly that:
+// `switch(foo) { case 0: { /* falls through */ } case 1: b(); }` returned zero comments from the
+// shelf. The shelf was fixed, so the local scan is gone and this filters the shared scan instead.
+// The gap turned out to be wider than a block, and the fix is described where it lives.
 //
-// Both scanner directions are needed for the same reason the shelf needs both. A comment opening a
-// run of trivia is leading; one following code on the same line is trailing, and
-// `{ /* falls through */ }` is reached only by the trailing scan because the run does not begin at
-// the brace.
-func lastCommentIn(sourceText string, start int, end int, matches func(string) bool) (core.TextRange, bool) {
-	if start < 0 || end > len(sourceText) || start >= end {
+// Filtering rather than scanning is also why this is now cheap. `comments.ForFile` is computed once
+// per file and shared with the four other comment rules, so the two windows this rule asks about
+// cost a walk over that file's comments rather than a fresh sweep of the source per window.
+func lastCommentIn(fileComments []comments.Comment, start int, end int,
+	matches func(string) bool) (core.TextRange, bool) {
+	if start < 0 || start >= end {
 		return core.TextRange{}, false
 	}
 
-	var factory ast.NodeFactory
+	// The last one wins, and the comments arrive in source order, so the final match in the window
+	// is the answer. That ordering is what separates upstream's clean
+	// `{ a(); /* falls through */ } /* comment */` from its failing
+	// `/* no break */ /* todo: fix readability */`: in the first the matching comment is last in the
+	// block window, in the second a non-matching comment follows it in the only window there is.
 	var lastRange core.TextRange
 	var lastText string
 	found := false
-
-	consider := func(commentRange ast.CommentRange) {
-		if commentRange.Pos() < start || commentRange.End() > end {
-			return
+	for _, comment := range fileComments {
+		if comment.Range.Pos() < start || comment.Range.End() > end {
+			continue
 		}
-		if found && commentRange.Pos() <= lastRange.Pos() {
-			return
-		}
-		lastRange = commentRange.TextRange
-		lastText = sourceText[commentRange.Pos():commentRange.End()]
+		lastRange = comment.Range
+		lastText = comment.Text
 		found = true
-	}
-
-	// Walking position by position rather than from `start` alone: the scanner yields the run of
-	// comments beginning at a position and stops at the first token, so a window whose first
-	// character is a brace is not covered from that brace at all.
-	//
-	// The trailing scan only, deliberately, and this is measured rather than inherited. The shelf's
-	// `comments.All` runs both directions because it scans two positions per node and each
-	// direction reaches comments the other misses from those two positions. Sweeping the whole
-	// window changes that: probed across ten inputs from this rule's corpus, comparing the two
-	// scans at every position, the leading scan found nothing the trailing scan did not, while the
-	// trailing scan found comments the leading scan missed in four of the ten. Over a swept window
-	// the trailing scan is a strict superset, so the leading pass is subsumed. A mutation deleting
-	// it survived every fixture, which is what sent me to measure rather than to write a case that
-	// could not exist.
-	for position := start; position <= end; position++ {
-		for commentRange := range scanner.GetTrailingCommentRanges(&factory, sourceText, position) {
-			consider(commentRange)
-		}
 	}
 
 	if !found {

@@ -42,23 +42,37 @@ type Comment struct {
 // scanner's iterator yields the run of comments beginning at a position and stops at the first
 // token. Positions repeat across a walk (a node and its first child usually start at the same
 // place), so the results are deduplicated by range rather than assumed distinct.
-// # A comment that is the only content of a block is invisible to this scan
+// # Comments inside an otherwise-empty pair of delimiters
 //
-// Measured, not theorized: `switch(foo) { case 0: { /* falls through */ } case 1: b(); }` returns
-// zero comments from both `All` and `AllWithoutGuard`, and that input is one of upstream's clean
-// cases for `no-fallthrough`.
+// A node's `Pos()` is where its leading trivia begins and its `End()` is past its closing token, so
+// both sit *outside* the delimiters. When the thing between the delimiters is empty there is no
+// child node to anchor a position inside them, and a comment sitting there was invisible to this
+// scan. Measured: `switch(foo) { case 0: { /* falls through */ } case 1: b(); }` returned zero
+// comments, and that input is one of upstream's clean cases for `no-fallthrough`.
 //
-// The cause is that this scans at each node's `Pos()` and `End()`. An empty block's positions sit
-// outside its braces, and an empty statement list yields no child to anchor a third position, so
-// nothing ever looks between them.
+// The gap was wider than the empty *block* it was first reported as. Nine shapes were measured
+// silent, including `class A { /* c */ }`, `interface I { /* c */ }`, `enum E { /* c */ }`,
+// `f( /* c */ )` and `function g(/* c */) {}`, none of which involve a block at all. What they share
+// is an empty `NodeList`, not an empty block.
 //
-// Left unfixed deliberately by the porter who found it. `AllWithoutGuard` is the differential
-// guard's control and has to change in lockstep, and five rules were mid-wave on the current
-// behavior. `no-fallthrough` carries a rule-local scan instead, with the reason at its own line.
+// The fix is `collectListInteriors`, which anchors on the empty list's own `Pos()`. The parser
+// records that position between the delimiters whether or not the list has elements, so it is the
+// interior anchor the walk was missing.
 //
-// Whoever fixes this should change both functions together and re-run every consumer:
-// no-irregular-whitespace, no-unused-labels, no-fallthrough, consistency-no-single-line-jsdoc,
-// consistency-no-long-line-comment.
+// It costs. Measured over 300 real files, three runs each: 5.45ms per pass before, 6.44ms after, so
+// about 18%, and the whole-tree `--timing` run agrees at 95.9ms against 116ms for `comments.All`
+// across 3,407 files. That is the price of a comment scan that can no longer go silent, paid once
+// per file and shared by every rule that asks. The work itself is small and the checking is most of
+// it: 195,800 nodes own 12,975 lists, of which only 1,547 are empty and actually reach the scanner.
+//
+// # Why the anchor has to come from the parser
+//
+// A cheaper-looking fix is to sweep the text for `/` characters the walk did not cover and scan
+// from each. It was tried and it is wrong: on `const s = 'http://x'; // real` it invented a comment
+// `//x'; // real` out of the `//` inside the string literal. Only the parser knows which slashes are
+// code, so every anchor here is one the parser handed us. That is also why `canBeginAt` is allowed
+// to be an over-approximation while this is not: the guard only ever *declines* to scan a position
+// the walk already trusted, whereas a text sweep would *invent* positions the walk never saw.
 func All(sourceFile *ast.SourceFile) []Comment {
 	if sourceFile == nil {
 		return nil
@@ -145,6 +159,9 @@ func All(sourceFile *ast.SourceFile) []Comment {
 		// would sit, and the two positions find different comments.
 		collectAt(node.Pos())
 		collectAt(node.End())
+		// The interior of an empty delimiter pair, which neither position above can reach. See the
+		// section on empty delimiters in this function's doc comment.
+		collectListInteriors(node, collectAt)
 		node.ForEachChild(func(child *ast.Node) bool {
 			visit(child)
 			return false
@@ -159,6 +176,87 @@ func All(sourceFile *ast.SourceFile) []Comment {
 
 	sortByPosition(comments)
 	return comments
+}
+
+// collectListInteriors offers the scan the position just inside a node's delimiters.
+//
+// A node's `Pos()` sits before its opening token and its `End()` sits after its closing one, so a
+// comment written between the two, with nothing else between them, is reachable from neither. The
+// parser already knows the position that would answer: every delimited child sequence is a
+// `NodeList`, and a `NodeList` carries its own `Pos()` recorded *inside* the delimiters whether or
+// not it holds any elements. `ForEachChild` flattens a list into its elements and discards the
+// list, which is why the walk never saw it; this asks the nodes that own one directly.
+//
+// Only the empty case actually needs this. A non-empty list has a first child whose `Pos()` the
+// walk already visits, and that position and the list's `Pos()` are the same. Scanning it anyway
+// would be correct and wasteful, so the check below is what keeps this off the hot path: on the
+// tree the cost is one map lookup per node that owns a list, and a scan only where a list is empty.
+//
+// The kinds enumerated here are the ones measured to hide a comment. Each was reproduced before it
+// was added, rather than being written from the shape of the AST: a kind listed on a hunch would be
+// untested code, and a kind that belongs here and is missing shows up as a comment nothing reports,
+// which is the failure this whole file exists to prevent. Anything not listed keeps the behavior it
+// had before, so a missing kind is the old gap rather than a new defect.
+func collectListInteriors(node *ast.Node, collectAt func(int)) {
+	offer := func(list *ast.NodeList) {
+		// A non-empty list starts where its first child starts, and the walk visits every child's
+		// `Pos()` already. Only an empty list names a position nothing else does.
+		if list == nil || len(list.Nodes) > 0 {
+			return
+		}
+		// `Pos()` and `End()` are interchangeable here and a mutation swapping them survives the
+		// sweep, correctly: the early return above means only empty lists reach this line, and an
+		// empty list spans zero characters, so the two are the same number. Measured rather than
+		// argued, across 2,407 empty lists in 600 real files, zero of which differed. `Pos()` is
+		// written because it is the position being asked for, not because it is the one that works.
+		collectAt(list.Pos())
+	}
+
+	// `FunctionLikeData` and `ClassLikeData` answer across every kind that has the shape, so a
+	// method, an arrow, a constructor and a class expression are all covered without naming each.
+	//
+	// Gating these behind `IsFunctionLikeKind` and `IsClassLike` was tried and reverted, because it
+	// was slower rather than faster: 6.57ms against 6.44ms per pass over 300 real files, three runs
+	// each. The dispatch these return is cheap enough that the extra kind test costs more than it
+	// saves, so the straightforward spelling is also the fast one. Recorded because the optimization
+	// looks obviously right and is not.
+	if functionLike := node.FunctionLikeData(); functionLike != nil {
+		offer(functionLike.Parameters)
+	}
+	if classLike := node.ClassLikeData(); classLike != nil {
+		offer(classLike.Members)
+	}
+
+	switch node.Kind {
+	case ast.KindBlock:
+		offer(node.AsBlock().Statements)
+	case ast.KindCaseBlock:
+		offer(node.AsCaseBlock().Clauses)
+	case ast.KindCaseClause, ast.KindDefaultClause:
+		offer(node.AsCaseOrDefaultClause().Statements)
+	case ast.KindModuleBlock:
+		offer(node.AsModuleBlock().Statements)
+	case ast.KindInterfaceDeclaration:
+		offer(node.AsInterfaceDeclaration().Members)
+	case ast.KindEnumDeclaration:
+		offer(node.AsEnumDeclaration().Members)
+	case ast.KindTypeLiteral:
+		offer(node.AsTypeLiteralNode().Members)
+	case ast.KindObjectLiteralExpression:
+		offer(node.AsObjectLiteralExpression().Properties)
+	case ast.KindArrayLiteralExpression:
+		offer(node.AsArrayLiteralExpression().Elements)
+	case ast.KindCallExpression:
+		offer(node.AsCallExpression().Arguments)
+	case ast.KindNewExpression:
+		offer(node.AsNewExpression().Arguments)
+	case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
+		offer(node.AsBindingPattern().Elements)
+	case ast.KindNamedImports:
+		offer(node.AsNamedImports().Elements)
+	case ast.KindNamedExports:
+		offer(node.AsNamedExports().Elements)
+	}
 }
 
 // sortByPosition puts comments in source order.
@@ -299,6 +397,7 @@ func AllWithoutGuard(sourceFile *ast.SourceFile) []Comment {
 		}
 		collectAt(node.Pos())
 		collectAt(node.End())
+		collectListInteriors(node, collectAt)
 		node.ForEachChild(func(child *ast.Node) bool {
 			visit(child)
 			return false
