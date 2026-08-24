@@ -522,6 +522,11 @@ func verifyCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 		return options.Verify, noCleanup, nil
 	}
 
+	// Deliberately `.oxlintrc.json` rather than verify's own `VerifySettings.json`. This harness
+	// runs the real oxlint binary to compare against, and oxlint reads its own config and would
+	// reject ours: `VerifySettings.json` enables rules oxlint does not implement, `no-octal` among
+	// them, and an unknown rule name makes oxlint refuse to start rather than skip the line. The
+	// two files split for that reason and this side must keep pointing at oxlint's.
 	configPath := filepath.Join(options.Root, ".oxlintrc.json")
 	existing, err := os.ReadFile(configPath)
 	if err != nil {

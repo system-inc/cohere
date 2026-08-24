@@ -7,7 +7,7 @@ import (
 
 // liveConfigPath is the real config verify must agree with. Absent in CI checkouts of this repo
 // alone, which the test treats as a skip rather than a failure.
-const liveConfigPath = "/Users/kirkouimet/Projects/ahra/.oxlintrc.json"
+const liveConfigPath = "/Users/kirkouimet/Projects/ahra/VerifySettings.json"
 
 // TestAgainstTheLiveConfig loads the actual file rather than a hand-written model of it.
 //

@@ -9,10 +9,10 @@ import (
 )
 
 // The live config, which is the only thing that decides whether a registered rule ever runs.
-const liveConfigPath = "/Users/kirkouimet/Projects/ahra/.oxlintrc.json"
+const liveConfigPath = "/Users/kirkouimet/Projects/ahra/VerifySettings.json"
 
 // A rule's fixture proves it works. The config decides whether it runs, and nothing else connects
-// the two: `ruletest` never reads `.oxlintrc.json`, so a rule can pass both directions of its own
+// the two: `ruletest` never reads `VerifySettings.json`, so a rule can pass both directions of its own
 // pair and be inert on every real file.
 //
 // That happened. The first `@next/next` rule registered as `next-no-assign-module-variable` while

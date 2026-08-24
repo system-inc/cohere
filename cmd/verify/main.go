@@ -43,7 +43,7 @@ func run() error {
 	directory := flag.String("directory", "", "the working directory paths resolve against (default: the process's own)")
 	typesOnly := flag.Bool("types", false, "build the graph and report TypeScript's own diagnostics, running no rules")
 	lintOnly := flag.Bool("lint", false, "run the rules, reporting no type diagnostics")
-	lintConfigFileName := flag.String("lint-config", ".oxlintrc.json", "the config that says which rules apply to which files")
+	lintConfigFileName := flag.String("lint-config", "VerifySettings.json", "the config that says which rules apply to which files")
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
 	fixOnly := flag.Bool("fix", false, "fix and format only, running no other phase")
 	noFix := flag.Bool("no-fix", false, "mutate nothing: report what would change without writing a byte")
