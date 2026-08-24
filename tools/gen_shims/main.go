@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"go/types"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -12,7 +15,9 @@ import (
 	"maps"
 	"os"
 	"path"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -34,13 +39,30 @@ type ExtraShim struct {
 	// vocabulary, and it drifts. Four were needed for the move from typescript-go to
 	// microsoft/TypeScript alone.
 	//
-	// IDENTICAL SIZE IS THE WHOLE CONTRACT, and a substitution that violates it fails silently in the
-	// worst available way. `checker.symbolArenaLinkStore` was substituted with `core.PagedLinkStore`,
-	// which is the store half of it and omits the arena half, leaving the mirror 24 bytes short at
-	// field 99 of 319. Every field after it then read at the wrong offset: `Checker_numberType`
-	// returned the `null` type and `Checker_booleanType` returned `false`. Nothing crashed, no test
-	// failed, and the one rule that depended on it went silent on every input. Anything mirroring a
-	// struct with more than one field needs ExtraDeclarations below rather than a bare rename.
+	// PER-FIELD OFFSET IS THE CONTRACT. Identical size and alignment is the cheap proxy that catches
+	// most violations of it, and verifyTypeSubstitutions below enforces that proxy, but the two are
+	// not the same claim: a stand-in of the right width whose fields are in the wrong ORDER passes
+	// every size comparison and still moves the fields that follow it. That was measured, not
+	// reasoned about — swapping two 8-byte pointer fields in a mirror survived a whole-struct size
+	// check while breaking the read. `reflect` can enumerate all 319 of Checker's fields with their
+	// names and offsets even though they are unexported, so a per-field guard is possible; it has
+	// not been built, and this comment is the record of that gap.
+	//
+	// A substitution that violates the proxy fails silently in the worst available way.
+	// `checker.symbolArenaLinkStore` was substituted with `core.PagedLinkStore`, which is the store
+	// half of it and omits the arena half, leaving the mirror 24 bytes short at field 99 of 319.
+	// Every field after it then read at the wrong offset: `Checker_numberType` returned the `null`
+	// type and `Checker_booleanType` returned `false`. Nothing crashed, no test failed, and the one
+	// rule that depended on it went silent on every input. Anything mirroring a struct with more
+	// than one field needs ExtraDeclarations below rather than a bare rename.
+	//
+	// WHERE a substitution appears decides whether its width is load-bearing at all, and the four
+	// here are not four equal risks. Three of them are only ever reached inside a map type
+	// (`map[*ast.Symbol]int32`, `map[uint64][]*ast.Symbol`), and a Go map is one pointer word
+	// whatever its key and value widths are, so those three cannot shift an offset at any size.
+	// Only `nodeLinkStore` at field 91 and `symbolArenaLinkStore` at field 99 sit inline, where
+	// width is what the layout is made of. Ask where a type lands in the mirror before asking
+	// whether its stand-in is the right size.
 	TypeSubstitutions map[string]string
 
 	// ExtraDeclarations are emitted verbatim into the generated file, ahead of the mirrors.
@@ -107,6 +129,24 @@ func main() {
 		if extraShim.TypeSubstitutions == nil {
 			extraShim.TypeSubstitutions = map[string]string{}
 		}
+
+		// Refuse a bad substitution rather than emitting one. This runs before this package's own
+		// shim is written, so a mirror whose stand-ins are the wrong width never reaches the tree.
+		//
+		// The abort is not transactional across packages: shims for packages processed earlier in
+		// this loop are already on disk when it fires. That is deliberate rather than overlooked —
+		// making it atomic would mean buffering every package before writing any, and the failure
+		// it would prevent is a stale shim for an UNRELATED package, which the next successful run
+		// overwrites. What must never exist is the bad mirror itself, and that is what this stops.
+		if problems := verifyTypeSubstitutions(pkg, packages, extraShim); len(problems) > 0 {
+			fmt.Printf("ERROR: %v declares type substitutions that do not preserve layout.\n",
+				extraShimFilePath)
+			for _, problem := range problems {
+				fmt.Printf("  - %v\n", problem)
+			}
+			os.Exit(1)
+		}
+
 		for _, declaration := range extraShim.ExtraDeclarations {
 			shimBuilder.WriteString(declaration)
 			shimBuilder.WriteString("\n")
@@ -441,3 +481,210 @@ func main() {
 		shimBuilder.Reset()
 	}
 }
+
+// verifyTypeSubstitutions refuses to emit a mirror whose stand-in types do not match the size and
+// alignment of the upstream types they replace.
+//
+// This is the check that the `checker.symbolArenaLinkStore` defect needed and did not have. A
+// mirror exists so `unsafe` can reach a field by offset, so a stand-in that is the wrong width
+// shifts every field declared after it, and the read then returns a perfectly valid value of the
+// right Go type that is simply not the field asked for. Nothing crashes and no test fails; the one
+// rule downstream of it goes silent. The comment on TypeSubstitutions above has said IDENTICAL SIZE
+// IS THE WHOLE CONTRACT since that defect was fixed, but a comment cannot enforce a contract, and
+// the substitution that violated it was accepted by this generator without a word.
+//
+// So this runs before anything is written. A check here is worth more than a check in a test
+// because it fails before the wrong code exists, and it covers substitutions no accessor reads
+// today — a field read added later inherits a layout that was already proven rather than one that
+// happened to be right.
+//
+// Alignment is checked alongside size because a stand-in can be the right width by accident and
+// still place the fields after it wrong.
+func verifyTypeSubstitutions(
+	upstreamPackage *packages.Package,
+	allPackages []*packages.Package,
+	extraShim ExtraShim,
+) []string {
+	if len(extraShim.TypeSubstitutions) == 0 {
+		return nil
+	}
+
+	sizes := types.SizesFor("gc", runtime.GOARCH)
+	if sizes == nil {
+		return []string{fmt.Sprintf("no go/types size model for GOARCH %q", runtime.GOARCH)}
+	}
+
+	packagesByPath := map[string]*types.Package{}
+	packagesByName := map[string]*types.Package{}
+	for _, loaded := range allPackages {
+		packagesByPath[loaded.Types.Path()] = loaded.Types
+		packagesByName[loaded.Types.Name()] = loaded.Types
+	}
+
+	// Stand-ins declared in ExtraDeclarations exist only as source text, so they are type-checked
+	// into a synthetic package here in order to be measurable at all.
+	declarationScope := typeCheckExtraDeclarations(extraShim.ExtraDeclarations, packagesByPath, sizes)
+
+	// A generic stand-in must match for every instantiation, not one. These arguments differ in
+	// width, alignment and pointer-ness, so a stand-in that only matches for one shape is caught.
+	probeArguments := []types.Type{
+		types.Typ[types.Int8],
+		types.Typ[types.Int],
+		types.NewPointer(types.Typ[types.Int]),
+		types.NewArray(types.Typ[types.Int64], 5),
+	}
+
+	resolve := func(qualified string) types.Type {
+		packageName, typeName, found := strings.Cut(qualified, ".")
+		if !found {
+			// An unqualified name is either a builtin or an ExtraDeclarations stand-in.
+			if builtin := types.Universe.Lookup(qualified); builtin != nil {
+				return builtin.Type()
+			}
+			if declarationScope != nil {
+				if object := declarationScope.Lookup(qualified); object != nil {
+					return object.Type()
+				}
+			}
+			return nil
+		}
+		hostPackage, ok := packagesByName[packageName]
+		if !ok {
+			return nil
+		}
+		object := hostPackage.Scope().Lookup(typeName)
+		if object == nil {
+			return nil
+		}
+		return object.Type()
+	}
+
+	instantiate := func(base types.Type, argument types.Type) (types.Type, error) {
+		named, ok := base.(*types.Named)
+		if !ok || named.TypeParams().Len() == 0 {
+			return base, nil
+		}
+		arguments := make([]types.Type, named.TypeParams().Len())
+		for i := range arguments {
+			arguments[i] = argument
+		}
+		return types.Instantiate(nil, named, arguments, false)
+	}
+
+	problems := []string{}
+	for _, upstreamName := range slices.Sorted(maps.Keys(extraShim.TypeSubstitutions)) {
+		standInName := extraShim.TypeSubstitutions[upstreamName]
+
+		upstreamType := resolve(upstreamName)
+		if upstreamType == nil {
+			problems = append(problems, fmt.Sprintf(
+				"substitution %q -> %q: could not resolve the upstream type, so its size was never "+
+					"compared. An unresolvable substitution is not a passing one: if upstream renamed "+
+					"or removed this type, the mirror is being built against a type that no longer "+
+					"exists.", upstreamName, standInName))
+			continue
+		}
+		standInType := resolve(standInName)
+		if standInType == nil {
+			problems = append(problems, fmt.Sprintf(
+				"substitution %q -> %q: could not resolve the stand-in type. If it is declared in "+
+					"ExtraDeclarations, that block failed to type-check; if it names a package, that "+
+					"package is not among the ones loaded here.", upstreamName, standInName))
+			continue
+		}
+
+		for _, argument := range probeArguments {
+			upstreamInstance, err := instantiate(upstreamType, argument)
+			if err != nil {
+				continue
+			}
+			standInInstance, err := instantiate(standInType, argument)
+			if err != nil {
+				problems = append(problems, fmt.Sprintf(
+					"substitution %q -> %q: the stand-in could not be instantiated at %s while the "+
+						"upstream type could, so their shapes differ: %v",
+					upstreamName, standInName, argument, err))
+				break
+			}
+
+			upstreamSize := sizes.Sizeof(upstreamInstance)
+			standInSize := sizes.Sizeof(standInInstance)
+			upstreamAlign := sizes.Alignof(upstreamInstance)
+			standInAlign := sizes.Alignof(standInInstance)
+			if upstreamSize == standInSize && upstreamAlign == standInAlign {
+				continue
+			}
+			problems = append(problems, fmt.Sprintf(
+				"substitution %q -> %q at [%s]: upstream is size %d align %d, the stand-in is size "+
+					"%d align %d (off by %d bytes).\n"+
+					"    A mirror is read through unsafe.Pointer by field offset, so a stand-in of "+
+					"the wrong width shifts every field declared after it and every accessor past "+
+					"that point silently returns the wrong field.\n"+
+					"    Fix the stand-in rather than this check: give it the same shape as "+
+					"upstream, adding an ExtraDeclarations struct if upstream has more than one "+
+					"field.",
+				upstreamName, standInName, argument,
+				upstreamSize, upstreamAlign, standInSize, standInAlign,
+				upstreamSize-standInSize))
+			break
+		}
+	}
+	return problems
+}
+
+// typeCheckExtraDeclarations type-checks the ExtraDeclarations block on its own so the stand-ins
+// declared there can be measured. It returns nil when there is nothing to check; a block that does
+// not compile is reported by the caller as an unresolvable stand-in rather than silently skipped.
+func typeCheckExtraDeclarations(
+	declarations []string,
+	packagesByPath map[string]*types.Package,
+	sizes types.Sizes,
+) *types.Scope {
+	if len(declarations) == 0 {
+		return nil
+	}
+
+	var sourceBuilder strings.Builder
+	sourceBuilder.WriteString("package extradeclarations\n\n")
+	// Named rather than blank imports: a blank import does not bind the package name, so a
+	// declaration referring to `core.Arena` would not resolve.
+	for _, path := range slices.Sorted(maps.Keys(packagesByPath)) {
+		sourceBuilder.WriteString("import ")
+		sourceBuilder.WriteString(packagesByPath[path].Name())
+		sourceBuilder.WriteString(" ")
+		sourceBuilder.WriteString(strconv.Quote(path))
+		sourceBuilder.WriteString("\n")
+	}
+	sourceBuilder.WriteString("\n")
+	for _, declaration := range declarations {
+		sourceBuilder.WriteString(declaration)
+		sourceBuilder.WriteString("\n")
+	}
+
+	fileSet := token.NewFileSet()
+	parsed, err := parser.ParseFile(fileSet, "extra-declarations.go", sourceBuilder.String(), 0)
+	if err != nil {
+		return nil
+	}
+	configuration := types.Config{
+		Sizes: sizes,
+		Importer: importerFromMap(func(path string) (*types.Package, error) {
+			if found, ok := packagesByPath[path]; ok {
+				return found, nil
+			}
+			return nil, fmt.Errorf("package %q is not loaded", path)
+		}),
+		// The declarations reference imports the blank-import list above already covers; an
+		// unused-import complaint would be noise rather than a layout problem.
+		DisableUnusedImportCheck: true,
+	}
+	checked, err := configuration.Check("extradeclarations", fileSet, []*ast.File{parsed}, nil)
+	if err != nil {
+		return nil
+	}
+	return checked.Scope()
+}
+
+type importerFromMap func(string) (*types.Package, error)
+
+func (i importerFromMap) Import(path string) (*types.Package, error) { return i(path) }
