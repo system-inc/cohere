@@ -30,6 +30,7 @@ import (
 func init() {
 	rule.Register(
 		rule.Registration{Rule: Config},
+		rule.Registration{Rule: ErrorBoundaries},
 		rule.Registration{Rule: ExhaustiveDeps, Decode: rule.DecodeOptionsInto[ExhaustiveDepsOptions]()},
 		rule.Registration{Rule: ForwardRefUsesRef},
 		rule.Registration{Rule: Gating, Decode: rule.DecodeOptionsInto[GatingOptions]()},
@@ -49,6 +50,7 @@ func init() {
 		rule.Registration{Rule: NoUnsafe, Decode: rule.DecodeOptionsInto[NoUnsafeOptions]()},
 		rule.Registration{Rule: NoWillUpdateSetState, Decode: rule.DecodeOptionsInto[NoWillUpdateSetStateOptions]()},
 		rule.Registration{Rule: RulesOfHooks},
+		rule.Registration{Rule: UnsupportedSyntax},
 		rule.Registration{Rule: VoidDomElementsNoChildren},
 	)
 }
