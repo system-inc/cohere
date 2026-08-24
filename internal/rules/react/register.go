@@ -34,6 +34,7 @@ func init() {
 		rule.Registration{Rule: NoChildrenProp},
 		rule.Registration{Rule: NoFindDOMNode},
 		rule.Registration{Rule: NoIsMounted},
+		rule.Registration{Rule: NoRenderReturnValue},
 		rule.Registration{Rule: NoStringRefs, Decode: rule.DecodeOptionsInto[NoStringRefsOptions]()},
 	)
 }
