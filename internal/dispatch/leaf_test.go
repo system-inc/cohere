@@ -26,13 +26,14 @@ var allowedRuleImports = map[string]bool{
 // nothing, and refusing them would push legitimate dependencies into a worse shape for no measured
 // gain.
 //
-// `internal/upstream/` is vendored third-party code pinned to a commit.
-//
 // `internal/utils/` is the shared utility layer, which is the thing rules are supposed to reach
-// for. `ecmascript/` is ported third-party code, an ECMAScript regex parser the regex rules read
-// patterns with, and it moves when we resync upstream rather than when a rule is written. Measured
-// twice, independently, when `no-invalid-regexp` first reached it: editing a rule that imports the
-// parser and editing one that does not both rebuild in 0.30s warm, and a rule edit stays in the
+// for. It also now holds what vendoring leaves behind: `ecmascript/` is a ported ECMAScript regex
+// parser the regex rules read patterns with, and `typecheck/` is tsgolint's type-checker helper
+// shelf. Neither is re-synced against anything, so both move when we change a shared decision
+// rather than when an upstream releases.
+//
+// Measured twice, independently, when `no-invalid-regexp` first reached the parser: editing a
+// rule that imports the parser and editing one that does not both rebuild in 0.30s warm, and a rule edit stays in the
 // ~1.9s band it was in before the import existed. Editing the parser itself costs 3.24s, which is
 // the real depth cost and is paid by whoever edits the parser rather than by rule authors.
 //
@@ -58,7 +59,6 @@ var allowedRuleImports = map[string]bool{
 // in this same file exists to prevent. Two guards of ours would have been pulling against each
 // other, and the measurement is what says which one was wrong.
 var allowedRuleImportPrefixes = []string{
-	"github.com/system-inc/verify/internal/upstream/",
 	"github.com/system-inc/verify/internal/utils/",
 }
 
