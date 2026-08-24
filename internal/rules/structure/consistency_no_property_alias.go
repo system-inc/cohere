@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/scope"
 )
 
 var messageNoPropertyAlias = rule.Message{
@@ -96,7 +97,7 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 					return
 				}
 
-				enclosing := containingFunction(node)
+				enclosing := scope.EnclosingFunctionLike(node)
 				if enclosing == nil {
 					return
 				}
@@ -179,23 +180,6 @@ func chainContainsCall(expression *ast.Node) bool {
 		}
 	}
 	return false
-}
-
-// containingFunction returns the nearest enclosing function-like node, or nil at module scope.
-//
-// This is what keeps the rule inside function bodies. A `const Foo = Bar.Foo` at the top of a file
-// is a re-export shape rather than an alias, and reporting it would put the rule in the business of
-// how modules are assembled.
-func containingFunction(node *ast.Node) *ast.Node {
-	for current := node.Parent; current != nil; current = current.Parent {
-		switch current.Kind {
-		case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
-			ast.KindArrowFunction, ast.KindMethodDeclaration,
-			ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-			return current
-		}
-	}
-	return nil
 }
 
 // isReadInsideHookDependencyArray reports whether the local is mentioned inside a hook call's

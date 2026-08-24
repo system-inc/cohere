@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/scope"
 	"github.com/system-inc/verify/internal/utils/react"
 )
 
@@ -87,7 +88,7 @@ var ReactComponentNoDestructuring = rule.Rule{
 		}
 
 		checkParameters := func(node *ast.Node, parameters []*ast.Node) {
-			name := functionLikeName(node)
+			name := scope.NameOf(node)
 			if name == "" || !react.IsLikelyComponentName(name) {
 				return
 			}
@@ -143,8 +144,8 @@ var ReactComponentNoDestructuring = rule.Rule{
 					return
 				}
 
-				containing := enclosingFunctionLike(node)
-				if containing == nil || !react.IsLikelyComponentName(functionLikeName(containing)) {
+				containing := scope.EnclosingFunctionLike(node)
+				if containing == nil || !react.IsLikelyComponentName(scope.NameOf(containing)) {
 					return
 				}
 
@@ -166,7 +167,7 @@ var ReactComponentNoDestructuring = rule.Rule{
 func destructuringProblem(pattern *ast.Node, functionNode *ast.Node) (rule.Message, bool) {
 	// A component taking `ref` out and exposing an imperative handle is not a passthrough, so the
 	// rest-spread convention does not apply to it.
-	if bindsReferenceShorthand(pattern) && callsNamedHook(functionLikeBody(functionNode), "useImperativeHandle") {
+	if bindsReferenceShorthand(pattern) && callsNamedHook(scope.BodyOf(functionNode), "useImperativeHandle") {
 		return rule.Message{}, false
 	}
 
@@ -182,7 +183,7 @@ func destructuringProblem(pattern *ast.Node, functionNode *ast.Node) (rule.Messa
 	if genericSpreadNames[name] {
 		return messageSemanticSpreadName, true
 	}
-	if !bodyReferencesName(functionLikeBody(functionNode), name) {
+	if !bodyReferencesName(scope.BodyOf(functionNode), name) {
 		return messageSpreadMustBeUsed, true
 	}
 
@@ -226,36 +227,6 @@ func bindsReferenceShorthand(pattern *ast.Node) bool {
 		}
 	}
 	return false
-}
-
-// functionLikeBody returns a function's body, or nil.
-func functionLikeBody(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-	switch node.Kind {
-	case ast.KindFunctionDeclaration:
-		return node.AsFunctionDeclaration().Body
-	case ast.KindFunctionExpression:
-		return node.AsFunctionExpression().Body
-	case ast.KindArrowFunction:
-		return node.AsArrowFunction().Body
-	case ast.KindMethodDeclaration:
-		return node.AsMethodDeclaration().Body
-	}
-	return nil
-}
-
-// enclosingFunctionLike walks up to the nearest function.
-func enclosingFunctionLike(node *ast.Node) *ast.Node {
-	for current := node.Parent; current != nil; current = current.Parent {
-		switch current.Kind {
-		case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
-			ast.KindArrowFunction, ast.KindMethodDeclaration:
-			return current
-		}
-	}
-	return nil
 }
 
 // spreadUsageDepthLimit bounds the body walks, matching the original's limit of 40.

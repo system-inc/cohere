@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/scope"
 	"github.com/system-inc/verify/internal/utils/react"
 )
 
@@ -75,65 +76,10 @@ var ReactHookNoDestructuring = rule.Rule{
 // to test at all, and stopping there would silence the rule wherever it matters most.
 func isInsideCustomHook(node *ast.Node) bool {
 	for current := node.Parent; current != nil; current = current.Parent {
-		name := functionLikeName(current)
+		name := scope.NameOf(current)
 		if name != "" && react.IsHookName(name) {
 			return true
 		}
 	}
 	return false
-}
-
-// functionLikeName returns the name a function-like node is known by, or "" when it has none.
-//
-// A function expression or arrow assigned to a variable takes the variable's name, which is how
-// `const useThing = () => {}` is recognized. Without that, every arrow-bodied hook in the codebase
-// would be anonymous and the rule would see none of them.
-func functionLikeName(node *ast.Node) string {
-	switch node.Kind {
-	case ast.KindFunctionDeclaration:
-		if name := node.AsFunctionDeclaration().Name(); name != nil {
-			return name.Text()
-		}
-
-	case ast.KindMethodDeclaration:
-		if name := node.AsMethodDeclaration().Name(); name != nil && name.Kind == ast.KindIdentifier {
-			return name.Text()
-		}
-
-	case ast.KindFunctionExpression:
-		if name := node.AsFunctionExpression().Name(); name != nil {
-			return name.Text()
-		}
-		return nameFromEnclosingDeclaration(node)
-
-	case ast.KindArrowFunction:
-		return nameFromEnclosingDeclaration(node)
-	}
-	return ""
-}
-
-// nameFromEnclosingDeclaration reads the variable or property name an anonymous function is
-// assigned to.
-//
-// Only the immediate parent is consulted. A function nested inside an object passed to something
-// else does not inherit that thing's name, and walking further would attribute a callback to
-// whatever declaration happened to enclose it.
-func nameFromEnclosingDeclaration(node *ast.Node) string {
-	parent := node.Parent
-	if parent == nil {
-		return ""
-	}
-
-	switch parent.Kind {
-	case ast.KindVariableDeclaration:
-		if name := parent.AsVariableDeclaration().Name(); name != nil && name.Kind == ast.KindIdentifier {
-			return name.Text()
-		}
-
-	case ast.KindPropertyAssignment:
-		if name := parent.AsPropertyAssignment().Name(); name != nil && name.Kind == ast.KindIdentifier {
-			return name.Text()
-		}
-	}
-	return ""
 }

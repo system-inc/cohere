@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/scope"
 	"github.com/system-inc/verify/internal/utils/react"
 )
 
@@ -162,7 +163,7 @@ func dependencyArrayArgument(call *ast.CallExpression, hookName string) *ast.Nod
 // stopping there would silence the rule everywhere.
 func isInsideComponent(node *ast.Node) bool {
 	for current := node.Parent; current != nil; current = current.Parent {
-		name := functionLikeName(current)
+		name := scope.NameOf(current)
 		if name != "" && react.IsLikelyComponentName(name) && !react.IsHookName(name) {
 			return true
 		}
