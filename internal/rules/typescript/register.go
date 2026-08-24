@@ -18,6 +18,14 @@ import (
 func init() {
 	rule.Register(
 		rule.Registration{Rule: AwaitThenable},
+		rule.Registration{
+			Rule:   BanTsComment,
+			Decode: DecodeBanTsCommentOptions,
+		},
+		rule.Registration{
+			Rule:   ConsistentTypeImports,
+			Decode: DecodeConsistentTypeImportsOptions,
+		},
 		rule.Registration{Rule: NoArrayDelete},
 		rule.Registration{Rule: NoDuplicateEnumValues},
 		rule.Registration{Rule: NoEmptyObjectType},
@@ -40,9 +48,14 @@ func init() {
 		rule.Registration{Rule: NoNonNullAssertedOptionalChain},
 		rule.Registration{Rule: NoNonNullAssertion},
 		rule.Registration{
+			Rule:   NoRequireImports,
+			Decode: DecodeNoRequireImportsOptions,
+		},
+		rule.Registration{
 			Rule:   NoThisAlias,
 			Decode: DecodeNoThisAliasOptions,
 		},
+		rule.Registration{Rule: NoUnnecessaryParameterPropertyAssignment},
 		rule.Registration{Rule: NoUnnecessaryTypeConstraint},
 		rule.Registration{Rule: NoUnsafeDeclarationMerging},
 		rule.Registration{Rule: NoUnsafeFunctionType},
