@@ -43,6 +43,7 @@ func init() {
 		rule.Registration{Rule: ReactComponentRequireNamedExport},
 		rule.Registration{Rule: ReactComponentRequirePropertiesParameter},
 		rule.Registration{Rule: ReactComponentRequirePropertiesTypeSuffix},
+		rule.Registration{Rule: ReactHookAnyType},
 		rule.Registration{Rule: ReactHookNoDestructuring},
 		rule.Registration{Rule: ReactHookNoPropertiesInDependencies},
 		rule.Registration{Rule: ReactHookRequireEffectComment},

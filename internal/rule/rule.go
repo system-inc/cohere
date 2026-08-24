@@ -257,6 +257,29 @@ type Rule struct {
 	// question answerable per rule: two of them genuinely read the program and declare it, four do
 	// not and no longer claim to. Every rule in the tree now declares this from its own body.
 	ReadsProgram bool
+
+	// ResolvesReactValueTypes declares that this rule identifies a React value by asking the checker
+	// for its TYPE, so a file where the hook call resolves to `any` costs it every finding it would
+	// otherwise make, silently.
+	//
+	// This is narrower than NeedsTypeChecker and the difference is the whole reason the field exists.
+	// Measured on 2026-08-24: of the forty-one rules declaring NeedsTypeChecker, only the two that
+	// call GetTypeAtLocation and read the resulting type go blind when `useState` resolves to `any`.
+	// The rest ask GetSymbolAtLocation, which resolves a BINDING rather than a type, and a binding to
+	// `declare function useState<T>(initial: T): any` resolves exactly as well as one to the real
+	// declaration. Probed both ways on the same input: under the ambient shim the symbol comes back
+	// named `useState` with one declaration, while the call's type comes back `any` with TypeFlagsAny.
+	//
+	// So a message naming every NeedsTypeChecker rule as blinded would be confidently wrong about
+	// thirty-nine of them, and a message naming a hardcoded list would be confidently wrong the week a
+	// fifth rule ships. `structure/react-hook-any-type` reads this flag off the live catalog instead,
+	// which is why the flag is a declaration on the rule rather than a list somewhere else: the rule
+	// that goes blind is the only thing that knows it does.
+	//
+	// Under-declaring costs a reader the knowledge that suppressing the tripwire disables this rule
+	// too. Over-declaring names a rule that would have survived. Neither is silent, which is what
+	// makes this field cheaper to get wrong than the two above it.
+	ResolvesReactValueTypes bool
 }
 
 // ReportNode is the common case: this node is wrong, here is why.

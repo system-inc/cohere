@@ -225,6 +225,9 @@ var messageSetStateInEffect = rule.Message{
 var SetStateInEffect = rule.Rule{
 	Name:             "set-state-in-effect",
 	NeedsTypeChecker: true,
+	// Same predicate as `set-state-in-render`: the setter is the type's alias, so an `any` hook
+	// return takes every finding in the file with it. Declared so the tripwire can name it.
+	ResolvesReactValueTypes: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, matching `static-components`. Lowering already descends into

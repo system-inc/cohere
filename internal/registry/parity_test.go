@@ -212,6 +212,14 @@ var rulesOutsideTheInventory = map[string]string{
 	// map line. So the rule is real, its judgment is real, and it has never run anywhere. Porting
 	// it was correct and enabling it is a decision for Kirk rather than a parity question.
 	"import-require-path-alias": "in the nexus plugin map, enabled in no config, so it has never run",
+
+	// A house rule with no upstream on either side, written from reasoning rather than ported, so
+	// no inventory entry could exist for it. It guards verify's own type-based React rules rather
+	// than the source: in a file where a hook call resolves to `any`, `set-state-in-render` and
+	// `set-state-in-effect` report nothing and nothing says a check was skipped. The gate being
+	// replaced has no equivalent because it has no such rules to protect.
+	"react-hook-any-type": "a house tripwire over verify's own type-based React rules; the gate " +
+		"being replaced has no rule it could correspond to",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
