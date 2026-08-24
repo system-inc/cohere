@@ -34,6 +34,7 @@ func init() {
 		rule.Registration{Rule: ExhaustiveDeps, Decode: rule.DecodeOptionsInto[ExhaustiveDepsOptions]()},
 		rule.Registration{Rule: ForwardRefUsesRef},
 		rule.Registration{Rule: Gating, Decode: rule.DecodeOptionsInto[GatingOptions]()},
+		rule.Registration{Rule: Globals},
 		rule.Registration{Rule: JsxNoDuplicateProps},
 		rule.Registration{Rule: JsxNoUndef},
 		rule.Registration{Rule: JsxPropsNoSpreadMulti},
@@ -46,11 +47,14 @@ func init() {
 		rule.Registration{Rule: NoIsMounted},
 		rule.Registration{Rule: NoRenderReturnValue},
 		rule.Registration{Rule: NoStringRefs, Decode: rule.DecodeOptionsInto[NoStringRefsOptions]()},
+		rule.Registration{Rule: StaticComponents},
 		rule.Registration{Rule: NoThisInSfc},
 		rule.Registration{Rule: NoUnsafe, Decode: rule.DecodeOptionsInto[NoUnsafeOptions]()},
 		rule.Registration{Rule: NoWillUpdateSetState, Decode: rule.DecodeOptionsInto[NoWillUpdateSetStateOptions]()},
 		rule.Registration{Rule: RulesOfHooks},
 		rule.Registration{Rule: UnsupportedSyntax},
+		rule.Registration{Rule: UseMemo},
 		rule.Registration{Rule: VoidDomElementsNoChildren},
+		rule.Registration{Rule: VoidUseMemo},
 	)
 }
