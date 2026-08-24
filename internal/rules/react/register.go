@@ -29,8 +29,10 @@ import (
 // rules that vanished rather than as a quieter run.
 func init() {
 	rule.Register(
+		rule.Registration{Rule: Config},
 		rule.Registration{Rule: ExhaustiveDeps, Decode: rule.DecodeOptionsInto[ExhaustiveDepsOptions]()},
 		rule.Registration{Rule: ForwardRefUsesRef},
+		rule.Registration{Rule: Gating, Decode: rule.DecodeOptionsInto[GatingOptions]()},
 		rule.Registration{Rule: JsxNoDuplicateProps},
 		rule.Registration{Rule: JsxNoUndef},
 		rule.Registration{Rule: JsxPropsNoSpreadMulti},
