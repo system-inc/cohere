@@ -42,6 +42,23 @@ type Comment struct {
 // scanner's iterator yields the run of comments beginning at a position and stops at the first
 // token. Positions repeat across a walk (a node and its first child usually start at the same
 // place), so the results are deduplicated by range rather than assumed distinct.
+// # A comment that is the only content of a block is invisible to this scan
+//
+// Measured, not theorized: `switch(foo) { case 0: { /* falls through */ } case 1: b(); }` returns
+// zero comments from both `All` and `AllWithoutGuard`, and that input is one of upstream's clean
+// cases for `no-fallthrough`.
+//
+// The cause is that this scans at each node's `Pos()` and `End()`. An empty block's positions sit
+// outside its braces, and an empty statement list yields no child to anchor a third position, so
+// nothing ever looks between them.
+//
+// Left unfixed deliberately by the porter who found it. `AllWithoutGuard` is the differential
+// guard's control and has to change in lockstep, and five rules were mid-wave on the current
+// behavior. `no-fallthrough` carries a rule-local scan instead, with the reason at its own line.
+//
+// Whoever fixes this should change both functions together and re-run every consumer:
+// no-irregular-whitespace, no-unused-labels, no-fallthrough, consistency-no-single-line-jsdoc,
+// consistency-no-long-line-comment.
 func All(sourceFile *ast.SourceFile) []Comment {
 	if sourceFile == nil {
 		return nil
