@@ -17,11 +17,14 @@ import (
 // rules that vanished rather than as a quieter run.
 func init() {
 	rule.Register(
+		rule.Registration{Rule: NoDuplicateEnumValues},
 		rule.Registration{Rule: NoEmptyObjectType},
 		rule.Registration{Rule: NoExtraNonNullAssertion},
 		rule.Registration{Rule: NoNonNullAssertedOptionalChain},
 		rule.Registration{Rule: NoNonNullAssertion},
 		rule.Registration{Rule: NoUnsafeFunctionType},
+		rule.Registration{Rule: NoUselessEmptyExport},
 		rule.Registration{Rule: NoWrapperObjectTypes},
+		rule.Registration{Rule: PreferNamespaceKeyword},
 	)
 }
