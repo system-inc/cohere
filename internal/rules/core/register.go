@@ -107,7 +107,9 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoShadowRestrictedNamesOptions](),
 		},
 		rule.Registration{Rule: NoSparseArrays},
+		rule.Registration{Rule: NoThisBeforeSuper},
 		rule.Registration{Rule: NoUnassignedVars},
+		rule.Registration{Rule: NoUselessAssignment},
 		rule.Registration{Rule: NoUnsafeFinally},
 		rule.Registration{
 			Rule:   NoUnsafeNegation,
