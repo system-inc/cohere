@@ -87,7 +87,7 @@ func TestLowerRealCodebase(t *testing.T) {
 		}, string(contents), kind)
 
 		forEachFunctionLike(source.AsNode(), func(node *ast.Node) {
-			function := Lower(node)
+			function := Lower(node, nil)
 			if function == nil {
 				return
 			}
@@ -164,7 +164,7 @@ func TestLowerRealCodebaseIsDeterministic(t *testing.T) {
 
 		var out strings.Builder
 		forEachFunctionLike(source.AsNode(), func(node *ast.Node) {
-			if function := Lower(node); function != nil {
+			if function := Lower(node, nil); function != nil {
 				out.WriteString(Print(function))
 			}
 		})

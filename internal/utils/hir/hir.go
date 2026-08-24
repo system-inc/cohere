@@ -117,11 +117,15 @@
 //
 // # What this package deliberately does not do
 //
-// No single-assignment form. Values here are named but not uniquely defined; a `let` reassigned in
-// a loop is one `Identifier` with several stores, and `Block.Phis` is present and empty. It is
-// declared here rather than added later because every consumer of a block must already be prepared
-// to see one, and a field that appears in version two silently changes the meaning of every walk
-// written against version one.
+// Single-assignment form is NOT what lowering produces, and is a separate opt-in pass. Straight out
+// of `Lower`, values are named but not uniquely defined: a `let` reassigned in a loop is several
+// `Identifier`s sharing one `DeclarationId`, each store mints a fresh one, and a read binds to
+// whichever store the lowering WALK saw last rather than to the one that reaches it on the path.
+// That last part is the important one: the pre-SSA graph's reads are lexically correct and
+// dataflow-wrong at any join, so a pass must not read them as reaching definitions.
+//
+// `Construct` in ssa.go is what makes them reaching definitions, and it also fills `Block.Phis`.
+// A pass that reasons about values should run it; a pass that only walks control flow need not.
 //
 // No type inference, no effect inference, no optimisation, and no rule. `Place.Effect` and
 // `Identifier.Type` exist, are threaded through lowering, and are left at their zero values -
@@ -322,8 +326,9 @@ type BasicBlock struct {
 
 	// Phis are the merge points for values with several reaching definitions.
 	//
-	// Always empty until single-assignment construction runs. Declared now so every walk written
-	// against this IR already handles the case; see the package comment.
+	// Empty until `Construct` runs. After it, a phi appears here wherever a binding's value depends
+	// on which predecessor control arrived from, and every phi is a REAL merge: `Construct` runs
+	// redundant-phi elimination, so a phi whose operands all agree has already been removed.
 	Phis []*Phi
 }
 
@@ -365,7 +370,20 @@ func (k BlockKind) String() string {
 // Phi is a merge: the value of Place at the top of a block, given which predecessor control came
 // from.
 //
-// Operands is keyed by predecessor block. Nothing constructs one yet.
+// Operands is keyed by predecessor block, and there is exactly one entry per entry in the block's
+// Predecessors.
+//
+// # Read the operands through PhiOperandsInOrder, never by ranging this map
+//
+// Go randomises map iteration deliberately, so ranging Operands directly makes the same function
+// print, hash, or compare differently between runs. `BasicBlock.Predecessors` is a slice precisely
+// because phi operands need a deterministic order, and a map cannot supply one. The ordered read is
+// `PhiOperandsInOrder`; the printer uses it and `TestLowerIsDeterministic` is what catches a caller
+// that forgets.
+//
+// The map is kept rather than replaced by a slice because the natural question at a phi is "what
+// came from THIS predecessor", which is a lookup, and every ordered walk already has the
+// predecessor list to hand.
 type Phi struct {
 	Place    Place
 	Operands map[BlockId]Place

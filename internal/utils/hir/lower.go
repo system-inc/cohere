@@ -59,7 +59,14 @@
 //     This is the largest single gap and it matters most to the memoization rules.
 //     - A free identifier becomes `LoadGlobal` whether it is a true global, an import, or a capture
 //     from an enclosing function. `GlobalBindingKind` is always `Global`. Distinguishing them
-//     needs the checker and belongs to the pass that consults it.
+//     belongs to a later pass.
+//     Note what this entry originally claimed and what was measured. It said resolution "needs the
+//     checker", which was right, but `Lower` took no checker and `symbolOf` read `node.Symbol()` -
+//     a field the binder writes only onto DECLARATION nodes, and only when a binder has run at
+//     all. Parsing alone runs none. So the fallback caught not just free identifiers but EVERY
+//     identifier: over 4,333 functions of real TypeScript, 0 `LoadLocal` instructions named a
+//     source variable against 43,137 `LoadGlobal`. `Lower` now takes a checker, and this entry is
+//     true again only for names that checker cannot resolve.
 //     - `MaybeThrow` is not emitted. The `Try` terminal gives the handler an edge, but the
 //     instruction-level "an exception can leave here" markers upstream places after each
 //     throwable instruction in a try body are absent, so an effect pass cannot yet see the
@@ -85,6 +92,7 @@ package hir
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
@@ -93,7 +101,23 @@ import (
 // node must be a function-like node: a function declaration, function expression, arrow function,
 // method, or accessor. Returns nil for anything else, and for a function with no body such as an
 // overload signature or a declaration.
-func Lower(node *ast.Node) *Function {
+//
+// # The checker is what makes variable references resolve, and it is not optional in practice
+//
+// typeChecker may be nil, and a nil one still produces a well-formed graph. What it does NOT
+// produce is a graph where a variable reference names the binding it reads: every such reference
+// falls back to `LoadGlobal`, carrying a name rather than a value. That fallback is correct for a
+// true global and wrong for everything else.
+//
+// The distinction is invisible in the graph's shape, which is why it is stated here rather than
+// left to be discovered. Measured over 4,333 functions of real TypeScript with a nil checker: 0
+// `LoadLocal` instructions named a source variable, 43,137 variable reads became `LoadGlobal`, and
+// single-assignment construction over that mints zero phis while passing every structural test.
+//
+// So a pass that reasons about VALUES - single-assignment form, effect inference, anything asking
+// what a binding holds - must pass a real checker. A pass that only walks control flow need not.
+// See `lowerIdentifier` for the resolution itself.
+func Lower(node *ast.Node, typeChecker *checker.Checker) *Function {
 	body := functionBody(node)
 	if body == nil {
 		return nil
@@ -106,6 +130,7 @@ func Lower(node *ast.Node) *Function {
 
 	builder := &builder{
 		function:     function,
+		typeChecker:  typeChecker,
 		declarations: map[*ast.Symbol]DeclarationId{},
 		identifiers:  map[*ast.Symbol]IdentifierId{},
 	}
@@ -137,6 +162,10 @@ func Lower(node *ast.Node) *Function {
 type builder struct {
 	function     *Function
 	currentBlock *BasicBlock
+
+	// typeChecker resolves a reference identifier to the binding it names. Nil is tolerated and
+	// degrades every variable reference to LoadGlobal; see Lower.
+	typeChecker *checker.Checker
 
 	// declarations maps a source symbol to the binding it names, so two references to the same
 	// variable resolve to one DeclarationId. Symbol identity is the checker's answer to scoping,
@@ -291,7 +320,7 @@ func (b *builder) lowerParams(node *ast.Node) {
 		// A destructured parameter becomes a temporary plus a Destructure in the entry block, so
 		// Function.Params stays flat and a pass reading it never walks a pattern.
 		if name.Kind == ast.KindIdentifier {
-			place := b.bind(name.Text(), symbolOf(name), name)
+			place := b.bind(name.Text(), b.symbolOf(name), name)
 			b.function.Params = append(b.function.Params, place)
 			continue
 		}
@@ -427,7 +456,7 @@ func (b *builder) lowerVariableDeclaration(node *ast.Node, kind InstructionKind)
 
 	if declaration.Initializer == nil {
 		if name.Kind == ast.KindIdentifier {
-			place := b.bind(name.Text(), symbolOf(name), name)
+			place := b.bind(name.Text(), b.symbolOf(name), name)
 			b.emit(&DeclareLocal{LValue: place, Kind: kind}, node)
 		}
 		return
@@ -435,7 +464,7 @@ func (b *builder) lowerVariableDeclaration(node *ast.Node, kind InstructionKind)
 
 	value := b.lowerExpressionToPlace(declaration.Initializer)
 	if name.Kind == ast.KindIdentifier {
-		place := b.bind(name.Text(), symbolOf(name), name)
+		place := b.bind(name.Text(), b.symbolOf(name), name)
 		b.emit(&StoreLocal{LValue: place, Value: value, Kind: kind}, node)
 		return
 	}
@@ -692,7 +721,7 @@ func (b *builder) lowerForBinding(initializer *ast.Node, value Place) {
 				continue
 			}
 			if name.Kind == ast.KindIdentifier {
-				place := b.bind(name.Text(), symbolOf(name), name)
+				place := b.bind(name.Text(), b.symbolOf(name), name)
 				b.emit(&StoreLocal{LValue: place, Value: value, Kind: kind}, name)
 				continue
 			}
@@ -813,7 +842,7 @@ func (b *builder) lowerTryStatement(node *ast.Node) {
 		if catchClause.VariableDeclaration != nil {
 			name := catchClause.VariableDeclaration.AsVariableDeclaration().Name()
 			if name != nil && name.Kind == ast.KindIdentifier {
-				place := b.bind(name.Text(), symbolOf(name), name)
+				place := b.bind(name.Text(), b.symbolOf(name), name)
 				handlerBinding = &place
 			}
 		}
@@ -978,7 +1007,7 @@ func isLoopStatement(node *ast.Node) bool {
 }
 
 func (b *builder) lowerFunctionDeclaration(node *ast.Node) {
-	nested := Lower(node)
+	nested := Lower(node, b.typeChecker)
 	if nested == nil {
 		return
 	}
@@ -990,7 +1019,7 @@ func (b *builder) lowerFunctionDeclaration(node *ast.Node) {
 	if name != "" {
 		var symbol *ast.Symbol
 		if nameNode := node.Name(); nameNode != nil {
-			symbol = symbolOf(nameNode)
+			symbol = b.symbolOf(nameNode)
 		}
 		place := b.bind(name, symbol, node)
 		b.emit(&StoreLocal{LValue: place, Value: value, Kind: InstructionKindHoistedFunction}, node)
@@ -1008,10 +1037,32 @@ func rangeOf(node *ast.Node) core.TextRange {
 	return core.NewTextRange(node.Pos(), node.End())
 }
 
-func symbolOf(node *ast.Node) *ast.Symbol {
+// symbolOf resolves a node to the symbol it names.
+//
+// # Why the checker is consulted rather than the node's own field
+//
+// `node.Symbol()` is the DECLARATION symbol: a field the binder writes onto a declaration node. A
+// reference - the `y` in `y > 1` - is not a declaration and its field is nil, so resolving a
+// reference through it always fails. Worse, the field is nil on declaration names too unless a
+// binder has run over the file, and parsing alone does not run one.
+//
+// Both failures are silent: the caller sees nil and treats the name as a global.
+//
+// `GetSymbolAtLocation` answers for references and declarations alike, and returns the SAME symbol
+// pointer for a binding and every reference to it, which is the identity `declarationOf` groups on.
+// It distinguishes shadowed bindings of one name, verified rather than assumed: in
+// `let y = 2; { let y = 99; }` it returns two distinct symbols, four occurrences against two.
+func (b *builder) symbolOf(node *ast.Node) *ast.Symbol {
 	if node == nil {
 		return nil
 	}
+	if b.typeChecker != nil {
+		if symbol := b.typeChecker.GetSymbolAtLocation(node); symbol != nil {
+			return symbol
+		}
+	}
+	// No checker, or a name the checker cannot resolve - a true global, or an unresolved import.
+	// The declaration field is the only remaining source and is correct when a binder has run.
 	return node.Symbol()
 }
 

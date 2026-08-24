@@ -142,17 +142,23 @@ func (b *builder) lowerExpressionToPlace(node *ast.Node) Place {
 
 // lowerIdentifier resolves a name to a value.
 //
-// Resolution is by SYMBOL, from the checker's binder, rather than by a scope tree this package
-// maintains. That is the payoff of having a resident checker: shadowing, hoisting, and closure
-// capture are already answered correctly, including through imports, and re-deriving them here
-// would be a second implementation that can disagree with the first.
+// Resolution is by SYMBOL, via `symbolOf`, rather than by a scope tree this package maintains. That
+// is the payoff of having a resident checker: shadowing, hoisting, and closure capture are already
+// answered correctly, including through imports, and re-deriving them here would be a second
+// implementation that can disagree with the first.
+//
+// # What happens without a checker, stated because it is silent
+//
+// This resolves nothing when `builder.typeChecker` is nil, and the failure produces a well-formed
+// graph rather than an error: every reference takes the `LoadGlobal` path below. Nothing downstream
+// can tell that apart from a program made entirely of globals. See `Lower` for the measurement.
 func (b *builder) lowerIdentifier(node *ast.Node) Place {
 	name := node.Text()
 	if name == "undefined" {
 		return b.emit(&Primitive{Value: nil}, node)
 	}
 
-	symbol := symbolOf(node)
+	symbol := b.symbolOf(node)
 	if symbol != nil {
 		if identifier, ok := b.identifiers[symbol]; ok {
 			place := Place{Identifier: identifier, Range: rangeOf(node)}
@@ -377,7 +383,7 @@ func (b *builder) lowerAssignmentTarget(target *ast.Node, value Place, kind Inst
 	}
 	switch target.Kind {
 	case ast.KindIdentifier:
-		symbol := symbolOf(target)
+		symbol := b.symbolOf(target)
 		if symbol != nil {
 			if _, known := b.identifiers[symbol]; known {
 				place := b.bind(target.Text(), symbol, target)
@@ -509,7 +515,7 @@ func (b *builder) lowerObjectLiteral(node *ast.Node) Place {
 			properties = append(properties, ObjectProperty{Value: value, Spread: true})
 
 		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-			nested := Lower(property)
+			nested := Lower(property, b.typeChecker)
 			if nested == nil {
 				continue
 			}
@@ -607,7 +613,7 @@ func (b *builder) lowerTaggedTemplate(node *ast.Node) Place {
 
 // lowerFunctionExpression lowers a nested function and records what it captures.
 func (b *builder) lowerFunctionExpression(node *ast.Node) Place {
-	nested := Lower(node)
+	nested := Lower(node, b.typeChecker)
 	if nested == nil {
 		return b.emit(&UnsupportedNode{Node: node, Reason: "function expression"}, node)
 	}
@@ -772,7 +778,7 @@ func (b *builder) lowerPattern(node *ast.Node) Pattern {
 
 	switch node.Kind {
 	case ast.KindIdentifier:
-		return &PlacePattern{Place: b.bind(node.Text(), symbolOf(node), node)}
+		return &PlacePattern{Place: b.bind(node.Text(), b.symbolOf(node), node)}
 
 	case ast.KindObjectBindingPattern:
 		return b.lowerObjectBindingPattern(node)
@@ -803,7 +809,7 @@ func (b *builder) lowerObjectBindingPattern(node *ast.Node) Pattern {
 		if binding.DotDotDotToken != nil {
 			name := binding.Name()
 			if name != nil && name.Kind == ast.KindIdentifier {
-				place := b.bind(name.Text(), symbolOf(name), name)
+				place := b.bind(name.Text(), b.symbolOf(name), name)
 				result.Rest = &place
 			}
 			continue
@@ -855,7 +861,7 @@ func (b *builder) lowerArrayBindingPattern(node *ast.Node) Pattern {
 		if binding.DotDotDotToken != nil {
 			name := binding.Name()
 			if name != nil && name.Kind == ast.KindIdentifier {
-				place := b.bind(name.Text(), symbolOf(name), name)
+				place := b.bind(name.Text(), b.symbolOf(name), name)
 				result.Rest = &place
 			}
 			continue
@@ -904,7 +910,7 @@ func (b *builder) lowerObjectAssignmentPattern(node *ast.Node) Pattern {
 		case ast.KindSpreadAssignment:
 			target := property.AsSpreadAssignment().Expression
 			if target != nil && target.Kind == ast.KindIdentifier {
-				place := b.bind(target.Text(), symbolOf(target), target)
+				place := b.bind(target.Text(), b.symbolOf(target), target)
 				result.Rest = &place
 			}
 		}
@@ -924,7 +930,7 @@ func (b *builder) lowerArrayAssignmentPattern(node *ast.Node) Pattern {
 		case ast.KindSpreadElement:
 			target := element.AsSpreadElement().Expression
 			if target != nil && target.Kind == ast.KindIdentifier {
-				place := b.bind(target.Text(), symbolOf(target), target)
+				place := b.bind(target.Text(), b.symbolOf(target), target)
 				result.Rest = &place
 			}
 		case ast.KindBinaryExpression:

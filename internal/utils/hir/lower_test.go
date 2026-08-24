@@ -49,7 +49,7 @@ func lowerSource(t *testing.T, code string) *Function {
 		t.Fatal("test source has no function")
 	}
 
-	function := Lower(root)
+	function := Lower(root, nil)
 	if function == nil {
 		t.Fatal("lowering produced nothing")
 	}
