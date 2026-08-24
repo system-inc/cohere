@@ -156,14 +156,29 @@ func upstreamContext(context rule.Context, ruleName string) upstreamrule.RuleCon
 		ReportRangeWithSuggestions: func(textRange core.TextRange, message upstreamrule.RuleMessage, suggestions ...upstreamrule.RuleSuggestion) {
 			report(textRange, message, nil, suggestions)
 		},
+		// The node forms trim to the token, which upstream's own linter does and an earlier version
+		// of this adapter did not.
+		//
+		// tsgolint's runner wraps every one of these in `utils.TrimNodeTextRange(file, node)`
+		// (internal/linter/linter.go:61,69,79), and that function is
+		// `GetRangeOfTokenAtPosition(file, node.Pos()).WithEnd(node.End())` — byte for byte what
+		// `rule.TokenRange` is. Reporting `node.Loc` instead includes the node's leading trivia, so
+		// a finding on an indented statement began at the end of the previous line and its rendered
+		// span carried a newline and the indentation with it.
+		//
+		// Measured on await-thenable before the change: `await 0` indented by two spaces inside a
+		// function reported the text "\n  await 0" rather than "await 0", and an `await using`
+		// initializer reported " disposable" with a leading space. No message-id fixture can see
+		// this, because the id and the count are both correct; only slicing the source with the
+		// finding's own range shows it. It reaches the user as a caret pointing at the wrong line.
 		ReportNode: func(node *ast.Node, message upstreamrule.RuleMessage) {
-			report(node.Loc, message, nil, nil)
+			report(rule.TokenRange(context.SourceFile, node), message, nil, nil)
 		},
 		ReportNodeWithFixes: func(node *ast.Node, message upstreamrule.RuleMessage, fixes ...upstreamrule.RuleFix) {
-			report(node.Loc, message, fixes, nil)
+			report(rule.TokenRange(context.SourceFile, node), message, fixes, nil)
 		},
 		ReportNodeWithSuggestions: func(node *ast.Node, message upstreamrule.RuleMessage, suggestions ...upstreamrule.RuleSuggestion) {
-			report(node.Loc, message, nil, suggestions)
+			report(rule.TokenRange(context.SourceFile, node), message, nil, suggestions)
 		},
 	}
 }

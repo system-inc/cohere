@@ -203,3 +203,56 @@ func TestRealNodeKindsStayBelowThePseudoKindFloor(t *testing.T) {
 		)
 	}
 }
+
+// TestAdaptedNodeReportsTrimLeadingTrivia pins that the node report forms trim to the token.
+//
+// This guards a defect that shipped here and that no existing test could see. The adapter reported
+// `node.Loc`, which spans a node INCLUDING its leading trivia, so a finding on an indented statement
+// began at the end of the previous line: `await 0` inside a function rendered as "\n\t\t\t\tawait 0"
+// rather than "await 0", and a caret drawn from it points at the wrong line.
+//
+// tsgolint's own runner wraps all three node forms in `utils.TrimNodeTextRange(file, node)`, at
+// internal/linter/linter.go lines 61, 69 and 79, and that helper is
+// `GetRangeOfTokenAtPosition(file, node.Pos()).WithEnd(node.End())`, which is byte for byte what
+// `rule.TokenRange` is. So the trim is upstream's behavior rather than an improvement on it.
+//
+// All three forms are asserted rather than only the one a vendored rule happens to call today.
+// await-thenable reaches ReportNodeWithSuggestions and nothing reaches plain ReportNode or
+// ReportNodeWithFixes, so a mutation reverting those two survives the whole typescript package. The
+// branch is unreachable through the only rule vendored so far and becomes reachable the moment a
+// second one lands, which is precisely when nobody would think to look.
+func TestAdaptedNodeReportsTrimLeadingTrivia(t *testing.T) {
+	// A rule reporting the same node through each of the three node entry points.
+	probe := upstreamrule.Rule{
+		Name: "trivia-probe",
+		Run: func(context upstreamrule.RuleContext, options any) upstreamrule.RuleListeners {
+			return upstreamrule.RuleListeners{
+				ast.KindAwaitExpression: func(node *ast.Node) {
+					message := upstreamrule.RuleMessage{Id: "probe", Description: "probe"}
+					context.ReportNode(node, message)
+					context.ReportNodeWithFixes(node, message)
+					context.ReportNodeWithSuggestions(node, message)
+				},
+			}
+		},
+	}
+
+	adapted, err := Adapt(probe)
+	if err != nil {
+		t.Fatalf("adapting the probe: %v", err)
+	}
+
+	// runAgainstProgram trims the source before writing it, so the offsets a finding carries are
+	// against the trimmed text. Trimming here too keeps the slice below honest.
+	source := strings.TrimSpace("async function main() {\n\tawait 0;\n}") + "\n"
+	findings := runAgainstProgram(t, source, adapted)
+	if len(findings) != 3 {
+		t.Fatalf("want three findings, one per node report form, got %d", len(findings))
+	}
+	for index, finding := range findings {
+		reported := source[finding.Range.Pos():finding.Range.End()]
+		if reported != "await 0" {
+			t.Errorf("report form %d spans %q, want %q with no leading trivia", index, reported, "await 0")
+		}
+	}
+}
