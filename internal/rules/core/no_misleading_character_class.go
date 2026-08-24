@@ -328,8 +328,53 @@ func cookedToRawOffsets(raw string, cooked string) []int {
 	if cookedIndex != len(cooked) {
 		return nil
 	}
+	// Cooked finishing is necessary but not sufficient: the loop stops as soon as EITHER text runs
+	// out, so a raw tail that produced no cooked characters at all is never compared against
+	// anything and slips through. `'a  b\<newline>'` cooks to `a  b`, and checking only the cooked
+	// side returns a complete, well formed mapping whose every offset past the run is wrong.
+	//
+	// Leftover raw is not wrong on its own, which is the trap and the reason this is not simply
+	// `rawIndex != len(raw)`. A surrogate pair spends twelve raw bytes on one four byte rune, so
+	// `[\uD83D\uDC4D]` legitimately exhausts cooked with six raw bytes still to go, and the strict
+	// form rejects the case this rule exists for. What separates the two is whether the tail would
+	// have produced anything: a low surrogate and a closing bracket would, a lone backslash or a
+	// line continuation would not.
+	//
+	// Found by a mutation sweep in no-regex-spaces, which adopted this mapper and probed it against
+	// its own corpus before building on it. The first form of this fix was the strict one and it
+	// broke two of this rule's own fixtures, which is how the distinction got measured.
+	if rawIndex < len(raw) && producesNoCookedBytes(raw[rawIndex:]) {
+		return nil
+	}
 	offsets = append(offsets, rawIndex)
 	return offsets
+}
+
+// producesNoCookedBytes reports whether a raw tail contributes nothing to the cooked string.
+//
+// Only two shapes do: a line continuation, which is defined to produce nothing, and a trailing lone
+// backslash, which has nothing to escape. Anything else is either an ordinary character or an escape
+// that decodes to one, so a tail containing any of it means the two texts genuinely disagree about
+// length rather than the walk having stopped early.
+func producesNoCookedBytes(tail string) bool {
+	for index := 0; index < len(tail); {
+		if tail[index] != '\\' {
+			return false
+		}
+		if index+1 >= len(tail) {
+			// A trailing backslash with nothing after it escapes nothing.
+			return true
+		}
+		if tail[index+1] != '\n' && tail[index+1] != '\r' {
+			return false
+		}
+		index += 2
+		// A CRLF continuation spends one more byte.
+		if tail[index-1] == '\r' && index < len(tail) && tail[index] == '\n' {
+			index++
+		}
+	}
+	return true
 }
 
 // escapeWidthInStringLiteral returns how many raw bytes a backslash escape occupies.

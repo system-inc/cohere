@@ -340,6 +340,30 @@ func (c Context) ReportRangeWithSuggestions(textRange core.TextRange, message Me
 	})
 }
 
+// ReportRangeWithFixes reports a span that is not one node and proposes repairs the engine applies
+// unattended.
+//
+// The last corner of the same asymmetry ReportRangeWithSuggestions describes. The node helpers came
+// in three shapes and the range helpers had reached two, so a rule whose finding is a computed span
+// and whose repair is safe to apply had no helper and would have hand-built a Diagnostic.
+//
+// No trimming happens here, and that is the point rather than an omission. A range helper exists
+// precisely because the caller computed a span the AST does not name, so a helper that adjusted it
+// would be second-guessing the only party that knows what it means.
+//
+// The fixture harness has looked for this method name since before it existed: fixture_pair_test
+// matches on `ReportRangeWithFixes` alongside `ReportNodeWithFixes` when deciding whether a rule
+// proposes a fix. A rule reporting a computed span with a fix through a hand-built Diagnostic would
+// have read to that guard as proposing nothing.
+func (c Context) ReportRangeWithFixes(textRange core.TextRange, message Message, fixes ...Fix) {
+	c.Report(Diagnostic{
+		Range:      textRange,
+		Message:    message,
+		SourceFile: c.SourceFile,
+		Fixes:      fixes,
+	})
+}
+
 // TokenRange is a node's own text, without the trivia that precedes it.
 //
 // This distinction is the single sharpest edge in the fix API, and getting it wrong produces damage
