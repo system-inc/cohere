@@ -36,6 +36,7 @@ func init() {
 		rule.Registration{Rule: NoLossOfPrecision},
 		rule.Registration{Rule: NoNewNativeNonconstructor},
 		rule.Registration{Rule: NoObjCalls},
+		rule.Registration{Rule: NoOctal},
 		rule.Registration{Rule: NoPrototypeBuiltins},
 		rule.Registration{Rule: PreferRestParams},
 		rule.Registration{
