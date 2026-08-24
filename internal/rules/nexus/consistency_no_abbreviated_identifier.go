@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/binding"
 	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
 )
 
@@ -376,7 +377,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 				}
 
 				// These are names somebody else chose, not bindings this file has to live with.
-				if isNonRenameableIdentifier(node) {
+				if binding.IsForeignName(node) {
 					return
 				}
 
@@ -704,73 +705,6 @@ func matchesAnyFilePattern(fileName string, patterns []string) bool {
 		if pattern != "" && strings.Contains(fileName, pattern) {
 			return true
 		}
-	}
-	return false
-}
-
-// isNonRenameableIdentifier reports whether an identifier names something this file does not own.
-//
-// Every entry here is an exemption the TypeScript original spells out, plus the JSX cases it never
-// needed to. That difference is the highest-risk part of porting an identifier rule: an exemption
-// the original gets from its AST for free has to be written down in ours. A JSX tag name is a
-// distinct node type in the TypeScript parser and a plain KindIdentifier in typescript-go, and the
-// sibling rule cost 3,081 false findings by reproducing only the written-down exemptions.
-func isNonRenameableIdentifier(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-
-	switch parent.Kind {
-	case ast.KindPropertyAccessExpression:
-		// The property half of `thing.props`, but not the object half.
-		//
-		// `this.props` is deliberately not exempt: the property belongs to the class being read,
-		// which is ours, and its declaration is a property declaration that no member check
-		// protects. Treating it like any other property read is how `BackoffTask` ended up
-		// declaring `maximumBackoff` while reading `this.maximumBackoff`.
-		access := parent.AsPropertyAccessExpression()
-		if access == nil || access.Name() != node {
-			return false
-		}
-		return access.Expression == nil || access.Expression.Kind != ast.KindThisKeyword
-
-	case ast.KindPropertyAssignment:
-		// The key half of `{ config: 1 }`, but not a shorthand value.
-		assignment := parent.AsPropertyAssignment()
-		return assignment != nil && assignment.Name() == node
-
-	case ast.KindImportSpecifier, ast.KindExportSpecifier, ast.KindNamespaceImport,
-		ast.KindImportClause:
-		// An imported name is external surface we cannot rename, in all three of its spellings:
-		// `import { config }`, `import * as config`, and `import config from`.
-		return true
-
-	case ast.KindPropertySignature:
-		// An interface or type-literal key shapes an external surface often enough that the
-		// original skips the whole family: HTML props, the cookie spec, Google API wire fields.
-		signature := parent.AsPropertySignatureDeclaration()
-		return signature != nil && signature.Name() == node
-
-	case ast.KindQualifiedName:
-		// The right half of `TSESLint.FlatConfig.Config` is typescript-eslint's spelling, reachable
-		// here only because we import the namespace. The left root is still judged, since a locally
-		// declared namespace is ours.
-		qualified := parent.AsQualifiedName()
-		return qualified != nil && qualified.Right == node
-
-	case ast.KindTypeReference:
-		// `validators: FormValidateOrFn<T>` names an external type we cannot rename. The import is
-		// already exempt above; this covers the usage sites.
-		reference := parent.AsTypeReferenceNode()
-		return reference != nil && reference.TypeName == node
-
-	case ast.KindJsxOpeningElement, ast.KindJsxClosingElement, ast.KindJsxSelfClosingElement,
-		ast.KindJsxAttribute:
-		// A JSX tag and a JSX attribute are identifiers syntactically and neither is a binding this
-		// file owns: an intrinsic element is named by HTML, and an attribute is named by whatever
-		// component declares it.
-		return true
 	}
 	return false
 }

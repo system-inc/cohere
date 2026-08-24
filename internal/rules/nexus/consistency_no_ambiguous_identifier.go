@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/binding"
 )
 
 // alwaysAllowedSingleLetters are the coordinate and math names, where the single letter is the
@@ -79,7 +80,20 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule{
 				}
 
 				// These are names somebody else chose, not bindings this file has to live with.
-				if isNonBindingIdentifier(node) {
+				//
+				// This rule carried its own copy of the question until a census found it beside the
+				// abbreviation rule's, one word apart in name and four kinds apart in answer. The
+				// shared version is wider in four places and narrower in one, and both directions
+				// were measured at this rule rather than argued:
+				//
+				//	import * as e from 'm'    was reported; a namespace binding is not ours
+				//	import e from 'm'         was reported; a default binding is not ours
+				//	let v: N.e                was reported; the right half of a qualified name
+				//	let v: e                  was reported; a type this file may not own
+				//	this.e                    was exempt; the class owns that property, so it is
+				//	                          judged now, matching the sibling rule, which carries a
+				//	                          named production defect as its evidence
+				if binding.IsForeignName(node) {
 					return
 				}
 
@@ -104,48 +118,6 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule{
 			},
 		}
 	},
-}
-
-// isNonBindingIdentifier reports whether an identifier names a property, key, import binding, or
-// type member rather than a variable the reader has to track.
-func isNonBindingIdentifier(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-
-	switch parent.Kind {
-	case ast.KindPropertyAccessExpression:
-		// The property half of `thing.e`, but not the object half.
-		access := parent.AsPropertyAccessExpression()
-		return access != nil && access.Name() == node
-
-	case ast.KindPropertyAssignment:
-		// The key half of `{ e: 1 }`, but not a shorthand value.
-		assignment := parent.AsPropertyAssignment()
-		return assignment != nil && assignment.Name() == node
-
-	case ast.KindImportSpecifier, ast.KindExportSpecifier:
-		return true
-
-	case ast.KindPropertySignature:
-		signature := parent.AsPropertySignatureDeclaration()
-		return signature != nil && signature.Name() == node
-
-	case ast.KindJsxOpeningElement, ast.KindJsxClosingElement, ast.KindJsxSelfClosingElement,
-		ast.KindJsxAttribute:
-		// A JSX tag and a JSX attribute are identifiers syntactically and neither is a binding. An
-		// intrinsic element is named by HTML, not by us, so `<p>` and `<b>` are not names anyone
-		// chose or has to hold in their head.
-		//
-		// This cost 3,081 false findings on the ahra tree before it was caught. The port visited
-		// every KindIdentifier and reproduced only the exemptions the TypeScript original spells
-		// out; the original never needed a JSX case because its parser gives a JSX name a distinct
-		// node type. That is the general shape of this class of divergence: an exemption the
-		// original gets from its AST for free has to be written down in ours.
-		return true
-	}
-	return false
 }
 
 // isInsideSortComparator reports whether an identifier sits in a function passed as the first

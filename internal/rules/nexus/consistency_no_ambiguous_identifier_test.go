@@ -111,3 +111,66 @@ func TestConsistencyNoAmbiguousIdentifierProposesNoFix(t *testing.T) {
 		}
 	}
 }
+
+// TestConsistencyNoAmbiguousIdentifierForeignNames pins the positions a name can occupy that this
+// file did not choose.
+//
+// Every case here is a shape the rule reported before it adopted the shared ownership predicate,
+// and none of them was covered by any fixture, which is why the change was invisible: the whole
+// suite stayed green through it. The rule carried its own copy of the question, one word apart in
+// name from the abbreviation rule's and four kinds apart in answer, and neither file could see the
+// other.
+//
+// The binding position is written without a use site on purpose. A reference to an imported name is
+// a different question, and including one would make these cases measure that instead.
+func TestConsistencyNoAmbiguousIdentifierForeignNames(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		sourceText string
+	}{
+		{"a namespace import binding", "import * as e from './m';"},
+		{"a default import binding", "import e from './m';"},
+		{"a named import binding", "import { e } from './m';"},
+		// The namespace is imported rather than declared here, so the only occurrence of `e` is the
+		// right half of the qualified name. A locally declared `type e` inside the namespace is a
+		// name this file owns and is correctly still reported, which would measure the wrong thing.
+		{"the right half of a qualified type name",
+			"import type * as N from './m';\ndeclare const v: N.e;"},
+		{"a reference to an imported type", "import type { e } from './m';\ndeclare const v: e;"},
+		{"a property read off another object", "declare const thing: any;\nthing.e;"},
+		{"an object literal key", "({ e: 1 });"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.Run(t, ConsistencyNoAmbiguousIdentifier, "p.ts", testCase.sourceText)
+			for _, diagnostic := range result.Diagnostics {
+				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if reported == "e" {
+					t.Errorf("reported `e` in a position this file does not own: %q",
+						testCase.sourceText)
+				}
+			}
+		})
+	}
+}
+
+// TestConsistencyNoAmbiguousIdentifierJudgesThisProperty is the other half of the same adoption,
+// and the one place the two lifted implementations genuinely disagreed rather than merely differing
+// in coverage.
+//
+// A property read off `this` belongs to the class being read, which this file owns, and its
+// declaration is a property declaration that no member check protects. The abbreviation rule judges
+// it and records a named production defect as its evidence: a class declared `maximumBackoff` while
+// reading `this.maximumBackoff`. This rule exempted it, and now does not.
+func TestConsistencyNoAmbiguousIdentifierJudgesThisProperty(t *testing.T) {
+	const sourceText = "class C { e = 1; m() { return this.e; } }"
+	result := ruletest.Run(t, ConsistencyNoAmbiguousIdentifier, "p.ts", sourceText)
+	reads := 0
+	for _, diagnostic := range result.Diagnostics {
+		if sourceText[diagnostic.Range.Pos():diagnostic.Range.End()] == "e" {
+			reads++
+		}
+	}
+	if reads == 0 {
+		t.Error("a property read off `this` was exempted; the class owns that property")
+	}
+}
