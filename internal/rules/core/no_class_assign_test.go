@@ -116,6 +116,13 @@ func TestNoClassAssignPointsAtTheWrite(t *testing.T) {
 		want       []string
 	}{
 		{"a plain reassignment", "class A { } A = 0;", []string{"A"}},
+		// A parenthesized assignment target, which neither upstream's corpus nor this one had until
+		// a sibling rule tripped over it. `writesToItsIdentifier` climbs and reassigns `child` to
+		// the parent, so at the binary node `child` was the parenthesis while the arm compared
+		// against `ast.SkipParentheses(binary.Left)`, which is the identifier. The two never
+		// matched and `(A) = 1` read as a read. The span assertion is the useful half here: it
+		// pins the finding to the name rather than to the parentheses around it.
+		{"a parenthesized target", "class A { } (A) = 1;", []string{"A"}},
 		{"a hoisted reassignment", "A = 0; class A { }", []string{"A"}},
 		{"a shorthand destructuring target", "class A { } ({A} = 0);", []string{"A"}},
 		{"two writes point at their own sites", "class A { } A = 0; A = 1;", []string{"A", "A"}},

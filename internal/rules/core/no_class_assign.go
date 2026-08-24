@@ -257,7 +257,13 @@ func writesToItsIdentifier(identifier *ast.Node) bool {
 			// reassigns the binding.
 			return false
 		}
-		child = parent
+		// Advance unwrapped. The arms above compare against `ast.SkipParentheses(...)` on the
+		// parent's own operand, which yields the identifier rather than the parenthesis around it,
+		// so carrying a `KindParenthesizedExpression` up as `child` makes every one of those
+		// comparisons fail. `(A) = 1` is a write and read as a read before this line existed;
+		// neither upstream's corpus nor ours had a parenthesized assignment target, which is why it
+		// shipped silently. Skipping here keeps both sides of the comparison unwrapped.
+		child = ast.SkipParentheses(parent)
 	}
 	return false
 }
