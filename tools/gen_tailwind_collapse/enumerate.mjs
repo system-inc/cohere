@@ -131,6 +131,8 @@ function parseCandidate(className) {
 // reading the root back out of the parser rather than by splitting names on dashes. A dash-splitter
 // reads `border-l` as root `border` with value `l`, which is the mistake that silently stopped
 // reporting `border-x`.
+const knownRoots = new Set();
+const knownStatics = new Set();
 const functionalRoots = new Set();
 const staticUtilities = new Set();
 for (const entry of designSystem.getClassList?.() ?? []) {
@@ -145,12 +147,20 @@ for (const entry of designSystem.getClassList?.() ?? []) {
     // silently stopped `flex block` being reported as a display conflict, which is the headline
     // case of the rule this data feeds.
     const asStatic = parseCandidate(name);
-    if (asStatic?.kind === 'static') staticUtilities.add(name);
+    if (asStatic?.kind === 'static') {
+        staticUtilities.add(name);
+        knownStatics.add(name);
+    }
 
     const asFunctional = parseCandidate(name + '-4');
     if (asFunctional?.kind === 'functional' && asFunctional.root) {
         functionalRoots.add(asFunctional.root);
     }
+
+    // Existence, read from the name as written rather than from a probe value. `from-black/70`
+    // parses as root `from`, and `from` never appears with a numeric probe.
+    const asWritten = parseCandidate(name);
+    if (asWritten?.kind === 'functional' && asWritten.root) knownRoots.add(asWritten.root);
 }
 
 const roots = Array.from(functionalRoots).sort();
@@ -158,6 +168,21 @@ const roots = Array.from(functionalRoots).sort();
 // Roots no probe value could reach. Reported rather than skipped, because an unmeasured root is
 // absent from every table below for a reason nobody can infer from its absence.
 const unreachableRoots = [];
+
+/*
+ * Every root and static name the design system knows, whether or not it declares a CSS property.
+ *
+ * `no-unknown-classes` asks a different question from every other rule here: not "what does this
+ * declare" but "does this exist". Answering it from the properties tables gets 12 real classes wrong
+ * on this tree alone, because those tables deliberately exclude things that declare nothing a rule
+ * can compare: `from-black/70` sets only `--tw-gradient-from`, `container` emits several rules, and
+ * `fade-in` sets only `--enter-opacity`.
+ *
+ * Absence from a properties table is not evidence a class does not exist, so existence gets its own
+ * list. This is the union of every functional root and every static name, which is what
+ * `getClassList()` already enumerates.
+ */
+
 
 /*
  * A real class for each root, taken from the design system's own class list.
@@ -714,6 +739,8 @@ process.stdout.write(
             pairsProbed,
             families,
             rootProperties,
+            knownRoots: Array.from(knownRoots).sort(),
+            knownStatics: Array.from(knownStatics).sort(),
             unreachableRoots: unreachableRoots.sort(),
             rootSelectorShapes,
             composingRoots: composingRoots.sort(),

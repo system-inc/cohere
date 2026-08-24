@@ -51,6 +51,8 @@ type enumeration struct {
 	ComposingRoots      []string            `json:"composingRoots"`
 	ClassProperties     []utilityProperties `json:"classProperties"`
 	UnreachableRoots    []string            `json:"unreachableRoots"`
+	KnownRoots          []string            `json:"knownRoots"`
+	KnownStatics        []string            `json:"knownStatics"`
 	ColorNames          []string            `json:"colorNames"`
 	StaticProperties    []utilityProperties `json:"staticProperties"`
 }
@@ -328,6 +330,29 @@ var ComposingRoots = map[string]bool{
 `)
 	for _, root := range result.ComposingRoots {
 		fmt.Fprintf(&buffer, "\t%q: true,\n", root)
+	}
+
+	fmt.Fprintf(&buffer, `}
+
+// KnownRoots is every functional utility root the design system defines.
+//
+// Existence is a different question from what a class declares, and answering it from the property
+// tables gets 12 real classes wrong on the ahra tree: from-black/70 sets only --tw-gradient-from,
+// container emits several rules, fade-in sets only --enter-opacity. All three are deliberately
+// absent from the property tables and all three exist.
+var KnownRoots = map[string]bool{
+`)
+	for _, root := range result.KnownRoots {
+		fmt.Fprintf(&buffer, "\t%q: true,\n", root)
+	}
+
+	fmt.Fprintf(&buffer, `}
+
+// KnownStatics is every utility whose whole name is its identity.
+var KnownStatics = map[string]bool{
+`)
+	for _, name := range result.KnownStatics {
+		fmt.Fprintf(&buffer, "\t%q: true,\n", name)
 	}
 
 	fmt.Fprintf(&buffer, `}

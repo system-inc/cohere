@@ -38,6 +38,10 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoDuplicateClassesOptions](),
 		},
 		rule.Registration{
+			Rule:   NoUnknownClasses,
+			Decode: rule.DecodeOptionsInto[NoUnknownClassesOptions](),
+		},
+		rule.Registration{
 			Rule:   NoUnnecessaryWhitespace,
 			Decode: rule.DecodeOptionsInto[NoUnnecessaryWhitespaceOptions](),
 		},
