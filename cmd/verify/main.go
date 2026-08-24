@@ -62,6 +62,11 @@ func run() error {
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
 	unusedReport := flag.Bool("unused", false, "report code that was written and never used: unreferenced exports, and statements nothing can reach")
 	unusedAll := flag.Bool("unused-all", false, "with --unused, list the findings already marked verify-keep rather than only counting them")
+	// Opt-in on purpose. The closure's claim is strictly stronger than the flat one and it fails
+	// differently: a wrong root mis-reports one file in the flat view and cascades here, going dark
+	// across everything that was alive only through it. Keeping both means the two numbers can be
+	// read against each other before the bigger one is trusted.
+	unusedDeep := flag.Bool("unused-deep", false, "with --unused, also compute the transitive closure and group the dead code into islands")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -125,7 +130,7 @@ func run() error {
 	// of the correctness gate. An export kept for an external consumer is unused and correct, so
 	// there is no answer here a build can enforce, and a phase that cannot fail honestly should not
 	// be in the path of a phase that can.
-	runUnused := *unusedReport || *unusedAll
+	runUnused := *unusedReport || *unusedAll || *unusedDeep
 
 	// Carried to every bail site so an opt-in phase that was genuinely cut off reads differently
 	// from one nobody asked for. Without it a bail prints "unused did not run (types bailed)" on
@@ -424,7 +429,7 @@ func run() error {
 			)
 		}
 
-		unusedResult, err := unused.Run(ctx, graph, projectFiles)
+		unusedResult, err := unused.Run(ctx, graph, projectFiles, *unusedDeep)
 		if err != nil {
 			return fmt.Errorf("running the unused report: %w", err)
 		}

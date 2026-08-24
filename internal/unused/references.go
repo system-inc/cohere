@@ -54,6 +54,126 @@ type Report struct {
 
 	// ExportsAnalyzed is how many exported declarations were examined.
 	ExportsAnalyzed int
+
+	// Islands are the clusters the transitive closure found dead together. Empty unless the closure
+	// was asked for, which is the point: the flat sections above make a weaker claim that does not
+	// depend on the root set being complete.
+	Islands []Island
+
+	// DeclarationsAnalyzed is the closure's population — every declaration, not only the exported
+	// ones — printed for the same reason as the others: a cluster count with no denominator cannot be
+	// told apart from a broken inventory.
+	DeclarationsAnalyzed int
+
+	// ClosurePasses is the longest chain THIS traversal followed, which is a lower bound on the
+	// graph's depth rather than a property of it: a worklist reaches a symbol by whichever path it
+	// pops first, so the number moves between runs while the finding does not. Reported because a
+	// closure that stops at depth 1 on a real tree has failed to propagate, and that failure produces
+	// a bigger report rather than an error.
+	ClosurePasses int
+}
+
+// referenceIndex is the edge set: which declarations reference which symbols.
+//
+// It replaced a plain `map[*ast.Symbol]bool` that recorded only THAT a symbol was used. The walk is
+// identical and costs the same; what changed is what it stores. Recording the edge is what makes
+// the transitive question answerable, and the transitive question is the one that finds an island —
+// an abandoned export plus the private world that existed only to serve it.
+type referenceIndex struct {
+	// referencedBy maps a symbol to the declarations that reference it. A symbol present with an
+	// empty slice is impossible; a symbol referenced only from module top level appears with
+	// `nil` in its slice, which is the root marker rather than a missing entry.
+	referencedBy map[*ast.Symbol][]*ast.Symbol
+
+	// referenced is the flat question the original set answered, kept because the flat report is
+	// genuinely useful and a reader may trust it more than the closure.
+	referenced map[*ast.Symbol]bool
+}
+
+// record adds one edge. A nil `from` means the reference sits at module top level, which is a ROOT
+// and not an absent referrer — the distinction the whole closure turns on.
+func (index *referenceIndex) record(to *ast.Symbol, from *ast.Symbol) {
+	index.referenced[to] = true
+	index.referencedBy[to] = append(index.referencedBy[to], from)
+}
+
+// enclosingDeclarationNode walks up from a reference to the declaration that contains it, or nil
+// when the reference sits at module top level.
+//
+// # Why the walk stops where it does
+//
+// The set of kinds is the set of things that can THEMSELVES be dead. A reference inside an `if`
+// block belongs to the function containing the block, because deleting the function deletes the
+// reference; the block is not a unit anyone deletes on its own. Function, class, interface, type,
+// enum, variable, method, accessor, constructor, property, module and export-assignment are the
+// units, and everything else is passed through.
+//
+// # What was probed rather than assumed
+//
+// The three shapes where "what declaration am I inside" gets strange were measured on a fixture
+// built for exactly this, not reasoned about:
+//
+//	JSX          `<div title={String(usedInJsx())}>` attributes both `String` and `usedInJsx` to the
+//	             enclosing function. A JSX expression container does not break the parent chain.
+//	decorators   `@usedByDecorator() export class DecoratedClass {}` attributes the decorator's
+//	             reference to `DecoratedClass`, because the decorator is a child of the class node.
+//	             That is the answer this analysis wants: if the class is dead its decorator's
+//	             reference should die with it, rather than escaping to module level as a root.
+//	default      `export default function defaultFn()` attributes to `defaultFn`. The anonymous
+//	exports      `export default arrow` form lands on the ExportAssignment, which has no name — see
+//	             `symbolOfDeclaration` for why that case still resolves.
+//
+// Returning nil at `KindSourceFile` rather than falling out of the loop is deliberate: a module-top
+// -level reference must be distinguishable from a walk that ran off the end of a detached subtree,
+// and both would otherwise produce the same nil.
+func enclosingDeclarationNode(node *ast.Node) *ast.Node {
+	for current := node.Parent; current != nil; current = current.Parent {
+		switch current.Kind {
+		case ast.KindFunctionDeclaration,
+			ast.KindClassDeclaration,
+			ast.KindInterfaceDeclaration,
+			ast.KindTypeAliasDeclaration,
+			ast.KindEnumDeclaration,
+			ast.KindVariableDeclaration,
+			ast.KindMethodDeclaration,
+			ast.KindPropertyDeclaration,
+			ast.KindGetAccessor,
+			ast.KindSetAccessor,
+			ast.KindConstructor,
+			ast.KindExportAssignment,
+			ast.KindModuleDeclaration:
+			return current
+		case ast.KindSourceFile:
+			return nil
+		}
+	}
+	return nil
+}
+
+// symbolOfDeclaration returns a declaration node's own symbol without asking the checker.
+//
+// # Why this is not a second GetSymbolAtLocation
+//
+// The checker call is the expensive primitive in this phase, and resolving "who is doing the
+// referencing" the obvious way — walk to the enclosing declaration, take its name, ask the checker —
+// roughly doubles how many are made. `node.Symbol()` is populated by the binder when the program is
+// built, which is exactly the situation this phase runs in, so the answer is already sitting on the
+// node.
+//
+// Probed on the fixture rather than assumed, because a nil here would silently sever every edge and
+// read as a clean codebase: 18 of 18 enclosing declarations agreed between `node.Symbol()` and a
+// second `GetSymbolAtLocation` on the declaration's name, with zero disagreements and zero nils from
+// the free path.
+//
+// The free path is also strictly BETTER on one shape. `export default arrow` produces an anonymous
+// ExportAssignment with no name for `GetSymbolAtLocation` to be given, so the checker path returns
+// nil and drops the edge, while `node.Symbol()` returns the `default` symbol regardless. The cheaper
+// call is the more complete one, which is not the usual direction and is why it is written down.
+func symbolOfDeclaration(node *ast.Node) *ast.Symbol {
+	if node == nil {
+		return nil
+	}
+	return node.Symbol()
 }
 
 // FindUnreferenced builds a program-wide reverse index and reports the exported declarations
@@ -80,16 +200,27 @@ type Report struct {
 // imported names resolved through `GetAliasedSymbol` to a declaration in another file, with zero nil
 // symbols. Pointer identity is what makes a reference in one file and a declaration in another the
 // same fact.
-func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, roots *RootSet) (*Report, error) {
+func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, roots *RootSet, deep bool) (*Report, error) {
 	report := &Report{FilesAnalyzed: len(files)}
 
-	// Pass one: every symbol that anything anywhere refers to.
+	// The closure's inputs, collected during the passes below rather than in a third walk. Both stay
+	// empty when `deep` is false, so the flat report pays nothing for a feature it does not use.
+	var inventory []declarationRecord
+	rootSymbols := map[*ast.Symbol]bool{}
+
+	// Pass one: every symbol that anything anywhere refers to, and WHO refers to it.
 	//
 	// Built from identifier positions rather than from import statements, because a reference is a
 	// use wherever it appears — a call, a type position, a JSX tag, a re-export — and enumerating the
 	// forms would miss whichever one nobody thought of. Resolving every identifier is more work and
 	// it cannot have that class of gap.
-	referenced := make(map[*ast.Symbol]bool, len(files)*8)
+	//
+	// The referrer is resolved without a second checker call, which is the difference between this
+	// costing what the set cost and costing twice that. See `symbolOfDeclaration`.
+	index := &referenceIndex{
+		referencedBy: make(map[*ast.Symbol][]*ast.Symbol, len(files)*8),
+		referenced:   make(map[*ast.Symbol]bool, len(files)*8),
+	}
 
 	for _, file := range files {
 		checker, release := graph.CheckerForFile(ctx, file)
@@ -109,12 +240,15 @@ func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.So
 				// that reads as a clean codebase.
 				if !isDeclarationName(node) {
 					if symbol := checker.GetSymbolAtLocation(node); symbol != nil {
-						referenced[symbol] = true
+						// Resolved once per reference, not once per edge, because the alias and its
+						// target share a referrer.
+						from := symbolOfDeclaration(enclosingDeclarationNode(node))
+						index.record(symbol, from)
 						// An import binding is an alias; the thing actually used is what it points
 						// at. Recording only the alias leaves every real declaration looking unused.
 						if symbol.Flags&ast.SymbolFlagsAlias != 0 {
 							if aliased := checker.GetAliasedSymbol(symbol); aliased != nil {
-								referenced[aliased] = true
+								index.record(aliased, from)
 							}
 						}
 					}
@@ -132,6 +266,12 @@ func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.So
 		fileName := file.FileName()
 		if isRoot, _ := roots.IsRoot(fileName); isRoot {
 			report.RootedFiles++
+			// A spared file's declarations are roots of the closure, not merely absent from the flat
+			// report. A `page.tsx` is loaded by the framework with no import anywhere, so everything
+			// it reaches is alive, and omitting these would darken every component the app renders.
+			if deep {
+				collectRootSymbols(file, rootSymbols)
+			}
 			continue
 		}
 
@@ -145,6 +285,13 @@ func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.So
 		fileExports := 0
 		fileUnusedExports := 0
 		var fileFindings []Unreferenced
+
+		// The closure needs EVERY declaration, not only the exported ones. The private helper that
+		// existed to serve an abandoned export is the second half of an island, and a report that
+		// inventoried only exports could never find it.
+		if deep {
+			inventory = append(inventory, fileDeclarations(file, text)...)
+		}
 
 		for _, statement := range file.Statements.Nodes {
 			for _, declaration := range exportedDeclarations(statement) {
@@ -162,7 +309,7 @@ func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.So
 					// counted rather than guessed.
 					continue
 				}
-				if referenced[symbol] {
+				if index.referenced[symbol] {
 					continue
 				}
 
@@ -198,6 +345,11 @@ func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.So
 		}
 
 		release()
+	}
+
+	if deep {
+		report.Islands, report.ClosurePasses = computeIslands(index, inventory, rootSymbols)
+		report.DeclarationsAnalyzed = len(inventory)
 	}
 
 	return report, nil
