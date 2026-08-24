@@ -1,4 +1,10 @@
-package utils
+// Source: tsgolint `internal/utils/builtin_symbol_likes.go`.
+//
+// The is-this-a-builtin questions. A rule that special-cases `Promise` or `Error` has to mean the one
+// from the default library rather than a local class wearing the name, and answering that means
+// walking unions, intersections, type-parameter constraints and base types before asking where the
+// symbol was declared.
+package typecheck
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"

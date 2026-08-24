@@ -6,7 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/upstream/tsgolint/utils"
+	"github.com/system-inc/verify/internal/utils/typecheck"
 )
 
 // NoImpliedEval flags the `eval()`-like calls: a non-function handed to `setTimeout`,
@@ -199,7 +199,7 @@ var NoImpliedEval = rule.Rule{
 	// required rather than opportunistic.
 	NeedsTypeChecker: true,
 
-	// `isFunctionType` and the `Function` arm both call `utils.IsBuiltinSymbolLike(ctx.Program, ...)`,
+	// `isFunctionType` and the `Function` arm both call `typecheck.IsBuiltinSymbolLike(ctx.Program, ...)`,
 	// which walks the program's own default-library files to decide whether a type is the builtin
 	// `Function`. That is a read outside the file being linted, so the findings cache must not key on
 	// that file alone. While this rule was adapted, `upstream.Adapt` set this flag on every rule it
@@ -233,15 +233,15 @@ var NoImpliedEval = rule.Rule{
 			t := ctx.TypeChecker.GetTypeAtLocation(node)
 			symbol := checker.Type_symbol(t)
 
-			if symbol != nil && utils.IsSymbolFlagSet(symbol, ast.SymbolFlagsFunction|ast.SymbolFlagsMethod) {
+			if symbol != nil && typecheck.IsSymbolFlagSet(symbol, ast.SymbolFlagsFunction|ast.SymbolFlagsMethod) {
 				return true
 			}
 
-			if utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "Function") {
+			if typecheck.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "Function") {
 				return true
 			}
 
-			return len(utils.GetCallSignatures(ctx.TypeChecker, t)) > 0
+			return len(typecheck.GetCallSignatures(ctx.TypeChecker, t)) > 0
 		}
 
 		isBind := func(node *ast.Node) bool {
@@ -281,7 +281,7 @@ var NoImpliedEval = rule.Rule{
 				symbol := checker.Type_symbol(t)
 
 				if symbol != nil {
-					if utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "FunctionConstructor") {
+					if typecheck.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "FunctionConstructor") {
 						ctx.ReportNode(node, buildNoFunctionConstructorMessage())
 						return
 					}
@@ -298,7 +298,7 @@ var NoImpliedEval = rule.Rule{
 
 			if slices.Contains(evalLikeFunctions, calleeName) && !isFunction(handler) {
 				symbol := ctx.TypeChecker.GetSymbolAtLocation(node.Expression())
-				if symbol == nil || !utils.Some(symbol.Declarations, func(d *ast.Node) bool {
+				if symbol == nil || !typecheck.Some(symbol.Declarations, func(d *ast.Node) bool {
 					return ast.GetSourceFileOfNode(d) == ctx.SourceFile
 				}) {
 					ctx.ReportNode(handler, buildNoImpliedEvalErrorMessage())

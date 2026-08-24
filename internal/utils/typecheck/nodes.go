@@ -1,4 +1,10 @@
-package utils
+// Source: tsgolint `internal/utils/utils.go`.
+//
+// Node and range helpers, plus the generic slice functions the rest of this package is written in
+// terms of. The slice helpers carry their own `Source:` lines: they came to tsgolint from
+// typescript-go's `internal/core/core.go`, which our shim does not re-export, so this is the only
+// copy reachable from our code rather than a second one.
+package typecheck
 
 import (
 	"iter"

@@ -1,4 +1,9 @@
-package utils
+// Source: tsgolint `internal/utils/ts_eslint.go`.
+//
+// The checker-aware queries typescript-eslint's own rules lean on: constraint resolution, awaitability,
+// contextual and enum types, the unsafe-assignment walk, and the precedence questions a fix needs
+// before it can add or drop parentheses.
+package typecheck
 
 import (
 	"slices"

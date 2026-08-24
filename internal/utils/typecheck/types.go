@@ -1,4 +1,42 @@
-package utils
+// Package typecheck answers questions about types that only the type checker can settle.
+//
+// It is the shelf's type-aware layer, and until it landed there was no such layer: no package under
+// `internal/utils/` imported `shim/checker` at all. Every type-aware rule needs the same handful of
+// primitives -- what a union is made of, whether a type is thenable, whether a symbol came from the
+// default library -- and before this they were reachable only through a path named `upstream`.
+//
+// # Provenance
+//
+// These helpers are vendored from tsgolint (https://github.com/typescript-eslint/tsgolint), MIT
+// licensed, `Copyright (c) 2025 typescript-eslint and other contributors`. The full text sits in
+// `LICENSE` beside this file, and each file names the tsgolint source it came from.
+//
+// tsgolint is a dead project and we will never re-sync, so the `upstream/` path these lived under
+// was actively misleading: it told a reader to expect a sync that cannot happen and to treat edits
+// as merge hazards. This code is ours to maintain now, and the next change to one of these helpers
+// is an ordinary edit. The vendored commit was `4178710` (2025-07-13), recorded here because it is
+// the provenance a reader wants rather than a baseline anyone will diff against.
+//
+// # What was changed from tsgolint
+//
+// Import paths, and nothing else about the logic. Upstream vendored against `microsoft/typescript-go`
+// and we are on `microsoft/TypeScript` at `tsc/`, which renamed part of the surface: `ast.IsParameter`
+// became `IsParameterDeclaration` and `AsTypeParameter` became `AsTypeParameterDeclaration`. Those
+// renames are the only edits inside a function body. A reader who expects byte-identical files needs
+// this note.
+//
+// # Why it compiles against our shim
+//
+// Every `github.com/microsoft/TypeScript/tsc/shim/...` path is `replace`-directed in `go.mod` to
+// `./shim/...`. There is exactly one shim tree in this repo and it is ours, so `ast.Node` and
+// `checker.Checker` are not merely the same shape across two trees, they are the same package. A
+// mismatch fails loudly at compile rather than quietly at runtime.
+
+// Source: tsgolint `internal/utils/ts_api_utils.go`.
+//
+// The type predicates: what a type's flags say, what a union or intersection is made of, and the
+// signature and thenable questions that read the checker to answer.
+package typecheck
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"

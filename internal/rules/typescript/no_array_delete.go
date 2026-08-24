@@ -5,7 +5,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/upstream/tsgolint/utils"
+	"github.com/system-inc/verify/internal/utils/typecheck"
 )
 
 // NoArrayDelete flags the `delete` operator applied to an element of an array or a tuple.
@@ -41,7 +41,7 @@ import (
 //
 // The reported SPAN is unchanged too, and that is the part worth naming. While this rule was
 // adapted, `upstream.Adapt` wrapped every node report in `rule.TokenRange(SourceFile, node)` because
-// tsgolint's own runner does the same through `utils.TrimNodeTextRange`. Our native
+// tsgolint's own runner does the same through `typecheck.TrimNodeTextRange`. Our native
 // `ctx.ReportNodeWithSuggestions` applies exactly that trim itself, so absorbing the rule preserves
 // the behavior rather than relying on the adapter to supply it. Passing `node.Loc` instead would
 // include leading trivia and reintroduce the defect fixed in `8bdd70b`; the span test in this
@@ -128,7 +128,7 @@ import (
 //
 // # Two mutants survive the sweep and both are equivalent rather than unseen
 //
-// Rewriting `utils.TrimNodeTextRange(sourceFile, n)` to `n.Loc` for either the receiver range or the
+// Rewriting `typecheck.TrimNodeTextRange(sourceFile, n)` to `n.Loc` for either the receiver range or the
 // argument range compiles, changes bytes, and no fixture notices. That reads as a blind spot and it
 // is not one, which matters because the trivia-trimming difference is a real defect this project has
 // already shipped once at the adapter.
@@ -159,7 +159,7 @@ var NoArrayDelete = rule.Rule{
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		isUnderlyingTypeArray := func(t *checker.Type) bool {
-			if utils.IsTypeFlagSet(t, checker.TypeFlagsUnion) {
+			if typecheck.IsTypeFlagSet(t, checker.TypeFlagsUnion) {
 				for _, t := range t.Types() {
 					if !checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
 						return false
@@ -168,7 +168,7 @@ var NoArrayDelete = rule.Rule{
 				return true
 			}
 
-			if utils.IsTypeFlagSet(t, checker.TypeFlagsIntersection) {
+			if typecheck.IsTypeFlagSet(t, checker.TypeFlagsIntersection) {
 				for _, t := range t.Types() {
 					if checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
 						return true
@@ -197,14 +197,14 @@ var NoArrayDelete = rule.Rule{
 
 				expression := deleteExpression.AsElementAccessExpression()
 
-				argType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression.Expression)
+				argType := typecheck.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression.Expression)
 
 				if !isUnderlyingTypeArray(argType) {
 					return
 				}
 
-				expressionRange := utils.TrimNodeTextRange(ctx.SourceFile, expression.Expression)
-				argumentRange := utils.TrimNodeTextRange(ctx.SourceFile, expression.ArgumentExpression)
+				expressionRange := typecheck.TrimNodeTextRange(ctx.SourceFile, expression.Expression)
+				argumentRange := typecheck.TrimNodeTextRange(ctx.SourceFile, expression.ArgumentExpression)
 
 				deleteTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
 				leftBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, expressionRange.End())

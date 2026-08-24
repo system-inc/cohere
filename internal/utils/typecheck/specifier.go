@@ -1,4 +1,8 @@
-package utils
+// Source: tsgolint `internal/utils/type_matches_specifier.go`.
+//
+// Option specifier matching: how a rule's configuration names a type it wants to allow or forbid, by
+// file, by lib, or by package, and how a type in hand is tested against that name.
+package typecheck
 
 import (
 	"fmt"

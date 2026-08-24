@@ -7,14 +7,14 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/upstream/tsgolint/utils"
+	"github.com/system-inc/verify/internal/utils/typecheck"
 )
 
 // NoFloatingPromisesOptions is upstream's option struct, field-for-field.
 type NoFloatingPromisesOptions struct {
-	AllowForKnownSafeCalls          []utils.TypeOrValueSpecifier
+	AllowForKnownSafeCalls          []typecheck.TypeOrValueSpecifier
 	AllowForKnownSafeCallsInline    []string
-	AllowForKnownSafePromises       []utils.TypeOrValueSpecifier
+	AllowForKnownSafePromises       []typecheck.TypeOrValueSpecifier
 	AllowForKnownSafePromisesInline []string
 	CheckThenables                  *bool
 	IgnoreIIFE                      *bool
@@ -109,7 +109,7 @@ func buildFloatingVoidMessage() rule.Message {
 // shows those renames, the two declared flags below, and the nil guard, and nothing else: no
 // predicate, no traversal, no message text.
 //
-// It reaches for `utils.UnionTypeParts`, `IsPromiseLike`, `GetCallSignatures`, `Some` and
+// It reaches for `typecheck.UnionTypeParts`, `IsPromiseLike`, `GetCallSignatures`, `Some` and
 // `TypeMatchesSomeSpecifier` because that is what upstream reaches for, and this note is why a
 // reader finds those helpers in a file that otherwise looks native. tsgolint is not re-synced, so
 // this file is now the only copy of the algorithm rather than a translation layer over a vendored
@@ -134,7 +134,7 @@ func buildFloatingVoidMessage() rule.Message {
 // run therefore reports `floatingVoid` rather than `floating`, and the decoder keeps all three
 // booleans as pointers end to end so that absent stays distinguishable from an explicit false.
 //
-// The two allowlists take TYPE SPECIFIERS, which is why `utils.type_matches_specifier.go` is
+// The two allowlists take TYPE SPECIFIERS, which is why `typecheck/specifier.go` is
 // load-bearing here. Each entry is either a bare string matched against the type's own name, or an
 // object whose `from` is `file`, `lib` or `package`. Those are two different fields in the struct
 // the rule reads, so `DecodeNoFloatingPromisesOptions` below is hand-written rather than a
@@ -244,7 +244,7 @@ func buildFloatingVoidMessage() rule.Message {
 //
 // `ReadsProgram` is a measurement rather than an assumption, and it is declared because the body
 // genuinely reaches `ctx.Program` at three sites, one of them on the core path:
-// `utils.IsPromiseLike(ctx.Program, ...)` walks the program's default-library files to decide
+// `typecheck.IsPromiseLike(ctx.Program, ...)` walks the program's default-library files to decide
 // whether a type is the builtin `Promise`, which happens for every promise test this rule makes.
 // The two `TypeMatchesSomeSpecifier` calls read the program too, and enum-key resolution reaches
 // the declaring module, which a fixture pins across two files. A findings cache keyed on the linted
@@ -280,20 +280,20 @@ var NoFloatingPromises = rule.Rule{
 		opts, ok := options.(NoFloatingPromisesOptions)
 		if !ok {
 			opts = NoFloatingPromisesOptions{
-				AllowForKnownSafeCalls:          []utils.TypeOrValueSpecifier{},
+				AllowForKnownSafeCalls:          []typecheck.TypeOrValueSpecifier{},
 				AllowForKnownSafeCallsInline:    []string{},
-				AllowForKnownSafePromises:       []utils.TypeOrValueSpecifier{},
+				AllowForKnownSafePromises:       []typecheck.TypeOrValueSpecifier{},
 				AllowForKnownSafePromisesInline: []string{},
 			}
 		}
 		if opts.CheckThenables == nil {
-			opts.CheckThenables = utils.Ref(false)
+			opts.CheckThenables = typecheck.Ref(false)
 		}
 		if opts.IgnoreIIFE == nil {
-			opts.IgnoreIIFE = utils.Ref(false)
+			opts.IgnoreIIFE = typecheck.Ref(false)
 		}
 		if opts.IgnoreVoid == nil {
-			opts.IgnoreVoid = utils.Ref(true)
+			opts.IgnoreVoid = typecheck.Ref(true)
 		}
 
 		isHigherPrecedenceThanUnary := func(node *ast.Node) bool {
@@ -326,8 +326,8 @@ var NoFloatingPromises = rule.Rule{
 			t *checker.Type,
 			matcher func(signature *checker.Signature) bool,
 		) bool {
-			for _, part := range utils.UnionTypeParts(t) {
-				if utils.Some(utils.GetCallSignatures(ctx.TypeChecker, part), matcher) {
+			for _, part := range typecheck.UnionTypeParts(t) {
+				if typecheck.Some(typecheck.GetCallSignatures(ctx.TypeChecker, part), matcher) {
 					return true
 				}
 			}
@@ -341,8 +341,8 @@ var NoFloatingPromises = rule.Rule{
 		) bool {
 			t := checker.Checker_getApparentType(ctx.TypeChecker, ctx.TypeChecker.GetTypeOfSymbolAtLocation(param, node))
 
-			for _, part := range utils.UnionTypeParts(t) {
-				if len(utils.GetCallSignatures(ctx.TypeChecker, part)) != 0 {
+			for _, part := range typecheck.UnionTypeParts(t) {
+				if len(typecheck.GetCallSignatures(ctx.TypeChecker, part)) != 0 {
 					return true
 				}
 			}
@@ -355,7 +355,7 @@ var NoFloatingPromises = rule.Rule{
 			}
 
 			// The highest priority is to allow anything allowlisted
-			if utils.TypeMatchesSomeSpecifier(
+			if typecheck.TypeMatchesSomeSpecifier(
 				t,
 				opts.AllowForKnownSafePromises,
 				opts.AllowForKnownSafePromisesInline,
@@ -365,9 +365,9 @@ var NoFloatingPromises = rule.Rule{
 			}
 
 			// Otherwise, we always consider the built-in Promise to be Promise-like...
-			typeParts := utils.UnionTypeParts(checker.Checker_getApparentType(ctx.TypeChecker, t))
-			if utils.Some(typeParts, func(typePart *checker.Type) bool {
-				return utils.IsPromiseLike(ctx.Program, ctx.TypeChecker, typePart)
+			typeParts := typecheck.UnionTypeParts(checker.Checker_getApparentType(ctx.TypeChecker, t))
+			if typecheck.Some(typeParts, func(typePart *checker.Type) bool {
+				return typecheck.IsPromiseLike(ctx.Program, ctx.TypeChecker, typePart)
 			}) {
 				return true
 			}
@@ -402,7 +402,7 @@ var NoFloatingPromises = rule.Rule{
 
 		isPromiseArray := func(node *ast.Node) bool {
 			t := ctx.TypeChecker.GetTypeAtLocation(node)
-			for _, typePart := range utils.UnionTypeParts(t) {
+			for _, typePart := range typecheck.UnionTypeParts(t) {
 				apparent := checker.Checker_getApparentType(ctx.TypeChecker, typePart)
 
 				if checker.Checker_isArrayType(ctx.TypeChecker, apparent) {
@@ -430,7 +430,7 @@ var NoFloatingPromises = rule.Rule{
 
 			t := ctx.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
 
-			return utils.TypeMatchesSomeSpecifier(
+			return typecheck.TypeMatchesSomeSpecifier(
 				t,
 				opts.AllowForKnownSafeCalls,
 				opts.AllowForKnownSafeCallsInline,
@@ -449,7 +449,7 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		isValidRejectionHandler := func(rejectionHandler *ast.Node) bool {
-			return len(utils.GetCallSignatures(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(rejectionHandler))) > 0
+			return len(typecheck.GetCallSignatures(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(rejectionHandler))) > 0
 		}
 
 		var isUnhandledPromise func(
@@ -703,8 +703,8 @@ func (s *noFloatingPromisesRawSpecifier) UnmarshalJSON(raw []byte) error {
 }
 
 // specifiersFrom splits one wire allowlist into the two fields the rule reads.
-func specifiersFrom(raw []noFloatingPromisesRawSpecifier) ([]utils.TypeOrValueSpecifier, []string) {
-	specifiers := []utils.TypeOrValueSpecifier{}
+func specifiersFrom(raw []noFloatingPromisesRawSpecifier) ([]typecheck.TypeOrValueSpecifier, []string) {
+	specifiers := []typecheck.TypeOrValueSpecifier{}
 	inline := []string{}
 	for _, entry := range raw {
 		if entry.inline != "" {
@@ -712,14 +712,14 @@ func specifiersFrom(raw []noFloatingPromisesRawSpecifier) ([]utils.TypeOrValueSp
 			continue
 		}
 
-		specifier := utils.TypeOrValueSpecifier{Name: entry.Name, Path: entry.Path, Package: entry.Package}
+		specifier := typecheck.TypeOrValueSpecifier{Name: entry.Name, Path: entry.Path, Package: entry.Package}
 		switch entry.From {
 		case "file":
-			specifier.From = utils.TypeOrValueSpecifierFromFile
+			specifier.From = typecheck.TypeOrValueSpecifierFromFile
 		case "lib":
-			specifier.From = utils.TypeOrValueSpecifierFromLib
+			specifier.From = typecheck.TypeOrValueSpecifierFromLib
 		case "package":
-			specifier.From = utils.TypeOrValueSpecifierFromPackage
+			specifier.From = typecheck.TypeOrValueSpecifierFromPackage
 		default:
 			// An unrecognized `from` cannot be represented, and a specifier that matches nothing is
 			// a better answer than refusing the whole configuration. `file` is the zero value, so

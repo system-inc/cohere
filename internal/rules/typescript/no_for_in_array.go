@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/upstream/tsgolint/utils"
+	"github.com/system-inc/verify/internal/utils/typecheck"
 )
 
 // NoForInArray flags a `for...in` loop whose subject is array-like.
@@ -155,11 +155,11 @@ var NoForInArray = rule.Rule{
 				return false
 			}
 
-			return utils.IsTypeFlagSet(checker.Checker_getTypeOfSymbol(ctx.TypeChecker, lengthProperty), checker.TypeFlagsNumberLike)
+			return typecheck.IsTypeFlagSet(checker.Checker_getTypeOfSymbol(ctx.TypeChecker, lengthProperty), checker.TypeFlagsNumberLike)
 		}
 		isArrayLike := func(t *checker.Type) bool {
-			return utils.TypeRecurser(t, func(t *checker.Type) bool {
-				return utils.GetNumberIndexType(ctx.TypeChecker, t) != nil && hasArrayishLength(t)
+			return typecheck.TypeRecurser(t, func(t *checker.Type) bool {
+				return typecheck.GetNumberIndexType(ctx.TypeChecker, t) != nil && hasArrayishLength(t)
 			})
 		}
 
@@ -169,11 +169,11 @@ var NoForInArray = rule.Rule{
 					return
 				}
 
-				t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.AsForInOrOfStatement().Expression)
+				t := typecheck.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.AsForInOrOfStatement().Expression)
 
 				if isArrayLike(t) {
 					ctx.ReportRange(
-						utils.GetForStatementHeadLoc(ctx.SourceFile, node),
+						typecheck.GetForStatementHeadLoc(ctx.SourceFile, node),
 						buildForInViolationMessage(),
 					)
 				}

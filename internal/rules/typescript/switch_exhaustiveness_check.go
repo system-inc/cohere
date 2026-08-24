@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/upstream/tsgolint/utils"
+	"github.com/system-inc/verify/internal/utils/typecheck"
 )
 
 // SwitchExhaustivenessCheck flags a switch over a union of literal types that does not handle every
@@ -212,17 +212,17 @@ var SwitchExhaustivenessCheck = rule.Rule{
 			opts = SwitchExhaustivenessCheckOptions{}
 		}
 		if opts.AllowDefaultCaseForExhaustiveSwitch == nil {
-			opts.AllowDefaultCaseForExhaustiveSwitch = utils.Ref(true)
+			opts.AllowDefaultCaseForExhaustiveSwitch = typecheck.Ref(true)
 		}
 		if opts.ConsiderDefaultExhaustiveForUnions == nil {
-			opts.ConsiderDefaultExhaustiveForUnions = utils.Ref(false)
+			opts.ConsiderDefaultExhaustiveForUnions = typecheck.Ref(false)
 		}
 		if opts.RequireDefaultForNonUnion == nil {
-			opts.RequireDefaultForNonUnion = utils.Ref(false)
+			opts.RequireDefaultForNonUnion = typecheck.Ref(false)
 		}
 
 		isLiteralLikeType := func(t *checker.Type) bool {
-			return utils.IsTypeFlagSet(
+			return typecheck.IsTypeFlagSet(
 				t,
 				checker.TypeFlagsLiteral|checker.TypeFlagsUndefined|checker.TypeFlagsNull|checker.TypeFlagsUniqueESSymbol,
 			)
@@ -238,11 +238,11 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		 * Default cases are never superfluous in switches with non-literal types.
 		 */
 		doesTypeContainNonLiteralType := func(t *checker.Type) bool {
-			return utils.Some(
-				utils.UnionTypeParts(t),
+			return typecheck.Some(
+				typecheck.UnionTypeParts(t),
 				func(t *checker.Type) bool {
-					return utils.Every(
-						utils.IntersectionTypeParts(t),
+					return typecheck.Every(
+						typecheck.IntersectionTypeParts(t),
 						func(t *checker.Type) bool {
 							return !isLiteralLikeType(t)
 						},
@@ -261,7 +261,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				defaultCase = cases[defaultCaseIndex].AsCaseOrDefaultClause()
 			}
 
-			discriminantType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.Expression)
+			discriminantType := typecheck.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.Expression)
 
 			caseTypes := make([]*checker.Type, 0, len(cases))
 			for _, c := range cases {
@@ -269,13 +269,13 @@ var SwitchExhaustivenessCheck = rule.Rule{
 					continue
 				}
 
-				caseTypes = append(caseTypes, utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, c.AsCaseOrDefaultClause().Expression))
+				caseTypes = append(caseTypes, typecheck.GetConstrainedTypeAtLocation(ctx.TypeChecker, c.AsCaseOrDefaultClause().Expression))
 			}
 
 			containsNonLiteralType := doesTypeContainNonLiteralType(discriminantType)
 
 			missingLiteralBranchTypes := make([]*checker.Type, 0, 10)
-			utils.TypeRecurser(discriminantType, func(t *checker.Type) bool {
+			typecheck.TypeRecurser(discriminantType, func(t *checker.Type) bool {
 				if slices.Contains(caseTypes, t) || !isLiteralLikeType(t) {
 					return false
 				}
@@ -283,8 +283,8 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				// "missing", "optional" and "undefined" types are different runtime objects,
 				// but all of them have TypeFlags.Undefined type flag
 				if slices.ContainsFunc(caseTypes, func(t *checker.Type) bool {
-					return utils.IsTypeFlagSet(t, checker.TypeFlagsUndefined)
-				}) && utils.IsTypeFlagSet(t, checker.TypeFlagsUndefined) {
+					return typecheck.IsTypeFlagSet(t, checker.TypeFlagsUndefined)
+				}) && typecheck.IsTypeFlagSet(t, checker.TypeFlagsUndefined) {
 					return false
 				}
 

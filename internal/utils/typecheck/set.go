@@ -1,6 +1,9 @@
-// Source: github.com/microsoft/typescript-go - internal/core/set.go
-
-package utils
+// Source: typescript-go `internal/core/set.go`, by way of tsgolint's copy of it.
+//
+// Our shim re-exports `core` but not `Set`, and upstream has since moved the type to
+// `internal/collections`, which is not shimmed either. So this is the only `Set` reachable from our
+// code rather than a third copy of one we already have.
+package typecheck
 
 type Set[T comparable] struct {
 	M map[T]struct{}
