@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 var messagePageStateRemounts = rule.Message{
@@ -82,7 +83,7 @@ var NextNoPageState = rule.Rule{
 					//
 					// The receiver must be React. `Store.useState` is somebody's own accessor and
 					// has nothing to do with the App Router's remounting.
-					if isReactMemberNamed(callee, func(name string) bool { return pageStateHookNames[name] }) {
+					if react.IsNamespacedMember(callee, func(name string) bool { return pageStateHookNames[name] }) {
 						ctx.ReportNode(callee, messagePageStateRemounts)
 					}
 				}

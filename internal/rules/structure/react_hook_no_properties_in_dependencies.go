@@ -106,21 +106,16 @@ var ReactHookNoPropertiesInDependencies = rule.Rule{
 
 // reactHookNameOf returns the hook name in a `React.useThing` callee, or "" for anything else.
 func reactHookNameOf(callee *ast.Node) string {
-	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
-		return ""
-	}
-	access := callee.AsPropertyAccessExpression()
-	if access.Expression == nil || access.Expression.Kind != ast.KindIdentifier {
-		return ""
-	}
-	if access.Expression.Text() != "React" {
-		return ""
-	}
-	name := access.Name()
-	if name == nil || name.Kind != ast.KindIdentifier {
-		return ""
-	}
-	return name.Text()
+	// `react.IsNamespacedMember` rather than a hand-rolled receiver test, which additionally skips
+	// parentheses on the receiver: `(React).useEffect(...)` is the same call and the hand-rolled
+	// version declined it while looking correct. The predicate captures the name rather than
+	// answering about it, since this function returns the name it found.
+	found := ""
+	react.IsNamespacedMember(callee, func(name string) bool {
+		found = name
+		return true
+	})
+	return found
 }
 
 // dependencyArrayArgument returns the hook's dependency array, or nil when it has none or when the

@@ -3,6 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 var messageNoDisplayNameAssignment = rule.Message{
@@ -118,7 +119,7 @@ func isAnonymousWrapperCall(initializer *ast.Node) bool {
 	case ast.KindIdentifier:
 		return anonymousComponentWrapperNames[callee.Text()]
 	case ast.KindPropertyAccessExpression:
-		return isReactMemberNamed(callee, func(name string) bool {
+		return react.IsNamespacedMember(callee, func(name string) bool {
 			return anonymousComponentWrapperNames[name]
 		})
 	}

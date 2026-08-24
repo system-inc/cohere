@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 const forwardRefReasoning = "React 19 passes ref as an ordinary property to a function component, " +
@@ -69,7 +70,7 @@ var ReactComponentNoForwardRef = rule.Rule{
 						ctx.ReportNode(callee, messageNoForwardRefCall)
 					}
 				case ast.KindPropertyAccessExpression:
-					if isReactMemberNamed(callee, func(name string) bool { return name == "forwardRef" }) {
+					if react.IsNamespacedMember(callee, func(name string) bool { return name == "forwardRef" }) {
 						ctx.ReportNode(callee, messageNoForwardRefCall)
 					}
 				}
@@ -119,15 +120,4 @@ func reportForwardRefImport(ctx rule.Context, node *ast.Node) {
 			ctx.ReportNode(element, messageNoForwardRefImport)
 		}
 	}
-}
-
-// isReactMemberNamed reports `React.<name>` where name satisfies the predicate.
-func isReactMemberNamed(node *ast.Node, matches func(string) bool) bool {
-	access := node.AsPropertyAccessExpression()
-	receiver := ast.SkipParentheses(access.Expression)
-	if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.Text() != "React" {
-		return false
-	}
-	name := access.Name()
-	return name != nil && name.Kind == ast.KindIdentifier && matches(name.Text())
 }

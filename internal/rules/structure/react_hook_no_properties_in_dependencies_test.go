@@ -213,3 +213,20 @@ func TestReactHookNoPropertiesInDependenciesStaysSilent(t *testing.T) {
 		})
 	}
 }
+
+// TestReactHookNoPropertiesInDependenciesSkipsParenthesizedReceiver pins a shape the rule declined
+// before it adopted the shared namespaced-member predicate.
+//
+// `(React).useEffect(...)` is the same call as `React.useEffect(...)`, and the hand-rolled receiver
+// test read the parenthesis as a non-identifier and declined. Nobody writes it deliberately, which
+// is exactly why no fixture covered it and the miss was invisible.
+func TestReactHookNoPropertiesInDependenciesSkipsParenthesizedReceiver(t *testing.T) {
+	const sourceText = "function Thing(properties: { id: string }) {\n" +
+		"    (React).useEffect(() => { run(properties.id); }, [properties]);\n" +
+		"    return <div />;\n}\n"
+	result := ruletest.Run(t, ReactHookNoPropertiesInDependencies, propertiesInDependenciesFile, sourceText)
+	if len(result.Diagnostics) != 1 {
+		t.Errorf("a parenthesized React receiver produced %d findings, want 1",
+			len(result.Diagnostics))
+	}
+}

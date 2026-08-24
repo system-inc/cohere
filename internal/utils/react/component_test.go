@@ -188,3 +188,64 @@ func TestHelpersSurviveNilAndWrongKinds(t *testing.T) {
 		t.Fatal("want an identifier to answer false everywhere")
 	}
 }
+
+// TestIsNamespacedMember covers the shape four rules were matching by hand.
+func TestIsNamespacedMember(t *testing.T) {
+	anyName := func(string) bool { return true }
+	named := func(want string) func(string) bool {
+		return func(got string) bool { return got == want }
+	}
+
+	for _, testCase := range []struct {
+		name       string
+		sourceText string
+		matches    func(string) bool
+		want       bool
+	}{
+		{"a namespaced member", "React.useEffect;", named("useEffect"), true},
+		// Parentheses on the receiver are skipped, which is the one place the four lifted copies
+		// differed. `(React).useEffect(...)` is the same call, and a check on the raw node declines
+		// it while looking correct.
+		{"a parenthesized receiver", "(React).useEffect;", named("useEffect"), true},
+		{"a doubly parenthesized receiver", "((React)).useEffect;", named("useEffect"), true},
+		// The receiver must be React. A copy accepting any namespace exempted aliases the gate still
+		// reports, measured in consistency-no-property-alias.
+		{"another namespace", "Other.useEffect;", anyName, false},
+		// The predicate decides the name, so a member React does have but the caller does not want
+		// still declines.
+		{"a name the predicate rejects", "React.useMemo;", named("useEffect"), false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			node := firstNodeOfKind(t, testCase.sourceText, ast.KindPropertyAccessExpression)
+			if got := IsNamespacedMember(node, testCase.matches); got != testCase.want {
+				t.Errorf("%q: IsNamespacedMember = %v, want %v", testCase.sourceText, got, testCase.want)
+			}
+		})
+	}
+}
+
+// TestIsNamespacedMemberDeclinesOtherKinds covers the kind guard the lifted copy did not have.
+//
+// Inside its rule the node always arrived from a matched switch arm, so the guard was unnecessary
+// there; on a shelf any caller can pass anything, and the local version dereferences without
+// checking.
+func TestIsNamespacedMemberDeclinesOtherKinds(t *testing.T) {
+	anyName := func(string) bool { return true }
+
+	if IsNamespacedMember(nil, anyName) {
+		t.Error("IsNamespacedMember(nil) = true, want false")
+	}
+
+	// A computed member carries no identifier name to match, and it is a different node kind.
+	elementAccess := firstNodeOfKind(t, "React['useEffect'];", ast.KindElementAccessExpression)
+	if IsNamespacedMember(elementAccess, anyName) {
+		t.Error("a computed member answered true")
+	}
+
+	// A call expression is the kind the four lifted copies were handed after their own switch had
+	// already narrowed it. Passing one directly must decline rather than panic.
+	call := firstNodeOfKind(t, "f();", ast.KindCallExpression)
+	if IsNamespacedMember(call, anyName) {
+		t.Error("a call expression answered true")
+	}
+}

@@ -114,15 +114,10 @@ func isHookCall(call *ast.CallExpression) bool {
 		return react.IsHookName(call.Expression.Text())
 
 	case ast.KindPropertyAccessExpression:
-		access := call.Expression.AsPropertyAccessExpression()
-		if access.Expression == nil || access.Expression.Kind != ast.KindIdentifier {
-			return false
-		}
-		if access.Expression.Text() != "React" {
-			return false
-		}
-		name := access.Name()
-		return name != nil && react.IsHookName(name.Text())
+		// `react.IsNamespacedMember` rather than a hand-rolled receiver test, which additionally
+		// skips parentheses on the receiver: `(React).useState(...)` is the same call and the
+		// hand-rolled version declined it while looking correct.
+		return react.IsNamespacedMember(call.Expression, react.IsHookName)
 	}
 	return false
 }

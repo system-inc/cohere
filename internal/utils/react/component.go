@@ -241,3 +241,29 @@ func isIdentifierNamed(expression *ast.Node, name string) bool {
 	expression = ast.SkipParentheses(expression)
 	return expression != nil && expression.Kind == ast.KindIdentifier && expression.Text() == name
 }
+
+// IsNamespacedMember reports whether a node is `React.<name>` where name satisfies the predicate.
+//
+// Lifted after a census found four copies of this shape in two packages, differing only in whether
+// they skipped parentheses on the receiver. Parentheses are skipped here, for the same reason
+// `isIdentifierNamed` skips them: `(React).useEffect(...)` is the same call, and a check on the raw
+// node declines it while looking correct.
+//
+// The receiver must be React specifically. `somethingElse.useThing(...)` is not a React hook, and a
+// copy that accepted any namespace exempted aliases the gate still reports, which is measured in
+// `consistency-no-property-alias` and is why that rule reaches for the shared predicate rather than
+// writing a fifth one.
+//
+// The pragma is fixed rather than configurable, matching the rest of this package. A rule needing a
+// different one should make it an option rather than reach past this.
+func IsNamespacedMember(node *ast.Node, matches func(name string) bool) bool {
+	if node == nil || node.Kind != ast.KindPropertyAccessExpression {
+		return false
+	}
+	access := node.AsPropertyAccessExpression()
+	if !isIdentifierNamed(access.Expression, reactPragma) {
+		return false
+	}
+	name := access.Name()
+	return name != nil && name.Kind == ast.KindIdentifier && matches(name.Text())
+}

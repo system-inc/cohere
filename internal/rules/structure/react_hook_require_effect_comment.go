@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/react"
 )
 
 var messageMissingEffectComment = rule.Message{
@@ -55,7 +56,7 @@ var ReactHookRequireEffectComment = rule.Rule{
 				if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
 					return
 				}
-				if !isReactMemberNamed(callee, func(name string) bool { return name == "useEffect" }) {
+				if !react.IsNamespacedMember(callee, func(name string) bool { return name == "useEffect" }) {
 					return
 				}
 
