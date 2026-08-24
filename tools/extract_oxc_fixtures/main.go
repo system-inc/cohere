@@ -254,7 +254,19 @@ func rustLiteralText(literal string) string {
 	// `let area = r => 2 * Math.PI * r * r`, which swallowed a whole vector and took the pass count
 	// from 35 to 0. Trimming the delimiters here is the narrow fix, and it leaves the counts alone.
 	if len(literal) >= 2 && literal[0] == '"' && literal[len(literal)-1] == '"' {
-		return literal[1 : len(literal)-1]
+		// The body still carries Rust's escapes, and this path is reached precisely because Go's
+		// unquoter refused the whole literal. Returning it as written meant `-dump` re-escaped an
+		// already-escaped body: a source holding `ref=\"hello\"` printed as `ref=\\"hello\\"`, so a
+		// porter decoding it got a literal backslash and a fixture testing a different attribute
+		// value while sitting green. Found by a porter comparing bytes rather than reading.
+		//
+		// Unescaping the two sequences that actually appear is the narrow fix. Anything else is
+		// left alone, because guessing at an escape this reader does not understand is how the
+		// mangling started.
+		body := literal[1 : len(literal)-1]
+		body = strings.ReplaceAll(body, `\"`, `"`)
+		body = strings.ReplaceAll(body, `\\`, `\`)
+		return body
 	}
 	return literal
 }
