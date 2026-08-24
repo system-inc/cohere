@@ -164,11 +164,18 @@ func (b *builder) lowerIdentifier(node *ast.Node) Place {
 			place := Place{Identifier: identifier, Range: rangeOf(node)}
 			return b.emit(&LoadLocal{Place: place}, node)
 		}
+		// Not declared here, but declared by an enclosing function: a capture. This is the case
+		// that used to fall through to LoadGlobal, making a closed-over variable indistinguishable
+		// from a true global and stopping every analysis at the function boundary.
+		if place, ok := b.captureOf(symbol); ok {
+			place.Range = rangeOf(node)
+			return b.emit(&LoadContext{Place: place}, node)
+		}
 	}
 
-	// Unresolved here means it is not a binding this function created: a global, an import, or a
-	// value captured from an enclosing function. Distinguishing those needs the checker and is left
-	// to a later pass; the instruction records the name so that pass has something to work from.
+	// Unresolved by the checker and unknown to every enclosing function: a true global, an import,
+	// or a module-scope binding. `GlobalBindingKind` is still always `Global`; distinguishing an
+	// import from a global remains a later pass.
 	return b.emit(&LoadGlobal{Name: name, BindingKind: GlobalBindingKindGlobal}, node)
 }
 
@@ -390,8 +397,15 @@ func (b *builder) lowerAssignmentTarget(target *ast.Node, value Place, kind Inst
 				b.emit(&StoreLocal{LValue: place, Value: value, Kind: kind}, target)
 				return value
 			}
+			// A write to a binding an enclosing function declared. Emitting StoreGlobal here was a
+			// real over-report: `let n = 0; const f = () => { n = 1; };` claimed a global write.
+			if place, ok := b.captureOf(symbol); ok {
+				place.Range = rangeOf(target)
+				b.emit(&StoreContext{LValue: place, Value: value, Kind: kind}, target)
+				return value
+			}
 		}
-		// Not a binding this function declared: a global or a captured variable.
+		// Not a binding this function declared and unknown to every enclosing one: a global.
 		b.emit(&StoreGlobal{Name: target.Text(), Value: value}, target)
 		return value
 
@@ -515,7 +529,11 @@ func (b *builder) lowerObjectLiteral(node *ast.Node) Place {
 			properties = append(properties, ObjectProperty{Value: value, Spread: true})
 
 		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-			nested := Lower(property, b.typeChecker)
+			// An object method closes over the enclosing function exactly like any other nested
+			// function. `ObjectMethod` carries no Captures field, so the pairing is not recorded
+			// here, but the nested function's own `Context` is populated by the lowering and its
+			// body reads captured names as LoadContext rather than LoadGlobal.
+			nested, _ := b.lowerNestedFunction(property)
 			if nested == nil {
 				continue
 			}
@@ -613,17 +631,13 @@ func (b *builder) lowerTaggedTemplate(node *ast.Node) Place {
 
 // lowerFunctionExpression lowers a nested function and records what it captures.
 func (b *builder) lowerFunctionExpression(node *ast.Node) Place {
-	nested := Lower(node, b.typeChecker)
+	nested, captures := b.lowerNestedFunction(node)
 	if nested == nil {
 		return b.emit(&UnsupportedNode{Node: node, Reason: "function expression"}, node)
 	}
 	id := FunctionId(len(b.function.Functions))
 	b.function.Functions = append(b.function.Functions, nested)
-
-	// Captures are the values from THIS function the nested one closes over. Computing them
-	// precisely needs the checker's symbol resolution over the nested body; recording an empty set
-	// keeps the shape honest and leaves the work named rather than silently skipped.
-	return b.emit(&FunctionExpression{Function: id}, node)
+	return b.emit(&FunctionExpression{Function: id, Captures: captures}, node)
 }
 
 // ---------------------------------------------------------------------------

@@ -54,12 +54,9 @@
 //     otherwise:
 //     - `var` is lowered as `let`. Function-scoped hoisting is not modelled, so a `var` used before
 //     its declaration in a different block resolves as though it were block-scoped.
-//     - `FunctionExpression.Captures` is always EMPTY. Nested functions lower correctly but what
-//     they close over is not computed, so a pass asking what a callback captures gets nothing.
-//     This is the largest single gap and it matters most to the memoization rules.
-//     - A free identifier becomes `LoadGlobal` whether it is a true global, an import, or a capture
-//     from an enclosing function. `GlobalBindingKind` is always `Global`. Distinguishing them
-//     belongs to a later pass.
+//     - A free identifier becomes `LoadGlobal` whether it is a true global, an import, or a
+//     module-scope binding. `GlobalBindingKind` is always `Global`. Distinguishing an import from
+//     a true global belongs to a later pass. A CAPTURE is no longer in this list: see `captureOf`.
 //     Note what this entry originally claimed and what was measured. It said resolution "needs the
 //     checker", which was right, but `Lower` took no checker and `symbolOf` read `node.Symbol()` -
 //     a field the binder writes only onto DECLARATION nodes, and only when a binder has run at
@@ -85,8 +82,9 @@
 //     `Sequence` (terminal) - a comma expression lowers both operands into one block, which is
 //     correct for evaluation order and loses the construct.
 //     `MaybeThrow` (terminal) - see above.
-//     `LoadContext`, `StoreContext`, `DeclareContext` - context variables are not distinguished
-//     from locals, so a value a nested function can change between reads looks stable.
+//     `DeclareContext` - hoisting of a binding a nested function captures is not modelled, so the
+//     temporal dead zone is not visible. `LoadContext` and `StoreContext` ARE produced, for every
+//     read and write of a binding an enclosing function declared.
 //     `StartMemoize`, `FinishMemoize` - inserted by a later pass by design, never by lowering.
 package hir
 
@@ -118,6 +116,18 @@ import (
 // what a binding holds - must pass a real checker. A pass that only walks control flow need not.
 // See `lowerIdentifier` for the resolution itself.
 func Lower(node *ast.Node, typeChecker *checker.Checker) *Function {
+	return lowerNested(node, typeChecker, nil)
+}
+
+// lowerNested lowers a function that may sit inside another one being lowered.
+//
+// `enclosing` is the builder for the immediately surrounding function, or nil for a function
+// lowered on its own. It is the entire mechanism by which captures are found: see `captureOf`.
+//
+// The parameter is threaded rather than made a package-level stack because lowering is re-entrant -
+// a rule may lower one function while another lowering is in progress - and a stack would make two
+// unrelated lowerings each other's enclosing scope.
+func lowerNested(node *ast.Node, typeChecker *checker.Checker, enclosing *builder) *Function {
 	body := functionBody(node)
 	if body == nil {
 		return nil
@@ -131,8 +141,10 @@ func Lower(node *ast.Node, typeChecker *checker.Checker) *Function {
 	builder := &builder{
 		function:     function,
 		typeChecker:  typeChecker,
+		enclosing:    enclosing,
 		declarations: map[*ast.Symbol]DeclarationId{},
 		identifiers:  map[*ast.Symbol]IdentifierId{},
+		captured:     map[*ast.Symbol]IdentifierId{},
 	}
 
 	entry := function.NewBlock(BlockKindBlock)
@@ -155,6 +167,9 @@ func Lower(node *ast.Node, typeChecker *checker.Checker) *Function {
 	}
 
 	Finalize(function)
+	if enclosing != nil {
+		enclosing.lastNested = builder
+	}
 	return function
 }
 
@@ -167,12 +182,35 @@ type builder struct {
 	// degrades every variable reference to LoadGlobal; see Lower.
 	typeChecker *checker.Checker
 
+	// enclosing is the builder for the function this one is nested inside, or nil at the top.
+	//
+	// It exists so a free identifier can be asked of the enclosing scopes before being declared a
+	// global. See `captureOf`.
+	enclosing *builder
+
 	// declarations maps a source symbol to the binding it names, so two references to the same
 	// variable resolve to one DeclarationId. Symbol identity is the checker's answer to scoping,
 	// which is why this does not implement its own scope tree.
 	declarations map[*ast.Symbol]DeclarationId
 	// identifiers maps a symbol to the value currently held by that binding.
 	identifiers map[*ast.Symbol]IdentifierId
+
+	// lastNested is the builder of the most recently lowered nested function.
+	//
+	// It exists because `lowerNested` returns a `*Function`, which does not carry the symbol->value
+	// map needed to pair captures across the boundary. Handing the builder back through the parent
+	// avoids widening the public return type of `Lower` for a detail no caller outside this package
+	// can use. Read and cleared immediately by `lowerNestedFunction`.
+	lastNested *builder
+
+	// captured maps an enclosing function's symbol to the value THIS function names it by.
+	//
+	// A capture gets a fresh identifier in this function rather than reusing the enclosing one,
+	// because the two functions have separate identifier tables and a Place is only meaningful
+	// against the table of the function holding it. The entry is memoised so that two reads of one
+	// captured binding are the same value here, which is what makes single-assignment form over a
+	// nested function meaningful.
+	captured map[*ast.Symbol]IdentifierId
 
 	// jumps is the stack of enclosing constructs a break or continue can target.
 	jumps []jumpTarget
@@ -272,6 +310,136 @@ func (b *builder) declarationOf(symbol *ast.Symbol) DeclarationId {
 	b.nextDeclaration++
 	b.declarations[symbol] = b.nextDeclaration
 	return b.nextDeclaration
+}
+
+// lowerNestedFunction lowers a function nested in this one and pairs up what it captured.
+//
+// The second result is this function's view of the captures, in the same order as the nested
+// function's `Context`. Index i of the two slices name the same source binding seen from the two
+// sides of the boundary: `Captures[i]` is a value in THIS function's identifier table,
+// `nested.Context[i]` is a value in the nested one's. That pairing is the edge a pass walks to
+// follow a value into a closure, and it is why the order is fixed rather than incidental.
+//
+// A capture the nested function found in a grandparent rather than in this function is re-captured
+// here first, so the chain is complete at every level: an inner arrow reading a variable two
+// functions up produces a capture in the middle function too, and the middle function's own
+// `Context` grows to match. Without that the pairing would name an identifier that does not exist
+// in this function's table.
+func (b *builder) lowerNestedFunction(node *ast.Node) (*Function, []Place) {
+	nested := lowerNested(node, b.typeChecker, b)
+	if nested == nil {
+		return nil, nil
+	}
+
+	nestedBuilder := b.lastNested
+	b.lastNested = nil
+	if nestedBuilder == nil {
+		return nested, nil
+	}
+
+	symbols := nestedBuilder.capturedSymbolsInOrder()
+	captures := make([]Place, 0, len(symbols))
+	for _, symbol := range symbols {
+		if symbol == nil {
+			captures = append(captures, Place{})
+			continue
+		}
+		// The value THIS function names the binding by: a local if this function declared it, or a
+		// capture of its own if an enclosing one did.
+		if identifier, ok := b.identifiers[symbol]; ok {
+			captures = append(captures, Place{Identifier: identifier})
+			continue
+		}
+		if place, ok := b.captureOf(symbol); ok {
+			captures = append(captures, place)
+			continue
+		}
+		captures = append(captures, Place{})
+	}
+	return nested, captures
+}
+
+// captureOf reports whether a symbol names a binding declared in an ENCLOSING function, and if so
+// returns the value this function refers to it by.
+//
+// # Why this replaces a scope walk rather than implementing one
+//
+// Upstream computes captures with a dedicated AST pass, `FindContextIdentifiers`, which maintains
+// its own scope stack and function stack and is 519 lines in the Rust port. That pass exists because
+// Babel and oxc hand it scopes and it must decide, from scope ancestry, whether a reference crosses
+// a function boundary.
+//
+// verify does not need any of it, and the reason was measured rather than assumed. The resident
+// checker returns the SAME `*ast.Symbol` pointer for a declaration and for every reference to it,
+// including references inside a nested function: for `const C = ...; const r = () => <C/>` it
+// answers one distinct symbol across both occurrences. Symbol identity therefore already encodes
+// "same binding" across the boundary, and the enclosing builder's `identifiers` map already records
+// which symbols that function declared. Asking the enclosing builder is the whole algorithm.
+//
+// This is the same trade the package comment makes for type inference: where upstream infers what a
+// checker would know, verify asks the checker. `TestCaptureSymbolIdentityCrossesFunctions` pins the
+// property this rests on, so a checker change that broke it would fail loudly here rather than
+// quietly reverting every capture to a global.
+//
+// # What counts as a capture, and what deliberately does not
+//
+// Only a binding an enclosing LOWERED function declared. A module-scope `const`, an import, and a
+// true global are all absent from every enclosing builder's map and stay `LoadGlobal`, which is the
+// answer the `globals` rule already depends on. The walk goes outward through every enclosing
+// builder, so a binding captured through two function boundaries is found at the depth that
+// declared it.
+func (b *builder) captureOf(symbol *ast.Symbol) (Place, bool) {
+	if symbol == nil || b.enclosing == nil {
+		return Place{}, false
+	}
+	if identifier, ok := b.captured[symbol]; ok {
+		return Place{Identifier: identifier}, true
+	}
+
+	// Find the enclosing function that declared this binding. Nothing about the value it holds
+	// there is copied: only the fact that it is a local of some enclosing function.
+	declaredOutside := false
+	for scope := b.enclosing; scope != nil; scope = scope.enclosing {
+		if _, ok := scope.identifiers[symbol]; ok {
+			declaredOutside = true
+			break
+		}
+	}
+	if !declaredOutside {
+		return Place{}, false
+	}
+
+	// A fresh identifier in THIS function's table, grouped under a declaration of its own. The
+	// declaration is local because DeclarationIds are per-function too, and a pass correlating a
+	// capture with the outer binding does so through `FunctionExpression.Captures`, which pairs the
+	// two places explicitly.
+	name := ""
+	if symbol.Name != "" {
+		name = symbol.Name
+	}
+	identifier := b.function.NewIdentifier(name, nil, 0)
+	b.captured[symbol] = identifier.Id
+	b.function.Context = append(b.function.Context, Place{Identifier: identifier.Id})
+	return Place{Identifier: identifier.Id}, true
+}
+
+// capturedSymbolsInOrder returns the symbols this function captured, in the order first seen.
+//
+// Order is first-encounter rather than map order, because `Function.Context` is built in the same
+// order and the two must correspond index for index: `FunctionExpression.Captures[i]` is the
+// enclosing function's value for `nested.Context[i]`. A Go map cannot supply that, which is the
+// same reason `BasicBlock.Predecessors` is a slice.
+func (b *builder) capturedSymbolsInOrder() []*ast.Symbol {
+	ordered := make([]*ast.Symbol, len(b.function.Context))
+	for symbol, identifier := range b.captured {
+		for index, place := range b.function.Context {
+			if place.Identifier == identifier {
+				ordered[index] = symbol
+				break
+			}
+		}
+	}
+	return ordered
 }
 
 // bind creates a new value for a named binding and records it as that binding's current value.
@@ -1007,7 +1175,7 @@ func isLoopStatement(node *ast.Node) bool {
 }
 
 func (b *builder) lowerFunctionDeclaration(node *ast.Node) {
-	nested := Lower(node, b.typeChecker)
+	nested, captures := b.lowerNestedFunction(node)
 	if nested == nil {
 		return
 	}
@@ -1015,7 +1183,7 @@ func (b *builder) lowerFunctionDeclaration(node *ast.Node) {
 	b.function.Functions = append(b.function.Functions, nested)
 
 	name := functionName(node)
-	value := b.emit(&FunctionExpression{Function: id}, node)
+	value := b.emit(&FunctionExpression{Function: id, Captures: captures}, node)
 	if name != "" {
 		var symbol *ast.Symbol
 		if nameNode := node.Name(); nameNode != nil {

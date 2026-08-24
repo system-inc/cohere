@@ -470,10 +470,33 @@ type Place struct {
 	Range core.TextRange
 }
 
-// Effect is the mutation lattice: what a reference does to the value it names.
+// Effect is what a reference does to the value it names.
 //
-// Ordered from least to most constraining, which is the order a join uses. Nothing computes these
-// yet; lowering leaves every place at EffectUnknown.
+// Nothing computes these yet; lowering leaves every place at EffectUnknown.
+//
+// # This ordering is NOT the lattice an effect inference joins over, and reading it that way is a
+// # trap that was walked into once
+//
+// The declaration order below runs least to most constraining, which reads like the specification
+// for a meet operation. It is not one, and building a dataflow pass whose join is "take the larger
+// Effect" would produce a pass that is self-consistent, passes its own tests, and is wrong.
+//
+// Upstream's effect inference (`InferMutationAliasingEffects`, 3,297 lines) joins over a DIFFERENT
+// and disjoint lattice, `ValueKind`: `Mutable | Frozen | Primitive | MaybeFrozen | Global |
+// Context`. Its join, `mergeValueKinds`, is not a max over an order, because it is not a total
+// order at all: `Frozen` joined with `Mutable` is `MaybeFrozen`, a THIRD element that is neither
+// operand. No ordering of the constants below can express that, so a meet defined over this type
+// cannot be made correct by reordering it.
+//
+// `Effect` is an OUTPUT of that pass, written per reference by `applySignature` once the abstract
+// interpretation has settled what kind of value each place holds. The abstract state is keyed by
+// value, `Effect` is recorded per reference, and the two are different things: a value has one
+// kind at a program point, while the several references to it at that point can read, mutate, and
+// freeze it independently. That is what the `Place` comment means by the effect differing per
+// reference.
+//
+// So a pass filling these in computes a `ValueKind` lattice it must add, and writes `Effect` as a
+// result. See `Reactive` below for the other half, and the package comment for what is not here.
 type Effect uint8
 
 const (

@@ -81,12 +81,26 @@ import "sort"
 // the short version is that SSA over an unresolved function is well-formed, empty of phis, and
 // meaningless.
 //
-// A second limit, inherited from lowering and worth knowing before building on this: a variable a
-// NESTED function closes over is not tracked. `FunctionExpression.Captures` is always empty and the
-// nested body reads the captured name as `LoadGlobal`, so renaming stops at the function boundary.
-// For `let n = 1; const g = () => n; n = 2;` the outer `n` is versioned correctly and `g`'s read of
-// it is not connected to either version. A pass reasoning about what a callback observes must treat
-// that as unknown rather than as a global.
+// # Captures, and what renaming does and does not do at a function boundary
+//
+// A variable a nested function closes over IS tracked: lowering populates `FunctionExpression.
+// Captures` and `Function.Context`, and the nested body reads it as `LoadContext` rather than
+// `LoadGlobal`. `Construct` recurses into nested functions, so both sides are in single-assignment
+// form.
+//
+// What renaming does NOT do is unify the two sides, and a pass must not assume it did. The capture
+// and the captured value are separate identifiers in separate tables, because a `Place` is only
+// meaningful against the table of the function holding it. The edge between them is positional:
+// `FunctionExpression.Captures[i]` is the enclosing function's value and `nested.Context[i]` is the
+// nested function's, naming one source binding from the two sides. A pass following a value into a
+// closure walks that pairing.
+//
+// The capture is bound at the point the closure is CREATED, which is what makes it a value rather
+// than a name. For `let n = 1; if (c) { n = 2; } const g = () => n;` the capture names the phi that
+// merges the two versions, so `g` closes over what actually reaches it. A later write through
+// `StoreContext` is a definition inside the nested function and is versioned there; it is NOT
+// reflected back into the enclosing function's versions, so a pass asking what the OUTER `n` holds
+// after calling `g` must still treat that as unknown.
 func Construct(function *Function) {
 	if function == nil {
 		return
@@ -107,9 +121,15 @@ func Construct(function *Function) {
 
 	// Elimination is part of construction rather than an optional follow-up, because Braun's
 	// placement cannot avoid producing redundant phis and their share is not marginal. Measured over
-	// 1,945 functions of real TypeScript: 21,654 phis before elimination, 2,770 after. Leaving them
-	// in would mean 87% of the merge points a consumer sees are not merges, and every pass above
+	// 1,945 functions of real TypeScript: 24,418 phis before elimination, 2,746 after. Leaving them
+	// in would mean 89% of the merge points a consumer sees are not merges, and every pass above
 	// this would have to re-derive which ones are real.
+	//
+	// Both numbers moved when captures landed (from 21,654 and 2,770), in opposite directions, and
+	// the split is worth knowing. Captures ADD raw phis, because a captured binding is now a real
+	// value that gets merged at every join it crosses rather than an opaque name. They REMOVE
+	// surviving ones, because a variable only reassigned from inside a closure now takes that write
+	// as a `StoreContext` in the nested function instead of leaving the outer versions to be merged.
 	EliminateRedundantPhis(function)
 
 	for _, nested := range function.Functions {
