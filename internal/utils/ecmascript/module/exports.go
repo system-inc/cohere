@@ -110,3 +110,41 @@ func IsExportedByName(modifiers *ast.ModifierList) bool {
 	}
 	return hasExport && !hasDefault
 }
+
+// PositionAfterModifiers returns the position a finding about a declaration should be scanned from,
+// skipping any modifiers that precede the declaration keyword.
+//
+// TypeScript and ESTree disagree about where `export` lives, and that disagreement is a span defect
+// waiting for anyone porting a rule from ESLint. In ESTree an exported function is an
+// `ExportNamedDeclaration` **wrapping** a `FunctionDeclaration`, so a rule reporting the inner
+// declaration points at `function`. In TypeScript there is no wrapper: `export` is a modifier on the
+// declaration itself and is inside its `Pos()`, so the same rule reporting the same conceptual node
+// points at `export`, eight columns to the left.
+//
+// Measured rather than reasoned: `react-component-no-multiple-primary` produced 128 findings on our
+// own tree, matching oxlint's count exactly, and **29 of them pointed at the wrong column**. Every
+// one was an exported function component, every one was column 1 against oxlint's column 8. The
+// counts agreeing is what makes this expensive to notice, since a rule can be right about every file
+// and every line while being wrong about where it points, and no count-based check can see it.
+//
+// This returns a **position to scan from**, not a range, because the caller still has to trim
+// leading trivia the way `rule.TokenRange` does. Returning a raw range here skipped that trimming and
+// moved all 128 findings onto the line of the preceding comment, which is a worse defect than the one
+// being fixed and is why this is shaped as a position.
+//
+// A declaration carrying no modifiers yields its own `Pos()`, so a caller can reach for this
+// unconditionally rather than branching on whether an export is present.
+func PositionAfterModifiers(node *ast.Node) int {
+	if node == nil {
+		return 0
+	}
+	modifiers := node.Modifiers()
+	if modifiers == nil || len(modifiers.Nodes) == 0 {
+		return node.Pos()
+	}
+	last := modifiers.Nodes[len(modifiers.Nodes)-1]
+	if last == nil || last.End() >= node.End() {
+		return node.Pos()
+	}
+	return last.End()
+}

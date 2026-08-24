@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/utils/ecmascript/module"
@@ -250,7 +251,11 @@ func reportComponents(
 	if len(nonSmall) > 1 {
 		primary := nonSmall[0]
 		for _, component := range nonSmall[1:] {
-			ctx.ReportNode(component.node, messageNoMultiplePrimary(
+			// Anchored past the modifiers rather than at the node, because `export` is inside a
+			// TypeScript declaration's own span while ESTree keeps it in a wrapper the original
+			// never reports. Without this, 29 of 128 findings on our tree pointed at column 1
+			// where oxlint points at column 8, with the counts matching exactly.
+			ctx.ReportRange(componentAnchor(ctx, component.node), messageNoMultiplePrimary(
 				primary.lineCount, maximumComponentLines, component.lineCount,
 			))
 		}
@@ -260,7 +265,7 @@ func reportComponents(
 	// of small parts, which is not what this half is about.
 	if len(large) > 0 && len(small) > helperCompanyLimit {
 		for _, component := range small[helperCompanyLimit:] {
-			ctx.ReportNode(component.node, messageTooManyHelpers)
+			ctx.ReportRange(componentAnchor(ctx, component.node), messageTooManyHelpers)
 		}
 	}
 }
@@ -293,4 +298,19 @@ func countCodeLines(ctx rule.Context, sourceLines []string, node *ast.Node) int 
 		codeLines++
 	}
 	return codeLines
+}
+
+// componentAnchor is the range a finding about a component points at: the declaration keyword, past
+// any `export` modifier, with leading trivia trimmed the way `rule.TokenRange` trims it.
+//
+// Both halves are load-bearing and each was established by getting it wrong. Reporting the node
+// itself puts 29 of 128 findings on `export` where oxlint points at `function`. Reporting a raw
+// range past the modifiers fixes those 29 and moves all 128 onto whatever comment precedes the
+// declaration, because a node's `Loc` starts at its trivia rather than at its first token.
+func componentAnchor(ctx rule.Context, node *ast.Node) core.TextRange {
+	position := module.PositionAfterModifiers(node)
+	if ctx.SourceFile == nil {
+		return core.NewTextRange(position, node.End())
+	}
+	return scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, position).WithEnd(node.End())
 }
