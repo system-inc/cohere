@@ -18,6 +18,10 @@ import (
 func init() {
 	rule.Register(
 		rule.Registration{Rule: ForDirection},
+		rule.Registration{
+			Rule:   GetterReturn,
+			Decode: rule.DecodeOptionsInto[GetterReturnOptions](),
+		},
 		rule.Registration{Rule: NoArrayConstructor},
 		rule.Registration{Rule: NoAsyncPromiseExecutor},
 		rule.Registration{Rule: NoCaseDeclarations},
@@ -47,6 +51,10 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoUnusedExpressionsOptions](),
 		},
 		rule.Registration{Rule: NoUnusedPrivateClassMembers},
+		rule.Registration{
+			Rule:   PreferConst,
+			Decode: rule.DecodeOptionsInto[PreferConstOptions](),
+		},
 		rule.Registration{Rule: PreferRestParams},
 		rule.Registration{
 			Rule:   NoConstantBinaryExpression,
@@ -87,6 +95,7 @@ func init() {
 		rule.Registration{Rule: NoInvalidRegexp},
 		rule.Registration{Rule: NoMisleadingCharacterClass},
 		rule.Registration{Rule: NoNonoctalDecimalEscape},
+		rule.Registration{Rule: NoRegexSpaces},
 		rule.Registration{Rule: NoSelfAssign},
 		rule.Registration{Rule: NoSetterReturn},
 		rule.Registration{
