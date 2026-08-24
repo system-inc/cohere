@@ -71,15 +71,23 @@ import (
 //     behaviour. Faithful, not broken, and recorded here so it is not helpfully repaired into a
 //     divergence.
 //
-// # The one place this knowingly under-reports
+// # A JSX tag inside a nested function never reports, and the reason changed under this rule
 //
-// A component captured by a nested function is missed. Upstream flags
-// `const C = makeIt(); const render = () => <C />;` and this does not, because lowering leaves
-// `FunctionExpression.Captures` empty and the nested body reads `C` as a global rather than as the
-// captured value. The gap is in the substrate rather than in this rule, so it is named here and
-// covered by a fixture instead of being worked around: a rule-local approximation of capture would
-// make the two implementations agree on the cases both already handle while disagreeing about why,
-// which costs the differential harness its meaning.
+// `const C = makeIt(); const render = () => <C />;` is silent, and upstream is silent on it too,
+// measured on the exact input. The mechanism is the compilation gate below: the tag lives in a
+// function that is not a unit, and the function that IS a unit does not contain the tag.
+//
+// This comment previously said the silence came from `FunctionExpression.Captures` being empty, so
+// taint could not cross a function boundary at all. That was true when this rule was written and
+// stopped being true one commit later, when lowering learned to resolve a closed-over variable to
+// the binding it captures. Captures now populate and `LoadContext` is emitted. The BEHAVIOUR did
+// not change and neither did the agreement with upstream; only the reason did. It is corrected
+// here rather than left, because a stale reason is worse than no reason: the next reader would
+// have gone looking for a substrate gap that no longer exists.
+//
+// Taint deliberately still does not follow a capture. Nothing in the corpus asks it to, upstream
+// does not do it, and a rule-local approximation would make the two implementations agree on the
+// cases both already handle while disagreeing about why.
 //
 // # One span where upstream has two
 //
@@ -374,14 +382,18 @@ func isCompilationUnit(function *hir.Function) bool {
 //
 // The branch is unreachable for THIS rule. A finding requires a JSX tag naming a tainted value, so
 // every reportable input contains JSX. The question is whether that JSX can be somewhere this walk
-// does not look, and the only such place is inside a nested function. But taint cannot cross into a
-// nested function either, because lowering leaves `FunctionExpression.Captures` empty, so a tag in
-// there can never be tainted from this scope and can never report. The two blind spots are the same
-// blind spot, so no input can exist where the hook half changes the answer.
+// does not look, and the only such place is inside a nested function. A tag there is never reported
+// anyway: the enclosing function is not a compilation unit, so nothing analyses it, and the unit
+// above it does not contain the tag. So no input can exist where the hook half changes the answer.
 //
-// Falsified rather than argued: a component calling `useEffect` whose only JSX sits inside a
-// `.map` callback reports nothing upstream either. A rule that gains capture tracking must revisit
-// this, and the note is here rather than in a commit message for that reason.
+// Falsified rather than argued: a component calling `useEffect` whose only JSX sits inside a `.map`
+// callback reports nothing upstream either, measured on that input.
+//
+// This argument originally rested on captures being untracked, which stopped being true one commit
+// after this rule landed. It was re-run against the new substrate rather than assumed to survive:
+// both probe inputs still report nothing and still agree with upstream, because the gate rather
+// than the capture gap is what makes the branch unreachable. Any change to the compilation gate
+// must revisit this.
 func createsJsx(node *ast.Node) bool {
 	body := functionBodyOf(node)
 	if body == nil {

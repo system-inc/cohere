@@ -110,6 +110,21 @@ func TestStaticComponentsFires(t *testing.T) {
 		{"conditionalAssignment", scConditionalAssignment},
 		{"testerFail", scTesterFail},
 
+		// The tag family beyond the plain case. An identifier tag reports wherever it sits, so
+		// nesting inside an element or a fragment changes nothing; a member tag never reports
+		// however dynamic its base. Measured across six shapes against the release binary, because
+		// one shape is not the family and `<c.x/>` alone could have been declining by accident.
+		{"tagInsideFragment", `function D() {
+  const T = mk();
+  return <><T /></>;
+}
+`},
+		{"tagNestedInElement", `function E() {
+  const T = mk();
+  return <div><T /></div>;
+}
+`},
+
 		// A component created inside a NESTED function still reports, which is what makes the
 		// recursion into `function.Functions` load-bearing rather than tidy. Measured: upstream
 		// reports at the inner `<Component />` on the arrow's own line, so each function is
@@ -257,11 +272,16 @@ function Outer() {
 }
 `},
 
-		// Closure capture, and the one place this port knowingly under-reports. Upstream flags
-		// this; we do not, because `FunctionExpression.Captures` is empty in our lowering and the
-		// nested body reads `C` as a global rather than as the captured value. Stated as a fixture
-		// rather than left undiscovered, so the gap is visible and moves when the substrate does.
-		{"closureCaptureKnownGap", `function Outer() {
+		// A tag inside a nested function, where the enclosing function is not a compilation unit.
+		// Upstream is silent here too, measured on this exact input, so this is agreement rather
+		// than the under-reporting the comment here used to claim.
+		//
+		// The claim was that `FunctionExpression.Captures` was empty so taint could not cross a
+		// function boundary. That was true when this fixture was written and stopped being true one
+		// commit later, when lowering learned to resolve captures. Re-measured rather than left:
+		// captures now populate, this input is still silent, and upstream is still silent, because
+		// what decides it is the compilation gate and not the capture gap.
+		{"tagInsideNonUnitNestedFunction", `function Outer() {
   const C = makeIt();
   const render = () => <C />;
   return render();
