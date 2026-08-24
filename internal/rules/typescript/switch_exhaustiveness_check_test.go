@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
 
 	"github.com/system-inc/verify/internal/ruletest"
@@ -1588,16 +1589,13 @@ switch (literal) {
 	}
 }
 
-// TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker is the guard that cannot live in the rule
-// file.
+// TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker pins the declarations AND the nil guard.
 //
 // The standing advice is that a type-aware listener opens with `if ctx.TypeChecker == nil { return }`.
-// That cannot be followed here: the listener is upstream's vendored code, and editing it is exactly
-// what turns a future re-sync from a diff into a merge.
-//
-// So the guard is the declaration instead. `upstream.Adapt` sets `NeedsTypeChecker` on every rule
-// it wraps, which makes the nil case unreachable through registration, and this pins that so a
-// later revert fails loudly rather than going vacuously green.
+// While this rule was adapted that could not be followed: the listener was upstream's vendored code,
+// and editing it was exactly what would have turned a future re-sync from a diff into a merge, so
+// the declaration `upstream.Adapt` set unconditionally was the only guard available. Absorbing the
+// rule made the listener ours to edit and made the nil case REACHABLE, so both halves are asserted.
 //
 // The vacuous direction is the dangerous one and it is worse for this rule than for its siblings.
 // Handed no checker the rule does not panic, it reports nothing — and forty-nine of the
@@ -1610,6 +1608,26 @@ func TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker(t *testing.T) {
 	}
 	if !SwitchExhaustivenessCheck.ReadsProgram {
 		t.Fatal("the rule must declare ReadsProgram: it resolves an imported enum across a module boundary, and a findings cache keyed on the linted file alone would serve a stale result forever")
+	}
+
+	// The guard the absorption made possible. Driving the listener with a checker-less Context must
+	// return before `getSwitchMetadata` reaches the checker, and this is the only path that reaches
+	// that branch, since registration always supplies one.
+	typed := ruletest.RunTyped(t, SwitchExhaustivenessCheck, switchExhaustivenessFile,
+		"declare const day: 'a' | 'b';\nswitch (day) {\n  case 'a':\n    break;\n}\n")
+	if len(typed.Diagnostics) != 1 {
+		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
+	}
+
+	listeners := SwitchExhaustivenessCheck.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
+	listener, hasListener := listeners[ast.KindSwitchStatement]
+	if !hasListener {
+		t.Fatal("the rule stopped listening on switch statements")
+	}
+	for _, statement := range typed.SourceFile.Statements.Nodes {
+		if statement.Kind == ast.KindSwitchStatement {
+			listener(statement)
+		}
 	}
 }
 

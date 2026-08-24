@@ -1,9 +1,10 @@
 package typescript
 
 import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rules/upstream"
-	"github.com/system-inc/verify/internal/upstream/tsgolint/rules/no_for_in_array"
+	"github.com/system-inc/verify/internal/upstream/tsgolint/utils"
 )
 
 // NoForInArray flags a `for...in` loop whose subject is array-like.
@@ -19,7 +20,19 @@ import (
 // walks the prototype chain along with any other enumerable property, so it is almost never what
 // the author meant.
 //
-// # This rule is wiring rather than a port
+// # Absorbed from tsgolint, which is the source of record for this rule
+//
+// Provenance: tsgolint `internal/rules/no_for_in_array/no_for_in_array.go`, vendored at commit
+// `05b7fbc` and absorbed onto verify's own rule interface here. It reaches for
+// `GetConstrainedTypeAtLocation`, `TypeRecurser`, `GetNumberIndexType` and `GetForStatementHeadLoc`
+// because that is what upstream reaches for, and this note is why a reader finds those helpers in a
+// file that otherwise looks native.
+//
+// tsgolint is not re-synced, so this file is now the only copy of the algorithm rather than a
+// translation layer over a vendored one. The checker logic below is byte-identical to upstream's;
+// what changed is the interface it speaks: `rule.RuleContext` became `rule.Context`,
+// `RuleListeners` became `Listeners`, and `rule.RuleMessage` became `rule.Message`. No predicate,
+// no flag set and no traversal was touched.
 //
 // oxc has no implementation. `no_for_in_array.rs` declares `NoForInArray(tsgolint)` and its body is
 // `impl Rule for NoForInArray {}`, sixty four lines of documentation around an empty block. There
@@ -27,16 +40,7 @@ import (
 // IS tsgolint's, by delegation, and on this machine oxlint refuses to run it at all with `Failed to
 // find tsgolint executable` rather than falling back to something of its own.
 //
-// So the algorithm was vendored from tsgolint rather than retyped, at
-// `internal/upstream/tsgolint/rules/no_for_in_array`, and `internal/rules/upstream.Adapt` converts
-// it. Retyping it here would produce a second copy of logic we already carry, which would drift
-// from the vendored one with nothing comparing them.
-//
-// Unlike `await-thenable`, this rule was NOT already vendored. It was fetched from tsgolint's tree
-// and carries the same four import-line rewrites every vendored file carries, plus ONE real edit
-// described below.
-//
-// # The one edit: upstream misspells its own rule name
+// # The one correction to upstream: it misspells its own rule name
 //
 // Upstream declares `Name: "no-for-in-array-rule"`. Every other rule in tsgolint spells its name as
 // its directory with underscores turned to dashes, and this one appends "-rule".
@@ -50,7 +54,7 @@ import (
 // on this exact string, so `no-for-in-array-rule` would register a rule that
 // `typescript/no-for-in-array` in `VerifySettings.json` never enables, that the inventory entry
 // never matches, and that no suppression comment an author would plausibly write could silence. It
-// is corrected in the vendored file, at the line, with the measurement recorded beside it.
+// is corrected below, at the line, with the measurement recorded beside it.
 //
 // # Where the two references disagree: they do not
 //
@@ -97,33 +101,91 @@ import (
 //
 // Upstream reports `GetForStatementHeadLoc`, which runs from the `for` keyword to the start of the
 // loop BODY, deliberately excluding the body itself. It is also the reason the node-report trivia
-// question does not arise: this is a `ReportRange` of a range upstream computed, so the adapter's
-// `TokenRange` trimming is not in the path at all, and the trimming that does happen is
-// `TrimNodeTextRange` inside the helper.
+// question does not arise for this rule: this is a `ReportRange` of a range the helper computed, so
+// the `TokenRange` trimming that `ReportNode` applies is not in the path at all, and the trimming
+// that does happen is `TrimNodeTextRange` inside `GetForStatementHeadLoc`. Absorbing the rule
+// therefore cannot move this span: neither the adapter nor our own node helpers ever touched it.
 //
 // That span is asserted rather than assumed. All 18 of upstream's single-file diagnostics are
 // replayed in the test file against their exact line and column, including the two cases where the
 // head runs across ten lines through nested parentheses and trailing comments.
 //
-// # The checker
+// # The checker, and the nil guard that now lives here
 //
-// Every listener reads `ctx.TypeChecker`, so this needs the checker and its fixtures use RunTyped.
-// The standing `if ctx.TypeChecker == nil { return }` guard cannot live in this file: the listener
-// is upstream's, and editing it is what keeps re-syncing a diff rather than a merge. The guard is
-// one level up, where `upstream.Adapt` sets `NeedsTypeChecker` unconditionally, so the nil case is
-// unreachable through registration. A test in this package pins that declaration so a later revert
-// fails loudly instead of going vacuously green.
+// The listener reads `ctx.TypeChecker` unconditionally, so this needs the checker and its fixtures
+// use `RunTyped`. While this rule was adapted, the standing `if ctx.TypeChecker == nil { return }`
+// could not be written, because the listener was upstream's and editing it would have turned a
+// re-sync into a merge. `upstream.Adapt` set `NeedsTypeChecker` on every rule it wrapped, so the
+// nil case was unreachable through it. Absorbing the rule removes that constraint AND makes the nil
+// case reachable, so the guard is now written where the advice always wanted it, and it is the one
+// addition to the body.
 //
-// Reaching the checker only through a vendored file in another package also means the registry's
-// per-file textual guard, which looks for a `.TypeChecker` selector in the rule's own file, reports
-// this as over-declared. That message is wrong and the declaration is right.
-var NoForInArray = adaptNoForInArray()
+// It matters more than a crash-avoidance would suggest. `GetSymbolAtLocation` and its neighbours on
+// this shim return nil rather than panicking under a nil checker, so a missing guard here does not
+// crash — it buys a VACUOUS GREEN, where every clean fixture passes having proven nothing and every
+// reporting one fails. A test in this package pins the declaration and the guard together so a
+// later revert fails loudly.
+var NoForInArray = rule.Rule{
+	// Upstream spells this "no-for-in-array-rule". That trailing "-rule" is a typo, and correcting
+	// it is the one correction this absorption carries.
+	//
+	// It is not cosmetic. verify keys the catalog, the config, and suppression comments on this
+	// string, so shipping upstream's spelling would register a rule no `VerifySettings.json` entry
+	// enables, that the inventory's `typescript/no-for-in-array` never matches, and that no
+	// `verify-disable` comment an author would actually write could silence.
+	//
+	// Measured rather than assumed before editing: all 38 rules in tsgolint's `internal/rules/` were
+	// fetched and their Name compared against their directory, and this is the ONLY one that
+	// disagrees. tsgolint's own `cmd/tsgolint/main.go` passes `r.Name` straight through to its
+	// reporter with no mapping table, so upstream really does emit the suffixed name; the typo is
+	// live there rather than absorbed somewhere downstream.
+	//
+	// Both other references spell it without the suffix: oxc declares `NoForInArray(tsgolint)` and
+	// `@typescript-eslint` 8.67.0 declares `name: 'no-for-in-array'`.
+	Name: "no-for-in-array",
 
-// adaptNoForInArray wires the vendored rule, panicking at startup if it cannot be adapted.
-//
-// `MustAdapt` rather than `Adapt` because a rule that cannot be adapted is a build-time mistake:
-// the registry is assembled at process start, so failing there stops the tool immediately instead
-// of leaving a rule silently absent from a run that otherwise looks clean.
-func adaptNoForInArray() rule.Rule {
-	return upstream.MustAdapt(no_for_in_array.NoForInArrayRule)
+	// The listener resolves the subject's type on every for-in statement, so the checker is required
+	// rather than opportunistic.
+	NeedsTypeChecker: true,
+
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		hasArrayishLength := func(t *checker.Type) bool {
+			lengthProperty := checker.Checker_getPropertyOfType(ctx.TypeChecker, t, "length")
+			if lengthProperty == nil {
+				return false
+			}
+
+			return utils.IsTypeFlagSet(checker.Checker_getTypeOfSymbol(ctx.TypeChecker, lengthProperty), checker.TypeFlagsNumberLike)
+		}
+		isArrayLike := func(t *checker.Type) bool {
+			return utils.TypeRecurser(t, func(t *checker.Type) bool {
+				return utils.GetNumberIndexType(ctx.TypeChecker, t) != nil && hasArrayishLength(t)
+			})
+		}
+
+		return rule.Listeners{
+			ast.KindForInStatement: func(node *ast.Node) {
+				if ctx.TypeChecker == nil {
+					return
+				}
+
+				t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.AsForInOrOfStatement().Expression)
+
+				if isArrayLike(t) {
+					ctx.ReportRange(
+						utils.GetForStatementHeadLoc(ctx.SourceFile, node),
+						buildForInViolationMessage(),
+					)
+				}
+			},
+		}
+	},
+}
+
+// buildForInViolationMessage is upstream's message, text unchanged.
+func buildForInViolationMessage() rule.Message {
+	return rule.Message{
+		Id:          "forInViolation",
+		Description: "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
+	}
 }

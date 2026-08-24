@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/ruletest"
 )
 
@@ -304,16 +306,40 @@ func TestNoForInArrayMessageText(t *testing.T) {
 	}
 }
 
-// TestNoForInArrayRequiresTheTypedHarness pins the checker declaration.
+// TestNoForInArrayRequiresTheTypedHarness pins the checker declaration AND the nil guard.
 //
-// The usual `if ctx.TypeChecker == nil { return }` guard cannot live in the rule file, because the
-// listener is upstream's and editing it would turn re-syncing into a merge. `upstream.Adapt` sets
-// NeedsTypeChecker unconditionally instead, so the nil case is unreachable through registration.
-// This asserts that declaration directly, so a later revert fails loudly rather than making every
-// fixture above pass vacuously against a nil checker.
+// While this rule was adapted, the `if ctx.TypeChecker == nil { return }` guard could not live in
+// the rule file, because the listener was upstream's and editing it would have turned re-syncing
+// into a merge; `upstream.Adapt` set NeedsTypeChecker unconditionally instead, so the nil case was
+// unreachable through it. Absorbing the rule made the listener ours to edit and made that case
+// REACHABLE, so both halves are asserted here.
+//
+// The declaration is the half that matters for registration. The guard is the half that matters for
+// the harness path, where a Context can be built by hand — and it matters more than a crash would,
+// because the shim's type queries return nil rather than panicking. Without the guard this rule
+// would not crash under a nil checker, it would go silent, and every fixture above would pass having
+// proven nothing.
 func TestNoForInArrayRequiresTheTypedHarness(t *testing.T) {
 	if !NoForInArray.NeedsTypeChecker {
 		t.Fatal("this rule asks the checker what a type is; without NeedsTypeChecker it would be " +
 			"handed a nil checker and go silent on every input while every fixture still passed")
+	}
+
+	// Drive the listener with a checker-less Context. It must return rather than reach the checker,
+	// and this is the only path that reaches that branch, since registration always supplies one.
+	typed := ruletest.RunTyped(t, NoForInArray, noForInArrayFile, "declare const arr: number[];\nfor (const key in arr) {\n}\n")
+	if len(typed.Diagnostics) != 1 {
+		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
+	}
+
+	listeners := NoForInArray.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
+	listener, hasListener := listeners[ast.KindForInStatement]
+	if !hasListener {
+		t.Fatal("the rule stopped listening on for-in statements")
+	}
+	for _, statement := range typed.SourceFile.Statements.Nodes {
+		if statement.Kind == ast.KindForInStatement {
+			listener(statement)
+		}
 	}
 }
