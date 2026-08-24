@@ -35,6 +35,7 @@ func init() {
 		rule.Registration{Rule: ForwardRefUsesRef},
 		rule.Registration{Rule: Gating, Decode: rule.DecodeOptionsInto[GatingOptions]()},
 		rule.Registration{Rule: Globals},
+		rule.Registration{Rule: Immutability},
 		rule.Registration{Rule: IncompatibleLibrary},
 		rule.Registration{Rule: JsxNoDuplicateProps},
 		rule.Registration{Rule: JsxNoUndef},
