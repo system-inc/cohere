@@ -35,6 +35,10 @@ func init() {
 		rule.Registration{Rule: NoCaller},
 		rule.Registration{Rule: NoControlRegex},
 		rule.Registration{Rule: NoDupeClassMembers},
+		rule.Registration{
+			Rule:   NoFallthrough,
+			Decode: rule.DecodeOptionsInto[NoFallthroughOptions](),
+		},
 		rule.Registration{Rule: NoImportAssign},
 		rule.Registration{
 			Rule:   NoIrregularWhitespace,
