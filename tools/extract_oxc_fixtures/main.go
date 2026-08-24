@@ -390,11 +390,25 @@ func readTesterBlocks(source string) []corpus {
 		segment := source[start:location[1]]
 		trailing := source[location[1]:end]
 
+		pass, fail := readVector(segment, "let pass"), readVector(segment, "let fail")
+
+		// A block can pass its vectors inline as arguments rather than binding them to `let` first,
+		// and reading only the `let` form reports such a block as zero pass and zero fail. That is a
+		// silent zero inside the tool built to refuse silent zeros: `no-irregular-whitespace`'s
+		// second block holds two regression cases and this reported none, which a porter caught only
+		// because a research pass had counted them by hand.
+		//
+		// The inline form is the two `vec![...]` arguments of the `Tester::new` call itself, so it is
+		// read from the call rather than from the text preceding it.
+		if len(pass) == 0 && len(fail) == 0 {
+			pass, fail = readInlineVectors(source[location[0]:end])
+		}
+
 		blocks = append(blocks, corpus{
 			blockIndex:  index + 1,
 			snapshotted: strings.Contains(trailing, "test_and_snapshot"),
-			pass:        readVector(segment, "let pass"),
-			fail:        readVector(segment, "let fail"),
+			pass:        pass,
+			fail:        fail,
 		})
 	}
 	return blocks
@@ -722,4 +736,30 @@ func countFixVector(source string) int {
 		return 0
 	}
 	return len(readTuples(body))
+}
+
+// readInlineVectors reads the pass and fail vectors a Tester::new call passes as arguments.
+//
+// `Tester::new(NAME, PLUGIN, vec![...], vec![...])` rather than the usual form that binds them to
+// `let pass` and `let fail` first. The two vectors are the third and fourth arguments, so this takes
+// the first two `vec![` occurrences inside the call and reads each as a case list.
+func readInlineVectors(call string) (pass []fixtureCase, fail []fixtureCase) {
+	remaining := call
+	for index := 0; index < 2; index++ {
+		marker := strings.Index(remaining, "vec![")
+		if marker < 0 {
+			return pass, fail
+		}
+		body, ok := balancedSlice(remaining[marker+len("vec!"):], '[', ']')
+		if !ok {
+			return pass, fail
+		}
+		if index == 0 {
+			pass = readTuples(body)
+		} else {
+			fail = readTuples(body)
+		}
+		remaining = remaining[marker+len("vec!")+len(body):]
+	}
+	return pass, fail
 }
