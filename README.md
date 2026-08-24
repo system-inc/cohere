@@ -24,6 +24,13 @@ scratch on every run, once per shard.
 - [typescript-eslint/tsgolint](https://github.com/typescript-eslint/tsgolint) — MIT. The shim
   generator and the type-aware rule catalog. We do not fork it: its architecture is one-shot and
   stateless by design, which is precisely what we are replacing.
+- [web-infra-dev/rslint](https://github.com/web-infra-dev/rslint) — MIT, copyright Bytedance Inc and
+  typescript-eslint contributors. Its `internal/utils/cfg` is vendored at
+  `internal/utils/controlflow`: a basic-block control-flow graph with dominators, reachability, and
+  correct `try`/`catch`/`finally` edges, built on the same typescript-go AST we use. Vendored rather
+  than depended on, because it is a package rather than a library and we change it when we change a
+  shared decision. The header on `internal/utils/controlflow/cfg.go` names the commit and what was
+  changed.
 
 ## Development
 
