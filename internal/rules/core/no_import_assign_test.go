@@ -213,6 +213,28 @@ func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
 		{"a shorthand destructuring target on a default import",
 			"import mod from 'mod'; ({mod} = foo)", []string{"mod"}},
 
+		// A parenthesis directly around a namespace member write. The climb passes through the
+		// paren and then compared a wrapped child against an unwrapped left, so every one of these
+		// read as a read. All four throw a TypeError at runtime, which is the whole subject of the
+		// rule: a module namespace object is sealed and its properties are non-writable.
+		//
+		// Nothing in either corpus covers them, and it is structural rather than an oversight:
+		// parentheses are a real node in typescript-go and absent from ESTree, so no imported
+		// fixture can contain one. `no-class-assign` hit the identical defect on a plain assignment
+		// target and fixed it the same way; this rule inherited that climb before the fix and kept
+		// it after that rule moved onto the shelf.
+		//
+		// The span is the member expression rather than the parenthesis, matching the unwrapped
+		// spelling, which is why these assert spans rather than counts.
+		{"a parenthesized namespace member write",
+			"import * as mod from 'mod'; (mod.named) = 0", []string{"mod.named"}},
+		{"a doubly parenthesized namespace member write",
+			"import * as mod from 'mod'; ((mod.named)) = 0", []string{"mod.named"}},
+		{"a parenthesized computed namespace member write",
+			"import * as mod from 'mod'; (mod['named']) = 0", []string{"mod['named']"}},
+		{"a parenthesized delete of a namespace member",
+			"import * as mod from 'mod'; delete (mod.named)", []string{"mod.named"}},
+
 		// Two imports in one file. Cheap coverage that the anchor set is per declaration.
 		{"one write with two named imports in the file",
 			"import {a} from 'x'; import {b} from 'y'; b = 0", []string{"b"}},

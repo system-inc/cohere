@@ -348,7 +348,23 @@ func isWriteTarget(member *ast.Node) bool {
 			// (`mod.named.prop`), a plain expression statement. None of them writes.
 			return false
 		}
-		child = parent
+		// Advance unwrapped. Every arm above compares against `ast.SkipParentheses(...)` of the
+		// parent's own operand, which yields the member expression rather than the parenthesis
+		// around it, so carrying a `KindParenthesizedExpression` up as `child` makes every one of
+		// those comparisons fail. `(mod.named) = 0` is a write and was read as a read before this
+		// line existed, and so were `((mod.named)) = 0`, `(mod['named']) = 0` and
+		// `delete (mod.named)`. All four throw a TypeError at runtime, which is the whole subject
+		// of this rule.
+		//
+		// Neither upstream's corpus nor ours had a parenthesized namespace write, which is why it
+		// shipped silently: parentheses are a real node here and absent from ESTree, so no imported
+		// corpus can contain one. `no-class-assign` hit the same defect on a plain assignment
+		// target, fixed it the same way, and recorded it at its own line; that climb has since been
+		// replaced by `reference.WritesToBinding`, which walks parentheses, so this was the last
+		// hand-rolled climb still carrying the bug. The rebinding half of this rule already routes
+		// through the shelf and was never affected, which is why `(mod) = 0` reported while
+		// `(mod.named) = 0` did not.
+		child = ast.SkipParentheses(parent)
 	}
 	return false
 }
