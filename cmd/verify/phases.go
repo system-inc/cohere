@@ -11,9 +11,10 @@ import (
 type phaseName string
 
 const (
-	phaseFix   phaseName = "fix"
-	phaseTypes phaseName = "types"
-	phaseLint  phaseName = "lint"
+	phaseFix    phaseName = "fix"
+	phaseTypes  phaseName = "types"
+	phaseLint   phaseName = "lint"
+	phaseUnused phaseName = "unused"
 )
 
 // phaseOrder is the pipeline, and the order is the design rather than a convenience.
@@ -28,7 +29,28 @@ const (
 // against wrong semantics are noise a reader has to re-read after fixing the real problem — one type
 // error alone at the top beats one type error buried under a hundred style findings in a file that
 // does not compile.
-var phaseOrder = []phaseName{phaseFix, phaseTypes, phaseLint}
+//  5. unused           a report, opt-in, and never part of the gate
+//
+// Unused runs last and only when asked for. It is the one phase a bare `verify` does not run, and
+// that break from the other three is deliberate: the first three answer "is this correct", which
+// nobody should have to opt into, while unused answers "is this still wanted", which is a question
+// with no right answer that a build can enforce. An export held for an external consumer is unused
+// and correct. So it reports, it never fails a build on its own account, and it stays out of the
+// way of the gate people run a hundred times a day.
+//
+// It runs after types for a hard reason rather than a tidy one. The reference analysis is keyed on
+// symbol identity, and a tree that does not type-check has unresolved symbols, which read as
+// "nothing references this". Reporting live code as unused because the build was broken is the
+// failure mode that gets a report closed and never reopened, so the phase states loudly when it ran
+// without a clean type check rather than quietly producing a longer list.
+var phaseOrder = []phaseName{phaseFix, phaseTypes, phaseLint, phaseUnused}
+
+// optInPhases are the phases a bare `verify` does not run.
+//
+// Kept as a set rather than a comparison against phaseUnused so that a second opt-in phase does not
+// have to rediscover every place the distinction matters. Three places consult it today, and a
+// fourth phase added without noticing all three would be reported wrongly in one of them.
+var optInPhases = map[phaseName]bool{phaseUnused: true}
 
 // phaseOutcome is what happened to one phase.
 type phaseOutcome string
@@ -91,12 +113,29 @@ func (r *pipelineReport) record(name phaseName, outcome phaseOutcome, elapsed ti
 	})
 }
 
+// requested records which phases the caller actually asked for.
+//
+// Only consulted for the opt-in phases. A phase that runs by default is always "requested" in the
+// sense that matters here: nobody had to ask, so being cut off by a bail is always a gap.
+type requestedPhases map[phaseName]bool
+
 // markRemainingNotReached fills in every phase after the one that bailed.
 //
 // Called at the bail rather than left implicit, because a phase that is simply absent from the
 // report is indistinguishable from one the reporter forgot. Every phase in the pipeline appears in
 // every run's output, with a stated outcome.
+//
+// An opt-in phase nobody asked for is recorded as skipped rather than as not reached, and the
+// distinction is the same one this whole file exists to preserve. "Did not run because types
+// bailed" tells the reader something was taken from them; "not requested" tells them nothing was.
+// Printing the first when the second is true manufactures a gap out of an ordinary run, which is
+// the mirror image of the silent-green failure and just as misleading.
 func (r *pipelineReport) markRemainingNotReached(bailedAt phaseName, reason string) {
+	r.markRemainingNotReachedFor(bailedAt, reason, nil)
+}
+
+// markRemainingNotReachedFor is markRemainingNotReached told which opt-in phases were asked for.
+func (r *pipelineReport) markRemainingNotReachedFor(bailedAt phaseName, reason string, requested requestedPhases) {
 	reached := false
 	for _, name := range phaseOrder {
 		if name == bailedAt {
@@ -107,6 +146,11 @@ func (r *pipelineReport) markRemainingNotReached(bailedAt phaseName, reason stri
 			continue
 		}
 		if r.has(name) {
+			continue
+		}
+		// An opt-in phase nobody named was not deprived of anything by the bail.
+		if optInPhases[name] && !requested[name] {
+			r.record(name, outcomeSkipped, 0, "not requested — this is a report, ask for it with --unused")
 			continue
 		}
 		r.record(name, outcomeNotReached, 0, fmt.Sprintf("%s bailed: %s", bailedAt, reason))
@@ -141,7 +185,18 @@ func (r *pipelineReport) checkedEverything() bool {
 		}
 		// A reporting phase that never ran is a hole in the verdict. Fix is exempt when it was
 		// skipped on purpose: declining to mutate withholds no finding.
-		if record.Outcome == outcomeSkipped && record.Name != phaseFix {
+		//
+		// Unused is exempt for a different reason, and it is worth stating rather than folding into
+		// the same clause. Fix is exempt because skipping it withholds no finding; unused withholds
+		// findings by definition when it is skipped. It is exempt because being absent is its NORMAL
+		// state — it is opt-in, so a bare `verify` skips it every time, and a coverage warning that
+		// fires on every ordinary run is one people learn to stop reading. That would cost exactly
+		// the case the warning exists for.
+		//
+		// What keeps this honest is that the phase line still prints `unused skipped (not
+		// requested)` on every run, so the absence is stated even though it is not warned about. The
+		// warning is for a gap somebody did not choose; this one is chosen by default.
+		if record.Outcome == outcomeSkipped && record.Name != phaseFix && !optInPhases[record.Name] {
 			return false
 		}
 	}

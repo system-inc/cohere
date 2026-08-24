@@ -24,6 +24,7 @@ import (
 	"github.com/system-inc/verify/internal/registry"
 	"github.com/system-inc/verify/internal/release"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/unused"
 )
 
 // processStart is stamped before anything else runs, so the phase line can say how much of the run
@@ -59,6 +60,8 @@ func run() error {
 	maxFixPasses := flag.Int("fix-passes", fix.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
+	unusedReport := flag.Bool("unused", false, "report code that was written and never used: unreferenced exports, and statements nothing can reach")
+	unusedAll := flag.Bool("unused-all", false, "with --unused, list the findings already marked verify-keep rather than only counting them")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -108,6 +111,26 @@ func run() error {
 	runFix := *fixOnly || !anyPhaseNamed
 	runTypes := *typesOnly || !anyPhaseNamed
 	runLint := *lintOnly || !anyPhaseNamed
+
+	// `--unused` is the one phase a bare `verify` does not run, and it is deliberately absent from
+	// `anyPhaseNamed` above rather than folded into it.
+	//
+	// Two separate things follow from that, and both are the point. It does not run unless named, so
+	// the gate people run constantly stays the correctness gate and nothing else. And naming it does
+	// not narrow the run the way `--lint` does — `verify --unused` still fixes, type-checks, and
+	// lints, because unused leans on the type graph being sound and a narrowing flag would encourage
+	// running it against a tree whose symbols do not resolve.
+	//
+	// The reason it is opt-in rather than merely quiet: this is a report someone asks for, not part
+	// of the correctness gate. An export kept for an external consumer is unused and correct, so
+	// there is no answer here a build can enforce, and a phase that cannot fail honestly should not
+	// be in the path of a phase that can.
+	runUnused := *unusedReport || *unusedAll
+
+	// Carried to every bail site so an opt-in phase that was genuinely cut off reads differently
+	// from one nobody asked for. Without it a bail prints "unused did not run (types bailed)" on
+	// every ordinary run, which manufactures a gap out of a run where nothing was withheld.
+	unusedRequest := requestedPhases{phaseUnused: runUnused}
 
 	// `--no-fix` mutates nothing, which is what continuous integration needs and what anyone asking
 	// "what would this change" needs. It wins over `--fix` rather than erroring, because the safe
@@ -249,7 +272,7 @@ func run() error {
 			// that cannot write a parseable file means the edit was malformed and everything after it
 			// is meaningless, so the pipeline stops and says which phases never ran.
 			report.record(phaseFix, outcomeRan, fixDuration, "")
-			report.markRemainingNotReached(phaseFix, err.Error())
+			report.markRemainingNotReachedFor(phaseFix, err.Error(), unusedRequest)
 			report.Write(os.Stdout)
 			return fmt.Errorf("fix: %w", err)
 		}
@@ -268,7 +291,7 @@ func run() error {
 		if fixSummary.FilesChanged > 0 && (runTypes || runLint) {
 			rebuiltGraph, rebuildDuration, err := rebuildGraph(*configFileName, *directory, *singleThreaded, lintConfig)
 			if err != nil {
-				report.markRemainingNotReached(phaseFix, fmt.Sprintf("the graph could not be rebuilt after fixing: %v", err))
+				report.markRemainingNotReachedFor(phaseFix, fmt.Sprintf("the graph could not be rebuilt after fixing: %v", err), unusedRequest)
 				report.Write(os.Stdout)
 				return fmt.Errorf("rebuilding the type graph after fixing: %w", err)
 			}
@@ -307,9 +330,10 @@ func run() error {
 		// Bailing here is only honest because the phase line says lint did not run. Without it, a
 		// bailed run and a clean lint print the same absence of findings.
 		if len(typeDiagnostics) > 0 && runLint {
-			report.markRemainingNotReached(
+			report.markRemainingNotReachedFor(
 				phaseTypes,
 				fmt.Sprintf("%d type diagnostics — lint findings against wrong semantics are noise", len(typeDiagnostics)),
+				unusedRequest,
 			)
 			report.Write(os.Stdout)
 			os.Exit(1)
@@ -376,6 +400,43 @@ func run() error {
 		}
 
 		report.record(phaseLint, outcomeRan, lintDuration, "")
+	}
+
+	// Phase 5: unused. A report, run only when asked for, and never a reason to fail a build.
+	if !runUnused {
+		report.record(phaseUnused, outcomeSkipped, 0, "not requested — this is a report, ask for it with --unused")
+	} else {
+		unusedStart := time.Now()
+
+		// The honest statement about what the findings are worth. The reference analysis is keyed on
+		// symbol identity, so unresolved symbols read as "nothing references this" and a broken build
+		// produces a longer report rather than an error. Saying so beside the findings is the whole
+		// difference between a report a reader can calibrate and one that quietly misleads.
+		//
+		// It is a warning rather than a refusal because the reachability half needs no types at all
+		// and is fully trustworthy either way, so refusing to run would withhold good findings over a
+		// caveat that only applies to the other half.
+		if !runTypes {
+			fmt.Printf(
+				"\nunused: types did not run, so the reference half of this report is UNRELIABLE — " +
+					"unresolved symbols look exactly like unreferenced ones. The unreachable half " +
+					"below needs no types and is unaffected.\n",
+			)
+		}
+
+		unusedResult, err := unused.Run(ctx, graph, projectFiles)
+		if err != nil {
+			return fmt.Errorf("running the unused report: %w", err)
+		}
+		unusedDuration := time.Since(unusedStart)
+
+		unused.Write(os.Stdout, unusedResult, *unusedAll)
+
+		// Deliberately NOT added to `findings`. The exit code is the gate's verdict, and this phase
+		// is not part of the gate: an export held for an external consumer is unused and correct, so
+		// failing a build over it would make the report something people route around rather than
+		// read.
+		report.record(phaseUnused, outcomeRan, unusedDuration, "")
 	}
 
 	// The phase line prints on every run, success included. A run that checked nothing must not be

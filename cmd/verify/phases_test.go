@@ -42,10 +42,54 @@ func TestABailNamesTheUnreachedPhasesAndWarns(t *testing.T) {
 	report.markRemainingNotReached(phaseTypes, "4 type diagnostics")
 
 	got := render(report)
-	want := "phases: fix ran in 4ms · types ran in 12ms · lint did not run (types bailed: 4 type diagnostics)\n" +
+	// Unused reads as skipped rather than as not reached, because nobody asked for it here. A bail
+	// takes nothing from an opt-in phase that was never requested, and saying it did would
+	// manufacture a gap out of an ordinary run.
+	want := "phases: fix ran in 4ms · types ran in 12ms · lint did not run (types bailed: 4 type diagnostics)" +
+		" · unused skipped (not requested — this is a report, ask for it with --unused)\n" +
 		"  this run did not check everything — the phases above say what was not checked\n"
 	if got != want {
 		t.Fatalf("the bail line reads wrong:\n  want %q\n  got  %q", want, got)
+	}
+}
+
+// An opt-in phase the caller DID ask for and that a bail then cut off is a real gap, and must read
+// as one.
+//
+// This is the other half of the distinction above, and it is the half that would be easy to lose:
+// exempting unused from the coverage warning is correct when nobody asked for it and wrong when
+// somebody did. Somebody who typed --unused and got no report has had something withheld.
+func TestARequestedUnusedPhaseCutOffByABailIsAGap(t *testing.T) {
+	report := &pipelineReport{}
+	report.record(phaseFix, outcomeRan, 4*time.Millisecond, "")
+	report.record(phaseTypes, outcomeRan, 12*time.Millisecond, "")
+	report.markRemainingNotReachedFor(phaseTypes, "4 type diagnostics", requestedPhases{phaseUnused: true})
+
+	got := render(report)
+	if !strings.Contains(got, "unused did not run (types bailed: 4 type diagnostics)") {
+		t.Fatalf("a requested unused phase that was cut off did not read as cut off: %q", got)
+	}
+	if !warnsAboutCoverage(got) {
+		t.Fatalf("a requested phase that was withheld did not warn about coverage: %q", got)
+	}
+}
+
+// A bare run must not warn merely because unused was not requested, or the warning appears on every
+// ordinary run and people stop reading it — which costs exactly the case it exists for.
+func TestAnUnrequestedUnusedPhaseDoesNotWarn(t *testing.T) {
+	report := &pipelineReport{}
+	report.record(phaseFix, outcomeRan, time.Millisecond, "")
+	report.record(phaseTypes, outcomeRan, time.Millisecond, "")
+	report.record(phaseLint, outcomeRan, time.Millisecond, "")
+	report.record(phaseUnused, outcomeSkipped, 0, "not requested")
+
+	got := render(report)
+	if warnsAboutCoverage(got) {
+		t.Fatalf("an ordinary run warned about coverage because unused was not requested: %q", got)
+	}
+	// The absence is still stated, which is what keeps the exemption honest.
+	if !strings.Contains(got, "unused skipped") {
+		t.Fatalf("the phase line did not state that unused was skipped: %q", got)
 	}
 }
 
