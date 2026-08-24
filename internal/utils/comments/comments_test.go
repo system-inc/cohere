@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/system-inc/verify/internal/rule"
 )
 
 // parseForComments parses source text the way the rule harness does, so the comment scan is proven
@@ -259,5 +260,108 @@ func TestCommentContentLines(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestLeadingRunFor covers the run-detection a rule reimplemented before this existed.
+func TestLeadingRunFor(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		sourceText string
+		want       []string
+	}{
+		{
+			"a single line comment",
+			"// one\nlet value = 1;",
+			[]string{"// one"},
+		},
+		{
+			// The whole run, because only its first line has to carry a claim a rule is checking.
+			"a run of line comments",
+			"// one\n// two\n// three\nlet value = 1;",
+			[]string{"// one", "// two", "// three"},
+		},
+		{
+			// A blank line ends a passage, so only what follows it belongs to the node.
+			"a blank line breaks the run",
+			"// far\n\n// near\nlet value = 1;",
+			[]string{"// near"},
+		},
+		{
+			// A block comment holds its whole text in one node, so it ends any run above it.
+			"a block comment ends the run",
+			"// above\n/* block */\nlet value = 1;",
+			[]string{"/* block */"},
+		},
+		{
+			"a block comment alone",
+			"/* block */\nlet value = 1;",
+			[]string{"/* block */"},
+		},
+		{
+			// Code between the comment and the node means the comment belongs to that code.
+			"code between the comment and the node",
+			"// far\nlet other = 0;\nlet value = 1;",
+			nil,
+		},
+		{
+			// A comment on the same line as the node is trailing rather than leading.
+			"a trailing comment on the same line",
+			"let value = 1; // trailing",
+			nil,
+		},
+		{
+			"no comment at all",
+			"let value = 1;",
+			nil,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := leadingRunTextsFor(t, testCase.sourceText)
+			if len(got) != len(testCase.want) {
+				t.Fatalf("got %d comments %v, want %d %v",
+					len(got), got, len(testCase.want), testCase.want)
+			}
+			for index := range got {
+				if got[index] != testCase.want[index] {
+					t.Errorf("comment %d is %q, want %q", index, got[index], testCase.want[index])
+				}
+			}
+		})
+	}
+}
+
+// leadingRunTextsFor drives LeadingRunFor over the last statement of a source and returns the run's
+// comment texts.
+//
+// The context is built by hand rather than through the rule harness, which this package cannot
+// import. A nil FileCache is legal and documented: it means no caching, so the scan simply runs
+// each time, which is what a test wants anyway.
+func leadingRunTextsFor(t *testing.T, sourceText string) []string {
+	t.Helper()
+	sourceFile := parseForComments(t, sourceText)
+	statements := sourceFile.Statements.Nodes
+	if len(statements) == 0 {
+		t.Fatalf("%q: parsed to no statements", sourceText)
+	}
+	last := statements[len(statements)-1]
+
+	var texts []string
+	for _, comment := range LeadingRunFor(rule.Context{SourceFile: sourceFile}, last) {
+		texts = append(texts, comment.Text)
+	}
+	return texts
+}
+
+// TestLeadingRunForDeclinesNil covers the guards a shared function needs: a rule-local version was
+// only ever handed a node from its own walk, and on a shelf any caller can pass anything.
+func TestLeadingRunForDeclinesNil(t *testing.T) {
+	sourceFile := parseForComments(t, "// a comment\nlet value = 1;")
+	if run := LeadingRunFor(rule.Context{SourceFile: sourceFile}, nil); run != nil {
+		t.Errorf("LeadingRunFor with a nil node returned %d comments", len(run))
+	}
+	last := sourceFile.Statements.Nodes[0]
+	if run := LeadingRunFor(rule.Context{}, last); run != nil {
+		t.Errorf("LeadingRunFor with no source file returned %d comments", len(run))
 	}
 }

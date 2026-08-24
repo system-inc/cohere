@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/comments"
 	"github.com/system-inc/verify/internal/utils/react"
 )
 
@@ -60,7 +60,7 @@ var ReactHookRequireEffectComment = rule.Rule{
 					return
 				}
 
-				if !hasEffectCommentAbove(ctx.SourceFile, node) {
+				if !hasEffectCommentAbove(ctx, node) {
 					ctx.ReportNode(callee, messageMissingEffectComment)
 				}
 			},
@@ -72,72 +72,23 @@ var ReactHookRequireEffectComment = rule.Rule{
 // the required prefix.
 //
 // The topmost comment of a contiguous run is what is checked, not the nearest one. A multi-line
-// explanation is several comment nodes, and only its first line has to make the claim: requiring
+// explanation is several comment nodes and only its first line has to make the claim: requiring
 // every line to start with "Effect to" would forbid explaining anything in a second sentence.
-func hasEffectCommentAbove(sourceFile *ast.SourceFile, call *ast.Node) bool {
+//
+// The run comes from `comments.LeadingRunFor`, which reads the shared per-file scan. This rule
+// scanned the file itself for every `React.useEffect` call before that existed, which is the cost
+// the shared scan was built to remove: three rules calling a well-factored scan directly each
+// rescanned the file, measured at 807ms, 619ms and 601ms while visiting one node per file.
+func hasEffectCommentAbove(ctx rule.Context, call *ast.Node) bool {
 	statement := enclosingStatement(call)
 	if statement == nil {
 		return false
 	}
-
-	text := sourceFile.Text()
-	var factory ast.NodeFactory
-
-	var comments []commentSpan
-	for commentRange := range scanner.GetLeadingCommentRanges(&factory, text, statement.Pos()) {
-		comments = append(comments, commentSpan{
-			start: commentRange.Pos(),
-			end:   commentRange.End(),
-			text:  text[commentRange.Pos():commentRange.End()],
-		})
-	}
-	if len(comments) == 0 {
+	run := comments.LeadingRunFor(ctx, statement)
+	if len(run) == 0 {
 		return false
 	}
-
-	// Walk back from the comment nearest the call through the contiguous run. A line comment run is
-	// several nodes; a block comment holds its whole text in one and so ends any run.
-	index := len(comments) - 1
-	for index > 0 {
-		current := comments[index]
-		previous := comments[index-1]
-		if !current.isLineComment() || !previous.isLineComment() {
-			break
-		}
-		if !areAdjacentLines(text, previous.end, current.start) {
-			break
-		}
-		index--
-	}
-
-	return startsWithEffectPrefix(comments[index])
-}
-
-// commentSpan is one comment's source range and text.
-type commentSpan struct {
-	start int
-	end   int
-	text  string
-}
-
-func (comment commentSpan) isLineComment() bool {
-	return strings.HasPrefix(comment.text, "//")
-}
-
-// areAdjacentLines reports whether two comments sit on consecutive lines with nothing between them.
-//
-// Checked by reading the gap rather than by comparing line numbers, which needs no line map: the
-// two are adjacent exactly when the text between them is whitespace containing one newline. Two
-// newlines means a blank line, which ends the run, and anything else means code between them.
-func areAdjacentLines(text string, previousEnd int, currentStart int) bool {
-	if previousEnd > currentStart || currentStart > len(text) {
-		return false
-	}
-	gap := text[previousEnd:currentStart]
-	if strings.TrimSpace(gap) != "" {
-		return false
-	}
-	return strings.Count(gap, "\n") == 1
+	return startsWithEffectPrefix(run[0])
 }
 
 // startsWithEffectPrefix reports whether a comment's first meaningful line makes the claim.
@@ -145,8 +96,8 @@ func areAdjacentLines(text string, previousEnd int, currentStart int) bool {
 // A block comment's leading asterisks are stripped per line, so the JSDoc shape counts: the run of
 // `*` characters is decoration rather than content, and requiring the prefix immediately after
 // `/**` would reject the multi-line form everyone writes.
-func startsWithEffectPrefix(comment commentSpan) bool {
-	body := comment.text
+func startsWithEffectPrefix(comment comments.Comment) bool {
+	body := comment.Text
 
 	switch {
 	case strings.HasPrefix(body, "//"):

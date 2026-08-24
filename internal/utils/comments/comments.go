@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/system-inc/verify/internal/rule"
 )
 
 // Three rules judge comments rather than nodes, and a comment is not a node: it is trivia the
@@ -407,4 +408,86 @@ func AllWithoutGuard(sourceFile *ast.SourceFile) []Comment {
 
 	sortByPosition(comments)
 	return comments
+}
+
+// LeadingRunFor returns the contiguous run of comments immediately above a node, in source order.
+//
+// A rule asking "does the comment above this say X" wants the run rather than the nearest comment,
+// because a multi-line explanation is several comment nodes and only its first line makes the claim.
+// Requiring every line to carry the prefix would forbid explaining anything in a second sentence.
+//
+// Contiguity is decided by reading the gap between two comments rather than by comparing line
+// numbers, which needs no line map: two comments are adjacent exactly when the text between them is
+// whitespace containing one newline. Two newlines means a blank line, which ends the run, and
+// anything else means code between them.
+//
+// A block comment holds its whole text in one node and so ends any run.
+//
+// The scan is the shared per-file one, so a rule reaching for this pays for it once across the whole
+// run rather than once per node it asks about. That is not a micro-optimization: three rules calling
+// a well-factored scan directly each rescanned the file, measured at 807ms, 619ms and 601ms while
+// visiting exactly one node per file.
+func LeadingRunFor(ctx rule.Context, node *ast.Node) []Comment {
+	if node == nil || ctx.SourceFile == nil {
+		return nil
+	}
+
+	all := ForFile(ctx)
+	if len(all) == 0 {
+		return nil
+	}
+
+	// The comments above the node are those ending at or before where its own text begins. The
+	// token position is used rather than Pos(), since Pos() sits before the leading trivia and would
+	// place the node before its own comments.
+	nodeStart := rule.TokenRange(ctx.SourceFile, node).Pos()
+
+	last := -1
+	for index, comment := range all {
+		if comment.Range.End() <= nodeStart {
+			last = index
+			continue
+		}
+		break
+	}
+	if last < 0 {
+		return nil
+	}
+
+	// Only a comment the node actually follows counts. A comment separated from it by code belongs
+	// to that code, and one separated by a blank line is a passage of its own.
+	text := ctx.SourceFile.Text()
+	if !isAdjacentGap(text, all[last].Range.End(), nodeStart) {
+		return nil
+	}
+
+	first := last
+	for first > 0 {
+		previous, current := all[first-1], all[first]
+		if previous.IsBlock || current.IsBlock {
+			break
+		}
+		if !isAdjacentGap(text, previous.Range.End(), current.Range.Pos()) {
+			break
+		}
+		first--
+	}
+	return all[first : last+1]
+}
+
+// isAdjacentGap reports whether two source positions are separated by nothing but one line break.
+//
+// The gap between a comment and whatever follows it is whitespace containing exactly one newline
+// when the two are on consecutive lines with nothing between them. Zero newlines means they share a
+// line, which is a trailing comment rather than a leading one; two means a blank line, which ends a
+// passage.
+func isAdjacentGap(text string, from int, to int) bool {
+	if from > to || to > len(text) {
+		return false
+	}
+	gap := text[from:to]
+	if strings.TrimSpace(gap) != "" {
+		return false
+	}
+	return strings.Count(gap, "\n") == 1
 }
