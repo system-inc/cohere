@@ -224,24 +224,12 @@ var rulesOutsideTheInventory = map[string]string{
 // The bar for an entry is the same as for `rulesOutsideTheInventory`: a reason a future reader can
 // act on. Specifically, what supersedes the rule, and what the decline costs if that thing ever goes
 // away, because a decline that holds today may not hold for a different consumer.
-var rulesDeclined = map[string]string{
-	// Ruled 2026-08-23 after a research pass found the two upstream implementations are different
-	// rules sharing a name. oxlint's is purely syntactic; @next's reads the pages and app
-	// directories off disk, builds a route regex per file, and disables itself entirely when it
-	// finds neither.
-	//
-	// `react-no-anchor-element` (internal/rules/structure/react_no_intrinsic_element.go) already
-	// flags every raw `<a>` with no href condition at all, which is strictly stronger than oxlint's
-	// spelling, and names our own Link component as the fix rather than leaving the author to infer
-	// one. So porting oxlint's version would emit a subset of findings we already emit, under a
-	// different rule name, pointing at a weaker remedy.
-	//
-	// The cost, stated rather than assumed: a consumer whose codebase does not enable
-	// `react-no-anchor-element` loses this check. If verify ever ships to such a tree, this comes
-	// back, and @next's version is the one to build, because oxlint's would still be duplicating a
-	// rule that tree would not have.
-	"nextjs/no-html-link-for-pages": "superseded by structure/react-no-anchor-element, which flags every raw anchor unconditionally",
-}
+// The map is empty, and that is a state rather than an oversight. Its one entry declined
+// `nextjs/no-html-link-for-pages` on the ground that `structure/react-no-anchor-element` was
+// strictly stronger, and that premise was measured false and the rule ported. Keeping the mechanism
+// with nothing in it costs a reader nothing and means the next decline is an entry rather than a
+// rediscovery of why this state exists.
+var rulesDeclined = map[string]string{}
 
 // A declined rule must be in the inventory, must not be registered, and must name a reason.
 //
