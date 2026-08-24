@@ -24,17 +24,11 @@
 package reactconformancescore
 
 import (
-	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/program"
 	"github.com/system-inc/verify/internal/reactconformance"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rules/react"
 )
 
 // fixtureRoot reaches into the sibling package's vendored corpus.
@@ -43,177 +37,6 @@ import (
 // tree that exists twice is a tree that disagrees with itself eventually, and the disagreement would
 // show up as a score change nobody made.
 const fixtureRoot = "../reactconformance/testdata/fixtures"
-
-const tsConfig = `{
-  "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "jsx": "preserve",
-    "strict": false,
-    "noEmit": true,
-    "skipLibCheck": true,
-    "allowJs": true
-  },
-  "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
-}`
-
-// ruleUnderTest pairs a verify rule with the upstream rule name it implements.
-type ruleUnderTest struct {
-	Upstream string
-	Rule     rule.Rule
-}
-
-// analyze runs one verify rule over one fixture and returns what it found, in the shape the
-// conformance comparison expects.
-//
-// The message text a rule produces does not match React's prose, and it is not meant to: verify's
-// messages were written for verify's users. So this maps a finding to the upstream message the
-// fixture expects via the rule's message id, which is the same join upstream's own backend
-// comparison makes. A rule whose id is not in the table reports nothing here rather than guessing,
-// because a wrong join produces a confident false failure.
-func analyze(t *testing.T, subject ruleUnderTest, fixture reactconformance.Fixture) (reactconformance.Result, error) {
-	t.Helper()
-
-	// The golden's location line names a `.ts` or `.tsx` file even when the input is `.js`, and the
-	// extension decides how the parser reads JSX. Following the golden keeps the parse the same one
-	// upstream made.
-	name := fixture.Expected.Errors[0].File
-	if name == "" {
-		name = filepath.Base(fixture.Name)
-	}
-	name = filepath.Base(name)
-
-	directory := t.TempDir()
-	path := filepath.Join(directory, name)
-	if err := os.WriteFile(path, []byte(fixture.Source), 0o644); err != nil {
-		t.Fatalf("writing the fixture: %v", err)
-	}
-	configPath := filepath.Join(directory, "tsconfig.json")
-	if err := os.WriteFile(configPath, []byte(tsConfig), 0o644); err != nil {
-		t.Fatalf("writing the tsconfig: %v", err)
-	}
-
-	graph, err := program.Build(program.Options{
-		ConfigFileName:   configPath,
-		CurrentDirectory: directory,
-		SingleThreaded:   true,
-	})
-	if err != nil {
-		return reactconformance.Result{}, &reactconformance.ErrUnsupported{Reason: "the fixture does not parse: " + err.Error()}
-	}
-
-	projectFiles := graph.ProjectFiles()
-	if len(projectFiles) == 0 {
-		return reactconformance.Result{}, &reactconformance.ErrUnsupported{Reason: "the fixture produced no project files"}
-	}
-
-	var sourceFile *ast.SourceFile
-	wanted := filepath.ToSlash(path)
-	for _, candidate := range projectFiles {
-		if filepath.ToSlash(candidate.FileName()) == wanted {
-			sourceFile = candidate
-		}
-	}
-	if sourceFile == nil {
-		return reactconformance.Result{}, &reactconformance.ErrUnsupported{Reason: "the fixture is not in the built program"}
-	}
-
-	fileChecker, release := graph.CheckerForFile(context.Background(), sourceFile)
-	defer release()
-	if fileChecker == nil {
-		// A nil checker would make a type-aware rule take its decline path and report nothing,
-		// which would score as a failure it did not earn.
-		return reactconformance.Result{}, &reactconformance.ErrUnsupported{Reason: "no type checker for the fixture"}
-	}
-
-	var diagnostics []rule.Diagnostic
-	context := rule.Context{
-		SourceFile:  sourceFile,
-		Program:     graph.Program,
-		TypeChecker: fileChecker,
-		FileCache:   rule.NewFileCache(),
-		Report: func(diagnostic rule.Diagnostic) {
-			diagnostic.RuleName = subject.Rule.Name
-			if diagnostic.SourceFile == nil {
-				diagnostic.SourceFile = sourceFile
-			}
-			diagnostics = append(diagnostics, diagnostic)
-		},
-	}
-
-	listeners := subject.Rule.Run(context, nil)
-	if listeners != nil {
-		walk(sourceFile.AsNode(), listeners)
-	}
-
-	result := reactconformance.Result{}
-	for _, diagnostic := range diagnostics {
-		message, found := upstreamMessageForId[diagnostic.Message.Id]
-		if !found {
-			continue
-		}
-		line, _ := scanner_GetLineAndCharacterOfPosition(sourceFile, diagnostic.Range.Pos())
-		result.Errors = append(result.Errors, reactconformance.ReportedError{
-			Heading: message.Heading,
-			Message: message.Text,
-			Line:    line + 1,
-		})
-	}
-	return result, nil
-}
-
-// upstreamMessage is the golden-side text a verify message id corresponds to.
-type upstreamMessage struct {
-	Heading string
-	Text    string
-}
-
-// upstreamMessageForId joins verify's message ids to React's message text.
-//
-// Only ids whose correspondence was checked against a real golden are here. An id that is absent
-// reports nothing rather than being mapped by resemblance, because a wrong join is worse than a
-// missing one: it produces a specific, confident, wrong failure.
-var upstreamMessageForId = map[string]upstreamMessage{
-	"globalReassignment": {
-		Heading: "Error",
-		Text:    "Cannot reassign variables declared outside of the component/hook",
-	},
-}
-
-// walk visits every node, dispatching to the listeners registered for its kind.
-func walk(node *ast.Node, listeners rule.Listeners) {
-	if node == nil {
-		return
-	}
-	if listener, found := listeners[node.Kind]; found {
-		listener(node)
-	}
-	node.ForEachChild(func(child *ast.Node) bool {
-		walk(child, listeners)
-		return false
-	})
-}
-
-// scanner_GetLineAndCharacterOfPosition converts an offset into a zero-based line and column.
-//
-// Written here rather than taken from the shim because the shim's spelling has moved before, and a
-// scoring harness that stops compiling for a rename is worse than twelve lines of arithmetic.
-func scanner_GetLineAndCharacterOfPosition(sourceFile *ast.SourceFile, position int) (line int, character int) {
-	text := sourceFile.Text()
-	if position > len(text) {
-		position = len(text)
-	}
-	line = 0
-	lastNewline := -1
-	for index := 0; index < position; index++ {
-		if text[index] == '\n' {
-			line++
-			lastNewline = index
-		}
-	}
-	return line, position - lastNewline - 1
-}
 
 // TestGlobalsScoresAgainstReactsOwnGoldens is the end-to-end proof.
 //
@@ -240,19 +63,8 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(t *testing.T) {
 		t.Fatalf("loading the corpus: %v", err)
 	}
 
-	subject := ruleUnderTest{Upstream: "globals", Rule: react.Globals}
-
-	var scored []reactconformance.Fixture
-	for _, fixture := range fixtures {
-		if fixture.RequiresFlow() {
-			continue
-		}
-		rules, complete := fixture.Rules()
-		if !complete || len(rules) != 1 || rules[0] != subject.Upstream {
-			continue
-		}
-		scored = append(scored, fixture)
-	}
+	subject := Rules["globals"]
+	scored := SelectFixtures(fixtures, subject.Upstream)
 
 	// 11 flow-free fixtures whose every diagnostic is a `globals` one. Pinned so that a change in
 	// the attribution shows up here as well as in its own test.
@@ -272,7 +84,7 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(t *testing.T) {
 	counts := map[reactconformance.Verdict]int{}
 	var detail []string
 	for _, fixture := range scored {
-		result, analyzeErr := analyze(t, subject, fixture)
+		result, analyzeErr := Analyze(subject, fixture, t.TempDir())
 		verdict := reactconformance.Classify(fixture, result, analyzeErr)
 		counts[verdict.Verdict]++
 		detail = append(detail, "  "+fixture.Name+": "+string(verdict.Verdict))
@@ -322,7 +134,7 @@ func TestScoringHarnessCanFail(t *testing.T) {
 		t.Fatalf("loading the corpus: %v", err)
 	}
 
-	silent := ruleUnderTest{Upstream: "globals", Rule: rule.Rule{
+	silent := RuleUnderTest{Upstream: "globals", Rule: rule.Rule{
 		Name: "probe-reports-nothing",
 		Run:  func(rule.Context, any) rule.Listeners { return nil },
 	}}
@@ -336,7 +148,7 @@ func TestScoringHarnessCanFail(t *testing.T) {
 		if !complete || len(rules) != 1 || rules[0] != "globals" {
 			continue
 		}
-		result, analyzeErr := analyze(t, silent, fixture)
+		result, analyzeErr := Analyze(silent, fixture, t.TempDir())
 		verdict := reactconformance.Classify(fixture, result, analyzeErr)
 		if verdict.Verdict == reactconformance.VerdictPassed {
 			t.Errorf("%s: a rule that reports nothing scored a pass", fixture.Name)
@@ -370,7 +182,7 @@ func TestUpstreamMessageJoinIsNotByResemblance(t *testing.T) {
 		}
 	}
 
-	for id, message := range upstreamMessageForId {
+	for id, message := range Rules["globals"].Messages {
 		if !present[message.Text] {
 			t.Errorf("%s maps to %q, which no golden in the corpus contains", id, message.Text)
 		}

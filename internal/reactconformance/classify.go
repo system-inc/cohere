@@ -7,41 +7,83 @@ import (
 	"strings"
 )
 
-// ShippedRules are the upstream rule names verify has an implementation for.
+// ShippedRules are the upstream rule names verify has an implementation for, mapped to the name
+// verify registers that rule under.
 //
 // Keyed by UPSTREAM's rule name rather than verify's, because the join to the corpus goes through
-// upstream's `getRuleForCategory`. The two happen to agree on spelling for every rule here, which
-// is convenient and is not relied on: the map is explicit so a rename on either side is a visible
-// edit rather than a silent unjoin.
+// upstream's `getRuleForCategory`.
 //
-// `hooks` maps to verify's `rules-of-hooks`, which is the one place the names differ.
+// # The value side was wrong for every entry, and nothing could see it
+//
+// Until 2026-08-24 every value here read `react/<name>`, on the strength of a doc comment claiming
+// the two sides "happen to agree on spelling" and that the map was explicit so a rename would be "a
+// visible edit rather than a silent unjoin". Measured against `registry.All()`: not one of those
+// eleven strings is a registered rule. The react-compiler rules register BARE — `globals`,
+// `rules-of-hooks`, `use-memo` — and the namespace was never part of the name.
+//
+// The unjoin was silent for the reason the comment did not anticipate: nothing in this package ever
+// READ the value. `Classify` asks only `_, found := ShippedRules[ruleName]`, so the right-hand side
+// was decorative, and a decorative field that claims to be a join is worse than no field, because
+// it reads as checked. `TestShippedRuleNamesAreRegistered` now reads it, which is what makes this
+// map's second column a claim rather than a caption. That is the open finding `#5vyycz7` measured:
+// the parity guard cannot see a namespaced spelling because this side was never executed.
+//
+// `hooks` maps to verify's `rules-of-hooks`, which is the one place the two names differ.
 var ShippedRules = map[string]string{
-	"config":              "react/config",
-	"error-boundaries":    "react/error-boundaries",
-	"gating":              "react/gating",
-	"globals":             "react/globals",
-	"hooks":               "react/rules-of-hooks",
-	"set-state-in-effect": "react/set-state-in-effect",
-	"set-state-in-render": "react/set-state-in-render",
-	"static-components":   "react/static-components",
-	"unsupported-syntax":  "react/unsupported-syntax",
-	"use-memo":            "react/use-memo",
-	"void-use-memo":       "react/void-use-memo",
+	"config":               "config",
+	"error-boundaries":     "error-boundaries",
+	"gating":               "gating",
+	"globals":              "globals",
+	"hooks":                "rules-of-hooks",
+	"immutability":         "immutability",
+	"incompatible-library": "incompatible-library",
+	"purity":               "purity",
+	"refs":                 "refs",
+	"set-state-in-effect":  "set-state-in-effect",
+	"set-state-in-render":  "set-state-in-render",
+	"static-components":    "static-components",
+	"unsupported-syntax":   "unsupported-syntax",
+	"use-memo":             "use-memo",
+	"void-use-memo":        "void-use-memo",
 }
 
-// TypeAwareRules are the shipped rules that decide by asking the type checker.
+// TypeAwareRules are the shipped rules whose DECISION depends on resolving React's own types.
 //
 // This list is what makes `VerdictUnresolvableTypes` a measurement rather than an excuse: only a
 // rule that actually reads types can be excused by a fixture that has none. A syntax-only rule
-// producing nothing on an import-less fixture is a failure, and must be scored as one.
+// producing nothing on an import-less fixture is a failure, and must be scored as one. Getting this
+// wrong in the generous direction inflates the score with excuses, so the bar for entry is narrow
+// and stated below.
 //
-// Membership was read from the rule sources, not guessed. Each of these calls `ctx.TypeChecker` on
-// the path that decides whether to report, and each ships fixtures carrying a local `react.d.ts`
-// for exactly this reason (`set_state_in_effect_test.go:57`, `set_state_in_render_test.go:79`).
+// # `NeedsTypeChecker` is the wrong test, and it was the obvious one
+//
+// Nine of the fifteen react-compiler rules declare `NeedsTypeChecker`. Reading membership off that
+// flag would put `globals`, `use-memo`, `purity` and `unsupported-syntax` in here and hand each of
+// them a blanket excuse on every import-less fixture. Measured at the call sites, the flag covers
+// two different questions:
+//
+//	GetSymbolAtLocation      binding resolution: "is this identifier declared anywhere in scope?"
+//	                         Answers correctly with no `@types/react` present, because the question
+//	                         is about the fixture's own bindings. `globals.go:616`, `use_memo.go:424`,
+//	                         `purity.go:565`, `unsupported_syntax.go:234`. NOT an excuse.
+//	GetTypeAtLocation        reads a type and then its alias symbol, which is `any` without React's
+//	                         declarations, so the deciding branch cannot be reached.
+//	                         `set_state_in_render.go:450`, `refs.go:359`. This IS the excuse.
+//
+// So membership is by call site, verified rather than declared. `set-state-in-effect` is kept from
+// the previous revision on the same grounds (it ships fixtures carrying a local `react.d.ts` at
+// `set_state_in_effect_test.go:57` for exactly this reason), and `refs` joins it on the measurement
+// above.
+//
+// `static-components` was in this map and is REMOVED. It declares `NeedsTypeChecker: true` at
+// `static_components.go:100` and then never touches `ctx.TypeChecker` anywhere in its body —
+// grepped for the selector, zero hits. It was in here on the strength of a declaration it does not
+// use, which is the generous direction this comment warns about, arriving through the flag rather
+// than through a guess.
 var TypeAwareRules = map[string]bool{
+	"refs":                true,
 	"set-state-in-effect": true,
 	"set-state-in-render": true,
-	"static-components":   true,
 }
 
 // reactImportPattern matches an import or require of `react`.
@@ -188,6 +230,75 @@ var statedDivergences = map[string]StatedDivergence{
 		Reason:   "a mixed destructuring assignment where only one target is a global, measured as declined by the rule",
 	},
 
+	// The `config` rule's input does not exist in this tree, by construction rather than by
+	// accident. All four of upstream's Config error fixtures import from modules that exist only
+	// inside upstream's own test harness — `ReactCompilerTest` and `useDefaultExportNotTypedAsHook`
+	// — and the diagnostic is produced by consulting a `moduleTypeProvider`, which React 7.1.1
+	// takes as a JavaScript FUNCTION VALUE handed to the Babel plugin programmatically. It is not a
+	// file, not a JSON key, and not anything a linter can read off disk; upstream supplies it from
+	// `snap/src/sprout/shared-runtime-type-provider.ts`.
+	//
+	// verify implements the half whose input is a fact about the compiler rather than a value
+	// nobody passes: `defaultModuleTypeProvider`, three hardcoded modules. `config.go`'s doc
+	// comment measures that half and shows it is structurally unable to fire, because every
+	// hardcoded entry pairs a `use`-prefixed name with a `hook` type, so the contradiction the rule
+	// looks for is false at every row.
+	//
+	// So this is a rule that is correct, wired, and silent, meeting four goldens whose input is a
+	// test harness. Recorded here rather than counted as failure, because calling it a defect would
+	// mean the only way to score would be to grow a channel for a user-supplied function value that
+	// this codebase deliberately does not have.
+	"error.invalid-type-provider-hook-name-not-typed-as-hook.js": {
+		Fixture:  "error.invalid-type-provider-hook-name-not-typed-as-hook.js",
+		Boundary: "TestConfigFixturesNeedAModuleTypeProvider",
+		Reason:   "the diagnostic needs a `moduleTypeProvider` function value from upstream's test harness, which verify has no channel to receive; measured as reporting nothing",
+	},
+	"error.invalid-type-provider-hook-name-not-typed-as-hook-namespace.js": {
+		Fixture:  "error.invalid-type-provider-hook-name-not-typed-as-hook-namespace.js",
+		Boundary: "TestConfigFixturesNeedAModuleTypeProvider",
+		Reason:   "imports the harness-only module `ReactCompilerTest`, whose type configuration verify has no channel to receive",
+	},
+	"error.invalid-type-provider-hooklike-module-default-not-hook.js": {
+		Fixture:  "error.invalid-type-provider-hooklike-module-default-not-hook.js",
+		Boundary: "TestConfigFixturesNeedAModuleTypeProvider",
+		Reason:   "imports the harness-only module `useDefaultExportNotTypedAsHook`, whose type configuration verify has no channel to receive",
+	},
+	"error.invalid-type-provider-nonhook-name-typed-as-hook.js": {
+		Fixture:  "error.invalid-type-provider-nonhook-name-typed-as-hook.js",
+		Boundary: "TestConfigFixturesNeedAModuleTypeProvider",
+		Reason:   "imports the harness-only module `ReactCompilerTest`, whose type configuration verify has no channel to receive",
+	},
+
+	// Three `set-state-in-render` goldens recorded under an upstream feature flag that defaults to
+	// OFF, so the expectation describes a compiler verify does not implement rather than a finding
+	// verify missed.
+	//
+	// Measured in React's own unminified bundle rather than inferred:
+	// `enableUseKeyedState: z.boolean().default(false)` at line 31626 and
+	// `enableTreatSetIdentifiersAsStateSetters: z.boolean().default(false)` at 31647. Without the
+	// flag, upstream itself reports nothing on these inputs.
+	//
+	// This is the narrow, real half of the pragma question. Most pragmas on this corpus restate a
+	// default that is already on (`validateNoSetStateInRender` defaults TRUE), which is why the
+	// engine deliberately does not gate on pragmas in general. These three are the exception, and
+	// they were found by enumerating every wired fixture carrying a pragma measured as
+	// `default(false)` — exactly three across all seven wired rules, all in this one rule.
+	"error.invalid-setstate-unconditional-with-keyed-state.js": {
+		Fixture:  "error.invalid-setstate-unconditional-with-keyed-state.js",
+		Boundary: "TestOptInPragmaFixturesAreEnumerated",
+		Reason:   "the golden was recorded under `@enableUseKeyedState`, an upstream flag defaulting to false that verify does not implement",
+	},
+	"error.invalid-unconditional-set-state-prop-in-render.js": {
+		Fixture:  "error.invalid-unconditional-set-state-prop-in-render.js",
+		Boundary: "TestOptInPragmaFixturesAreEnumerated",
+		Reason:   "the golden was recorded under `@enableTreatSetIdentifiersAsStateSetters`, an upstream flag defaulting to false, which makes any `setX` identifier a state setter",
+	},
+	"error.invalid-unconditional-set-state-hook-return-in-render.js": {
+		Fixture:  "error.invalid-unconditional-set-state-hook-return-in-render.js",
+		Boundary: "TestOptInPragmaFixturesAreEnumerated",
+		Reason:   "the golden was recorded under `@enableTreatSetIdentifiersAsStateSetters`, an upstream flag defaulting to false",
+	},
+
 	// The gate again, in its sharpest form. `useFoo` is hook-NAMED but calls no hook, and verify's
 	// gate requires a hook CALL in the body, not a hook name on the function. The rule's own doc
 	// comment states this directly at globals.go:195 (`function useFoo() { useState(0); g = 1; }
@@ -207,6 +318,21 @@ var statedDivergences = map[string]StatedDivergence{
 		Boundary: "TestGlobalsGateIsSharedWithUnsupportedSyntax",
 		Reason:   "`useFoo` is hook-named but calls no hook, and verify's compilation gate requires a hook call in the body; probed with controls showing the same write reports from a function that does call one",
 	},
+}
+
+// StatedDivergenceNames returns the fixtures recorded as deliberate divergences, keyed by name.
+//
+// Exported so the boundary tests in `reactconformancescore` can assert that a divergence they hold
+// in place is actually recorded here. Without it the two halves of a stated divergence — the entry
+// and the test named in its `Boundary` field — could drift apart silently, which would leave the
+// entry as a label with nothing behind it. That is precisely what the `StatedDivergence` doc
+// comment says must not happen.
+func StatedDivergenceNames() map[string]StatedDivergence {
+	names := make(map[string]StatedDivergence, len(statedDivergences))
+	for name, divergence := range statedDivergences {
+		names[name] = divergence
+	}
+	return names
 }
 
 // Classify decides which category a fixture belongs to for the rules verify ships.

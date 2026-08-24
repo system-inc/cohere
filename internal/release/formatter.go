@@ -16,7 +16,7 @@ import (
 // The default is a path on one machine, which is the whole problem this file exists to bound. A CI
 // runner or a second developer needs to say where their checkout is, and saying it explicitly is
 // better than a search that might find the wrong one.
-const FormatterForkPathVariable = "AHRA_VERIFY_PRETTIER_FORK"
+const FormatterForkPathVariable = "VERIFY_PRETTIER_FORK"
 
 // DefaultFormatterForkPath is where the fork lives on the machine it was built on.
 const DefaultFormatterForkPath = "/Users/kirkouimet/Projects/system/prettier"

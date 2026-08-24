@@ -258,10 +258,10 @@ time anyone formatted markdown.
 Staleness is measured by modification time against the fork's newest tracked source file, not by
 recording a commit beside the bundles. A recorded commit only catches a rebuild someone remembered
 to re-record; the case that actually happens is an edited working tree that was never rebuilt, where
-the commit has not moved and the bundles are wrong anyway. `AHRA_VERIFY_PRETTIER_FORK` points at a
+the commit has not moved and the bundles are wrong anyway. `VERIFY_PRETTIER_FORK` points at a
 checkout somewhere other than the default path.
 
-`AHRA_VERIFY_BINARY=/path/to/verify` points every `verify` on the machine at a local build. A broken
+`VERIFY_BINARY=/path/to/verify` points every `verify` on the machine at a local build. A broken
 override is fatal rather than a fallback, even when a good install is sitting right there: someone
 who sets it has stated which binary they want, and quietly running a different one would hand them
 results they would read as their own build's.

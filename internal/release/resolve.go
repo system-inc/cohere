@@ -15,7 +15,7 @@ import (
 // every repo on the machine runs that build instead of the installed one. It is deliberately an
 // absolute-path override rather than a directory to search, so that what it selects is stated
 // rather than resolved.
-const BinaryOverrideVariable = "AHRA_VERIFY_BINARY"
+const BinaryOverrideVariable = "VERIFY_BINARY"
 
 // PlatformPackageScope is the npm scope the platform binaries publish under.
 const PlatformPackageScope = "@verify"

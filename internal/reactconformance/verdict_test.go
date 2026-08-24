@@ -52,31 +52,39 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
 		t.Errorf("flow-excluded %d, want 35", got)
 	}
 
-	// 196 fixtures belong entirely to rules verify does not ship. This is the single biggest fact
-	// about the number and the one a headline score would bury: 60% of React's error corpus is
-	// immutability, refs, todo, preserve-manual-memoization and friends, none of which verify has.
-	if got := report.Counts[VerdictNoRuleShipped]; got != 196 {
-		t.Errorf("no-rule-shipped %d, want 196", got)
+	// 101 fixtures belong entirely to rules verify does not ship, down from 196 on 2026-08-24 when
+	// `ShippedRules` was corrected: `immutability`, `incompatible-library`, `purity` and `refs` were
+	// all on disk and registered while this map still said we had never written them.
+	//
+	// It remains the single biggest fact about the number and the one a headline score would bury:
+	// a third of React's error corpus is preserve-manual-memoization, todo, invariant and friends,
+	// none of which verify has.
+	if got := report.Counts[VerdictNoRuleShipped]; got != 101 {
+		t.Errorf("no-rule-shipped %d, want 101", got)
 	}
 
 	// The addressable set: fixtures a rule verify ships is responsible for. This is the real
-	// denominator any future parity number is measured against, and it is 94 rather than 325.
+	// denominator any future parity number is measured against, and it is 189 rather than 325.
 	answerable := report.Counts[VerdictPassed] + report.Counts[VerdictFailed] +
 		report.Counts[VerdictUnresolvableTypes] + report.Counts[VerdictUnreachableFixture] +
 		report.Counts[VerdictNotScored] + report.Counts[VerdictStatedDivergence]
-	if answerable != 94 {
-		t.Errorf("fixtures a shipped rule could be asked about = %d, want 94", answerable)
+	if answerable != 189 {
+		t.Errorf("fixtures a shipped rule could be asked about = %d, want 189", answerable)
 	}
 
-	// 11 of the 94 have been run against a real rule and land in `stated divergence`; the other 83
-	// have not been scored at all. Both numbers are asserted because the second is the honest
-	// statement of how much of the addressable set is still unmeasured, and it is the number most
-	// likely to be quietly forgotten once the first one exists.
-	if got := report.Counts[VerdictStatedDivergence]; got != 11 {
-		t.Errorf("stated-divergence %d, want 11", got)
+	// This test scores `NothingImplemented`, so it measures the CATEGORISATION rather than any rule:
+	// 18 fixtures carry a stated divergence, and every other addressable fixture lands in
+	// `not scored` because the implementation handed in here declines everything.
+	//
+	// That is deliberate and it is why this package still depends on nothing in the rule engine.
+	// The same partition WITH real rules running is
+	// `reactconformancescore.TestAggregateWithTheRuleEngineWired`, and the two are meant to differ:
+	// this one answers "what could be asked", that one answers "what did the rules say".
+	if got := report.Counts[VerdictStatedDivergence]; got != 18 {
+		t.Errorf("stated-divergence %d, want 18", got)
 	}
-	if got := report.Counts[VerdictNotScored]; got != 83 {
-		t.Errorf("not-scored %d, want 83", got)
+	if got := report.Counts[VerdictNotScored]; got != 171 {
+		t.Errorf("not-scored %d, want 171", got)
 	}
 
 	t.Logf("\n%s", report.Summary())
@@ -117,13 +125,24 @@ func TestNoRuleShippedIsTheCorpusRatherThanTheRules(t *testing.T) {
 		}
 	}
 
+	// `immutability` (62) and `refs` (30) were the two largest rows here until both shipped on
+	// 2026-08-24, and their removal is the measurement rather than a tidy-up: 92 flow-free fixtures
+	// stopped being "we never wrote this" on the day the rules landed.
+	//
+	// `todo` moved 36 -> 30 in the same change, and the six are enumerated rather than retyped,
+	// because a pinned number that is edited to match whatever the code now says has stopped being
+	// a pin. Each is a fixture whose diagnostics span `todo` AND a now-shipped rule, so it leaves
+	// the set of fixtures no shipped rule claims at all: `error.todo-reassign-const.js`,
+	// `fault-tolerance/error.try-finally-and-mutation-of-props.js`,
+	// `fault-tolerance/error.try-finally-and-ref-access.js`,
+	// `fault-tolerance/error.try-finally-ref-access-and-mutation.js`,
+	// `fault-tolerance/error.var-declaration-and-mutation-of-props.js`, and
+	// `fault-tolerance/error.var-declaration-and-ref-access.js`.
 	for _, want := range []struct {
 		Rule  string
 		Count int
 	}{
-		{"immutability", 62},
-		{"refs", 30},
-		{"todo", 36},
+		{"todo", 30},
 		{"preserve-manual-memoization", 31},
 		{"invariant", 15},
 		{"memo-dependencies", 8},
@@ -216,12 +235,16 @@ func TestEveryCategoryIsReachable(t *testing.T) {
 			Want:   VerdictUnresolvableTypes,
 		},
 		{
+			// `preserve-manual-memoization` rather than `immutability`, which this case used until
+			// `immutability` shipped on 2026-08-24. The case needs a rule verify genuinely does not
+			// implement, so picking one that is being actively ported makes the calibration expire
+			// the day the port lands — which is exactly what happened here.
 			Name: "declined: no rule shipped",
 			Fixture: Fixture{
-				Name:   "reachability.immutability.js",
-				Source: "function Component(props) { props.x = 1; }",
+				Name:   "reachability.preserve-manual-memoization.js",
+				Source: "function Component(props) { return useMemo(() => props.x, []); }",
 				Expected: Expectation{Errors: []ExpectedError{
-					{Heading: "Error", Message: "This value cannot be modified", Line: 1},
+					{Heading: "Compilation Skipped", Message: "Existing memoization could not be preserved", Line: 1},
 				}},
 			},
 			Want: VerdictNoRuleShipped,

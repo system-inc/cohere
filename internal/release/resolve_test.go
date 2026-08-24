@@ -175,7 +175,7 @@ func TestBinaryFileNameCarriesTheWindowsExtension(t *testing.T) {
 
 // clearOverride makes a test independent of the developer's own shell.
 //
-// Without this, a machine with AHRA_VERIFY_BINARY exported would pass the "nothing is installed"
+// Without this, a machine with VERIFY_BINARY exported would pass the "nothing is installed"
 // test by resolving the developer's local build — the exact green-over-nothing result these tests
 // exist to catch.
 func clearOverride(t *testing.T) {

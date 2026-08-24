@@ -24,12 +24,12 @@ dispatcher="${module}/verify-dispatch"
 # An override is fatal when broken rather than a fallback, even with a good install available.
 # Someone who sets it has stated which binary they want, and quietly running a different one hands
 # them results they would read as their own build's.
-if [ -n "${AHRA_VERIFY_BINARY:-}" ]; then
-    if [ -x "${AHRA_VERIFY_BINARY}" ]; then
-        exec "${AHRA_VERIFY_BINARY}" "$@"
+if [ -n "${VERIFY_BINARY:-}" ]; then
+    if [ -x "${VERIFY_BINARY}" ]; then
+        exec "${VERIFY_BINARY}" "$@"
     fi
-    echo "verify: AHRA_VERIFY_BINARY is set to a path that is not executable, so nothing was checked." >&2
-    echo "  ${AHRA_VERIFY_BINARY}" >&2
+    echo "verify: VERIFY_BINARY is set to a path that is not executable, so nothing was checked." >&2
+    echo "  ${VERIFY_BINARY}" >&2
     exit 1
 fi
 
@@ -39,7 +39,7 @@ fi
 
 echo "verify: no binary found, so nothing was checked." >&2
 echo "  Looked, in order:" >&2
-echo "    \$AHRA_VERIFY_BINARY (unset)" >&2
+echo "    \$VERIFY_BINARY (unset)" >&2
 echo "    ${installed}" >&2
 echo "    ${dispatcher}" >&2
 echo "  Build it with: go build -o ${dispatcher} ./cmd/verify-dispatch" >&2
