@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
 )
 
 var messageUnexpectedExceptionAssignment = rule.Message{
@@ -85,7 +86,7 @@ func reportAssignmentsTo(ctx rule.Context, root *ast.Node, targetName string, me
 		// Prefix and postfix both, since `++e` and `e++` differ only in what they evaluate to and
 		// neither leaves the binding alone.
 		if current.Kind == ast.KindPrefixUnaryExpression || current.Kind == ast.KindPostfixUnaryExpression {
-			if operand, operator := updateOperandAndOperator(current); isUpdateOperator(operator) {
+			if operand, operator := updateOperandAndOperator(current); reference.IsUpdateOperator(operator) {
 				if operand != nil && operand.Kind == ast.KindIdentifier && operand.Text() == targetName {
 					ctx.ReportNode(operand, message)
 				}
@@ -111,12 +112,4 @@ func updateOperandAndOperator(node *ast.Node) (*ast.Node, ast.Kind) {
 		return ast.SkipParentheses(unary.Operand), unary.Operator
 	}
 	return nil, ast.KindUnknown
-}
-
-// isUpdateOperator reports whether an operator writes to its operand.
-//
-// Only `++` and `--`. A `-x` or `!x` reads the binding and leaves it alone, so treating every unary
-// as a write would report on code that never assigns.
-func isUpdateOperator(operator ast.Kind) bool {
-	return operator == ast.KindPlusPlusToken || operator == ast.KindMinusMinusToken
 }

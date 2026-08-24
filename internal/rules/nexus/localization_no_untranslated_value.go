@@ -371,14 +371,11 @@ func translationFileInformation(sourceFile *ast.SourceFile) (string, string, boo
 		return "", "", false
 	}
 
-	isInTranslationsDirectory := false
-	for _, segment := range strings.Split(directory, "/") {
-		if segment == "_translations" || segment == "translations" {
-			isInTranslationsDirectory = true
-			break
-		}
-	}
-	if !isInTranslationsDirectory {
+	// A whole path segment rather than a bare substring. Matching the substring would pull in a
+	// directory named "translations-archive" and, worse, would silently start linting whatever a
+	// future directory named that way holds.
+	if !imports.HasPathSegment(directory, "_translations") &&
+		!imports.HasPathSegment(directory, "translations") {
 		return "", "", false
 	}
 

@@ -135,3 +135,27 @@ func SpecifierNode(node *ast.Node) *ast.Node {
 	}
 	return node
 }
+
+// HasPathSegment reports whether a path contains a directory or file named exactly segment.
+//
+// Matching the bare substring instead would flag `@structure/internalization/Thing` for the letters
+// it happens to contain, and a boundary rule that fires on a name it never meant to claim teaches
+// people to disable it.
+//
+// Both separators are handled. Two of the three lifted implementations split on the forward slash
+// alone, so a path arriving in the Windows shape answered no to every question. Nothing in this tree
+// produces one today, which is why the gap was invisible; `NormalizedFileName` exists a few lines up
+// for exactly this reason and those callers were not using it.
+func HasPathSegment(path string, segment string) bool {
+	if segment == "" {
+		return false
+	}
+	for _, part := range strings.FieldsFunc(path, func(character rune) bool {
+		return character == '/' || character == '\\'
+	}) {
+		if part == segment {
+			return true
+		}
+	}
+	return false
+}

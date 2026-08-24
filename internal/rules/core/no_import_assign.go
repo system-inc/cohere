@@ -308,11 +308,11 @@ func isWriteTarget(member *ast.Node) bool {
 
 		case ast.KindPrefixUnaryExpression:
 			unary := parent.AsPrefixUnaryExpression()
-			return isUpdateOperator(unary.Operator) && ast.SkipParentheses(unary.Operand) == child
+			return reference.IsUpdateOperator(unary.Operator) && ast.SkipParentheses(unary.Operand) == child
 
 		case ast.KindPostfixUnaryExpression:
 			unary := parent.AsPostfixUnaryExpression()
-			return isUpdateOperator(unary.Operator) && ast.SkipParentheses(unary.Operand) == child
+			return reference.IsUpdateOperator(unary.Operator) && ast.SkipParentheses(unary.Operand) == child
 
 		case ast.KindDeleteExpression:
 			// `delete mod.named`. Only reachable from this side of the rule.

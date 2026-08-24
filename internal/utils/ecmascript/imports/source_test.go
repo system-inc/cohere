@@ -165,3 +165,35 @@ func TestHelpersSurviveNilInput(t *testing.T) {
 	var noCache *rule.FileCache
 	_ = noCache
 }
+
+// TestHasPathSegment covers the question three rules were answering separately, two of them on the
+// forward slash alone.
+func TestHasPathSegment(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		path    string
+		segment string
+		want    bool
+	}{
+		{"a matching segment", "/a/b/internal/Thing.ts", "internal", true},
+		{"a leading segment", "internal/Thing.ts", "internal", true},
+		{"a trailing segment", "/a/b/internal", "internal", true},
+		// The reason this is not a substring test. A boundary rule that fires on a name it never
+		// meant to claim teaches people to disable it.
+		{"a longer word containing it", "/a/internalization/Thing.ts", "internal", false},
+		{"a word ending in it", "/a/notinternal/Thing.ts", "internal", false},
+		{"an unrelated path", "/a/b/Thing.ts", "internal", false},
+		// The Windows shape, which two of the three lifted implementations answered no to for every
+		// question because they split on the forward slash alone.
+		{"a Windows path", `\a\b\internal\Thing.ts`, "internal", true},
+		{"a mixed path", `/a\b/internal\Thing.ts`, "internal", true},
+		{"an empty segment", "/a/b/Thing.ts", "", false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := HasPathSegment(testCase.path, testCase.segment); got != testCase.want {
+				t.Errorf("HasPathSegment(%q, %q) = %v, want %v",
+					testCase.path, testCase.segment, got, testCase.want)
+			}
+		})
+	}
+}

@@ -154,3 +154,14 @@ func WritesToBinding(identifier *ast.Node) bool {
 	}
 	return ast.IsWriteAccess(current)
 }
+
+// IsUpdateOperator reports whether an operator writes back to its operand.
+//
+// Only `++` and `--`. A `-x`, `!x` or `typeof x` reads the binding and leaves it alone, so treating
+// every unary as a write would report on code that never assigns.
+//
+// Lifted because two packages declared it separately under two names, byte-identical in logic, and
+// neither could see the other.
+func IsUpdateOperator(operator ast.Kind) bool {
+	return operator == ast.KindPlusPlusToken || operator == ast.KindMinusMinusToken
+}

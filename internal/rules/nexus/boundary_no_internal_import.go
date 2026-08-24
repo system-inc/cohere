@@ -65,7 +65,7 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 	// be inside the owning folder and is refused outright. A relative specifier is the only shape
 	// that can prove it belongs.
 	if !strings.HasPrefix(source, ".") {
-		if hasPathSegment(source, "internal") {
+		if imports.HasPathSegment(source, "internal") {
 			ctx.ReportNode(imports.SpecifierNode(node), messageAliasedInternal)
 		}
 		return
@@ -90,18 +90,4 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 	if !strings.HasPrefix(importingFile, owningFolder+"/") {
 		ctx.ReportNode(imports.SpecifierNode(node), messageOutsideInternal)
 	}
-}
-
-// hasPathSegment reports whether a specifier contains a path segment named exactly segment.
-//
-// Matching the bare substring would flag '@structure/internalization/Thing' for the letters it
-// happens to contain, and a boundary rule that fires on an unrelated word teaches people to
-// disable it.
-func hasPathSegment(path string, segment string) bool {
-	for _, part := range strings.Split(path, "/") {
-		if part == segment {
-			return true
-		}
-	}
-	return false
 }

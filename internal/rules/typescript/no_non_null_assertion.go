@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
 )
 
 var messageNoNonNull = rule.Message{
@@ -185,11 +186,11 @@ func isAssignmentTarget(node *ast.Node) bool {
 	case ast.KindPrefixUnaryExpression:
 		// `--a.b`
 		operator := parent.AsPrefixUnaryExpression()
-		return isIncrementOrDecrement(operator.Operator) && operator.Operand == node
+		return reference.IsUpdateOperator(operator.Operator) && operator.Operand == node
 	case ast.KindPostfixUnaryExpression:
 		// `a.b++`
 		operator := parent.AsPostfixUnaryExpression()
-		return isIncrementOrDecrement(operator.Operator) && operator.Operand == node
+		return reference.IsUpdateOperator(operator.Operator) && operator.Operand == node
 	case ast.KindArrayLiteralExpression, ast.KindSpreadElement:
 		// `[a.b] = [0]` and `[...a.b] = [0]`. A destructuring assignment target parses as an array
 		// literal here rather than as a pattern, so this reaches both the element and the spread.
@@ -214,9 +215,4 @@ func isAssignmentTarget(node *ast.Node) bool {
 		return isAssignmentTarget(parent)
 	}
 	return false
-}
-
-// isIncrementOrDecrement reports whether an operator writes back to its operand.
-func isIncrementOrDecrement(operator ast.Kind) bool {
-	return operator == ast.KindPlusPlusToken || operator == ast.KindMinusMinusToken
 }

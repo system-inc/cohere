@@ -117,7 +117,7 @@ var ImportRequirePathAlias = rule.Rule{
 				return
 			}
 			// An internal import must stay relative; see the rule comment above.
-			if hasPathSegment(repositoryPath, "internal") {
+			if imports.HasPathSegment(repositoryPath, "internal") {
 				return
 			}
 

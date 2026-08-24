@@ -218,3 +218,23 @@ func TestDefaultValuesInOtherPatterns(t *testing.T) {
 		t.Errorf("[a = b] = xs: target answered %v, want [true]", got)
 	}
 }
+
+// TestIsUpdateOperator covers the two operators that write back and a sample of those that do not.
+func TestIsUpdateOperator(t *testing.T) {
+	for _, c := range []struct {
+		operator ast.Kind
+		want     bool
+	}{
+		{ast.KindPlusPlusToken, true},
+		{ast.KindMinusMinusToken, true},
+		{ast.KindMinusToken, false},
+		{ast.KindPlusToken, false},
+		{ast.KindExclamationToken, false},
+		{ast.KindTildeToken, false},
+		{ast.KindTypeOfKeyword, false},
+	} {
+		if got := reference.IsUpdateOperator(c.operator); got != c.want {
+			t.Errorf("IsUpdateOperator(kind %d) = %v, want %v", int(c.operator), got, c.want)
+		}
+	}
+}
