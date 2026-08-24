@@ -430,6 +430,20 @@ func TestNoUnusedLabelsDoesNotLetAJumpEscapeItsFunction(t *testing.T) {
 		{"an arrow function", "outer: while (true) { (() => { break outer; })(); }"},
 		{"a continue rather than a break", "outer: while (true) { (function () { continue outer; })(); }"},
 		{"a method in a class body", "outer: while (true) { class C { m() { break outer; } } }"},
+		// The class arm of the boundary, which the four above do not reach. Written for a
+		// surviving mutant: dropping `ast.IsClassLike` from the walk while keeping
+		// `ast.IsFunctionLikeDeclaration` changed no fixture, because in every case above the
+		// jump sits inside a method and the function arm stops the walk before the class arm
+		// can matter. A class static initialization block is the one place a jump's ancestor
+		// chain reaches a class before any function, confirmed by walking the parsed tree.
+		//
+		// Such a program is not legal JavaScript. ESLint's own parser rejects it outright with
+		// "Unsyntactic break", so on valid input this branch cannot change the verdict. It is
+		// still not dead, for the same reason the function boundary is not: the TypeScript
+		// parser is error-tolerant and hands a rule the tree for source a runtime would refuse.
+		// Here the outer label is genuinely unused, because the jump naming it cannot reach it,
+		// and a rule without the class arm calls it used and stays silent.
+		{"a class static initialization block", "outer: while (true) { class C { static { break outer; } } }"},
 	}
 
 	for _, testCase := range cases {
@@ -466,5 +480,39 @@ func TestNoUnusedLabelsMarksOnlyTheNearestMatchingLabel(t *testing.T) {
 	if result.Diagnostics[0].Range.Pos() != 0 {
 		t.Errorf("expected the outer label to be the unused one, reported at offset %d",
 			result.Diagnostics[0].Range.Pos())
+	}
+}
+
+// A safe token before the label defeats the ASI hazard, even when the body opens unsafely.
+//
+// Written for a surviving mutant: dropping the half of the ASI test that asks whether the preceding
+// token already terminates a statement changed no fixture. The imported corpus never pairs a safe
+// preceding token with an unsafe body opener, so every fix case it carries has a body starting with
+// an ordinary token and the preceding-token half is never consulted.
+//
+// The mutant withholds the repair on all four of these, where the correct rule offers it. The
+// symptom is a rule that quietly stops repairing rather than one that reports wrongly, which is why
+// no message-id fixture could have seen it.
+//
+// Both expectations were taken from ESLint's own Linter rather than derived: verifyAndFix rewrites
+// `{ A: (foo) }` to `{ (foo) }` and `foo; A: (bar)` to `foo; (bar)`. Nothing can rejoin across a
+// `{`, a `;`, or a `:`, and at the start of the file there is no previous token to rejoin with.
+func TestNoUnusedLabelsFixesWhenThePrecedingTokenTerminates(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+		wantSource string
+	}{
+		{"an open brace before the label", "{ A: (foo) }", "{ (foo) }"},
+		{"a semicolon before the label", "foo; A: (bar)", "foo; (bar)"},
+		{"nothing at all before the label", "A: (foo)", "(foo)"},
+		{"an open brace before a bracket body", "function f() { A: [1]; }", "function f() { [1]; }"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ruletest.ExpectFixedSource(t,
+				ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
+		})
 	}
 }
