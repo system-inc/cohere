@@ -18,6 +18,7 @@ import (
 func init() {
 	rule.Register(
 		rule.Registration{Rule: AwaitThenable},
+		rule.Registration{Rule: NoArrayDelete},
 		rule.Registration{Rule: NoDuplicateEnumValues},
 		rule.Registration{Rule: NoEmptyObjectType},
 		rule.Registration{
@@ -28,9 +29,14 @@ func init() {
 		rule.Registration{Rule: NoMisusedNew},
 		rule.Registration{Rule: NoNonNullAssertedOptionalChain},
 		rule.Registration{Rule: NoNonNullAssertion},
+		rule.Registration{
+			Rule:   NoThisAlias,
+			Decode: DecodeNoThisAliasOptions,
+		},
 		rule.Registration{Rule: NoUnnecessaryTypeConstraint},
 		rule.Registration{Rule: NoUnsafeDeclarationMerging},
 		rule.Registration{Rule: NoUnsafeFunctionType},
+		rule.Registration{Rule: NoUnsafeUnaryMinus},
 		rule.Registration{Rule: NoUselessEmptyExport},
 		rule.Registration{Rule: NoWrapperObjectTypes},
 		rule.Registration{Rule: PreferAsConst},
