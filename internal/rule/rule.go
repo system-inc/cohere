@@ -247,11 +247,15 @@ type Rule struct {
 	// property could not live in discipline either. The failure is worse here: a nil checker is a
 	// loud crash, a stale cache is silence.
 	//
-	// The declaration is asymmetric on purpose, the same way NeedsTypeChecker is, and the adapter
-	// in internal/rules/upstream states the reasoning: under-declaring serves stale findings
-	// forever, over-declaring costs a cache miss. Those are not comparable, so anything that cannot
-	// see whether it reads the program declares true. The adapter hands ctx.Program to a rule whose
-	// body it does not own, so every adapted rule is cross-file by assumption.
+	// The declaration is asymmetric on purpose, the same way NeedsTypeChecker is: under-declaring
+	// serves stale findings forever, over-declaring costs a cache miss. Those are not comparable, so
+	// anything that cannot see whether it reads the program declares true.
+	//
+	// That rule used to have a standing exception. The adapter at internal/rules/upstream handed
+	// ctx.Program to rules whose bodies it did not own, so it declared this true for all of them by
+	// assumption. The adapter is gone and the six rules it wrapped were absorbed, which made the
+	// question answerable per rule: two of them genuinely read the program and declare it, four do
+	// not and no longer claim to. Every rule in the tree now declares this from its own body.
 	ReadsProgram bool
 }
 

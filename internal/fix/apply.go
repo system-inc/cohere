@@ -242,9 +242,12 @@ func Resolve(proposals []Proposal) Plan {
 // hazard has no live caller and this is a warning rather than a bug. A rule that genuinely needs two
 // edits to land together needs grouping here first; it cannot get it by reporting them side by side.
 //
-// The path to watch is not a hand-written rule. adaptFixes in internal/rules/upstream carries an
-// upstream fix slice of any length into one diagnostic, so an adapted rule reaches this without
-// anyone writing one of ours. No vendored rule emits two today; that is the door it comes through.
+// The door this used to come through is now closed. adaptFixes in internal/rules/upstream carried an
+// upstream fix slice of any length into one diagnostic, so an adapted rule could reach this hazard
+// without anyone writing one of ours. That adapter and every rule that went through it are gone: the
+// six tsgolint rules were absorbed onto our own interface and each one's fixes are now written here,
+// in this repo, by someone who can read this comment. So the next multi-fix report will be
+// deliberate, which is the condition under which grouping should be built rather than warned about.
 func ProposalsFrom(diagnostics []rule.Diagnostic) []Proposal {
 	proposals := []Proposal{}
 	for _, diagnostic := range diagnostics {

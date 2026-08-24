@@ -24,11 +24,13 @@ import (
 // completion signal is 171 rules with pairs, which makes this guard the thing standing between a
 // finished-looking catalog and a real one.
 //
-// Parsing rather than grepping. A grep for `rule.Rule{` over the same files reports
-// internal/rules/upstream/adapt.go as an unpaired rule: it builds a rule.Rule inside a function, so
-// the text matches while the declaration does not exist. That false positive is cheap here and
-// expensive at 171 rules, and it is the same class as two probes that searched for invented harness
-// names and returned confident wrong answers.
+// Parsing rather than grepping. The example that made the case was internal/rules/upstream/adapt.go,
+// where a grep for `rule.Rule{` reported an unpaired rule because the adapter built a rule.Rule
+// inside a function: the text matched while the declaration did not exist. That file is gone, but
+// the reasoning outlives it — any helper that constructs a rule value rather than declaring one
+// reproduces the same false positive. It is cheap here and expensive at 171 rules, and it is the
+// same class as two probes that searched for invented harness names and returned confident wrong
+// answers.
 func TestEveryRuleShipsAFixturePair(t *testing.T) {
 	rules := ruleDeclarationsByFile(t)
 	if len(rules) == 0 {
