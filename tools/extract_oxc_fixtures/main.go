@@ -38,6 +38,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -67,6 +68,11 @@ func main() {
 	snapshotDirectory := flag.String("snapshots", "", "oxc snapshots directory")
 	rule := flag.String("rule", "", "rule file stem, e.g. use_isnan")
 	snapshotPrefix := flag.String("prefix", "", "snapshot filename prefix; defaults to the rules directory's name")
+	// Two clones wrote throwaway dumpers before this existed, because the counts above tell a porter
+	// how many cases there are and step 5 of the brief requires the cases themselves, verbatim. The
+	// parser that produced the counts already holds them, so printing them costs one flag and
+	// removes the hand transcription that a third dumper would have reintroduced.
+	dump := flag.Bool("dump", false, "print every extracted case verbatim, one per line, Go-quoted")
 	flag.Parse()
 
 	if *rulesDirectory == "" || *snapshotDirectory == "" || *rule == "" {
@@ -91,6 +97,7 @@ func main() {
 		fmt.Printf("layout          directory rather than a single file\n")
 	}
 
+	fixCases := countFixVector(string(source))
 	blocks := readTesterBlocks(string(source))
 	if len(blocks) == 0 {
 		// A rule file with no Tester block is a real state, and reporting it as an empty corpus
@@ -171,6 +178,30 @@ func main() {
 	}
 	fmt.Printf("with options    %d cases carry a second tuple element\n", withOptions)
 
+	if fixCases > 0 {
+		// The fix vector is the highest-value artifact in a fixable rule's file and this tool did not
+		// read it for a long time. A clone porting a rule with 382 input/output pairs found them
+		// invisible here and had to pull them out by hand, which is the same waste the case dumper
+		// exists to prevent. Counting them at least tells a porter the vector is there.
+		fmt.Printf("fix vector      %d before/after pairs, which assert the repair rather than the "+
+			"finding; extract them separately and assert with ExpectFixedSource\n", fixCases)
+	}
+
+	if *dump {
+		// Go-quoted rather than raw, so a case carrying a newline, a tab or a quote survives being
+		// read off a terminal and pasted into a fixture table. The block and options columns come
+		// along because a case's block decides whether the snapshot counts it and a case's options
+		// decide whether it tests what it looks like it tests.
+		for _, block := range blocks {
+			for _, entry := range block.pass {
+				fmt.Printf("PASS block=%d options=%s %s\n", block.blockIndex, quoteOrNone(entry.options), strconv.Quote(entry.source))
+			}
+			for _, entry := range block.fail {
+				fmt.Printf("FAIL block=%d options=%s %s\n", block.blockIndex, quoteOrNone(entry.options), strconv.Quote(entry.source))
+			}
+		}
+	}
+
 	for _, key := range unrecognizedKeys(optionKeys, string(source), rulesDirectoryFor(rulePath)) {
 		// A case configuring a key the rule never reads runs on defaults while wearing the shape of
 		// a case that proves the option works, and it passes. oxc's own no-unused-vars corpus has
@@ -183,6 +214,15 @@ func main() {
 			"the rule's own source, so that case runs on defaults while looking like it tests the "+
 			"option\n", key)
 	}
+}
+
+// quoteOrNone renders a case's options column for -dump, distinguishing a case with no second
+// tuple element from one whose options happen to be empty text.
+func quoteOrNone(options string) string {
+	if options == "" {
+		return "none"
+	}
+	return strconv.Quote(options)
 }
 
 // optionKeyPattern finds the quoted keys of a serde_json object literal.
@@ -604,4 +644,25 @@ func readRuleDirectory(directory string) (string, error) {
 		return "", fmt.Errorf("no .rs files under %s", directory)
 	}
 	return combined.String(), nil
+}
+
+// countFixVector reports how many before/after pairs a rule's `let fix = vec![...]` declares.
+//
+// Separate from the pass and fail vectors because it asserts a different thing: those say whether a
+// finding appears, this says what the repair writes. A rule can pass every fixture in both
+// directions while its fix rewrites the wrong span, which is a defect this project has shipped.
+func countFixVector(source string) int {
+	marker := strings.Index(source, "let fix = vec!")
+	if marker < 0 {
+		return 0
+	}
+	open := strings.Index(source[marker:], "[")
+	if open < 0 {
+		return 0
+	}
+	body, ok := balancedSlice(source[marker+open:], '[', ']')
+	if !ok {
+		return 0
+	}
+	return len(readTuples(body))
 }

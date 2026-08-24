@@ -37,6 +37,15 @@ func TestRulesDeclareTheirCheckerUse(t *testing.T) {
 		registered[registration.name] = registration.needsChecker
 	}
 
+	// Which packages read the checker anywhere, so a rule reaching it through a sibling file's
+	// helper is not reported as over-declaring.
+	packageReadsChecker := map[string]bool{}
+	for _, declaration := range declarations {
+		if declaration.readsChecker {
+			packageReadsChecker[filepath.Dir(declaration.file)] = true
+		}
+	}
+
 	for _, declaration := range declarations {
 		needs, known := registered[declaration.ruleName]
 		if !known {
@@ -51,13 +60,20 @@ func TestRulesDeclareTheirCheckerUse(t *testing.T) {
 				"will be handed nil; a nil checker does not announce itself, it either panics into a "+
 				"lost file or takes a nil-guarded path and answers wrongly in silence",
 				declaration.ruleName, declaration.file)
-		case !declaration.readsChecker && needs:
+		case !declaration.readsChecker && needs && !packageReadsChecker[filepath.Dir(declaration.file)]:
 			// The safe direction, and still worth reporting. A rule that declares a need it does not
 			// have makes every file it applies to acquire an exclusive lock for nothing, which is
 			// exactly the cost `f4793b6` removed.
-			t.Errorf("rule %q declares NeedsTypeChecker and never reads ctx.TypeChecker in %s, so "+
+			//
+			// The package-level escape exists because this scan is per file and a rule may reach the
+			// checker through a helper its own file does not spell. `no-eval` declares the need and
+			// asks `resolvesToAGlobal`, which lives beside it in `no_new_native_nonconstructor.go`,
+			// so the per-file answer was a false positive that two porters reported independently
+			// before it was fixed. Reporting a correct declaration as an over-declaration is worse
+			// than missing one: it teaches the next porter that the guard is noise.
+			t.Errorf("rule %q declares NeedsTypeChecker and no file in %s reads ctx.TypeChecker, so "+
 				"every file it applies to takes the exclusive lock for nothing",
-				declaration.ruleName, declaration.file)
+				declaration.ruleName, filepath.Dir(declaration.file))
 		}
 	}
 }
