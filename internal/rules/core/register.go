@@ -130,6 +130,10 @@ func init() {
 		rule.Registration{Rule: NoVar},
 		rule.Registration{Rule: NoWith},
 		rule.Registration{Rule: PreferSpread},
+		rule.Registration{
+			Rule:   PreserveCaughtError,
+			Decode: rule.DecodeOptionsInto[PreserveCaughtErrorOptions](),
+		},
 		rule.Registration{Rule: RequireYield},
 		rule.Registration{
 			Rule:   UseIsNaN,
