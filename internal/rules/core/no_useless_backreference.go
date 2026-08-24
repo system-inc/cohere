@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/literal"
 	"github.com/system-inc/verify/internal/utils/ecmascript/regexsyntax"
 )
 
@@ -164,7 +165,7 @@ func checkBackreferencesInRegExpCall(ctx rule.Context, callee *ast.Node, argumen
 		return
 	}
 
-	offsets := cookedToRawOffsets(rawBody, pattern)
+	offsets := literal.CookedToRaw(rawBody, pattern)
 	if offsets == nil {
 		return
 	}

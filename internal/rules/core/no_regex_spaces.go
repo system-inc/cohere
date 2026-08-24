@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/literal"
 	"github.com/system-inc/verify/internal/utils/ecmascript/regexpattern"
 	"github.com/system-inc/verify/internal/utils/ecmascript/regexsyntax"
 )
@@ -59,7 +60,7 @@ var messageRegexSpaces = rule.Message{
 // short, and the fix would eat a character it did not mean to.
 //
 // oxc gets both at once by running its reader in string-literal mode, cooking while carrying each
-// unit's original span. We have no such reader, so `cookedToRawOffsets` rebuilds the correspondence
+// unit's original span. We have no such reader, so `literal.CookedToRaw` rebuilds the correspondence
 // instead. ESLint takes the third route: it computes against the cooked value and then refuses the
 // fix whenever cooked and raw differ, so it reports those cases without repairing them. Ours
 // repairs them, which is upstream's behavior rather than ESLint's.
@@ -160,7 +161,7 @@ var NoRegexSpaces = rule.Rule{
 				return
 			}
 
-			offsets := cookedToRawOffsets(rawBody, cooked)
+			offsets := literal.CookedToRaw(rawBody, cooked)
 			if offsets == nil {
 				return
 			}
@@ -249,7 +250,7 @@ func firstConsecutiveSpaces(pattern string, flags regexsyntax.RegexFlags) (int, 
 	return start, end, true
 }
 
-// The cooked-to-raw offset mapping this rule needs already exists: `cookedToRawOffsets` in
+// The cooked-to-raw offset mapping this rule needs already exists: `literal.CookedToRaw` in
 // no_misleading_character_class.go, which asks the identical question of the identical inputs (a
 // string literal's raw body and its cooked value) and returns the identical shape. Adopted rather
 // than duplicated, and probed against this rule's own corpus before adopting rather than taken on
