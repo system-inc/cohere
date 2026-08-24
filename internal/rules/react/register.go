@@ -29,6 +29,8 @@ import (
 // rules that vanished rather than as a quieter run.
 func init() {
 	rule.Register(
+		rule.Registration{Rule: JsxNoDuplicateProps},
 		rule.Registration{Rule: NoChildrenProp},
+		rule.Registration{Rule: NoStringRefs, Decode: rule.DecodeOptionsInto[NoStringRefsOptions]()},
 	)
 }
