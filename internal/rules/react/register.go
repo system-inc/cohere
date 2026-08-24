@@ -52,6 +52,7 @@ func init() {
 		rule.Registration{Rule: NoUnsafe, Decode: rule.DecodeOptionsInto[NoUnsafeOptions]()},
 		rule.Registration{Rule: NoWillUpdateSetState, Decode: rule.DecodeOptionsInto[NoWillUpdateSetStateOptions]()},
 		rule.Registration{Rule: Purity},
+		rule.Registration{Rule: Refs},
 		rule.Registration{Rule: RulesOfHooks},
 		rule.Registration{Rule: SetStateInEffect},
 		rule.Registration{Rule: SetStateInRender},
