@@ -45,6 +45,7 @@ func init() {
 		rule.Registration{Rule: NoThisInSfc},
 		rule.Registration{Rule: NoUnsafe, Decode: rule.DecodeOptionsInto[NoUnsafeOptions]()},
 		rule.Registration{Rule: NoWillUpdateSetState, Decode: rule.DecodeOptionsInto[NoWillUpdateSetStateOptions]()},
+		rule.Registration{Rule: RulesOfHooks},
 		rule.Registration{Rule: VoidDomElementsNoChildren},
 	)
 }
