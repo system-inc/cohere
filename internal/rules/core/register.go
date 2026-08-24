@@ -19,7 +19,9 @@ func init() {
 	rule.Register(
 		rule.Registration{Rule: ForDirection},
 		rule.Registration{Rule: NoArrayConstructor},
+		rule.Registration{Rule: NoAsyncPromiseExecutor},
 		rule.Registration{Rule: NoCaseDeclarations},
+		rule.Registration{Rule: NoClassAssign},
 		rule.Registration{Rule: NoCompareNegZero},
 		rule.Registration{
 			Rule:   NoCondAssign,
@@ -31,6 +33,7 @@ func init() {
 		rule.Registration{Rule: NoIterator},
 		rule.Registration{Rule: NoLossOfPrecision},
 		rule.Registration{Rule: NoNewNativeNonconstructor},
+		rule.Registration{Rule: NoObjCalls},
 		rule.Registration{
 			Rule:   NoConstantBinaryExpression,
 			Decode: rule.DecodeOptionsInto[NoConstantBinaryExpressionOptions](),
@@ -61,6 +64,11 @@ func init() {
 		rule.Registration{Rule: NoSetterReturn},
 		rule.Registration{Rule: NoSparseArrays},
 		rule.Registration{Rule: NoUnsafeFinally},
+		rule.Registration{
+			Rule:   NoUnsafeNegation,
+			Decode: rule.DecodeOptionsInto[NoUnsafeNegationOptions](),
+		},
+		rule.Registration{Rule: NoUselessBackreference},
 		rule.Registration{Rule: NoUselessCatch},
 		rule.Registration{
 			Rule:   NoUselessEscape,
