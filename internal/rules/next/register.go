@@ -21,8 +21,16 @@ func init() {
 		rule.Registration{Rule: GoogleFontPreconnect},
 		rule.Registration{Rule: NoAssignModuleVariable},
 		rule.Registration{Rule: NoCssTags},
+		rule.Registration{Rule: NoDuplicateHead},
+		rule.Registration{Rule: NoDocumentImportInPage},
 		rule.Registration{Rule: NoHeadElement},
+		rule.Registration{Rule: NoHtmlLinkForPages},
+		rule.Registration{Rule: NoHeadImportInDocument},
 		rule.Registration{Rule: NoImgElement},
+		rule.Registration{Rule: NoStyledJsxInDocument},
+		rule.Registration{Rule: NoScriptComponentInHead},
 		rule.Registration{Rule: NoSyncScripts},
+		rule.Registration{Rule: NoTypos},
+		rule.Registration{Rule: NoTitleInDocumentHead},
 	)
 }
