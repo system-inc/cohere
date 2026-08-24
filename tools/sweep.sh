@@ -82,8 +82,16 @@ if cmp -s "$backup" "$file"; then
     exit 2
 fi
 
-if ! go build ./... >/dev/null 2>&1; then
+# `go vet` on the package under test, not `go build ./...` on the whole tree. The tree-wide form
+# meant any sibling's broken file reported as "your mutant does not compile", and two porters each
+# lost four verdicts to that before reading this script. The message named your mutation and was
+# wrong about whose fault it was.
+#
+# Scoped here, so a refusal at this point really is your rewrite. A package that will not compile
+# without your mutation was already refused by the baseline check above, in different words.
+if ! go vet "$package" >/dev/null 2>&1; then
     echo "REFUSED: the mutant does not compile, which is neither a catch nor a survival."
+    echo "This checked only $package, so the breakage is your rewrite rather than a sibling's file."
     exit 2
 fi
 
