@@ -11,10 +11,21 @@ import (
 // heredoc on the way in. Every string here is byte-identical to the Rust source it came from; the
 // verification script that established that is recorded in the commit message.
 //
-// Two categories of upstream case are deliberately absent and neither is a silent drop. The JSX
-// cases need a `.tsx` harness and a JSX-aware read of a tag name, which this port does not
-// implement. The `test_d_ts` cases run under a `.d.ts` extension upstream, which this rule skips
-// entirely, so running them as `.ts` would assert the opposite of upstream's intent.
+// Three categories of upstream case are deliberately absent and none is a silent drop. The
+// `test_d_ts` cases run under a `.d.ts` extension upstream, which this rule skips entirely, so
+// running them as `.ts` would assert the opposite of upstream's intent.
+//
+// The `test_vars_self_use_js` cases run under `.js`, and `ruletest`'s generated tsconfig includes
+// only `**/*.ts` and `**/*.tsx`, so a `.js` fixture fails to build a program at all rather than
+// producing a verdict. Its one clean case is
+// `export function promisify() { var fn; function fn() {} return fn; }`, which is clean ONLY as
+// JavaScript: there `var fn` and `function fn` are one merged binding that `return fn` reads. As
+// TypeScript the checker keeps them separate — measured, the read resolves to the function at
+// offset 37 while the `var` at offset 33 is genuinely unread — so the same source is a true
+// positive under `.ts` and reproducing it as clean would require making the rule wrong about
+// TypeScript to be right about a file it never sees.
+//
+// The JSX cases are handled in `no_unused_vars_jsx_test.go` under a `.tsx` harness.
 var noUnusedVarsUpstreamClean = []string{
 	"function foo(cb) { cb = function(a) { return cb(1 + a); }(); } foo();",
 	"function foo(cb) { cb = (0, function(a) { cb(1 + a); }); } foo();",
@@ -123,7 +134,6 @@ var noUnusedVarsUpstreamClean = []string{
 	"\n        function foo() {\n            let bar = 0;\n            return bar++;\n        }\n        foo();\n        ",
 	"\n        let cancel = () => {}\n        export function close() { cancel = cancel?.() }\n        ",
 	"\n        class Chain { extend() { return this; } }\n\n        let chain = new Chain();\n        for (let i = 0; i < 10; i++) {\n            chain = chain.extend();\n        }\n        ",
-	"export function promisify() { var fn; function fn() {} return fn; }",
 	"\n        (() => {\n            const t = import.meta.url,\n                s = {};\n            return '' !== t && (s.resourcesUrl = new URL('.', t).href), e(s);\n        })();\n        ",
 	"var a; b !== '' && (x = a, f(c))",
 	"\n        class Test {\n            async updateContextGroup(t, i, s = !0) {\n                s ? await this.leave(i) : await this.join(t, i), false;\n            }\n        }\n\n        new Test();\n        ",
@@ -749,10 +759,12 @@ func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(t *testing.T) {
 // floor would go green if the rule started reporting more, which is the direction a false positive
 // arrives from, and this rule's clean-case suite is the only other thing watching for that.
 //
-// The number is measured, not aspirational: 268 of upstream's 303 reporting cases report here. The
-// 35 that do not are a stated subset rather than an accident, and `noUnusedVarsKnownGaps` below
-// names every one with its cause, so a change in either direction fails this test and has to be
+// The number is measured, not aspirational: 301 of upstream's 303 reporting cases report here. The
+// 2 that do not are a stated subset rather than an accident, and `noUnusedVarsKnownGaps` below
+// names both with its cause, so a change in either direction fails this test and has to be
 // explained rather than absorbed.
+//
+// One of the two is a case upstream cannot report either and documents as such in its own source.
 func TestNoUnusedVarsFiresOnUpstreamReportingCases(t *testing.T) {
 	silent := 0
 	for _, source := range noUnusedVarsUpstreamReports {
@@ -768,80 +780,33 @@ func TestNoUnusedVarsFiresOnUpstreamReportingCases(t *testing.T) {
 }
 
 // noUnusedVarsKnownGaps names every upstream reporting case this port does not report, with the
-// cause. It exists so the count assertion above cannot be satisfied by a different set of 35 cases:
-// a fix in one place and a regression in another would net to zero and go green.
+// cause. It exists so the count assertion above cannot be satisfied by a different set of cases: a
+// fix in one place and a regression in another would net to zero and go green.
 //
-// This is the stated subset the rule's doc comment refers to. Two rules in this tree already ship
-// as declared subsets rather than claiming parity, and this is the third. Every entry below is a
-// case where oxc reports and we do not; there is no case where we report and oxc does not, which
-// the clean-case suite above establishes over all 409 of upstream's passing inputs.
+// It started at 35 and is now 2. Both survivors are stated rather than pending, and neither can be
+// closed without giving something up that is worth more than the finding.
 var noUnusedVarsKnownGaps = []string{
-	// An exported CONTAINER makes everything inside it exempt here, and upstream judges the inner
-	// bindings anyway. `export function fn2(x, y) { console.log(x) }` reports `y` upstream: the
-	// function leaves the file, its parameters do not. The same shape arrives as an exported class
-	// whose constructor parameter is unused, an exported namespace's inner members, and an
-	// exported overload's parameter names.
+	// Upstream cannot report this one either, and says so in its own source. `tests/eslint.rs:744`
+	// ships this line in the FAIL list while the two neighbouring spellings sit COMMENTED OUT at
+	// `:743` and `:745` — oxc knows all three should report and can only manage one. The two it
+	// gives up on are `cb = function(a){ return cb(1+a); }()` and `cb = (0, function(a){ cb(1+a);
+	// })`, and both appear in its PASS list at `:16` and `:17`, so the same source text is
+	// simultaneously a passing case and a known-unreportable failing case.
 	//
-	// This is the direct cost of the per-file export assumption in the rule's doc comment, and it
-	// is the conservative half of it. A parameter of an exported function is genuinely invisible to
-	// this rule in one direction only: it can never be read from another file, so upstream is right
-	// and this is a real miss rather than a disagreement. Narrowing the exemption from "anything
-	// under an export" to "the exported binding itself" is the fix, and it is deliberately not
-	// attempted in this port because it changes the answer on every exported declaration in the
-	// tree at once and wants its own measurement.
-	"export function fn2({ x, y }) { console.log(x); };",
-	"export function fn2( x, y ) { console.log(x); };",
-	"export default function(a) {}",
-	"export default function(a, b) { console.log(a); }",
-	"\n        export function log(message: string, ...interpolations: unknown[]): void;\n        export function log(message: string, ...interpolations: unknown[]): void {\n            console.log(message);\n        }\n        ",
-	"\n        export function log(...messages: unknown[]): void {\n            return;\n        }\n        ",
-	"export class Foo { constructor(a: number) {} }",
-	"export class Foo { set(value) { } }",
-	"\n        export abstract class Foo {\n            public bar(a: number): string {}\n        }\n        ",
-	"export namespace N { function foo() }",
-	"\n        export namespace NonAmbientModuleDeclaration {\n            export interface Matchers<T> extends MatcherOverride {\n                toBeFoo(value: unknown): unknown;\n            }\n        }\n        ",
-	"export namespace N { namespace Inner {} }",
-	"export type F<T> = T extends infer R ? /* R not used */ string : never",
-	"export function foo(a: unknown): a is string { return true }",
-	"export const foo = (a: unknown): a is string => true",
-	"\n        declare module 'foo' {\n            type Test = any;\n            const x = 1;\n            export = x;\n        }\n        ",
-	"\n        // not declared\n        export namespace Foo {\n            namespace Bar {\n                namespace Baz {\n                    namespace Bam {\n                        const x = 1;\n                    }\n                }\n            }\n        }\n        ",
-	"\n          namespace Foo {\n            export const foo = 1;\n          }\n          export namespace Bar {\n            import TheFoo = Foo;\n          },\n        ",
-
-	// A comma sequence and a self-update composed together. `let a = 0; a = ++a;` and
-	// `let b = (a, 0) + 1;` both discard the value through a route this port's `isDiscardedResult`
-	// does not follow: the first nests an update inside the assignment that reads it, the second
-	// reads through a sequence whose result IS consumed while the operand's is not. Upstream
-	// separates these with a parent-and-grandparent walk (`usage.rs:709`) that this port models
-	// only one level deep.
-	"\n        function foo(a) { return (a, 0); }\n        foo(1);\n        ",
-	"let a = 0; a = a++ as any;",
-	"let a = 0; a = ++a;",
-	"let a = 0; a = (0, ++a);",
-	"let a = 0; let b = (a, 0) + 1; f(b);",
-
-	// `try {} catch(_) {}` reports upstream because `caughtErrorsIgnorePattern` has NO default
-	// pattern, while `varsIgnorePattern` and `argsIgnorePattern` default to a leading underscore.
-	// This port applies the underscore default to all three. That asymmetry is recorded here rather
-	// than fixed because the corpus has exactly one case for it and the tree has many `catch (_)`,
-	// so reproducing upstream here would trade one imported case for a large real-tree cost that
-	// nobody has asked for. Stated, not silent.
-	"try {} catch(_) { }",
-
-	// The remainder, each a distinct shape with no shared cause: a `with` statement (which the
-	// rule never sees a scope for), a function assigned to its own parameter, a type predicate
-	// naming a parameter it does not otherwise read (`a is string`), a rest parameter referenced in
-	// its own type (`...args: typeof args`), a re-export beside an import of the same name, and an
-	// `import X = Y` alias inside a namespace. Each would want its own probe and its own fixture.
-	"function foo(cb) { cb = function(a) { cb(1 + a); }; bar(not_cb); } foo();",
+	// This port reports the two spellings upstream reports and stays silent on the sequence form,
+	// which is the arrangement that keeps the differential clean: reporting a case oxlint cannot
+	// report is a difference, and this one is a difference upstream has explicitly declined.
 	"function foo(cb) { cb = (function(a) { cb(1 + a); }, cb); } foo();",
+
+	// `with` makes scope resolution undecidable, which is why it is banned in strict mode and in
+	// modules. Inside `with (a) var foo;` the checker returns no symbol for `foo` at all, because
+	// whether the name binds to the declaration or to a property of `a` is not knowable until the
+	// statement runs.
+	//
+	// The rule declines every binding it cannot resolve, and that guard is doing real work rather
+	// than papering over this: an unresolvable name reported as unused is a false positive on code
+	// the rule does not understand. Closing this one case means either special-casing `with` or
+	// weakening that guard everywhere, and the second would cost clean cases to gain one finding on
+	// a construct our own tree uses zero times and TypeScript forbids in every module.
 	"with (a) var foo;",
-	"export function promisify() { var fn; function fn() { fn() } }",
-	"import { resolve } from \"path\";\nexport { resolve } from \"path\";",
-	"function foo(...args: typeof args) {} foo()",
-	"function foo(...args: unknown[]): args is string[] { return true } foo()",
-	"declare module 'bun:test' { type Matchers2<T> = {} }",
-	"declare module 'bun:test' { class MyClass<T> {} }",
-	"function assertString(a: unknown): asserts a is string {} assertString('')",
-	"function assertDefined(a: unknown): asserts a {} assertDefined('')",
 }

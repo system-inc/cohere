@@ -242,3 +242,175 @@ func TestNoUnusedVarsExemptsMappedTypeKeys(t *testing.T) {
 			len(result.Diagnostics))
 	}
 }
+
+// TestNoUnusedVarsExportedContainerDoesNotExemptItsContents pins the change that closed the largest
+// group of gaps.
+//
+// An exported function leaves the file; its parameter list does not, and no importer can read a
+// parameter name. The same holds for a type parameter and for anything inside an exported
+// namespace's body. Before this, the export climb walked from the binding all the way to the
+// enclosing `export` and exempted everything under it.
+//
+// The controls matter as much as the cases: the exported binding ITSELF must still be exempt, or
+// this test would pass on a rule that had simply stopped believing in exports.
+func TestNoUnusedVarsExportedContainerDoesNotExemptItsContents(t *testing.T) {
+	for _, testCase := range []struct {
+		name   string
+		source string
+		want   int
+	}{
+		{"parameter of an exported function", "export function f(x, y) { return x; }", 1},
+		{"type parameter of an exported interface", "export interface M<T> { a: string }", 1},
+		{"binding inside an exported namespace", "export namespace N { function inner() {} }", 1},
+		{"import equals inside an exported namespace",
+			"namespace Foo { export const foo = 1; }\nexport namespace Bar { import TheFoo = Foo; }", 1},
+
+		// Controls: the exported thing itself stays exempt, and a local inside an exported arrow
+		// is still judged rather than being swept up by the same change.
+		{"control, the exported function itself", "export function used() {}", 0},
+		{"control, the exported interface itself", "export interface Used { a: string }", 0},
+		{"control, exported const", "export const value = 1;", 0},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
+			if len(result.Diagnostics) != testCase.want {
+				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
+			}
+		})
+	}
+}
+
+// TestNoUnusedVarsDiscardedReads pins the three positions where a read's value goes nowhere.
+//
+// Each has a control differing in exactly the one thing that decides it, because every one of these
+// is a left-versus-right or a same-name-versus-different-name distinction where a rule that ignored
+// the side would pass a one-sided fixture.
+func TestNoUnusedVarsDiscardedReads(t *testing.T) {
+	for _, testCase := range []struct {
+		name   string
+		source string
+		want   int
+	}{
+		// A comma sequence yields its RIGHT operand, so only the left one is discarded.
+		{"sequence left operand", "let a = 0; let b = (a, 0) + 1; f(b);", 1},
+		{"control, sequence right operand", "let a = 0; let b = (0, a) + 1; f(b);", 0},
+
+		// A self-update assigned back into its own binding observes nothing.
+		{"update fed back to itself", "let a = 0; a = ++a;", 1},
+		{"control, update fed to another binding", "let a = 0; let b = ++a; f(b);", 0},
+		{"update through a cast", "let a = 0; a = a++ as any;", 1},
+
+		// A closure assigned to the binding it reads.
+		{"closure assigned to itself",
+			"function foo(cb) { cb = function(a) { cb(1 + a); }; bar(not_cb); } foo();", 1},
+		{"control, immediately invoked so it really runs",
+			"function foo(cb) { cb = function(a) { return cb(1 + a); }(); } foo();", 0},
+		{"control, parameter default shadows the outer binding",
+			"let a; a = function(a = a) {}; a();", 0},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
+			if len(result.Diagnostics) != testCase.want {
+				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
+			}
+		})
+	}
+}
+
+// TestNoUnusedVarsTypePositionsThatNameWithoutReading pins the type-level shapes where a binding is
+// mentioned without being used.
+func TestNoUnusedVarsTypePositionsThatNameWithoutReading(t *testing.T) {
+	for _, testCase := range []struct {
+		name   string
+		source string
+		want   int
+	}{
+		{"return type predicate", "export function f(a: unknown): a is string { return true; }", 1},
+		{"asserts predicate", "function g(a: unknown): asserts a is string {} g('');", 1},
+		{"rest parameter typed by itself", "function h(...args: typeof args) {} h();", 1},
+		// Only `R` reports. `T` is genuinely read by the `T extends` on its left, which is worth
+		// pinning: the first version of this fixture expected two and the rule was right.
+		{"infer binding nothing uses",
+			"export type F<T> = T extends infer R ? string : never;", 1},
+
+		// Control: a parameter the body genuinely reads is not reported just because a predicate
+		// also names it.
+		{"control, predicate over a parameter the body reads",
+			"export function f(a: unknown): a is string { return typeof a === 'string'; }", 0},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
+			if len(result.Diagnostics) != testCase.want {
+				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
+			}
+		})
+	}
+}
+
+// TestNoUnusedVarsAmbientModuleExplicitExports pins the split between an ambient block that states
+// an interface and one that does not, and the interface-versus-alias split inside an ambient block.
+//
+// Both are upstream distinctions visible only in its snapshot rather than in its source, and each
+// one has a near-identical neighbour falling the other way.
+func TestNoUnusedVarsAmbientModuleExplicitExports(t *testing.T) {
+	for _, testCase := range []struct {
+		name   string
+		source string
+		want   int
+	}{
+		{"ambient block with no exports is left alone",
+			"declare module 'm' { type Unused = any; }", 0},
+		{"ambient block WITH an export has its contents judged",
+			"declare module 'm' { type Unused = any; const x = 1; export = x; }", 1},
+		{"ambient interface type parameter is left alone",
+			"declare module 'vitest' { interface Matchers<T> { toBeFoo(v: unknown): unknown; } }", 0},
+		{"ambient type alias type parameter is judged",
+			"declare module 'bun:test' { type Matchers2<T> = {} }", 1},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
+			if len(result.Diagnostics) != testCase.want {
+				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
+			}
+		})
+	}
+}
+
+// TestNoUnusedVarsReExportFromModuleIsNotALocalRead pins the one-word difference between a specifier
+// that reads a local binding and one that names something in another module.
+func TestNoUnusedVarsReExportFromModuleIsNotALocalRead(t *testing.T) {
+	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts",
+		"import { resolve } from \"path\";\nexport { resolve } from \"path\";"); len(result.Diagnostics) != 1 {
+		t.Errorf("`export { x } from './m'` names the other module, so the import is unused; got %d",
+			len(result.Diagnostics))
+	}
+	// The control is the same file with the `from` clause removed, where the specifier really does
+	// read the local binding.
+	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts",
+		"import { resolve } from \"path\";\nexport { resolve };"); len(result.Diagnostics) != 0 {
+		t.Errorf("control: `export { x }` without a module specifier reads the local binding; got %d",
+			len(result.Diagnostics))
+	}
+}
+
+// TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern pins the asymmetry between the three ignore
+// patterns: a variable or parameter named with a leading underscore is ignored by default, a caught
+// error is not.
+func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(t *testing.T) {
+	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", "try {} catch(_) { }"); len(result.Diagnostics) != 1 {
+		t.Errorf("caughtErrorsIgnorePattern has no default, so `catch(_)` reports; got %d",
+			len(result.Diagnostics))
+	}
+	// The control on the other side of the asymmetry: a VARIABLE named `_` is ignored.
+	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", "const _ = 1;"); len(result.Diagnostics) != 0 {
+		t.Errorf("control: a variable named `_` is ignored by default; got %d", len(result.Diagnostics))
+	}
+	// And configuring a pattern turns it back off.
+	options, err := DecodeNoUnusedVarsOptions(json.RawMessage(`{"caughtErrorsIgnorePattern":"^_"}`))
+	if err != nil {
+		t.Fatalf("decoding failed: %v", err)
+	}
+	if result := ruletest.RunTypedWithOptions(t, NoUnusedVars, "a.ts", "try {} catch(_) { }", options); len(result.Diagnostics) != 0 {
+		t.Errorf("an explicit caughtErrorsIgnorePattern ignores it; got %d", len(result.Diagnostics))
+	}
+}
