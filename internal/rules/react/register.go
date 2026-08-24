@@ -30,6 +30,7 @@ import (
 func init() {
 	rule.Register(
 		rule.Registration{Rule: JsxNoDuplicateProps},
+		rule.Registration{Rule: JsxNoUndef},
 		rule.Registration{Rule: NoChildrenProp},
 		rule.Registration{Rule: NoFindDOMNode},
 		rule.Registration{Rule: NoIsMounted},
