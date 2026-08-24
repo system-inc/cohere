@@ -18,6 +18,16 @@ import "github.com/microsoft/TypeScript/tsc/internal/tracing"
 import "sync"
 import "unsafe"
 
+// arenaPagedLinkStore stands in for checker.symbolArenaLinkStore, whose name is unexported.
+//
+// It must match that type's size and alignment exactly, because the mirror it appears in is read
+// through unsafe.Pointer by field offset. Upstream is a PagedLinkStore of pointers plus an Arena of
+// values (typescript-go/tsc/internal/checker/links.go), and substituting the store half alone left
+// the mirror 24 bytes short, which silently corrupted every field declared after it.
+type arenaPagedLinkStore[V any] struct {
+	store core.PagedLinkStore[*V]
+	arena core.Arena[V]
+}
 type AccessFlags = checker.AccessFlags
 const AccessFlagsAllowMissing = checker.AccessFlagsAllowMissing
 const AccessFlagsCacheSymbol = checker.AccessFlagsCacheSymbol
@@ -227,7 +237,7 @@ type extra_Checker struct {
   jsxElementLinks core.LinkStore[*ast.Node, checker.JsxElementLinks]
   computedNameLinks core.LinkStore[*ast.Node, checker.ComputedNameNodeLinks]
   symbolReferenceLinks core.LinkStore[*ast.Symbol, checker.SymbolReferenceLinks]
-  valueSymbolLinks core.PagedLinkStore[checker.ValueSymbolLinks]
+  valueSymbolLinks arenaPagedLinkStore[checker.ValueSymbolLinks]
   mappedSymbolLinks core.LinkStore[*ast.Symbol, checker.MappedSymbolLinks]
   deferredSymbolLinks core.LinkStore[*ast.Symbol, checker.DeferredSymbolLinks]
   aliasSymbolLinks core.LinkStore[*ast.Symbol, checker.AliasSymbolLinks]

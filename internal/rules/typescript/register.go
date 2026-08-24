@@ -26,6 +26,8 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoExplicitAnyOptions](),
 		},
 		rule.Registration{Rule: NoExtraNonNullAssertion},
+		rule.Registration{Rule: NoImpliedEval},
+		rule.Registration{Rule: NoForInArray},
 		rule.Registration{Rule: NoMisusedNew},
 		rule.Registration{Rule: NoNonNullAssertedOptionalChain},
 		rule.Registration{Rule: NoNonNullAssertion},
@@ -41,5 +43,13 @@ func init() {
 		rule.Registration{Rule: NoWrapperObjectTypes},
 		rule.Registration{Rule: PreferAsConst},
 		rule.Registration{Rule: PreferNamespaceKeyword},
+		rule.Registration{
+			Rule:   TripleSlashReference,
+			Decode: DecodeTripleSlashReferenceOptions,
+		},
+		rule.Registration{
+			Rule:   SwitchExhaustivenessCheck,
+			Decode: rule.DecodeOptionsInto[SwitchExhaustivenessCheckOptions](),
+		},
 	)
 }

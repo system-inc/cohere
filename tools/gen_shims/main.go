@@ -33,7 +33,23 @@ type ExtraShim struct {
 	// This is configuration rather than a code change because the substitutions are upstream's private
 	// vocabulary, and it drifts. Four were needed for the move from typescript-go to
 	// microsoft/TypeScript alone.
+	//
+	// IDENTICAL SIZE IS THE WHOLE CONTRACT, and a substitution that violates it fails silently in the
+	// worst available way. `checker.symbolArenaLinkStore` was substituted with `core.PagedLinkStore`,
+	// which is the store half of it and omits the arena half, leaving the mirror 24 bytes short at
+	// field 99 of 319. Every field after it then read at the wrong offset: `Checker_numberType`
+	// returned the `null` type and `Checker_booleanType` returned `false`. Nothing crashed, no test
+	// failed, and the one rule that depended on it went silent on every input. Anything mirroring a
+	// struct with more than one field needs ExtraDeclarations below rather than a bare rename.
 	TypeSubstitutions map[string]string
+
+	// ExtraDeclarations are emitted verbatim into the generated file, ahead of the mirrors.
+	//
+	// TypeSubstitutions can only rewrite the head of a rendered type expression, so a generic
+	// upstream type keeps its `[V]` suffix and the stand-in has to be a generic named type too. An
+	// inline anonymous struct cannot carry that suffix, and the shim packages are wholly generated,
+	// so there is nowhere else in them to put such a declaration. This is that place.
+	ExtraDeclarations []string
 }
 
 func main() {
@@ -90,6 +106,10 @@ func main() {
 		}
 		if extraShim.TypeSubstitutions == nil {
 			extraShim.TypeSubstitutions = map[string]string{}
+		}
+		for _, declaration := range extraShim.ExtraDeclarations {
+			shimBuilder.WriteString(declaration)
+			shimBuilder.WriteString("\n")
 		}
 		if extraShim.IgnoreFunctions == nil {
 			extraShim.IgnoreFunctions = []string{}

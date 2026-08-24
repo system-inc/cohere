@@ -3,7 +3,12 @@
 Upstream: https://github.com/typescript-eslint/tsgolint
 License: MIT, `Copyright (c) 2025 typescript-eslint and other contributors`. Full text in `LICENSE`.
 
-**Vendored commit: `4178710` (2025-07-13), established by diff rather than by record.** The copy
+**Vendored commit: `4178710` (2025-07-13).** Recorded properly for `no_for_in_array`, which was
+fetched from `main` when `main` was `4178710`; the GitHub API also reports that file unchanged since
+`4c49bac` (2025-04-01), so the bytes belong to `4178710` by both routes. The original note below
+applies to everything vendored before it.
+
+**Everything else: established by diff rather than by record.** The copy
 landed in `ea1d334` without capturing the upstream commit. It was recovered afterward by cloning
 upstream and diffing: `rules/await_thenable/await_thenable.go` matches that commit exactly apart
 from its four import lines, and the rest of the vendored surface matches apart from the API
@@ -48,9 +53,23 @@ re-signed part of the surface:
                                          AsTypeParameter -> AsTypeParameterDeclaration
     utils/ts_api_utils.go      2 lines   the same IsParameter rename
 
-**No rule file is edited.** All 36 lines are in the shared harness, and `rules/await_thenable`
-differs from upstream by exactly its four import lines and nothing else. That is the property that
-matters for trusting an adapted rule: the logic we run is upstream's logic.
+**One rule file is now edited, and only one.** All 36 lines above are in the shared harness, and
+`rules/await_thenable`, `rules/no_array_delete` and `rules/no_unsafe_unary_minus` differ from
+upstream by exactly their four import lines and nothing else. That is the property that matters for
+trusting an adapted rule: the logic we run is upstream's logic.
+
+`rules/no_for_in_array` carries the import lines plus **one real edit, to its rule NAME**. Upstream
+declares `Name: "no-for-in-array-rule"`; that trailing "-rule" is a typo and it is corrected here.
+
+It was measured rather than eyeballed before editing: all 38 rules under tsgolint's `internal/rules/`
+were fetched and each `Name` compared against its own directory, and this is the **only** one in the
+family that disagrees. The typo is live upstream rather than absorbed downstream, because
+`cmd/tsgolint/main.go` builds its `ConfiguredRule` with `Name: r.Name` and no mapping table.
+
+It cannot ship unedited, because verify keys the catalog, `VerifySettings.json`, and suppression
+comments on that exact string. Two registry guards catch it if anyone reverts the correction:
+`TestEveryRegisteredRuleIsReachableFromTheLiveConfig` and `TestParityAgainstInventory` both fail by
+name. No logic is edited in any rule file.
 
 Re-syncing is still a diff rather than a merge, but it is a diff against these 36 lines rather than
 against nothing, and a reader who expects byte-identical files will be confused without this note.
