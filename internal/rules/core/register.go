@@ -32,12 +32,21 @@ func init() {
 		rule.Registration{Rule: NoControlRegex},
 		rule.Registration{Rule: NoDupeClassMembers},
 		rule.Registration{Rule: NoImportAssign},
+		rule.Registration{
+			Rule:   NoIrregularWhitespace,
+			Decode: rule.DecodeOptionsInto[NoIrregularWhitespaceOptions](),
+		},
 		rule.Registration{Rule: NoIterator},
 		rule.Registration{Rule: NoLossOfPrecision},
 		rule.Registration{Rule: NoNewNativeNonconstructor},
 		rule.Registration{Rule: NoObjCalls},
 		rule.Registration{Rule: NoOctal},
 		rule.Registration{Rule: NoPrototypeBuiltins},
+		rule.Registration{
+			Rule:   NoUnusedExpressions,
+			Decode: rule.DecodeOptionsInto[NoUnusedExpressionsOptions](),
+		},
+		rule.Registration{Rule: NoUnusedPrivateClassMembers},
 		rule.Registration{Rule: PreferRestParams},
 		rule.Registration{
 			Rule:   NoConstantBinaryExpression,
