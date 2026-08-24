@@ -21,14 +21,23 @@
 # a catch is how a sweep congratulates itself for a syntax error.
 set -uo pipefail
 
-if [ "$#" -ne 3 ]; then
-    echo "usage: tools/sweep.sh <file> <package> <python-rewrite>" >&2
+if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
+    echo "usage: tools/sweep.sh <file> <package> <python-rewrite> [test-name-pattern]" >&2
     exit 2
 fi
 
 file="$1"
 package="$2"
 rewrite="$3"
+# A fourth argument scopes the run to one rule's tests with `-run`. That exists because this tree
+# has several agents in one package and a sibling's half-written file makes the whole package red
+# for reasons unrelated to any mutant. Scoping keeps the baseline green and the measurement honest.
+#
+# The cost is real and has to be stated: a scoped run cannot see a guard living in another package.
+# A mutation renaming a rule reads as a survivor under scoping, because the parity guard that would
+# catch it is in internal/registry. So a scoped sweep measures the rule's own fixtures and nothing
+# else, and anything relying on a cross-package guard needs an unscoped run to score.
+pattern="${4:-}"
 
 if [ ! -f "$file" ]; then
     echo "sweep: no such file: $file" >&2
@@ -44,9 +53,14 @@ if ! go vet "$package" >/dev/null 2>&1; then
     echo "REFUSED: $package does not compile before any mutation, so nothing can be scored." >&2
     exit 2
 fi
-if [ "$(go test -count=1 "$package" 2>&1 | grep -c 'FAIL')" -gt 0 ]; then
+baseline_command=(go test -count=1 "$package")
+if [ -n "$pattern" ]; then
+    baseline_command=(go test -count=1 "$package" -run "$pattern")
+fi
+
+if [ "$("${baseline_command[@]}" 2>&1 | grep -c 'FAIL')" -gt 0 ]; then
     echo "REFUSED: $package is already failing before any mutation, so every mutant would score" >&2
-    echo "as caught. Establish a green baseline first, or wait for the other agent to land." >&2
+    echo "as caught. Pass a fourth argument to scope the run, e.g. -run TestYourRule, or wait." >&2
     exit 2
 fi
 
@@ -73,7 +87,7 @@ if ! go build ./... >/dev/null 2>&1; then
     exit 2
 fi
 
-failures="$(go test -count=1 "$package" 2>&1 | grep -c 'FAIL')"
+failures="$("${baseline_command[@]}" 2>&1 | grep -c 'FAIL')"
 if [ "$failures" -gt 0 ]; then
     echo "CAUGHT: $failures failing line(s) in $package"
 else
