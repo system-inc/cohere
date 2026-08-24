@@ -356,6 +356,16 @@ func TestNoUnassignedVarsExemptions(t *testing.T) {
 		{"an array binding pattern", "let [a, b] = o; log(a, b);"},
 		{"a const is exempt even when never assigned again", "const x = 1; log(x);"},
 		{"a using declaration is const-like", "using x = r(); log(x);"},
+		// A catch parameter is bound by the runtime, so no assignment to it exists in the source.
+		// That is the exact shape this rule reports, and it produced 445 findings on our own tree
+		// with a 100% false positive rate before this case existed. Upstream never faces it: oxc
+		// requires a declarator whose parent is a VariableDeclaration, and a catch parameter fails
+		// that parent check. TypeScript spells the declarator KindVariableDeclaration, so the port
+		// collapsed both anchors into one and lost the exemption with it.
+		{"a catch parameter", "try { risky(); } catch(error) { log(error); }"},
+		{"a typed catch parameter", "try { risky(); } catch(error: unknown) { log(error); }"},
+		{"a destructured catch parameter", "try { risky(); } catch({message}) { log(message); }"},
+
 		// The for-head exemptions. A loop variable is assigned by the loop itself on every
 		// iteration, so it is never the finding even though no initializer is written.
 		{"a for-in loop variable", "for (let k in o) { log(k) }"},

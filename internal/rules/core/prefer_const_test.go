@@ -219,11 +219,24 @@ func TestPreferConstStaysSilent(t *testing.T) {
 		{"an initialized rest after another element", "let w = 1; [a, ...w] = [];"},
 		{"an initialized rest nested in a property value", "let w = 1; ({ x: [...w] } = {});"},
 
+		// A parenthesis directly around the identifier, which is the shape the rule's own write
+		// detector missed until the detector was lifted onto the shelf. Both are real writes: node
+		// reports `w` holding [1,2] after `[...(w)] = [1,2]`, and the const form throws
+		// `TypeError: Assignment to constant variable`. So the rule reporting these as convertible
+		// proposed a fix that produces code which cannot run.
+		//
+		// The unparenthesized siblings three lines above were always correct, which is what made
+		// this invisible: every fixture anyone thought to write used the bare form.
+		{"an initialized parenthesized array rest target", "let w = 1; [...(w)] = [];"},
+		{"an initialized parenthesized object rest target", "let w = 1; ({...(w)} = {});"},
+
 		{"an array rest assignment target", "let w; [...w] = [];"},
 		{"an object rest assignment target", "let w; ({...w} = {});"},
 		{"an array rest after another element", "let w; [a, ...w] = [];"},
 		{"an object rest after another property", "let w; ({a, ...w} = {});"},
 		{"a rest nested inside a property value", "let w; ({ x: [...w] } = {});"},
+		{"a parenthesized array rest target", "let w; [...(w)] = [];"},
+		{"a parenthesized object rest target", "let w; ({...(w)} = {});"},
 
 		// A postfix update, the shape no_ex_assign was missing entirely until today.
 		{"a postfix increment", "let w = 1; w++;"},

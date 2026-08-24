@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
+	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
 )
 
 var messageNoImportAssign = rule.Message{
@@ -71,7 +72,7 @@ var messageNoImportAssign = rule.Message{
 // Symbol identity says which binding an identifier names and nothing about whether the occurrence
 // writes. `mod.prop = 0` and `foo(mod)` both resolve to the import and neither rebinds it, so the
 // rule needs the structural half too. For the plain rebinding that is a straight conjunction and
-// `writesToItsIdentifier` is the structural half, shared with `no-class-assign`.
+// `reference.WritesToBinding` is the structural half, shared with five sibling rules.
 //
 // The namespace shapes are where the two halves are not a simple conjunction, which is the thing
 // that makes this rule bigger than its sibling. `mod.named = 0` does not write to `mod` by that
@@ -79,7 +80,7 @@ var messageNoImportAssign = rule.Message{
 // The write being flagged is a write to a property of the thing the identifier names, so the
 // structural question is asked one level up: is the member expression whose object is this
 // identifier the target of an assignment, an update, a delete, or a for-in/of head. That is
-// `writesThroughMemberExpression`, and it is a different question from `writesToItsIdentifier`
+// `writesThroughMemberExpression`, and it is a different question from `reference.WritesToBinding`
 // rather than a variant of it.
 //
 // # What upstream misses and this reproduces
@@ -193,7 +194,7 @@ var NoImportAssign = rule.Rule{
 						var blame *ast.Node
 						needsNamespace := false
 						switch {
-						case writesToItsIdentifier(current):
+						case reference.WritesToBinding(current):
 							blame = current
 						default:
 							// The namespace-only shapes, checked for any anchored name and then gated on
@@ -246,7 +247,7 @@ func resolvedDeclarationOf(ctx rule.Context, identifier *ast.Node) *ast.Node {
 // writesThroughMemberExpression returns the member expression through which an identifier's
 // properties are written, or nil.
 //
-// This is the namespace half of the rule and it is a different question from `writesToItsIdentifier`
+// This is the namespace half of the rule and it is a different question from `reference.WritesToBinding`
 // rather than a variant of it: `mod.named = 0` writes to a property of what `mod` names, while `mod`
 // itself is only read. Asking the same question one level up is what separates the two, and getting
 // that wrong in either direction breaks a clean case rather than a failing one. Widening it to any
@@ -289,10 +290,10 @@ func writesThroughMemberExpression(identifier *ast.Node) *ast.Node {
 //
 // Split out from `writesThroughMemberExpression` because the member expression is found by one
 // question and judged by another, and because `delete` belongs only here. Deleting a binding is a
-// syntax error, so `writesToItsIdentifier` has no reason to know the operator; deleting a namespace
+// syntax error, so `reference.WritesToBinding` has no reason to know the operator; deleting a namespace
 // property is upstream's `delete mod12.named` and fails.
 //
-// The climb through destructuring wrappers mirrors `writesToItsIdentifier` and exists for the same
+// The climb through destructuring wrappers mirrors `reference.WritesToBinding` and exists for the same
 // reason: `[mod6.named] = foo` and `({ ...mod11.named } = foo)` reach their assignment through an
 // array or object literal rather than directly.
 func isWriteTarget(member *ast.Node) bool {

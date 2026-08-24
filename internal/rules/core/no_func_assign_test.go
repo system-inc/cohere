@@ -108,7 +108,7 @@ func TestNoFuncAssignPointsAtTheWrite(t *testing.T) {
 			[]string{"foo"}},
 		{"a hoisted reassignment", "foo = bar; function foo() { };", []string{"foo"}},
 		// A parenthesized assignment target, which neither upstream's corpus nor this one had
-		// until a sibling rule tripped over it in the shared `writesToItsIdentifier`. The climb
+		// until a sibling rule tripped over it in the shared write detector. The climb
 		// reassigns `child` to the parent, so at the binary node `child` was the parenthesis while
 		// the arm compared against `ast.SkipParentheses(binary.Left)`, which is the identifier, and
 		// `(foo) = 1` read as a read. The span assertion is the useful half: it pins the finding to

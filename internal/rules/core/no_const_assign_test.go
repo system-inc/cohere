@@ -246,7 +246,7 @@ func TestNoConstAssignPointsAtTheWrite(t *testing.T) {
 		{"a destructuring target with a default", "const x = 0; ({a: x = 1} = {});",
 			[]string{"x"}},
 		// The rest shapes, which are the ones `ast.IsWriteAccess` declines on its own and which
-		// `writesToItsBinding` reaches through a spread wrapper. A port reporting the spread element
+		// `reference.WritesToBinding` reaches through a spread wrapper. A port reporting the spread element
 		// rather than the identifier inside it would still produce one finding with the right id.
 		{"a nested rest element as a destructuring target",
 			"const d = 123; [a, b, ...[c, ...d]] = [1, 2, 3, 4, 5]", []string{"d"}},

@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
 )
 
 // NoGlobalAssignOptions is the decoded option surface.
@@ -88,7 +89,7 @@ type NoGlobalAssignOptions struct {
 // Symbol identity says which binding an identifier names and says nothing about whether the
 // occurrence writes. `Object.x = 1;` and `foo(Object);` both resolve to the global and neither
 // reassigns it, so the rule needs the structural half too and reports only where the two agree.
-// `writesToItsIdentifier` is that half, shared with `no-class-assign`.
+// `reference.WritesToBinding` is that half, shared with five sibling rules.
 //
 // # The one shape the checker answers differently
 //
@@ -136,7 +137,7 @@ var NoGlobalAssign = rule.Rule{
 				}
 				// The structural half first, because it is far cheaper than a checker call and this
 				// listener sees every identifier in the file. Most of them are reads.
-				if !writesToItsIdentifier(node) {
+				if !reference.WritesToBinding(node) {
 					return
 				}
 				if !resolvesToAGlobalThroughShorthand(ctx, node) {

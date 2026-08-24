@@ -227,7 +227,7 @@ func TestNoShadowRestrictedNamesCarveOutBoundary(t *testing.T) {
 		wantCount  int
 	}{
 		// The write shapes. Each of these makes an otherwise-bare `var undefined` unsafe, and each
-		// reaches `writesToItsIdentifier` through a different arm.
+		// reaches `reference.WritesToBinding` through a different arm.
 		{"a compound assignment to the binding", "var undefined; undefined += 1;", 1},
 		{"a logical assignment to the binding", "var undefined; undefined ??= 1;", 1},
 		{"a postfix increment of the binding", "var undefined; undefined++;", 1},

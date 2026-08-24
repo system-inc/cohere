@@ -251,7 +251,7 @@ func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
 		{"two writes to the same import", "import mod from 'mod'; mod = 0; mod = 1",
 			[]string{"mod", "mod"}},
 
-		// A logical assignment. `writesToItsIdentifier` accepts any assignment operator and the
+		// A logical assignment. `reference.WritesToBinding` accepts any assignment operator and the
 		// corpus only ever uses `=` and `+=`.
 		{"a logical assignment to an import", "import mod from 'mod'; mod ||= 0",
 			[]string{"mod"}},

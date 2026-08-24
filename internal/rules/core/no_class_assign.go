@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
 )
 
 var messageNoClassAssign = rule.Message{
@@ -60,7 +61,7 @@ var messageNoClassAssign = rule.Message{
 // Symbol identity says which binding an identifier names; it says nothing about whether the
 // occurrence writes. `class A { } A.x = 0;` and `class A { } foo(A);` both resolve to the class and
 // neither reassigns it, so the rule needs the structural half too and reports only where the two
-// agree. `writesToItsIdentifier` is that half.
+// agree. `reference.WritesToBinding` is that half, shared with five sibling rules.
 //
 // # The one shape the checker answers differently
 //
@@ -131,7 +132,7 @@ var NoClassAssign = rule.Rule{
 				// correctly so.
 				if current.Kind == ast.KindIdentifier &&
 					current.Text() == name.Text() &&
-					writesToItsIdentifier(current) &&
+					reference.WritesToBinding(current) &&
 					resolvesToDeclaration(ctx, current, declaration) {
 					ctx.ReportNode(current, messageNoClassAssign)
 				}
@@ -189,81 +190,4 @@ func resolvesToDeclaration(ctx rule.Context, identifier *ast.Node, declaration *
 		return false
 	}
 	return symbol.Declarations[0] == declaration
-}
-
-// writesToItsIdentifier reports whether an identifier occurrence assigns to the binding it names.
-//
-// This is the structural half of the rule, and it exists because symbol identity alone cannot see
-// the difference between `A = 0` and `A.x = 0`: both name the class, and only one reassigns it.
-// Upstream gets this from `is_write()` on a reference the semantic layer already classified, so its
-// corpus never exercises most of these shapes and cannot tell a port which ones it missed. Each arm
-// below is therefore a place this could be silently short, and each has its own fixture.
-//
-// The walk climbs through the wrappers that can sit between an identifier and the construct
-// assigning to it, so a target inside a parenthesis or a nested pattern is found at whatever depth
-// it sits.
-func writesToItsIdentifier(identifier *ast.Node) bool {
-	child := identifier
-	for parent := identifier.Parent; parent != nil; parent = parent.Parent {
-		switch parent.Kind {
-		case ast.KindBinaryExpression:
-			// `A = 0`, `A += 1`, `A ||= 1`. Compound and logical assignments write to the binding
-			// exactly as `=` does. Only the left side counts: `b = A` reads it.
-			binary := parent.AsBinaryExpression()
-			return binary.OperatorToken != nil &&
-				ast.IsAssignmentOperator(binary.OperatorToken.Kind) &&
-				ast.SkipParentheses(binary.Left) == child
-
-		case ast.KindPrefixUnaryExpression:
-			// `--A`. A `-A` or `!A` reads the binding and leaves it alone.
-			unary := parent.AsPrefixUnaryExpression()
-			return isUpdateOperator(unary.Operator) && ast.SkipParentheses(unary.Operand) == child
-
-		case ast.KindPostfixUnaryExpression:
-			// `A++`, which differs from the prefix form only in what it evaluates to.
-			unary := parent.AsPostfixUnaryExpression()
-			return isUpdateOperator(unary.Operator) && ast.SkipParentheses(unary.Operand) == child
-
-		case ast.KindForInStatement, ast.KindForOfStatement:
-			// `for (A of []) {}` assigns on every iteration. The head is only a write when it is a
-			// bare target; `for (const A of [])` declares a fresh binding instead, and that
-			// initializer is a variable declaration list rather than this identifier's ancestor
-			// chain ending here.
-			return parent.AsForInOrOfStatement().Initializer == child
-
-		case ast.KindParenthesizedExpression,
-			ast.KindArrayLiteralExpression,
-			ast.KindSpreadElement,
-			ast.KindSpreadAssignment,
-			ast.KindObjectLiteralExpression,
-			ast.KindShorthandPropertyAssignment:
-			// The destructuring wrappers. A destructuring assignment target parses as an array or
-			// object literal rather than as a pattern, so `[A] = [0]` and `({...A} = {})` reach the
-			// assignment through one of these. The question passes through unchanged and the
-			// binary-expression arm above decides it, which is what keeps `const o = {A};` clean:
-			// the same object literal is not being assigned to, so the climb ends at a declaration
-			// rather than at an assignment operator.
-
-		case ast.KindPropertyAssignment:
-			// `({b: A} = {})` writes to `A` through the value side. `({A: b} = {})` writes to `b`
-			// and merely names `A` as a key, so only the initializer counts.
-			if parent.AsPropertyAssignment().Initializer != child {
-				return false
-			}
-
-		default:
-			// Anything else ends the climb. A property access (`A.x = 0`), a call argument
-			// (`foo(A)`), an extends clause, and a type reference all land here, and none of them
-			// reassigns the binding.
-			return false
-		}
-		// Advance unwrapped. The arms above compare against `ast.SkipParentheses(...)` on the
-		// parent's own operand, which yields the identifier rather than the parenthesis around it,
-		// so carrying a `KindParenthesizedExpression` up as `child` makes every one of those
-		// comparisons fail. `(A) = 1` is a write and read as a read before this line existed;
-		// neither upstream's corpus nor ours had a parenthesized assignment target, which is why it
-		// shipped silently. Skipping here keeps both sides of the comparison unwrapped.
-		child = ast.SkipParentheses(parent)
-	}
-	return false
 }

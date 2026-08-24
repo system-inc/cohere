@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
 )
 
 var messagePreferConst = rule.Message{
@@ -128,11 +129,16 @@ type PreferConstOptions struct {
 // a missed report. For this rule it is exactly the false positive described above: upstream carries
 // `let predicate; [typeNode.returnType, ...predicate] = foo();` as a *clean* case, and a rule
 // trusting the shelf sees zero writes to `predicate` and reports it. So the write detection here is
-// `writesToBinding`, which is `ast.IsWriteAccess` plus the spread arms, and the gap has its own
-// fixture in both corpora.
+// `reference.WritesToBinding`, which is `ast.IsWriteAccess` with the spread arms added, and the gap
+// has its own fixture in both corpora.
 //
-// This is reported rather than worked around silently, per the brief: the shelf accessor is short
-// for rest targets and three rules in this package now depend on it.
+// That wrapper was written three times, once per rule, before a census read the whole corpus at
+// once and lifted the union onto the shelf. The lifted version also closes a gap this rule's own
+// wrapper had: a parenthesis sitting directly around the identifier made the climb bail on its
+// first step, so `let w = 1; [...(w)] = xs;` read as never written and was reported as convertible
+// to `const`. Applying that suggestion produces code that throws `TypeError: Assignment to constant
+// variable` at runtime. Measured with a control on the unparenthesized form, which was always
+// correct.
 //
 // # What counts as never reassigned
 //
@@ -159,7 +165,7 @@ type PreferConstOptions struct {
 //
 // A binding written from a nested function is never reported, whatever the count. `let a; function
 // foo() { a = bar(); }` is clean upstream, and the reason is not stylistic: the write may run any
-// number of times including zero, and `const` cannot express it. `writesToBinding` sees these, and
+// number of times including zero, and `const` cannot express it. The write detector sees these, and
 // `unconditionalWrite` refuses them at the function boundary.
 //
 // A pattern whose bindings disagree is where the `destructuring` option lives, and the two answers
@@ -422,7 +428,7 @@ func writesResolvingTo(ctx rule.Context, sourceFile *ast.SourceFile, boundName *
 			return
 		}
 		// The declarator's own name is not a write: its parent is the declarator, which
-		// `writesToBinding` declines. No explicit exclusion is needed and adding one would be
+		// `reference.WritesToBinding` declines. No explicit exclusion is needed and adding one would be
 		// untested code.
 		//
 		// The text comparison is a pre-filter rather than a discrimination, since symbol identity
@@ -430,7 +436,7 @@ func writesResolvingTo(ctx rule.Context, sourceFile *ast.SourceFile, boundName *
 		// walk visits every identifier in the file.
 		if current.Kind == ast.KindIdentifier &&
 			current.Text() == boundName.Text() &&
-			writesToBinding(current) &&
+			reference.WritesToBinding(current) &&
 			resolvesToDeclaration(ctx, current, anchor) {
 			found = append(found, current)
 		}
@@ -462,7 +468,7 @@ func readsBeforePosition(ctx rule.Context, sourceFile *ast.SourceFile, boundName
 		if current.Kind == ast.KindIdentifier &&
 			current.Text() == boundName.Text() &&
 			current.Pos() < position &&
-			!writesToBinding(current) &&
+			!reference.WritesToBinding(current) &&
 			resolvesToDeclaration(ctx, current, anchor) {
 			found = true
 			return
@@ -474,73 +480,6 @@ func readsBeforePosition(ctx rule.Context, sourceFile *ast.SourceFile, boundName
 	}
 	visit(sourceFile.AsNode())
 	return found
-}
-
-// writesToBinding reports whether an identifier occurrence assigns to the binding it names.
-//
-// `ast.IsWriteAccess` plus the two arms it is missing. The gap is measured rather than assumed and
-// is documented on PreferConst: the accessor declines an identifier under a `KindSpreadElement` or
-// `KindSpreadAssignment` in a destructuring assignment target, so `[...w] = []` and `({...w} = {})`
-// read as no write at all.
-//
-// The spread arms climb rather than testing the immediate parent, because a rest element nests:
-// `[, {foo: a, ...predicate}] = foo()` reaches its assignment through an object literal inside an
-// array literal, and upstream carries that exact case as clean.
-func writesToBinding(identifier *ast.Node) bool {
-	if ast.IsWriteAccess(identifier) {
-		return true
-	}
-	return isRestTargetOfAssignment(identifier)
-}
-
-// isRestTargetOfAssignment reports whether an identifier is a rest element of a destructuring
-// assignment target.
-//
-// A destructuring assignment target parses as an array or object *literal* rather than as a binding
-// pattern, so the climb passes through literal and property nodes on its way to the assignment
-// operator. It stops at anything else, which keeps a genuine spread argument (`foo(...w)`) and a
-// spread in a constructed value (`const o = {...w};`) from reading as writes: neither climb reaches
-// a binary assignment.
-func isRestTargetOfAssignment(identifier *ast.Node) bool {
-	if identifier.Parent == nil {
-		return false
-	}
-	if identifier.Parent.Kind != ast.KindSpreadElement &&
-		identifier.Parent.Kind != ast.KindSpreadAssignment {
-		return false
-	}
-
-	child := identifier.Parent
-	for parent := child.Parent; parent != nil; parent = parent.Parent {
-		switch parent.Kind {
-		case ast.KindBinaryExpression:
-			binary := parent.AsBinaryExpression()
-			return binary.OperatorToken != nil &&
-				ast.IsAssignmentOperator(binary.OperatorToken.Kind) &&
-				ast.SkipParentheses(binary.Left) == child
-
-		case ast.KindForInStatement, ast.KindForOfStatement:
-			return parent.AsForInOrOfStatement().Initializer == child
-
-		case ast.KindArrayLiteralExpression,
-			ast.KindObjectLiteralExpression,
-			ast.KindParenthesizedExpression,
-			ast.KindSpreadElement,
-			ast.KindSpreadAssignment:
-			// Pass through: the question is decided further up.
-
-		case ast.KindPropertyAssignment:
-			// `({k: [...w]} = {})` writes through the value side. A key merely names a property.
-			if parent.AsPropertyAssignment().Initializer != child {
-				return false
-			}
-
-		default:
-			return false
-		}
-		child = parent
-	}
-	return false
 }
 
 // isWriteOnly reports whether an occurrence writes without first reading.
@@ -679,7 +618,7 @@ func letKeywordToConst(ctx rule.Context, list *ast.Node) rule.Fix {
 // writeArrivesThroughDestructuring reports whether an identifier is written by being a target
 // inside an array or object destructuring assignment, rather than by a plain `x = value`.
 //
-// The climb is the same shape as isRestTargetOfAssignment's and for the same reason: a target
+// The climb is the same shape as the shelf write detector's and for the same reason: a target
 // nests, so `[, {foo: typeNode.returnType, ...predicate}] = foo()` reaches its assignment through
 // object, array and spread nodes in turn. Seeing any array or object literal on the way up to the
 // assignment operator is the whole test, because in an assignment target position those literals

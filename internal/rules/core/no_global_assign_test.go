@@ -53,7 +53,7 @@ func TestNoGlobalAssignFires(t *testing.T) {
 			[]string{"noGlobalAssign"}},
 
 		// Cases upstream does not cover, added from reading our own code and from the shapes
-		// `writesToItsIdentifier` distinguishes. Upstream gets its write classification from
+		// `reference.WritesToBinding` distinguishes. Upstream gets its write classification from
 		// `is_write()` on a semantic-layer reference, so its corpus never exercises most of these
 		// and cannot tell a port which arm it got short.
 		{"a compound assignment", "Object += 1;", []string{"noGlobalAssign"}},

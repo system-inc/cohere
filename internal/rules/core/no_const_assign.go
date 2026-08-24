@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
 )
 
 var messageNoConstAssign = rule.Message{
@@ -99,10 +100,13 @@ var messageNoConstAssign = rule.Message{
 //	const d = 123; [a, b, ...[c, ...d]] = [1, 2, 3, 4, 5]
 //	const b = 0; ({a, ...b} = {a: 1, c: 2, d: 3})
 //
-// and both went silent on the first run against the imported corpus. `writesToItsBinding` wraps the
-// shelf function with that one gap closed, by climbing spread wrappers to whatever encloses them and
-// asking again. The climb is the narrowest thing that works: it adds no judgment of its own beyond
-// "a spread passes the question through", and every other shape is still the shelf's answer.
+// and both went silent on the first run against the imported corpus.
+//
+// `reference.WritesToBinding` is the shelf function with that one gap closed. This rule wrote the
+// wrapper first and two sibling rules wrote their own, differently; a census that read the whole
+// corpus at once found four implementations of the one decision and lifted the union. The lifted
+// version also corrects a shape this rule's own wrapper got wrong, the shorthand default value, and
+// its doc records how.
 //
 // This is the reason the corpus goes in verbatim before the rule is written. Nothing about the name
 // `IsWriteAccess` suggests it declines a rest element, and a fixture set invented alongside the port
@@ -238,7 +242,7 @@ func reportConstWrites(ctx rule.Context, sourceFile *ast.SourceFile,
 		// The map lookup is a pre-filter rather than a discrimination, since symbol identity already
 		// implies it. It is here because it is far cheaper than a checker call and this walk visits
 		// every identifier in the file.
-		if current.Kind == ast.KindIdentifier && writesToItsBinding(current) {
+		if current.Kind == ast.KindIdentifier && reference.WritesToBinding(current) {
 			for _, anchor := range anchors[current.Text()] {
 				if resolvesToDeclaration(ctx, current, anchor) {
 					ctx.ReportNode(current, messageNoConstAssign)
@@ -278,56 +282,4 @@ func forEachBoundName(name *ast.Node, callback func(*ast.Node)) {
 			forEachBoundName(element.Name(), callback)
 		}
 	}
-}
-
-// writesToItsBinding reports whether an identifier occurrence assigns to the binding it names.
-//
-// This is `ast.IsWriteAccess` with one gap closed. That function classifies a rest element as a read
-// because its switch has no arm for `KindSpreadElement` or `KindSpreadAssignment`, so `...d` in
-// `[a, ...d] = xs` and `...b` in `({a, ...b} = o)` both answer false there while oxc's `is_write()`
-// answers true. Both shapes are failing cases upstream, and both went silent before this existed.
-//
-// The climb walks spread wrappers and the array or object literals a spread sits inside, alternating,
-// because a nested rest element interleaves them. Upstream's deepest case is
-//
-//	const d = 123; [a, b, ...[c, ...d]] = [1, 2, 3, 4, 5]
-//
-// where `d` sits under spread, array, spread, array before reaching the assignment, so a climb that
-// skipped only spreads stopped at the inner array literal and got that literal's answer, which is
-// `false` precisely because it is reached through a spread. Both wrapper kinds have to be walked or
-// neither is enough. Measured, not reasoned: the spread-only version passed twenty two of upstream's
-// twenty four failing cases and went silent on these two.
-//
-// The literal arm is deliberately unguarded, and that is the opposite of what it first looked like.
-// An earlier version only stepped through a literal when the child was a spread, on the reasoning
-// that an ordinary element should keep the shelf function's own answer. A mutant deleting that guard
-// survived, and the reason is that the guard was subsumed rather than untested: `IsWriteAccess`
-// already recurses through array literals and property assignments itself, so asking it at the
-// literal and asking it at the child return the same answer for every element that is not a spread.
-// Eight inputs were run against both versions to check this rather than argue it, covering shorthand
-// in a plain literal, a plain element in a call argument and in an initializer, a property
-// assignment value, a nested array target, and an object pattern inside an array target. All eight
-// agreed. The guard is gone and this comment is what it left behind.
-//
-// What keeps the unguarded climb honest is that it only ever hands the question to the shelf
-// function. `foo(...d)` and `const xs = [...d]` climb to a literal or a call nothing assigns to, so
-// the answer comes back `false` and the rule stays quiet.
-func writesToItsBinding(identifier *ast.Node) bool {
-	current := identifier
-	for current.Parent != nil {
-		switch current.Parent.Kind {
-		case ast.KindSpreadElement,
-			ast.KindSpreadAssignment,
-			ast.KindArrayLiteralExpression,
-			ast.KindObjectLiteralExpression:
-			// These wrappers pass the question through to whatever encloses them. A destructuring
-			// target parses as a literal rather than as a pattern, so this is the path from a rest
-			// element out to the assignment that decides it.
-			current = current.Parent
-
-		default:
-			return ast.IsWriteAccess(current)
-		}
-	}
-	return ast.IsWriteAccess(current)
 }

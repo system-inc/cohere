@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
 )
 
 var messageNoFuncAssign = rule.Message{
@@ -68,8 +69,7 @@ var messageNoFuncAssign = rule.Message{
 // Symbol identity says which binding an identifier names; it says nothing about whether the
 // occurrence writes. `function foo() {} foo.x = 0;` and `function foo() {} foo();` both resolve to
 // the function and neither reassigns it, so the rule needs the structural half too and reports only
-// where the two agree. `writesToItsIdentifier` is that half, shared with the sibling rule on class
-// bindings.
+// where the two agree. `reference.WritesToBinding` is that half, shared with five sibling rules.
 //
 // # One shape the checker answers differently
 //
@@ -144,7 +144,7 @@ var NoFuncAssign = rule.Rule{
 				// asserts nothing.
 				if current.Kind == ast.KindIdentifier &&
 					current.Text() == name.Text() &&
-					writesToItsIdentifier(current) &&
+					reference.WritesToBinding(current) &&
 					resolvesToDeclaration(ctx, current, declaration) {
 					ctx.ReportNode(current, messageNoFuncAssign)
 				}

@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
 )
 
 // NoShadowRestrictedNamesOptions configures which names count as restricted.
@@ -272,7 +273,7 @@ func safelyShadowsUndefined(ctx rule.Context, name *ast.Node) bool {
 		// identifier in the file.
 		if current.Kind == ast.KindIdentifier &&
 			current.Text() == "undefined" &&
-			writesToItsIdentifier(current) &&
+			reference.WritesToBinding(current) &&
 			resolvesToDeclaration(ctx, current, anchor) {
 			written = true
 			return

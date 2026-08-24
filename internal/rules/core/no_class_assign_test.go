@@ -117,7 +117,7 @@ func TestNoClassAssignPointsAtTheWrite(t *testing.T) {
 	}{
 		{"a plain reassignment", "class A { } A = 0;", []string{"A"}},
 		// A parenthesized assignment target, which neither upstream's corpus nor this one had until
-		// a sibling rule tripped over it. `writesToItsIdentifier` climbs and reassigns `child` to
+		// a sibling rule tripped over it. `reference.WritesToBinding` climbs and reassigns `child` to
 		// the parent, so at the binary node `child` was the parenthesis while the arm compared
 		// against `ast.SkipParentheses(binary.Left)`, which is the identifier. The two never
 		// matched and `(A) = 1` read as a read. The span assertion is the useful half here: it

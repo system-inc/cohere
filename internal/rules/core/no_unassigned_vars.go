@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
 )
 
 var messageNoUnassignedVars = rule.Message{
@@ -70,7 +71,7 @@ var messageNoUnassignedVars = rule.Message{
 // Symbol identity says which binding an identifier names; it says nothing about whether the
 // occurrence writes. `x.y = 1` and `foo(x)` both resolve to the binding and neither assigns it, so a
 // rule that treated every resolved occurrence as a write would go silent on most real findings.
-// `writesToItsIdentifier` is the structural half, shared with the sibling rules, and the rule
+// `reference.WritesToBinding` is the structural half, shared with the sibling rules, and the rule
 // concludes "never assigned" only where no occurrence satisfies both halves.
 //
 // # What is exempt, and why each one
@@ -134,6 +135,20 @@ var NoUnassignedVars = rule.Rule{
 					return
 				}
 
+				// A catch parameter is bound by the runtime when the exception is thrown, so no
+				// assignment to it exists anywhere in the source. That is exactly the shape this
+				// rule reports, which is why it read as 445 findings on our own tree and every one
+				// of them was wrong.
+				//
+				// Upstream never faces this because it requires two nodes: a `VariableDeclarator`
+				// whose parent is a `VariableDeclaration` (oxc `no_unassigned_vars.rs:59` and `:66`).
+				// A catch parameter fails that parent check. TypeScript's AST spells the declarator
+				// itself `KindVariableDeclaration`, so the port collapsed the two into one anchor
+				// and the parent check went with it. It was not redundant; it was this exemption.
+				if node.Parent != nil && node.Parent.Kind == ast.KindCatchClause {
+					return
+				}
+
 				// A for-head declaration is assigned by the loop on every iteration. All three heads
 				// count: `for (let i; ;)` is upstream's `ForStatement` arm and is the one that looks
 				// most like an ordinary unassigned declaration.
@@ -178,7 +193,7 @@ var NoUnassignedVars = rule.Rule{
 					// checker call and this walk visits every identifier in the file.
 					if current.Kind == ast.KindIdentifier && current.Text() == name.Text() &&
 						current != name && resolvesToDeclaration(ctx, current, anchor) {
-						if writesToItsIdentifier(current) {
+						if reference.WritesToBinding(current) {
 							// One write is enough to settle the question, and finding it stops the
 							// walk. Upstream returns on its first `is_write()` for the same reason.
 							hasWrite = true
