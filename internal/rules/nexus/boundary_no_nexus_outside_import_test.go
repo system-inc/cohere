@@ -66,3 +66,62 @@ func TestBoundaryNoNexusOutsideImportStaysSilent(t *testing.T) {
 		})
 	}
 }
+
+// TestBoundaryNoNexusOutsideImportReportsTheSpecifier pins where the finding lands.
+//
+// This rule reported the whole declaration until a census compared it against its two sibling
+// boundary rules, which both wrap the node in `imports.SpecifierNode`. Every fixture above stayed
+// green through the change, because `ExpectFindings` asserts message ids and count and nothing
+// else: a rule whose defect is where it points passes a complete fixture pair while being wrong.
+//
+// The difference is narrower than it first looks, and the measurement is worth keeping. On a
+// single-line import the two spellings agree, because `ctx.ReportNode` routes through `TokenRange`
+// and strips leading trivia, so a comment above the statement does not move the finding. Measured
+// on eight shapes; seven agreed.
+//
+// The eighth is a multiline import, which is common in real code. There the declaration starts on
+// the line of the `import` keyword while the specifier sits several lines down, so the finding
+// landed on line 1 and an `eslint-disable-next-line` written above the specifier could not reach
+// it. A `-next-line` directive matches the line after itself, so the finding was unreachable by any
+// suppression the author could write, and it read as a real finding in every count.
+func TestBoundaryNoNexusOutsideImportReportsTheSpecifier(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		sourceText string
+		want       string
+	}{
+		{
+			"a single-line import reports the specifier",
+			"import { Thing } from '@structure/source/Thing';",
+			"'@structure/source/Thing'",
+		},
+		{
+			// The shape that was wrong. The declaration spans four lines and the specifier is on
+			// the last of them.
+			"a multiline import reports the specifier rather than the declaration",
+			"import {\n  Thing,\n  Other,\n} from '@structure/source/Thing';",
+			"'@structure/source/Thing'",
+		},
+		{
+			"a dynamic import reports the specifier",
+			"const loaded = await import('@structure/source/Thing');",
+			"'@structure/source/Thing'",
+		},
+		{
+			"a require call reports the specifier",
+			"const loaded = require('@structure/source/Thing');",
+			"'@structure/source/Thing'",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.Run(t, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
+			}
+			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
+			if reported != testCase.want {
+				t.Errorf("finding covers %q, want %q", reported, testCase.want)
+			}
+		})
+	}
+}

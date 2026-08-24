@@ -36,7 +36,7 @@ var BoundaryNoNexusOutsideImport = rule.Rule{
 
 		return imports.SourceVisitors(func(source string, node *ast.Node) {
 			if isOutsideNexusAlias(source) {
-				ctx.ReportNode(node, messageForbiddenOutsideImport)
+				ctx.ReportNode(imports.SpecifierNode(node), messageForbiddenOutsideImport)
 			}
 		})
 	},
