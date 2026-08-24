@@ -236,11 +236,13 @@ var SetStateInEffect = rule.Rule{
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
-					lowered := hir.Lower(functionNode, ctx.TypeChecker)
+					// Shared with the other rules that lower this same function; see hir.ForFunction.
+					// Construct runs inside the cached computation, because it mutates in place and is
+					// not idempotent.
+					lowered := hir.ForFunction(ctx, functionNode)
 					if lowered == nil {
 						return
 					}
-					hir.Construct(lowered)
 					reportSetStateInEffects(ctx, lowered)
 				})
 			},
