@@ -102,6 +102,25 @@ func WritesToBinding(identifier *ast.Node) bool {
 		return false
 	}
 
+	// The name side of a property access is not a binding at all. `document.cookie = x` writes to a
+	// property of `document`; `cookie` there names a member, and no global, class, or const named
+	// `cookie` is touched by it. `ast.IsWriteAccess` answers true for that identifier because the
+	// access as a whole is a write target, so a rule reaching this without the guard reports every
+	// property write whose member name happens to collide with a binding it watches.
+	//
+	// Measured: `no-global-assign` produced 625 findings on our own tree against oxlint's 0, and
+	// `document.cookie` alone accounted for most of them. The same shape is reachable from every
+	// rule in this family, which is why the guard is here rather than in one of them.
+	//
+	// An element access is deliberately not excluded. `globalThis["Object"] = 1` writes through a
+	// computed member, and the identifier inside the brackets is a read of a string, not a name
+	// position, so it never reaches here as a write in the first place.
+	if identifier.Parent != nil &&
+		identifier.Parent.Kind == ast.KindPropertyAccessExpression &&
+		identifier.Parent.AsPropertyAccessExpression().Name() == identifier {
+		return false
+	}
+
 	current := identifier
 	for current.Parent != nil {
 		switch current.Parent.Kind {

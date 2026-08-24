@@ -94,6 +94,18 @@ func TestReads(t *testing.T) {
 		"({[a]: b} = o);",
 		// A key merely names a property.
 		"({a: b} = o);",
+		// The NAME side of a property access. `o.a = 1` writes to a property of `o`; the identifier
+		// `a` names a member and no binding called `a` is touched. Note `a.x = 1` above covers the
+		// object side, which is a read; this is the other half and it was missing.
+		//
+		// `ast.IsWriteAccess` answers true here because the access as a whole is a write target, so
+		// without the guard every rule in this family reports any property write whose member name
+		// collides with a binding it watches. Measured: `no-global-assign` produced 625 findings on
+		// our own tree against oxlint's 0, nearly all of them `document.cookie = ...`.
+		"o.a = 1;",
+		"o.a += 1;",
+		"foo.bar.a = 1;",
+		"this.a = 1;",
 	} {
 		expectOne(t, source, false)
 	}
