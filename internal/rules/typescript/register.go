@@ -27,8 +27,16 @@ func init() {
 		},
 		rule.Registration{Rule: NoExtraNonNullAssertion},
 		rule.Registration{Rule: NoImpliedEval},
+		rule.Registration{
+			Rule:   NoFloatingPromises,
+			Decode: DecodeNoFloatingPromisesOptions,
+		},
 		rule.Registration{Rule: NoForInArray},
 		rule.Registration{Rule: NoMisusedNew},
+		rule.Registration{
+			Rule:   NoMisusedPromises,
+			Decode: rule.DecodeOptionsInto[NoMisusedPromisesOptions](),
+		},
 		rule.Registration{Rule: NoNonNullAssertedOptionalChain},
 		rule.Registration{Rule: NoNonNullAssertion},
 		rule.Registration{

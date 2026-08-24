@@ -1920,7 +1920,7 @@
                 "eslint",
                 "oxlint"
             ],
-            "options": "no",
+            "options": "yes",
             "severity": "error",
             "enabledBy": "rulesBlock"
         },
