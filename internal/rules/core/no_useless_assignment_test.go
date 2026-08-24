@@ -183,17 +183,19 @@ func TestNoUselessAssignmentSurvey(t *testing.T) {
 		caught, expected, falsePositives, len(noUselessAssignmentUpstreamPass))
 }
 
-// TestNoUselessAssignmentFires pins the 27 upstream failing inputs this port reproduces exactly.
+// TestNoUselessAssignmentFires pins every one of upstream's 43 failing inputs, at upstream's own
+// per-input diagnostic count.
 //
-// Listed by index into the imported corpus rather than retyped, so the assertion and the survey
-// cannot drift apart, and the expected count comes from the same snapshot-derived number the survey
-// uses. An index appearing here is a claim that this port matches upstream on that input exactly,
-// which is stronger than the survey's "does not exceed".
+// It used to carry a hand-listed subset of 27 indices, because the inverted implementation matched
+// only those. The liveness pass matches all of them, so the list is gone and the loop runs the whole
+// corpus: an exception list that is empty is better deleted than kept at zero length, and a later
+// regression now fails on the input it broke rather than slipping through an index nobody updated.
+//
+// Read from the imported corpus rather than retyped, so the assertion and the survey cannot drift,
+// and the expected count is the same snapshot-derived number the survey uses. This is stronger than
+// the survey's "does not exceed": it is a claim of exact agreement on every input.
 func TestNoUselessAssignmentFires(t *testing.T) {
-	reproduced := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 20, 21, 22, 23, 24, 25,
-		34, 35, 36, 37, 41, 42}
-
-	for _, index := range reproduced {
+	for index := range noUselessAssignmentUpstreamFail {
 		entry := noUselessAssignmentUpstreamFail[index]
 		t.Run(fmt.Sprintf("upstream fail %d", index), func(t *testing.T) {
 			result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, entry.source)
@@ -309,25 +311,114 @@ func TestNoUselessAssignmentNeedsTheTypedHarness(t *testing.T) {
 // later porter extending the rule sees immediately which of these they have picked up. Each is a
 // silent miss, never a wrong report, which is the direction a partial port should miss in.
 func TestNoUselessAssignmentBoundary(t *testing.T) {
-	declined := []struct {
-		name   string
-		reason string
-		index  int
+	recovered := []struct {
+		name  string
+		why   string
+		index int
 	}{
-		{"an update expression", "++ and -- are writes this port does not treat as candidates", 15},
-		{"a destructuring assignment target", "a pattern target's flow node does not line up with the single-identifier question", 17},
-		{"a write inside a try block", "upstream suppresses these too, but it still reports the earlier write that they kill", 26},
-		{"a self-referential write chain", "x = x + 1 followed by x = 5 needs the right-hand read ordered before the store", 30},
-		{"a destructuring declarator", "the declared binding is a pattern element rather than a plain identifier", 33},
+		{"an update expression", "the graph emits a real store for the increment, judged before the load half puts the bit back", 15},
+		{"a destructuring assignment target", "the graph places a pattern element's write where it happens, so no flow node has to line up", 17},
+		{"a write inside a try block", "still never reported itself, but it now kills the earlier write it overwrites", 26},
+		{"a self-referential write chain", "the graph emits the right-hand read before the store, so no reordering is needed", 30},
+		{"a destructuring declarator", "the declarator is reached by walking up through the binding pattern", 33},
 	}
 
-	for _, entry := range declined {
+	for _, entry := range recovered {
 		t.Run(entry.name, func(t *testing.T) {
-			source := noUselessAssignmentUpstreamFail[entry.index].source
-			result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source)
-			if len(result.Diagnostics) != 0 {
-				t.Fatalf("this case is now reported (%d findings), so the boundary has moved and "+
-					"this test should become a Fires case: %s", len(result.Diagnostics), entry.reason)
+			imported := noUselessAssignmentUpstreamFail[entry.index]
+			result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, imported.source)
+			if len(result.Diagnostics) != imported.count {
+				t.Fatalf("got %d findings, want upstream's %d; this shape was declined by the "+
+					"inverted implementation and is recovered because %s",
+					len(result.Diagnostics), imported.count, entry.why)
+			}
+		})
+	}
+}
+
+// TestNoUselessAssignmentConditionalWritesDoNotKill is the regression for the false positive the
+// inverted implementation shipped, and it is the most important test in this file.
+//
+// A write inside an `if` with no `else` does not run on every path, so it cannot kill an earlier
+// write: on the path where the branch is skipped, the earlier value is what a later read observes.
+// The inversion expressed the kill as a barrier in the flow graph rather than as a per-path bit, and
+// a barrier stops the backward walk regardless of which path it sits on, so the earlier write looked
+// dead.
+//
+// Measured rather than reasoned. Against the real tree this cost 34 findings at 34 locations, every
+// one of them wrong, and the shape is the commonest one there is: an accumulator seeded before a
+// search. Variables named closestDistance, minimumDistance, bestDistanceSquared, sign and task were
+// all condemned at their initializers. The release binary reports nothing on any of the twenty three
+// files involved, with a control case in the same invocation firing to prove the rule was running.
+//
+// No imported case could see it: upstream's corpus writes the shape only with an else arm present,
+// where the kill is real and both implementations agree.
+func TestNoUselessAssignmentConditionalWritesDoNotKill(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+		wantCount  int
+	}{
+		{
+			// The exact shape from ColorConverter.ts, which the inverted implementation reported at
+			// the initializer. Both arms write, but neither is guaranteed, so the initializer is
+			// live on the path where the chain falls through.
+			name:       "an if/else-if chain with no final else keeps the initializer live",
+			sourceText: "function f(sector: number, chroma: number, mid: number) {\n\tlet red = 0;\n\tif (sector < 1) { red = chroma; }\n\telse if (sector < 2) { red = mid; }\n\treturn red;\n}",
+			wantCount:  0,
+		},
+		{
+			// The accumulator shape, seeded then conditionally improved inside a loop.
+			name:       "a loop accumulator seeded before a conditional update stays live",
+			sourceText: "function f(points: number[], target: number) {\n\tlet best = Infinity;\n\tfor (const point of points) {\n\t\tconst d = Math.abs(point - target);\n\t\tif (d < best) { best = d; }\n\t}\n\treturn best;\n}",
+			wantCount:  0,
+		},
+		{
+			// A single guarded write, the smallest form of the same mistake.
+			name:       "a single guarded write does not kill the initializer",
+			sourceText: "function f(c: boolean) {\n\tlet v = 1;\n\tif (c) { v = 2; }\n\treturn v;\n}",
+			wantCount:  0,
+		},
+		{
+			// An update loads before it stores, so the load keeps the earlier write live. Measured
+			// against the release binary, which is silent on this input while a control in the same
+			// invocation fires. The mutation that clears the bit here instead of setting it survived
+			// the whole imported corpus and every other fixture in this file, because no upstream
+			// case writes a compound assignment whose target was written before it.
+			name:       "a compound assignment keeps the earlier write live",
+			sourceText: "function f() {\n\tlet v = 1;\n\tv += 1;\n\tg(v);\n}",
+			wantCount:  0,
+		},
+		{
+			// The same property through the other update spelling, which reaches the same arm by a
+			// different branch of occurrenceKindOf.
+			name:       "an increment keeps the earlier write live",
+			sourceText: "function f() {\n\tlet v = 1;\n\tv++;\n\tg(v);\n}",
+			wantCount:  0,
+		},
+		{
+			// The other half of the same arm: an update's STORE is a candidate, so a trailing
+			// compound assignment nothing reads is reported. Without this the two cases above would
+			// also pass a rule that had stopped judging updates entirely.
+			name:       "a trailing compound assignment nothing reads is reported",
+			sourceText: "function f() {\n\tlet v = 1;\n\tg(v);\n\tv += 1;\n}",
+			wantCount:  1,
+		},
+		{
+			// The control: with BOTH arms writing, the initializer really is dead on every path and
+			// upstream reports it. Without this case the three above would also pass a rule that had
+			// simply stopped reporting initializers at all.
+			name:       "a write on every arm does kill the initializer",
+			sourceText: "function f(c: boolean) {\n\tlet v = 1;\n\tif (c) { v = 2; } else { v = 3; }\n\treturn v;\n}",
+			wantCount:  1,
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+			if len(result.Diagnostics) != testCase.wantCount {
+				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
 		})
 	}
@@ -396,11 +487,16 @@ func TestNoUselessAssignmentSelfReferentialWritesStayLive(t *testing.T) {
 			wantCount:  0,
 		},
 		{
-			// A loop back-edge makes the write at the top of the body reachable from the
-			// self-referential read below it, and the write before the loop is killed by it.
-			name:       "a write before a loop that always overwrites is dead",
+			// A loop body may run zero times, so a write inside it never kills a write before it.
+			// The inverted implementation answered one here and this test asserted that answer;
+			// both were wrong. Measured against the release binary, which reports nothing on this
+			// input while a control case in the same invocation fires, so the silence is the rule
+			// declining rather than the rule being absent. The corrected expectation is what the
+			// liveness pass produces, because the loop-exit edge carries the pre-loop value to
+			// `use(v)` untouched.
+			name:       "a write before a loop that may not run stays live",
 			sourceText: "function f() {\n\tlet v = 0;\n\tuse(v);\n\tv = 1;\n\tfor (let i = 0; i < 2; i++) {\n\t\tv = 5;\n\t\tv = v + 1;\n\t}\n\tuse(v);\n}",
-			wantCount:  1,
+			wantCount:  0,
 		},
 	}
 
