@@ -109,3 +109,119 @@ func lastSeparator(filePath string) int {
 	}
 	return posix
 }
+
+// IsDocumentPage reports whether a path is the custom document, answering the way oxc's shared
+// `is_document_page` answers rather than the way IsDocumentFile above does.
+//
+// Both predicates exist on purpose and a reader arriving at one should be sent to the other, so the
+// difference is stated here rather than left to be discovered:
+//
+//	IsDocumentFile   the union of every upstream spelling, for the family of rules whose own
+//	                 upstream spellings disagree and whose corpora do not pin the disagreement
+//	IsDocumentPage   oxc's single shared helper, byte for byte, for the one rule whose corpus
+//	                 asserts the difference as a test
+//
+// `no-document-import-in-page` is that rule. Its fourth failing case is
+// `src/pages/user/_document.tsx`, a file literally named `_document.tsx` that upstream deliberately
+// **reports**, and its pass list includes `pages/_documentation.tsx`-shaped exemptions by way of a
+// prefix test that carries no trailing dot. IsDocumentFile answers the opposite on both, and it is
+// right to: it serves rules whose corpora never vote on those paths. Here the corpus votes, so the
+// vote wins.
+//
+// Measured against the release oxlint binary rather than modelled, on all eleven corpus paths plus
+// the two disagreements:
+//
+//	src/pages/user/_document.tsx   reports upstream    IsDocumentFile exempts it
+//	components/_document.tsx       reports upstream    IsDocumentFile exempts it
+//	pages/_documentation.tsx       exempt upstream     IsDocumentFile reports it
+//
+// The mechanism is a split on the bare word `pages` keeping the LAST segment, so only the immediate
+// child of a `pages` directory is the document and a path with no `pages` in it at all is never the
+// document. `pagesapp/src/pages/_document.js` is upstream's own probe of the `.last()`: splitting
+// gives `["", "app/src/", "/_document.js"]` and the last one exempts.
+//
+// Both separators are tested, unconditionally, exactly as upstream does. ESLint uses the platform's
+// separator plus the posix one, so on a Unix host it tests the forward slash twice and never tests
+// the backslash. oxc is strictly more correct there and oxc is the port target.
+//
+// One further ESLint divergence is reproduced in oxc's direction rather than ESLint's: ESLint
+// carries a leading emptiness guard, so a path ENDING in `pages` splits to an empty last segment and
+// exempts, where oxc reports. Unreachable in practice, since a lintable file needs an extension, but
+// it is asserted in the tests below so the choice is visible rather than incidental.
+func IsDocumentPage(filePath string) bool {
+	segments := strings.Split(filePath, "pages")
+	page := segments[len(segments)-1]
+	return strings.HasPrefix(page, "/_document") || strings.HasPrefix(page, `\_document`)
+}
+
+// IsInPagesDirectory reports whether a path is a Pages Router route rather than an API route.
+//
+// Two questions in one answer, because upstream asks them together: the file must sit under a
+// `pages` directory at all, and the segment *directly* under `pages` must not be `api`. A file that
+// is under no `pages` directory answers false, which is the same false a file under `pages/api`
+// gets, and both mean "this rule does not apply here".
+//
+//	pages/index.tsx           true
+//	src/pages/index.tsx       true
+//	pages/api/user.ts         false   an API route, which returns data rather than rendering
+//	pages/blog/api/x.tsx      true    only the top-level api directory is Next's API routes
+//	pages/api                 false   the segment after pages is api, with nothing after it
+//	mypages/index.tsx         false   a segment test, not a substring test
+//	components/Thing.tsx      false
+//
+// # Why a segment test here when IsInApplicationDirectory above is a substring test
+//
+// The two look inconsistent and are faithful to two different upstream spellings. oxc's `should_run`
+// for this walks path *components* and compares each to `pages` and `api` exactly, so a directory
+// named `mypages` does not match and `apiary` does not exempt. Its sibling `is_in_app_dir` really is
+// a bare `contains`. Reproducing each as written is why one is loose and one is tight.
+//
+// The `@next/eslint-plugin-next` original spells it a third way, by splitting the filename on the
+// literal text `pages` and asking whether the remainder's directory starts with `/api`. That is
+// wrong in two directions and oxc fixed both: `mypages/x.tsx` runs under ESLint because the split
+// matches inside a longer word, and `pages/apiary/x.tsx` is exempted because `"/apiary"` starts with
+// `"/api"`. oxc is the port target and it is also simply right, so no note is needed at any call
+// site.
+//
+// Only the FIRST `pages` segment decides, matching oxc's walk: it sets a flag on the first match and
+// returns on the very next component. So `pages/api/pages/x.tsx` is false, because the segment after
+// the first `pages` is `api`, and the second `pages` is never consulted.
+//
+// Both separators are handled here, as everywhere in this package. Paths reaching a rule have
+// already been normalized to forward slashes, so the backslash arm cannot currently fire; it is kept
+// because every other predicate in this package accepts both and a caller should not have to know
+// which of them normalizes.
+func IsInPagesDirectory(filePath string) bool {
+	segments := splitSegments(filePath)
+	for index, segment := range segments {
+		if segment != "pages" {
+			continue
+		}
+		// The component immediately after `pages` decides, and a `pages` with nothing after it is
+		// not a route directory at all. oxc reaches its `return` only when a next component exists.
+		if index+1 >= len(segments) {
+			return false
+		}
+		return segments[index+1] != "api"
+	}
+	return false
+}
+
+// splitSegments breaks a path on separators of either kind, dropping empty segments.
+//
+// Empty segments are dropped so that a leading separator, a trailing one, or a doubled one cannot
+// shift what counts as "the component after pages". The harness roots every fixture path, so a
+// leading empty segment is the ordinary case rather than a malformed one.
+func splitSegments(filePath string) []string {
+	segments := make([]string, 0, 8)
+	start := 0
+	for index := 0; index <= len(filePath); index++ {
+		if index == len(filePath) || filePath[index] == '/' || filePath[index] == '\\' {
+			if index > start {
+				segments = append(segments, filePath[start:index])
+			}
+			start = index + 1
+		}
+	}
+	return segments
+}
