@@ -1,9 +1,11 @@
 package typescript
 
 import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rules/upstream"
-	"github.com/system-inc/verify/internal/upstream/tsgolint/rules/no_array_delete"
+	"github.com/system-inc/verify/internal/upstream/tsgolint/utils"
 )
 
 // NoArrayDelete flags the `delete` operator applied to an element of an array or a tuple.
@@ -20,29 +22,37 @@ import (
 // reads back as `undefined`, and every later index keeps its old position. That is almost never
 // what the author meant, which is why the repair is offered as a suggestion rather than applied.
 //
-// # This is wiring plus vendoring, not a re-implementation
+// # Absorbed from tsgolint, which is the source of record for this rule
+//
+// Provenance: tsgolint `internal/rules/no_array_delete/no_array_delete.go`, vendored at commit
+// `05b7fbc` and absorbed onto verify's own rule interface here. It reaches for
+// `GetConstrainedTypeAtLocation`, `TrimNodeTextRange` and `Checker_isArrayOrTupleType` because that
+// is what upstream reaches for, and this note is why a reader finds those helpers in a file that
+// otherwise looks native.
+//
+// tsgolint is not re-synced, so this file is now the only copy of the algorithm rather than a
+// translation layer over a vendored one. The checker logic below is byte-identical to upstream's;
+// what changed is the interface it speaks: `rule.RuleContext` became `rule.Context`,
+// `RuleListeners` became `Listeners`, `rule.RuleMessage` became `rule.Message`, and the single
+// report call site's suggestion moved from `rule.RuleSuggestion{FixesArr: []rule.RuleFix{...}}` to
+// `rule.Suggestion{Fixes: []rule.Fix{...}}` with `RuleFixRemoveRange`/`RuleFixReplaceRange` becoming
+// `rule.RemoveRange`/`rule.ReplaceRange`. Those are the same constructors under different names, so
+// the three surgical ranges are unchanged. No predicate and no traversal was touched.
+//
+// The reported SPAN is unchanged too, and that is the part worth naming. While this rule was
+// adapted, `upstream.Adapt` wrapped every node report in `rule.TokenRange(SourceFile, node)` because
+// tsgolint's own runner does the same through `utils.TrimNodeTextRange`. Our native
+// `ctx.ReportNodeWithSuggestions` applies exactly that trim itself, so absorbing the rule preserves
+// the behavior rather than relying on the adapter to supply it. Passing `node.Loc` instead would
+// include leading trivia and reintroduce the defect fixed in `8bdd70b`; the span test in this
+// package pins all eighteen positioned cases against it.
 //
 // oxc declares `NoArrayDelete(tsgolint)` and carries no algorithm and no corpus, so the behavior
 // oxlint exhibits for this rule IS tsgolint's: the release binary shells out to a `tsgolint`
 // executable and refuses to run the rule when that binary is absent, which is what it does on this
 // machine. That refusal is itself the proof, so oxlint cannot serve as ground truth here and
-// tsgolint's own test file is the corpus instead.
-//
-// Unlike `await-thenable`, this rule was NOT already vendored. It was fetched from tsgolint's tree
-// and placed at `internal/upstream/tsgolint/rules/no_array_delete`, byte-identical below the import
-// block, which is the only edit: the module paths are rewritten from
-// `github.com/microsoft/typescript-go/shim/...` to `github.com/microsoft/TypeScript/tsc/shim/...`
-// and from `github.com/typescript-eslint/tsgolint/internal/...` to this tree's vendor path. Every
-// utility it calls was already here, and every checker call it makes was confirmed reachable
-// through our shims by a compiling probe rather than by a grep, since `Checker_isArrayOrTupleType`
-// and `scanner.GetRangeOfTokenAtPosition` are neither of them on the list an earlier port
-// established.
-//
-// Retyping the algorithm here would produce a second copy of logic we already carry, which would
-// then drift with nothing comparing them. So the decision is to vendor and wire, and the
-// verification effort went into proving the vendored rule reproduces upstream: all thirty one of
-// tsgolint's own cases are replayed through the adapted rule, including all twenty two exact
-// suggestion outputs.
+// tsgolint's own test file is the corpus instead. All thirty one of its cases are replayed in the
+// test file, including all twenty two exact suggestion outputs.
 //
 // # What decides a finding
 //
@@ -101,22 +111,20 @@ import (
 // differential harness compares against. Reproducing the other repair would be a difference the
 // harness could see, for no gain.
 //
-// # The checker, and why the guard does not live here
+// # The checker, and the nil guard that now lives here
 //
 // The listener reads `ctx.TypeChecker` unconditionally, so this needs the checker and its fixtures
-// use `RunTyped`. The standing advice to write `if ctx.TypeChecker == nil { return }` at the top of
-// every listener cannot be followed in this file: the listener is upstream's, and editing it is
-// what would turn a re-sync into a merge.
+// use `RunTyped`. While this rule was adapted, the standing `if ctx.TypeChecker == nil { return }`
+// could not be written, because the listener was upstream's and editing it would have turned a
+// re-sync into a merge. Absorbing the rule removes that constraint, so the guard is now written
+// where the advice always wanted it, and it is the one addition to the body.
 //
-// The guard is one level up. `upstream.Adapt` sets `NeedsTypeChecker` on every rule it wraps
-// unconditionally, so the nil case is unreachable through registration. A test in this package pins
-// that declaration so a later revert fails loudly rather than going vacuously green, which is the
-// dangerous direction here: under the untyped harness this rule goes silent rather than panicking,
-// and silence makes every clean fixture pass having proven nothing.
-//
-// Reaching the checker only through a vendored file in another package also means the registry's
-// per-file textual guard, which looks for a `.TypeChecker` selector in the rule's own file, will
-// report this as over-declared. That message is wrong and the declaration is right.
+// The guard is unreachable through registration, since `NeedsTypeChecker` is declared right above.
+// It is here for the harness path, where a Context can be built by hand, and because the dangerous
+// direction for this rule is silence rather than a panic: under the untyped harness this rule goes
+// quiet rather than crashing, and silence makes every clean fixture pass having proven nothing. A
+// test in this package pins the declaration so a later revert fails loudly rather than going
+// vacuously green.
 //
 // # Two mutants survive the sweep and both are equivalent rather than unseen
 //
@@ -143,13 +151,88 @@ import (
 //
 // `KindDeleteExpression` is a rare anchor and the listener exits on the second line for anything
 // that is not an element access, so the checker is consulted only for a genuine `delete x[y]`.
-var NoArrayDelete = adaptNoArrayDelete()
+var NoArrayDelete = rule.Rule{
+	Name: "no-array-delete",
 
-// adaptNoArrayDelete wires the vendored rule, panicking at startup if it cannot be adapted.
-//
-// `MustAdapt` rather than `Adapt` because a rule that cannot be adapted is a build-time mistake:
-// the registry is assembled at process start, so failing there stops the tool immediately instead
-// of leaving a rule silently absent from a run that otherwise looks clean.
-func adaptNoArrayDelete() rule.Rule {
-	return upstream.MustAdapt(no_array_delete.NoArrayDeleteRule)
+	// The listener resolves the receiver's type on every `delete x[y]`, so the checker is required.
+	NeedsTypeChecker: true,
+
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		isUnderlyingTypeArray := func(t *checker.Type) bool {
+			if utils.IsTypeFlagSet(t, checker.TypeFlagsUnion) {
+				for _, t := range t.Types() {
+					if !checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
+						return false
+					}
+				}
+				return true
+			}
+
+			if utils.IsTypeFlagSet(t, checker.TypeFlagsIntersection) {
+				for _, t := range t.Types() {
+					if checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
+						return true
+					}
+				}
+				return false
+			}
+
+			return checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t)
+		}
+
+		return rule.Listeners{
+			ast.KindDeleteExpression: func(node *ast.Node) {
+				if ctx.TypeChecker == nil {
+					return
+				}
+
+				if node.Kind != ast.KindDeleteExpression {
+					return
+				}
+				deleteExpression := ast.SkipParentheses(node.AsDeleteExpression().Expression)
+
+				if !ast.IsElementAccessExpression(deleteExpression) {
+					return
+				}
+
+				expression := deleteExpression.AsElementAccessExpression()
+
+				argType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression.Expression)
+
+				if !isUnderlyingTypeArray(argType) {
+					return
+				}
+
+				expressionRange := utils.TrimNodeTextRange(ctx.SourceFile, expression.Expression)
+				argumentRange := utils.TrimNodeTextRange(ctx.SourceFile, expression.ArgumentExpression)
+
+				deleteTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
+				leftBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, expressionRange.End())
+				rightBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, argumentRange.End())
+
+				ctx.ReportNodeWithSuggestions(node, buildNoArrayDeleteMessage(), rule.Suggestion{
+					Message: buildUseSpliceMessage(),
+					Fixes: []rule.Fix{
+						rule.RemoveRange(deleteTokenRange),
+						rule.ReplaceRange(leftBracketTokenRange, ".splice("),
+						rule.ReplaceRange(rightBracketTokenRange, ", 1)"),
+					},
+				})
+			},
+		}
+	},
+}
+
+func buildNoArrayDeleteMessage() rule.Message {
+	return rule.Message{
+		Id:          "noArrayDelete",
+		Description: "Using the `delete` operator with an array expression is unsafe.",
+	}
+}
+
+func buildUseSpliceMessage() rule.Message {
+	return rule.Message{
+		Id:          "useSplice",
+		Description: "Use `array.splice()` instead.",
+	}
 }

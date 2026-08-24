@@ -3,6 +3,8 @@ package typescript
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/ruletest"
 )
 
@@ -280,10 +282,10 @@ func TestNoUnsafeUnaryMinusSpansAndText(t *testing.T) {
 //
 // This rule is the silent kind rather than the panicking kind under a nil checker, which is the
 // more dangerous of the two: moved to `ruletest.Run`, every Fires case would fail and every silent
-// case would pass VACUOUSLY. The nil guard the standing advice asks for cannot live in the rule's
-// own file, because the listener belongs to the vendored upstream rule and editing it would turn a
-// re-sync into a merge. `upstream.Adapt` sets `NeedsTypeChecker` unconditionally for exactly that
-// reason, so the nil case is unreachable through registration and this test is what pins it.
+// case would pass VACUOUSLY. The nil guard the standing advice asks for now lives at the top of the
+// listener, because absorbing the rule off the adapter made that listener ours to edit. It is
+// unreachable through registration, since `NeedsTypeChecker` is declared; it covers the harness
+// path, where a Context is built by hand. This test pins the declaration AND the guard.
 func TestNoUnsafeUnaryMinusRequiresTheTypedHarness(t *testing.T) {
 	if !NoUnsafeUnaryMinus.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
@@ -296,5 +298,24 @@ func TestNoUnsafeUnaryMinusRequiresTheTypedHarness(t *testing.T) {
 	typed := ruletest.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
 	if len(typed.Diagnostics) != 1 {
 		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
+	}
+
+	// The guard the absorption made possible. Driving the listener with a checker-less Context must
+	// return rather than dereference nil, and this is the only path that reaches that branch, since
+	// registration always supplies a checker.
+	listeners := NoUnsafeUnaryMinus.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
+	listener, hasListener := listeners[ast.KindPrefixUnaryExpression]
+	if !hasListener {
+		t.Fatal("the rule stopped listening on prefix unary expressions")
+	}
+	for _, statement := range typed.SourceFile.Statements.Nodes {
+		if statement.Kind != ast.KindVariableStatement {
+			continue
+		}
+		for _, declarator := range statement.AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes {
+			if initializer := declarator.Initializer(); initializer != nil {
+				listener(initializer)
+			}
+		}
 	}
 }

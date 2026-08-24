@@ -329,10 +329,12 @@ func applySuggestion(t *testing.T, source string, suggestion rule.Suggestion) st
 // fixture set moved to the untyped harness would see every Fires case fail and every StaysSilent
 // case pass VACUOUSLY, having proven nothing at all. The count below is what makes that visible.
 //
-// The nil guard the standing advice asks for is not in this file and cannot be: the listeners belong
-// to the vendored upstream rule, and editing them is what would turn re-syncing into a merge.
-// upstream.Adapt sets NeedsTypeChecker on every rule it wraps for exactly this reason, so the nil
-// case is unreachable through registration. This test pins the declaration that makes that true.
+// The nil guard the standing advice asks for now lives in this rule, because absorbing it off the
+// adapter made the listeners ours to edit. It sits in Run rather than in each listener, so a nil
+// checker declines the file once instead of being re-tested per node. The guard is unreachable
+// through registration, since NeedsTypeChecker is declared; it covers the harness path, where a
+// Context is built by hand. This test pins the declaration AND the decline, so losing either one
+// fails loudly rather than going vacuously green.
 func TestAwaitThenableRequiresTheTypedHarness(t *testing.T) {
 	if !AwaitThenable.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
@@ -346,5 +348,12 @@ func TestAwaitThenableRequiresTheTypedHarness(t *testing.T) {
 	typed := ruletest.RunTyped(t, AwaitThenable, awaitThenableFile, source)
 	if len(typed.Diagnostics) != 1 {
 		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
+	}
+
+	// The decline the guard buys. A Context with no checker must yield no listeners rather than
+	// dereferencing nil, and asserting it here is the only way the guard is covered at all: the
+	// registration path always supplies a checker, so nothing else can reach this branch.
+	if listeners := AwaitThenable.Run(rule.Context{}, nil); listeners != nil {
+		t.Errorf("a nil checker produced %d listeners, want the rule to decline the file", len(listeners))
 	}
 }

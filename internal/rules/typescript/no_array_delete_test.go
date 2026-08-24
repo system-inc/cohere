@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/ruletest"
 )
@@ -374,10 +375,11 @@ func TestNoArrayDeleteSpans(t *testing.T) {
 // fixture set moved to the untyped harness would see every Fires case fail and every StaysSilent
 // case pass VACUOUSLY, having proven nothing at all.
 //
-// The nil guard the standing advice asks for is not in the rule file and cannot be: the listener
-// belongs to the vendored upstream rule, and editing it is what would turn re-syncing into a merge.
-// upstream.Adapt sets NeedsTypeChecker on every rule it wraps for exactly this reason, so the nil
-// case is unreachable through registration. This test pins the declaration that makes that true.
+// The nil guard the standing advice asks for now lives at the top of the listener, because
+// absorbing the rule off the adapter made that listener ours to edit. It is unreachable through
+// registration, since NeedsTypeChecker is declared; it covers the harness path, where a Context is
+// built by hand. This test pins the declaration AND the guard, so losing either one fails loudly
+// rather than going vacuously green.
 func TestNoArrayDeleteRequiresTheTypedHarness(t *testing.T) {
 	if !NoArrayDelete.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
@@ -391,5 +393,19 @@ func TestNoArrayDeleteRequiresTheTypedHarness(t *testing.T) {
 	typed := ruletest.RunTyped(t, NoArrayDelete, noArrayDeleteFile, source)
 	if len(typed.Diagnostics) != 1 {
 		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
+	}
+
+	// The guard the absorption made possible. Driving the listener with a checker-less Context must
+	// return rather than dereference nil, and this is the only path that reaches that branch, since
+	// registration always supplies a checker.
+	listeners := NoArrayDelete.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
+	listener, hasListener := listeners[ast.KindDeleteExpression]
+	if !hasListener {
+		t.Fatal("the rule stopped listening on delete expressions")
+	}
+	for _, statement := range typed.SourceFile.Statements.Nodes {
+		if statement.Kind == ast.KindExpressionStatement {
+			listener(statement.AsExpressionStatement().Expression)
+		}
 	}
 }

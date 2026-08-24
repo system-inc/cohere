@@ -1,9 +1,12 @@
 package typescript
 
 import (
+	"fmt"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rules/upstream"
-	"github.com/system-inc/verify/internal/upstream/tsgolint/rules/no_unsafe_unary_minus"
+	"github.com/system-inc/verify/internal/upstream/tsgolint/utils"
 )
 
 // NoUnsafeUnaryMinus flags unary negation applied to a value that is not a number or a bigint.
@@ -20,7 +23,18 @@ import (
 //	invalid: (a: unknown) => -a
 //	invalid: <T,>(t: T) => -t
 //
-// # This is wiring rather than a port, and the vendoring was the only new code
+// # Absorbed from tsgolint, which is the source of record for this rule
+//
+// Provenance: tsgolint `internal/rules/no_unsafe_unary_minus/no_unsafe_unary_minus.go`, vendored at
+// commit `05b7fbc` and absorbed onto verify's own rule interface here. It reaches for
+// `GetConstrainedTypeAtLocation` and `UnionTypeParts` because that is what upstream reaches for,
+// and this note is why a reader finds those helpers in a file that otherwise looks native.
+//
+// tsgolint is not re-synced, so this file is now the only copy of the algorithm rather than a
+// translation layer over a vendored one. The checker logic below is byte-identical to upstream's;
+// what changed is the interface it speaks: `rule.RuleContext` became `rule.Context`,
+// `RuleListeners` became `Listeners`, and `rule.RuleMessage` became `rule.Message`. No predicate,
+// no flag set and no traversal was touched.
 //
 // oxc has no implementation. `no_unsafe_unary_minus.rs` is sixty lines of documentation ending in
 // `impl Rule for NoUnsafeUnaryMinus {}`, an empty body, with the declaration `NoUnsafeUnaryMinus`
@@ -28,18 +42,6 @@ import (
 // behavior oxlint exhibits for this rule IS tsgolint's: the release binary shells out to a
 // `tsgolint` executable and refuses with `Failed to find tsgolint executable` when it is absent,
 // which is what it does on this machine. That refusal is the proof rather than an obstacle.
-//
-// Unlike await-thenable, this rule was NOT already vendored. `internal/upstream/tsgolint/rules/`
-// held one directory. So the work here was to vendor upstream's forty one line file and register
-// it, and the vendoring is mechanical: the only edits are the four import paths, rewritten from
-// `github.com/microsoft/typescript-go/shim/` to `github.com/microsoft/TypeScript/tsc/shim/` and
-// from `github.com/typescript-eslint/tsgolint/internal/` to this tree's copy. Every helper it calls
-// was already on the shelf. A byte comparison against upstream's file shows those four lines and
-// nothing else, which is the same transform the await_thenable directory carries.
-//
-// Rewriting the algorithm by hand would produce a second copy of logic we already carry, which
-// would then drift with nothing comparing them, so the verification effort went into proving the
-// vendored rule reproduces upstream rather than into retyping it.
 //
 // # Where the two references disagree: the message text, not the verdict
 //
@@ -115,31 +117,64 @@ import (
 // asserts nothing. Every fixture in the test file was checked against that hazard, and the corpus
 // happens to name no such type, so none needed a second file.
 //
-// # The checker, and why the nil guard is not in this file
+// # The checker, and the nil guard that now lives here
 //
-// The single listener reads `ctx.TypeChecker` unconditionally, so the fixtures use `RunTyped`. The
-// standing advice to write `if ctx.TypeChecker == nil { return }` at the top of every listener
-// cannot be followed here: the listener is upstream's, and editing it is what would turn a re-sync
-// into a merge. `upstream.Adapt` sets `NeedsTypeChecker` on every rule it wraps precisely because
-// it cannot see whether the wrapped rule reads the checker, so the nil case is unreachable through
-// registration. A test in this package pins that declaration so a later revert fails loudly.
+// The single listener reads `ctx.TypeChecker` unconditionally, so the fixtures use `RunTyped` and
+// the rule declares `NeedsTypeChecker`. While this rule was adapted, that declaration was made by
+// `upstream.Adapt` on every rule it wrapped and the standing `if ctx.TypeChecker == nil { return }`
+// could not be written, because the listener was upstream's and editing it would have turned a
+// re-sync into a merge. Absorbing the rule removes that constraint: the listener is ours now, so
+// the guard is written where the advice always wanted it, and it is the one addition to the body.
 //
-// Reaching the checker only through a vendored file in another package also means the registry's
-// per-file textual guard, which looks for a `.TypeChecker` selector in the rule's own file, reports
-// this as over-declared. That message is wrong and the declaration is right.
+// The guard is unreachable through registration, since `NeedsTypeChecker` is declared right above.
+// It is here for the harness path, where a Context can be built by hand, and because the dangerous
+// direction for this rule is silence rather than a panic: under an untyped harness the rule would
+// report nothing and every clean fixture would pass having proven nothing. A test in this package
+// pins the declaration so a later revert fails loudly instead of going vacuously green.
 //
 // # Cost
 //
 // The anchor is `KindPrefixUnaryExpression` and the operator test is the first line, so every `+`,
 // `!`, `~`, `++` and `--` exits before the checker is touched. Only `-` pays for a type query, and
 // a negated numeric literal is the overwhelmingly common case in real source.
-var NoUnsafeUnaryMinus = adaptNoUnsafeUnaryMinus()
+var NoUnsafeUnaryMinus = rule.Rule{
+	Name: "no-unsafe-unary-minus",
 
-// adaptNoUnsafeUnaryMinus wires the vendored rule, panicking at startup if it cannot be adapted.
-//
-// `MustAdapt` rather than `Adapt` because a rule that cannot be adapted is a build-time mistake:
-// the registry is assembled at process start, so failing there stops the tool immediately instead
-// of leaving a rule silently absent from a run that otherwise looks clean.
-func adaptNoUnsafeUnaryMinus() rule.Rule {
-	return upstream.MustAdapt(no_unsafe_unary_minus.NoUnsafeUnaryMinusRule)
+	// The listener reads ctx.TypeChecker on every `-` operand, so the checker is required rather
+	// than opportunistic.
+	NeedsTypeChecker: true,
+
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		return rule.Listeners{
+			ast.KindPrefixUnaryExpression: func(node *ast.Node) {
+				if ctx.TypeChecker == nil {
+					return
+				}
+
+				expr := node.AsPrefixUnaryExpression()
+
+				if expr.Operator != ast.KindMinusToken {
+					return
+				}
+
+				argType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, expr.Operand)
+
+				for _, t := range utils.UnionTypeParts(argType) {
+					if !utils.IsTypeFlagSet(t, checker.TypeFlagsAny|checker.TypeFlagsNever|checker.TypeFlagsBigIntLike|checker.TypeFlagsNumberLike) {
+						ctx.ReportNode(node, buildUnaryMinusMessage(ctx.TypeChecker.TypeToString(t)))
+						break
+					}
+				}
+			},
+		}
+	},
+}
+
+// buildUnaryMinusMessage names the offending union PART rather than the whole argument type, which
+// is tsgolint's behavior and differs observably from `@typescript-eslint`. See the note above.
+func buildUnaryMinusMessage(t string) rule.Message {
+	return rule.Message{
+		Id:          "unaryMinus",
+		Description: fmt.Sprintf("Argument of unary negation should be assignable to number | bigint but is %v instead.", t),
+	}
 }

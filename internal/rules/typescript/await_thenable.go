@@ -1,9 +1,10 @@
 package typescript
 
 import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rules/upstream"
-	"github.com/system-inc/verify/internal/upstream/tsgolint/rules/await_thenable"
+	"github.com/system-inc/verify/internal/upstream/tsgolint/utils"
 )
 
 // AwaitThenable flags `await` applied to a value that is not a Thenable, `for await...of` over a
@@ -18,25 +19,42 @@ import (
 //	invalid: for await (const value of yieldNumbers())
 //	invalid: declare const d: Disposable; await using x = d
 //
-// # This rule is wiring rather than a port, and that is the whole finding
+// # Absorbed from tsgolint, which is the source of record for this rule
+//
+// Provenance: tsgolint `internal/rules/await_thenable/await_thenable.go`, vendored at commit
+// `05b7fbc` and absorbed onto verify's own rule interface here. It reaches for `NeedsToBeAwaited`,
+// `GetWellKnownSymbolPropertyOfType` and `GetForStatementHeadLoc` because that is what upstream
+// reaches for, and this note is why a reader finds those helpers in a file that otherwise looks
+// native.
+//
+// tsgolint is not re-synced, so this file is now the only copy of the algorithm rather than a
+// translation layer over a vendored one. The checker logic below is byte-identical to upstream's;
+// what changed is the interface it speaks: `rule.RuleContext` became `rule.Context`,
+// `RuleListeners` became `Listeners`, `rule.RuleMessage` became `rule.Message`, and each
+// suggestion moved from `rule.RuleSuggestion{FixesArr: []rule.RuleFix{...}}` to
+// `rule.Suggestion{Fixes: []rule.Fix{...}}`. The three fix constructors map one to one:
+// `RuleFixRemoveRange` is `rule.RemoveRange`, and `RuleFixRemove(file, node)` is `ctx.RemoveNode`,
+// which are the same expression under different names since `utils.TrimNodeTextRange` and
+// `rule.TokenRange` are both `GetRangeOfTokenAtPosition(file, node.Pos()).WithEnd(node.End())`. No
+// predicate, no tri-state and no traversal was touched.
+//
+// The reported SPANS are unchanged, and that is the part worth naming. While this rule was adapted,
+// `upstream.Adapt` wrapped every node report in `rule.TokenRange(SourceFile, node)` because
+// tsgolint's own runner does the same through `utils.TrimNodeTextRange`. Our native
+// `ctx.ReportNodeWithSuggestions` applies exactly that trim itself, so absorbing the rule preserves
+// the behavior rather than relying on the adapter to supply it. Passing `node.Loc` instead would
+// include leading trivia, so an indented `await 0` would report the text "\n  await 0" and an
+// `await using` initializer would report " disposable" with a leading space; that is the defect
+// fixed in `8bdd70b`, and the span test in this package pins both shapes against it. The
+// `for await...of` arm reports a computed head range rather than a node, so it goes through
+// `ReportRangeWithSuggestions`, which trims nothing by design because the caller already said what
+// it meant.
 //
 // oxc has no implementation. Its rule file declares `AwaitThenable(tsgolint)` and delegates, with
 // fifty seven lines carrying documentation and no algorithm. So the behavior oxlint exhibits for
 // this rule IS tsgolint's, literally: the release binary shells out to a `tsgolint` executable and
-// refuses to run the rule when that binary is absent, which is what it does on this machine.
-//
-// tsgolint's rule is already vendored in this tree at
-// `internal/upstream/tsgolint/rules/await_thenable`, byte-identical to upstream, and
-// `internal/rules/upstream.Adapt` already converts it. Both compile against the same shims over the
-// same typescript-go commit. What was missing was the registration: `MustAdapt` had zero call sites
-// outside its own test, so the vendored rule ran on nothing. That is exactly the "present and
-// blind" failure the adapter's own doc comment names, sitting one line away from being fixed.
-//
-// Rewriting the algorithm by hand here would produce a second copy of logic we already carry, which
-// would then drift from the vendored one with nothing comparing them. The decision this file makes
-// is therefore to wire rather than to re-implement, and the verification effort went into proving
-// the vendored rule reproduces upstream rather than into retyping it. See the test file: all forty
-// eight of tsgolint's own cases were replayed through the adapted rule and all forty eight agree.
+// refuses to run the rule when that binary is absent, which is what it does on this machine. All
+// forty eight of tsgolint's own cases are replayed in the test file and all forty eight agree.
 //
 // # Where the two upstreams disagree, measured rather than read
 //
@@ -70,36 +88,155 @@ import (
 // `asyncIterator` or `asyncDispose`, looked up through `GetPropertyNameForKnownSymbolName`. Those
 // are not `then` checks and do not go through the tri-state.
 //
-// # The checker, and why the guard question does not arise here
+// # The checker, and the nil guard that now lives here
 //
 // Every listener reads `ctx.TypeChecker` unconditionally, so this needs the checker and its
-// fixtures use `RunTyped`. The standing advice is to write `if ctx.TypeChecker == nil { return }`
-// at the top of every listener in a typed rule, and this file cannot follow it: the listeners are
-// upstream's and editing them is what keeps re-syncing a diff rather than a merge.
+// fixtures use `RunTyped`. While this rule was adapted, the standing
+// `if ctx.TypeChecker == nil { return }` could not be written, because the listeners were
+// upstream's and editing them would have turned a re-sync into a merge. Absorbing the rule removes
+// that constraint, so the guard is now written where the advice always wanted it.
 //
-// The guard is not missing, it is one level up. `upstream.Adapt` sets `NeedsTypeChecker` on every
-// adapted rule unconditionally, precisely because it cannot see whether the rule it wraps reads the
-// checker, and it comments that under-declaring risks a nil checker inside a type-aware rule while
-// over-declaring only costs a lock. So the nil case is unreachable through registration. A test in
-// this package asserts the declaration is present, so a later revert fails loudly rather than going
-// vacuously green.
-//
-// Reaching the checker only through a vendored file in another package also means the registry's
-// per-file textual guard, which looks for a `.TypeChecker` selector in the rule's own file, will
-// report this as over-declared. That message is wrong and the declaration is right.
+// It is placed in `Run` rather than repeated at the top of all three listeners, which declines the
+// file once instead of three times per node and is the cheapest thing a rule can do. The guard is
+// unreachable through registration, since `NeedsTypeChecker` is declared right above; it is here
+// for the harness path, where a Context can be built by hand. A test in this package pins both the
+// declaration and the decline, so a later revert fails loudly rather than going vacuously green.
 //
 // # Cost
 //
 // The anchor is what to price, not the checker. `KindAwaitExpression` and `KindForOfStatement` are
 // uncommon nodes, and `KindVariableDeclarationList` is common but exits on the first line for
 // anything that is not `await using`. Measured on the real tree, see the test file's note.
-var AwaitThenable = adaptAwaitThenable()
+var AwaitThenable = rule.Rule{
+	Name: "await-thenable",
 
-// adaptAwaitThenable wires the vendored rule, panicking at startup if it cannot be adapted.
-//
-// `MustAdapt` rather than `Adapt` because a rule that cannot be adapted is a build-time mistake:
-// the registry is assembled at process start, so failing there stops the tool immediately instead
-// of leaving a rule silently absent from a run that otherwise looks clean.
-func adaptAwaitThenable() rule.Rule {
-	return upstream.MustAdapt(await_thenable.AwaitThenableRule)
+	// All three listeners read ctx.TypeChecker unconditionally, so the checker is required.
+	NeedsTypeChecker: true,
+
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		if ctx.TypeChecker == nil {
+			return nil
+		}
+
+		return rule.Listeners{
+			ast.KindAwaitExpression: func(node *ast.Node) {
+				awaitArgument := node.AsAwaitExpression().Expression
+				awaitArgumentType := ctx.TypeChecker.GetTypeAtLocation(awaitArgument)
+				certainty := utils.NeedsToBeAwaited(ctx.TypeChecker, awaitArgument, awaitArgumentType)
+
+				if certainty == utils.TypeAwaitableNever {
+					ctx.ReportNodeWithSuggestions(node, buildAwaitMessage(), rule.Suggestion{
+						Message: buildRemoveAwaitMessage(),
+						Fixes: []rule.Fix{
+							rule.RemoveRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())),
+						},
+					})
+				}
+			},
+			ast.KindForOfStatement: func(node *ast.Node) {
+				stmt := node.AsForInOrOfStatement()
+				if stmt.AwaitModifier == nil {
+					return
+				}
+
+				exprType := ctx.TypeChecker.GetTypeAtLocation(stmt.Expression)
+				if utils.IsTypeAnyType(exprType) {
+					return
+				}
+
+				for _, typePart := range utils.UnionTypeParts(exprType) {
+					if utils.GetWellKnownSymbolPropertyOfType(typePart, "asyncIterator", ctx.TypeChecker) != nil {
+						return
+					}
+				}
+
+				ctx.ReportRangeWithSuggestions(
+					utils.GetForStatementHeadLoc(ctx.SourceFile, node),
+					buildForAwaitOfNonAsyncIterableMessage(),
+					// Note that this suggestion causes broken code for sync iterables
+					// of promises, since the loop variable is not awaited.
+					rule.Suggestion{
+						Message: buildConvertToOrdinaryForMessage(),
+						Fixes: []rule.Fix{
+							ctx.RemoveNode(stmt.AwaitModifier),
+						},
+					},
+				)
+			},
+			ast.KindVariableDeclarationList: func(node *ast.Node) {
+				if !ast.IsVarAwaitUsing(node) {
+					return
+				}
+
+				declaration := node.AsVariableDeclarationList()
+			DeclaratorLoop:
+				for _, declarator := range declaration.Declarations.Nodes {
+					init := declarator.Initializer()
+					if init == nil {
+						continue
+					}
+					initType := ctx.TypeChecker.GetTypeAtLocation(init)
+					if utils.IsTypeAnyType(initType) {
+						continue
+					}
+
+					for _, typePart := range utils.UnionTypeParts(initType) {
+						if utils.GetWellKnownSymbolPropertyOfType(typePart, "asyncDispose", ctx.TypeChecker) != nil {
+							continue DeclaratorLoop
+						}
+					}
+
+					var suggestions []rule.Suggestion
+					// let the user figure out what to do if there's
+					// await using a = b, c = d, e = f;
+					// it's rare and not worth the complexity to handle.
+					if len(declaration.Declarations.Nodes) == 1 {
+						suggestions = append(suggestions, rule.Suggestion{
+							Message: buildRemoveAwaitMessage(),
+							Fixes: []rule.Fix{
+								rule.RemoveRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())),
+							},
+						})
+					}
+
+					ctx.ReportNodeWithSuggestions(init, buildAwaitUsingOfNonAsyncDisposableMessage(), suggestions...)
+				}
+			},
+		}
+	},
+}
+
+func buildAwaitMessage() rule.Message {
+	return rule.Message{
+		Id:          "await",
+		Description: "Unexpected `await` of a non-Promise (non-\"Thenable\") value.",
+	}
+}
+
+func buildRemoveAwaitMessage() rule.Message {
+	return rule.Message{
+		Id:          "removeAwait",
+		Description: "Remove unnecessary `await`.",
+	}
+}
+
+func buildForAwaitOfNonAsyncIterableMessage() rule.Message {
+	return rule.Message{
+		Id:          "forAwaitOfNonAsyncIterable",
+		Description: "Unexpected `for await...of` of a value that is not async iterable.",
+	}
+}
+
+func buildConvertToOrdinaryForMessage() rule.Message {
+	return rule.Message{
+		Id:          "convertToOrdinaryFor",
+		Description: "Convert to an ordinary `for...of` loop.",
+	}
+}
+
+func buildAwaitUsingOfNonAsyncDisposableMessage() rule.Message {
+	return rule.Message{
+		Id:          "awaitUsingOfNonAsyncDisposable",
+		Description: "Unexpected `await using` of a value that is not async disposable.",
+	}
 }
