@@ -27,6 +27,7 @@ import (
 	_ "github.com/system-inc/verify/internal/rules/core"
 	_ "github.com/system-inc/verify/internal/rules/next"
 	_ "github.com/system-inc/verify/internal/rules/nexus"
+	_ "github.com/system-inc/verify/internal/rules/react"
 	_ "github.com/system-inc/verify/internal/rules/structure"
 	_ "github.com/system-inc/verify/internal/rules/tailwind"
 	_ "github.com/system-inc/verify/internal/rules/typescript"
