@@ -20,6 +20,7 @@ func init() {
 		rule.Registration{Rule: GoogleFontDisplay},
 		rule.Registration{Rule: GoogleFontPreconnect},
 		rule.Registration{Rule: InlineScriptId},
+		rule.Registration{Rule: NextScriptForGa},
 		rule.Registration{Rule: NoAssignModuleVariable},
 		rule.Registration{Rule: NoAsyncClientComponent},
 		rule.Registration{Rule: NoBeforeInteractiveScriptOutsideDocument},
