@@ -42,5 +42,7 @@ func init() {
 		rule.Registration{Rule: NoIsMounted},
 		rule.Registration{Rule: NoRenderReturnValue},
 		rule.Registration{Rule: NoStringRefs, Decode: rule.DecodeOptionsInto[NoStringRefsOptions]()},
+		rule.Registration{Rule: NoThisInSfc},
+		rule.Registration{Rule: VoidDomElementsNoChildren},
 	)
 }
