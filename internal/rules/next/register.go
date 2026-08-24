@@ -19,7 +19,9 @@ func init() {
 	rule.Register(
 		rule.Registration{Rule: GoogleFontDisplay},
 		rule.Registration{Rule: GoogleFontPreconnect},
+		rule.Registration{Rule: InlineScriptId},
 		rule.Registration{Rule: NoAssignModuleVariable},
+		rule.Registration{Rule: NoBeforeInteractiveScriptOutsideDocument},
 		rule.Registration{Rule: NoCssTags},
 		rule.Registration{Rule: NoDuplicateHead},
 		rule.Registration{Rule: NoDocumentImportInPage},
@@ -27,10 +29,13 @@ func init() {
 		rule.Registration{Rule: NoHtmlLinkForPages},
 		rule.Registration{Rule: NoHeadImportInDocument},
 		rule.Registration{Rule: NoImgElement},
+		rule.Registration{Rule: NoLocationAssignRelativeDestination},
 		rule.Registration{Rule: NoStyledJsxInDocument},
+		rule.Registration{Rule: NoPageCustomFont},
 		rule.Registration{Rule: NoScriptComponentInHead},
 		rule.Registration{Rule: NoSyncScripts},
 		rule.Registration{Rule: NoTypos},
 		rule.Registration{Rule: NoTitleInDocumentHead},
+		rule.Registration{Rule: NoUnwantedPolyfillio},
 	)
 }
