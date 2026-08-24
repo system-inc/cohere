@@ -17,6 +17,7 @@ import (
 // rules that vanished rather than as a quieter run.
 func init() {
 	rule.Register(
+		rule.Registration{Rule: ConstructorSuper},
 		rule.Registration{Rule: ForDirection},
 		rule.Registration{
 			Rule:   GetterReturn,
