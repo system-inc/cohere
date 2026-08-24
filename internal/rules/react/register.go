@@ -31,6 +31,7 @@ func init() {
 	rule.Register(
 		rule.Registration{Rule: JsxNoDuplicateProps},
 		rule.Registration{Rule: NoChildrenProp},
+		rule.Registration{Rule: NoFindDOMNode},
 		rule.Registration{Rule: NoIsMounted},
 		rule.Registration{Rule: NoStringRefs, Decode: rule.DecodeOptionsInto[NoStringRefsOptions]()},
 	)
