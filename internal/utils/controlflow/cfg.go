@@ -16,8 +16,28 @@
 //     functions; one was dropped as a no-op on our parser and one was inlined. The measurement
 //     that separates them is recorded at `isAlwaysTruthyTest`.
 //
-// Nothing calls this package yet. It is a foundation lift rather than a rule port, and the
-// coupling to the rest of the tree is deliberately zero: it imports one shim and the standard
+// # Added here, and absent upstream
+//
+// Two files are ours entirely. They are listed separately from the changes above because the
+// distinction matters to the next person diffing against upstream: nothing below modifies a
+// vendored line, so a three-way merge of a new rslint commit touches none of it.
+//
+//   - `dominators.go` — predecessor edges and a dominator tree over the reachable subgraph.
+//     Upstream computes both inside `paths.go`'s `findFinalPathDominators` and discards them; this
+//     exposes them as an API. The algorithm is Cooper-Harvey-Kennedy either way, written a second
+//     time here because the two run over different graphs (that one adds a synthetic exit and drops
+//     thrown edges), and `TestDominatorsAgreeWithFinalPathDominators` pins them against each other
+//     so neither can drift silently.
+//   - `dataflow.go` — a monotone dataflow solver over a caller-supplied lattice, in either
+//     direction. Upstream has none, and every consumer that needed one wrote its own loop inline.
+//
+// Both are additive. No vendored file lost a line to them, and the three consumers that predate
+// them — `internal/unused/reachable.go`, `no_useless_assignment_analysis.go`, and
+// `internal/rules/react/rules_of_hooks.go` — were measured byte-identical in their findings across
+// the whole `~/Projects/ahra` tree afterwards.
+//
+// Three rules consume this package today. It began as a foundation lift with no callers, and the
+// coupling to the rest of the tree is still deliberately zero: it imports one shim and the standard
 // library, so it can be adopted by a rule without dragging anything behind it.
 //
 // Package controlflow builds a control-flow graph for one code path root — a source

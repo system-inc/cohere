@@ -272,30 +272,30 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 		}
 	}
 
-	// live[block] is the set of symbols live on entry to that block, computed backward to a fixed
-	// point. Only reachable blocks participate: an unreachable block's events are the same source
-	// positions laid out a second time, and letting them contribute would let a `finally` copy's
-	// own kill mask a live read.
-	live := make([]map[*ast.Symbol]bool, len(graph.Blocks))
-	for index := range live {
-		live[index] = map[*ast.Symbol]bool{}
-	}
-
-	for changed := true; changed; {
-		changed = false
-		for index := len(graph.Blocks) - 1; index >= 0; index-- {
-			block := graph.Blocks[index]
-			if !block.Reachable {
-				continue
-			}
-			current := liveOnExit(block, live)
-			applyBlockTransfer(block, current, reachable, nil)
-			if !sameSymbolSet(current, live[index]) {
-				live[index] = current
-				changed = true
-			}
-		}
-	}
+	// The backward liveness dataflow, run to a fixed point by `controlflow.Solve`.
+	//
+	// # What moved out of this file, and what did not
+	//
+	// This used to be a hand-written loop here: iterate blocks by DESCENDING INDEX, rebuild each
+	// block's successor union from scratch every round, compare, repeat. Both of those were
+	// workarounds for the graph exposing neither an iteration order nor predecessor edges, and both
+	// are now the framework's problem rather than this rule's. `Solve` walks reverse postorder
+	// reversed, which is the order a backward analysis wants, and it excludes unreachable blocks for
+	// the reason spelled out above.
+	//
+	// The LATTICE did not move. The meet is still the union of the reachable successors' entry sets
+	// and the transfer is still `applyBlockTransfer` walking one block's events backward, because
+	// those two are what this rule believes about liveness and they are exactly what the framework
+	// declines to have an opinion about. What changed is who runs them, not what they say.
+	//
+	// The verdicts are unchanged and that is checked rather than asserted: a fixed point does not
+	// depend on the order it is reached in, and the imported corpus plus the fixtures pin the
+	// answers.
+	solution := controlflow.Solve[map[*ast.Symbol]bool, deadStoreEvent](
+		graph,
+		controlflow.Backward,
+		deadStoreLiveness{reachable: reachable},
+	)
 
 	// The reporting pass runs once the sets have settled, walking each reachable block backward and
 	// collecting a verdict per write. A write is named only when EVERY reachable copy of it found
@@ -329,7 +329,16 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 		if !block.Reachable {
 			continue
 		}
-		current := liveOnExit(block, live)
+		// `In` on a Backward solution is the value on EXIT from the block: the symbols live after it.
+		// That is what the reporting walk starts from, exactly as `liveOnExit` used to supply it.
+		liveAfter, ok := solution.In(block)
+		if !ok {
+			continue
+		}
+		current := map[*ast.Symbol]bool{}
+		for symbol := range liveAfter {
+			current[symbol] = true
+		}
 		applyBlockTransfer(block, current, reachable, func(event deadStoreEvent, dead bool) {
 			position := event.node.Pos()
 			existing := verdicts[position]
@@ -350,27 +359,66 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 	}
 }
 
-// liveOnExit unions the live-on-entry sets of a block's reachable successors.
+// deadStoreLiveness is this rule's lattice: a set of symbols, met by union, transferred by walking
+// one block's events backward.
 //
-// This is the whole of the meet operation. Upstream distinguishes six edge kinds here — Normal,
-// Jump, Backedge, Error, Finalize, Join — and unions all but Unreachable into one of two sets, with
-// the error set kept separate so a write bypassed by a throw is not reported. Our graph carries no
-// edge kinds, so the same conservatism is obtained by a different route: the fork to a handler is a
-// real successor edge, so the handler's live set is unioned in like any other, and a write followed
-// by a throwing call stays live because the catch path reads the earlier value. Measured on
+// # The meet, and why union is the conservative choice here
+//
+// Upstream distinguishes six edge kinds — Normal, Jump, Backedge, Error, Finalize, Join — and unions
+// all but Unreachable into one of two sets, keeping the error set separate so a write bypassed by a
+// throw is not reported. Our graph carries no edge kinds, so the same conservatism is obtained by a
+// different route: the fork to a handler is a real successor edge, so the handler's live set is
+// unioned in like any other, and a write followed by a throwing call stays live because the catch
+// path reads the earlier value. Measured on
 // `function f() { let v = 1; try { h(); } catch (e) { v = 2; } return v; }`, where the fork out of
 // the `try` block reaches the catch and the join before it.
-func liveOnExit[E any](block *controlflow.Block[E], live []map[*ast.Symbol]bool) map[*ast.Symbol]bool {
-	current := map[*ast.Symbol]bool{}
-	for _, successor := range block.Successors {
-		if successor == nil || !successor.Reachable {
-			continue
-		}
-		for symbol := range live[successor.Index()] {
-			current[symbol] = true
-		}
+//
+// # Bottom and Entry are both empty, and they mean different things
+//
+// Bottom is the identity for union, so it is the empty set. Entry is the claim that NOTHING is live
+// where the code path leaves — no symbol declared inside this root can be read after it returns —
+// and it is also the empty set. They coincide numerically and not in meaning, which is why they are
+// written separately rather than sharing one constructor.
+type deadStoreLiveness struct {
+	// reachable is keyed by source position, and `applyBlockTransfer` consults it to decide whether
+	// a write is judged at all. It is threaded through the lattice because the transfer needs it and
+	// the framework hands the lattice nothing but the block.
+	reachable map[int]bool
+}
+
+func (deadStoreLiveness) Bottom() map[*ast.Symbol]bool { return map[*ast.Symbol]bool{} }
+
+func (deadStoreLiveness) Entry() map[*ast.Symbol]bool { return map[*ast.Symbol]bool{} }
+
+func (deadStoreLiveness) Meet(left, right map[*ast.Symbol]bool) map[*ast.Symbol]bool {
+	// Neither argument is mutated: `Solve` holds one of them as a settled boundary value and
+	// compares against it to decide whether anything moved.
+	merged := make(map[*ast.Symbol]bool, len(left)+len(right))
+	for symbol := range left {
+		merged[symbol] = true
 	}
-	return current
+	for symbol := range right {
+		merged[symbol] = true
+	}
+	return merged
+}
+
+func (l deadStoreLiveness) Transfer(
+	block *controlflow.Block[deadStoreEvent],
+	incoming map[*ast.Symbol]bool,
+) map[*ast.Symbol]bool {
+	outgoing := make(map[*ast.Symbol]bool, len(incoming))
+	for symbol := range incoming {
+		outgoing[symbol] = true
+	}
+	// nil observer: the fixed-point rounds must report nothing, because a block is transferred many
+	// times before the sets settle. Reporting happens once afterwards, in a separate walk.
+	applyBlockTransfer(block, outgoing, l.reachable, nil)
+	return outgoing
+}
+
+func (deadStoreLiveness) Equal(left, right map[*ast.Symbol]bool) bool {
+	return sameSymbolSet(left, right)
 }
 
 // applyBlockTransfer walks one block's events backward, updating the live set and optionally
