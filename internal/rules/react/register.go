@@ -29,6 +29,7 @@ import (
 // rules that vanished rather than as a quieter run.
 func init() {
 	rule.Register(
+		rule.Registration{Rule: ExhaustiveDeps, Decode: rule.DecodeOptionsInto[ExhaustiveDepsOptions]()},
 		rule.Registration{Rule: ForwardRefUsesRef},
 		rule.Registration{Rule: JsxNoDuplicateProps},
 		rule.Registration{Rule: JsxNoUndef},
