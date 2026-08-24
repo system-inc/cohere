@@ -1,6 +1,8 @@
 package core
 
 import (
+	"unicode/utf8"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
@@ -236,10 +238,51 @@ var NoIrregularWhitespace = rule.Rule{
 // offset and cannot stop. Fusing them would mean either walking the tree before knowing whether it
 // is needed, which is the cost this removes, or reporting before the skip regions exist.
 func containsIrregularWhitespace(text string) bool {
-	for _, character := range text {
-		if irregularWhitespaceCodepoints[character] {
+	// Iterating bytes rather than runes, and testing the byte range before the map.
+	//
+	// The obvious loop ranges over runes and asks the map about each one, and that is what shipped
+	// first. It measured 240ms across 3,407 files, still the most expensive rule in the run, to
+	// report nothing: a map lookup per character over roughly 25 MB of source is the whole cost, and
+	// only four files in that tree contain any of these characters at all, so the tree walk this
+	// guard protects almost never runs and the guard itself became the rule's entire expense.
+	//
+	// Every character in the set is either one of two ASCII controls or is non-ASCII, so a byte
+	// below 0x80 that is neither of those two cannot begin one. That test is a comparison against a
+	// byte already in a register and it decides the overwhelming majority of a typical file, leaving
+	// the map to the rare non-ASCII byte. Ranging over bytes also skips UTF-8 decoding on the common
+	// path, which ranging over runes cannot.
+	for index := 0; index < len(text); index++ {
+		character := text[index]
+		if character < 0x80 {
+			if character == 0x0B || character == 0x0C {
+				return true
+			}
+			continue
+		}
+
+		// The map, not a range test. Widening this to "any non-ASCII rune" is a mutation no
+		// fixture can catch, and correctly so: the reporting loop tests every character against
+		// this same map independently, so a guard that says yes too often changes what the rule
+		// costs and never what it reports. It is still wrong, because the entire purpose of the
+		// guard is to be cheap and decisive, and one that fires on any accented letter defeats
+		// itself on every file holding ordinary non-English text.
+		decoded, width := utf8.DecodeRuneInString(text[index:])
+		if irregularWhitespaceCodepoints[decoded] {
 			return true
 		}
+		// Minus one because the loop's own increment supplies the last byte. DecodeRuneInString
+		// returns a width of one for invalid UTF-8, so this always advances and cannot spin.
+		//
+		// The skip is an optimization and not a correctness requirement, which the sweep settled
+		// rather than assumed: advancing zero here survives every fixture. It re-examines each
+		// continuation byte of a multi-byte character, and a continuation byte decodes to the
+		// replacement rune, which is not in the map, so the extra visits cost time and cannot
+		// change the answer. Advancing one byte too far is the opposite and is a real defect: it
+		// lands inside the next character and decodes the replacement rune in place of a character
+		// that might be in the map, so the guard reports a clean file and every finding in it
+		// disappears. Only an irregular character abutting a multi-byte one distinguishes that, and
+		// there is a fixture for exactly that shape.
+		index += width - 1
 	}
 	return false
 }

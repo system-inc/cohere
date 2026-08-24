@@ -511,3 +511,26 @@ func TestNoIrregularWhitespaceDoesNotTreatACommentOpenerInAStringAsAComment(t *t
 		NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(false)}),
 		"noIrregularWhitespace")
 }
+
+// A multi-byte character standing immediately before an irregular one, with no byte between them.
+//
+// This exists for the guard rather than for the rule. The guard walks bytes and steps over a decoded
+// character's width, and that arithmetic has to be exact: advancing one byte too far lands inside
+// the following character, decodes the replacement rune instead of it, and the guard concludes the
+// file holds nothing, which silently suppresses every finding in that file.
+//
+// Adjacency is the whole point and it is easy to lose. An earlier version of this case put a space
+// between the two characters, and a mis-stepping guard landed back on that ASCII byte and recovered,
+// so the case passed against the broken version and proved nothing. The two must share a boundary:
+// an e-acute is two bytes and an ideographic space is three, so the irregular character begins
+// exactly at the byte an off-by-one guard skips. Every other case in this file puts ASCII in front
+// of its irregular character, where a mis-stepped index happens to land correctly.
+func TestNoIrregularWhitespaceFindsAnIrregularCharacterAbuttingAMultiByteOne(t *testing.T) {
+	ruletest.ExpectFindings(t, ruletest.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+		"const \u00e9\u3000x = 1;"), "noIrregularWhitespace")
+
+	// A three-byte character abutting a three-byte one, so a guard mis-stepping by a different
+	// amount is caught too.
+	ruletest.ExpectFindings(t, ruletest.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+		"const \u4e2d\u3000x = 1;"), "noIrregularWhitespace")
+}
