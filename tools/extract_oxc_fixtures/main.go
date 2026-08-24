@@ -536,6 +536,19 @@ func readTuples(body string) []fixtureCase {
 			continue
 		}
 
+		// A block comment too. Skipping only the line form left a leading `/* ... */` above the
+		// first case splitting into a phantom entry, so `no-this-before-super` reported 40 pass
+		// where it has 39. A porter caught it by transcribing the corpus by hand and reconciling,
+		// which is not a check that scales.
+		if current == '/' && index+1 < len(runes) && runes[index+1] == '*' {
+			index += 2
+			for index+1 < len(runes) && !(runes[index] == '*' && runes[index+1] == '/') {
+				index++
+			}
+			index++
+			continue
+		}
+
 		switch {
 		case current == '(':
 			entry, ok := balancedSlice(string(runes[index:]), '(', ')')
