@@ -31,9 +31,22 @@ import (
 // the abbreviation rule that carries this exemption today.
 //
 // The sibling ambiguous-identifier rule exempted it, and that was the one place the two lifted
-// implementations genuinely disagreed rather than merely differing in coverage. This function takes
-// the abbreviation rule's answer, because that rule has a named production defect as its evidence
-// and the sibling has none.
+// implementations genuinely disagreed rather than merely differing in coverage.
+//
+// **Decided once, by Kirk, rather than left to two files that could not see each other.** The
+// reasoning is about ownership rather than about syntax: `document.cookie` is foreign because nobody
+// here owns `document`, while `this.e` is a name we chose, on an object we own, in a file we
+// control. Renaming it is a rename, not a reach for somebody else's API, so exempting it would mean
+// a naming rule cannot see the names we actually control. The `BackoffTask` receipt is the evidence
+// rather than the argument: a class declared `maximumBackoff` while reading `this.maximumBackoff`,
+// and the rule was blind to it.
+//
+// The consequence is intended rather than tolerated: `consistency-no-ambiguous-identifier` reports
+// `this.e` and its one-letter siblings now, where it did not before.
+//
+// A later reader who finds this surprising should not helpfully re-add the carve-out. The question
+// was asked and answered; re-adding it re-opens a disagreement that cost two rules their agreement
+// for as long as neither could see the other.
 //
 // # JSX has no exemption upstream and needs one here
 //
