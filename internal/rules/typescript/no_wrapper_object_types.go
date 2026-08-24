@@ -3,6 +3,7 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/module"
 )
 
 // wrapperObjectTypes are the six object types that wrap a primitive.
@@ -76,7 +77,11 @@ var NoWrapperObjectTypes = rule.Rule{
 		// let value: Number;` as a passing case. The walk is whole-file because a declaration nested
 		// in a block is still a declaration, which is a false positive this package already shipped
 		// once.
-		shadowed := declaredTypeNames(ctx.SourceFile, wrapperObjectTypes)
+		wrapperNames := make(map[string]bool, len(wrapperObjectTypes))
+		for name := range wrapperObjectTypes {
+			wrapperNames[name] = true
+		}
+		shadowed := module.DeclaredTypeNames(ctx.SourceFile, wrapperNames)
 
 		return rule.Listeners{
 			ast.KindTypeReference: func(node *ast.Node) {
@@ -125,40 +130,4 @@ func enclosingHeritageClause(node *ast.Node) (*ast.HeritageClause, bool) {
 		}
 	}
 	return nil, false
-}
-
-// declaredTypeNames returns which of the given names this file declares as a type.
-//
-// One walk answers for all six rather than one walk per name, since the file is the expensive part
-// and the map lookup is not.
-func declaredTypeNames(sourceFile *ast.SourceFile, names map[string]string) map[string]bool {
-	declared := map[string]bool{}
-
-	var visit func(node *ast.Node)
-	visit = func(node *ast.Node) {
-		if node == nil {
-			return
-		}
-		var name *ast.Node
-		switch node.Kind {
-		case ast.KindInterfaceDeclaration:
-			name = node.AsInterfaceDeclaration().Name()
-		case ast.KindTypeAliasDeclaration:
-			name = node.AsTypeAliasDeclaration().Name()
-		case ast.KindClassDeclaration:
-			name = node.AsClassDeclaration().Name()
-		}
-		if name != nil && name.Kind == ast.KindIdentifier {
-			if _, isTracked := names[name.Text()]; isTracked {
-				declared[name.Text()] = true
-			}
-		}
-		node.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return false
-		})
-	}
-	visit(sourceFile.AsNode())
-
-	return declared
 }

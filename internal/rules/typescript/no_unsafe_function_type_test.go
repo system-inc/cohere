@@ -65,6 +65,11 @@ func TestNoUnsafeFunctionTypeStaysSilent(t *testing.T) {
 		{"a locally declared interface", "interface Function {\n    tag: string;\n}\nexport let handler: Function;\n"},
 		{"a locally declared type alias", "type Function = (input: string) => void;\nexport let handler: Function;\n"},
 		{"a locally declared class", "class Function {\n    tag = 'x';\n}\nexport let handler: Function;\n"},
+		// An enum shadows too, measured with the checker rather than assumed: an enum declares a
+		// value and a TYPE of the same name, so the annotation resolves to the enum rather than to
+		// the global. The shadow walk counted only interface, type alias and class until it was
+		// lifted onto the shelf, so this was a false positive on a name the author owns.
+		{"a locally declared enum", "enum Function {\n    A,\n}\nexport let handler: Function;\n"},
 		// oxc's own passing test case, and it was a false positive here until oxc's fixtures were
 		// read. A top-level scan misses a declaration nested inside a block, so the shadow check has
 		// to walk the whole file.

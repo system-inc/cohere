@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/module"
 	"github.com/system-inc/verify/internal/utils/react"
 )
 
@@ -139,7 +140,14 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 			// `react-component-no-multiple-primary`, which collects in this listener for the same
 			// reason.
 			ast.KindSourceFile: func(node *ast.Node) {
-				collectComponentPropertyTypeNames(node, componentPropertyTypes, declaredTypeNames)
+				// Every type name the file declares, so a rename can refuse a target that is
+				// already taken. The four declaration kinds are the shelf's, which counts an enum
+				// as well: an enum declares a type as much as a value, and renaming onto one
+				// produces a duplicate identifier exactly as renaming onto an interface does.
+				for name := range module.AllDeclaredTypeNames(ctx.SourceFile) {
+					declaredTypeNames[name] = true
+				}
+				collectComponentPropertyTypeNames(node, componentPropertyTypes)
 			},
 
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
@@ -191,33 +199,11 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 // needs the complete set before it judges anything and walk order does not supply that. Reaching
 // every component means walking the whole tree rather than the top level: a component can be
 // declared inside a function, and the original's map was filled from a listener that saw those too.
-func collectComponentPropertyTypeNames(sourceFile *ast.Node, into map[string]bool, declared map[string]bool) {
+func collectComponentPropertyTypeNames(sourceFile *ast.Node, into map[string]bool) {
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {
 		if node == nil {
 			return
-		}
-
-		// Every type name the file already declares, so a rename can refuse a target that is
-		// taken. Collected in the same walk rather than a second one, since both questions are
-		// about the whole file and neither is answerable from one node.
-		switch node.Kind {
-		case ast.KindInterfaceDeclaration:
-			if declarationName := node.AsInterfaceDeclaration().Name(); declarationName != nil {
-				declared[declarationName.Text()] = true
-			}
-		case ast.KindTypeAliasDeclaration:
-			if declarationName := node.AsTypeAliasDeclaration().Name(); declarationName != nil {
-				declared[declarationName.Text()] = true
-			}
-		case ast.KindClassDeclaration:
-			if declarationName := node.AsClassDeclaration().Name(); declarationName != nil {
-				declared[declarationName.Text()] = true
-			}
-		case ast.KindEnumDeclaration:
-			if declarationName := node.AsEnumDeclaration().Name(); declarationName != nil {
-				declared[declarationName.Text()] = true
-			}
 		}
 
 		var name *ast.Node
