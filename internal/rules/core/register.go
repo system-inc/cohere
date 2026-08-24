@@ -22,6 +22,7 @@ func init() {
 		rule.Registration{Rule: NoAsyncPromiseExecutor},
 		rule.Registration{Rule: NoCaseDeclarations},
 		rule.Registration{Rule: NoClassAssign},
+		rule.Registration{Rule: NoConstAssign},
 		rule.Registration{Rule: NoCompareNegZero},
 		rule.Registration{
 			Rule:   NoCondAssign,
@@ -30,10 +31,13 @@ func init() {
 		rule.Registration{Rule: NoCaller},
 		rule.Registration{Rule: NoControlRegex},
 		rule.Registration{Rule: NoDupeClassMembers},
+		rule.Registration{Rule: NoImportAssign},
 		rule.Registration{Rule: NoIterator},
 		rule.Registration{Rule: NoLossOfPrecision},
 		rule.Registration{Rule: NoNewNativeNonconstructor},
 		rule.Registration{Rule: NoObjCalls},
+		rule.Registration{Rule: NoPrototypeBuiltins},
+		rule.Registration{Rule: PreferRestParams},
 		rule.Registration{
 			Rule:   NoConstantBinaryExpression,
 			Decode: rule.DecodeOptionsInto[NoConstantBinaryExpressionOptions](),
@@ -41,6 +45,10 @@ func init() {
 		rule.Registration{
 			Rule:   NoConstantCondition,
 			Decode: rule.DecodeOptionsInto[NoConstantConditionOptions](),
+		},
+		rule.Registration{
+			Rule:   NoExtraBooleanCast,
+			Decode: rule.DecodeOptionsInto[NoExtraBooleanCastOptions](),
 		},
 		rule.Registration{Rule: NoDebugger},
 		rule.Registration{Rule: NoDeleteVar},
@@ -56,18 +64,33 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoEmptyPatternOptions](),
 		},
 		rule.Registration{Rule: NoEmptyStaticBlock},
+		rule.Registration{
+			Rule:   NoEval,
+			Decode: rule.DecodeOptionsInto[NoEvalOptions](),
+		},
 		rule.Registration{Rule: NoExAssign},
+		rule.Registration{Rule: NoFuncAssign},
+		rule.Registration{
+			Rule:   NoGlobalAssign,
+			Decode: rule.DecodeOptionsInto[NoGlobalAssignOptions](),
+		},
 		rule.Registration{Rule: NoInvalidRegexp},
 		rule.Registration{Rule: NoMisleadingCharacterClass},
 		rule.Registration{Rule: NoNonoctalDecimalEscape},
 		rule.Registration{Rule: NoSelfAssign},
 		rule.Registration{Rule: NoSetterReturn},
+		rule.Registration{
+			Rule:   NoShadowRestrictedNames,
+			Decode: rule.DecodeOptionsInto[NoShadowRestrictedNamesOptions](),
+		},
 		rule.Registration{Rule: NoSparseArrays},
+		rule.Registration{Rule: NoUnassignedVars},
 		rule.Registration{Rule: NoUnsafeFinally},
 		rule.Registration{
 			Rule:   NoUnsafeNegation,
 			Decode: rule.DecodeOptionsInto[NoUnsafeNegationOptions](),
 		},
+		rule.Registration{Rule: NoUnusedLabels},
 		rule.Registration{Rule: NoUselessBackreference},
 		rule.Registration{Rule: NoUselessCatch},
 		rule.Registration{
@@ -75,6 +98,7 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoUselessEscapeOptions](),
 		},
 		rule.Registration{Rule: NoVar},
+		rule.Registration{Rule: NoWith},
 		rule.Registration{Rule: PreferSpread},
 		rule.Registration{Rule: RequireYield},
 		rule.Registration{
