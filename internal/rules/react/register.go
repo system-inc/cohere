@@ -29,9 +29,11 @@ import (
 // rules that vanished rather than as a quieter run.
 func init() {
 	rule.Register(
+		rule.Registration{Rule: ForwardRefUsesRef},
 		rule.Registration{Rule: JsxNoDuplicateProps},
 		rule.Registration{Rule: JsxNoUndef},
 		rule.Registration{Rule: NoChildrenProp},
+		rule.Registration{Rule: NoDangerWithChildren},
 		rule.Registration{Rule: NoDidMountSetState, Decode: rule.DecodeOptionsInto[NoDidMountSetStateOptions]()},
 		rule.Registration{Rule: NoDidUpdateSetState, Decode: rule.DecodeOptionsInto[NoDidUpdateSetStateOptions]()},
 		rule.Registration{Rule: NoFindDOMNode},
