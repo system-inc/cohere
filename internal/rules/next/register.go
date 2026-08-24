@@ -21,6 +21,7 @@ func init() {
 		rule.Registration{Rule: GoogleFontPreconnect},
 		rule.Registration{Rule: InlineScriptId},
 		rule.Registration{Rule: NoAssignModuleVariable},
+		rule.Registration{Rule: NoAsyncClientComponent},
 		rule.Registration{Rule: NoBeforeInteractiveScriptOutsideDocument},
 		rule.Registration{Rule: NoCssTags},
 		rule.Registration{Rule: NoDuplicateHead},
