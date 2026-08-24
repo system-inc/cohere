@@ -194,10 +194,10 @@ func main() {
 		// decide whether it tests what it looks like it tests.
 		for _, block := range blocks {
 			for _, entry := range block.pass {
-				fmt.Printf("PASS block=%d options=%s %s\n", block.blockIndex, quoteOrNone(entry.options), strconv.Quote(entry.source))
+				fmt.Printf("PASS block=%d options=%s %s\n", block.blockIndex, quoteOrNone(entry.options), strconv.Quote(rustLiteralText(entry.source)))
 			}
 			for _, entry := range block.fail {
-				fmt.Printf("FAIL block=%d options=%s %s\n", block.blockIndex, quoteOrNone(entry.options), strconv.Quote(entry.source))
+				fmt.Printf("FAIL block=%d options=%s %s\n", block.blockIndex, quoteOrNone(entry.options), strconv.Quote(rustLiteralText(entry.source)))
 			}
 		}
 	}
@@ -214,6 +214,49 @@ func main() {
 			"the rule's own source, so that case runs on defaults while looking like it tests the "+
 			"option\n", key)
 	}
+}
+
+// rustLiteralText strips a Rust string literal's delimiters, leaving the source the case actually
+// runs.
+//
+// A case is stored with its delimiters because everything before -dump only counted cases, so the
+// wrapper never mattered. It matters here: a raw string comes back as `r#"..."#` and a porter
+// pasting that into a Go fixture gets the wrapper too. The raw form is left otherwise untouched,
+// since a raw string is exactly the bytes between its delimiters, and a plain literal is unquoted
+// so that its escapes become the characters they denote.
+func rustLiteralText(literal string) string {
+	if strings.HasPrefix(literal, "r") {
+		// `r"..."` carries zero hashes and `r#"..."#` carries one, so the count is read rather
+		// than assumed: oxc uses both forms, and a fixed guess of one leaves the quotes on the
+		// zero-hash cases, which is what the first version of this did.
+		hashes := 0
+		for 1+hashes < len(literal) && literal[1+hashes] == '#' {
+			hashes++
+		}
+		opening := 1 + hashes + 1
+		closing := len(literal) - 1 - hashes
+		if opening <= closing {
+			return literal[opening:closing]
+		}
+		return literal
+	}
+	// Go and Rust agree on the escapes these fixtures use, so Go's unquoter is the right reader;
+	// anything it rejects is returned as written rather than silently mangled.
+	if unquoted, err := strconv.Unquote(literal); err == nil {
+		return unquoted
+	}
+
+	// Rust's zero-hash raw form `r"..."` reaches here with its `r` already dropped by the scanner's
+	// dispatch, which tests for `r#"` specifically. Its body is raw, so a backslash inside it is a
+	// backslash and Go's unquoter rejects the whole literal rather than mangling it. Two of
+	// no-obj-calls's clean cases are that form and both carry real newlines. Widening the dispatch
+	// to accept a bare `r` was tried and is wrong: it matches the identifier `r` in
+	// `let area = r => 2 * Math.PI * r * r`, which swallowed a whole vector and took the pass count
+	// from 35 to 0. Trimming the delimiters here is the narrow fix, and it leaves the counts alone.
+	if len(literal) >= 2 && literal[0] == '"' && literal[len(literal)-1] == '"' {
+		return literal[1 : len(literal)-1]
+	}
+	return literal
 }
 
 // quoteOrNone renders a case's options column for -dump, distinguishing a case with no second
@@ -511,12 +554,26 @@ func readStringLiteral(runes []rune) (string, bool) {
 	}
 
 	if runes[0] == 'r' {
-		for index := 3; index < len(runes); index++ {
-			if runes[index] == '"' && index+1 < len(runes) && runes[index+1] == '#' {
-				return string(runes[:index+2]), true
-			}
+		// The hash count is part of the delimiter and Rust allows any number, zero included. This
+		// read `r#"..."#` only, starting at index 3 and requiring a closing `"#`, so oxc's
+		// zero-hash `r"..."` cases fell through to the plain-string branch below: the leading `r`
+		// was dropped, the case was still counted, and the text was read as a quoted literal it is
+		// not. Two of no-obj-calls's clean cases are that form, and the silence is exactly the kind
+		// this tool exists to refuse.
+		hashes := 0
+		for 1+hashes < len(runes) && runes[1+hashes] == '#' {
+			hashes++
 		}
-		return "", false
+		if 1+hashes >= len(runes) || runes[1+hashes] != '"' {
+			return "", false
+		}
+		closing := `"` + strings.Repeat("#", hashes)
+		body := string(runes[1+hashes+1:])
+		end := strings.Index(body, closing)
+		if end < 0 {
+			return "", false
+		}
+		return string(runes[:1+hashes+1+len([]rune(body[:end]))+len(closing)]), true
 	}
 
 	for index := 1; index < len(runes); index++ {
