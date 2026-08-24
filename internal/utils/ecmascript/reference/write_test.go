@@ -238,3 +238,57 @@ func TestIsUpdateOperator(t *testing.T) {
 		}
 	}
 }
+
+// TestShelfAccessorStillDeclinesRestElements is a differential guard on the shim rather than on this
+// package, and it is the reason the climb above exists.
+//
+// `ast.IsWriteAccess` classifies a rest element in a destructuring assignment target as a read,
+// because typescript-go's `accessKind` switch has no arm for `KindSpreadElement` or
+// `KindSpreadAssignment`. Three rules measured that independently and each wrote a different
+// workaround before the union was lifted here.
+//
+// If a future vendored compiler closes that gap, this test fails, and the failure is the useful
+// signal: the climb becomes redundant and should be deleted rather than left as code nobody can
+// justify. Without it the climb would sit there forever, correct but unexplainable, and the next
+// reader would have no way to learn whether it still does anything.
+//
+// The assertion is deliberately on the SHIM's answer rather than on ours. Asserting our answer would
+// pass either way and prove nothing about why the wrapper exists.
+func TestShelfAccessorStillDeclinesRestElements(t *testing.T) {
+	for _, source := range []string{
+		"[...a] = xs;",
+		"({...a} = o);",
+		"[b, ...a] = xs;",
+		"[b, c, ...[d, ...a]] = [1,2,3,4,5];",
+	} {
+		full := "let a, b, c, d, o, xs;\n" + source
+		var shimAnswers []bool
+		ruletest.Run(t, rule.Rule{
+			Name: "shim-differential",
+			Run: func(ctx rule.Context, options any) rule.Listeners {
+				return rule.Listeners{
+					ast.KindIdentifier: func(node *ast.Node) {
+						if node.Text() != "a" {
+							return
+						}
+						if node.Parent != nil && node.Parent.Kind == ast.KindVariableDeclaration {
+							return
+						}
+						shimAnswers = append(shimAnswers, ast.IsWriteAccess(node))
+					},
+				}
+			},
+		}, "probe.ts", full)
+
+		if len(shimAnswers) != 1 {
+			t.Fatalf("%q: expected one occurrence of `a`, got %d", source, len(shimAnswers))
+		}
+		if shimAnswers[0] {
+			t.Errorf("%q: ast.IsWriteAccess now reports a rest element as a write. The gap this "+
+				"package's climb exists to close has been fixed upstream: delete the spread and "+
+				"literal arms of WritesToBinding and this test with them.", source)
+		}
+		// Ours must answer true whatever the shim says, which is the whole point of the wrapper.
+		expectOne(t, source, true)
+	}
+}

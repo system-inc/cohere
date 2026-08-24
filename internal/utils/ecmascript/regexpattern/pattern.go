@@ -76,6 +76,35 @@ type Character struct {
 // contract regexsyntax uses and it exists for the same reason: an unterminated construct is a
 // syntax error the parser has already refused, so a second opinion here would be noise on a file
 // that does not compile.
+//
+// # What this does NOT report, measured
+//
+// Four limits, each found by a caller that needed the missing thing. They are stated here rather
+// than left in the rule that discovered them, because the next caller will otherwise measure them a
+// fifth time:
+//
+//   - **A set escape never arrives.** `\d`, `\D`, `\s`, `\S`, `\w`, `\W`, `\p`, `\P`, `\k`, `\q`, and
+//     `\b`/`\B` outside a class all match a set or a position rather than a single character, so
+//     they have no value to report and are skipped. `no-useless-escape` has to answer about every
+//     one of them.
+//   - **WHICH class a character sits in is not reported.** `ClassDepth` is a counter, not a stack,
+//     so a caller needing the enclosing class's own start and end cannot use this. The caret rule
+//     and the hyphen rule both need exactly that: a caret means negation only as a class's first
+//     character, and a hyphen opens a range only away from a class's edges.
+//   - **A `v`-flag nested class is not recursed into.** `walkClass` is not re-entered, so
+//     `/[[\.&]--[\.&]]/v` walks to silence where upstream reports twice. Measured directly rather
+//     than read off the source.
+//   - **A range's interior is not reported**, only its written endpoints. That is deliberate and
+//     stated on `walkClass`: the characters between the endpoints were never written down.
+//
+// `no-useless-escape` needed the first three and was built on `regexsyntax.SkipPatternEscape` and
+// `regexsyntax.ClassEnd` instead, which is the right call for a caller needing class structure.
+// Extending this to serve it would change the contract for the two callers below, which is a larger
+// change than one rule justifies.
+//
+// So the note at the top of this file stands with a correction: a third caller wanting more
+// structure should reach for the layer underneath rather than extend this, and only a caller wanting
+// *characters plus depth* belongs here.
 func Walk(pattern string, flags regexsyntax.RegexFlags, callback func(Character) bool) bool {
 	walker := &walker{pattern: pattern, flags: flags, callback: callback}
 	return walker.run()
