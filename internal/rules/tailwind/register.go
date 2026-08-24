@@ -18,6 +18,10 @@ import (
 func init() {
 	rule.Register(
 		rule.Registration{
+			Rule:   EnforceConsistentClassOrder,
+			Decode: rule.DecodeOptionsInto[EnforceConsistentClassOrderOptions](),
+		},
+		rule.Registration{
 			Rule:   EnforceCanonicalClasses,
 			Decode: rule.DecodeOptionsInto[EnforceCanonicalClassesOptions](),
 		},

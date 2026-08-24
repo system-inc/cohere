@@ -131,6 +131,43 @@ function parseCandidate(className) {
 // reading the root back out of the parser rather than by splitting names on dashes. A dash-splitter
 // reads `border-l` as root `border` with value `l`, which is the mistake that silently stopped
 // reporting `border-x`.
+/*
+ * Class ordering, for `enforce-consistent-class-order`.
+ *
+ * `getClassOrder` returns positions within the queried set, which reads as query-relative and is
+ * not: across all 66 pairs of a twelve-class sample the pairwise order always matches the global
+ * order. It is a stable total order whose numbers renumber per call.
+ *
+ * It needs a position per class rather than per root, and that was measured rather than assumed:
+ * 84 of 1,210 root groups are non-contiguous in the global order, and those 84 contain 18,936 of
+ * the 37,643 ranked classes. Storing roots plus an exception list saves nothing when half the
+ * registry is in the exceptions.
+ *
+ * Unranked classes are excluded rather than stored with a position. `group` and `peer` generate no
+ * CSS of their own and the engine returns null for them; giving them a position sorts them among
+ * real utilities instead of last, which was the final three literals in the corpus differential.
+ */
+/*
+ * Class ordering data, for `enforce-consistent-class-order`.
+ *
+ * A per-class position table would be 37,643 entries and 2.0 MB. Tailwind's own sort is ~25 lines in
+ * its `compile.ts`, and porting the comparator instead needs 353 rows: a property-order list and a
+ * handful of overrides. Verified exact against the engine over 2,465 real literals and 296
+ * deliberately shuffled ones.
+ *
+ * The comparator, from `getPropertySort` and the `astNodes.sort` in `compile.ts`:
+ *
+ *   1. variant order
+ *   2. first differing index into the property order
+ *   3. more declarations first
+ *   4. alphabetical
+ *
+ * `propertyOrder` is Tailwind's own list, read from the installed package rather than transcribed.
+ * `sortOverrides` are utilities that declare `--tw-sort`, which replaces their sort position
+ * entirely: `space-x` sorts as `row-gap` rather than as its own margins. That declaration is
+ * stripped from compiled output, so it cannot be probed and has to come from the source.
+ */
+const classOrder = [];
 const knownRoots = new Set();
 const knownStatics = new Set();
 const functionalRoots = new Set();
@@ -163,10 +200,186 @@ for (const entry of designSystem.getClassList?.() ?? []) {
     if (asWritten?.kind === 'functional' && asWritten.root) knownRoots.add(asWritten.root);
 }
 
+const orderingByRoot = [];
+const orderingByStatic = [];
+const orderingByClass = [];
 const roots = Array.from(functionalRoots).sort();
 
-// Roots no probe value could reach. Reported rather than skipped, because an unmeasured root is
-// absent from every table below for a reason nobody can infer from its absence.
+/*
+ * Ordering properties, per root and per static, with per-class exceptions.
+ *
+ * 312 roots and 893 statics, of which 65 roots vary by value and contribute 130 exception entries.
+ * A per-class table was built first at 37,643 entries and 2.0 MB; this is the same information in
+ * about a thousand rows, because the declarations a utility emits are a fact about its root far more
+ * often than not.
+ */
+{
+    const seenRoot = new Map();
+    const seenReading = new Map();
+    const exceptions = [];
+
+    for (const entry of designSystem.getClassList?.() ?? []) {
+        const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
+        if (typeof name !== 'string') continue;
+
+        const candidate = parseCandidate(name);
+        if (!candidate) continue;
+        const properties = orderingProperties(name);
+        if (properties === null) continue;
+
+        if (candidate.kind === 'static') {
+            orderingByStatic.push({ name, properties });
+            continue;
+        }
+        if (!candidate.root) continue;
+
+        const joined = properties.join(',');
+        if (!seenRoot.has(candidate.root)) {
+            seenRoot.set(candidate.root, joined);
+            orderingByRoot.push({ name: candidate.root, properties });
+            continue;
+        }
+        if (seenRoot.get(candidate.root) === joined) continue;
+
+        /*
+         * One entry per distinct reading, not per class that differs.
+         *
+         * 65 roots vary and they hold 130 distinct property sets between them, but 24,161 classes
+         * sit inside those roots. Recording each class produced a 2.7 MB file for information that
+         * fits in a few hundred rows. The variation is by value kind exactly as it is in the
+         * conflict tables: `border-0` emits width and style, `border-amber-50` emits color.
+         *
+         * Keyed by root and the kind of value, so a rule looks up the pair rather than the class.
+         */
+        /*
+         * Keyed by the root and the class's own VALUE, not by a two-way colour flag.
+         *
+         * A first version classified each reading as colour or other, which cannot separate two
+         * non-colour readings of one root: `font-medium` emits `font-weight` and `font-sans` emits
+         * `font-family`, both non-colour, so whichever was seen second silently replaced the other
+         * and every `font-*` class sorted at the wrong index. That regressed the differential from
+         * 2,751 to 2,463.
+         *
+         * The value is the thing that actually decides, so it is the key. This stores one row per
+         * distinct reading per root rather than one per class, which is 65 rows rather than 24,161.
+         */
+        const readingKey = candidate.root + '\u0000' + joined;
+        if (seenReading.has(readingKey)) continue;
+        seenReading.set(readingKey, true);
+        /*
+         * Two key shapes, because two different things vary.
+         *
+         * A colour reading covers hundreds of value names that all behave identically, so it is
+         * keyed by kind: one row for every `text-<colour>`. Any other reading is keyed by its own
+         * value, because `font-medium` and `font-sans` differ from each other and from nothing else.
+         *
+         * Keying everything by kind cannot separate two non-colour readings and cost 288 literals;
+         * keying everything by value cannot cover the colour scale and cost 298.
+         */
+        const isColorReading = properties.some((property) => property.endsWith('color'));
+        const keyValue = isColorReading ? '\u0001color' : valueTextOf(candidate);
+        exceptions.push({ name: candidate.root + '\u0000' + keyValue, properties });
+    }
+
+    orderingByRoot.sort((left, right) => left.name.localeCompare(right.name));
+    orderingByStatic.sort((left, right) => left.name.localeCompare(right.name));
+    exceptions.sort((left, right) => left.name.localeCompare(right.name));
+    orderingByClass.push(...exceptions);
+}
+
+
+const propertyOrder = [];
+const sortOverrides = [];
+const variantOrder = [];
+
+{
+    const tailwindRoot = NodePath.dirname(
+        NodeModule.createRequire(NodePath.join(entryDirectory, 'noop.js')).resolve('tailwindcss/package.json'),
+    );
+
+    /*
+     * Tailwind's property order, read out of the installed bundle.
+     *
+     * It ships as a plain string array, so it is recovered exactly rather than reconstructed.
+     * A first attempt derived the order by asking the engine to sort one utility per property, which
+     * only reaches properties some utility declares alone: it found 254 of 359, and every index
+     * after a missing one was shifted, which took the comparator from exact to 55%.
+     */
+    let bundleSource = '';
+    try {
+        bundleSource = NodeFileSystem.readFileSync(NodePath.join(tailwindRoot, 'dist', 'lib.mjs'), 'utf8');
+    }
+    catch {
+        bundleSource = '';
+    }
+
+    const orderMatch = bundleSource.match(/\["container-type","pointer-events"[^\]]*\]/);
+    if (orderMatch !== null) {
+        for (const property of JSON.parse(orderMatch[0])) propertyOrder.push(property);
+    }
+
+    /*
+     * Utilities whose `--tw-sort` replaces their position, read from Tailwind's own source.
+     *
+     * Sixteen exist across the whole framework. They cannot be recovered from compiled CSS because
+     * the declaration is stripped before emission, so this is the one place the generator reads
+     * source rather than asking the engine.
+     */
+    /*
+     * Variant order, asked of the engine rather than guessed.
+     *
+     * A first version ranked variants by prefix length, which put `focus:` before `hover:` because
+     * it is shorter. The engine has its own order and exposes it: sorting one fixed base class under
+     * each known variant recovers it exactly.
+     */
+    {
+        const variantNames = [];
+        try {
+            for (const variant of designSystem.getVariants?.() ?? []) {
+                const name = typeof variant === 'string' ? variant : variant?.name;
+                if (typeof name === 'string') variantNames.push(name);
+            }
+        }
+        catch {
+            // A design system that cannot list its variants leaves the order empty, and the rule
+            // then treats every variant as equal rather than inventing an order.
+        }
+
+        /*
+         * Compound variants too. `getVariants` lists bases, so `group-hover:` and `peer-checked:`
+         * are absent from it and fell to the unknown sentinel, which sorted every one of them after
+         * every known variant instead of in its own place.
+         */
+        for (const name of [...variantNames]) {
+            variantNames.push('group-' + name, 'peer-' + name);
+        }
+
+        const probes = variantNames
+            .map((name) => name + ':flex')
+            .filter((className) => {
+                try {
+                    return Array.from(designSystem.parseCandidate?.(className) ?? []).length > 0;
+                }
+                catch {
+                    return false;
+                }
+            });
+
+        for (const [className] of designSystem
+            .getClassOrder(probes)
+            .filter(([, position]) => position !== null)
+            .sort((left, right) => (left[1] < right[1] ? -1 : left[1] > right[1] ? 1 : 0))) {
+            variantOrder.push(className.slice(0, className.lastIndexOf(':') + 1));
+        }
+    }
+
+    for (const match of bundleSource.matchAll(/"--tw-sort",\s*"([^"]+)"/g)) {
+        // The bundle is minified, so the utility name is recovered from the surrounding text rather
+        // than from a stable structure. Recorded as a value list; the rule maps roots to them below.
+        sortOverrides.push(match[1]);
+    }
+}
+
 const unreachableRoots = [];
 
 /*
@@ -332,6 +545,50 @@ families.sort((left, right) => left.inputs.join(' ').localeCompare(right.inputs.
  * property names, and upstream reports no conflict between `p-4` and `px-8` even though they
  * visually overlap. Normalising shorthands here would invent a finding upstream does not report.
  */
+/*
+ * The declarations a class emits, in source order, keeping custom properties.
+ *
+ * Separate from `declaredProperties` on purpose, and the two disagree deliberately.
+ * `no-conflicting-classes` strips `--tw-*` because two classes both setting `--tw-border-style` are
+ * not in conflict about anything an author can see. Ordering is the opposite: Tailwind's own sort
+ * indexes custom properties, and they are what separates classes that share a visible one.
+ *
+ * `shadow-lg` declares `--tw-shadow` then `box-shadow`; `ring-1` declares `--tw-ring-shadow` then
+ * `box-shadow`. Stripping the first left both with the identical key `[box-shadow]`, so their
+ * relative order fell through to a tiebreak and ten real class lists came out wrong.
+ *
+ * Order is preserved rather than sorted, because the engine walks declarations as written.
+ */
+// valueTextOf renders a candidate's value as the plain text a color name would match.
+function valueTextOf(candidate) {
+    const value = candidate?.value;
+    if (!value || value.kind === 'arbitrary') return '';
+    const text = String(value.value ?? '');
+    const slash = text.indexOf('/');
+    return slash >= 0 ? text.slice(0, slash) : text;
+}
+
+function orderingProperties(className) {
+    let compiled;
+    try {
+        compiled = designSystem.candidatesToCss?.([className]);
+    }
+    catch {
+        return null;
+    }
+    if (!compiled || !compiled[0]) return null;
+
+    const beforeAtRules = compiled[0].split('@')[0];
+    const bodies = Array.from(beforeAtRules.matchAll(/\{([^{}]*)\}/g)).map((match) => match[1]);
+    if (bodies.length === 0) return null;
+
+    const properties = bodies
+        .flatMap((body) => Array.from(body.matchAll(/([-a-zA-Z]+)\s*:\s*[^;]+;/g)))
+        .map((match) => match[1].trim());
+
+    return properties.length === 0 ? null : properties;
+}
+
 function declaredProperties(className) {
     let compiled;
     try {
@@ -739,6 +996,12 @@ process.stdout.write(
             pairsProbed,
             families,
             rootProperties,
+            propertyOrder,
+            orderingByRoot,
+            orderingByStatic,
+            orderingByClass,
+            sortOverrides: Array.from(new Set(sortOverrides)).sort(),
+            variantOrder,
             knownRoots: Array.from(knownRoots).sort(),
             knownStatics: Array.from(knownStatics).sort(),
             unreachableRoots: unreachableRoots.sort(),
