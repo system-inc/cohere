@@ -25,12 +25,15 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoExplicitAnyOptions](),
 		},
 		rule.Registration{Rule: NoExtraNonNullAssertion},
+		rule.Registration{Rule: NoMisusedNew},
 		rule.Registration{Rule: NoNonNullAssertedOptionalChain},
 		rule.Registration{Rule: NoNonNullAssertion},
+		rule.Registration{Rule: NoUnnecessaryTypeConstraint},
 		rule.Registration{Rule: NoUnsafeDeclarationMerging},
 		rule.Registration{Rule: NoUnsafeFunctionType},
 		rule.Registration{Rule: NoUselessEmptyExport},
 		rule.Registration{Rule: NoWrapperObjectTypes},
+		rule.Registration{Rule: PreferAsConst},
 		rule.Registration{Rule: PreferNamespaceKeyword},
 	)
 }
