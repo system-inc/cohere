@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/property"
 )
 
 // NoEvalOptions tunes whether indirect access to `eval` is permitted.
@@ -168,7 +169,7 @@ var NoEval = rule.Rule{
 
 		// A `.eval` property reached through a name for the global object.
 		listeners[ast.KindPropertyAccessExpression] = func(node *ast.Node) {
-			name, known := staticPropertyName(node)
+			name, known := property.AccessedName(node, property.Static)
 			if !known || name != "eval" {
 				return
 			}
@@ -179,7 +180,7 @@ var NoEval = rule.Rule{
 		}
 
 		listeners[ast.KindElementAccessExpression] = func(node *ast.Node) {
-			name, known := staticPropertyName(node)
+			name, known := property.AccessedName(node, property.Static)
 			if !known || name != "eval" {
 				return
 			}
@@ -329,7 +330,7 @@ func namesTheGlobalObject(node *ast.Node) bool {
 
 	// A chain: the property read must repeat the object's own name, so this compares the two
 	// spellings rather than merely asking whether each is a candidate.
-	name, known := staticPropertyName(current)
+	name, known := property.AccessedName(current, property.Static)
 	if !known || !globalObjectNames[name] {
 		return false
 	}
@@ -340,6 +341,6 @@ func namesTheGlobalObject(node *ast.Node) bool {
 	if object.Kind == ast.KindIdentifier {
 		return object.Text() == name
 	}
-	objectName, objectKnown := staticPropertyName(object)
+	objectName, objectKnown := property.AccessedName(object, property.Static)
 	return objectKnown && objectName == name && namesTheGlobalObject(object)
 }

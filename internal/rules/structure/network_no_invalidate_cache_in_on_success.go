@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/property"
 )
 
 var messageNoInvalidateCacheInOnSuccess = rule.Message{
@@ -85,15 +86,13 @@ var NetworkNoInvalidateCacheInOnSuccess = rule.Rule{
 }
 
 // isNamedOnSuccess reports a property named onSuccess, in either the identifier or string spelling.
+//
+// `property.Textual` rather than the wider set, and the narrowness is preserved rather than widened
+// on adoption: this compares against one fixed non-numeric name, so a numeric or computed key could
+// never answer `onSuccess` and accepting them would change no verdict while widening the rule.
 func isNamedOnSuccess(name *ast.Node) bool {
-	if name == nil {
-		return false
-	}
-	switch name.Kind {
-	case ast.KindIdentifier, ast.KindStringLiteral:
-		return name.Text() == "onSuccess"
-	}
-	return false
+	text, named := property.Name(name, property.Textual)
+	return named && text == "onSuccess"
 }
 
 // isServiceCacheInvalidate reports a `<something>.cache.invalidate(...)` whose receiver reads as a

@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/property"
 )
 
 var messageInlineVariablesType = rule.Message{
@@ -228,13 +229,11 @@ func isSameNamedReadOff(property *ast.Node, variablesName string) bool {
 }
 
 // propertyKeyText reads an identifier or string-literal key as text, and anything else as "".
+//
+// `property.Textual` rather than the wider set. This compares a key against the property read off
+// the variables parameter, so both sides go through the same accept set and a spelling neither side
+// accepts simply fails to match, which is the answer this rule wants.
 func propertyKeyText(node *ast.Node) string {
-	if node == nil {
-		return ""
-	}
-	switch node.Kind {
-	case ast.KindIdentifier, ast.KindStringLiteral:
-		return node.Text()
-	}
-	return ""
+	text, _ := property.Name(node, property.Textual)
+	return text
 }

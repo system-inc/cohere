@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/property"
 )
 
 // isJavaScriptSourceFile answers whether the rule should run on this file at all.
@@ -253,23 +254,16 @@ func isGetterFunction(node *ast.Node) bool {
 
 // getterPropertyKeyName returns the key a property names when that is knowable statically.
 //
-// Deliberately not the shelf's `staticPropertyName`: that one is scoped to subscripts and answers
-// only for string and template literals, while a descriptor's key is nearly always the plain
-// identifier `get`. A computed key naming a variable is declined here for the same reason it is
-// declined there, since the property it names is whatever the variable holds.
+// The accept set is the identifier, string and template spellings, and it is stated rather than
+// inherited. A descriptor's key is nearly always the plain identifier `get`; the quoted and template
+// spellings reach the same property and upstream's corpus writes both. Numerics are excluded because
+// this compares against one fixed non-numeric name, so accepting them could change no verdict.
+//
+// A computed key naming a variable is declined by the shelf whatever the accept set says, since the
+// property it names is whatever the variable holds.
 func getterPropertyKeyName(name *ast.Node) string {
-	if name == nil {
-		return ""
-	}
-	switch name.Kind {
-	case ast.KindIdentifier:
-		return name.Text()
-	case ast.KindStringLiteral:
-		return name.AsStringLiteral().Text
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return name.AsNoSubstitutionTemplateLiteral().Text
-	}
-	return ""
+	text, _ := property.Name(name, property.Named|property.Quoted|property.Templated)
+	return text
 }
 
 // isPropertyDescriptorObject answers whether this object literal is being passed somewhere that

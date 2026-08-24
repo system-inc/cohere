@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/property"
 )
 
 var messageSelfAssignment = rule.Message{
@@ -181,13 +182,13 @@ func reportObjectSelfAssignments(ctx rule.Context, left *ast.Node, right *ast.No
 //
 // A computed key is only static when it is a literal: `{ [k]: v }` names a property nobody can
 // know at lint time, and treating it as matching would report an assignment that may not be one.
-func propertyName(property *ast.Node) (string, bool) {
+func propertyName(member *ast.Node) (string, bool) {
 	var name *ast.Node
-	switch property.Kind {
+	switch member.Kind {
 	case ast.KindPropertyAssignment:
-		name = property.AsPropertyAssignment().Name()
+		name = member.AsPropertyAssignment().Name()
 	case ast.KindShorthandPropertyAssignment:
-		name = property.AsShorthandPropertyAssignment().Name()
+		name = member.AsShorthandPropertyAssignment().Name()
 	default:
 		return "", false
 	}
@@ -195,16 +196,10 @@ func propertyName(property *ast.Node) (string, bool) {
 		return "", false
 	}
 
-	switch name.Kind {
-	case ast.KindIdentifier, ast.KindStringLiteral, ast.KindNumericLiteral:
-		return name.Text(), true
-	case ast.KindComputedPropertyName:
-		inner := ast.SkipParentheses(name.AsComputedPropertyName().Expression)
-		if inner != nil && (inner.Kind == ast.KindStringLiteral || inner.Kind == ast.KindNumericLiteral) {
-			return inner.Text(), true
-		}
-	}
-	return "", false
+	// Templates are absent from the accept set deliberately: a bare `+"`"+`{ `+"`"+`k`+"`"+`: 1 }`+"`"+` is not valid
+	// JavaScript, so a template can only reach a key through brackets, and this rule's computed arm
+	// only ever met the string and numeric spellings.
+	return property.Name(name, property.Named|property.Quoted|property.Numeric|property.Computed)
 }
 
 // propertyValue reads the value a property assigns, which for shorthand is the name itself.
@@ -240,8 +235,11 @@ func isSameReference(left *ast.Node, right *ast.Node) bool {
 	}
 
 	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) {
-		leftName, leftStatic := staticPropertyName(left)
-		rightName, rightStatic := staticPropertyName(right)
+		// `AccessedName` answers "b" for both `a.b` and `a['b']`, which is what makes the two
+		// spellings compare as one reference, and answers nothing for `a[i]`, so a comparison
+		// involving a variable subscript is false rather than optimistic.
+		leftName, leftStatic := property.AccessedName(left, property.Static)
+		rightName, rightStatic := property.AccessedName(right, property.Static)
 		if !leftStatic || !rightStatic || leftName != rightName {
 			return false
 		}
@@ -262,28 +260,6 @@ func isSameReference(left *ast.Node, right *ast.Node) bool {
 	}
 
 	return false
-}
-
-// staticPropertyName reads the property an access expression reads, when it is knowable.
-//
-// `a.b` and `a["b"]` both answer "b", which is what makes the two spellings compare equal. `a[i]`
-// answers nothing, so a comparison involving it is false rather than optimistic.
-func staticPropertyName(node *ast.Node) (string, bool) {
-	switch node.Kind {
-	case ast.KindPropertyAccessExpression:
-		name := node.AsPropertyAccessExpression().Name()
-		if name != nil {
-			return name.Text(), true
-		}
-	case ast.KindElementAccessExpression:
-		argument := ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
-		if argument != nil &&
-			(argument.Kind == ast.KindStringLiteral || argument.Kind == ast.KindNumericLiteral ||
-				argument.Kind == ast.KindNoSubstitutionTemplateLiteral) {
-			return argument.Text(), true
-		}
-	}
-	return "", false
 }
 
 // accessedObject reads the receiver of an access expression.

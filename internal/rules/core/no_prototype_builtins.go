@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/property"
 )
 
 var messageNoPrototypeBuiltins = rule.Message{
@@ -90,7 +91,7 @@ var NoPrototypeBuiltins = rule.Rule{
 				// nil, so a guard here would be a branch no input can reach.
 				callee := ast.SkipParentheses(node.AsCallExpression().Expression)
 
-				name, static := staticPropertyName(callee)
+				name, static := property.AccessedName(callee, property.Static)
 				if !static {
 					return
 				}

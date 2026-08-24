@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
+	"github.com/system-inc/verify/internal/utils/ecmascript/property"
 )
 
 // minimumLengthToFlagAsUntranslated is how long a string must be before matching English is taken
@@ -211,19 +212,11 @@ func forEachStringProperty(
 
 // propertyKeyName reads the key of a property, whether it was written bare or quoted.
 //
-// A computed key is skipped: its value is not known from the syntax, so there is no key path to
-// compare against English.
+// A computed key is skipped, which is why `property.Computed` is absent from the accept set: its
+// value is not known from the syntax, so there is no key path to compare against English. The
+// remaining four kinds are exactly what this rule read before adoption.
 func propertyKeyName(keyNode *ast.Node) (string, bool) {
-	if keyNode == nil {
-		return "", false
-	}
-	switch {
-	case ast.IsIdentifier(keyNode):
-		return keyNode.Text(), true
-	case ast.IsStringLiteralLike(keyNode), ast.IsNumericLiteral(keyNode):
-		return keyNode.Text(), true
-	}
-	return "", false
+	return property.Name(keyNode, property.Named|property.Quoted|property.Templated|property.Numeric)
 }
 
 // exportedObjectLiteral finds the object a file default-exports, or nil.

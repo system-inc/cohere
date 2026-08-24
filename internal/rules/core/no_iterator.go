@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/property"
 )
 
 var messageNoIterator = rule.Message{
@@ -82,7 +83,7 @@ func reportIfIteratorAccess(ctx rule.Context) func(*ast.Node) {
 		// when the name is "", which the comparison below already rejects. A mutation dropping the
 		// check survived the whole fixture set, and reading `staticPropertyName` shows why. Kept out
 		// rather than kept in, because an unreachable guard reads as a case somebody handled.
-		name, _ := staticPropertyName(node)
+		name, _ := property.AccessedName(node, property.Static)
 		if name != "__iterator__" {
 			return
 		}

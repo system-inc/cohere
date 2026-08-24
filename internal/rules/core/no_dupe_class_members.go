@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utils/ecmascript/property"
 )
 
 // classMemberKey identifies one class member for duplicate detection.
@@ -128,7 +129,10 @@ func classMemberName(member *ast.Node) *ast.Node {
 // the rule declines rather than guesses at: `[foo]()` and `foo()` are different members because the
 // first depends on a variable, and the corpus pins that.
 func classMemberKeyOf(member *ast.Node, name *ast.Node) (classMemberKey, bool) {
-	text, known := staticClassMemberName(name)
+	// `NameTagged` rather than `Name`, and this is the one caller in the tree that needs the
+	// tag: `[1.0]` and `['1.0']` are different members while `10` and `1e1` are the same one,
+	// so neither the source spelling nor the cooked text answers alone.
+	text, known := property.NameTagged(name, property.Static)
 	if !known {
 		return classMemberKey{}, false
 	}
@@ -137,43 +141,4 @@ func classMemberKeyOf(member *ast.Node, name *ast.Node) (classMemberKey, bool) {
 		isStatic:  ast.HasStaticModifier(member),
 		isPrivate: name.Kind == ast.KindPrivateIdentifier,
 	}, true
-}
-
-// staticClassMemberName returns a member key's static value, tagged by type.
-//
-// The tag is what keeps a number and a string apart when their text agrees. `[1.0]` and `['1.0']`
-// are different members and `10` and `1e1` are the same one, so neither the source spelling nor the
-// cooked text answers alone: a numeric key is normalized through its value and a string key is not.
-func staticClassMemberName(name *ast.Node) (string, bool) {
-	switch name.Kind {
-	case ast.KindIdentifier, ast.KindPrivateIdentifier:
-		// A bare identifier key is a name, and it unifies with the string spellings: `foo()` and
-		// `[`+"`"+`foo`+"`"+`]()` are the same member, which upstream's corpus pins in both directions. Only a
-		// *bracketed* identifier is a variable, and that arm declines below.
-		return "string:" + name.Text(), true
-
-	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		return "string:" + name.Text(), true
-
-	case ast.KindNumericLiteral:
-		// No normalization: the TypeScript parser already gives `10` and `1e1` the same Text, so a
-		// round-trip through a float adds nothing. Measured with a probe rather than assumed, after
-		// a mutation replacing the normalizer with the raw text changed no fixture.
-		return "number:" + name.Text(), true
-
-	case ast.KindComputedPropertyName:
-		expression := ast.SkipParentheses(name.AsComputedPropertyName().Expression)
-		if expression == nil {
-			return "", false
-		}
-		// An identifier inside brackets is a variable reference rather than a name, so `[foo]()`
-		// and `foo()` are different members and the first is not knowable before the class runs.
-		// Recursing without this arm reads the variable's spelling as the key, which reported the
-		// pair as duplicates: caught by upstream's own clean case rather than by inspection.
-		if expression.Kind == ast.KindIdentifier || expression.Kind == ast.KindPrivateIdentifier {
-			return "", false
-		}
-		return staticClassMemberName(expression)
-	}
-	return "", false
 }
