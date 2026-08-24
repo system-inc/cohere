@@ -116,6 +116,10 @@ func init() {
 			Rule:   NoUnsafeNegation,
 			Decode: rule.DecodeOptionsInto[NoUnsafeNegationOptions](),
 		},
+		rule.Registration{
+			Rule:   NoUnsafeOptionalChaining,
+			Decode: rule.DecodeOptionsInto[NoUnsafeOptionalChainingOptions](),
+		},
 		rule.Registration{Rule: NoUnusedLabels},
 		rule.Registration{Rule: NoUselessBackreference},
 		rule.Registration{Rule: NoUselessCatch},
