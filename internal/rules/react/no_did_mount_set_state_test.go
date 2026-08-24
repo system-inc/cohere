@@ -529,6 +529,20 @@ class Hello extends React.Component {
   }
 }
 `, didMountFile, false, []string{"noDidMountSetState"}},
+		// A method the walk merely PASSES THROUGH is a function scope too. This shipped as a false
+		// positive: the latch counted the lifecycle method's own scope by hand, and `isFunctionScope`
+		// omitted method kinds entirely, so `setState` inside an object method declared in the
+		// lifecycle body came out one scope shallow and reported. Silent at the release binary,
+		// confirmed with a control that fires on the direct form in the same run. Found by the
+		// porter of `no-will-update-set-state`, whose sweep exposed it in their copy of this walk.
+		{"a method declared inside the lifecycle body", `
+class Hello extends React.Component {
+  componentDidMount() {
+    const helper = { run() { this.setState({ data: 1 }); } };
+    helper.run();
+  }
+}
+`, didMountFile, false, nil},
 		// An accessor gets the same count correction a method gets, so a callback inside a getter
 		// crosses two scopes and is silent by default. This is the case that fails if accessors are
 		// added to the lifecycle kinds without also being added to the count correction.

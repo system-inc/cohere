@@ -333,6 +333,19 @@ func isFunctionScope(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
 		return true
+	// A method is a function scope too, and leaving it out was a live false positive. oxc splits a
+	// `MethodDefinition` into two nodes and counts the inner `Function`; our `KindMethodDeclaration`
+	// fuses them, so the latch above counts the lifecycle method's own scope by hand. That handled
+	// the method the walk STOPS at and silently skipped every method it merely passes through, so
+	// `setState` inside an object method declared in the lifecycle body came out one scope shallow
+	// and reported where upstream is silent. Measured against the release binary with a control:
+	//
+	//	componentDidMount() { const h = { run() { this.setState({}) } }; h.run() }
+	//
+	// is silent at oxlint and reported here before this arm existed. Found by the porter of
+	// `no-will-update-set-state`, whose own sweep exposed it in their copy of this walk.
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		return true
 	}
 	return false
 }
