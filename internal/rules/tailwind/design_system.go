@@ -70,6 +70,14 @@ import (
 type DesignSystemResult struct {
 	// System is the loaded design system, nil when Err is set.
 	System *tailwindengine.LoadedDesignSystem
+	// Table is this design system's descriptor table, nil when Err is set.
+	//
+	// Built here rather than by each rule, and that is the same claim the whole file makes about the
+	// design system: a rule computing a sort key needs a table on every class in the repository, and
+	// a table built per rule or per file is the per-file rebuild this file exists to refuse, wearing
+	// a different name. It costs a few map copies over the framework's roots plus one PropertySort
+	// per static `@utility` block, on a path the build counter already guards.
+	Table *tailwindengine.Table
 	// Err is why no design system could be built, nil when System is set.
 	//
 	// A rule holding this must decline rather than report zero findings. See the failing-safe note
@@ -161,7 +169,10 @@ func loadDesignSystemForProgram(program *compiler.Program) DesignSystemResult {
 	if err != nil {
 		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
 	}
-	return DesignSystemResult{System: system, EntryPoint: entryPoint}
+	// The descriptor table is built here, on the counted path, rather than lazily on first use. A
+	// second build path would not be visible to TestDesignSystemIsBuiltOncePerProgram, and an
+	// invisible build path is exactly how the per-file rebuild came back the last time.
+	return DesignSystemResult{System: system, Table: tailwindengine.NewTable(system), EntryPoint: entryPoint}
 }
 
 // projectRootOf is the directory the program's tsconfig sits in.

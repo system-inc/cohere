@@ -1,0 +1,45 @@
+/*
+ * A design system that shares nothing with the corpus repositories.
+ *
+ * It exists because the two corpus repositories cannot, between them, tell a fact about Tailwind
+ * from a fact about a repository. They both vendor the Structure submodule, so they share its
+ * `@theme` and its `@utility` blocks, and their byte-identical descriptor arrays are a shared
+ * dependency rather than framework invariance. Generating against this file instead produces 258 of
+ * 301 shared roots differing, every one of them only in its namespace maps, which is the measurement
+ * the framework/repository seam in ../main.go is drawn from.
+ *
+ * The tokens are deliberately meaningless. `--color-weird` is a namespace no framework root consumes
+ * and `--frobnicate` has no framework analogue at all, so between them they exercise both halves of
+ * the split: a namespace that falls through to `@none` on 300 buckets, and one that reaches a
+ * repository `@utility` block and nothing else.
+ *
+ * Generate the pair this command consumes with:
+ *
+ *   node tools/gen_tailwind_descriptors/extract.mjs <this file> --json independent.json
+ *   node tools/gen_tailwind_descriptor_table/context.mjs <this file> > independent-context.json
+ *
+ * The extractor exits 4 on this file and that is expected: its corpus-volume assertion scans for
+ * classes a repository writes and there is no repository here. The table it writes is complete, and
+ * the assertions that matter — 23,391 registry classes, the planted dirty descriptor proven — pass.
+ *
+ * `@import "tailwindcss"` resolves through whichever `node_modules` is reachable from wherever this
+ * file is placed, so run it from a directory that has one.
+ */
+
+@import 'tailwindcss';
+
+@theme {
+    --color-weird-1: #010203;
+    --color-weird-2: #040506;
+    --frobnicate-small: 2px;
+    --frobnicate-large: 9px;
+}
+
+@utility synthetic-static {
+    display: grid;
+    opacity: 0.5;
+}
+
+@utility synthetic-fn-* {
+    margin: --value(--frobnicate-*, [length]);
+}

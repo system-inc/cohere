@@ -208,9 +208,20 @@ func TestDesignSystemIsBuiltOncePerProgram(t *testing.T) {
 			t.Fatalf("file %d received a different design system pointer than file 0; the cache is "+
 				"handing out per-file values", index)
 		}
+		// The descriptor table rides the same cache entry, so it gets the same assertion. The
+		// counter cannot cover it — it counts design system builds — and a table rebuilt per file
+		// would be invisible to every check above while costing 959µs a file, which is more than the
+		// design system build it sits behind.
+		if result.Table != first.Table {
+			t.Fatalf("file %d received a different descriptor table pointer than file 0; the table "+
+				"is being rebuilt per file", index)
+		}
 	}
 	if first.System.BuildCount == 0 {
 		t.Fatal("BuildCount is zero, so the counter is not being set and every assertion above is vacuous")
+	}
+	if first.Table == nil {
+		t.Fatal("the result carries no descriptor table, so a rule computing a sort key has nothing to look up in")
 	}
 
 	_ = graph
