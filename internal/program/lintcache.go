@@ -155,9 +155,25 @@ func HashContent(content string) [sha256.Size]byte {
 
 // HashRuleSet covers the names of every rule that ran, in order.
 //
-// Order is included deliberately. Two rules can report on the same range, and the order they
-// ran in is the order the findings come back in; a cache that ignored order could replay a
-// finding set the current rule configuration would not produce.
+// Order is included deliberately, but not for the reason first written here. That reason was:
+// "the order they ran in is the order the findings come back in". It is false. Findings come
+// back in SCHEDULING order, not rule order: files are walked in parallel and each worker appends
+// its local diagnostics under a mutex in whatever order it finishes (walk.go, the worker merge).
+// Measured on the ahra tree, three runs of one binary produce three distinct output orderings
+// while the sorted set is byte-identical.
+//
+// The conclusion survives the correction on different grounds. A reordered rule set can change
+// which findings EXIST rather than merely their sequence, because fixes applied by an earlier
+// rule change the text a later rule reads, and suppression directives are consumed in the order
+// rules run. So a cache keyed without rule order could replay a set the current configuration
+// would not produce, which is what this hash prevents.
+//
+// A note for anyone reviving this cache, because it is a decision they must make explicitly
+// rather than inherit. LintCacheEntry.Findings is an ordered slice, so a warm run would replay
+// stored order while a cold run produces scheduling order: the same set, sequenced differently
+// depending on cache state. Output order is incidental today and nothing depends on it, which is
+// a deliberate ruling rather than an oversight. Wiring this cache is the moment that stops being
+// true, and the fix is to sort at the boundary rather than to let cache state decide sequence.
 func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 	hash := sha256.New()
 	for _, name := range ruleNames {
