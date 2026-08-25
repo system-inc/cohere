@@ -522,8 +522,17 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// and after -- so it cannot adjudicate this one either way. What it CAN say is that nothing was
 	// lost: `matched` did not fall and `ours` did not rise, so no dependency was dropped and none
 	// was invented. The eleven are on corpus files rather than on scored fixtures.
-	if deep != 600 || flat != 2087 {
-		t.Errorf("got %d deep and %d flat dependencies, want 600 and 2087; a SMALL move here is "+
+	// # And again when `.current` reads stopped being dependencies
+	//
+	// 600 deep to 595, 2,087 flat to 2,092. Five paths truncated to their roots, which is this
+	// change's whole point rather than a side effect: upstream's `visitDependency` does the same
+	// with the comment "ref.current access is not a valid dep", because a scope must depend on the
+	// ref object rather than on the mutable slot inside it.
+	//
+	// A FALL in `deep` is the direction this heading calls safe, and the oracle agrees it cost
+	// nothing: 78 matched of 88 with `ours` at 158, identical before and after.
+	if deep != 595 || flat != 2092 {
+		t.Errorf("got %d deep and %d flat dependencies, want 595 and 2092; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

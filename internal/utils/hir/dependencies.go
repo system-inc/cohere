@@ -967,6 +967,24 @@ func (c *dependencyCollector) checkValidDependency(dep ReactiveScopeDependency) 
 // The second half is the `declarations` field: a value produced inside a scope and read outside it
 // must be exported from that scope, because the memoized block has to return it.
 func (c *dependencyCollector) visitDependency(dep ReactiveScopeDependency) {
+	// A `.current` read is not a dependency; the object holding it is.
+	//
+	// Upstream's `visitDependency` does the same, with the comment "ref.current access is not a
+	// valid dep", and truncates the path to empty. Its guard is
+	// `isUseRefType(identifier) && path[0].property === 'current'`, and the type half is not
+	// expressible here -- `Identifier.Type` is nil throughout, which is what
+	// `DependencyGapTypeExclusions` records.
+	//
+	// Taking the name half alone is a DIVERGENCE and is measured rather than assumed safe: a value
+	// named `current` on a non-ref object would be truncated where upstream keeps the path, which
+	// costs precision in the safe direction -- the scope depends on the whole object and
+	// invalidates more often, never less.
+	if len(dep.Path) > 0 && dep.Path[0].Property == "current" {
+		dep = ReactiveScopeDependency{
+			Identifier: dep.Identifier,
+			Reactive:   dep.Reactive,
+		}
+	}
 	identifier := c.function.Identifiers[dep.Identifier]
 	if identifier == nil {
 		return
