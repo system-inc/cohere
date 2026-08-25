@@ -90,15 +90,26 @@ func NewTable(system *LoadedDesignSystem) *Table {
 	table := &Table{
 		TailwindVersion: system.TailwindVersion,
 		Descriptors:     make(map[string]*Descriptor, len(baseDescriptors)+len(system.utilityRoots)),
-		Statics:         make(map[string]Reading, len(baseStatics)+len(system.staticUtilityNodes)),
+		Statics:         make(map[string]Reading, len(FrameworkStaticDeclarations)+len(system.staticUtilityNodes)),
 		PropertyOrder:   PropertyOrder,
 	}
 
 	for root, descriptor := range baseDescriptors {
 		table.Descriptors[root] = descriptor
 	}
-	for name, value := range baseStatics {
-		table.Statics[name] = value
+	// The framework statics come from their compiled declarations rather than from a table of
+	// readings, so this path and the repository path below are the same PropertySort walk.
+	//
+	// `baseStatics` used to be read here. It held 869 readings against the 890 registrations
+	// FrameworkStaticDeclarations carries, agreed with all 869, and was missing 21 that
+	// `getClassList()` does not advertise: the deprecated-but-registered utilities such as
+	// `bg-gradient-to-r`, `break-words` and `max-w-screen`. Two of those are written in the ahra tree
+	// today, so the table was not merely incomplete, it was answering the wrong reading for classes
+	// in front of it.
+	for name := range FrameworkStaticDeclarations {
+		if reading, found := FrameworkStaticReading(name); found {
+			table.Statics[name] = reading
+		}
 	}
 
 	table.addThemeNamespaces(system.theme)
