@@ -55,10 +55,20 @@ import (
 //	                              from the same value. An emitter answers every type it is asked and
 //	                              so cannot rank them; see
 //	                              TestTypeListOrderDecidesTheCellAndEmittersCannotSupplyIt.
-//	CollapseFamilies         45   which pairs canonicalize into a third root. All 45 are CSS
-//	                              shorthand relationships between declared properties, so deriving
-//	                              it means carrying a shorthand table of equal size, one layer
-//	                              further from the question.
+//	CollapseFamilies         45   which pairs canonicalize into a third root. Upstream does ship
+//	                              shorthand data, which this entry used to deny: two maps keyed on
+//	                              CSS property, `padding-inline: [padding-left, padding-right]` and
+//	                              its kin, covering inset, margin, padding, scroll-margin,
+//	                              scroll-padding, border width/style/colour, gap, overflow,
+//	                              overscroll-behavior and ten logical block/inline pairs. They do not
+//	                              derive this. This is keyed on utility roots, `pl + pr => px`, and
+//	                              bridging the two key spaces is `canonicalizeCandidates`, the
+//	                              signature-equivalence search enumerate.mjs prices at eight to ten
+//	                              thousand lines that changes every Tailwind minor. It also holds
+//	                              families no CSS shorthand covers: `h + w => size`, `skew`,
+//	                              `translate`, the `rounded-*` corners, the `mask-*` edges and
+//	                              `border-spacing`, which collapse through a utility relationship
+//	                              rather than a property one.
 //
 // `RootDeclaredProperties` and its three companions were here until #mz0m6k8, carried for exactly the
 // reason the paragraph below rejected. The emitting half is now ported, so the answer is computed by
