@@ -192,13 +192,44 @@ func (system *LoadedDesignSystem) HasUtility(root string, kind UtilityKind) bool
 	}
 	switch kind {
 	case UtilityKindStatic:
-		return KnownStatics[root]
+		_, registered := FrameworkStaticDeclarations[root]
+		return registered
 	case UtilityKindFunctional:
-		return KnownRoots[root]
+		return frameworkFunctionalRoots[root]
 	default:
 		return false
 	}
 }
+
+// frameworkFunctionalRoots is every functional root the framework registers.
+//
+// Built once from the ported registration tables plus the descriptor rows that carry the roots no
+// registration shape expresses, which is the same union `Lookup` answers from. It replaces
+// `KnownRoots` in collapse_table.go, and the reason is that the generated table was not describing
+// Tailwind.
+//
+// Measured: `KnownStatics` held 895 names against the 890 the framework registers, and the 27 it
+// carried beyond them are ahra's own `@utility` blocks. `markdown-content`, `prose`,
+// `scrollbar-hide`, the `slide-in-from-*` family, `fade-in` and `zoom-in`. `fade-in` and `zoom-in`
+// are declared by ahra and not by www-connected-app, so a table under a "Source: Tailwind 4.3.3"
+// header was telling every other repository that two of ahra's animations were framework utilities.
+//
+// The repository's own blocks are answered above this switch, from `system.utilityRoots`, so nothing
+// is lost by dropping them here: a repository that declares `prose` still gets it, and one that does
+// not no longer inherits ahra's.
+var frameworkFunctionalRoots = func() map[string]bool {
+	roots := make(map[string]bool, len(baseDescriptors)+len(FrameworkFunctionalUtilities)+len(FrameworkMultiDeclarationUtilities))
+	for root := range baseDescriptors {
+		roots[root] = true
+	}
+	for root := range FrameworkFunctionalUtilities {
+		roots[root] = true
+	}
+	for root := range FrameworkMultiDeclarationUtilities {
+		roots[root] = true
+	}
+	return roots
+}()
 
 // HasVariant reports whether root is a registered variant.
 //

@@ -500,69 +500,59 @@ func TestExistenceComesFromTheRepositoryRatherThanATable(t *testing.T) {
 // tables could not do for any repository except the one they were generated from. That is the
 // failure the task names and TestExistenceComesFromTheRepositoryRatherThanATable measures.
 //
-// # What is not
+// # What was not fixed here, and now is
 //
-// `KnownStatics` and `KnownRoots` were enumerated by `tools/gen_tailwind_collapse/enumerate.mjs`
-// from `designSystem.getClassList()` on a LOADED design system, which returns the repository's
-// `@utility` classes alongside the framework's. The generator was run against ahra's `theme.css`, so
-// ahra's own tokens are in tables headed `Source: Tailwind 4.3.3`.
+// `KnownStatics` and `KnownRoots` were enumerated from `designSystem.getClassList()` on a LOADED
+// design system, which returns the repository's `@utility` classes alongside the framework's. The
+// generator ran against ahra's `theme.css`, so ahra's own tokens sat in tables headed
+// `Source: Tailwind 4.3.3`, and `HasUtility` consulted them as its framework fallback.
 //
-// Measured here rather than asserted: 16 of `KnownStatics`'s 895 entries and 26 of `KnownRoots`'s
-// 315 are roots the ahra repository declares in its own stylesheet. `LoadedDesignSystem.HasUtility`
-// consults those tables as its framework fallback, so `ParseCandidate` accepts all 42 on every
-// design system, including one that shares nothing with ahra.
-//
-// # Why it is not fixed here
-//
-// Fixing it means regenerating both tables against a framework-only design system, which changes
-// what `ParseCandidate` accepts for every consumer — including `enforce-consistent-class-order`,
-// whose 11,307-class population and zero-disagreement result in `cccaed1` were both measured under
-// the current behaviour. That is engine work with a blast radius past this task, and doing it as a
-// side effect of a rule migration would revalidate a shipped measurement by accident.
-//
-// The residual error direction is the safe one: these 42 names are vouched for where they should not
-// be, so the rule under-reports on a repository that does not declare them. It never reports a class
-// that works.
-func TestRepositoryNamesInTheFrameworkTablesAreStillVouchedFor(t *testing.T) {
+// M9 replaced that fallback with the ported registrations: `FrameworkStaticDeclarations` for statics
+// and the union of the wave tables and the descriptor rows for functional roots. The test that used
+// to measure the leak said to delete it and assert the corrected behaviour instead, so this is that
+// assertion.
+func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(t *testing.T) {
 	ahra := unknownFixtureLiveSystem(t)
 	independent := independentLiveSystem(t)
 
-	leakedStatics := 0
-	for name := range tailwindengine.KnownStatics {
+	// Names ahra declares and the independent system does not, measured rather than listed.
+	//
+	// `zoom-in` and `zoom-out` are deliberately absent from this sample, and the reason is worth
+	// stating because writing it wrong is what surfaced it. Ahra declares both as `@utility` blocks,
+	// so a list built from "ahra declares it" includes them. But they also parse as the framework
+	// root `zoom` with the value `in`, which every design system registers, so they are correctly
+	// known everywhere and flagging them measured the parser rather than the tables.
+	//
+	// The rest are static names with no functional root behind them, so their only source is a
+	// registration, which is exactly what this asserts.
+	var declaredByAhra []string
+	for _, name := range []string{
+		"markdown-content", "typing-dots", "prose", "scrollbar-hide",
+		"fade-in", "fade-out",
+		"slide-in-from-top", "slide-out-to-left",
+	} {
 		if ahra.Utilities() == nil || !ahra.Utilities().Has(name) {
 			continue
 		}
-		leakedStatics++
-		if !classExistsIn(name, independent) {
-			t.Errorf(
-				"%q is no longer vouched for on a design system that does not declare it, which means "+
-					"the framework tables were rescoped. That is the fix this test exists to notice: "+
-					"delete it and assert the corrected behaviour instead",
-				name,
-			)
-		}
+		declaredByAhra = append(declaredByAhra, name)
 	}
 
-	leakedRoots := 0
-	for root := range tailwindengine.KnownRoots {
-		if ahra.Utilities() == nil || !ahra.Utilities().Has(root) {
-			continue
-		}
-		leakedRoots++
+	if len(declaredByAhra) == 0 {
+		t.Fatal("ahra declares none of the sampled utilities, so this measurement compared nothing; " +
+			"either the fixture stopped loading the repository's blocks or the names changed")
 	}
 
-	// The population guard, for the same reason every other count here carries one. A zero would mean
-	// the tables no longer overlap the repository's utilities at all, which is either the fix or a
-	// broken measurement, and the two must not read alike.
-	if leakedStatics == 0 && leakedRoots == 0 {
-		t.Fatal("no repository-declared names were found in either framework table, so this " +
-			"measurement found nothing; either the gap is closed and this test should be replaced, " +
-			"or the design system stopped reporting its own utility blocks")
+	for _, name := range declaredByAhra {
+		if classExistsIn(name, independent) {
+			t.Errorf("%q is declared by ahra and still vouched for on a design system that does not "+
+				"declare it, so a repository token is being carried as a framework fact", name)
+		}
+		if !classExistsIn(name, ahra) {
+			t.Errorf("%q is declared by ahra and no longer known there, so the fix removed more than "+
+				"the leak", name)
+		}
 	}
-	t.Logf("repository-declared names carried in the framework tables: %d of %d KnownStatics, "+
-		"%d of %d KnownRoots",
-		leakedStatics, len(tailwindengine.KnownStatics),
-		leakedRoots, len(tailwindengine.KnownRoots))
+	t.Logf("checked %d repository-declared utilities: known on ahra, unknown on an independent system", len(declaredByAhra))
 }
 
 // TestUnknownClassFixturesActuallyRan is what stops this file from going green on nothing.
