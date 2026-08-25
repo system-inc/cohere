@@ -22,7 +22,28 @@ import (
 // Each `$[n] !== <expression>` is one dependency as upstream inferred it, at the depth upstream
 // inferred it to. That is the answer key this package has been missing: every measurement of
 // dependency collection so far could say a count moved and could not say which direction was right.
-var goldenDependencyPattern = regexp.MustCompile(`\$\[[0-9]+\] !== ([A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*)`)
+//
+// # The optional step, and the four fake matches it was manufacturing
+//
+// The path alternates on `?.` as well as `.`, because upstream emits optional chains verbatim:
+//
+//	if ($[0] !== arg?.items) {
+//	if ($[0] !== arg?.items.edges?.nodes) {
+//
+// A pattern alternating on `.` alone halts at the `?` and records that golden as bare `arg`. We
+// produce bare `arg`, so it scored -- a match awarded for an answer upstream never gave. Corrected,
+// this tree scores 68 rather than 72 with nothing about the collector having changed.
+//
+// That is the fourth population this oracle has had to correct, after codegen temporaries, Flow
+// fixtures, and the assigned-versus-survived stage question that `scope_oracle_test.go` settles.
+// All four are the same failure in different clothes: comparing two populations that were never
+// constructed to be compared. The cost here was worse than a wrong count, because the four fake
+// matches sat directly on top of `DependencyGapOptionalChains` -- the one gap in this file's own
+// list that the oracle was least able to see -- and made progress on it read as regression. A
+// nested-function walk measured against the old pattern scored -3 and against this one scores +1.
+//
+// Bounded: 7 slot occurrences over 5 distinct expressions corpus-wide.
+var goldenDependencyPattern = regexp.MustCompile(`\$\[[0-9]+\] !== ([A-Za-z_$][A-Za-z0-9_$]*(?:\??\.[A-Za-z_$][A-Za-z0-9_$]*)*)`)
 
 // goldenDependencies returns the dependency expressions upstream's compiled output compares.
 func goldenDependencies(t *testing.T, expectPath string) []string {
@@ -164,10 +185,33 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// recovered are `cb` and `shouldShowMessage`, both `useCallback` results upstream names as
 	// dependencies and we were rejecting because the holding scope's range had not been restated
 	// after the terminals pass renumbered every instruction.
-	const knownMatched = 72
+	// Lowered from 72 to 68 when the pattern above learned the optional step, which is the one
+	// circumstance under which dropping a floor is not a retreat: the four that vanished were
+	// matches against a golden the pattern had truncated, so they were never earned. Nothing about
+	// the collector changed in that measurement, and the number is more honest at 68 than at 72.
+	const knownMatched = 68
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
+	}
+	// A floor cannot catch the failure that produced the 72: a pattern that reads upstream's answer
+	// SHORTER than upstream wrote it hands our shallow answers something to match, and the score
+	// rises for a reason that has nothing to do with collection.
+	//
+	// Not hypothetical, and it is why this ceiling exists. Mutating the path above to require the
+	// optional step -- `(?:\?\.…)*` rather than `(?:\??\.…)*` -- truncates every path at its first
+	// plain step and scores 74. Six free matches, floor cleared, nothing about the collector
+	// touched. The old 72 was four of the same thing.
+	//
+	// So a rise is asserted as loudly as a fall. Raise this deliberately, alongside the floor, when
+	// collection genuinely improves.
+	const knownMatchedCeiling = 68
+	if matched > knownMatchedCeiling {
+		t.Errorf("matched %d of %d golden dependencies, UP from %d, which this test treats as "+
+			"suspect rather than good: the usual cause is the pattern above reading upstream's "+
+			"dependency shorter than upstream wrote it, so our shallower answer matches something "+
+			"upstream never said. Confirm collection actually improved, then raise both pins",
+			matched, scored, knownMatchedCeiling)
 	}
 	// # The second half of the score, and the oracle was blind to it until now
 	//
@@ -203,9 +247,19 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// Ten matches lost to remove the over-production, and 22 fixtures flip to under-producing. So
 	// the pruned scopes carry real dependencies too and the population is not simply wrong.
 	//
-	// Read the 151 as "what collection produces", not as "what the rule sees". Which population
-	// upstream's slots correspond to is unsettled and is upstream of every count comparison here.
-	const knownUpstreamTotal = 115
+	// Read the 151 as "what collection produces", not as "what the rule sees".
+	//
+	// That last question -- which population upstream's slots correspond to -- was recorded here as
+	// unsettled and is now settled, in `scope_oracle_test.go`: upstream's output is emitted after
+	// their prune chain, so it corresponds to our SURVIVING scopes. Counted there, our scope total
+	// is 114 against upstream's 97 rather than 160, and per-fixture exact agreement more than
+	// doubles. The over-production this file measures is therefore mostly scopes that our own prune
+	// chain later dissolves, which is why `ours` here is 158 against 115 while the survived
+	// populations are 108 against 115 -- an UNDER-production of seven, in the other direction.
+	//
+	// Raised from 115 to 116 when the pattern above learned the optional step: `arg?.items.edges?.
+	// nodes` and `arg?.items` are now one slot each rather than two truncated readings of `arg`.
+	const knownUpstreamTotal = 116
 	// Raised from 151 in the same change, and this is its cost. Two of the seven additional
 	// dependencies are upstream's; five are not. Recorded rather than buried: the trade was taken
 	// because it also recovered a broken invariant, 2,345 of 3,357 scopes covering none of their own
