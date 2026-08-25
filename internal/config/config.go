@@ -60,8 +60,83 @@ type Config struct {
 	// oxlint resolve them. Order is preserved rather than sorted for exactly this reason.
 	Overrides []Override
 
+	// Plugins are the namespaces the config declares, which contribute their own rules without any
+	// rules block naming them. See PluginDefaultRules.
+	Plugins []string
+
 	// Root is the directory glob patterns resolve against.
 	Root string
+}
+
+// PluginDefaultRules are the rules a `plugins` declaration turns on without any rules block naming
+// them, keyed by rule name and valued by the plugin that contributes each.
+//
+// # Why this is a table rather than a computation
+//
+// oxlint's mechanism is `warn_correctness(plugins)` in `config_builder.rs:570`: every rule whose
+// category is `Correctness` AND whose plugin is declared, at severity `Warn`. Reproducing that
+// directly needs each rule's category, and neither this registry nor `rule-inventory.json` carries
+// one -- adding categories for 214 rules would be a fresh transcription of oxc's metadata, which is
+// a larger and less trustworthy job than the one this solves.
+//
+// The table is not a transcription. `rule-inventory.json`'s `enabledBy: pluginDefault` was
+// established empirically, by planting violations and watching the real oxlint binary report rules
+// named in no config -- `no-const-assign` and `react/no-children-prop` among them. That is a
+// measurement of what the tool actually enables, which is what parity is about, rather than a
+// second-hand copy of the metadata that produces it.
+//
+// # `eslint` is not a plugin, and the 16 core rules depend on that
+//
+// Sixteen of these have no namespace, and no `plugins` entry names `eslint`. In oxc, `ESLINT` is a
+// bitflag with the value 0 (`config/plugins.rs:95`), so `plugins.contains(ESLINT)` is true whatever
+// is declared, and upstream's own comment on `warn_correctness` says "there's no way to disable
+// ESLint correctness rules". They are therefore contributed unconditionally, and `PluginEslint` is
+// the name that records that rather than leaving sixteen entries looking unattributed.
+var PluginDefaultRules = pluginDefaultRules()
+
+// PluginEslint is the pseudo-plugin that contributes core rules. See PluginDefaultRules.
+const PluginEslint = "eslint"
+
+// pluginContributing returns which plugin a plugin-default rule arrives from.
+func pluginContributing(ruleName string) string {
+	namespace, _, namespaced := strings.Cut(ruleName, "/")
+	if !namespaced {
+		return PluginEslint
+	}
+	return namespace
+}
+
+// PluginDefaultSeverity is the severity a plugin declaration contributes at.
+//
+// `Warn`, and not by choice: `warn_correctness` inserts `AllowWarnDeny::Warn` and the inventory
+// records all forty as `warn` today. This matters because the hand-written lines currently in the
+// config set them to `error`, so the two paths agree on WHICH rules run and disagree on how loudly.
+// See `RulesFromPlugins` for why that difference is surfaced rather than smoothed over.
+const PluginDefaultSeverity = SeverityWarn
+
+// RulesFromPlugins returns the settings a `plugins` declaration contributes, given what the rules
+// block already names.
+//
+// A rule the config names explicitly is left alone: an explicit line is a decision and a default is
+// not, so the default never overrides one. That is also what oxlint does, since a rules block entry
+// is applied after `warn_correctness` seeds the map.
+func RulesFromPlugins(plugins []string, named map[string]RuleSetting) map[string]RuleSetting {
+	declared := map[string]bool{PluginEslint: true}
+	for _, plugin := range plugins {
+		declared[plugin] = true
+	}
+
+	contributed := map[string]RuleSetting{}
+	for ruleName, plugin := range PluginDefaultRules {
+		if !declared[plugin] {
+			continue
+		}
+		if _, explicit := named[ruleName]; explicit {
+			continue
+		}
+		contributed[ruleName] = RuleSetting{Severity: PluginDefaultSeverity}
+	}
+	return contributed
 }
 
 // Load reads a configuration file from disk.
@@ -93,6 +168,7 @@ func Load(path string) (*Config, error) {
 	loaded := &Config{
 		Rules:          map[string]RuleSetting{},
 		IgnorePatterns: raw.IgnorePatterns,
+		Plugins:        raw.Plugins,
 		Root:           root,
 	}
 
@@ -101,6 +177,13 @@ func Load(path string) (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("rule %q in %s: %w", name, path, err)
 		}
+		loaded.Rules[name] = setting
+	}
+
+	// Applied after the rules block, and reading it: an explicit line is a decision and a default is
+	// not, so `RulesFromPlugins` skips any rule already named. Seeding before would let a default
+	// overwrite a deliberate `off`.
+	for name, setting := range RulesFromPlugins(raw.Plugins, loaded.Rules) {
 		loaded.Rules[name] = setting
 	}
 
@@ -120,6 +203,7 @@ func Load(path string) (*Config, error) {
 }
 
 type rawConfig struct {
+	Plugins        []string                   `json:"plugins"`
 	Rules          map[string]json.RawMessage `json:"rules"`
 	IgnorePatterns []string                   `json:"ignorePatterns"`
 	Overrides      []rawOverride              `json:"overrides"`
@@ -127,6 +211,7 @@ type rawConfig struct {
 
 // parsedTopLevelKeys are the keys `rawConfig` decodes and the loader acts on.
 var parsedTopLevelKeys = map[string]bool{
+	"plugins":        true,
 	"rules":          true,
 	"ignorePatterns": true,
 	"overrides":      true,
@@ -146,12 +231,6 @@ var ignoredTopLevelKeys = map[string]string{
 		"honour. Ignored deliberately, and it stays in the config because oxlint still reads it " +
 		"while both tools run side by side.",
 
-	"plugins": "the namespaces whose rules oxlint enables by declaration rather than by a rules " +
-		"block. Forty inventory entries carry `enabledBy: pluginDefault` and depend on it, and it " +
-		"is currently reproduced by naming all forty by hand in `rules`. Ignoring it is therefore " +
-		"correct only for as long as those hand-written lines exist. Owned by `#0ympke3`, which is " +
-		"ruled to implement it; when that lands this entry moves out of this map and into " +
-		"`rawConfig`, and the gate on that change is that both paths agree for all forty.",
 
 	"settings": "per-plugin configuration for the JavaScript plugins above, and it is the entry " +
 		"most worth re-reading. `settings.better-tailwindcss.entryPoint` names this repository's " +
@@ -295,4 +374,55 @@ func truncate(value string) string {
 		return value
 	}
 	return value[:60] + "..."
+}
+
+// pluginDefaultRules builds the table. See PluginDefaultRules for why it is a table.
+//
+// Generated from `rule-inventory.json`'s `enabledBy: pluginDefault` entries and pinned by
+// `TestPluginDefaultsMatchTheInventory`, which reads that file and fails on any drift. Written out
+// rather than read at runtime because `internal/config` has no business reading a repository-root
+// JSON file to answer a question about its own semantics, and a test can hold the two together.
+func pluginDefaultRules() map[string]string {
+	return map[string]string{
+		"constructor-super":                   PluginEslint,
+		"getter-return":                       PluginEslint,
+		"no-caller":                           PluginEslint,
+		"no-class-assign":                     PluginEslint,
+		"no-const-assign":                     PluginEslint,
+		"no-dupe-class-members":               PluginEslint,
+		"no-eval":                             PluginEslint,
+		"no-func-assign":                      PluginEslint,
+		"no-import-assign":                    PluginEslint,
+		"no-iterator":                         PluginEslint,
+		"no-new-native-nonconstructor":        PluginEslint,
+		"no-obj-calls":                        PluginEslint,
+		"no-setter-return":                    PluginEslint,
+		"no-this-before-super":                PluginEslint,
+		"no-unsafe-negation":                  PluginEslint,
+		"no-with":                             PluginEslint,
+		"react/forward-ref-uses-ref":          "react",
+		"react/jsx-no-duplicate-props":        "react",
+		"react/jsx-no-undef":                  "react",
+		"react/jsx-props-no-spread-multi":     "react",
+		"react/no-children-prop":              "react",
+		"react/no-danger-with-children":       "react",
+		"react/no-did-mount-set-state":        "react",
+		"react/no-did-update-set-state":       "react",
+		"react/no-direct-mutation-state":      "react",
+		"react/no-find-dom-node":              "react",
+		"react/no-is-mounted":                 "react",
+		"react/no-render-return-value":        "react",
+		"react/no-string-refs":                "react",
+		"react/no-this-in-sfc":                "react",
+		"react/no-unsafe":                     "react",
+		"react/no-will-update-set-state":      "react",
+		"react/void-dom-elements-no-children": "react",
+		"react/void-use-memo":                 "react",
+		"typescript/no-array-delete":          "typescript",
+		"typescript/no-for-in-array":          "typescript",
+		"typescript/no-implied-eval":          "typescript",
+		"typescript/no-unnecessary-parameter-property-assignment": "typescript",
+		"typescript/no-unsafe-unary-minus":                        "typescript",
+		"typescript/no-useless-empty-export":                      "typescript",
+	}
 }

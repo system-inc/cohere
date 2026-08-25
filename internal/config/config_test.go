@@ -1,9 +1,10 @@
 package config
 
 import (
-	"strings"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -363,6 +364,23 @@ func TestEveryIgnoredKeyCarriesAReason(t *testing.T) {
 	}
 }
 
+// TestPluginsIsParsedRatherThanIgnored records that one of the three dropped keys is now implemented.
+//
+// `plugins` was discarded, then recorded as deliberately ignored, and is now parsed and acted on.
+// Each of those is a different state and only the last is correct, so this asserts the current one
+// rather than leaving the transition implicit. It also documents why `plugins` is absent from the
+// known-dirty control below: it left that population by being fixed.
+func TestPluginsIsParsedRatherThanIgnored(t *testing.T) {
+	if !parsedTopLevelKeys["plugins"] {
+		t.Error("`plugins` is not parsed; it was implemented under #0ympke3 and a config declaring " +
+			"it would be refused rather than honoured")
+	}
+	if _, ignored := ignoredTopLevelKeys["plugins"]; ignored {
+		t.Error("`plugins` is recorded as deliberately ignored AND parsed; one of the two is stale " +
+			"and a reader cannot tell which describes the behaviour")
+	}
+}
+
 // TestTheThreeRealKeysWouldHaveBeenCaught is the known-dirty control.
 //
 // The refusal test above uses a synthetic key, which proves the mechanism and not that it would have
@@ -374,7 +392,10 @@ func TestEveryIgnoredKeyCarriesAReason(t *testing.T) {
 // Without a control like this, the guard and a guard that fires only on names nobody uses look
 // identical from a green suite.
 func TestTheThreeRealKeysWouldHaveBeenCaught(t *testing.T) {
-	for _, key := range []string{"plugins", "jsPlugins", "settings"} {
+	// `plugins` was one of these and is no longer: it is implemented now, so it is parsed rather
+	// than ignored and the decay guard below correctly refused to keep testing it. Removed here
+	// rather than by weakening the guard, which is the whole point of the guard.
+	for _, key := range []string{"jsPlugins", "settings"} {
 		t.Run(key, func(t *testing.T) {
 			reason, recorded := ignoredTopLevelKeys[key]
 			if !recorded {
@@ -401,5 +422,134 @@ func TestTheThreeRealKeysWouldHaveBeenCaught(t *testing.T) {
 				t.Errorf("the error does not name %q: %v", key, err)
 			}
 		})
+	}
+}
+
+// TestPluginDefaultsMatchTheInventory holds the generated table against its source.
+//
+// `PluginDefaultRules` is written out rather than read at runtime, so it can drift from
+// `rule-inventory.json` silently. This is what stops that: it reads the inventory and asserts the
+// two describe the same forty rules with the same contributing plugin.
+//
+// The plugin for each is derived here rather than copied, so a wrong value in the table fails even
+// though both sides came from the same file.
+func TestPluginDefaultsMatchTheInventory(t *testing.T) {
+	contents, err := os.ReadFile(filepath.Join("..", "..", "rule-inventory.json"))
+	if err != nil {
+		t.Fatalf("reading the inventory: %v", err)
+	}
+	var document struct {
+		Rules []struct {
+			Rule      string `json:"rule"`
+			EnabledBy string `json:"enabledBy"`
+			Severity  string `json:"severity"`
+		} `json:"rules"`
+	}
+	if err := json.Unmarshal(contents, &document); err != nil {
+		t.Fatalf("parsing the inventory: %v", err)
+	}
+
+	fromInventory := map[string]string{}
+	for _, entry := range document.Rules {
+		if entry.EnabledBy != "pluginDefault" {
+			continue
+		}
+		fromInventory[entry.Rule] = pluginContributing(entry.Rule)
+
+		// All forty are `warn` upstream, which is what `PluginDefaultSeverity` encodes. A rule
+		// arriving here at a different severity means the constant is answering for a population it
+		// no longer describes.
+		if entry.Severity != "warn" {
+			t.Errorf("inventory records %q as %q; PluginDefaultSeverity is a single constant and "+
+				"assumes every plugin-default rule is `warn`", entry.Rule, entry.Severity)
+		}
+	}
+
+	if len(fromInventory) == 0 {
+		t.Fatal("the inventory lists no pluginDefault rules, so this test compared nothing")
+	}
+	if len(fromInventory) != len(PluginDefaultRules) {
+		t.Errorf("inventory lists %d plugin-default rules, the table holds %d",
+			len(fromInventory), len(PluginDefaultRules))
+	}
+	for ruleName, plugin := range fromInventory {
+		recorded, present := PluginDefaultRules[ruleName]
+		if !present {
+			t.Errorf("%q is pluginDefault in the inventory and absent from the table, so it would "+
+				"not be enabled by a plugin declaration", ruleName)
+			continue
+		}
+		if recorded != plugin {
+			t.Errorf("%q is attributed to plugin %q in the table and %q by its name",
+				ruleName, recorded, plugin)
+		}
+	}
+	for ruleName := range PluginDefaultRules {
+		if _, present := fromInventory[ruleName]; !present {
+			t.Errorf("%q is in the table and not pluginDefault in the inventory, so this would "+
+				"enable a rule nothing says the gate enables", ruleName)
+		}
+	}
+}
+
+// TestPluginDeclarationEnablesItsRules is the mechanism, on a config naming none of them.
+func TestPluginDeclarationEnablesItsRules(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "VerifySettings.json")
+	contents := `{"plugins": ["react"], "rules": {"some-named-rule": "error"}}`
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatalf("writing the config: %v", err)
+	}
+
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("loading: %v", err)
+	}
+
+	// A react rule nobody named must now be enabled, at warn.
+	setting, enabled := loaded.Rules["react/no-children-prop"]
+	if !enabled {
+		t.Fatal("declaring the react plugin did not enable react/no-children-prop, which the real " +
+			"oxlint binary reports on a tree whose config never names it")
+	}
+	if setting.Severity != SeverityWarn {
+		t.Errorf("react/no-children-prop resolved at severity %v, want warn: `warn_correctness` "+
+			"inserts Warn and reporting it louder than the gate does is a divergence", setting.Severity)
+	}
+
+	// A typescript rule must NOT be, since that plugin is not declared. Without this the test
+	// passes for a resolver that enables everything.
+	if _, enabled := loaded.Rules["typescript/no-extra-non-null-assertion"]; enabled {
+		t.Error("a typescript rule was enabled by a config declaring only react, so the plugin " +
+			"filter is not discriminating")
+	}
+
+	// Core rules arrive whatever is declared, because `ESLINT` is an empty bitflag upstream.
+	if _, enabled := loaded.Rules["no-const-assign"]; !enabled {
+		t.Error("no-const-assign was not enabled; core correctness rules are contributed " +
+			"unconditionally and upstream states there is no way to disable them")
+	}
+}
+
+// TestAnExplicitLineBeatsAPluginDefault pins the precedence.
+//
+// An explicit entry is a decision and a default is not. Getting this backwards would let a plugin
+// declaration silently re-enable a rule someone deliberately turned off, which is the loudest way
+// this feature could go wrong.
+func TestAnExplicitLineBeatsAPluginDefault(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "VerifySettings.json")
+	contents := `{"plugins": ["react"], "rules": {"react/no-children-prop": "off"}}`
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatalf("writing the config: %v", err)
+	}
+
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("loading: %v", err)
+	}
+	if loaded.Rules["react/no-children-prop"].Severity != SeverityOff {
+		t.Error("a plugin default overrode an explicit `off`, so declaring a plugin would silently " +
+			"re-enable rules somebody decided to disable")
 	}
 }
