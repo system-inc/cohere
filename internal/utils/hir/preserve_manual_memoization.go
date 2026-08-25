@@ -146,9 +146,17 @@ func (v *manualMemoValidator) walk(block ReactiveBlock) {
 
 		case *ReactiveScopeBlock:
 			v.walk(shape.Instructions)
-			// The inferred-versus-written comparison runs here, after the body and BEFORE the scope
-			// is recorded live, which is upstream's ordering at `visitScope` (:417-433).
-			v.compareInferredDependencies(shape)
+			// A pruned scope is recorded and NOT compared, which is upstream's split into two
+			// methods: `visitScope` runs `validateInferredDep` over the scope's dependencies,
+			// `visitPrunedScope` only adds the id to `prunedScopes`
+			// (`ValidatePreservedManualMemoization.ts:413` and `:441`).
+			//
+			// One arm for both was a real defect rather than a shape difference. A pruned scope
+			// still carries the dependency table entry it was assigned, so comparing it re-reports
+			// whatever its surviving twin already agreed about. Measured on
+			// `useCallback-alias-property-load-dep.ts`: two scopes both carry `propA.x` and `x`,
+			// scope 2 is pruned, and upstream emits one guard naming exactly that pair.
+			//
 			// Recorded after the body, matching upstream: a scope is known to have survived only
 			// once the walk has left it, so a memo block inside it is checked against the scopes
 			// that closed before it rather than against its own enclosing scope.
@@ -156,6 +164,9 @@ func (v *manualMemoValidator) walk(block ReactiveBlock) {
 				v.prunedScopes[shape.Scope] = true
 				continue
 			}
+			// The inferred-versus-written comparison, after the body and before the scope is
+			// recorded live.
+			v.compareInferredDependencies(shape)
 			v.liveScopes[shape.Scope] = true
 			for _, absorbed := range shape.Merged {
 				// A scope absorbed by a merge survived under its survivor's identity, so the ids it
