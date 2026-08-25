@@ -233,9 +233,15 @@ type Rule struct {
 	// ReadsProgram declares that this rule reads something outside the file it was handed.
 	//
 	// `ctx.Program` reaches every source file in the run, so a rule that touches it is not pure
-	// per-file even when it declares NeedsTypeChecker false. Two rules do this today:
-	// localization-no-untranslated-value reads the English translation table, and
-	// boundary-no-project-theme-value scans every theme file.
+	// per-file even when it declares NeedsTypeChecker false. Eleven rules do this today, counted
+	// 2026-08-25 by grepping for the declaration rather than from memory: the two this note
+	// originally named (localization-no-untranslated-value reads the English translation table,
+	// boundary-no-project-theme-value scans every theme file), five tailwind rules that resolve
+	// classes against the design system, three typescript rules, and react/unsupported-syntax.
+	//
+	// The count is recorded with its date because it drifts, and it drifted badly once already:
+	// this note read "two rules" long after the tailwind family landed. Trust the grep over the
+	// prose, and prefer reading the number off the declarations to citing it from here.
 	//
 	// The flag exists for the findings cache, and the failure it prevents is the one this tool
 	// exists to catch. A cache keyed on one file's hash serves a stale result when a file the rule

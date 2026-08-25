@@ -26,9 +26,20 @@ import (
 // under-declaring serves a stale finding silently and forever, over-declaring costs a cache
 // miss. One of those is a correctness failure and the other is a performance one.
 //
-// The measured prize: lint is roughly 323ms of a 1.57s run on the ahra tree, 95 rules over
-// 3,407 files producing 129 findings across 73 files. Most files produce nothing, and an empty
-// result is a real cached answer rather than an absence.
+// The measured prize, re-measured 2026-08-25 on the ahra tree at load 5-7, medians over several
+// runs: lint is roughly 635ms of a ~3s run, 212 rules over 3,481 files producing 29 findings.
+// Most files produce nothing, and an empty result is a real cached answer rather than an absence.
+//
+// Those numbers replace an earlier note here reading 323ms of a 1.57s run, 95 rules over 3,407
+// files, 129 findings across 73 files. Every figure had drifted, and the direction matters: the
+// rule count more than doubled as parity landed (214 of 215 rules the config asks for now run),
+// so lint roughly doubled in cost and became the second-largest phase. The prize this cache is
+// aimed at grew; it did not shrink.
+//
+// Re-measure before pricing work against this. A cost recorded next to a cache is read as the
+// reason the cache exists, so a stale one argues for building something the tree no longer wants.
+// Measure with a plain run: `--timing` bills roughly a second of its own instrumentation to this
+// phase, which is enough to invert which phase looks largest.
 type LintCache struct {
 	// RuleSetHash covers which rules ran and their order. A rule added, removed, or renamed
 	// changes what the tree should report, and every stored entry becomes wrong at once. This
