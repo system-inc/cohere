@@ -1,6 +1,7 @@
 package reactconformance
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -42,29 +43,38 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
 		t.Fatalf("aggregating: %v", err)
 	}
 
-	if report.Considered != 325 {
-		t.Errorf("considered %d, want 325", report.Considered)
+	if report.Considered != ExpectedFixtureCount {
+		t.Errorf("considered %d, want %d", report.Considered, ExpectedFixtureCount)
 	}
 
-	// 35 Flow, unchanged from `TestFlowFixtureCountIsUpstreamsOwnTest`, restated here so a change in
+	// Flow count, unchanged from `TestFlowFixtureCountIsUpstreamsOwnTest`, restated here so a change in
 	// the exclusion rule shows up in the aggregate rather than only in the loader's own test.
-	if got := report.Counts[VerdictFlowSyntax]; got != 35 {
-		t.Errorf("flow-excluded %d, want 35", got)
+	if got := report.Counts[VerdictFlowSyntax]; got != ExpectedFlowFixtureCount {
+		t.Errorf("flow-excluded %d, want %d", got, ExpectedFlowFixtureCount)
 	}
 
-	// 101 fixtures belong entirely to rules verify does not ship, down from 196 on 2026-08-24 when
-	// `ShippedRules` was corrected: `immutability`, `incompatible-library`, `purity` and `refs` were
-	// all on disk and registered while this map still said we had never written them.
+	// 166 fixtures belong entirely to rules verify does not ship: 101 of the error population, and
+	// all 65 non-Flow fixtures of the clean one.
+	//
+	// The clean fixtures all land here for a reason that is correct rather than incidental.
+	// `ShippedRules` does not list `preserve-manual-memoization`, because that rule's registration is
+	// deliberately held: it reports on valid code, and a gate that cries wolf gets switched off. The
+	// clean population exists precisely to measure that, so a corpus entry counted as addressable
+	// while the rule that addresses it is unregistered would be the score claiming credit for a rule
+	// nothing runs. When the registration lands, these move into the addressable set and this number
+	// drops by 65.
 	//
 	// It remains the single biggest fact about the number and the one a headline score would bury:
 	// a third of React's error corpus is preserve-manual-memoization, todo, invariant and friends,
 	// none of which verify has.
-	if got := report.Counts[VerdictNoRuleShipped]; got != 101 {
-		t.Errorf("no-rule-shipped %d, want 101", got)
+	if got := report.Counts[VerdictNoRuleShipped]; got != 166 {
+		t.Errorf("no-rule-shipped %d, want 166", got)
 	}
 
 	// The addressable set: fixtures a rule verify ships is responsible for. This is the real
-	// denominator any future parity number is measured against, and it is 189 rather than 325.
+	// denominator any future parity number is measured against, and it is 189 rather than the
+	// corpus size. Unchanged by the clean population, which is the point of asserting it separately
+	// from `Considered`: adding 70 fixtures nothing can be asked about must not move this number.
 	answerable := report.Counts[VerdictPassed] + report.Counts[VerdictFailed] +
 		report.Counts[VerdictUnresolvableTypes] + report.Counts[VerdictUnreachableFixture] +
 		report.Counts[VerdictNotScored] + report.Counts[VerdictStatedDivergence]
@@ -380,30 +390,64 @@ func TestReactImportDetectionDoesNotOverMatch(t *testing.T) {
 func TestCorpusTypeResolutionIsMeasured(t *testing.T) {
 	fixtures := load(t)
 
-	importing, hookUsing, hookUsingWithoutImport := 0, 0, 0
+	// Counted per population rather than over the corpus as a whole, because the two differ sharply
+	// and a combined number would hide it: 63% of hook-using error fixtures omit the import against
+	// 13% of the clean ones. Summing them reports 51%, a figure describing neither population and
+	// moving with the mix rather than with anything about React.
+	var importing, hookUsing, hookUsingWithoutImport int
+	var cleanImporting, cleanHookUsing, cleanHookUsingWithoutImport int
 	for _, fixture := range fixtures {
-		if fixture.ResolvesReactTypes() {
-			importing++
+		base := filepath.Base(fixture.Name)
+		errorNamed := strings.HasPrefix(base, "error.") || strings.HasPrefix(base, "todo.error.")
+
+		resolves := fixture.ResolvesReactTypes()
+		if errorNamed {
+			if resolves {
+				importing++
+			}
+			if fixture.CallsHook() {
+				hookUsing++
+				if !resolves {
+					hookUsingWithoutImport++
+				}
+			}
+			continue
+		}
+		if resolves {
+			cleanImporting++
 		}
 		if fixture.CallsHook() {
-			hookUsing++
-			if !fixture.ResolvesReactTypes() {
-				hookUsingWithoutImport++
+			cleanHookUsing++
+			if !resolves {
+				cleanHookUsingWithoutImport++
 			}
 		}
 	}
 
 	if importing != 77 {
-		t.Errorf("fixtures importing react = %d, want 77", importing)
+		t.Errorf("error fixtures importing react = %d, want 77", importing)
 	}
 	if hookUsing != 202 {
-		t.Errorf("fixtures calling a hook = %d, want 202", hookUsing)
+		t.Errorf("error fixtures calling a hook = %d, want 202", hookUsing)
 	}
 	if hookUsingWithoutImport != 128 {
-		t.Errorf("hook-using fixtures with no react import = %d, want 128", hookUsingWithoutImport)
+		t.Errorf("hook-using error fixtures with no react import = %d, want 128", hookUsingWithoutImport)
 	}
-	t.Logf("%d of %d hook-using fixtures (%.0f%%) never import react, so a type-aware rule reads `any`",
+
+	if cleanImporting != 61 {
+		t.Errorf("clean fixtures importing react = %d, want 61", cleanImporting)
+	}
+	if cleanHookUsing != 69 {
+		t.Errorf("clean fixtures calling a hook = %d, want 69", cleanHookUsing)
+	}
+	if cleanHookUsingWithoutImport != 9 {
+		t.Errorf("hook-using clean fixtures with no react import = %d, want 9", cleanHookUsingWithoutImport)
+	}
+
+	t.Logf("error fixtures: %d of %d hook-using (%.0f%%) never import react, so a type-aware rule reads `any`",
 		hookUsingWithoutImport, hookUsing, 100*float64(hookUsingWithoutImport)/float64(hookUsing))
+	t.Logf("clean fixtures: %d of %d hook-using (%.0f%%) never import react",
+		cleanHookUsingWithoutImport, cleanHookUsing, 100*float64(cleanHookUsingWithoutImport)/float64(cleanHookUsing))
 }
 
 // TestReportCheckCatchesANonPartition proves the arithmetic guard fires.

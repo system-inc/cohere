@@ -54,11 +54,39 @@ const upstreamFixtureDirectory = "compiler/packages/babel-plugin-react-compiler/
 // updating and read the diff before changing it.
 const expectedFixtureCount = 325
 
+// expectedCleanFixtureCount is how many fixtures carrying `preserveMemoizationPragma` expect no
+// error at all, at the pinned sha.
+//
+// It is asserted exactly rather than as "more than zero", and that is the whole point of the number.
+// A corpus of error fixtures cannot measure false positives: over-reporting produces more findings
+// and reads as success. The clean fixtures are the only population where silence is the right answer
+// and firing is a defect, so a run that quietly collects none restores exactly the blind spot this
+// change exists to close -- and it would report success while doing it.
+//
+// The exact count also guards a failure a nonzero check cannot see. Collecting fixtures by copying
+// them into one directory loses any whose basenames collide, and four of these do:
+// `optional-member-expression-as-memo-dep.js` and three siblings appear in more than one
+// subdirectory. That collection lost four, returned 66, and errored on nothing. A guard asserting
+// "some clean fixtures exist" passes on 66 as happily as on 70.
+//
+// Changing this number is meant to be a deliberate act with the diff read, not a threshold nudged
+// until a run goes green.
+const expectedCleanFixtureCount = 70
+
+// preserveMemoizationPragma marks the fixtures that exercise manual-memoization preservation.
+//
+// This is the one non-error population vendored, rather than upstream's whole 1,486, because a
+// corpus is only worth vendoring if a human can review the diff that lands it. These are the
+// fixtures `preserve-manual-memoization` is scored against; the rest are other rules' business and
+// would be vendored when someone needs them for the same stated reason.
+const preserveMemoizationPragma = "validatePreserveExistingMemoizationGuarantees"
+
 func main() {
 	sha := flag.String("sha", "", "facebook/react commit to vendor from (required)")
 	out := flag.String("out", "", "directory to write the fixture pairs into (required unless -dry-run)")
 	dryRun := flag.Bool("dry-run", false, "report the counts without writing")
 	expect := flag.Int("expect", expectedFixtureCount, "fixture pairs a correct run finds; a mismatch aborts")
+	expectClean := flag.Int("expect-clean", expectedCleanFixtureCount, "clean fixture pairs a correct run finds; a mismatch aborts")
 	flag.Parse()
 
 	if *sha == "" {
@@ -100,12 +128,27 @@ func main() {
 		fail("found %d error fixtures, expected %d; if upstream really changed, read the diff and pass -expect", len(names), *expect)
 	}
 
+	clean, err := cleanFixtureNames(*sha)
+	if err != nil {
+		fail("listing the clean fixtures: %v", err)
+	}
+	fmt.Printf("clean fixtures   %d  (carry %s and expect no error)\n", len(clean), preserveMemoizationPragma)
+
+	// Asserted exactly rather than as a floor. A run collecting zero clean fixtures restores the
+	// blind spot this population exists to close -- a corpus of error fixtures cannot measure false
+	// positives -- and it would report success while doing it. See `expectedCleanFixtureCount` for
+	// why a nonzero check is not enough.
+	if len(clean) != *expectClean {
+		fail("found %d clean fixtures, expected %d; if upstream really changed, read the diff and pass -expect-clean",
+			len(clean), *expectClean)
+	}
+
 	if *dryRun {
 		fmt.Println("dry run, nothing written")
 		return
 	}
 
-	written, err := writeFixtures(*sha, names, *out)
+	written, err := writeFixtures(*sha, append(append([]string(nil), names...), clean...), *out)
 	if err != nil {
 		fail("writing fixtures: %v", err)
 	}
@@ -157,7 +200,101 @@ func errorFixtureNames(sha string) ([]string, error) {
 	return names, nil
 }
 
-// writeFixtures pulls the tarball once and writes each pair.
+// cleanFixtureNames returns the inputs carrying `preserveMemoizationPragma` whose expectation holds
+// no error, relative to the fixture root.
+//
+// It reads the tarball rather than the tree listing, because the pragma is in the file's contents
+// and an expectation's error block is in its pair's. Neither question can be answered from a list of
+// paths, which is why this population was invisible to a tool built to filter on names.
+func cleanFixtureNames(sha string) ([]string, error) {
+	contents, err := fixtureContents(sha)
+	if err != nil {
+		return nil, err
+	}
+
+	var names []string
+	for name, source := range contents {
+		if strings.HasSuffix(name, ".expect.md") || !strings.Contains(string(source), preserveMemoizationPragma) {
+			continue
+		}
+		expectation, paired := contents[strings.TrimSuffix(name, path.Ext(name))+".expect.md"]
+		// An input with no expectation is not a judgement about it either way, so it is not
+		// evidence of cleanliness and is left out rather than assumed silent.
+		if !paired {
+			continue
+		}
+		// Upstream writes the errors under a `## Error` heading, and its absence is what "expects no
+		// error" means. Anchored to a line start so a fixture merely discussing the word in prose is
+		// not mistaken for one that reports.
+		if !strings.Contains("\n"+string(expectation), "\n## Error") {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+// fixtureContents pulls the tarball once and returns every fixture file, keyed by its path relative
+// to the fixture root.
+//
+// Memoised, because two callers need it -- the clean-fixture selection reads contents to find the
+// pragma, and the write pass needs the same bytes. Fetching twice would double a 10MB download and,
+// worse, admit the possibility of the two passes disagreeing about what upstream holds.
+var fixtureContentsCache map[string][]byte
+
+func fixtureContents(sha string) (map[string][]byte, error) {
+	if fixtureContentsCache != nil {
+		return fixtureContentsCache, nil
+	}
+
+	body, err := get(fmt.Sprintf("https://api.github.com/repos/facebook/react/tarball/%s", sha))
+	if err != nil {
+		return nil, err
+	}
+	defer body.Close()
+
+	gzipReader, err := gzip.NewReader(body)
+	if err != nil {
+		return nil, err
+	}
+	defer gzipReader.Close()
+
+	contents := map[string][]byte{}
+	tarReader := tar.NewReader(gzipReader)
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if header.Typeflag != tar.TypeReg {
+			continue
+		}
+
+		// The tarball root is a generated `owner-repo-sha` directory, so the first path segment is
+		// dropped rather than matched.
+		_, rest, cut := strings.Cut(header.Name, "/")
+		if !cut {
+			continue
+		}
+		name, under := strings.CutPrefix(rest, upstreamFixtureDirectory+"/")
+		if !under {
+			continue
+		}
+		file, err := io.ReadAll(tarReader)
+		if err != nil {
+			return nil, err
+		}
+		contents[name] = file
+	}
+
+	fixtureContentsCache = contents
+	return contents, nil
+}
+
+// writeFixtures writes each pair out of the fetched tarball.
 //
 // One tarball rather than 650 blob requests: it is a single round trip, it cannot be rate-limited
 // halfway into a corpus, and it gives byte-identical content to what a clone would.
@@ -168,53 +305,23 @@ func writeFixtures(sha string, names []string, out string) (int, error) {
 		wanted[strings.TrimSuffix(name, filepath.Ext(name))+".expect.md"] = true
 	}
 
-	body, err := get(fmt.Sprintf("https://api.github.com/repos/facebook/react/tarball/%s", sha))
+	contents, err := fixtureContents(sha)
 	if err != nil {
 		return 0, err
 	}
-	defer body.Close()
-
-	gzipReader, err := gzip.NewReader(body)
-	if err != nil {
-		return 0, err
-	}
-	defer gzipReader.Close()
 
 	found := map[string]bool{}
 	written := 0
-	tarReader := tar.NewReader(gzipReader)
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return written, err
-		}
-		if header.Typeflag != tar.TypeReg {
+	for name := range wanted {
+		file, present := contents[name]
+		if !present {
 			continue
 		}
-
-		// The tarball root is a generated `owner-repo-sha` directory, so the first path segment is
-		// dropped rather than matched.
-		_, rest, found1 := strings.Cut(header.Name, "/")
-		if !found1 {
-			continue
-		}
-		name, found2 := strings.CutPrefix(rest, upstreamFixtureDirectory+"/")
-		if !found2 || !wanted[name] {
-			continue
-		}
-
 		destination := filepath.Join(out, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
 			return written, err
 		}
-		contents, err := io.ReadAll(tarReader)
-		if err != nil {
-			return written, err
-		}
-		if err := os.WriteFile(destination, contents, 0o644); err != nil {
+		if err := os.WriteFile(destination, file, 0o644); err != nil {
 			return written, err
 		}
 		found[name] = true

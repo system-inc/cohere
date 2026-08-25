@@ -1,6 +1,7 @@
 package hir
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -74,68 +75,77 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// below instead, where silence is the right answer.
 }
 
-// TestPreserveManualMemoizationOnFixturesExpectingNoSuchError is the over-reporting half.
+// TestPreserveManualMemoizationFalsePositiveRate is the over-reporting half, measured directly.
 //
 // The 33 error fixtures can only show under-reporting: a rule that fires on everything passes all of
-// them. The complement is what shows over-reporting.
+// them. This is the population where silence is the right answer, so a finding here is a defect and
+// nothing else in the phase can see one.
 //
-// # Defining the complement correctly, which took two attempts
+// # It took three attempts to define this population, and the first two are why the number is pinned
 //
 // The first spelling took every fixture whose `Expected.Raw` lacks this rule's message and which
-// mentions `useMemo`. That found 30 fixtures and 11 firings, which read as an 11-false-positive rate
-// -- the `refs`/`immutability` shape this domain has paid for twice.
+// mentions `useMemo`. That found 30 fixtures and 11 firings, which read as an 11-false-positive rate.
+// The filter was wrong: `Expectation` parses only the `## Error` block, so `Raw` is empty for every
+// fixture expecting clean output, and the complement was made almost entirely of error fixtures for
+// other rules. Firing on those is not obviously wrong.
 //
-// It was the filter that was wrong. `Expectation` parses only the `## Error` block, so `Raw` is
-// empty for every fixture that expects clean output, and the complement was made almost entirely of
-// error fixtures for other rules. Firing on those is not obviously wrong: upstream reports something
-// there too, and a program with one rule violation frequently has another.
+// The second concluded the corpus held zero fixtures that use manual memoization and expect no error
+// at all, and therefore that this rule's over-reporting could not be measured here. That was true of
+// the corpus and false about the cause: `Load` rejected every fixture not named `error.*`, so the
+// tree was error-only by construction. Upstream ships 70 of these. The loader excluded them, and the
+// exclusion was reasoned about for hours as a property of upstream.
 //
-// Measured directly: the corpus holds zero fixtures that use manual memoization and expect no error
-// at all. So there is no clean-fixture population to score against, and the honest statement is that
-// this rule's over-reporting cannot be measured from this corpus.
-//
-// What is measured instead: firings on fixtures whose golden expects errors this rule does not
-// produce. That is not a false-positive count -- it is an upper bound on one, and it is reported as
-// such.
-func TestPreserveManualMemoizationOnFixturesExpectingNoSuchError(t *testing.T) {
+// So the rate is now a real measurement rather than an upper bound, and it is high: 31 of 70. The
+// count is asserted exactly rather than as a ceiling, because a ceiling cannot distinguish a fix
+// from a rule that went quiet, and this rule's registration is being held precisely on the strength
+// of this number.
+func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	fixtures, err := reactconformance.Load("../../reactconformance/testdata/fixtures")
 	if err != nil {
 		t.Fatalf("loading the vendored corpus: %v", err)
 	}
 
 	const ruleMessage = "Existing memoization could not be preserved"
-	usesMemoization, expectsNoError, firedOnOtherRule := 0, 0, 0
-
+	clean, fired, silent, unsupported := 0, 0, 0, 0
 	for _, fixture := range fixtures {
-		if !strings.Contains(fixture.Source, "useMemo") &&
-			!strings.Contains(fixture.Source, "useCallback") {
+		base := filepath.Base(fixture.Name)
+		if strings.HasPrefix(base, "error.") || strings.HasPrefix(base, "todo.error.") {
 			continue
 		}
-		usesMemoization++
-		if len(fixture.Expected.Errors) == 0 && fixture.Expected.Raw == "" {
-			expectsNoError++
-		}
-		if strings.Contains(fixture.Expected.Raw, ruleMessage) {
-			continue
-		}
+		clean++
 		findings, ok := findingsForSource(t, fixture.Source)
-		if ok && len(findings) > 0 {
-			firedOnOtherRule++
+		if !ok {
+			unsupported++
+			continue
 		}
+		if len(findings) > 0 {
+			fired++
+			continue
+		}
+		silent++
 	}
 
-	if usesMemoization == 0 {
-		t.Fatal("no fixture in the corpus uses manual memoization, so this test measures nothing")
+	if clean != reactconformance.ExpectedCleanFixtureCount {
+		t.Fatalf("scored %d clean fixtures, want %d; the population this test measures is not the "+
+			"one it believes it is", clean, reactconformance.ExpectedCleanFixtureCount)
+	}
+	t.Logf("cleanFixtures=%d silentCorrect=%d falsePositives=%d unsupported=%d (%.0f%% false-positive rate)",
+		clean, silent, fired, unsupported, 100*float64(fired)/float64(clean))
+
+	// Every one of these is the rule reporting a lost memoization on a program upstream compiles
+	// clean. A gate that does this gets switched off, which is why the registration is held.
+	const knownFalsePositives = 31
+	if fired != knownFalsePositives {
+		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
+			"number should be lowered deliberately, and if it went UP something regressed",
+			fired, knownFalsePositives)
 	}
 
-	t.Logf("fixturesUsingMemoization=%d expectingNoErrorAtAll=%d firedWhereAnotherRuleIsExpected=%d",
-		usesMemoization, expectsNoError, firedOnOtherRule)
-
-	// The only assertion this corpus supports. A rule firing on every memoization fixture is
-	// reporting unconditionally, which the 33-fixture test cannot detect because all 33 are errors.
-	if firedOnOtherRule == usesMemoization {
-		t.Errorf("the rule fired on all %d fixtures using memoization; that is unconditional "+
-			"reporting and the error-fixture score above cannot distinguish it", usesMemoization)
+	// Non-degeneracy. A rule silent on everything scores zero false positives and is worthless, and
+	// the error-fixture test above is what would catch that -- restated here so this test cannot
+	// pass alone by the rule ceasing to report.
+	if silent == 0 {
+		t.Error("the rule fired on every clean fixture, which is unconditional reporting")
 	}
 }
 

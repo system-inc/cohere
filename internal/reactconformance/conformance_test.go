@@ -40,16 +40,42 @@ func load(t *testing.T) []Fixture {
 // walking the extracted tarball on disk. Both said 325, 222 at the top level and 103 across nine
 // subdirectories. The depth split is asserted too, because that is the exact axis the wrong answer
 // moved along: a run reporting 222 here is the original defect reproducing itself.
+// The corpus also holds a second population, and the split is asserted rather than the total alone.
+// `ExpectedCleanFixtureCount` fixtures carry the preserve-memoization pragma and expect no error;
+// they are the only false-positive oracle here, since over-reporting on an error fixture produces
+// more findings and reads as success. A total-only assertion would let the two populations trade
+// against each other silently, which is the shape of defect this whole file guards.
 func TestCorpusIsTheSizeItClaimsToBe(t *testing.T) {
 	fixtures := load(t)
 
-	if len(fixtures) != 325 {
-		t.Errorf("corpus holds %d fixtures, want 325 at sha %s", len(fixtures), UpstreamSha)
+	errorNamed, clean := 0, 0
+	for _, fixture := range fixtures {
+		if base := filepath.Base(fixture.Name); strings.HasPrefix(base, "error.") ||
+			strings.HasPrefix(base, "todo.error.") {
+			errorNamed++
+			continue
+		}
+		clean++
+	}
+	if errorNamed != ExpectedErrorFixtureCount {
+		t.Errorf("corpus holds %d error fixtures, want %d at sha %s",
+			errorNamed, ExpectedErrorFixtureCount, UpstreamSha)
+	}
+	if clean != ExpectedCleanFixtureCount {
+		t.Errorf("corpus holds %d clean fixtures, want %d at sha %s; these are the only population "+
+			"where a finding is a defect, so losing them silently removes the ability to measure "+
+			"over-reporting at all", clean, ExpectedCleanFixtureCount, UpstreamSha)
 	}
 
+	// The depth split below is about the error fixtures specifically, because 222 + 103 is the
+	// number that moved and the axis it moved along.
 	topLevel, nested := 0, 0
 	subdirectories := map[string]int{}
 	for _, fixture := range fixtures {
+		base := filepath.Base(fixture.Name)
+		if !strings.HasPrefix(base, "error.") && !strings.HasPrefix(base, "todo.error.") {
+			continue
+		}
 		directory := filepath.Dir(fixture.Name)
 		if directory == "." {
 			topLevel++
@@ -89,6 +115,15 @@ func TestEveryFixtureHasAParsedExpectation(t *testing.T) {
 
 	withDeclaredCount, withLocation, totalErrors := 0, 0, 0
 	for _, fixture := range fixtures {
+		// A clean fixture has no `## Error` block, and that absence IS its expectation rather than a
+		// parse failure. Only an error-named fixture with an empty block is the defect this catches.
+		base := filepath.Base(fixture.Name)
+		if !strings.HasPrefix(base, "error.") && !strings.HasPrefix(base, "todo.error.") {
+			if fixture.Expected.Raw != "" {
+				t.Errorf("%s: clean fixture carries an `## Error` block", fixture.Name)
+			}
+			continue
+		}
 		if fixture.Expected.Raw == "" {
 			t.Errorf("%s: empty `## Error` block", fixture.Name)
 		}
@@ -177,11 +212,12 @@ func TestFlowFixtureCountIsUpstreamsOwnTest(t *testing.T) {
 		}
 	}
 
-	if flowCount != 35 {
-		t.Errorf("fixtures requiring a Flow parser = %d, want 35 at sha %s", flowCount, UpstreamSha)
+	if flowCount != ExpectedFlowFixtureCount {
+		t.Errorf("fixtures requiring a Flow parser = %d, want %d at sha %s",
+			flowCount, ExpectedFlowFixtureCount, UpstreamSha)
 	}
-	if want := len(fixtures) - flowCount; want != 290 {
-		t.Errorf("fixtures needing no Flow parser = %d, want 290", want)
+	if got, want := len(fixtures)-flowCount, ExpectedFixtureCount-ExpectedFlowFixtureCount; got != want {
+		t.Errorf("fixtures needing no Flow parser = %d, want %d", got, want)
 	}
 }
 
@@ -204,10 +240,12 @@ func TestEveryPragmaInTheCorpusIsModelled(t *testing.T) {
 		}
 	}
 
-	// 31 distinct directives at the pinned sha. Asserted so that a corpus bump that adds one is
-	// visible here even if the new directive happened to already be in a map.
-	if len(seen) != 31 {
-		t.Errorf("distinct pragmas across the corpus = %d, want 31; got %v", len(seen), seen)
+	// 34 distinct directives at the pinned sha, up from 31 when the corpus held only error
+	// fixtures. Asserted so that a corpus bump that adds one is visible here even if the new
+	// directive happened to already be in a map. The three the clean population added are
+	// `panicThreshold`, `loggerTestOnly` and `expectNothingCompiled`.
+	if len(seen) != 34 {
+		t.Errorf("distinct pragmas across the corpus = %d, want 34; got %v", len(seen), seen)
 	}
 	t.Logf("modelled %d directives, deliberately ignore %d", len(KnownPragmaKeys()), len(IgnoredPragmaKeys()))
 }
@@ -448,16 +486,17 @@ func TestFirstHonestScoreIsZeroOfThreeHundredTwentyFive(t *testing.T) {
 		t.Fatalf("scoring the unimplemented engine: %v", err)
 	}
 
-	if score.Considered != 325 {
-		t.Errorf("considered %d fixtures, want 325 — a zero over a smaller denominator is not the same measurement", score.Considered)
+	if score.Considered != ExpectedFixtureCount {
+		t.Errorf("considered %d fixtures, want %d — a zero over a smaller denominator is not the same measurement",
+			score.Considered, ExpectedFixtureCount)
 	}
 	if score.Passed != 0 {
 		t.Errorf("passed %d, want 0; nothing implements these rules yet", score.Passed)
 	}
 	// Declined, not Failed. NothingImplemented says "I do not handle this" rather than "I found no
 	// errors", and those are different facts about the same absent implementation.
-	if score.Declined != 325 {
-		t.Errorf("declined %d, want 325", score.Declined)
+	if score.Declined != ExpectedFixtureCount {
+		t.Errorf("declined %d, want %d", score.Declined, ExpectedFixtureCount)
 	}
 	if score.Refused != 0 {
 		t.Errorf("refused %d, want 0; a non-zero refusal count is a defect in this package, not a score", score.Refused)
@@ -478,14 +517,15 @@ func TestFlowExclusionIsCountedNotDropped(t *testing.T) {
 		t.Fatalf("scoring with Flow fixtures excluded: %v", err)
 	}
 
-	if score.Considered != 325 {
-		t.Errorf("considered %d, want 325; excluding must not shrink the denominator", score.Considered)
+	if score.Considered != ExpectedFixtureCount {
+		t.Errorf("considered %d, want %d; excluding must not shrink the denominator",
+			score.Considered, ExpectedFixtureCount)
 	}
-	if score.Excluded != 35 {
-		t.Errorf("excluded %d, want 35", score.Excluded)
+	if score.Excluded != ExpectedFlowFixtureCount {
+		t.Errorf("excluded %d, want %d", score.Excluded, ExpectedFlowFixtureCount)
 	}
-	if score.Declined != 290 {
-		t.Errorf("declined %d, want 290", score.Declined)
+	if score.Declined != ExpectedFixtureCount-ExpectedFlowFixtureCount {
+		t.Errorf("declined %d, want %d", score.Declined, ExpectedFixtureCount-ExpectedFlowFixtureCount)
 	}
 	t.Logf("with Flow excluded: %s", score.Summary())
 }
@@ -522,8 +562,10 @@ func TestVendoredCorpusPairsAreComplete(t *testing.T) {
 		t.Fatalf("walking the vendored corpus: %v", err)
 	}
 
-	if len(inputs) != 325 || len(expectations) != 325 {
-		t.Errorf("vendored tree holds %d inputs and %d expectations, want 325 of each", len(inputs), len(expectations))
+	const wantPairs = ExpectedErrorFixtureCount + ExpectedCleanFixtureCount
+	if len(inputs) != wantPairs || len(expectations) != wantPairs {
+		t.Errorf("vendored tree holds %d inputs and %d expectations, want %d of each",
+			len(inputs), len(expectations), wantPairs)
 	}
 
 	haveExpectation := map[string]bool{}
@@ -563,7 +605,7 @@ func TestKnownAndIgnoredPragmasDoNotOverlap(t *testing.T) {
 	// modelled key was checked against upstream's own schemas when it was written — the 15
 	// PluginOptions keys in `Entrypoint/Options.ts` and the 40 in `EnvironmentConfigSchema` — so
 	// none of them is a directive this package invented a meaning for.
-	if got := len(KnownPragmaKeys()) + len(IgnoredPragmaKeys()); got != 31 {
-		t.Errorf("modelled plus ignored = %d, want 31 to match the corpus's distinct directives", got)
+	if got := len(KnownPragmaKeys()) + len(IgnoredPragmaKeys()); got != 34 {
+		t.Errorf("modelled plus ignored = %d, want 34 to match the corpus's distinct directives", got)
 	}
 }

@@ -157,12 +157,6 @@ func Load(root string) ([]Fixture, error) {
 		if entry.IsDir() || strings.HasSuffix(path, ".expect.md") {
 			return nil
 		}
-		base := filepath.Base(path)
-		if !strings.HasPrefix(base, "error.") && !strings.HasPrefix(base, "todo.error.") {
-			// The vendored tree holds only error-named fixtures, so this is a guard against the
-			// tree drifting rather than a filter over a mixed corpus.
-			return fmt.Errorf("%s: not an error-named fixture; the vendored corpus is error-named only", path)
-		}
 		inputPaths = append(inputPaths, path)
 		return nil
 	})
@@ -170,6 +164,38 @@ func Load(root string) ([]Fixture, error) {
 		return nil, err
 	}
 	sort.Strings(inputPaths)
+
+	// The corpus must hold both kinds, and the count of each is asserted rather than merely being
+	// nonzero.
+	//
+	// This replaces a guard that rejected any fixture not named `error.*`, justified in its own
+	// comment as protecting a tree that "holds only error-named fixtures" -- a property that guard
+	// created. The consequence was not cosmetic: a corpus of error fixtures cannot measure false
+	// positives, because over-reporting produces more findings and reads as success. That limitation
+	// was reasoned about for hours as a property of upstream. Upstream ships the clean fixtures; this
+	// loader excluded them.
+	//
+	// So the replacement asserts what a correct tree contains instead of what it excludes, and it
+	// asserts exact counts because a floor cannot see the failure that produced this. Collecting
+	// fixtures by copying them into one directory loses any whose basenames collide, and four of the
+	// clean ones do -- that collection returned 66 of 70 and errored on nothing. A check for "some
+	// clean fixtures exist" passes on 66 as happily as on 70.
+	var errorNamed, clean int
+	for _, path := range inputPaths {
+		if base := filepath.Base(path); strings.HasPrefix(base, "error.") ||
+			strings.HasPrefix(base, "todo.error.") {
+			errorNamed++
+			continue
+		}
+		clean++
+	}
+	if errorNamed != ExpectedErrorFixtureCount || clean != ExpectedCleanFixtureCount {
+		return nil, fmt.Errorf(
+			"corpus holds %d error-named and %d clean fixtures, want %d and %d; re-run "+
+				"`tools/vendor_react_fixtures` at the pinned sha, and if upstream really changed, "+
+				"read the diff before moving these numbers",
+			errorNamed, clean, ExpectedErrorFixtureCount, ExpectedCleanFixtureCount)
+	}
 
 	fixtures := make([]Fixture, 0, len(inputPaths))
 	for _, inputPath := range inputPaths {
@@ -190,9 +216,27 @@ func Load(root string) ([]Fixture, error) {
 			return nil, fmt.Errorf("%s: expectation missing; upstream pairs these 1:1 and a fixture without one cannot be scored: %w", name, err)
 		}
 
-		expectation, err := ParseExpectation(string(expectBytes))
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", name, err)
+		// The `## Error` invariant is conditional on the fixture being error-named, rather than
+		// universal. Error-named fixtures and `## Error` sections are still exactly the same set,
+		// which is what makes a missing section on one of those a real defect. A clean fixture has
+		// no section by definition -- that absence is its expectation -- so requiring one of every
+		// fixture is what made the corpus error-only, and it would reject the clean population on
+		// the way in.
+		base := filepath.Base(name)
+		errorNamed := strings.HasPrefix(base, "error.") || strings.HasPrefix(base, "todo.error.")
+
+		var expectation Expectation
+		if errorNamed {
+			expectation, err = ParseExpectation(string(expectBytes))
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+		} else if strings.Contains("\n"+string(expectBytes), "\n## Error") {
+			// The other direction of the same set equality, and it is the one that matters for a
+			// scorer: a fixture counted as clean while its golden reports errors would make every
+			// finding on it read as a false positive.
+			return nil, fmt.Errorf("%s: not error-named but its expectation has an `## Error` "+
+				"section, so it is neither a clean fixture nor an error one and cannot be scored", name)
 		}
 
 		firstLine, _, _ := strings.Cut(source, "\n")

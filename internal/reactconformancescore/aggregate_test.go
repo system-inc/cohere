@@ -85,7 +85,10 @@ func TestAggregateWithTheRuleEngineWired(t *testing.T) {
 		{reactconformance.VerdictFailed, 25},
 		{reactconformance.VerdictStatedDivergence, 18},
 		{reactconformance.VerdictUnresolvableTypes, 8},
-		{reactconformance.VerdictFlowSyntax, 35},
+		// The only one of the five that moved when the clean population was vendored, and the four
+		// that did not are the reassurance: adding 70 fixtures nothing addresses must change the
+		// exclusion count and leave every scored verdict alone.
+		{reactconformance.VerdictFlowSyntax, reactconformance.ExpectedFlowFixtureCount},
 	} {
 		if got := report.Counts[want.Verdict]; got != want.Count {
 			t.Errorf("%s = %d, want %d", want.Verdict, got, want.Count)

@@ -17,6 +17,41 @@ const UpstreamSha = "bd6ea412c6732b3b946a2827fcaac3a1c8f2e863"
 // UpstreamFixtureDirectory is where the vendored files came from, relative to the repository root.
 const UpstreamFixtureDirectory = "compiler/packages/babel-plugin-react-compiler/src/__tests__/fixtures/compiler"
 
+// ExpectedErrorFixtureCount is how many `error.*` and `todo.error.*` fixtures the corpus holds.
+//
+// The number that moved last time and the reason the vendoring tool refuses a path-anchored filter:
+// a research pass reported 221 by grepping the fixture root, which missed the nine subdirectories
+// holding 103 of them. Wrong by a third, and it read exactly like a clean result.
+const ExpectedErrorFixtureCount = 325
+
+// ExpectedCleanFixtureCount is how many fixtures carrying the preserve-memoization pragma expect no
+// error at all.
+//
+// These are the only population where silence is the correct answer and a finding is a defect, which
+// makes them the sole false-positive oracle in the corpus. Their absence was not upstream's doing:
+// `Load` rejected every fixture not named `error.*`, so the tree was error-only by construction and
+// the resulting inability to measure over-reporting was attributed to upstream for hours.
+//
+// Asserted exactly rather than as a floor, because the failure that produced the wrong number could
+// not be caught by one. Collecting these by copying them into a single directory loses any whose
+// basenames collide, and four do -- `optional-member-expression-single.js` and three siblings exist
+// in more than one subdirectory. That collection returned 66, wrote no error, and the four losses
+// were invisible.
+const ExpectedCleanFixtureCount = 70
+
+// ExpectedFixtureCount is the whole corpus, both populations.
+//
+// Spelled as the sum rather than as a literal, so the two populations cannot silently trade against
+// each other: a run that lost four clean fixtures and gained four error ones would hold a correct
+// total and a wrong corpus.
+const ExpectedFixtureCount = ExpectedErrorFixtureCount + ExpectedCleanFixtureCount
+
+// ExpectedFlowFixtureCount is how many fixtures need a Flow parser, across both populations.
+//
+// 35 error-named and 5 clean. They are declined rather than scored, which is a stated exclusion
+// rather than a skip -- see the `flow` entry in ignoredPragmas.
+const ExpectedFlowFixtureCount = 40
+
 // Pragma is one `@key` or `@key:value` directive from a fixture's configuration comment.
 type Pragma struct {
 	Key string
@@ -97,6 +132,11 @@ var knownPragmas = map[string]string{
 	"outputMode":             "PluginOptions: what the pipeline emits; irrelevant to diagnostics but recognised upstream",
 	"dynamicGating":          "PluginOptions: runtime feature gate",
 	"eslintSuppressionRules": "PluginOptions: which eslint suppressions the compiler honours",
+	"panicThreshold": "PluginOptions: whether a compilation error rethrows or is logged and the " +
+		"function skipped (`Entrypoint/Program.ts:256`). All three fixtures carrying it pass " +
+		"`\"none\"`, which is also upstream's default at `Entrypoint/Options.ts:314`, so it changes " +
+		"nothing for them. Modelled rather than ignored because it is a real compiler option that " +
+		"would change behaviour at another value, and an entry here says the runner knows that.",
 
 	// EnvironmentConfigSchema keys (`HIR/Environment.ts`).
 	"validatePreserveExistingMemoizationGuarantees": "Environment: preserve-manual-memoization validation",
@@ -155,6 +195,25 @@ var ignoredPragmas = map[string]string{
 
 	"enablePropagateDepsInHIR": "not in `EnvironmentConfigSchema.shape` at the pinned sha; upstream " +
 		"drops it at the `continue`. Same reasoning as enableNewMutationAliasingModel.",
+
+	"loggerTestOnly": "a snap output-formatting switch, not a compiler configuration. " +
+		"`packages/snap/src/compiler.ts:76` reads it off the first line and `:349` uses it to decide " +
+		"whether to serialise the compiler's log events into an extra section of the golden. It is " +
+		"in neither `EnvironmentConfigSchema.shape` nor `Entrypoint/Options.ts`, so the compiler " +
+		"never sees it and it cannot change which diagnostics a program produces -- it changes what " +
+		"upstream prints about them. A runner comparing diagnostics rather than reproducing snap's " +
+		"output format has nothing to do with it.",
+
+	"expectNothingCompiled": "an assertion made by upstream's test harness about its own output, not " +
+		"a compiler configuration. `packages/snap/src/compiler.ts:365` is the whole of its handling: " +
+		"it filters the log for `CompileSuccess` and `CompileError` events and fails the fixture if " +
+		"the presence of those events disagrees with the directive. It appears in neither " +
+		"`EnvironmentConfigSchema.shape` nor `Entrypoint/Options.ts`, so nothing in the compiler " +
+		"reads it and it cannot change which diagnostics a program produces. Two of the clean " +
+		"fixtures carry it. What it asserts -- that the compiler bailed out entirely rather than " +
+		"compiling anything -- is a claim about the pipeline's control flow that a rule-level runner " +
+		"has no events to check, so declining to model it loses nothing a diagnostic comparison " +
+		"would have caught.",
 
 	"compilationMode(infer)": "a spelling upstream cannot parse. `splitPragma` splits a value on `:` " +
 		"only, so `@compilationMode(infer)` yields the key `compilationMode(infer)`, which matches no " +
