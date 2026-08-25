@@ -31,6 +31,14 @@ type controlFlowTarget struct {
 	continueBlock BlockId
 	// hasContinue records that this loop entry owns a continue target.
 	hasContinue bool
+	// ownsBlock records whether this entry itself claimed the fallthrough, or found it already claimed by
+	// an enclosing construct.
+	//
+	// Upstream's `ownsBlock`, and `unschedule` reads it: a loop that did not claim the block must
+	// not release it, or the enclosing construct's break target disappears while that construct is
+	// still on the stack. It is meaningful for loops, which are the only entries that can find
+	// their fallthrough already claimed.
+	ownsBlock bool
 }
 
 // reactiveContext is the walk's state, upstream's `Context`.
@@ -108,7 +116,7 @@ func (c *reactiveContext) schedule(block BlockId, kind controlFlowKind) int {
 	id := c.nextScheduleId
 	c.nextScheduleId++
 	c.scheduled[block] = true
-	c.stack = append(c.stack, controlFlowTarget{block: block, id: id, kind: kind})
+	c.stack = append(c.stack, controlFlowTarget{block: block, id: id, kind: kind, ownsBlock: true})
 	return id
 }
 
@@ -128,11 +136,8 @@ func (c *reactiveContext) scheduleLoop(fallthrough_, continueBlock BlockId) int 
 		kind:          controlFlowLoop,
 		continueBlock: continueBlock,
 		hasContinue:   true,
+		ownsBlock:     ownsBlock,
 	})
-	if !ownsBlock {
-		// Marked so `unschedule` leaves the parent's claim intact.
-		c.stack[len(c.stack)-1].block = fallthrough_
-	}
 	return id
 }
 
@@ -141,7 +146,13 @@ func (c *reactiveContext) unschedule(scheduleId int) {
 	for len(c.stack) > 0 {
 		top := c.stack[len(c.stack)-1]
 		c.stack = c.stack[:len(c.stack)-1]
-		delete(c.scheduled, top.block)
+		// A loop that did not claim this block must not release it: the enclosing construct that
+		// did claim it is still on the stack and still needs it as a break target. Upstream's
+		// guard is `last.type !== 'loop' || last.ownsBlock !== null`, and dropping it is what
+		// makes a break to an outer construct stop matching part way through a nested loop.
+		if top.kind != controlFlowLoop || top.ownsBlock {
+			delete(c.scheduled, top.block)
+		}
 		if top.hasContinue {
 			delete(c.scheduled, top.continueBlock)
 		}
