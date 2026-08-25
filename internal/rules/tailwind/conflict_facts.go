@@ -342,10 +342,17 @@ func functionalRootIn(className string, system *tailwindengine.LoadedDesignSyste
 // hardcoding Tailwind's defaults would be wrong for it." It then hardcoded a generated set, which is
 // the same defect one step removed.
 //
-// The theme is asked first, so a repository's own palette is recognised wherever it defines one. The
-// generated set remains as the fallback, and that is the honest state of this seam rather than a
-// finished one: a repository that defines no `--color-*` of its own inherits Tailwind's, and this
-// still reads them from a table rather than from the theme it inherited them into.
+// The table is gone. A repository that defines no `--color-*` of its own still inherits Tailwind's,
+// and it inherits them into its theme, which is what this asks. Measured across both corpus systems
+// before deleting: 558 of the table's 561 names are answered by the live theme, the 3 that are not
+// are `current`, `inherit` and `transparent`, which are CSS keywords in no namespace and are what
+// `colorKeywords` already holds, and 0 of 561 were left uncovered by the two together.
+//
+// The other direction is why it had to go rather than merely could. www-connected-app's theme
+// declares `--color-brand`, `--color-brand-hover` and `--color-brand-active`, and the table knows
+// none of them, because it was generated from ahra. A generated palette is wrong for every
+// repository except the one it came from, which is the defect `KnownStatics` and
+// `StaticDeclaredProperties` were deleted for.
 func valueIsColorIn(base string, root string, system *tailwindengine.LoadedDesignSystem) bool {
 	if len(base) <= len(root) {
 		return false
@@ -370,5 +377,6 @@ func valueIsColorIn(base string, root string, system *tailwindengine.LoadedDesig
 		}
 	}
 
-	return tailwindengine.ColorNames[value]
+	// Tailwind's own colour keywords, which sit in no theme namespace and so cannot be asked for.
+	return tailwindengine.IsColorKeyword(value)
 }

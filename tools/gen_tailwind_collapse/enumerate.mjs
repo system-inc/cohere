@@ -1051,7 +1051,6 @@ process.stdout.write(
             rootSelectorShapes,
             rootColorProperties: rootValueProperties,
             classProperties,
-            colorNames: Array.from(colorNames).sort(),
             staticProperties,
         },
         null,

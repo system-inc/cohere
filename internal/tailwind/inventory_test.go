@@ -50,13 +50,6 @@ import (
 //	                              shorthand relationships between declared properties, so deriving
 //	                              it means carrying a shorthand table of equal size, one layer
 //	                              further from the question.
-//	ColorNames              561   whether a value names a colour. Upstream has no such table and
-//	                              resolves through `--color` at 39 sites; `valueIsColorIn` asks the
-//	                              live theme first and falls through to this. Its own comment says
-//	                              the fallback is a generated snapshot of one repository, which is
-//	                              the defect `KnownStatics` and `StaticDeclaredProperties` were
-//	                              deleted for. This is the next one to go and it needs the
-//	                              measurement first: whether an inherited theme answers all 561.
 //	RootSelectorShapes        8   the selector a root emits under when it is not a bare class.
 //	                              Upstream stores nothing and writes `:where(& > :not(:last-child))`
 //	                              inline in the handler bodies, which this port has now ported. So
@@ -106,7 +99,6 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	ours := map[string]int{
 		"baseDescriptors":    len(baseDescriptors),
 		"CollapseFamilies":   len(CollapseFamilies),
-		"ColorNames":         len(ColorNames),
 		"RootSelectorShapes": len(RootSelectorShapes),
 	}
 
@@ -125,8 +117,8 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	// The count of tables, not their contents. A fifth table of ours appearing without an entry in
 	// the doc comment above is the thing this catches: the inventory going stale is how a table ends
 	// up carried for no stated reason, which is what this package started with.
-	if len(ours) != 4 {
-		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 4, so "+
+	if len(ours) != 3 {
+		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 3, so "+
 			"one has been added or removed without its reason being written down", len(ours))
 	}
 

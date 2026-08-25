@@ -90,7 +90,6 @@ type enumeration struct {
 	PropertyOrder      []string            `json:"propertyOrder"`
 	SortOverrides      []string            `json:"sortOverrides"`
 	VariantOrder       []string            `json:"variantOrder"`
-	ColorNames         []string            `json:"colorNames"`
 
 	// VerifiedAgainst is the design systems CollapseFamilies was re-measured against on this run,
 	// filled in by the Go side rather than read from the enumeration. Rendered into the generated
@@ -581,18 +580,13 @@ var RootSelectorShapes = map[string]string{
 // Printing them after nothing read them left 1,236 dead entries in this file for two commits. If a
 // consumer ever needs either question again, ask the design system rather than reviving these.
 
-// ColorNames is every color value the design system defines.
+// ColorNames used to be printed here and is not any more.
 //
-// Needed because deciding whether a class value is a color requires the theme's palette, which is
-// the theme-dependent knowledge a Go-side table exists to carry. Hardcoding Tailwind's default
-// palette would be wrong for any project that customises it.
-var ColorNames = map[string]bool{
-`)
-	for _, name := range result.ColorNames {
-		fmt.Fprintf(&buffer, "\t%q: true,\n", name)
-	}
-
-	fmt.Fprintf(&buffer, `}
+// internal/rules/tailwind's valueIsColorIn asks the live theme's `+"`--color`"+` namespace, which is what
+// upstream does, with IsColorKeyword beside it for the three keywords that sit in no namespace.
+// Measured before the deletion: 558 of its 561 names answered by the theme and the other 3 by
+// colorKeywords, 0 uncovered, and the table knew nothing of the three colours www-connected-app
+// declares because it was generated from ahra.
 
 // TailwindVersion is the version these families were enumerated from.
 //

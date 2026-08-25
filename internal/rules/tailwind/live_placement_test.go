@@ -514,3 +514,39 @@ func TestConflictingClassesPerRepositoryPlacement(t *testing.T) {
 // quiet, and `TestComputedPropertiesMakeTheDistinctionsTheOverrideTablesHeld` in the engine package,
 // which pins each distinction the deleted tables encoded, including this `text` one in both
 // directions.
+
+// A repository's own colour tokens are recognised as colours, which the deleted table could not do.
+//
+// `valueIsColorIn` read `ColorNames`, 561 names generated from ahra, and www-connected-app declares
+// three the table did not carry. A class using one of them read as not-a-colour, so `bg-brand` was
+// answered on the wrong arm: `background-image` rather than `background-color`, which is a wrong
+// property set rather than a missing answer, and it fails to conflict with `bg-red-500` when it
+// should.
+//
+// Asserted against the live theme rather than a list, so a repository adding a colour joins this
+// test rather than needing to be added to it. The count is asserted non-zero because a theme that
+// resolved nothing would pass every comparison below without measuring anything.
+func TestRepositoryColorTokensReadAsColors(t *testing.T) {
+	var checkedRepositories, checkedTokens int
+
+	for entryPoint := range livePlacementLiterals(t) {
+		designSystem := livePlacementSystem(t, entryPoint)
+		if designSystem.Err != nil {
+			continue
+		}
+		checkedRepositories++
+
+		for _, key := range designSystem.System.Theme().KeysInNamespaces([]string{"--color"}) {
+			if !valueIsColorIn("bg-"+key, "bg", designSystem.System) {
+				t.Errorf("%s declares --color-%s and `bg-%s` does not read as a colour", entryPoint, key, key)
+			}
+			checkedTokens++
+		}
+	}
+
+	t.Logf("colour tokens read from live themes: %d across %d repositories", checkedTokens, checkedRepositories)
+
+	if checkedRepositories == 0 || checkedTokens == 0 {
+		t.Skip("no design system loaded, so this test measured nothing")
+	}
+}

@@ -467,3 +467,12 @@ func (table *Table) frameworkReading(candidate *ParsedCandidate) (Reading, bool)
 	}
 	return Reading{}, false
 }
+
+// IsColorKeyword reports whether a value is one of Tailwind's built-in colour keywords.
+//
+// `current`, `inherit` and `transparent` are literals in the colour path of `utilities.ts` rather
+// than entries in any theme namespace, so a caller asking the theme cannot reach them and needs this
+// beside it. Exported for `no-conflicting-classes`, which asks the live theme first and then here.
+func IsColorKeyword(value string) bool {
+	return colorKeywords[value]
+}
