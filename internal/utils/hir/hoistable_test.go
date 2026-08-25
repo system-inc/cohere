@@ -512,8 +512,18 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// [x.y.z], [x])` reads `x.y.z` only inside the callback, so the outer function saw the capture
 	// and recorded bare `x`. The walk recovers the path, and one root that swallowed a deep path
 	// becomes the deep path.
-	if deep != 589 || flat != 2088 {
-		t.Errorf("got %d deep and %d flat dependencies, want 589 and 2088; a SMALL move here is "+
+	// # And again when the analysis learned to descend into invoked callbacks
+	//
+	// 589 deep to 600, 2,088 flat to 2,087. Eleven dependencies that had truncated to a bare root
+	// now carry a path, which is the narrowing direction: a scope that invalidated on all of `x`
+	// now invalidates on the field the callback actually reads.
+	//
+	// The oracle is unmoved -- 76 matched of 88, ours 158 against upstream's 116, identical before
+	// and after -- so it cannot adjudicate this one either way. What it CAN say is that nothing was
+	// lost: `matched` did not fall and `ours` did not rise, so no dependency was dropped and none
+	// was invented. The eleven are on corpus files rather than on scored fixtures.
+	if deep != 600 || flat != 2087 {
+		t.Errorf("got %d deep and %d flat dependencies, want 600 and 2087; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

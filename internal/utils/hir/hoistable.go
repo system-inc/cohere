@@ -343,6 +343,7 @@ func (h *HoistableAnalysis) hoistableAt(block BlockId) []ReactiveScopeDependency
 func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges *MutableRanges,
 	identity ScopeIdentity, scopes *ReactiveScopes, registry *pathRegistry) map[BlockId]map[int]bool {
 	known := map[int]bool{}
+	invoked := CollectAssumedInvokedFunctions(function)
 
 	// # DIVERGENCE FROM React: the component test is a NAME here, not an inferred function type
 	//
@@ -385,6 +386,21 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 			if instruction == nil {
 				continue
 			}
+			if expression, isFunction := instruction.Value.(*FunctionExpression); isFunction {
+				// A callback that is assumed to run contributes what IT proves non-null, because
+				// the enclosing scope reaches those reads through the call. Upstream does the same
+				// at `CollectHoistablePropertyLoads.ts:432`, merging the inner analysis's
+				// `assumedNonNullObjects` into the outer block's.
+				//
+				// Gated on `CollectAssumedInvokedFunctions` rather than applied to every nested
+				// function: a read inside a callback that may never run is not safe to hoist out of
+				// it, and hoisting it would move a load to somewhere it can throw.
+				for _, path := range invokedNonNullPaths(function, expression, invoked,
+					ranges, identity, scopes, instruction.Order) {
+					assumed[registry.pathIndex(path)] = true
+				}
+				continue
+			}
 			path, ok := maybeNonNullInInstruction(instruction.Value, temporaries)
 			if !ok {
 				continue
@@ -398,6 +414,38 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 		blocks[block.Id] = assumed
 	}
 	return blocks
+}
+
+// isKnownImmutableParameter reports whether a value is a parameter of a component or a hook.
+//
+// Upstream's `knownImmutableIdentifiers`, and its comment states why the escape exists rather than
+// leaving it to the range analysis: "due to current limitations of mutable range inference, there
+// are edge cases in which we infer known-immutable values (e.g. props or hook params) to have a
+// mutable range and scope".
+//
+// Measured on `useMemo-infer-more-specific.ts`, which is the shape it exists for. `useHook(x)` reads
+// `x.y.z` inside a callback that `useMemo` invokes, and the invocation puts `x` inside a scope range
+// spanning the function expression -- so the range analysis calls a hook parameter mutable at the
+// call site, the descent into the callback is refused, and the dependency truncates to bare `x`
+// where upstream infers `x.y.z`. The identical `useCallback` fixture has no call and does not hit
+// this.
+//
+// The gate is the same one upstream applies: `fn.fnType === 'Component' || fn.fnType === 'Hook'`,
+// approximated here by name as `isLikelyComponentFunction` already does -- see the divergence note
+// at `collectNonNullsInBlocks` for why a name rather than an inferred function type.
+func isKnownImmutableParameter(function *Function, id IdentifierId) bool {
+	if function == nil || len(function.Params) == 0 {
+		return false
+	}
+	if !isLikelyComponentFunction(function) && !isHookName(function.Name) {
+		return false
+	}
+	for _, parameter := range function.Params {
+		if parameter.Identifier == id {
+			return true
+		}
+	}
+	return false
 }
 
 // isLikelyComponentFunction reports whether this function is one React would seed as a component.
@@ -458,6 +506,9 @@ func maybeNonNullInInstruction(value InstructionValue,
 // purpose despite having a non-empty range.
 func isImmutableAtInstruction(function *Function, id IdentifierId, order EvaluationOrder,
 	ranges *MutableRanges, identity ScopeIdentity, scopes *ReactiveScopes) bool {
+	if isKnownImmutableParameter(function, id) {
+		return true
+	}
 	memberRange := ranges.Get(id)
 	if memberRange.End <= memberRange.Start+1 {
 		return true
@@ -794,4 +845,74 @@ func hoistableTreeFor(paths []ReactiveScopeDependency) (map[IdentifierId]*hoista
 		}
 	}
 	return tree, conflicts
+}
+
+// invokedNonNullPaths returns what an invoked callback proves non-null, translated to the caller.
+//
+// The inner function names its captures in its own identifier space, so a path rooted at one of them
+// is meaningless outside. `Captures[i]` and `nested.Context[i]` name the same binding from the two
+// sides -- `lower.go:319`, measured across the corpus with zero mismatches -- so the translation is
+// a zip. A path rooted anywhere else is inner-local and is dropped rather than guessed at.
+func invokedNonNullPaths(parent *Function, expression *FunctionExpression,
+	invoked AssumedInvokedFunctions, ranges *MutableRanges,
+	identity ScopeIdentity, scopes *ReactiveScopes,
+	order EvaluationOrder) []ReactiveScopeDependency {
+	if !invoked[expression.Function] || int(expression.Function) >= len(parent.Functions) {
+		return nil
+	}
+	nested := parent.Functions[expression.Function]
+	if nested == nil || len(expression.Captures) != len(nested.Context) {
+		return nil
+	}
+	// The captures that are immutable AT THE CALL SITE, computed once. Upstream's
+	// `nestedFnImmutableContext`, and its comment gives the reason it is a set rather than a test
+	// repeated inside: "comparing instruction ids across inner-outer function bodies is not valid,
+	// as they are numbered [separately]". So the question is asked once, here, in the outer
+	// numbering, and inside the callback membership in this set IS the answer.
+	//
+	// Asked of the capture rather than of each path root, which is the same subject upstream uses:
+	// `innerFn.func.context.filter(place => isImmutableAtInstr(place.identifier, instr.id, ...))`.
+	translate := map[IdentifierId]Place{}
+	for index := range expression.Captures {
+		capture := expression.Captures[index]
+		if !isImmutableAtInstruction(parent, capture.Identifier, order, ranges, identity, scopes) {
+			continue
+		}
+		translate[nested.Context[index].Identifier] = capture
+	}
+	if len(translate) == 0 {
+		return nil
+	}
+
+	// The callback's own temporaries, so a path assembled across several loads inside it resolves
+	// to one access rather than to an anonymous intermediate.
+	nestedTemporaries := temporaries{}
+	collectTemporariesInto(nested, map[DeclarationId]bool{}, nestedTemporaries)
+
+	var paths []ReactiveScopeDependency
+	for _, block := range nested.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			instruction := nested.Instructions[instructionId]
+			if instruction == nil {
+				continue
+			}
+			path, ok := maybeNonNullInInstruction(instruction.Value, nestedTemporaries)
+			if !ok {
+				continue
+			}
+			outer, translatable := translate[path.Identifier]
+			if !translatable {
+				continue
+			}
+			paths = append(paths, ReactiveScopeDependency{
+				Identifier: outer.Identifier,
+				Reactive:   outer.Reactive,
+				Path:       path.Path,
+			})
+		}
+	}
+	return paths
 }
