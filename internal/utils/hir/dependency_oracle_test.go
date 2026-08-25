@@ -181,6 +181,26 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// `preserve-manual-memoization` checks it. Ten fixtures both over-produce here and false-positive
 	// in the rule's own score, which is what makes this the same defect seen from two ends rather
 	// than a second lane.
+	//
+	// # The two sides count different scope populations, and some of the 36 are that
+	//
+	// This scores `DependenciesOf` over every ASSIGNED scope. Upstream's cache slots are emitted
+	// after the whole prune chain, so they name only surviving scopes. Traced on
+	// `useCallback-nonescaping.js`: we produce three dependencies across three scopes, our pipeline
+	// prunes two of them exactly as upstream does, and the rule therefore sees the one dependency
+	// upstream emits. The extra two are real in this count and invisible to the rule.
+	//
+	// Restricting to survivors was measured rather than argued, and it is not simply better:
+	//
+	//	all assigned scopes                70 matched, 151 produced
+	//	minus scopes non-escaping dissolves 67 matched, 138 produced
+	//	minus every pruned scope            60 matched,  98 produced
+	//
+	// Ten matches lost to remove the over-production, and 22 fixtures flip to under-producing. So
+	// the pruned scopes carry real dependencies too and the population is not simply wrong.
+	//
+	// Read the 151 as "what collection produces", not as "what the rule sees". Which population
+	// upstream's slots correspond to is unsettled and is upstream of every count comparison here.
 	const knownUpstreamTotal = 115
 	const knownOursTotal = 151
 	if upstreamTotal != knownUpstreamTotal {
