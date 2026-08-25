@@ -10,7 +10,15 @@ Run it:
 
 ```
 node tools/gen_tailwind_descriptors/extract.mjs <theme.css> [--json <table.json>]
+                                                [--resolve-root <dir>] [--corpus-root <dir>]
 ```
+
+`<theme.css>`, the directory bare specifiers resolve from, and the tree scanned for a corpus are
+three questions with one answer for a repository stylesheet, which is why they were one input.
+`--resolve-root` borrows an install for a design system checked in outside any repository, the same
+split `gen_tailwind_collapse` took; `--corpus-root` names the tree to scan, because the derived one
+is four `dirname` calls up from the entry point and will happily climb into an unrelated directory.
+Both default to the old behaviour, so a repository invocation is unchanged.
 
 Ground truth is `compileAstNodes`, an **internal** Tailwind API that gives `{order, count}` directly.
 It is used because the question is diagnostic: `getClassOrder`, the public substitute, answers "did
@@ -20,11 +28,17 @@ end-to-end control, so a rename upstream is caught rather than silently changing
 ## The result
 
 Measured on Tailwind 4.3.3 against `~/Projects/ahra` and `~/Projects/connected/www-connected-app`.
-Both repos produce the same numbers and the **same exception set, class for class**.
+Both repos produce the same numbers and the **same exception set, class for class**, and that
+agreement is weaker evidence than it reads as: both vendor the Structure submodule and import its
+`global.css`, so the two stylesheets are byte-identical and the two systems contribute the same 35
+utility roots and 325 theme keys. Two design systems that cannot differ cannot detect a table that
+varies, which is the trap `a0f8635` documented for the invariance claims. The independent control
+is `gen_tailwind_descriptor_base/testdata/independent_theme.css`.
 
 | population | measured | agreed | exceptions |
 |---|---|---|---|
 | registry (`getClassList()`) | 37,643 / 37,795 | 37,625 / 37,777 | 18 |
+| — of which this repo's own | 35 roots, 325 theme keys | | |
 | corpus (classes the repo writes) | 1,233 / 971 | 1,233 / 970 | 0 / 1 |
 | modifier classes (sampled) | 40,110 / 40,325 | all | 0 |
 | arbitrary sweep (327 roots x 527 shapes) | 132,203 | 132,199 | 4 |
@@ -92,8 +106,33 @@ probes, all `<shadow-root>-[16/9]/[<arbitrary>]`, none of which any registry con
   that has never returned a positive has not been shown to be able to.
 - **Volume assertions.** Registry above 20,000, roots above 200, sweep above 100,000 probes,
   property order above 300 entries, corpus above 100 classes, planted control proven. Below any of
-  them the tool exits 4 and says the agreement numbers mean nothing. Verified to fire: run it against
-  a CSS file that imports nothing and it reports 3,487 classes and exits non-zero.
+  them the tool exits 4 and says the agreement numbers mean nothing.
+
+- **Own-contribution assertion**, because every floor above is cleared by bare Tailwind. This
+  README claimed a stylesheet importing nothing "reports 3,487 classes and exits non-zero". It does
+  not: `@import "tailwindcss" source(none);` reports **23,286 registry classes, 301 functional
+  roots and six figures of sweep probes**, and passed all six assertions. Tailwind registers its
+  built-in roots from JavaScript rather than from CSS, so the population is real and the volumes
+  are met while the `@utility` and `@theme` content that makes a design system per-repository is
+  entirely absent. The same defect was found independently in the candidate parser (`a219c8f`).
+
+  The check is the delta against a bare install built through the same borrowed engine: **35
+  utility roots and 325 theme keys** are ahra's own, and a system contributing zero of both is
+  refused by name. It is counted rather than named, because a hardcoded canary (`fade-in` on ahra,
+  `brand-hover` on connected) is the same baked-in assumption it exists to catch. The floor is 1,
+  since two roots is a real design system and a floor tuned to ahra's 35 would refuse one.
+
+  | design system | registry | own roots | own keys | exit |
+  |---|---|---|---|---|
+  | ahra / connected | 37,641 | 35 | 325 | 0 |
+  | `independent_theme.css` (borrowed install) | 23,391 | 2 | 4 | 0 |
+  | `@import "tailwindcss" source(none);` | 23,286 | 0 | 0 | **4** |
+  | real import that silently fails to resolve | 23,286 | 0 | 0 | **4** |
+
+  The last row is the one that matters: `loadStylesheet` swallows a missing `@import` and returns
+  empty content, so a broken graph produces a full-looking design system that met every volume
+  floor. Registry size cannot separate these — the fixture passes 105 classes *below* the bare
+  install that fails — so provenance is the only thing that does.
 - **Nulls reported, never scored.** A class returning no reading is not an agreement. The registry
   has none by construction, which is why the corpus is scanned separately: that is the population the
   documented figure came from, and it holds 11 of 1,244 on ahra (`group`, `text-dark-4/70`,

@@ -25,7 +25,7 @@
  *
  * Usage:
  *
- *   node tools/gen_tailwind_descriptor_table/context.mjs <theme.css> > context.json
+ *   node tools/gen_tailwind_descriptor_table/context.mjs <theme.css> [--resolve-root <dir>] > context.json
  */
 
 import NodeFileSystem from 'node:fs';
@@ -35,11 +35,23 @@ import { loadDesignSystem, parseCandidate, readingOf } from '../gen_tailwind_des
 
 const entryPointArgument = process.argv[2];
 if (!entryPointArgument) {
-    process.stderr.write('usage: context.mjs <theme.css>\n');
+    process.stderr.write('usage: context.mjs <theme.css> [--resolve-root <dir>]\n');
     process.exit(2);
 }
 
-const { designSystem, tailwindVersion, entryPoint } = await loadDesignSystem(entryPointArgument);
+/*
+ * `--resolve-root` separates where the CSS lives from where bare specifiers resolve, matching
+ * `extract.mjs`. The two tools are a pair generated from one stylesheet and consumed together, so a
+ * design system only one of them could open would be half-generable, which is what
+ * `testdata/independent_theme.css` was.
+ */
+const resolveRootFlagIndex = process.argv.indexOf('--resolve-root');
+const resolveRootArgument = resolveRootFlagIndex >= 0 ? process.argv[resolveRootFlagIndex + 1] : null;
+
+const { designSystem, tailwindVersion, entryPoint, resolveRoot } = await loadDesignSystem(
+    entryPointArgument,
+    resolveRootArgument,
+);
 
 /*
  * The namespaces, confirmed against the design system's own membership test.
@@ -84,8 +96,8 @@ const propertyOrder = [];
 {
     let bundleSource = '';
     try {
-        const requireFromEntry = NodeModule.createRequire(NodePath.join(NodePath.dirname(entryPoint), 'noop.js'));
-        const tailwindRoot = NodePath.dirname(requireFromEntry.resolve('tailwindcss/package.json'));
+        const requireFromResolveRoot = NodeModule.createRequire(NodePath.join(resolveRoot, 'noop.js'));
+        const tailwindRoot = NodePath.dirname(requireFromResolveRoot.resolve('tailwindcss/package.json'));
         bundleSource = NodeFileSystem.readFileSync(NodePath.join(tailwindRoot, 'dist', 'lib.mjs'), 'utf8');
     }
     catch {

@@ -15,12 +15,22 @@
  *
  * Generate the pair this command consumes with:
  *
- *   node tools/gen_tailwind_descriptors/extract.mjs <this file> --json independent.json
- *   node tools/gen_tailwind_descriptor_table/context.mjs <this file> > independent-context.json
+ *   node tools/gen_tailwind_descriptors/extract.mjs <this file> \
+ *       --resolve-root <any repo with tailwindcss> \
+ *       --corpus-root <that repo's source tree> --json independent.json
+ *   node tools/gen_tailwind_descriptor_table/context.mjs <this file> \
+ *       --resolve-root <any repo with tailwindcss> > independent-context.json
  *
- * The extractor exits 4 on this file and that is expected: its corpus-volume assertion scans for
- * classes a repository writes and there is no repository here. The table it writes is complete, and
- * the assertions that matter — 23,391 registry classes, the planted dirty descriptor proven — pass.
+ * Both flags borrow rather than vendor, for the reason spelled out below. The extractor exits 0 on
+ * this file: 23,391 registry classes, the planted dirty descriptor proven, and 2 `@utility` roots
+ * and 4 `@theme` keys of its own, which is what its own-contribution assertion reads. Two roots is
+ * a real design system and the assertion says so; the floor is provenance rather than volume,
+ * because a floor tuned to a corpus repository's 35 would refuse this file.
+ *
+ * The `--corpus-root` is a repository's source tree and the CSS is this file, which is the honest
+ * pairing available: there is no corpus written against these tokens, and the corpus scan only
+ * feeds the separately-reported null count, never the agreement columns. Omitting it makes the
+ * extractor climb four directories from this file into `tools/` and scan whatever is there.
  *
  * # Resolving `tailwindcss` from a file with no `node_modules` above it
  *

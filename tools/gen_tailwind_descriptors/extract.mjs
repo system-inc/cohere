@@ -40,18 +40,44 @@
 import * as NodeFileSystem from 'node:fs';
 import * as NodeModule from 'node:module';
 import * as NodePath from 'node:path';
-import { loadDesignSystem, parseCandidate, readingKey, readingOf } from './loader.mjs';
+import { loadDesignSystem, parseCandidate, readingKey, readingOf, surveyOwnContributions } from './loader.mjs';
 import { DataTypeNames, probeClassName, Shapes } from './shapes.mjs';
 
 const [, , entryPointArgument, ...restArguments] = process.argv;
 if (!entryPointArgument) {
-    process.stderr.write('usage: extract.mjs <theme.css> [--json <path>]\n');
+    process.stderr.write(
+        'usage: extract.mjs <theme.css> [--json <path>] [--resolve-root <dir>] [--corpus-root <dir>]\n',
+    );
     process.exit(2);
 }
-const jsonFlagIndex = restArguments.indexOf('--json');
-const jsonOutputPath = jsonFlagIndex >= 0 ? restArguments[jsonFlagIndex + 1] : null;
+function flagValue(name) {
+    const index = restArguments.indexOf(name);
+    return index >= 0 ? restArguments[index + 1] : null;
+}
+const jsonOutputPath = flagValue('--json');
 
-const { designSystem, tailwindVersion, entryPoint, inferDataType } = await loadDesignSystem(entryPointArgument);
+/*
+ * The CSS entry point, the directory bare specifiers resolve from, and the tree scanned for a
+ * corpus are three questions. For a repository stylesheet they collapse to one answer, which is why
+ * they were one input and why the collapse stayed invisible.
+ *
+ * `--resolve-root` is the same split `gen_tailwind_collapse` took in a0f8635, for the same reason:
+ * a design system written to share no `@theme` with any repository has no `node_modules` above it,
+ * so the file best able to show this tool describing bare Tailwind was the file it could not open.
+ *
+ * `--corpus-root` is separate because the derived one is four `dirname` calls up from the entry
+ * point, which is right for a repository and arbitrary anywhere else. Pointed at a scratch file it
+ * climbed into an unrelated tree and scanned 28,219 class occurrences that had nothing to do with
+ * the design system under test, clearing the `>= 100` floor on somebody else's files. A scan that
+ * cannot find a corpus should report zero, not borrow one.
+ */
+const resolveRootArgument = flagValue('--resolve-root');
+const corpusRootArgument = flagValue('--corpus-root');
+
+const { designSystem, tailwindVersion, entryPoint, resolveRoot, inferDataType } = await loadDesignSystem(
+    entryPointArgument,
+    resolveRootArgument,
+);
 
 if (typeof inferDataType !== 'function') {
     process.stderr.write(
@@ -184,8 +210,8 @@ const propertyOrder = [];
 {
     let bundleSource = '';
     try {
-        const requireFromEntry = NodeModule.createRequire(NodePath.join(NodePath.dirname(entryPoint), 'noop.js'));
-        const tailwindRoot = NodePath.dirname(requireFromEntry.resolve('tailwindcss/package.json'));
+        const requireFromResolveRoot = NodeModule.createRequire(NodePath.join(resolveRoot, 'noop.js'));
+        const tailwindRoot = NodePath.dirname(requireFromResolveRoot.resolve('tailwindcss/package.json'));
         bundleSource = NodeFileSystem.readFileSync(NodePath.join(tailwindRoot, 'dist', 'lib.mjs'), 'utf8');
     }
     catch {
@@ -995,7 +1021,9 @@ for (const root of roots) {
  */
 const corpusResult = { scanned: 0, distinct: 0, measured: 0, agreed: 0, nullReading: 0, disagreed: [], nullExamples: [] };
 {
-    const corpusRoot = NodePath.dirname(NodePath.dirname(NodePath.dirname(NodePath.dirname(entryPoint))));
+    const corpusRoot = corpusRootArgument
+        ? NodePath.resolve(corpusRootArgument)
+        : NodePath.dirname(NodePath.dirname(NodePath.dirname(NodePath.dirname(entryPoint))));
     const distinctClasses = new Set();
 
     function scanDirectory(directory, depth) {
@@ -1272,6 +1300,15 @@ for (const entry of [...registryResult.disagreed, ...sweepResult.disagreed]) {
     disagreeingRoots.set(entry.root, list);
 }
 
+/*
+ * What this design system contributes over a bare Tailwind install.
+ *
+ * Reported next to the volumes rather than instead of them, so a reader sees "37,641 registry, of
+ * which 35 utility roots and 325 theme keys are this repository's" instead of a number that cannot
+ * distinguish a repository from the framework it imports.
+ */
+const ownContributions = await surveyOwnContributions(designSystem, resolveRoot);
+
 const report = {
     tailwindVersion,
     entryPoint,
@@ -1281,7 +1318,11 @@ const report = {
         functionalRoots: roots.length,
         staticUtilities: staticNames.size,
         shapes: Shapes.length,
+        ownUtilityRoots: ownContributions.ownUtilityRootCount,
+        ownThemeKeys: ownContributions.ownThemeKeyCount,
+        baselineRegistryClasses: ownContributions.baselineRegistryClasses,
     },
+    ownContributions,
     registry: {
         measured: registryResult.measured,
         agreed: registryResult.agreed,
@@ -1361,6 +1402,36 @@ if (report.corpus.distinctClasses < 100) {
 }
 if (!report.controls.plantedDirty.proven) {
     assertionFailures.push('the planted-dirty control did not flag every probe, so this harness has not been shown to be able to fail.');
+}
+
+/*
+ * The design system is this repository's, and not bare Tailwind wearing its name.
+ *
+ * Every floor above is cleared by a stylesheet containing nothing but `@import "tailwindcss"`,
+ * because Tailwind registers its built-in roots from JavaScript rather than from CSS: 23,286
+ * registry classes, 301 functional roots, six figures of sweep probes, a full property order and a
+ * proven planted control. That run was measured, and it passed. What it lacks is the `@utility` and
+ * `@theme` content that makes a design system per-repository at all, which is precisely what the
+ * table generated from it would claim to describe.
+ *
+ * This is the same defect a219c8f found in the candidate parser's own volume assertion, and it is
+ * the bug this whole port exists to fix pointing the other way: a table describing one repository
+ * while claiming to describe Tailwind, and a generator describing bare Tailwind while claiming to
+ * describe a repository, are one error with two signs. Both look completely clean in the summary.
+ *
+ * Counted, not named. The floors are 1 because the honest claim is "this system contributes
+ * something of its own", and any number above that is a fact about one repository rather than about
+ * repositories: ahra contributes 35 roots and 325 theme keys, the independent fixture contributes 2
+ * and 4, and both are legitimate design systems. A floor tuned to ahra would refuse the fixture.
+ */
+if (report.ownContributions.ownUtilityRootCount < 1 && report.ownContributions.ownThemeKeyCount < 1) {
+    assertionFailures.push(
+        'this design system registers nothing a bare Tailwind install does not: ' +
+            report.population.registryClasses + ' registry classes against a baseline of ' +
+            report.ownContributions.baselineRegistryClasses + ', 0 own @utility roots and 0 own @theme keys. ' +
+            'The entry point loaded, and its @import graph reached no repository stylesheet, so this table ' +
+            'describes the framework while claiming to describe a repository.',
+    );
 }
 report.assertions = { passed: assertionFailures.length === 0, failures: assertionFailures };
 

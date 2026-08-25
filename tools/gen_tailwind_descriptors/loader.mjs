@@ -37,11 +37,17 @@ function resolveModuleUrl(specifier, directory) {
     return NodeUrl.pathToFileURL(resolvedPath).href;
 }
 
-function resolveStylesheet(specifier, directory) {
+/*
+ * A relative `@import` resolves against the importing file, and a bare one against the resolve
+ * root. Keeping those two separate is what lets a design system live outside the tree that
+ * installed Tailwind: `./tokens.css` still means the file beside it, while `tailwindcss` means the
+ * package the caller named.
+ */
+function resolveStylesheet(specifier, directory, resolveRoot) {
     if (specifier.startsWith('.') || NodePath.isAbsolute(specifier)) {
         return NodePath.resolve(directory, specifier);
     }
-    const requireFromDirectory = NodeModule.createRequire(NodePath.join(directory, 'noop.js'));
+    const requireFromDirectory = NodeModule.createRequire(NodePath.join(resolveRoot, 'noop.js'));
     if (specifier.endsWith('.css')) return requireFromDirectory.resolve(specifier);
 
     const packageJsonPath = requireFromDirectory.resolve(specifier + '/package.json');
@@ -102,19 +108,52 @@ async function loadInferDataType(tailwindModuleUrl) {
     return null;
 }
 
-export async function loadDesignSystem(entryPointArgument) {
+/*
+ * `resolveRootArgument` is where bare specifiers resolve from, which is a different question from
+ * where the CSS lives. For a repository they have the same answer: its stylesheet sits inside the
+ * tree that installed Tailwind, so anchoring resolution on the entry point's own directory worked
+ * and the distinction stayed invisible.
+ *
+ * It stops working for exactly the file that matters most. A design system written to share no
+ * `@theme` with any repository is checked in under `tools/` with no `node_modules` above it, so
+ * `@import 'tailwindcss'` cannot resolve and the file is ungenerable, which is the state
+ * `testdata/independent_theme.css` was in: the only stylesheet capable of showing this tool
+ * describing bare Tailwind was the one stylesheet this tool could not read.
+ *
+ * The install is borrowed rather than vendored, matching `gen_tailwind_collapse`. A second Tailwind
+ * checked in beside a probe theme would be a version to keep in step, and nothing of the lending
+ * repository's design system reaches the probe, because only the CSS named as the entry point is
+ * loaded.
+ *
+ * Defaults to the entry point's directory, so every repository invocation is unchanged.
+ */
+export async function loadDesignSystem(entryPointArgument, resolveRootArgument, entrySourceOverride) {
     const entryPointPath = NodePath.resolve(entryPointArgument);
     const entryDirectory = NodePath.dirname(entryPointPath);
-    const tailwindModuleUrl = resolveModuleUrl('tailwindcss', entryDirectory);
+    const resolveRoot = NodePath.resolve(resolveRootArgument ?? entryDirectory);
+    const tailwindModuleUrl = resolveModuleUrl('tailwindcss', resolveRoot);
     const tailwindModule = await import(tailwindModuleUrl);
 
+    /*
+     * `entrySourceOverride` supplies the entry stylesheet inline instead of reading it. The bare
+     * baseline in `surveyOwnContributions` is one literal `@import`, and writing it to disk to read
+     * it straight back would leave a file in a repository this tool is only borrowing an install
+     * from. Its path is still notional so `base` anchors correctly.
+     */
     const designSystem = await tailwindModule.__unstable__loadDesignSystem(
-        NodeFileSystem.readFileSync(entryPointPath, 'utf8'),
+        entrySourceOverride ?? NodeFileSystem.readFileSync(entryPointPath, 'utf8'),
         {
             base: entryDirectory,
             loadModule: async function (specifier, base, resourceType) {
                 try {
-                    const requireFromBase = NodeModule.createRequire(NodePath.join(base, 'noop.js'));
+                    /*
+                     * A relative `@plugin` is resolved against the importing file, as before; a bare
+                     * one falls back to the resolve root, so a borrowed install can supply it. No
+                     * stylesheet in the corpus uses `@plugin` or `@config`, so this path is
+                     * currently unexercised and the fallback is the only behaviour that changes.
+                     */
+                    const moduleBase = specifier.startsWith('.') || NodePath.isAbsolute(specifier) ? base : resolveRoot;
+                    const requireFromBase = NodeModule.createRequire(NodePath.join(moduleBase, 'noop.js'));
                     const resolved = requireFromBase.resolve(specifier);
                     const loaded = await import(NodeUrl.pathToFileURL(resolved).href);
                     return { base: NodePath.dirname(resolved), module: loaded.default ?? loaded };
@@ -125,7 +164,7 @@ export async function loadDesignSystem(entryPointArgument) {
             },
             loadStylesheet: async function (specifier, base) {
                 try {
-                    const resolved = resolveStylesheet(specifier, base);
+                    const resolved = resolveStylesheet(specifier, base, resolveRoot);
                     return { base: NodePath.dirname(resolved), content: NodeFileSystem.readFileSync(resolved, 'utf8') };
                 }
                 catch {
@@ -135,16 +174,76 @@ export async function loadDesignSystem(entryPointArgument) {
         },
     );
 
-    const requireFromEntry = NodeModule.createRequire(NodePath.join(entryDirectory, 'noop.js'));
+    const requireFromResolveRoot = NodeModule.createRequire(NodePath.join(resolveRoot, 'noop.js'));
     const tailwindVersion = JSON.parse(
-        NodeFileSystem.readFileSync(requireFromEntry.resolve('tailwindcss/package.json'), 'utf8'),
+        NodeFileSystem.readFileSync(requireFromResolveRoot.resolve('tailwindcss/package.json'), 'utf8'),
     ).version;
 
     return {
         designSystem,
         tailwindVersion,
         entryPoint: entryPointPath,
+        resolveRoot,
         inferDataType: await loadInferDataType(tailwindModuleUrl),
+    };
+}
+
+/*
+ * What this design system registers that a bare Tailwind install does not.
+ *
+ * The volume assertions cannot answer this on their own, and that is the gap they were found to
+ * have. Tailwind registers its built-in utility roots from JavaScript rather than from CSS, so a
+ * stylesheet importing nothing but the framework still produces 23,286 registry classes, 1,154
+ * utility roots and 419 theme keys, and every floor written to catch a loader that returned an
+ * empty system is cleared comfortably. Measured, not assumed: `@import "tailwindcss" source(none);`
+ * passed all six assertions before this existed.
+ *
+ * The delta is what discriminates, and it is counted rather than named. A hardcoded canary
+ * (`fade-in` exists on ahra, `brand-hover` on connected) is the same baked-in assumption the check
+ * is meant to catch, one repository's tokens standing in for a claim about any repository: it
+ * cannot travel, and it goes quiet the day someone renames the utility. Comparing against a live
+ * bare install asks the question directly, in whatever repository it runs, and needs no maintenance
+ * when the framework's own population moves.
+ *
+ * The baseline is built through the same borrowed install as the system under test, so the two
+ * populations come from one engine. Differencing against a different Tailwind version would
+ * attribute that version's own additions to the repository, which is the error this is here to
+ * prevent, pointing the other way.
+ */
+export async function surveyOwnContributions(designSystem, resolveRoot) {
+    const baseline = await loadDesignSystem(
+        NodePath.join(resolveRoot, '__bare_tailwind_probe__.css'),
+        resolveRoot,
+        '@import "tailwindcss" source(none);',
+    );
+
+    function rootsOf(system) {
+        const roots = new Set();
+        for (const entry of system.getClassList()) {
+            const candidate = parseCandidate(system, entry[0]);
+            if (candidate?.root) roots.add(candidate.root);
+        }
+        return roots;
+    }
+
+    function themeKeysOf(system) {
+        return new Set(Array.from(system.theme.entries(), ([key]) => key));
+    }
+
+    const baselineRoots = rootsOf(baseline.designSystem);
+    const baselineThemeKeys = themeKeysOf(baseline.designSystem);
+    const ownRoots = Array.from(rootsOf(designSystem)).filter((root) => !baselineRoots.has(root)).sort();
+    const ownThemeKeys = Array.from(themeKeysOf(designSystem)).filter((key) => !baselineThemeKeys.has(key)).sort();
+
+    return {
+        baselineTailwindVersion: baseline.tailwindVersion,
+        baselineRegistryClasses: baseline.designSystem.getClassList().length,
+        baselineUtilityRoots: baselineRoots.size,
+        baselineThemeKeys: baselineThemeKeys.size,
+        ownUtilityRootCount: ownRoots.length,
+        ownThemeKeyCount: ownThemeKeys.length,
+        ownUtilityRoots: ownRoots,
+        ownThemeKeys: ownThemeKeys,
     };
 }
 
