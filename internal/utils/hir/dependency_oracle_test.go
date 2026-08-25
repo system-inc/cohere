@@ -208,6 +208,12 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// comparison. Nothing about collection changed, and the seven recovered were verified one by one
 	// as the same path upstream printed with guards.
 	//
+	// Raised from 76 by not reading the memo marker's own operands as dependencies of the enclosing
+	// scope; see the `StartMemoize` arm in `dependencies.go` for why that is a divergence and what
+	// justifies it. The two recovered are `data.a` in `useMemo-inner-decl.ts` and `propA.x` in
+	// `useMemo-alias-property-load-dep.ts`, both of which upstream names in its own compiled output.
+	// A per-golden dump before and after differs by exactly those two rows out of 116.
+	//
 	// Raised from 68 by descending into nested functions. The recovered dependency is `x.y.z` in
 	// `useCallback-infer-more-specific.ts`, read only inside the callback, where we previously
 	// recorded the bare root `x` that the capture already supplied.
@@ -215,7 +221,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// Confirmed the way this test's ceiling demands rather than by watching the number rise: a
 	// per-golden dump before and after differs by exactly one row, `MISS x.y.z` becoming `hit`, out
 	// of 116. Nothing was traded and no golden was read differently.
-	const knownMatched = 76
+	const knownMatched = 78
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
@@ -231,7 +237,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	//
 	// So a rise is asserted as loudly as a fall. Raise this deliberately, alongside the floor, when
 	// collection genuinely improves.
-	const knownMatchedCeiling = 76
+	const knownMatchedCeiling = 78
 	if matched > knownMatchedCeiling {
 		t.Errorf("matched %d of %d golden dependencies, UP from %d, which this test treats as "+
 			"suspect rather than good: the usual cause is the pattern above reading upstream's "+

@@ -1278,6 +1278,40 @@ func (c *dependencyCollector) handleInstruction(instruction *Instruction) {
 		// The recursion REPLACES the bare capture visit: `EachPlace` would record each capture as
 		// a rootless access, and that bare root prunes away every deeper path in the same subtree.
 		c.visitNestedFunction(value.Function, value.Captures)
+	case *StartMemoize:
+		// The marker's operands are the dependencies the developer WROTE, and reading them as
+		// dependencies of the enclosing scope is what makes writing `[x]` change what we infer.
+		//
+		// `EachPlace` visits `dep.Root.Place` for every entry (`visitor.go:175`), so
+		// `useMemo(() => [x.y.z], [x])` visits bare `x` here. That bare access marks the dependency
+		// tree's ROOT, and `collectMinimalInSubtree` then prunes every deeper path beneath a node
+		// already marked -- correct pruning, given the root is there. The result is that the
+		// developer's own dependency array determines the inference it is supposed to be checked
+		// against, and the rule reports a disagreement it manufactured.
+		//
+		// # This is a divergence, and the reason it is taken rather than ported
+		//
+		// Upstream visits these places. `eachInstructionValueOperand` yields `dep.root.value` for
+		// every `NamedLocal` (`visitors.ts:260`), their `handleInstruction` has no `StartMemoize`
+		// arm so it reaches the same default operand loop, and the markers survive as far as
+		// codegen. So the arm below is not a transcription of anything.
+		//
+		// What justifies it is upstream's own compiled output on the fixtures it moves. Measured,
+		// two goldens go from miss to hit and nothing is traded:
+		//
+		//	useMemo-inner-decl.ts             upstream `$[0] !== data.a`   ours data.a
+		//	useMemo-alias-property-load-dep.ts upstream `$[0] !== propA.x` ours propA.x
+		//
+		// The oracle moves 76 to 78 of 88 with `ours` unchanged at 158 and scope under-production
+		// unchanged at 5 fixtures. A per-golden dump before and after differs by exactly those two
+		// rows.
+		//
+		// Why upstream does not need it is not established. Their marker sits in the same place
+		// ours does -- after the callee load, `DropManualMemoization.ts:499` -- and their
+		// `checkValidDependency` is this file's line for line. Something downstream of collection
+		// resolves the bare root for them, and until that is found this arm is the measured answer
+		// rather than the understood one.
+		_ = value
 	case *PropertyLoad:
 		c.visitDependency(c.temporaries.getProperty(value.Object, value.Property, value.Optional))
 	case *StoreLocal:

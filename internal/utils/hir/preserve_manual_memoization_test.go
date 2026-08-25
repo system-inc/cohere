@@ -182,16 +182,25 @@ func TestInferredDependencyComparisonIsBuiltAndGatedOnTruncation(t *testing.T) {
 			"the fixture stopped exercising the collector rather than the collector being correct")
 	}
 
-	// The finding this test exists to hold: the source writes `propA.x` and `propB.x.y`, and the
-	// inferred side carries bare roots. `DependencyGapNullPropagation` is why.
-	if withPath != 0 {
-		t.Errorf("%d inferred dependencies carry a path, want 0 on this fixture; if the hoistable "+
-			"analysis landed, the comparison should be turned on at the pipeline and these bounds "+
-			"re-measured", withPath)
-	}
-	if withoutPath == 0 {
-		t.Errorf("no inferred dependency was truncated, which contradicts the measured corpus " +
-			"state of 171 with a path against 1,435 without")
+	// # What this test held, and what it holds now
+	//
+	// It was written when the source wrote `propA.x` and `propB.x.y` and the inferred side carried
+	// only bare roots, and its own message said to re-measure "if the hoistable analysis landed".
+	// It has: `CollectHoistablePropertyLoads` populates the tree, the collector descends into
+	// nested functions and into callbacks assumed to be invoked, and the memo marker's own operands
+	// are no longer read as dependencies of the enclosing scope.
+	//
+	// On this fixture that is now 2 with a path and 0 truncated, and `propA.x` is one of the two
+	// goldens the marker change recovered -- upstream's compiled output for it is
+	// `$[0] !== propA.x || $[1] !== x`, so the deep path is the right answer rather than a
+	// regression.
+	//
+	// The floor is what the assertion became. A drop back to zero would mean truncation returned,
+	// which is the state this test was built to make visible.
+	if withPath == 0 {
+		t.Error("no inferred dependency carries a path on a fixture that writes `propA.x` and " +
+			"`propB.x.y`; path depth was recovered here and losing it again is the regression " +
+			"this test exists to catch")
 	}
 
 	// The comparison runs and disagrees, which is the correct answer for a truncated input and is
