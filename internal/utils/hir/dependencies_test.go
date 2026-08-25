@@ -533,3 +533,97 @@ func TestDependencyDistributionIsReal(t *testing.T) {
 	t.Logf("%d scopes: %d with dependencies, %d without, %d dependencies total",
 		scopes, withDependencies, withoutDependencies, totalDependencies)
 }
+
+// TestDeclarationOriginDiffersFromHoldingScope is why the origin is recorded at all.
+//
+// `declarations` writes a value into every enclosing scope on its stack, so the map key names a
+// scope that HOLDS a declaration rather than the one that produced it. If those never differed the
+// origin table would be pure overhead and `hasOwnDeclaration` -- the predicate `pruneUnusedScopes`
+// uses to prune a scope whose declarations all bubbled up -- would be answerable from the key alone.
+//
+// They differ: measured over 200 corpus files, 28 of 2,178 declarations are held by a scope other
+// than the one that produced them. Asserted as a nonzero rather than as 28, because the corpus moves
+// and the property that matters is that the two are not the same question.
+func TestDeclarationOriginDiffersFromHoldingScope(t *testing.T) {
+	total, known, differing := 0, 0, 0
+
+	forEachCorpusFunction(t, 200, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
+		identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
+		BuildReactiveScopeTerminals(function, scopes, identity)
+		dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
+		if dependencies == nil {
+			return
+		}
+		for _, scope := range dependencies.Ids() {
+			for _, declared := range dependencies.DeclarationsOf(scope) {
+				total++
+				origin, found := dependencies.OriginOf(declared)
+				if !found {
+					continue
+				}
+				known++
+				if origin != scope {
+					differing++
+				}
+			}
+		}
+	})
+
+	if total == 0 {
+		t.Fatal("no declarations were collected, so every assertion below is vacuous")
+	}
+	if known != total {
+		t.Errorf("%d of %d declarations have no recorded origin; `hasOwnDeclaration` cannot be "+
+			"asked about those and a scope holding one would be judged on missing information",
+			total-known, total)
+	}
+	if differing == 0 {
+		t.Errorf("no declaration is held by a scope other than its origin across %d declarations; "+
+			"if that is now always true the origin table is redundant and the key answers it",
+			total)
+	}
+
+	// # The assertion that actually discriminates, found because three mutants survived the one above
+	//
+	// "Some origins differ from their holding scope" is satisfied by several wrong implementations.
+	// Recording the holding scope as the origin still produces differences, because a value held by
+	// two scopes gets the first one written and differs for the second. Recording the outermost
+	// stack entry instead of the innermost produces differences too, just more of them.
+	//
+	// The property that separates them is nesting: a value's origin must be the innermost scope
+	// that held it, so for every scope holding a declaration, the recorded origin's range must be
+	// contained within -- or equal to -- that scope's range. An origin naming an enclosing scope is
+	// the outermost-entry bug; an origin naming an unrelated scope is the holding-scope bug.
+	containmentViolations := 0
+	forEachCorpusFunction(t, 200, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
+		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
+		identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
+		BuildReactiveScopeTerminals(function, scopes, identity)
+		dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
+		if dependencies == nil {
+			return
+		}
+		for _, scope := range dependencies.Ids() {
+			holding := identity.RangeOf(scope)
+			for _, declared := range dependencies.DeclarationsOf(scope) {
+				origin, found := dependencies.OriginOf(declared)
+				if !found || origin == scope {
+					continue
+				}
+				originRange := identity.RangeOf(origin)
+				if originRange.Start < holding.Start || originRange.End > holding.End {
+					containmentViolations++
+				}
+			}
+		}
+	})
+	if containmentViolations != 0 {
+		t.Errorf("%d declaration(s) name an origin whose range is not contained in the scope "+
+			"holding them; an origin must be the innermost scope that held the value, so an "+
+			"enclosing or unrelated scope is a recording bug", containmentViolations)
+	}
+
+	t.Logf("declarations=%d withKnownOrigin=%d originDiffersFromHoldingScope=%d containmentViolations=%d",
+		total, known, differing, containmentViolations)
+}

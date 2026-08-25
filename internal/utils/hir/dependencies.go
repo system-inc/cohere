@@ -208,10 +208,24 @@ func DependencyGaps() []DependencyGap {
 // A side table for the reason `ReactiveScopes` is one: the scope lives in a table rather than on the
 // identifier, so its outputs live beside it. The zero value is empty and ready to read.
 type ScopeDependencies struct {
-	dependencies  map[ScopeId][]ReactiveScopeDependency
-	declarations  map[ScopeId][]IdentifierId
-	reassignments map[ScopeId][]IdentifierId
-	order         []ScopeId
+	dependencies map[ScopeId][]ReactiveScopeDependency
+	declarations map[ScopeId][]IdentifierId
+	// declarationOrigin names the scope a declared value actually originated in.
+	//
+	// `declarations` records a value into every enclosing scope on its stack, which is upstream's
+	// behaviour and is what lets an outer scope see a value produced within it. The key therefore
+	// says which scope holds the declaration, not which one produced it, and those differ whenever
+	// a value bubbles up.
+	//
+	// Upstream keeps the origin in the map's value: `scope.declarations.set(id, {identifier, scope:
+	// originalDeclaration.scope.value})`. This table dropped it on the reasoning that "the scope is
+	// the map key, so the pair would store it twice" -- which is true for the key and false for the
+	// origin. `pruneUnusedScopes` is the pass that needs the difference: its `hasOwnDeclaration`
+	// prunes a scope whose declarations all bubbled up from inner ones, and without the origin that
+	// question cannot be asked at all.
+	declarationOrigin map[IdentifierId]ScopeId
+	reassignments     map[ScopeId][]IdentifierId
+	order             []ScopeId
 	// conflicts counts hoistable entries that disagreed about an access type. Upstream raises an
 	// invariant on these; see `hoistableTreeFor`. Measured at zero on the corpus.
 	conflicts int
@@ -236,6 +250,19 @@ func (d *ScopeDependencies) DeclarationsOf(scope ScopeId) []IdentifierId {
 		return nil
 	}
 	return d.declarations[scope]
+}
+
+// OriginOf returns the scope a declared value was produced in, and whether it is known.
+//
+// Distinct from the key of `DeclarationsOf`, which names a scope that holds the declaration and may
+// be an enclosing one. `pruneUnusedScopes` prunes a scope whose declarations all came from within
+// it, and that is the only question this answers.
+func (d *ScopeDependencies) OriginOf(identifier IdentifierId) (ScopeId, bool) {
+	if d == nil || d.declarationOrigin == nil {
+		return 0, false
+	}
+	origin, found := d.declarationOrigin[identifier]
+	return origin, found
 }
 
 // ReassignmentsOf returns the bindings a scope reassigns.
@@ -843,6 +870,20 @@ func (c *dependencyCollector) visitDependency(dep ReactiveScopeDependency) {
 				c.result.declarations[declaringScope] =
 					append(c.result.declarations[declaringScope], dep.Identifier)
 			}
+			// The origin is the innermost scope on the stack recorded at declaration time, which is
+			// the last entry: the stack is pushed outermost-first as scopes open.
+			//
+			// Written unconditionally rather than first-writer-wins. A guard was there and a
+			// mutation removing it changed nothing, which is correct: `original.scopeStack` is
+			// fixed per identifier, so every enclosing scope in this loop writes the same value.
+			// The guard read as protection against a later scope overwriting the origin with
+			// itself, and that cannot happen because the value written does not depend on
+			// `declaringScope` at all.
+			if c.result.declarationOrigin == nil {
+				c.result.declarationOrigin = map[IdentifierId]ScopeId{}
+			}
+			c.result.declarationOrigin[dep.Identifier] =
+				original.scopeStack[len(original.scopeStack)-1]
 		}
 	}
 	if len(c.dependencies) == 0 {
