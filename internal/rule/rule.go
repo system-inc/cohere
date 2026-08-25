@@ -187,13 +187,24 @@ type Rule struct {
 	//
 	// The checker is handed out under an exclusive per-file lock, so acquiring it serializes the
 	// whole walk of that file against every other file's walk. Declaring the need lets the walk skip
-	// the acquisition entirely on files where no applicable rule wants types, which is every file in
-	// the current catalog: of 112 rule files exactly one reads the checker, and it is the tsgolint
-	// adapter, which registers no rules yet.
+	// the acquisition entirely on files where no applicable rule wants types.
 	//
 	// Measured before this field existed: the exclusive lock cost the lint phase about 50%, 366-417ms
 	// against 557-575ms on the same tree, paid on every file for rules that never asked a type
 	// question.
+	//
+	// # How much the skip is still worth, as a dated measurement rather than a standing claim
+	//
+	// **2026-08-25: 44 of 212 registered rules declare this.** So the acquisition is skipped on a
+	// file only when none of those 44 applies to it, which is a real saving and is nothing like the
+	// blanket one this comment used to describe.
+	//
+	// It previously read "every file in the current catalog: of 112 rule files exactly one reads the
+	// checker, and it is the tsgolint adapter, which registers no rules yet." That was true when it
+	// was written and false the moment the adapter registered, and nothing announced the change. It
+	// is quoted here rather than deleted because it is the evidence for the rule underneath: **a rule
+	// count in a comment decays silently, so write it with a date and treat it as a measurement that
+	// expires.**
 	//
 	// A rule that leaves this false and then reads ctx.TypeChecker gets nil, which is the same thing
 	// it gets when the program fails to build. That is deliberate: a rule silently reading a checker

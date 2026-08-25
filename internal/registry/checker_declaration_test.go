@@ -13,8 +13,13 @@ import (
 //
 // `f4793b6` made the exclusive checker lock conditional on `Rule.NeedsTypeChecker`, which recovered
 // about 45% of the lint phase: the lock is held across a file's whole walk rather than around one
-// query, so acquiring it serialized every file against every other. Nothing paid for that, because
-// zero of the 93 rules read the checker.
+// query, so acquiring it serialized every file against every other. Nothing paid for that at the
+// time, because zero of the 93 rules then registered read the checker.
+//
+// **That is no longer the shape of the catalog. 2026-08-25: 44 of 212 registered rules declare it**,
+// so the lock is acquired on any file one of those 44 applies to. The saving is still real and it is
+// conditional now rather than total. Dated because a rule count in a comment decays silently: this
+// sentence said "zero" for as long as it took someone to notice, and nothing failed in between.
 //
 // **The saving is bought with a claim each rule makes about itself.** A rule that declares false and
 // then reads `ctx.TypeChecker` receives nil, and nil does not announce itself: the rule either
@@ -196,4 +201,40 @@ func fileReadsTypeChecker(parsed *ast.File) bool {
 		return true
 	})
 	return found
+}
+
+// TestCheckerDeclarationCountIsCurrent makes the number in the comments falsifiable.
+//
+// Two doc comments quote how many rules declare `NeedsTypeChecker`, because the number decides
+// whether the conditional checker lock is a blanket saving or a conditional one. Both were wrong for
+// an unknown stretch, in the direction that tells a reader the lock costs nothing:
+// `rule.go` said one of 112 and `checker_declaration_test.go` said zero of 93, while the real figure
+// had reached 44 of 212.
+//
+// Nothing failed in between, which is the whole problem. A dated comment is honest about being a
+// measurement and still says nothing when it expires, so this asserts the figure instead.
+//
+// It is deliberately a bare equality rather than a range. When it fails the fix is to read both
+// comments, decide whether the conclusion they draw still holds at the new number, and update all
+// three together -- which is the review the comments needed and did not get.
+func TestCheckerDeclarationCountIsCurrent(t *testing.T) {
+	const (
+		wantRegistered   = 212
+		wantNeedsChecker = 44
+	)
+
+	rules := All()
+	needsChecker := 0
+	for _, rule := range rules {
+		if rule.NeedsTypeChecker {
+			needsChecker++
+		}
+	}
+
+	if len(rules) != wantRegistered || needsChecker != wantNeedsChecker {
+		t.Errorf("%d registered rules, %d declaring NeedsTypeChecker; the comments in this file and "+
+			"in `internal/rule/rule.go` quote %d of %d. Update all three together, and check that "+
+			"what they conclude about the checker lock still follows from the new number",
+			len(rules), needsChecker, wantNeedsChecker, wantRegistered)
+	}
 }
