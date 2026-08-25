@@ -40,6 +40,18 @@ func main() {
 }
 
 func run() error {
+	// A subcommand is matched before flag.Parse, because the flag package stops at the first
+	// argument it does not recognize and would hand `rename` back as a positional while
+	// swallowing the flags meant for it. The dispatcher forwards unknown arguments untouched, so the
+	// verb arrives here intact.
+	//
+	// This is a verb rather than a flag on the pipeline for the reason set out on runRenameVerb: a
+	// rename is imperative where every other write here is reactive, and it must not inherit the
+	// default-on mutation that `--fix` correctly has.
+	if isRenameVerb(os.Args[1:]) {
+		return runRenameVerb(os.Args[2:])
+	}
+
 	configFileName := flag.String("tsconfig", "tsconfig.json", "the tsconfig that defines the program")
 	directory := flag.String("directory", "", "the working directory paths resolve against (default: the process's own)")
 	typesOnly := flag.Bool("types", false, "build the graph and report TypeScript's own diagnostics, running no rules")
