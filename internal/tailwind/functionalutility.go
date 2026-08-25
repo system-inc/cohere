@@ -77,6 +77,52 @@ type FunctionalUtilityDescription struct {
 	HandleNegativeBareValue func(value *ParsedValue) (string, bool)
 	// StaticValueNames are the names `staticValues` defines, as a set.
 	StaticValueNames map[string]bool
+	// Arms are the additional resolution paths a root tries, in the order it tries them.
+	//
+	// Empty for the 185 roots registered through `functionalUtility`, which consult one namespace
+	// list and are fully described by the fields above. The 57 roots in frameworkgaphandlers.go are
+	// registered as bare closures instead, and a closure can consult several namespace lists in
+	// sequence with different bare-value behaviour on each.
+	//
+	// `borderSideUtility` is the shape, read at the v4.3.3 tag: a colour arm resolving through
+	// `['--border-color', '--color']`, then a width arm resolving through `['--border-width']` with a
+	// positive-integer fallback that appends `px`. `ThemeKeys` cannot express that, because the two
+	// arms differ in more than their keys: the width arm refuses a modifier and the colour arm
+	// accepts one.
+	//
+	// Tried after `ThemeKeys` rather than instead of it, so a root can have both and the 185 keep
+	// resolving exactly as they did. A root with arms and no `ThemeKeys` starts at its first arm,
+	// which is what every gap root does.
+	Arms []FunctionalUtilityArm
+}
+
+// FunctionalUtilityArm is one resolution path inside a root's closure.
+//
+// Upstream a gap root's body is a sequence of blocks, each trying one way to resolve the value and
+// returning if it hit. An arm is one of those blocks, and the sequence is what makes the root's
+// answer depend on which one matched rather than on the value alone.
+type FunctionalUtilityArm struct {
+	// ThemeKeys are the namespaces this arm consults, in order.
+	ThemeKeys []string
+	// IsColor marks an arm that resolves through `resolveThemeColor` rather than `theme.resolve`.
+	//
+	// The difference is not decoration. A colour arm answers `inherit`, `transparent` and `current`
+	// before consulting the theme at all, and it accepts a modifier, which is the alpha. A width arm
+	// does neither: `border-red-500/50` resolves and `border-4/50` produces nothing.
+	IsColor bool
+	// BareValue is the arm's own bare-value handler, applied when the theme misses.
+	//
+	// `borderSideUtility`'s width arm accepts a positive integer and appends `px`, so `border-4`
+	// resolves without `4` being a `--border-width` key. An arm with no handler ends at the theme.
+	BareValue BareValueKind
+	// BareValueSuffix is appended to whatever the bare handler returned, as `px` above.
+	BareValueSuffix string
+	// RefusesModifier marks an arm that returns nothing when the candidate carries a modifier.
+	//
+	// Upstream spells this as an early `if (candidate.modifier) return` inside the block, and it is
+	// per-arm rather than per-root: the same class resolves or does not depending on which arm
+	// claimed its value.
+	RefusesModifier bool
 }
 
 // ResolvedUtilityValue is what the pipeline produces for one candidate.
@@ -221,7 +267,71 @@ func resolveNamedValue(
 		}
 	}
 
+	// The arms, in the order the closure tries them.
+	//
+	// After everything above rather than instead of it, so a root carrying no arms resolves exactly
+	// as it did before this field existed and the 185 registered through `functionalUtility` cannot
+	// move. A gap root carries no `ThemeKeys` and no bare handler of its own, so it falls straight
+	// through to here.
+	for index := range description.Arms {
+		value, found := resolveArm(candidate, &description.Arms[index], theme)
+		if found {
+			return value, namedValueOutcome{produced: true}
+		}
+	}
+
 	return "", namedValueOutcome{}
+}
+
+// resolveArm runs one arm of a gap root's closure against a named value.
+//
+// Returns false where upstream's block falls through to the next one, which is what makes the arms a
+// sequence rather than a set: `border-red-500` is claimed by the colour arm and never reaches the
+// width arm, and `border-4` is refused by the colour arm and resolved by the width one.
+func resolveArm(candidate *ParsedCandidate, arm *FunctionalUtilityArm, theme *Theme) (string, bool) {
+	if arm.RefusesModifier && candidate.Modifier != nil {
+		return "", false
+	}
+
+	if arm.IsColor {
+		return resolveArmColor(candidate, arm, theme)
+	}
+
+	if value, found := theme.Resolve(candidate.Value.Value, true, arm.ThemeKeys, 0); found {
+		return value, true
+	}
+
+	if arm.BareValue != BareValueNone {
+		handler := bareValueHandler(arm.BareValue, arm.BareValueSuffix)
+		if handler != nil {
+			if value, found := handler(candidate.Value); found {
+				return value, true
+			}
+		}
+	}
+	return "", false
+}
+
+// resolveArmColor is upstream's `resolveThemeColor`, which is not `theme.resolve` with a flag.
+//
+// Three keywords are answered before the theme is consulted at all, and they are answered whatever
+// the theme holds: a repository declaring `--color-inherit` does not change what `border-inherit`
+// means. `current` resolves to `currentcolor` rather than to itself, which is the one place the
+// returned string is not the written one.
+//
+// The modifier is the alpha and is deliberately not applied here. This pipeline answers whether a
+// value resolves, and `asColor` composes the alpha onto a value that already resolved, so applying
+// it would change the string without changing the answer.
+func resolveArmColor(candidate *ParsedCandidate, arm *FunctionalUtilityArm, theme *Theme) (string, bool) {
+	switch candidate.Value.Value {
+	case "inherit":
+		return "inherit", true
+	case "transparent":
+		return "transparent", true
+	case "current":
+		return "currentcolor", true
+	}
+	return theme.Resolve(candidate.Value.Value, true, arm.ThemeKeys, 0)
 }
 
 // isPositiveInteger is upstream's `isPositiveInteger` from `src/utils/infer-data-type.ts`.
