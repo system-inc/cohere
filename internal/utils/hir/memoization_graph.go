@@ -21,6 +21,8 @@
 // no gain because the answer only ever moves one way.
 package hir
 
+import "sort"
+
 // MemoizationGraph is what one walk of the tree produces: a node per declaration and per scope.
 type MemoizationGraph struct {
 	// identifiers is the node table, keyed by declaration.
@@ -156,7 +158,16 @@ func (g *MemoizationGraph) ComputeMemoized() map[DeclarationId]bool {
 		node.memoized = false
 
 		hasMemoizedDependency := false
-		for dependency := range node.dependencies {
+		// Sorted, because Go map iteration is randomised and this walk is order-dependent: the
+		// `seen` guard locks in whichever answer a node was first reached with, and a node reached
+		// with `force` set answers differently from the same node reached without it. Measured
+		// before this was added -- three identical runs over the corpus returned 506, 507 and 508
+		// pruned scopes and memoized counts spanning 1,922 to 2,054.
+		//
+		// A pass whose output varies run to run makes a cache non-reproducible without ever
+		// producing an answer anyone can point at as wrong, which is the same reason
+		// `ScopeDependencies.Ids` returns a slice rather than ranging a map.
+		for _, dependency := range sortedDeclarations(node.dependencies) {
 			if visit(dependency, false) {
 				hasMemoizedDependency = true
 			}
@@ -168,7 +179,7 @@ func (g *MemoizationGraph) ComputeMemoized() map[DeclarationId]bool {
 			node.level == MemoizationUnmemoized && force:
 			node.memoized = true
 			memoized[declaration] = true
-			for scope := range node.scopes {
+			for _, scope := range sortedScopes(node.scopes) {
 				forceScope(scope)
 			}
 		}
@@ -185,10 +196,30 @@ func (g *MemoizationGraph) ComputeMemoized() map[DeclarationId]bool {
 		}
 	}
 
-	for declaration := range g.escaping {
+	for _, declaration := range sortedDeclarations(g.escaping) {
 		visit(declaration, false)
 	}
 	return memoized
+}
+
+// sortedDeclarations returns a map's keys in a stable order. See ComputeMemoized for why.
+func sortedDeclarations(set map[DeclarationId]bool) []DeclarationId {
+	keys := make([]DeclarationId, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	return keys
+}
+
+// sortedScopes returns a map's keys in a stable order. See ComputeMemoized for why.
+func sortedScopes(set map[ScopeId]bool) []ScopeId {
+	keys := make([]ScopeId, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	return keys
 }
 
 // Len reports how many declarations the graph holds, for measurement.
