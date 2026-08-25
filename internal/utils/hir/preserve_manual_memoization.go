@@ -76,12 +76,31 @@ func ValidatePreservedManualMemoization(tree *ReactiveFunction, function *Functi
 	if tree == nil || function == nil {
 		return nil
 	}
+	return ValidatePreservedManualMemoizationWithDependencies(tree, function, scopes, nil)
+}
+
+// ValidatePreservedManualMemoizationWithDependencies adds the third firing condition.
+//
+// Separate entry point rather than a changed signature, matching `AssignReactiveScopesWithSets` and
+// `PruneNonEscapingScopesWithScopes`: the inferred-versus-written comparison needs the collected
+// dependency table and the temporaries map inside it, and neither is derivable from a tree.
+//
+// A caller that passes nil gets the two scope conditions and nothing else, which is what every
+// caller had before this existed.
+func ValidatePreservedManualMemoizationWithDependencies(tree *ReactiveFunction, function *Function,
+	scopes *ReactiveScopes, dependencies *ScopeDependencies) []PreserveManualMemoizationFinding {
+	if tree == nil || function == nil {
+		return nil
+	}
 	validator := manualMemoValidator{
-		function:       function,
-		scopes:         scopes,
-		liveScopes:     map[ScopeId]bool{},
-		prunedScopes:   map[ScopeId]bool{},
-		openMemoBlocks: map[int]bool{},
+		function:         function,
+		scopes:           scopes,
+		liveScopes:       map[ScopeId]bool{},
+		prunedScopes:     map[ScopeId]bool{},
+		openMemoBlocks:   map[int]bool{},
+		dependencies:     dependencies,
+		sourceDeps:       map[int][]ManualMemoDependency{},
+		declsInMemoBlock: map[DeclarationId]bool{},
 	}
 	validator.walk(tree.Body)
 	return validator.findings
@@ -102,7 +121,21 @@ type manualMemoValidator struct {
 	// boolean would let an inner `FinishMemoize` close an outer block, and the outer block's own
 	// finish would then be dropped as unopened.
 	openMemoBlocks map[int]bool
-	findings       []PreserveManualMemoizationFinding
+	// dependencies is the collected scope-dependency table, or nil when the caller did not supply
+	// one. Nil disables the inferred-versus-written comparison and leaves the two scope conditions
+	// unchanged, which is the state every caller was in before that comparison was wired.
+	dependencies *ScopeDependencies
+	// sourceDeps are the dependencies the developer wrote in the currently open memo block, keyed
+	// by `ManualMemoId`. Upstream keeps one `manualMemoState` because it asserts memo blocks do not
+	// nest; this keys by id for the same reason `openMemoBlocks` does.
+	sourceDeps map[int][]ManualMemoDependency
+	// declsInMemoBlock are declarations made inside an open memo block, by `DeclarationId`.
+	//
+	// Upstream's `manualMemoState.decls`. A scope dependency rooted at a value the memo block
+	// itself declared is not a dependency the developer could have written, so it is skipped rather
+	// than reported. Without this the comparison reports every intermediate value in the callback.
+	declsInMemoBlock map[DeclarationId]bool
+	findings         []PreserveManualMemoizationFinding
 }
 
 func (v *manualMemoValidator) walk(block ReactiveBlock) {
@@ -113,6 +146,9 @@ func (v *manualMemoValidator) walk(block ReactiveBlock) {
 
 		case *ReactiveScopeBlock:
 			v.walk(shape.Instructions)
+			// The inferred-versus-written comparison runs here, after the body and BEFORE the scope
+			// is recorded live, which is upstream's ordering at `visitScope` (:417-433).
+			v.compareInferredDependencies(shape)
 			// Recorded after the body, matching upstream: a scope is known to have survived only
 			// once the walk has left it, so a memo block inside it is checked against the scopes
 			// that closed before it rather than against its own enclosing scope.
@@ -171,6 +207,9 @@ func (v *manualMemoValidator) visitInstruction(instruction *ReactiveInstruction)
 		// The verdict expires if that validation is ever ported: at that point this guard becomes
 		// live and must land with it, or every program failing exhaustive-deps reports twice.
 		v.openMemoBlocks[marker.ManualMemoId] = true
+		if marker.Deps != nil && v.sourceDeps != nil {
+			v.sourceDeps[marker.ManualMemoId] = marker.Deps
+		}
 		// A dependency belonging to a scope that neither survived nor was pruned may be mutated
 		// after this point, so the memoization cannot be trusted.
 		for _, dependency := range marker.Deps {
@@ -189,12 +228,32 @@ func (v *manualMemoValidator) visitInstruction(instruction *ReactiveInstruction)
 			return
 		}
 		delete(v.openMemoBlocks, marker.ManualMemoId)
+		delete(v.sourceDeps, marker.ManualMemoId)
 		if marker.Pruned {
 			// A pruned memo block was deliberately discarded, so there is nothing to preserve.
 			return
 		}
 		v.check(marker.Value.Identifier, instruction.Order,
 			PreserveManualMemoizationValueUnmemoized)
+
+	default:
+		// Every other instruction, for the decls set only.
+		//
+		// Upstream records a declaration into the open memo block at two sites: any named lvalue
+		// (:394-397) and every lvalue of a `StoreLocal`, `StoreContext` or `Destructure` (:361-371).
+		// Both reduce here to "what this instruction defines", because a value declared inside the
+		// callback is not something the developer could have named in a dependency array.
+		if len(v.openMemoBlocks) == 0 || v.declsInMemoBlock == nil {
+			return
+		}
+		EachPlace(plain.Value, func(place Place, role PlaceRole) {
+			if role == PlaceRoleDefine {
+				v.declsInMemoBlock[declarationOf(v.function, place.Identifier)] = true
+			}
+		})
+		if instruction.LValue != nil {
+			v.declsInMemoBlock[declarationOf(v.function, instruction.LValue.Identifier)] = true
+		}
 	}
 }
 
@@ -298,7 +357,27 @@ func AnalyzePreservedManualMemoization(function *Function,
 	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 	PruneNonReactiveDependencies(tree, function, dependencies)
 
-	return ValidatePreservedManualMemoization(tree, function, scopes)
+	// Nil, deliberately, and this is the one place the third firing condition is turned off.
+	//
+	// The comparison itself is built and tested. Its INPUT is not ready: `CollectScopeDependencies`
+	// truncates a path to its root wherever the hoistable set is empty, and the hoistable analysis
+	// is `DependencyGapNullPropagation`, declined. Measured on the corpus, 171 dependencies carry a
+	// path and 1,435 do not, so 89% of what the comparison would see is shallower than what the
+	// developer wrote.
+	//
+	// A shorter inferred path than source is `CompareDependencyPathDifference`, which the comparison
+	// reports correctly. So passing `dependencies` here turns a systematic inference gap into a
+	// systematic stream of findings. Measured, against `useMemo-alias-property-load-dep.ts` and its
+	// nine siblings:
+	//
+	//	ungated                              golden 15 -> 25   clean 27 -> 37
+	//	skip an inferred dep with no path    golden 15 -> 17   clean 27 -> 31
+	//	skip when the two are incomparable   golden 15 -> 20   clean 27 -> 34
+	//
+	// Every variant costs more false positives than it gains true positives, so none of them is an
+	// improvement and the gate is not a tuning problem. Turn this on when the hoistable analysis
+	// lands, and expect the ungated numbers to be the ones that move.
+	return ValidatePreservedManualMemoizationWithDependencies(tree, function, scopes, nil)
 }
 
 // ForEachFunctionLike calls visit for every outermost function-like node under root.
@@ -319,4 +398,68 @@ func ForEachFunctionLike(root *ast.Node, visit func(*ast.Node)) {
 		ForEachFunctionLike(node, visit)
 		return false
 	})
+}
+
+// compareInferredDependencies is the third firing condition: what the compiler inferred as this
+// scope's dependencies against what the developer wrote in the memo block enclosing it.
+//
+// Upstream's `validateInferredDep` (`ValidatePreservedManualMemoization.ts:228-300`), driven from
+// `visitScope` (:417-433). It reports at most one finding per inferred dependency, and only when
+// that dependency matches NO source dependency, keeping the strongest disagreement seen.
+//
+// # Why this runs on scope exit rather than at the marker
+//
+// The dependencies being compared are the SCOPE's, and a scope's dependency set is not complete
+// until its body has been walked. The memo block's own markers sit inside that body, so the source
+// side is available and the inferred side is not until this point. That is also why upstream places
+// the loop before `this.scopes.add`: the comparison belongs to the scope being left, not to the
+// scopes already closed.
+//
+// # The two early returns, both load-bearing
+//
+// A dependency whose root is a value the memo block itself declared is skipped. Those are the
+// callback's own intermediates, which no developer could have written in a dependency array, and
+// reporting them would flag every temporary in the body.
+//
+// A dependency that cannot be normalized is skipped rather than reported. Upstream raises an
+// invariant there; see `NormalizeInferredDependency` for why declining is the honest answer in this
+// tree.
+func (v *manualMemoValidator) compareInferredDependencies(scope *ReactiveScopeBlock) {
+	if scope == nil || v.dependencies == nil || len(v.sourceDeps) == 0 {
+		return
+	}
+	// Upstream reads `state.manualMemoState`, a single open block, because it asserts memo blocks do
+	// not nest. This walks whichever blocks are open; with the non-nesting invariant holding there
+	// is exactly one, and if it ever does not hold this compares against each rather than silently
+	// picking one.
+	for id, sourceDependencies := range v.sourceDeps {
+		if !v.openMemoBlocks[id] || len(sourceDependencies) == 0 {
+			continue
+		}
+		for _, inferred := range v.dependencies.DependenciesOf(scope.Scope) {
+			normalized, ok := v.dependencies.NormalizeInferredDependency(v.function, inferred)
+			if !ok {
+				continue
+			}
+			if !normalized.Root.IsGlobal &&
+				v.declsInMemoBlock[declarationOf(v.function, normalized.Root.Place.Identifier)] {
+				continue
+			}
+			matched := false
+			for _, source := range sourceDependencies {
+				if CompareManualMemoDependencies(normalized, source) == CompareDependencyOk {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				continue
+			}
+			v.findings = append(v.findings, PreserveManualMemoizationFinding{
+				Identifier: inferred.Identifier,
+				Scope:      scope.Scope,
+				Kind:       PreserveManualMemoizationValueUnmemoized,
+			})
+		}
+	}
 }

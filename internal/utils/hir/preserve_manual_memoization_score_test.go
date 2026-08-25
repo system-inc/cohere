@@ -260,5 +260,5 @@ func pipelineFindings(function *Function, checker *shimchecker.Checker) []Preser
 	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 	PruneNonReactiveDependencies(tree, function, dependencies)
 
-	return ValidatePreservedManualMemoization(tree, function, scopes)
+	return ValidatePreservedManualMemoizationWithDependencies(tree, function, scopes, nil)
 }

@@ -1,6 +1,12 @@
 package hir
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/ruletest"
+)
 
 // TestValidatePreservedManualMemoizationFiresAndStaysSilent is the baseline.
 //
@@ -152,4 +158,117 @@ func memoStatement(order EvaluationOrder, value InstructionValue) ReactiveStatem
 		Order: order,
 		Value: &ReactiveInstructionValue{Value: value},
 	}}
+}
+
+// TestInferredDependencyComparisonIsBuiltAndGatedOnTruncation pins the reason the third firing
+// condition is wired but switched off.
+//
+// The comparison and its normalization are exercised here rather than left dark, because a pass with
+// no caller and no test is the shape this package keeps finding declared and never constructed. What
+// is asserted is the state of the INPUT, since that is what the decision rests on.
+func TestInferredDependencyComparisonIsBuiltAndGatedOnTruncation(t *testing.T) {
+	const source = `
+		import {useMemo} from 'react';
+		import {sum} from 'shared-runtime';
+		function Component({propA, propB}) {
+			const x = propB.x.y;
+			return useMemo(() => sum(propA.x, x), [propA.x, x]);
+		}
+	`
+
+	withPath, withoutPath, comparisons := inferredDependencyShapes(t, source)
+	if withPath+withoutPath == 0 {
+		t.Fatal("no scope dependency was collected, so this test asserts nothing about path depth; " +
+			"the fixture stopped exercising the collector rather than the collector being correct")
+	}
+
+	// The finding this test exists to hold: the source writes `propA.x` and `propB.x.y`, and the
+	// inferred side carries bare roots. `DependencyGapNullPropagation` is why.
+	if withPath != 0 {
+		t.Errorf("%d inferred dependencies carry a path, want 0 on this fixture; if the hoistable "+
+			"analysis landed, the comparison should be turned on at the pipeline and these bounds "+
+			"re-measured", withPath)
+	}
+	if withoutPath == 0 {
+		t.Errorf("no inferred dependency was truncated, which contradicts the measured corpus " +
+			"state of 171 with a path against 1,435 without")
+	}
+
+	// The comparison runs and disagrees, which is the correct answer for a truncated input and is
+	// what makes turning it on a regression rather than a fix.
+	if comparisons == 0 {
+		t.Error("the comparison was never reached, so its wiring is dead rather than gated")
+	}
+	t.Logf("inferred dependencies: %d with a path, %d truncated; %d comparisons made",
+		withPath, withoutPath, comparisons)
+}
+
+// inferredDependencyShapes reports the path depth of every inferred dependency, and how many
+// comparisons against a written dependency the validator would make.
+func inferredDependencyShapes(t *testing.T, source string) (withPath, withoutPath, comparisons int) {
+	t.Helper()
+	probe := rule.Rule{
+		Name:             "inferred-dependency-shapes",
+		NeedsTypeChecker: true,
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			return rule.Listeners{
+				ast.KindSourceFile: func(node *ast.Node) {
+					if ctx.TypeChecker == nil {
+						return
+					}
+					forEachFunctionLike(node, func(functionNode *ast.Node) {
+						function := Lower(functionNode, ctx.TypeChecker)
+						if function == nil {
+							return
+						}
+						Construct(function)
+						InferReactive(function, ctx.TypeChecker)
+						DropManualMemoization(function)
+						ranges := InferMutableRanges(function)
+						disjoint := FindDisjointMutableValuesWithRanges(function, ranges)
+						scopes := AssignReactiveScopesWithSets(function, ranges, disjoint)
+						aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
+						identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
+						BuildReactiveScopeTerminals(function, scopes, identity)
+						dependencies := CollectScopeDependenciesWithHoistable(
+							function, scopes, identity, ranges)
+
+						var written []ManualMemoDependency
+						for _, instruction := range function.Instructions {
+							if instruction == nil {
+								continue
+							}
+							if marker, isStart := instruction.Value.(*StartMemoize); isStart {
+								written = append(written, marker.Deps...)
+							}
+						}
+
+						for _, scope := range scopes.Ids() {
+							for _, inferred := range dependencies.DependenciesOf(scope) {
+								normalized, ok := dependencies.NormalizeInferredDependency(
+									function, inferred)
+								if !ok {
+									continue
+								}
+								if len(normalized.Path) > 0 {
+									withPath++
+								} else {
+									withoutPath++
+								}
+								for _, source := range written {
+									CompareManualMemoDependencies(normalized, source)
+									comparisons++
+								}
+							}
+						}
+					})
+				},
+			}
+		},
+	}
+	ruletest.RunTypedFiles(t, probe, map[string]string{
+		"/react.d.ts":  reactiveDeclarations,
+		"/fixture.tsx": source,
+	}, "/fixture.tsx")
+	return withPath, withoutPath, comparisons
 }

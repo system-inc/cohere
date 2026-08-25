@@ -208,6 +208,15 @@ func DependencyGaps() []DependencyGap {
 // A side table for the reason `ReactiveScopes` is one: the scope lives in a table rather than on the
 // identifier, so its outputs live beside it. The zero value is empty and ready to read.
 type ScopeDependencies struct {
+	// temporaries maps a temporary to the access path it holds, kept so the memoization validator
+	// can normalize an inferred dependency into the shape a source dependency is written in.
+	//
+	// Upstream's `ValidatePreservedManualMemoization` holds its own copy of this map, built by the
+	// same walk that collects dependencies. Recording it here rather than rebuilding it is what
+	// keeps the two answers identical: a second `collectTemporaries` over a tree three passes later
+	// would see a rewritten graph and resolve some paths differently.
+	temporaries temporaries
+
 	dependencies map[ScopeId][]ReactiveScopeDependency
 	declarations map[ScopeId][]IdentifierId
 	// declarationOrigin names the scope a declared value actually originated in.
@@ -1047,9 +1056,11 @@ func CollectScopeDependencies(function *Function, identity ScopeIdentity) *Scope
 	}
 
 	usedOutside := findTemporariesUsedOutsideDeclaringScope(function, terminals)
+	collected := collectTemporaries(function, usedOutside)
+	result.temporaries = collected
 	collector := &dependencyCollector{
 		function:      function,
-		temporaries:   collectTemporaries(function, usedOutside),
+		temporaries:   collected,
 		declarations:  map[DeclarationId]declaration{},
 		reassignments: map[IdentifierId]declaration{},
 		objectMethods: objectMethodValues(function),
@@ -1095,9 +1106,11 @@ func CollectScopeDependenciesWithHoistable(function *Function, scopes *ReactiveS
 	}
 
 	usedOutside := findTemporariesUsedOutsideDeclaringScope(function, terminals)
+	collected := collectTemporaries(function, usedOutside)
+	result.temporaries = collected
 	collector := &dependencyCollector{
 		function:      function,
-		temporaries:   collectTemporaries(function, usedOutside),
+		temporaries:   collected,
 		declarations:  map[DeclarationId]declaration{},
 		reassignments: map[IdentifierId]declaration{},
 		objectMethods: objectMethodValues(function),
@@ -1337,4 +1350,53 @@ func (c *dependencyCollector) alreadyPresent(existing []ReactiveScopeDependency,
 		}
 	}
 	return false
+}
+
+// NormalizeInferredDependency rewrites an inferred dependency into the shape a source one is in.
+//
+// Upstream's normalization step at the top of `validateInferredDep`
+// (`ValidatePreservedManualMemoization.ts:236-264`). An inferred dependency is rooted at whatever
+// identifier the collector recorded, which for `props.a.b` is the temporary holding `props.a`. A
+// source dependency is rooted at what the developer wrote. Comparing the two without this step
+// compares a temporary against a name and reports every dependency as a root difference.
+//
+// When the root is a known temporary, its path is PREPENDED to the inferred path, which is what
+// reassembles `t = props.a; t.b` into `props.a.b`. Otherwise the dependency is already rooted at a
+// real binding and only needs rewrapping.
+//
+// Returns false when the root is neither a known temporary nor a named binding. Upstream raises an
+// invariant there; this declines instead, because an unnamed root that is not in the map cannot be
+// compared against anything a developer could have written, and reporting it would be a finding
+// about the lowering rather than about the source.
+func (d *ScopeDependencies) NormalizeInferredDependency(function *Function,
+	dependency ReactiveScopeDependency) (ManualMemoDependency, bool) {
+	if d == nil || function == nil {
+		return ManualMemoDependency{}, false
+	}
+
+	if resolved, found := d.temporaries[dependency.Identifier]; found {
+		path := make([]DependencyPathEntry, 0, len(resolved.Path)+len(dependency.Path))
+		path = append(path, resolved.Path...)
+		path = append(path, dependency.Path...)
+		return ManualMemoDependency{
+			Root: ManualMemoRoot{Place: Place{Identifier: resolved.Identifier,
+				Reactive: resolved.Reactive}},
+			Path: path,
+		}, true
+	}
+
+	if int(dependency.Identifier) >= len(function.Identifiers) {
+		return ManualMemoDependency{}, false
+	}
+	identifier := function.Identifiers[dependency.Identifier]
+	if identifier == nil || identifier.Name == "" {
+		return ManualMemoDependency{}, false
+	}
+	path := make([]DependencyPathEntry, len(dependency.Path))
+	copy(path, dependency.Path)
+	return ManualMemoDependency{
+		Root: ManualMemoRoot{Place: Place{Identifier: dependency.Identifier,
+			Reactive: dependency.Reactive}},
+		Path: path,
+	}, true
 }
