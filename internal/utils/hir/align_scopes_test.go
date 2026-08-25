@@ -182,10 +182,15 @@ func TestAlignClosesTheFullBlockNestingAssertion(t *testing.T) {
 		t.Errorf("the merge alone leaves %d violations and align+merge leaves %d, so this pass "+
 			"closed nothing", fullMergeOnly, fullAligned)
 	}
-	if fullAligned != blockOnly {
-		t.Errorf("the full assertion leaves %d violations but the block-items-only control is %d; "+
-			"every remaining violation should be one this pass structurally cannot reach",
-			fullAligned, blockOnly)
+	// The scope-involving part of the residue is asserted over components and hooks below, for the
+	// reason recorded there. Here the whole-corpus residue is bounded rather than pinned: subtracting
+	// the scope-involving count leaves exactly the violations this pass structurally cannot reach,
+	// and that identity holds whichever population the scope violations come from.
+	if fullAligned-finalScopeInBlock != blockOnly {
+		t.Errorf("the full assertion leaves %d violations of which %d involve a scope, against a "+
+			"block-items-only control of %d; the non-scope residue should equal the control because "+
+			"those are the violations this pass structurally cannot reach",
+			fullAligned, finalScopeInBlock, blockOnly)
 	}
 	// # The population is every function in the corpus, and upstream's is not
 	//
