@@ -60,9 +60,37 @@
 // Five of this rule's seven tables remain framework data consulted through a repository-aware split.
 // `ColorNames` is the one that is genuinely per-repository and still generated, and it is a real gap
 // rather than a settled seam: a repository that defines its own palette has different color names,
-// and this rule reads Tailwind's. It is narrowed rather than closed here — the theme is asked first,
-// so a repository's own colors are recognised — and what remains is the framework's default palette
-// as a fallback for a repository that did not override it.
+// and this rule reads Tailwind's. It is narrowed rather than closed here, since the theme is asked
+// first so a repository's own colors are recognised, and what remains is the framework's default
+// palette as a fallback for a repository that did not override it.
+//
+// # RootSelectorShapes, and why it stays without being invariant
+//
+// The eighth table is `RootSelectorShapes`, read by `selectorShapeOf`. Measured two ways rather than
+// assumed, because "reads like framework data" is what was said about `CollapseFamilies` and the
+// variant registrations before a measurement that could not have detected a repository token.
+//
+// First, generated against `independent_theme.css` and diffed. That is two observations rather than
+// one wearing two names: 327 roots and 53,301 pairs on ahra against 302 and 45,451 on the
+// independent system. Both produce the same 8 entries, same roots, same shapes, none on either side
+// alone.
+//
+// That measurement is necessary and NOT sufficient, and the second one says why. A repository
+// `@utility` block can declare a nested selector, and a synthetic one that does contributes a ninth
+// entry: `@utility gutter-*` wrapping `& > :not(:last-child)` enumerates as
+// `gutter -> .CLASS > :not(:last-child)`. So the table is repository-invariant across the systems
+// that exist rather than by construction, and a repository that wrote such a block would have a root
+// whose shape this table does not carry.
+//
+// It stays generated anyway, because that class cannot reach the comparison the shape decides.
+// `repositoryClassFacts` counts only top-level declarations, and a nested block compiles to a single
+// `rule` node carrying no property at all, so the class resolves to false and is skipped before any
+// pairing. Measured on exactly that fixture: `gutter-small` beside `me-4` and beside `mr-4`, both
+// margin-inline-end on the element itself, produces zero findings.
+//
+// So a missing shape costs a finding this rule was never going to make rather than producing a wrong
+// one, which is the safe direction and the same direction every other gap here fails in.
+// TestSelectorShapeCannotProduceAWrongFinding holds that, so it cannot decay into a claim.
 package tailwind
 
 import (

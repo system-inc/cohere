@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/ruletest"
+	tailwindengine "github.com/system-inc/verify/internal/tailwind"
 )
 
 // # Why every fixture here runs through a program
@@ -468,5 +469,88 @@ func TestVariantsAreComparedNotStripped(t *testing.T) {
 	if len(differentVariant.Diagnostics) != 0 {
 		t.Fatalf("classes in different states both take effect where they belong, so this is correct "+
 			"code; got %d findings", len(differentVariant.Diagnostics))
+	}
+}
+
+// TestSelectorShapeCannotProduceAWrongFinding closes the `RootSelectorShapes` question.
+//
+// The table is repository-invariant across the systems that exist, measured by generating against
+// `independent_theme.css` and diffing: 327 roots and 53,301 pairs on ahra against 302 and 45,451 on
+// the independent system, both producing the same 8 entries with none on either side alone.
+//
+// That is not sufficient on its own, and this test is the reason. A repository `@utility` block can
+// declare a nested selector, and one that does contributes a ninth entry to the generator's output:
+// `@utility gutter-*` wrapping `& > :not(:last-child)` enumerates as
+// `gutter -> .CLASS > :not(:last-child)`. So a repository could hold a root whose shape the table
+// does not carry, and the invariance measurement could not have found that.
+//
+// What makes the table safe to keep is that such a class cannot reach the comparison the shape
+// decides. A nested block compiles to a single `rule` node carrying no property, `repositoryClassFacts`
+// counts only top-level declarations, and the class resolves to false and is skipped before pairing.
+//
+// Asserted on a design system built for this, rather than on the corpus, because neither corpus
+// repository writes a nested `@utility` block and a test that could not construct the case would be
+// asserting its absence.
+func TestSelectorShapeCannotProduceAWrongFinding(t *testing.T) {
+	packageRoot := unknownFixturePackageRoot()
+	if packageRoot == "" {
+		t.Skip("no installed tailwindcss on this machine")
+	}
+
+	staging := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(staging, "node_modules"), 0o755); err != nil {
+		t.Fatalf("creating the staging node_modules: %v", err)
+	}
+	if err := os.Symlink(packageRoot, filepath.Join(staging, "node_modules", "tailwindcss")); err != nil {
+		t.Fatalf("linking the installed tailwindcss: %v", err)
+	}
+
+	// A repository utility that emits under a nested selector, which is the one mechanism that can
+	// put a repository token into RootSelectorShapes.
+	stylesheet := `@import 'tailwindcss';
+@theme { --frobnicate-small: 2px; }
+@utility gutter-* {
+    & > :not(:last-child) { margin-inline-end: --value(--frobnicate-*, [length]); }
+}
+`
+	entryPoint := filepath.Join(staging, "theme.css")
+	if err := os.WriteFile(entryPoint, []byte(stylesheet), 0o644); err != nil {
+		t.Fatalf("writing the staging stylesheet: %v", err)
+	}
+
+	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+		EntryPoint:          entryPoint,
+		TailwindPackageRoot: findTailwindPackageRoot(staging),
+	})
+	if err != nil {
+		t.Fatalf("loading the nested-utility design system: %v", err)
+	}
+	designSystem := DesignSystemResult{System: system, Table: tailwindengine.NewTable(system)}
+
+	// The class whose shape the table does not carry declines rather than resolving to a wrong one.
+	if _, canResolve := resolveClassFactsIn("gutter-small", designSystem); canResolve {
+		t.Error("a nested-selector repository utility now resolves, so its selector shape decides a " +
+			"comparison and RootSelectorShapes cannot answer for it. That is the change this test " +
+			"exists to notice: the table must move to the live system, or the shape must be derived")
+	}
+
+	// And the classes it would have been compared against still resolve, so the silence above is the
+	// nested class declining rather than the whole design system failing to load.
+	for _, className := range []string{"me-4", "mr-4"} {
+		if _, canResolve := resolveClassFactsIn(className, designSystem); !canResolve {
+			t.Fatalf("%s did not resolve, so this test is measuring a broken design system rather "+
+				"than the nested-utility case", className)
+		}
+	}
+
+	// The finding count, which is the thing that actually matters. `gutter-small` lands on child
+	// elements and `me-4` lands on the element itself; both declare margin-inline-end, so a rule that
+	// resolved the first without its shape would report a conflict on correct code.
+	for _, pair := range [][]string{{"gutter-small", "me-4"}, {"gutter-small", "mr-4"}} {
+		if findings := conflictFindingsIn(pair, designSystem); len(findings) != 0 {
+			t.Errorf("%v produced %d findings; a nested-selector utility and a class on the element "+
+				"itself do not collide, and reporting them is the false positive a missing selector "+
+				"shape would cause", pair, len(findings))
+		}
 	}
 }
