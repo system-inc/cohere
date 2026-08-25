@@ -92,6 +92,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/system-inc/verify/internal/utils/ecmascript/property"
 )
 
 // Lower lowers one function to HIR.
@@ -1258,7 +1259,20 @@ func functionName(node *ast.Node) string {
 		return ""
 	}
 	if name := node.Name(); name != nil {
-		return name.Text()
+		// `Node.Text()` panics on a computed name rather than returning anything, so the kind is
+		// checked before the read. A class member spelled `[Symbol.for('x')]() {}` reaches here
+		// through `lowerNested`, and reading its text crashed the whole file: the linter recovers
+		// per file, so one method named this way meant nothing in that file was checked by any rule.
+		//
+		// The empty string is the right answer rather than a fallback. This name feeds
+		// `classifyFunction`, which asks whether it looks like a component or a hook, and a computed
+		// name is neither: `Symbol.for('nodejs.util.inspect.custom')` is not `Foo` and not `useFoo`.
+		// An anonymous function is already spelled this way here.
+		text, known := property.Name(name, property.Named|property.Quoted|property.Templated|property.Numeric|property.Private)
+		if !known {
+			return ""
+		}
+		return text
 	}
 	// An anonymous function assigned to a variable takes that variable's name, which is what makes
 	// `const Foo = () => ...` classify as a component.
