@@ -209,6 +209,17 @@ type reactivity struct {
 	// exempted from being marked even when they come out of a reactive hook call.
 	stable map[IdentifierId]bool
 
+	// hookResults maps a call's result to the hook's name, for the positional exemption below.
+	//
+	// Kept because a destructured setter cannot be identified from its own type. `[t, start] =
+	// useTransition()` binds `start` through an `ArrayPattern` element, and asking the checker for
+	// that element's type returns nothing usable -- measured, `stableTypeName` answers "" for it
+	// while answering `TransitionStartFunction` for the same binding read elsewhere. Upstream does
+	// not have this problem because it assigns its own shape ids over hook signatures
+	// (`isStartTransitionType` tests `shapeId === 'BuiltInStartTransition'`); this tree asks
+	// TypeScript, and TypeScript has no name to give for a tuple element.
+	hookResults map[IdentifierId]string
+
 	// changed is set only when an id is newly inserted into reactive. Reading a value that is
 	// already reactive is not a change; that asymmetry is upstream's and it is what terminates.
 	changed bool
@@ -311,6 +322,8 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[BlockId]bool) 
 		if instruction == nil {
 			continue
 		}
+		r.recordHookResult(instruction)
+		r.recordStablePositions(instruction)
 		r.recordStable(instruction)
 
 		hasReactiveInput := false
@@ -406,6 +419,73 @@ func (r *reactivity) mark(id IdentifierId) {
 // upstream needs the side-map because it has no checker to ask. Keeping it here would be a second
 // mechanism holding one fact, which is the redundancy that leaves a mutation sweep unable to see
 // either copy.
+// stableHookPositions names, per hook, which positions of its destructured result React guarantees
+// are identity-stable.
+//
+// Upstream's `isStableType` set, expressed positionally because that is the information available
+// here. The positions are the second element of each hook's returned tuple, which is React's own
+// documented contract: `useState` returns `[state, setState]`, `useReducer` `[state, dispatch]`,
+// `useTransition` `[isPending, startTransition]`, `useOptimistic` `[value, setOptimistic]`, and
+// `useActionState` `[state, dispatch, isPending]`.
+//
+// `useRef` is absent because its result is not destructured -- it is a whole object, and
+// `stableTypeName` already answers `RefObject` for it.
+var stableHookPositions = map[string][]int{
+	"useState":       {1},
+	"useReducer":     {1},
+	"useTransition":  {1},
+	"useOptimistic":  {1},
+	"useActionState": {1},
+}
+
+// recordHookResult notes that a value is the result of a named hook call.
+func (r *reactivity) recordHookResult(instruction *Instruction) {
+	call, isCall := instruction.Value.(*CallExpression)
+	if !isCall {
+		return
+	}
+	callee := r.function.Identifiers[call.Callee.Identifier]
+	if callee == nil || callee.Node == nil || !ast.IsIdentifier(callee.Node) {
+		return
+	}
+	name := callee.Node.Text()
+	if _, known := stableHookPositions[name]; !known {
+		return
+	}
+	if r.hookResults == nil {
+		r.hookResults = map[IdentifierId]string{}
+	}
+	r.hookResults[instruction.LValue.Identifier] = name
+}
+
+// recordStablePositions exempts the positions of a destructured hook result React keeps stable.
+//
+// The positional route exists because the type route cannot reach these. See `hookResults`.
+func (r *reactivity) recordStablePositions(instruction *Instruction) {
+	destructure, isDestructure := instruction.Value.(*Destructure)
+	if !isDestructure {
+		return
+	}
+	hook, fromHook := r.hookResults[destructure.Value.Identifier]
+	if !fromHook {
+		return
+	}
+	pattern, isArray := destructure.Pattern.(*ArrayPattern)
+	if !isArray {
+		return
+	}
+	for _, position := range stableHookPositions[hook] {
+		if position >= len(pattern.Elements) {
+			continue
+		}
+		bound, isPlace := pattern.Elements[position].Value.(*PlacePattern)
+		if !isPlace {
+			continue
+		}
+		r.stable[bound.Place.Identifier] = true
+	}
+}
+
 func (r *reactivity) recordStable(instruction *Instruction) {
 	// Every value the instruction binds is asked of the checker directly. A destructured setter is
 	// bound by a Destructure whose pattern places are lvalues, so this reaches them without the

@@ -139,8 +139,22 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// Both are pinned rather than logged because the asymmetry that nearly shipped a regression as
 	// an improvement in the score test applies here identically: a change that empties more blocks
 	// while emptying fewer elsewhere would read as neutral on a single total.
-	const knownBlocksWithCarrying = 74
-	const knownBlocksAllEmpty = 15
+	// # Moved when React's stable built-ins stopped being dependencies
+	//
+	// 74 carrying to 69, 15 all-empty to 20. Five memo blocks became empty because the only
+	// dependency they carried was a value React guarantees is identity-stable -- a `useTransition`
+	// start function, a `useState` setter, a `useOptimistic` setter.
+	//
+	// An empty block is the RIGHT answer for those, and upstream's own output says so: both
+	// `preserve-use-memo-transition.ts` and `preserve-use-callback-stable-built-ins.ts` compile to
+	// `if ($[0] === Symbol.for("react.memo_cache_sentinel"))`, which is the marker for a value
+	// memoized once with no dependencies at all. Neither expects an error.
+	//
+	// So this count moving down is not a regression here, and the direction of `blocksWithCarrying`
+	// is not always the direction of correctness. The ceiling on `blocksAllEmptyWithCapture` below
+	// is what still guards the defect this oracle was built for.
+	const knownBlocksWithCarrying = 69
+	const knownBlocksAllEmpty = 20
 	if blocksWithCarrying < knownBlocksWithCarrying {
 		t.Errorf("blocks with a dependency-carrying interior scope = %d, want at least %d; the "+
 			"rule's third condition can no longer reach programs it could reach before",
@@ -153,7 +167,9 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// The capture subset is pinned separately because it is the one with a known cause. It should
 	// fall to zero when the dependency collector descends into nested functions, and a rise means
 	// more blocks lost their dependencies to a closure boundary.
-	const knownBlocksAllEmptyWithCapture = 10
+	// Raised from 10 by the same change. The four added are the stable-built-in fixtures above,
+	// whose blocks hold a capturing function expression and correctly carry no dependency.
+	const knownBlocksAllEmptyWithCapture = 14
 	if blocksAllEmptyWithCapture > knownBlocksAllEmptyWithCapture {
 		t.Errorf("all-empty memo blocks holding a capturing closure = %d, want at most %d; the "+
 			"closure boundary is swallowing more dependencies than before",
@@ -162,7 +178,13 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// The strongest of the three, because it is upstream's answer rather than our own shape: a
 	// fixture whose compiled output emits a cache slot while every scope in our block carries
 	// nothing. Zero is the target and any rise is a straightforward regression.
-	const knownBlocksAllEmptyContradicted = 4
+	// Raised from 4 by the same change, and this one deserves the most scrutiny of the four: it
+	// counts blocks where upstream emits a cache slot and we carry nothing. The added fixture is
+	// `preserve-use-callback-stable-built-ins.ts`, whose slot is the sentinel rather than a
+	// dependency comparison -- `_c(1)` with `$[0] === Symbol.for("react.memo_cache_sentinel")`.
+	// Counting a sentinel as a contradicted dependency is a property of this oracle's slot pattern
+	// rather than of our output, and is left recorded rather than silently filtered.
+	const knownBlocksAllEmptyContradicted = 5
 	if blocksAllEmptyContradicted > knownBlocksAllEmptyContradicted {
 		t.Errorf("all-empty memo blocks contradicted by upstream's compiled output = %d, want at "+
 			"most %d; upstream infers a dependency in a block where we now infer none",
