@@ -138,6 +138,13 @@ func TestParityAgainstInventory(t *testing.T) {
 // is immutable and a backup is a write waiting to happen:
 //
 //	git show HEAD:internal/rules/react/unsupported_syntax.go > "$scratch/original.go"
+//
+// That form answers "what does this file contain at this commit", and it is the right question when
+// capturing a baseline. It is emphatically not an answer to "what did this commit change" -- a
+// commit inherits every line from its ancestors, so `git show <sha>:<path>` happily returns content
+// from a file that commit never touched. A wrong sha was confirmed that way in this repository: the
+// probe ran, reported honestly about the wrong object, and agreed with the story being checked.
+// For what a commit changed, `git show --stat <sha>` or `git log <sha> -- <path>`.
 func TestRegisteredNamesAreBare(t *testing.T) {
 	registered := registeredRuleNames()
 	if len(registered) == 0 {
