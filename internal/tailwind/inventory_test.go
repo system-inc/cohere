@@ -1,6 +1,15 @@
 package tailwind
 
-import "testing"
+import (
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"path/filepath"
+	"sort"
+	"strings"
+	"testing"
+)
 
 // TestEveryTableIsTailwindsOrHasAStatedReason is the inventory this package owes its reader.
 //
@@ -20,7 +29,12 @@ import "testing"
 //	FrameworkVariantRegistrations   88   variants.ts registrations
 //	FrameworkStaticDeclarations    890   staticUtility calls
 //	FrameworkFunctionalUtilities    33   functionalUtility registrations
-//	FrameworkMultiDeclaration      152   functionalUtility registrations
+//	FrameworkMultiDeclarationUtilities
+//	                               152   functionalUtility registrations
+//	VariantOrder                   145   the order numbers those registrations sort at
+//	FrameworkNamespaces             14   the theme namespaces a root consumes, all Tailwind's own
+//	baseReadings                   374   readings of Tailwind's own utilities, held by the differential
+//	baseStatics                    869   readings of Tailwind's own statics, same
 //
 // # Ours, each answering something a reading cannot
 //
@@ -36,6 +50,18 @@ import "testing"
 //	                              shorthand relationships between declared properties, so deriving
 //	                              it means carrying a shorthand table of equal size, one layer
 //	                              further from the question.
+//	ColorNames              561   whether a value names a colour. Upstream has no such table and
+//	                              resolves through `--color` at 39 sites; `valueIsColorIn` asks the
+//	                              live theme first and falls through to this. Its own comment says
+//	                              the fallback is a generated snapshot of one repository, which is
+//	                              the defect `KnownStatics` and `StaticDeclaredProperties` were
+//	                              deleted for. This is the next one to go and it needs the
+//	                              measurement first: whether an inherited theme answers all 561.
+//	RootSelectorShapes        8   the selector a root emits under when it is not a bare class.
+//	                              Upstream stores nothing and writes `:where(& > :not(:last-child))`
+//	                              inline in the handler bodies, which this port has now ported. So
+//	                              this is derivable from code already here, and its reason is
+//	                              weaker than the other three rather than absent.
 //
 // `RootDeclaredProperties` and its three companions were here until #mz0m6k8, carried for exactly the
 // reason the paragraph below rejected. The emitting half is now ported, so the answer is computed by
@@ -68,11 +94,20 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 		"FrameworkVariantRegistrations": len(FrameworkVariantRegistrations),
 		"FrameworkStaticDeclarations":   len(FrameworkStaticDeclarations),
 		"FrameworkFunctionalUtilities":  len(FrameworkFunctionalUtilities),
-		"FrameworkMultiDeclaration":     len(FrameworkMultiDeclarationUtilities),
+		// Spelled in full, because the hand-written list this replaced said
+		// `FrameworkMultiDeclaration` and nothing noticed: a name in a list nobody parses can be
+		// wrong forever.
+		"FrameworkMultiDeclarationUtilities": len(FrameworkMultiDeclarationUtilities),
+		"VariantOrder":                       len(VariantOrder),
+		"FrameworkNamespaces":                len(FrameworkNamespaces),
+		"baseReadings":                       len(baseReadings),
+		"baseStatics":                        len(baseStatics),
 	}
 	ours := map[string]int{
-		"baseDescriptors":  len(baseDescriptors),
-		"CollapseFamilies": len(CollapseFamilies),
+		"baseDescriptors":    len(baseDescriptors),
+		"CollapseFamilies":   len(CollapseFamilies),
+		"ColorNames":         len(ColorNames),
+		"RootSelectorShapes": len(RootSelectorShapes),
 	}
 
 	for name, count := range upstream {
@@ -90,27 +125,26 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	// The count of tables, not their contents. A fifth table of ours appearing without an entry in
 	// the doc comment above is the thing this catches: the inventory going stale is how a table ends
 	// up carried for no stated reason, which is what this package started with.
-	if len(ours) != 2 {
-		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 3, so "+
+	if len(ours) != 4 {
+		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 4, so "+
 			"one has been added or removed without its reason being written down", len(ours))
 	}
 
-	// Every exported table in the package is accounted for above, and this is the half the first
-	// version of this test was missing.
+	// Every table in the package is accounted for above, and this half is read out of the source
+	// rather than restated.
 	//
-	// It asserted "exactly four tables of ours" over a list it wrote itself, so `KnownRoots` and
-	// `KnownStatics` sat in the same file, generated on every run, dead since 58fb982 rewired
-	// `HasUtility` off them, and passed. 1,236 entries carried for two commits under a check that
-	// read as clean, which is the same defect class this package keeps finding: a measurement of the
-	// wrong population.
+	// The first version of this test asserted "exactly four tables of ours" over a list it wrote
+	// itself, so `KnownRoots` and `KnownStatics` sat in the same file, dead since 58fb982, and passed.
+	// The second version named the tables in a slice, which was the same defect one step removed: the
+	// slice was written by hand from the two maps above it, so a table nobody typed into it could
+	// never be caught. It listed 8 while the package held 35.
 	//
-	// Naming them here is what makes the assertion mechanical rather than a restatement of the list.
-	// A table added to the package and not to this slice fails, whatever the count says.
-	inPackage := []string{
-		"PropertyOrder", "SortOverrideProperties", "FrameworkVariantRegistrations",
-		"FrameworkStaticDeclarations", "FrameworkFunctionalUtilities", "FrameworkMultiDeclaration",
-		"baseDescriptors", "CollapseFamilies",
-	}
+	// This parses the package and finds every top-level composite-literal table, so a table added to
+	// a file is a failure here whether or not anyone remembered this test. That is the difference
+	// between a measurement and a restatement, which is the distinction this package keeps rebuilding
+	// the hard way.
+	declared := tablesDeclaredInPackage(t)
+
 	accounted := make(map[string]bool, len(upstream)+len(ours))
 	for name := range upstream {
 		accounted[name] = true
@@ -118,16 +152,143 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	for name := range ours {
 		accounted[name] = true
 	}
-	for _, name := range inPackage {
-		if !accounted[name] {
-			t.Errorf("%s is a table in this package with no entry in the inventory above", name)
+
+	var unaccounted []string
+	for name := range declared {
+		if !accounted[name] && !tablesExemptFromTheInventory[name] {
+			unaccounted = append(unaccounted, fmt.Sprintf("%s (%s, %d entries)", name, declared[name].file, declared[name].entries))
 		}
 	}
-	if len(accounted) != len(inPackage) {
-		t.Errorf("the inventory accounts for %d tables and the package holds %d; the two lists have "+
-			"drifted, which is how a dead table survives a passing check", len(accounted), len(inPackage))
+	sort.Strings(unaccounted)
+	for _, name := range unaccounted {
+		t.Errorf("%s is a table in this package with no entry in the inventory above", name)
+	}
+
+	for name := range accounted {
+		if _, isDeclared := declared[name]; !isDeclared {
+			t.Errorf("%s has an inventory entry and is not declared in this package, so the two have drifted", name)
+		}
 	}
 
 	t.Logf("Tailwind's own: %v", upstream)
 	t.Logf("ours, each with a stated reason: %v", ours)
+}
+
+// tableInPackage is one top-level composite-literal table found in this package's source.
+type tableInPackage struct {
+	file    string
+	entries int
+}
+
+// tablesDeclaredInPackage parses this package and returns every top-level map or slice literal.
+//
+// Reading the source rather than a list, because a list is what the two previous versions of this
+// check were and neither could see a table nobody added to it. A parse sees what is there.
+//
+// Composite literals only. A table is a set of entries written down, which is the thing that goes
+// stale and the thing this inventory is about; a `var x = someCall()` is code and is not.
+func tablesDeclaredInPackage(t *testing.T) map[string]tableInPackage {
+	t.Helper()
+
+	paths, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatalf("listing the package's files: %v", err)
+	}
+
+	declared := make(map[string]tableInPackage)
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		fileSet := token.NewFileSet()
+		parsed, err := parser.ParseFile(fileSet, path, nil, 0)
+		if err != nil {
+			t.Fatalf("parsing %s: %v", path, err)
+		}
+		for _, declaration := range parsed.Decls {
+			general, isGeneral := declaration.(*ast.GenDecl)
+			if !isGeneral || general.Tok != token.VAR {
+				continue
+			}
+			for _, specification := range general.Specs {
+				value, isValue := specification.(*ast.ValueSpec)
+				if !isValue {
+					continue
+				}
+				for index, name := range value.Names {
+					if index >= len(value.Values) {
+						continue
+					}
+					literal, isLiteral := value.Values[index].(*ast.CompositeLit)
+					if !isLiteral {
+						continue
+					}
+					switch literal.Type.(type) {
+					case *ast.MapType, *ast.ArrayType:
+						declared[name.Name] = tableInPackage{file: path, entries: len(literal.Elts)}
+					}
+				}
+			}
+		}
+	}
+
+	if len(declared) == 0 {
+		t.Fatal("the parse found no tables at all, so this check measured nothing")
+	}
+	return declared
+}
+
+// Tables the inventory deliberately does not carry an entry for, each with the reason.
+//
+// The inventory is about tables that answer a question upstream answers by running code, because
+// those are the ones that go stale against a repository or a Tailwind version. Three kinds do not:
+//
+// The ported handle bodies. `frameworkEmitters`, `frameworkMultiEmitters`,
+// `frameworkMultiLiteralEmitters` and `gapEmitters` are the port's own source, one closure per root
+// read at the tag. They are code written as a map, not data recording what code produced, and
+// TestEveryFrameworkRootHasAnEmitter already holds them against the registration tables.
+//
+// The CSS grammar. `lengthUnits`, `angleUnits`, `mathFunctions`, `imageFunctions`,
+// `gradientFunctions`, `colorFunctions`, `namedColors`, `genericNames`, `absoluteSizes`,
+// `backgroundPositionKeywords`, `percentSuffix` and `colorKeywords` are facts about CSS rather than
+// about Tailwind or about a repository. They move when the CSS specification moves, which is not the
+// drift this inventory watches, and upstream carries the same lists for the same reason.
+//
+// Small local constants. `ignoredThemeKeys`, `bareValueDataTypes`, `themedModifierValues`,
+// `composedAggregateValues` and `FrameworkVariantComparisonGroups` are each read by one function in
+// the file that declares them and are part of that function's definition.
+//
+// An entry here is a claim that a table cannot go stale against a repository. Adding one to silence
+// a failure rather than because that claim is true is the failure mode, and it is not defended
+// against: measured, adding a two-entry table to this package and an exemption for it turns the
+// check green. That is the honest limit of this test. It catches a table added and forgotten, which
+// is what happened to `KnownRoots`, `KnownStatics` and the three ordering tables, and it does not
+// catch a table added deliberately with a false reason.
+//
+// Each is grouped under a reason above rather than listed bare, so the claim is at least written
+// down where review can see it.
+var tablesExemptFromTheInventory = map[string]bool{
+	"frameworkEmitters":             true,
+	"frameworkMultiEmitters":        true,
+	"frameworkMultiLiteralEmitters": true,
+	"gapEmitters":                   true,
+
+	"lengthUnits":                true,
+	"angleUnits":                 true,
+	"mathFunctions":              true,
+	"imageFunctions":             true,
+	"gradientFunctions":          true,
+	"colorFunctions":             true,
+	"namedColors":                true,
+	"genericNames":               true,
+	"absoluteSizes":              true,
+	"backgroundPositionKeywords": true,
+	"percentSuffix":              true,
+	"colorKeywords":              true,
+
+	"ignoredThemeKeys":                 true,
+	"bareValueDataTypes":               true,
+	"themedModifierValues":             true,
+	"composedAggregateValues":          true,
+	"FrameworkVariantComparisonGroups": true,
 }
