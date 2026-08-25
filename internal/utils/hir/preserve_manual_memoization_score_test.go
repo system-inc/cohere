@@ -1,6 +1,7 @@
 package hir
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -209,10 +210,27 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	}
 
 	const ruleMessage = "Existing memoization could not be preserved"
-	clean, fired, silent, unsupported := 0, 0, 0, 0
+	clean, fired, silent, unsupported, logsOnly := 0, 0, 0, 0, 0
 	for _, fixture := range fixtures {
 		base := filepath.Base(fixture.Name)
 		if strings.HasPrefix(base, "error.") || strings.HasPrefix(base, "todo.error.") {
+			continue
+		}
+		if upstreamReportsInLogs(t, fixture.ExpectPath, ruleMessage) {
+			// Upstream reports this rule on the fixture, in its `## Logs` block rather than in a
+			// `## Error` section. The population above is chosen by FILENAME, and `Expectation`
+			// parses only `## Error`, so neither route can see it: the fixture reads as clean while
+			// upstream reports on it, and firing here was scored as a false positive.
+			//
+			// Measured: exactly one fixture corpus-wide,
+			// `gating/dynamic-gating-bailout-nopanic.js`, whose source is
+			// `useMemo(() => identity(value), [])` -- an empty dependency array over a callback that
+			// reads `value`, which is a real violation both compilers agree on. Its log line carries
+			// `"kind":"CompileError"` and this rule's message.
+			//
+			// Excluded here rather than in the loader because `ExpectedCleanFixtureCount` is pinned
+			// against the filename split and is read by other tests.
+			logsOnly++
 			continue
 		}
 		clean++
@@ -228,7 +246,13 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 		silent++
 	}
 
-	if clean != reactconformance.ExpectedCleanFixtureCount {
+	const knownLogsOnly = 1
+	if logsOnly != knownLogsOnly {
+		t.Errorf("%d fixtures report this rule only in `## Logs`, want %d; that population is "+
+			"invisible to both the filename split and to `Expectation`, so a change in it moves "+
+			"the false-positive count for a reason unrelated to the rule", logsOnly, knownLogsOnly)
+	}
+	if clean+logsOnly != reactconformance.ExpectedCleanFixtureCount {
 		t.Fatalf("scored %d clean fixtures, want %d; the population this test measures is not the "+
 			"one it believes it is", clean, reactconformance.ExpectedCleanFixtureCount)
 	}
@@ -248,6 +272,12 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	// Lowered from 30 by declaring the four `Object` statics in the effect table. Three fixtures,
 	// exactly the three whose subject they are: `object-keys`, `object-values` and
 	// `repro-object-fromEntries-entries`, all now silent.
+	// The DENOMINATOR moved from 70 to 69 without this number moving, which is worth stating
+	// because the two are usually read together. `gating/dynamic-gating-bailout-nopanic.js` is now
+	// excluded: upstream reports this rule on it, in `## Logs` rather than in a `## Error` section,
+	// so it was counted as clean while both compilers agree it is a violation. It was not firing
+	// under the current gate, so 27 is unchanged; ungated it was one of the false positives and is
+	// no longer counted as one.
 	const knownFalsePositives = 27
 	if fired != knownFalsePositives {
 		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
@@ -332,4 +362,32 @@ func pipelineFindings(function *Function, checker *shimchecker.Checker) []Preser
 	PruneNonReactiveDependencies(tree, function, dependencies)
 
 	return ValidatePreservedManualMemoizationWithDependencies(tree, function, scopes, nil)
+}
+
+// upstreamReportsInLogs reports whether a fixture's expectation carries this rule's message in its
+// `## Logs` block rather than in a `## Error` section.
+//
+// `Expectation` parses only `## Error`, deliberately -- see its own comment. A fixture compiled
+// under `@panicThreshold:"none"` still records the diagnostic, but as a `CompileError` log line, and
+// nothing else in this package can see that. Reading the file directly is the narrow answer.
+//
+// The `## Logs` scoping is intent rather than a measured necessity, and saying so is the honest
+// version: measured over every clean fixture that mentions this rule's message, all zero of the
+// mentions fall outside `## Logs`, so searching the whole file would answer identically today. A
+// mutation removing the scoping survives for that reason. It is kept because the question being
+// asked is specifically "did upstream RECORD a diagnostic here", and a fixture whose `## Input`
+// happened to contain the sentence in a comment would answer yes to a whole-file search and be
+// silently dropped from the population.
+func upstreamReportsInLogs(t *testing.T, expectPath string, ruleMessage string) bool {
+	t.Helper()
+	body, err := os.ReadFile(expectPath)
+	if err != nil {
+		return false
+	}
+	text := string(body)
+	start := strings.Index(text, "## Logs")
+	if start < 0 {
+		return false
+	}
+	return strings.Contains(text[start:], ruleMessage)
 }
