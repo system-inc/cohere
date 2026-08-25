@@ -25,7 +25,6 @@ import (
 // thing; reading it at lint time would be the same table with extra steps.
 //
 //	PropertyOrder                  359   property-order.ts
-//	SortOverrideProperties          12   the --tw-sort overrides
 //	FrameworkVariantRegistrations   88   variants.ts registrations
 //	FrameworkStaticDeclarations    890   staticUtility calls
 //	FrameworkFunctionalUtilities    33   functionalUtility registrations
@@ -104,7 +103,6 @@ import (
 func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	upstream := map[string]int{
 		"PropertyOrder":                 len(PropertyOrder),
-		"SortOverrideProperties":        len(SortOverrideProperties),
 		"FrameworkVariantRegistrations": len(FrameworkVariantRegistrations),
 		"FrameworkStaticDeclarations":   len(FrameworkStaticDeclarations),
 		"FrameworkFunctionalUtilities":  len(FrameworkFunctionalUtilities),

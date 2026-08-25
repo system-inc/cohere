@@ -87,7 +87,6 @@ type enumeration struct {
 	// enumerate.mjs.
 	UnreachableRoots []string `json:"unreachableRoots"`
 	PropertyOrder    []string `json:"propertyOrder"`
-	SortOverrides    []string `json:"sortOverrides"`
 	VariantOrder     []string `json:"variantOrder"`
 
 	// VerifiedAgainst is the design systems CollapseFamilies was re-measured against on this run,
@@ -578,7 +577,7 @@ func renderOrder(result *enumeration) ([]byte, error) {
 //
 //	go run ./tools/gen_tailwind_collapse -entry-point <theme.css>
 //
-// Source: Tailwind %s. %d ordered properties, %d sort overrides.
+// Source: Tailwind %s. %d ordered properties.
 //
 // Tailwind sorts utilities into a stable total order, and enforce-consistent-class-order reports
 // class lists written in a different one. Its own sort is about twenty-five lines: compare by
@@ -596,7 +595,7 @@ package tailwind
 // Custom properties belong here too. --tw-ring-color has a position, and excluding dash-prefixed
 // names left ring-(--color) with an empty sort key, falling through to the alphabetical tiebreak.
 var PropertyOrder = map[string]int{
-`, result.TailwindVersion, len(result.PropertyOrder), len(result.SortOverrides))
+`, result.TailwindVersion, len(result.PropertyOrder))
 
 	for position, property := range result.PropertyOrder {
 		fmt.Fprintf(&buffer, "\t%q: %d,\n", property, position)
@@ -604,19 +603,12 @@ var PropertyOrder = map[string]int{
 
 	fmt.Fprintf(&buffer, `}
 
-// SortOverrideProperties are the values a --tw-sort declaration can carry.
+// SortOverrideProperties used to be printed here and is not any more.
 //
-// A utility declaring --tw-sort sorts at that property's position rather than at its own. space-x
-// declares row-gap, so it sorts with the gap utilities rather than with its own margins, which is
-// why the engine places me-0.5 before space-x-1 even though margin-inline-start comes first.
-//
-// The declaration is stripped before the CSS is emitted, so it cannot be recovered by asking the
-// engine and is read from Tailwind's own bundle instead.
-var SortOverrideProperties = map[string]bool{
+// Nothing read it. The latch it described is implemented in walk.go by looking a --tw-sort value up
+// in PropertyOrder, which answers whether the value is legal by hitting or missing.
+
 `)
-	for _, property := range result.SortOverrides {
-		fmt.Fprintf(&buffer, "\t%q: true,\n", property)
-	}
 
 	// The three ordering tables used to be printed between here and VariantOrder.
 	//

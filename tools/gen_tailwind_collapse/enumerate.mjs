@@ -185,9 +185,11 @@ function parseCandidate(className) {
  *   4. alphabetical
  *
  * `propertyOrder` is Tailwind's own list, read from the installed package rather than transcribed.
- * `sortOverrides` are utilities that declare `--tw-sort`, which replaces their sort position
- * entirely: `space-x` sorts as `row-gap` rather than as its own margins. That declaration is
- * stripped from compiled output, so it cannot be probed and has to come from the source.
+ *
+ * A `sortOverrides` list was scanned out of the bundle here and printed as `SortOverrideProperties`
+ * until nothing read it. The latch it described is real and lives in walk.go, where `PropertySort`
+ * looks a `--tw-sort` value up in `PropertyOrder` and answers whether it is legal by hitting or
+ * missing, so a list of legal values answers a question nobody asks.
  */
 const classOrder = [];
 const functionalRoots = new Set();
@@ -334,7 +336,6 @@ const roots = Array.from(functionalRoots).sort();
 
 
 const propertyOrder = [];
-const sortOverrides = [];
 const variantOrder = [];
 
 {
@@ -418,11 +419,6 @@ const variantOrder = [];
         }
     }
 
-    for (const match of bundleSource.matchAll(/"--tw-sort",\s*"([^"]+)"/g)) {
-        // The bundle is minified, so the utility name is recovered from the surrounding text rather
-        // than from a stable structure. Recorded as a value list; the rule maps roots to them below.
-        sortOverrides.push(match[1]);
-    }
 }
 
 const unreachableRoots = [];
@@ -858,7 +854,6 @@ process.stdout.write(
             orderingByRoot,
             orderingByStatic,
             orderingByClass,
-            sortOverrides: Array.from(new Set(sortOverrides)).sort(),
             variantOrder,
             unreachableRoots: unreachableRoots.sort(),
             rootColorProperties: rootValueProperties,

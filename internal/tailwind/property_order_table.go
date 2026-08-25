@@ -383,28 +383,16 @@ var PropertyOrder = map[string]int{
 	"forced-color-adjust":            358,
 }
 
-// SortOverrideProperties are the values a --tw-sort declaration can carry.
+// SortOverrideProperties used to be printed here and is not any more.
 //
-// A utility declaring --tw-sort sorts at that property's position rather than at its own. space-x
-// declares row-gap, so it sorts with the gap utilities rather than with its own margins, which is
-// why the engine places me-0.5 before space-x-1 even though margin-inline-start comes first.
+// It held the twelve values a `--tw-sort` declaration can carry, and nothing read it. The latch it
+// describes is real and is implemented in walk.go: `PropertySort` reads a `--tw-sort` declaration's
+// value and looks it up in `PropertyOrder`, so a value that names a known property latches the order
+// there and a value that does not falls through. Neither branch consults a list of which values are
+// legal, because the lookup answers that by hitting or missing.
 //
-// The declaration is stripped before the CSS is emitted, so it cannot be recovered by asking the
-// engine and is read from Tailwind's own bundle instead.
-var SortOverrideProperties = map[string]bool{
-	"--tw-container-component": true,
-	"--tw-gradient-from":       true,
-	"--tw-gradient-to":         true,
-	"--tw-gradient-via":        true,
-	"column-gap":               true,
-	"divide-color":             true,
-	"divide-style":             true,
-	"divide-x-width":           true,
-	"divide-y-width":           true,
-	"placeholder-color":        true,
-	"row-gap":                  true,
-	"size":                     true,
-}
+// `c097bb8` recorded it as dead alongside `RootSelectorShapes` and left both standing rather than
+// grow a diff that was already carrying two authors' work. This is the rest of that.
 
 // OrderingPropertiesByRoot is the declarations a root's utilities emit, in source order, custom
 // properties included.
