@@ -38,6 +38,7 @@ const chunkCandidates = NodeFileSystem.readdirSync(distributionDirectory).filter
 let inferDataType = null;
 let isLength = null;
 let isPositiveInteger = null;
+let segment = null;
 let chunkName = null;
 
 for (const candidate of chunkCandidates) {
@@ -70,6 +71,26 @@ for (const candidate of chunkCandidates) {
     }
 
     if (inferDataType) {
+        /*
+         * `segment` takes (input, separator) like inferDataType takes (value, types), so arity does
+         * not separate them. Identity is behavioral: it splits on a top-level separator, keeps
+         * nested parens/brackets/braces together, and always pushes a final part, so an empty input
+         * yields one empty string rather than none.
+         */
+        for (const exported of Object.values(module)) {
+            if (typeof exported !== 'function' || exported.length !== 2 || exported === inferDataType) continue;
+            try {
+                const flat = exported('a,b,c', ',');
+                if (!Array.isArray(flat) || flat.join('|') !== 'a|b|c') continue;
+                if (exported('a(1,2),b', ',').join('|') !== 'a(1,2)|b') continue;
+                if (exported('[a,b],c', ',').join('|') !== '[a,b]|c') continue;
+                if (exported('', ',').length !== 1) continue;
+                segment = exported;
+            } catch {
+                continue;
+            }
+        }
+
         for (const exported of Object.values(module)) {
             if (typeof exported !== 'function' || exported.length !== 1) continue;
             try {
@@ -126,6 +147,8 @@ for (const value of corpus) {
         perType,
         isLength: isLength ? isLength(value) : null,
         isPositiveInteger: isPositiveInteger ? isPositiveInteger(value) : null,
+        segmentComma: segment ? segment(value, ',') : null,
+        segmentSpace: segment ? segment(value, ' ') : null,
     });
 }
 
@@ -134,6 +157,7 @@ process.stdout.write(JSON.stringify({
     chunk: chunkName,
     isLengthResolved: Boolean(isLength),
     isPositiveIntegerResolved: Boolean(isPositiveInteger),
+    segmentResolved: Boolean(segment),
     types: allTypes,
     reversedTypes,
     cases,

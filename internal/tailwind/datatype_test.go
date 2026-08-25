@@ -24,6 +24,7 @@ type dataTypeCorpus struct {
 	Chunk                     string         `json:"chunk"`
 	IsLengthResolved          bool           `json:"isLengthResolved"`
 	IsPositiveIntegerResolved bool           `json:"isPositiveIntegerResolved"`
+	SegmentResolved           bool           `json:"segmentResolved"`
 	Types                     []DataType     `json:"types"`
 	ReversedTypes             []DataType     `json:"reversedTypes"`
 	Cases                     []dataTypeCase `json:"cases"`
@@ -45,6 +46,10 @@ type dataTypeCase struct {
 	// IsLength and IsPositiveInteger are the two exported helpers, asked directly.
 	IsLength          bool `json:"isLength"`
 	IsPositiveInteger bool `json:"isPositiveInteger"`
+	// SegmentComma and SegmentSpace are the engine's own splitter, recorded so that segment can be
+	// tested directly rather than only through the answers it feeds.
+	SegmentComma []string `json:"segmentComma"`
+	SegmentSpace []string `json:"segmentSpace"`
 }
 
 func loadDataTypeCorpus(t *testing.T) dataTypeCorpus {
@@ -62,6 +67,9 @@ func loadDataTypeCorpus(t *testing.T) dataTypeCorpus {
 	// a suite that ran 12 cases has not tested this.
 	if len(corpus.Cases) < 400 {
 		t.Fatalf("fixture holds only %d cases; expected several hundred shapes", len(corpus.Cases))
+	}
+	if !corpus.SegmentResolved {
+		t.Fatal("fixture was generated without resolving the engine's segment; its segment columns are not measurements")
 	}
 	if !corpus.IsLengthResolved || !corpus.IsPositiveIntegerResolved {
 		t.Fatalf("fixture was generated without resolving both helper predicates; its isLength/isPositiveInteger columns are not measurements")
@@ -213,5 +221,88 @@ func TestAllDataTypesIsTheEnginesOrder(t *testing.T) {
 	all[0] = "mutated"
 	if AllDataTypes()[0] != DataTypeColor {
 		t.Error("AllDataTypes returns shared state; a caller mutated it")
+	}
+}
+
+// TestSegmentMatchesEngine compares the splitter directly against the engine's own.
+//
+// This test exists because of a measured gap rather than for completeness. Breaking bracket nesting
+// in segment — making `[` stop pushing a closer, so `[a,b]` splits into two parts — changes the
+// split of 15 corpus values and changes the inferred type of none of them, because the bracket
+// fragments are nonsense to every predicate whether they arrive as one part or two. A mutation that
+// real code would notice slipped through a suite that only ever asked segment questions through
+// InferDataType.
+//
+// The type answers are what production consumes, so they stay the primary check. But segment is
+// about to have other callers in this port — the candidate parser and the value parser both need
+// it — and a splitter verified only by the one consumer that cannot see its mistakes is verified
+// for that consumer alone.
+func TestSegmentMatchesEngine(t *testing.T) {
+	corpus := loadDataTypeCorpus(t)
+
+	comparisons := 0
+	for _, testCase := range corpus.Cases {
+		for _, separator := range []struct {
+			character byte
+			want      []string
+		}{
+			{',', testCase.SegmentComma},
+			{' ', testCase.SegmentSpace},
+		} {
+			got := segment(testCase.Value, separator.character)
+			if len(got) != len(separator.want) {
+				t.Errorf("segment(%q, %q) = %q (%d parts), engine says %q (%d parts)",
+					testCase.Value, string(separator.character), got, len(got), separator.want, len(separator.want))
+				continue
+			}
+			for index := range got {
+				if got[index] != separator.want[index] {
+					t.Errorf("segment(%q, %q)[%d] = %q, engine says %q",
+						testCase.Value, string(separator.character), index, got[index], separator.want[index])
+				}
+			}
+			comparisons++
+		}
+	}
+
+	t.Logf("compared %d segment splits across %d distinct value shapes", comparisons, len(corpus.Cases))
+}
+
+// TestImageVarSkipIsUnreachableThroughInferDataType records a measured limit of the differential
+// suite, and covers the branch the suite cannot reach.
+//
+// isImage skips `var(` parts without counting them, and a mutation that counts them instead survives
+// every one of the 9,386 differential comparisons. That is not a gap in the corpus; it is provably
+// unobservable through InferDataType. Counting a var() part can only raise `count`, and `count > 0`
+// is already satisfied whenever any real image part is present, so the two spellings differ only on
+// a value whose parts are all `var(...)`. Such a value necessarily starts with `var(` and is
+// short-circuited before isImage ever runs.
+//
+// Which leaves the branch correct, unreachable from the public entry point, and untested unless the
+// predicate is called directly. It is called directly here, because "no caller can see it today" is
+// a fact about today's callers.
+func TestImageVarSkipIsUnreachableThroughInferDataType(t *testing.T) {
+	// Directly: a value of nothing but var() parts is not an image, because the skips never count.
+	for _, value := range []string{"var(--a)", "var(--a),var(--b)", "var(--a),var(--b),var(--c)"} {
+		if isImage(value) {
+			t.Errorf("isImage(%q) = true, want false: var() parts are skipped, not counted", value)
+		}
+		// And through the public entry point the same value is short-circuited, for a different
+		// reason, which is why the two must both be checked.
+		if got := InferDataType(value, []DataType{DataTypeImage}); got != "" {
+			t.Errorf("InferDataType(%q, [image]) = %q, want no type", value, got)
+		}
+	}
+
+	// A real image part alongside a skipped var() part still counts, with no leading space, since
+	// segment does not trim and ` var(` fails the prefix test.
+	for _, value := range []string{"url(a.png),var(--b)", "linear-gradient(red,blue),var(--x)"} {
+		if !isImage(value) {
+			t.Errorf("isImage(%q) = false, want true", value)
+		}
+	}
+	// With the space, the part is not var-prefixed, so it falls through to the reject.
+	if isImage("url(a.png), var(--b)") {
+		t.Error(`isImage("url(a.png), var(--b)") = true, want false: " var(" is not a var() part`)
 	}
 }

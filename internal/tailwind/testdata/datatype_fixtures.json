@@ -3,6 +3,7 @@
   "chunk": "chunk-C2OYBFIH.mjs",
   "isLengthResolved": true,
   "isPositiveIntegerResolved": true,
+  "segmentResolved": true,
   "types": [
     "color",
     "length",
@@ -66,7 +67,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": true
+      "isPositiveInteger": true,
+      "segmentComma": [
+        "0"
+      ],
+      "segmentSpace": [
+        "0"
+      ]
     },
     {
       "value": "1",
@@ -92,7 +99,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": true
+      "isPositiveInteger": true,
+      "segmentComma": [
+        "1"
+      ],
+      "segmentSpace": [
+        "1"
+      ]
     },
     {
       "value": "12",
@@ -118,7 +131,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": true
+      "isPositiveInteger": true,
+      "segmentComma": [
+        "12"
+      ],
+      "segmentSpace": [
+        "12"
+      ]
     },
     {
       "value": "007",
@@ -144,7 +163,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "007"
+      ],
+      "segmentSpace": [
+        "007"
+      ]
     },
     {
       "value": "0.5",
@@ -170,7 +195,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0.5"
+      ],
+      "segmentSpace": [
+        "0.5"
+      ]
     },
     {
       "value": ".5",
@@ -196,7 +227,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        ".5"
+      ],
+      "segmentSpace": [
+        ".5"
+      ]
     },
     {
       "value": "5.",
@@ -222,7 +259,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "5."
+      ],
+      "segmentSpace": [
+        "5."
+      ]
     },
     {
       "value": "-1",
@@ -248,7 +291,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-1"
+      ],
+      "segmentSpace": [
+        "-1"
+      ]
     },
     {
       "value": "+1",
@@ -274,7 +323,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "+1"
+      ],
+      "segmentSpace": [
+        "+1"
+      ]
     },
     {
       "value": "1e3",
@@ -300,7 +355,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1e3"
+      ],
+      "segmentSpace": [
+        "1e3"
+      ]
     },
     {
       "value": "1E3",
@@ -326,7 +387,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1E3"
+      ],
+      "segmentSpace": [
+        "1E3"
+      ]
     },
     {
       "value": "1e-3",
@@ -352,7 +419,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1e-3"
+      ],
+      "segmentSpace": [
+        "1e-3"
+      ]
     },
     {
       "value": "1e+3",
@@ -378,7 +451,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1e+3"
+      ],
+      "segmentSpace": [
+        "1e+3"
+      ]
     },
     {
       "value": "1e",
@@ -404,7 +483,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1e"
+      ],
+      "segmentSpace": [
+        "1e"
+      ]
     },
     {
       "value": "1.5e2",
@@ -430,7 +515,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1.5e2"
+      ],
+      "segmentSpace": [
+        "1.5e2"
+      ]
     },
     {
       "value": "-0",
@@ -456,7 +547,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-0"
+      ],
+      "segmentSpace": [
+        "-0"
+      ]
     },
     {
       "value": "+0",
@@ -482,7 +579,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "+0"
+      ],
+      "segmentSpace": [
+        "+0"
+      ]
     },
     {
       "value": "0.0",
@@ -508,7 +611,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0.0"
+      ],
+      "segmentSpace": [
+        "0.0"
+      ]
     },
     {
       "value": "00",
@@ -534,7 +643,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "00"
+      ],
+      "segmentSpace": [
+        "00"
+      ]
     },
     {
       "value": "1.",
@@ -560,7 +675,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1."
+      ],
+      "segmentSpace": [
+        "1."
+      ]
     },
     {
       "value": "..5",
@@ -586,7 +707,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "..5"
+      ],
+      "segmentSpace": [
+        "..5"
+      ]
     },
     {
       "value": ".",
@@ -612,7 +739,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "."
+      ],
+      "segmentSpace": [
+        "."
+      ]
     },
     {
       "value": "-",
@@ -638,7 +771,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-"
+      ],
+      "segmentSpace": [
+        "-"
+      ]
     },
     {
       "value": "+",
@@ -664,7 +803,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "+"
+      ],
+      "segmentSpace": [
+        "+"
+      ]
     },
     {
       "value": "1.2.3",
@@ -690,7 +835,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1.2.3"
+      ],
+      "segmentSpace": [
+        "1.2.3"
+      ]
     },
     {
       "value": "9007199254740993",
@@ -716,7 +867,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "9007199254740993"
+      ],
+      "segmentSpace": [
+        "9007199254740993"
+      ]
     },
     {
       "value": "99999999999999999999999",
@@ -742,7 +899,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "99999999999999999999999"
+      ],
+      "segmentSpace": [
+        "99999999999999999999999"
+      ]
     },
     {
       "value": "1e21",
@@ -768,7 +931,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1e21"
+      ],
+      "segmentSpace": [
+        "1e21"
+      ]
     },
     {
       "value": "1000000000000000000000",
@@ -794,7 +963,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1000000000000000000000"
+      ],
+      "segmentSpace": [
+        "1000000000000000000000"
+      ]
     },
     {
       "value": "  1",
@@ -820,7 +995,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "  1"
+      ],
+      "segmentSpace": [
+        "",
+        "",
+        "1"
+      ]
     },
     {
       "value": "1  ",
@@ -846,7 +1029,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1  "
+      ],
+      "segmentSpace": [
+        "1",
+        "",
+        ""
+      ]
     },
     {
       "value": "1 ",
@@ -872,7 +1063,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1 "
+      ],
+      "segmentSpace": [
+        "1",
+        ""
+      ]
     },
     {
       "value": "2147483648",
@@ -898,7 +1096,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": true
+      "isPositiveInteger": true,
+      "segmentComma": [
+        "2147483648"
+      ],
+      "segmentSpace": [
+        "2147483648"
+      ]
     },
     {
       "value": "4294967296",
@@ -924,7 +1128,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": true
+      "isPositiveInteger": true,
+      "segmentComma": [
+        "4294967296"
+      ],
+      "segmentSpace": [
+        "4294967296"
+      ]
     },
     {
       "value": "10cm",
@@ -950,7 +1160,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10cm"
+      ],
+      "segmentSpace": [
+        "10cm"
+      ]
     },
     {
       "value": "-2.5cm",
@@ -976,7 +1192,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5cm"
+      ],
+      "segmentSpace": [
+        "-2.5cm"
+      ]
     },
     {
       "value": "0cm",
@@ -1002,7 +1224,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0cm"
+      ],
+      "segmentSpace": [
+        "0cm"
+      ]
     },
     {
       "value": "10mm",
@@ -1028,7 +1256,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10mm"
+      ],
+      "segmentSpace": [
+        "10mm"
+      ]
     },
     {
       "value": "-2.5mm",
@@ -1054,7 +1288,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5mm"
+      ],
+      "segmentSpace": [
+        "-2.5mm"
+      ]
     },
     {
       "value": "0mm",
@@ -1080,7 +1320,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0mm"
+      ],
+      "segmentSpace": [
+        "0mm"
+      ]
     },
     {
       "value": "10Q",
@@ -1106,7 +1352,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10Q"
+      ],
+      "segmentSpace": [
+        "10Q"
+      ]
     },
     {
       "value": "-2.5Q",
@@ -1132,7 +1384,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5Q"
+      ],
+      "segmentSpace": [
+        "-2.5Q"
+      ]
     },
     {
       "value": "0Q",
@@ -1158,7 +1416,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0Q"
+      ],
+      "segmentSpace": [
+        "0Q"
+      ]
     },
     {
       "value": "10in",
@@ -1184,7 +1448,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10in"
+      ],
+      "segmentSpace": [
+        "10in"
+      ]
     },
     {
       "value": "-2.5in",
@@ -1210,7 +1480,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5in"
+      ],
+      "segmentSpace": [
+        "-2.5in"
+      ]
     },
     {
       "value": "0in",
@@ -1236,7 +1512,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0in"
+      ],
+      "segmentSpace": [
+        "0in"
+      ]
     },
     {
       "value": "10pc",
@@ -1262,7 +1544,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10pc"
+      ],
+      "segmentSpace": [
+        "10pc"
+      ]
     },
     {
       "value": "-2.5pc",
@@ -1288,7 +1576,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5pc"
+      ],
+      "segmentSpace": [
+        "-2.5pc"
+      ]
     },
     {
       "value": "0pc",
@@ -1314,7 +1608,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0pc"
+      ],
+      "segmentSpace": [
+        "0pc"
+      ]
     },
     {
       "value": "10pt",
@@ -1340,7 +1640,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10pt"
+      ],
+      "segmentSpace": [
+        "10pt"
+      ]
     },
     {
       "value": "-2.5pt",
@@ -1366,7 +1672,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5pt"
+      ],
+      "segmentSpace": [
+        "-2.5pt"
+      ]
     },
     {
       "value": "0pt",
@@ -1392,7 +1704,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0pt"
+      ],
+      "segmentSpace": [
+        "0pt"
+      ]
     },
     {
       "value": "10px",
@@ -1418,7 +1736,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10px"
+      ],
+      "segmentSpace": [
+        "10px"
+      ]
     },
     {
       "value": "-2.5px",
@@ -1444,7 +1768,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5px"
+      ],
+      "segmentSpace": [
+        "-2.5px"
+      ]
     },
     {
       "value": "0px",
@@ -1470,7 +1800,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0px"
+      ],
+      "segmentSpace": [
+        "0px"
+      ]
     },
     {
       "value": "10em",
@@ -1496,7 +1832,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10em"
+      ],
+      "segmentSpace": [
+        "10em"
+      ]
     },
     {
       "value": "-2.5em",
@@ -1522,7 +1864,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5em"
+      ],
+      "segmentSpace": [
+        "-2.5em"
+      ]
     },
     {
       "value": "0em",
@@ -1548,7 +1896,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0em"
+      ],
+      "segmentSpace": [
+        "0em"
+      ]
     },
     {
       "value": "10ex",
@@ -1574,7 +1928,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10ex"
+      ],
+      "segmentSpace": [
+        "10ex"
+      ]
     },
     {
       "value": "-2.5ex",
@@ -1600,7 +1960,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5ex"
+      ],
+      "segmentSpace": [
+        "-2.5ex"
+      ]
     },
     {
       "value": "0ex",
@@ -1626,7 +1992,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0ex"
+      ],
+      "segmentSpace": [
+        "0ex"
+      ]
     },
     {
       "value": "10ch",
@@ -1652,7 +2024,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10ch"
+      ],
+      "segmentSpace": [
+        "10ch"
+      ]
     },
     {
       "value": "-2.5ch",
@@ -1678,7 +2056,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5ch"
+      ],
+      "segmentSpace": [
+        "-2.5ch"
+      ]
     },
     {
       "value": "0ch",
@@ -1704,7 +2088,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0ch"
+      ],
+      "segmentSpace": [
+        "0ch"
+      ]
     },
     {
       "value": "10rem",
@@ -1730,7 +2120,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10rem"
+      ],
+      "segmentSpace": [
+        "10rem"
+      ]
     },
     {
       "value": "-2.5rem",
@@ -1756,7 +2152,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5rem"
+      ],
+      "segmentSpace": [
+        "-2.5rem"
+      ]
     },
     {
       "value": "0rem",
@@ -1782,7 +2184,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0rem"
+      ],
+      "segmentSpace": [
+        "0rem"
+      ]
     },
     {
       "value": "10lh",
@@ -1808,7 +2216,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10lh"
+      ],
+      "segmentSpace": [
+        "10lh"
+      ]
     },
     {
       "value": "-2.5lh",
@@ -1834,7 +2248,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5lh"
+      ],
+      "segmentSpace": [
+        "-2.5lh"
+      ]
     },
     {
       "value": "0lh",
@@ -1860,7 +2280,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0lh"
+      ],
+      "segmentSpace": [
+        "0lh"
+      ]
     },
     {
       "value": "10rlh",
@@ -1886,7 +2312,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10rlh"
+      ],
+      "segmentSpace": [
+        "10rlh"
+      ]
     },
     {
       "value": "-2.5rlh",
@@ -1912,7 +2344,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5rlh"
+      ],
+      "segmentSpace": [
+        "-2.5rlh"
+      ]
     },
     {
       "value": "0rlh",
@@ -1938,7 +2376,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0rlh"
+      ],
+      "segmentSpace": [
+        "0rlh"
+      ]
     },
     {
       "value": "10vw",
@@ -1964,7 +2408,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10vw"
+      ],
+      "segmentSpace": [
+        "10vw"
+      ]
     },
     {
       "value": "-2.5vw",
@@ -1990,7 +2440,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5vw"
+      ],
+      "segmentSpace": [
+        "-2.5vw"
+      ]
     },
     {
       "value": "0vw",
@@ -2016,7 +2472,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0vw"
+      ],
+      "segmentSpace": [
+        "0vw"
+      ]
     },
     {
       "value": "10vh",
@@ -2042,7 +2504,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10vh"
+      ],
+      "segmentSpace": [
+        "10vh"
+      ]
     },
     {
       "value": "-2.5vh",
@@ -2068,7 +2536,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5vh"
+      ],
+      "segmentSpace": [
+        "-2.5vh"
+      ]
     },
     {
       "value": "0vh",
@@ -2094,7 +2568,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0vh"
+      ],
+      "segmentSpace": [
+        "0vh"
+      ]
     },
     {
       "value": "10vmin",
@@ -2120,7 +2600,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10vmin"
+      ],
+      "segmentSpace": [
+        "10vmin"
+      ]
     },
     {
       "value": "-2.5vmin",
@@ -2146,7 +2632,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5vmin"
+      ],
+      "segmentSpace": [
+        "-2.5vmin"
+      ]
     },
     {
       "value": "0vmin",
@@ -2172,7 +2664,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0vmin"
+      ],
+      "segmentSpace": [
+        "0vmin"
+      ]
     },
     {
       "value": "10vmax",
@@ -2198,7 +2696,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10vmax"
+      ],
+      "segmentSpace": [
+        "10vmax"
+      ]
     },
     {
       "value": "-2.5vmax",
@@ -2224,7 +2728,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5vmax"
+      ],
+      "segmentSpace": [
+        "-2.5vmax"
+      ]
     },
     {
       "value": "0vmax",
@@ -2250,7 +2760,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0vmax"
+      ],
+      "segmentSpace": [
+        "0vmax"
+      ]
     },
     {
       "value": "10vb",
@@ -2276,7 +2792,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10vb"
+      ],
+      "segmentSpace": [
+        "10vb"
+      ]
     },
     {
       "value": "-2.5vb",
@@ -2302,7 +2824,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5vb"
+      ],
+      "segmentSpace": [
+        "-2.5vb"
+      ]
     },
     {
       "value": "0vb",
@@ -2328,7 +2856,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0vb"
+      ],
+      "segmentSpace": [
+        "0vb"
+      ]
     },
     {
       "value": "10vi",
@@ -2354,7 +2888,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10vi"
+      ],
+      "segmentSpace": [
+        "10vi"
+      ]
     },
     {
       "value": "-2.5vi",
@@ -2380,7 +2920,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5vi"
+      ],
+      "segmentSpace": [
+        "-2.5vi"
+      ]
     },
     {
       "value": "0vi",
@@ -2406,7 +2952,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0vi"
+      ],
+      "segmentSpace": [
+        "0vi"
+      ]
     },
     {
       "value": "10svw",
@@ -2432,7 +2984,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10svw"
+      ],
+      "segmentSpace": [
+        "10svw"
+      ]
     },
     {
       "value": "-2.5svw",
@@ -2458,7 +3016,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5svw"
+      ],
+      "segmentSpace": [
+        "-2.5svw"
+      ]
     },
     {
       "value": "0svw",
@@ -2484,7 +3048,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0svw"
+      ],
+      "segmentSpace": [
+        "0svw"
+      ]
     },
     {
       "value": "10svh",
@@ -2510,7 +3080,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10svh"
+      ],
+      "segmentSpace": [
+        "10svh"
+      ]
     },
     {
       "value": "-2.5svh",
@@ -2536,7 +3112,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5svh"
+      ],
+      "segmentSpace": [
+        "-2.5svh"
+      ]
     },
     {
       "value": "0svh",
@@ -2562,7 +3144,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0svh"
+      ],
+      "segmentSpace": [
+        "0svh"
+      ]
     },
     {
       "value": "10lvw",
@@ -2588,7 +3176,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10lvw"
+      ],
+      "segmentSpace": [
+        "10lvw"
+      ]
     },
     {
       "value": "-2.5lvw",
@@ -2614,7 +3208,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5lvw"
+      ],
+      "segmentSpace": [
+        "-2.5lvw"
+      ]
     },
     {
       "value": "0lvw",
@@ -2640,7 +3240,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0lvw"
+      ],
+      "segmentSpace": [
+        "0lvw"
+      ]
     },
     {
       "value": "10lvh",
@@ -2666,7 +3272,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10lvh"
+      ],
+      "segmentSpace": [
+        "10lvh"
+      ]
     },
     {
       "value": "-2.5lvh",
@@ -2692,7 +3304,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5lvh"
+      ],
+      "segmentSpace": [
+        "-2.5lvh"
+      ]
     },
     {
       "value": "0lvh",
@@ -2718,7 +3336,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0lvh"
+      ],
+      "segmentSpace": [
+        "0lvh"
+      ]
     },
     {
       "value": "10dvw",
@@ -2744,7 +3368,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10dvw"
+      ],
+      "segmentSpace": [
+        "10dvw"
+      ]
     },
     {
       "value": "-2.5dvw",
@@ -2770,7 +3400,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5dvw"
+      ],
+      "segmentSpace": [
+        "-2.5dvw"
+      ]
     },
     {
       "value": "0dvw",
@@ -2796,7 +3432,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0dvw"
+      ],
+      "segmentSpace": [
+        "0dvw"
+      ]
     },
     {
       "value": "10dvh",
@@ -2822,7 +3464,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10dvh"
+      ],
+      "segmentSpace": [
+        "10dvh"
+      ]
     },
     {
       "value": "-2.5dvh",
@@ -2848,7 +3496,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5dvh"
+      ],
+      "segmentSpace": [
+        "-2.5dvh"
+      ]
     },
     {
       "value": "0dvh",
@@ -2874,7 +3528,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0dvh"
+      ],
+      "segmentSpace": [
+        "0dvh"
+      ]
     },
     {
       "value": "10cqw",
@@ -2900,7 +3560,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10cqw"
+      ],
+      "segmentSpace": [
+        "10cqw"
+      ]
     },
     {
       "value": "-2.5cqw",
@@ -2926,7 +3592,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5cqw"
+      ],
+      "segmentSpace": [
+        "-2.5cqw"
+      ]
     },
     {
       "value": "0cqw",
@@ -2952,7 +3624,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0cqw"
+      ],
+      "segmentSpace": [
+        "0cqw"
+      ]
     },
     {
       "value": "10cqh",
@@ -2978,7 +3656,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10cqh"
+      ],
+      "segmentSpace": [
+        "10cqh"
+      ]
     },
     {
       "value": "-2.5cqh",
@@ -3004,7 +3688,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5cqh"
+      ],
+      "segmentSpace": [
+        "-2.5cqh"
+      ]
     },
     {
       "value": "0cqh",
@@ -3030,7 +3720,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0cqh"
+      ],
+      "segmentSpace": [
+        "0cqh"
+      ]
     },
     {
       "value": "10cqi",
@@ -3056,7 +3752,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10cqi"
+      ],
+      "segmentSpace": [
+        "10cqi"
+      ]
     },
     {
       "value": "-2.5cqi",
@@ -3082,7 +3784,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5cqi"
+      ],
+      "segmentSpace": [
+        "-2.5cqi"
+      ]
     },
     {
       "value": "0cqi",
@@ -3108,7 +3816,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0cqi"
+      ],
+      "segmentSpace": [
+        "0cqi"
+      ]
     },
     {
       "value": "10cqb",
@@ -3134,7 +3848,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10cqb"
+      ],
+      "segmentSpace": [
+        "10cqb"
+      ]
     },
     {
       "value": "-2.5cqb",
@@ -3160,7 +3880,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5cqb"
+      ],
+      "segmentSpace": [
+        "-2.5cqb"
+      ]
     },
     {
       "value": "0cqb",
@@ -3186,7 +3912,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0cqb"
+      ],
+      "segmentSpace": [
+        "0cqb"
+      ]
     },
     {
       "value": "10cqmin",
@@ -3212,7 +3944,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10cqmin"
+      ],
+      "segmentSpace": [
+        "10cqmin"
+      ]
     },
     {
       "value": "-2.5cqmin",
@@ -3238,7 +3976,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5cqmin"
+      ],
+      "segmentSpace": [
+        "-2.5cqmin"
+      ]
     },
     {
       "value": "0cqmin",
@@ -3264,7 +4008,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0cqmin"
+      ],
+      "segmentSpace": [
+        "0cqmin"
+      ]
     },
     {
       "value": "10cqmax",
@@ -3290,7 +4040,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10cqmax"
+      ],
+      "segmentSpace": [
+        "10cqmax"
+      ]
     },
     {
       "value": "-2.5cqmax",
@@ -3316,7 +4072,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-2.5cqmax"
+      ],
+      "segmentSpace": [
+        "-2.5cqmax"
+      ]
     },
     {
       "value": "0cqmax",
@@ -3342,7 +4104,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0cqmax"
+      ],
+      "segmentSpace": [
+        "0cqmax"
+      ]
     },
     {
       "value": "10q",
@@ -3368,7 +4136,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10q"
+      ],
+      "segmentSpace": [
+        "10q"
+      ]
     },
     {
       "value": "10PX",
@@ -3394,7 +4168,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10PX"
+      ],
+      "segmentSpace": [
+        "10PX"
+      ]
     },
     {
       "value": "10Rem",
@@ -3420,7 +4200,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10Rem"
+      ],
+      "segmentSpace": [
+        "10Rem"
+      ]
     },
     {
       "value": "10foo",
@@ -3446,7 +4232,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10foo"
+      ],
+      "segmentSpace": [
+        "10foo"
+      ]
     },
     {
       "value": "10",
@@ -3472,7 +4264,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": true
+      "isPositiveInteger": true,
+      "segmentComma": [
+        "10"
+      ],
+      "segmentSpace": [
+        "10"
+      ]
     },
     {
       "value": "px",
@@ -3498,7 +4296,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "px"
+      ],
+      "segmentSpace": [
+        "px"
+      ]
     },
     {
       "value": "10 px",
@@ -3524,7 +4328,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10 px"
+      ],
+      "segmentSpace": [
+        "10",
+        "px"
+      ]
     },
     {
       "value": "10px ",
@@ -3550,7 +4361,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10px "
+      ],
+      "segmentSpace": [
+        "10px",
+        ""
+      ]
     },
     {
       "value": "1e2px",
@@ -3576,7 +4394,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1e2px"
+      ],
+      "segmentSpace": [
+        "1e2px"
+      ]
     },
     {
       "value": "-.5rem",
@@ -3602,7 +4426,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-.5rem"
+      ],
+      "segmentSpace": [
+        "-.5rem"
+      ]
     },
     {
       "value": ".5px",
@@ -3628,7 +4458,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        ".5px"
+      ],
+      "segmentSpace": [
+        ".5px"
+      ]
     },
     {
       "value": "--spacing(4)",
@@ -3654,7 +4490,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "--spacing(4)"
+      ],
+      "segmentSpace": [
+        "--spacing(4)"
+      ]
     },
     {
       "value": "--SPACING(4)",
@@ -3680,7 +4522,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "--SPACING(4)"
+      ],
+      "segmentSpace": [
+        "--SPACING(4)"
+      ]
     },
     {
       "value": "--Spacing(2)",
@@ -3706,7 +4554,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "--Spacing(2)"
+      ],
+      "segmentSpace": [
+        "--Spacing(2)"
+      ]
     },
     {
       "value": "--spacingx(4)",
@@ -3732,7 +4586,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "--spacingx(4)"
+      ],
+      "segmentSpace": [
+        "--spacingx(4)"
+      ]
     },
     {
       "value": "--spacing 4",
@@ -3758,7 +4618,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "--spacing 4"
+      ],
+      "segmentSpace": [
+        "--spacing",
+        "4"
+      ]
     },
     {
       "value": "--spacing(",
@@ -3784,7 +4651,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "--spacing("
+      ],
+      "segmentSpace": [
+        "--spacing("
+      ]
     },
     {
       "value": "50%",
@@ -3810,7 +4683,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "50%"
+      ],
+      "segmentSpace": [
+        "50%"
+      ]
     },
     {
       "value": "0%",
@@ -3836,7 +4715,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0%"
+      ],
+      "segmentSpace": [
+        "0%"
+      ]
     },
     {
       "value": "-10%",
@@ -3862,7 +4747,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-10%"
+      ],
+      "segmentSpace": [
+        "-10%"
+      ]
     },
     {
       "value": "100.5%",
@@ -3888,7 +4779,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "100.5%"
+      ],
+      "segmentSpace": [
+        "100.5%"
+      ]
     },
     {
       "value": "%",
@@ -3914,7 +4811,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "%"
+      ],
+      "segmentSpace": [
+        "%"
+      ]
     },
     {
       "value": "50 %",
@@ -3940,7 +4843,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "50 %"
+      ],
+      "segmentSpace": [
+        "50",
+        "%"
+      ]
     },
     {
       "value": "50%%",
@@ -3966,7 +4876,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "50%%"
+      ],
+      "segmentSpace": [
+        "50%%"
+      ]
     },
     {
       "value": ".5%",
@@ -3992,7 +4908,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        ".5%"
+      ],
+      "segmentSpace": [
+        ".5%"
+      ]
     },
     {
       "value": "1e2%",
@@ -4018,7 +4940,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1e2%"
+      ],
+      "segmentSpace": [
+        "1e2%"
+      ]
     },
     {
       "value": "1/2",
@@ -4044,7 +4972,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1/2"
+      ],
+      "segmentSpace": [
+        "1/2"
+      ]
     },
     {
       "value": "16/9",
@@ -4070,7 +5004,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "16/9"
+      ],
+      "segmentSpace": [
+        "16/9"
+      ]
     },
     {
       "value": "1 / 2",
@@ -4096,7 +5036,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1 / 2"
+      ],
+      "segmentSpace": [
+        "1",
+        "/",
+        "2"
+      ]
     },
     {
       "value": "1/ 2",
@@ -4122,7 +5070,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1/ 2"
+      ],
+      "segmentSpace": [
+        "1/",
+        "2"
+      ]
     },
     {
       "value": "1 /2",
@@ -4148,7 +5103,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1 /2"
+      ],
+      "segmentSpace": [
+        "1",
+        "/2"
+      ]
     },
     {
       "value": "1\t/\t2",
@@ -4174,7 +5136,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1\t/\t2"
+      ],
+      "segmentSpace": [
+        "1\t/\t2"
+      ]
     },
     {
       "value": "1/2/3",
@@ -4200,7 +5168,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1/2/3"
+      ],
+      "segmentSpace": [
+        "1/2/3"
+      ]
     },
     {
       "value": "/2",
@@ -4226,7 +5200,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "/2"
+      ],
+      "segmentSpace": [
+        "/2"
+      ]
     },
     {
       "value": "1/",
@@ -4252,7 +5232,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1/"
+      ],
+      "segmentSpace": [
+        "1/"
+      ]
     },
     {
       "value": "0/0",
@@ -4278,7 +5264,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0/0"
+      ],
+      "segmentSpace": [
+        "0/0"
+      ]
     },
     {
       "value": "-1/-2",
@@ -4304,7 +5296,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-1/-2"
+      ],
+      "segmentSpace": [
+        "-1/-2"
+      ]
     },
     {
       "value": "1.5/2.5",
@@ -4330,7 +5328,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1.5/2.5"
+      ],
+      "segmentSpace": [
+        "1.5/2.5"
+      ]
     },
     {
       "value": "45deg",
@@ -4356,7 +5360,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "45deg"
+      ],
+      "segmentSpace": [
+        "45deg"
+      ]
     },
     {
       "value": "-90deg",
@@ -4382,7 +5392,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-90deg"
+      ],
+      "segmentSpace": [
+        "-90deg"
+      ]
     },
     {
       "value": "0.5deg",
@@ -4408,7 +5424,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0.5deg"
+      ],
+      "segmentSpace": [
+        "0.5deg"
+      ]
     },
     {
       "value": "45rad",
@@ -4434,7 +5456,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "45rad"
+      ],
+      "segmentSpace": [
+        "45rad"
+      ]
     },
     {
       "value": "-90rad",
@@ -4460,7 +5488,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-90rad"
+      ],
+      "segmentSpace": [
+        "-90rad"
+      ]
     },
     {
       "value": "0.5rad",
@@ -4486,7 +5520,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0.5rad"
+      ],
+      "segmentSpace": [
+        "0.5rad"
+      ]
     },
     {
       "value": "45grad",
@@ -4512,7 +5552,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "45grad"
+      ],
+      "segmentSpace": [
+        "45grad"
+      ]
     },
     {
       "value": "-90grad",
@@ -4538,7 +5584,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-90grad"
+      ],
+      "segmentSpace": [
+        "-90grad"
+      ]
     },
     {
       "value": "0.5grad",
@@ -4564,7 +5616,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0.5grad"
+      ],
+      "segmentSpace": [
+        "0.5grad"
+      ]
     },
     {
       "value": "45turn",
@@ -4590,7 +5648,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "45turn"
+      ],
+      "segmentSpace": [
+        "45turn"
+      ]
     },
     {
       "value": "-90turn",
@@ -4616,7 +5680,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-90turn"
+      ],
+      "segmentSpace": [
+        "-90turn"
+      ]
     },
     {
       "value": "0.5turn",
@@ -4642,7 +5712,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0.5turn"
+      ],
+      "segmentSpace": [
+        "0.5turn"
+      ]
     },
     {
       "value": "45DEG",
@@ -4668,7 +5744,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "45DEG"
+      ],
+      "segmentSpace": [
+        "45DEG"
+      ]
     },
     {
       "value": "45",
@@ -4694,7 +5776,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": true
+      "isPositiveInteger": true,
+      "segmentComma": [
+        "45"
+      ],
+      "segmentSpace": [
+        "45"
+      ]
     },
     {
       "value": "45degx",
@@ -4720,7 +5808,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "45degx"
+      ],
+      "segmentSpace": [
+        "45degx"
+      ]
     },
     {
       "value": "45 deg",
@@ -4746,7 +5840,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "45 deg"
+      ],
+      "segmentSpace": [
+        "45",
+        "deg"
+      ]
     },
     {
       "value": "1 2 3",
@@ -4772,7 +5873,15 @@
         "vector": "vector"
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1 2 3"
+      ],
+      "segmentSpace": [
+        "1",
+        "2",
+        "3"
+      ]
     },
     {
       "value": "1  2  3",
@@ -4798,7 +5907,17 @@
         "vector": "vector"
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1  2  3"
+      ],
+      "segmentSpace": [
+        "1",
+        "",
+        "2",
+        "",
+        "3"
+      ]
     },
     {
       "value": "0 0 1",
@@ -4824,7 +5943,15 @@
         "vector": "vector"
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "0 0 1"
+      ],
+      "segmentSpace": [
+        "0",
+        "0",
+        "1"
+      ]
     },
     {
       "value": "-1 -2 -3",
@@ -4850,7 +5977,15 @@
         "vector": "vector"
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-1 -2 -3"
+      ],
+      "segmentSpace": [
+        "-1",
+        "-2",
+        "-3"
+      ]
     },
     {
       "value": "1 2",
@@ -4876,7 +6011,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1 2"
+      ],
+      "segmentSpace": [
+        "1",
+        "2"
+      ]
     },
     {
       "value": "1 2 3 4",
@@ -4902,7 +6044,16 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1 2 3 4"
+      ],
+      "segmentSpace": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ]
     },
     {
       "value": "1\t2\t3",
@@ -4928,7 +6079,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1\t2\t3"
+      ],
+      "segmentSpace": [
+        "1\t2\t3"
+      ]
     },
     {
       "value": "1 2 3 ",
@@ -4954,7 +6111,16 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1 2 3 "
+      ],
+      "segmentSpace": [
+        "1",
+        "2",
+        "3",
+        ""
+      ]
     },
     {
       "value": "1.5 2.5 3.5",
@@ -4980,7 +6146,15 @@
         "vector": "vector"
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1.5 2.5 3.5"
+      ],
+      "segmentSpace": [
+        "1.5",
+        "2.5",
+        "3.5"
+      ]
     },
     {
       "value": "#fff",
@@ -5006,7 +6180,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "#fff"
+      ],
+      "segmentSpace": [
+        "#fff"
+      ]
     },
     {
       "value": "#ffffff",
@@ -5032,7 +6212,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "#ffffff"
+      ],
+      "segmentSpace": [
+        "#ffffff"
+      ]
     },
     {
       "value": "#ffff",
@@ -5058,7 +6244,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "#ffff"
+      ],
+      "segmentSpace": [
+        "#ffff"
+      ]
     },
     {
       "value": "#ffffffff",
@@ -5084,7 +6276,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "#ffffffff"
+      ],
+      "segmentSpace": [
+        "#ffffffff"
+      ]
     },
     {
       "value": "#",
@@ -5110,7 +6308,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "#"
+      ],
+      "segmentSpace": [
+        "#"
+      ]
     },
     {
       "value": "#zzz",
@@ -5136,7 +6340,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "#zzz"
+      ],
+      "segmentSpace": [
+        "#zzz"
+      ]
     },
     {
       "value": "#FFF",
@@ -5162,7 +6372,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "#FFF"
+      ],
+      "segmentSpace": [
+        "#FFF"
+      ]
     },
     {
       "value": "rgb(0 0 0)",
@@ -5188,7 +6404,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "rgb(0 0 0)"
+      ],
+      "segmentSpace": [
+        "rgb(0 0 0)"
+      ]
     },
     {
       "value": "RGB(0 0 0)",
@@ -5214,7 +6436,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "RGB(0 0 0)"
+      ],
+      "segmentSpace": [
+        "RGB(0 0 0)"
+      ]
     },
     {
       "value": "Rgb(0 0 0)",
@@ -5240,7 +6468,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Rgb(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Rgb(0 0 0)"
+      ]
     },
     {
       "value": "rgba(0 0 0)",
@@ -5266,7 +6500,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "rgba(0 0 0)"
+      ],
+      "segmentSpace": [
+        "rgba(0 0 0)"
+      ]
     },
     {
       "value": "RGBA(0 0 0)",
@@ -5292,7 +6532,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "RGBA(0 0 0)"
+      ],
+      "segmentSpace": [
+        "RGBA(0 0 0)"
+      ]
     },
     {
       "value": "Rgba(0 0 0)",
@@ -5318,7 +6564,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Rgba(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Rgba(0 0 0)"
+      ]
     },
     {
       "value": "hsl(0 0 0)",
@@ -5344,7 +6596,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "hsl(0 0 0)"
+      ],
+      "segmentSpace": [
+        "hsl(0 0 0)"
+      ]
     },
     {
       "value": "HSL(0 0 0)",
@@ -5370,7 +6628,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "HSL(0 0 0)"
+      ],
+      "segmentSpace": [
+        "HSL(0 0 0)"
+      ]
     },
     {
       "value": "Hsl(0 0 0)",
@@ -5396,7 +6660,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Hsl(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Hsl(0 0 0)"
+      ]
     },
     {
       "value": "hsla(0 0 0)",
@@ -5422,7 +6692,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "hsla(0 0 0)"
+      ],
+      "segmentSpace": [
+        "hsla(0 0 0)"
+      ]
     },
     {
       "value": "HSLA(0 0 0)",
@@ -5448,7 +6724,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "HSLA(0 0 0)"
+      ],
+      "segmentSpace": [
+        "HSLA(0 0 0)"
+      ]
     },
     {
       "value": "Hsla(0 0 0)",
@@ -5474,7 +6756,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Hsla(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Hsla(0 0 0)"
+      ]
     },
     {
       "value": "hwb(0 0 0)",
@@ -5500,7 +6788,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "hwb(0 0 0)"
+      ],
+      "segmentSpace": [
+        "hwb(0 0 0)"
+      ]
     },
     {
       "value": "HWB(0 0 0)",
@@ -5526,7 +6820,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "HWB(0 0 0)"
+      ],
+      "segmentSpace": [
+        "HWB(0 0 0)"
+      ]
     },
     {
       "value": "Hwb(0 0 0)",
@@ -5552,7 +6852,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Hwb(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Hwb(0 0 0)"
+      ]
     },
     {
       "value": "color(0 0 0)",
@@ -5578,7 +6884,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "color(0 0 0)"
+      ],
+      "segmentSpace": [
+        "color(0 0 0)"
+      ]
     },
     {
       "value": "COLOR(0 0 0)",
@@ -5604,7 +6916,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "COLOR(0 0 0)"
+      ],
+      "segmentSpace": [
+        "COLOR(0 0 0)"
+      ]
     },
     {
       "value": "Color(0 0 0)",
@@ -5630,7 +6948,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Color(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Color(0 0 0)"
+      ]
     },
     {
       "value": "lab(0 0 0)",
@@ -5656,7 +6980,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "lab(0 0 0)"
+      ],
+      "segmentSpace": [
+        "lab(0 0 0)"
+      ]
     },
     {
       "value": "LAB(0 0 0)",
@@ -5682,7 +7012,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "LAB(0 0 0)"
+      ],
+      "segmentSpace": [
+        "LAB(0 0 0)"
+      ]
     },
     {
       "value": "Lab(0 0 0)",
@@ -5708,7 +7044,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Lab(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Lab(0 0 0)"
+      ]
     },
     {
       "value": "lch(0 0 0)",
@@ -5734,7 +7076,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "lch(0 0 0)"
+      ],
+      "segmentSpace": [
+        "lch(0 0 0)"
+      ]
     },
     {
       "value": "LCH(0 0 0)",
@@ -5760,7 +7108,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "LCH(0 0 0)"
+      ],
+      "segmentSpace": [
+        "LCH(0 0 0)"
+      ]
     },
     {
       "value": "Lch(0 0 0)",
@@ -5786,7 +7140,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Lch(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Lch(0 0 0)"
+      ]
     },
     {
       "value": "oklab(0 0 0)",
@@ -5812,7 +7172,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "oklab(0 0 0)"
+      ],
+      "segmentSpace": [
+        "oklab(0 0 0)"
+      ]
     },
     {
       "value": "OKLAB(0 0 0)",
@@ -5838,7 +7204,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "OKLAB(0 0 0)"
+      ],
+      "segmentSpace": [
+        "OKLAB(0 0 0)"
+      ]
     },
     {
       "value": "Oklab(0 0 0)",
@@ -5864,7 +7236,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Oklab(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Oklab(0 0 0)"
+      ]
     },
     {
       "value": "oklch(0 0 0)",
@@ -5890,7 +7268,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "oklch(0 0 0)"
+      ],
+      "segmentSpace": [
+        "oklch(0 0 0)"
+      ]
     },
     {
       "value": "OKLCH(0 0 0)",
@@ -5916,7 +7300,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "OKLCH(0 0 0)"
+      ],
+      "segmentSpace": [
+        "OKLCH(0 0 0)"
+      ]
     },
     {
       "value": "Oklch(0 0 0)",
@@ -5942,7 +7332,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Oklch(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Oklch(0 0 0)"
+      ]
     },
     {
       "value": "light-dark(0 0 0)",
@@ -5968,7 +7364,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "light-dark(0 0 0)"
+      ],
+      "segmentSpace": [
+        "light-dark(0 0 0)"
+      ]
     },
     {
       "value": "LIGHT-DARK(0 0 0)",
@@ -5994,7 +7396,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "LIGHT-DARK(0 0 0)"
+      ],
+      "segmentSpace": [
+        "LIGHT-DARK(0 0 0)"
+      ]
     },
     {
       "value": "Light-dark(0 0 0)",
@@ -6020,7 +7428,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Light-dark(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Light-dark(0 0 0)"
+      ]
     },
     {
       "value": "color-mix(0 0 0)",
@@ -6046,7 +7460,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "color-mix(0 0 0)"
+      ],
+      "segmentSpace": [
+        "color-mix(0 0 0)"
+      ]
     },
     {
       "value": "COLOR-MIX(0 0 0)",
@@ -6072,7 +7492,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "COLOR-MIX(0 0 0)"
+      ],
+      "segmentSpace": [
+        "COLOR-MIX(0 0 0)"
+      ]
     },
     {
       "value": "Color-mix(0 0 0)",
@@ -6098,7 +7524,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Color-mix(0 0 0)"
+      ],
+      "segmentSpace": [
+        "Color-mix(0 0 0)"
+      ]
     },
     {
       "value": "--alpha(0 0 0)",
@@ -6124,7 +7556,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "--alpha(0 0 0)"
+      ],
+      "segmentSpace": [
+        "--alpha(0 0 0)"
+      ]
     },
     {
       "value": "--ALPHA(0 0 0)",
@@ -6150,7 +7588,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "--ALPHA(0 0 0)"
+      ],
+      "segmentSpace": [
+        "--ALPHA(0 0 0)"
+      ]
     },
     {
       "value": "rgb(255, 0, 0)",
@@ -6176,7 +7620,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "rgb(255, 0, 0)"
+      ],
+      "segmentSpace": [
+        "rgb(255, 0, 0)"
+      ]
     },
     {
       "value": "rgba(255,0,0,.5)",
@@ -6202,7 +7652,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "rgba(255,0,0,.5)"
+      ],
+      "segmentSpace": [
+        "rgba(255,0,0,.5)"
+      ]
     },
     {
       "value": "oklch(0.7 0.15 200 / 50%)",
@@ -6228,7 +7684,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "oklch(0.7 0.15 200 / 50%)"
+      ],
+      "segmentSpace": [
+        "oklch(0.7 0.15 200 / 50%)"
+      ]
     },
     {
       "value": "color-mix(in oklab, red, blue)",
@@ -6254,7 +7716,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "color-mix(in oklab, red, blue)"
+      ],
+      "segmentSpace": [
+        "color-mix(in oklab, red, blue)"
+      ]
     },
     {
       "value": "light-dark(white, black)",
@@ -6280,7 +7748,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "light-dark(white, black)"
+      ],
+      "segmentSpace": [
+        "light-dark(white, black)"
+      ]
     },
     {
       "value": "--alpha(var(--x) / 50%)",
@@ -6306,7 +7780,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "--alpha(var(--x) / 50%)"
+      ],
+      "segmentSpace": [
+        "--alpha(var(--x) / 50%)"
+      ]
     },
     {
       "value": "colour(0 0 0)",
@@ -6332,7 +7812,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "colour(0 0 0)"
+      ],
+      "segmentSpace": [
+        "colour(0 0 0)"
+      ]
     },
     {
       "value": "rgb",
@@ -6358,7 +7844,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "rgb"
+      ],
+      "segmentSpace": [
+        "rgb"
+      ]
     },
     {
       "value": "rgb(",
@@ -6384,7 +7876,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "rgb("
+      ],
+      "segmentSpace": [
+        "rgb("
+      ]
     },
     {
       "value": "color-mixed(0)",
@@ -6410,7 +7908,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "color-mixed(0)"
+      ],
+      "segmentSpace": [
+        "color-mixed(0)"
+      ]
     },
     {
       "value": "colorx(0 0 0)",
@@ -6436,7 +7940,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "colorx(0 0 0)"
+      ],
+      "segmentSpace": [
+        "colorx(0 0 0)"
+      ]
     },
     {
       "value": "red",
@@ -6462,7 +7972,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "red"
+      ],
+      "segmentSpace": [
+        "red"
+      ]
     },
     {
       "value": "RED",
@@ -6488,7 +8004,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "RED"
+      ],
+      "segmentSpace": [
+        "RED"
+      ]
     },
     {
       "value": "Red",
@@ -6514,7 +8036,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Red"
+      ],
+      "segmentSpace": [
+        "Red"
+      ]
     },
     {
       "value": "rebeccapurple",
@@ -6540,7 +8068,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "rebeccapurple"
+      ],
+      "segmentSpace": [
+        "rebeccapurple"
+      ]
     },
     {
       "value": "transparent",
@@ -6566,7 +8100,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "transparent"
+      ],
+      "segmentSpace": [
+        "transparent"
+      ]
     },
     {
       "value": "currentcolor",
@@ -6592,7 +8132,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "currentcolor"
+      ],
+      "segmentSpace": [
+        "currentcolor"
+      ]
     },
     {
       "value": "currentColor",
@@ -6618,7 +8164,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "currentColor"
+      ],
+      "segmentSpace": [
+        "currentColor"
+      ]
     },
     {
       "value": "canvas",
@@ -6644,7 +8196,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "canvas"
+      ],
+      "segmentSpace": [
+        "canvas"
+      ]
     },
     {
       "value": "buttonface",
@@ -6670,7 +8228,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "buttonface"
+      ],
+      "segmentSpace": [
+        "buttonface"
+      ]
     },
     {
       "value": "accentcolortext",
@@ -6696,7 +8260,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "accentcolortext"
+      ],
+      "segmentSpace": [
+        "accentcolortext"
+      ]
     },
     {
       "value": "aliceblue",
@@ -6722,7 +8292,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "aliceblue"
+      ],
+      "segmentSpace": [
+        "aliceblue"
+      ]
     },
     {
       "value": "darkslategrey",
@@ -6748,7 +8324,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "darkslategrey"
+      ],
+      "segmentSpace": [
+        "darkslategrey"
+      ]
     },
     {
       "value": "notacolor",
@@ -6774,7 +8356,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "notacolor"
+      ],
+      "segmentSpace": [
+        "notacolor"
+      ]
     },
     {
       "value": "grey",
@@ -6800,7 +8388,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "grey"
+      ],
+      "segmentSpace": [
+        "grey"
+      ]
     },
     {
       "value": "gray",
@@ -6826,7 +8420,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "gray"
+      ],
+      "segmentSpace": [
+        "gray"
+      ]
     },
     {
       "value": "math",
@@ -6852,7 +8452,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "math"
+      ],
+      "segmentSpace": [
+        "math"
+      ]
     },
     {
       "value": "medium",
@@ -6878,7 +8484,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "medium"
+      ],
+      "segmentSpace": [
+        "medium"
+      ]
     },
     {
       "value": "tan",
@@ -6904,7 +8516,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "tan"
+      ],
+      "segmentSpace": [
+        "tan"
+      ]
     },
     {
       "value": "url(a.png)",
@@ -6930,7 +8548,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(a.png)"
+      ],
+      "segmentSpace": [
+        "url(a.png)"
+      ]
     },
     {
       "value": "url()",
@@ -6956,7 +8580,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url()"
+      ],
+      "segmentSpace": [
+        "url()"
+      ]
     },
     {
       "value": "url(  )",
@@ -6982,7 +8612,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(  )"
+      ],
+      "segmentSpace": [
+        "url(  )"
+      ]
     },
     {
       "value": "url('a.png')",
@@ -7008,7 +8644,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url('a.png')"
+      ],
+      "segmentSpace": [
+        "url('a.png')"
+      ]
     },
     {
       "value": "url(\"a.png\")",
@@ -7034,7 +8676,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(\"a.png\")"
+      ],
+      "segmentSpace": [
+        "url(\"a.png\")"
+      ]
     },
     {
       "value": "url(a.png) x",
@@ -7060,7 +8708,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(a.png) x"
+      ],
+      "segmentSpace": [
+        "url(a.png)",
+        "x"
+      ]
     },
     {
       "value": "xurl(a.png)",
@@ -7086,7 +8741,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "xurl(a.png)"
+      ],
+      "segmentSpace": [
+        "xurl(a.png)"
+      ]
     },
     {
       "value": "URL(a.png)",
@@ -7112,7 +8773,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "URL(a.png)"
+      ],
+      "segmentSpace": [
+        "URL(a.png)"
+      ]
     },
     {
       "value": "url(data:image/png;base64,AAA)",
@@ -7138,7 +8805,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(data:image/png;base64,AAA)"
+      ],
+      "segmentSpace": [
+        "url(data:image/png;base64,AAA)"
+      ]
     },
     {
       "value": "url(a\nb)",
@@ -7164,7 +8837,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(a\nb)"
+      ],
+      "segmentSpace": [
+        "url(a\nb)"
+      ]
     },
     {
       "value": "linear-gradient(red, blue)",
@@ -7190,7 +8869,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "linear-gradient(red, blue)"
+      ],
+      "segmentSpace": [
+        "linear-gradient(red, blue)"
+      ]
     },
     {
       "value": "radial-gradient(red, blue)",
@@ -7216,7 +8901,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "radial-gradient(red, blue)"
+      ],
+      "segmentSpace": [
+        "radial-gradient(red, blue)"
+      ]
     },
     {
       "value": "conic-gradient(red, blue)",
@@ -7242,7 +8933,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "conic-gradient(red, blue)"
+      ],
+      "segmentSpace": [
+        "conic-gradient(red, blue)"
+      ]
     },
     {
       "value": "repeating-linear-gradient(red, blue)",
@@ -7268,7 +8965,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "repeating-linear-gradient(red, blue)"
+      ],
+      "segmentSpace": [
+        "repeating-linear-gradient(red, blue)"
+      ]
     },
     {
       "value": "repeating-radial-gradient(red, blue)",
@@ -7294,7 +8997,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "repeating-radial-gradient(red, blue)"
+      ],
+      "segmentSpace": [
+        "repeating-radial-gradient(red, blue)"
+      ]
     },
     {
       "value": "repeating-conic-gradient(red, blue)",
@@ -7320,7 +9029,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "repeating-conic-gradient(red, blue)"
+      ],
+      "segmentSpace": [
+        "repeating-conic-gradient(red, blue)"
+      ]
     },
     {
       "value": "element(foo)",
@@ -7346,7 +9061,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "element(foo)"
+      ],
+      "segmentSpace": [
+        "element(foo)"
+      ]
     },
     {
       "value": "image(foo)",
@@ -7372,7 +9093,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "image(foo)"
+      ],
+      "segmentSpace": [
+        "image(foo)"
+      ]
     },
     {
       "value": "cross-fade(foo)",
@@ -7398,7 +9125,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cross-fade(foo)"
+      ],
+      "segmentSpace": [
+        "cross-fade(foo)"
+      ]
     },
     {
       "value": "image-set(foo)",
@@ -7424,7 +9157,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "image-set(foo)"
+      ],
+      "segmentSpace": [
+        "image-set(foo)"
+      ]
     },
     {
       "value": "linear-gradient(red, blue), url(a.png)",
@@ -7450,7 +9189,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "linear-gradient(red, blue)",
+        " url(a.png)"
+      ],
+      "segmentSpace": [
+        "linear-gradient(red, blue),",
+        "url(a.png)"
+      ]
     },
     {
       "value": "url(a.png), var(--x)",
@@ -7476,7 +9223,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(a.png)",
+        " var(--x)"
+      ],
+      "segmentSpace": [
+        "url(a.png),",
+        "var(--x)"
+      ]
     },
     {
       "value": "var(--x), var(--y)",
@@ -7502,7 +9257,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "var(--x)",
+        " var(--y)"
+      ],
+      "segmentSpace": [
+        "var(--x),",
+        "var(--y)"
+      ]
     },
     {
       "value": "linear-gradient(red,blue) extra",
@@ -7528,7 +9291,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "linear-gradient(red,blue) extra"
+      ],
+      "segmentSpace": [
+        "linear-gradient(red,blue)",
+        "extra"
+      ]
     },
     {
       "value": "LINEAR-GRADIENT(red,blue)",
@@ -7554,7 +9324,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "LINEAR-GRADIENT(red,blue)"
+      ],
+      "segmentSpace": [
+        "LINEAR-GRADIENT(red,blue)"
+      ]
     },
     {
       "value": "gradient(red,blue)",
@@ -7580,7 +9356,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "gradient(red,blue)"
+      ],
+      "segmentSpace": [
+        "gradient(red,blue)"
+      ]
     },
     {
       "value": "url(a.png),url(b.png)",
@@ -7606,7 +9388,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(a.png)",
+        "url(b.png)"
+      ],
+      "segmentSpace": [
+        "url(a.png),url(b.png)"
+      ]
     },
     {
       "value": "url(a.png),nonsense",
@@ -7632,7 +9421,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(a.png)",
+        "nonsense"
+      ],
+      "segmentSpace": [
+        "url(a.png),nonsense"
+      ]
     },
     {
       "value": "center",
@@ -7658,7 +9454,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "center"
+      ],
+      "segmentSpace": [
+        "center"
+      ]
     },
     {
       "value": "top",
@@ -7684,7 +9486,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "top"
+      ],
+      "segmentSpace": [
+        "top"
+      ]
     },
     {
       "value": "right",
@@ -7710,7 +9518,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "right"
+      ],
+      "segmentSpace": [
+        "right"
+      ]
     },
     {
       "value": "bottom",
@@ -7736,7 +9550,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "bottom"
+      ],
+      "segmentSpace": [
+        "bottom"
+      ]
     },
     {
       "value": "left",
@@ -7762,7 +9582,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "left"
+      ],
+      "segmentSpace": [
+        "left"
+      ]
     },
     {
       "value": "center top",
@@ -7788,7 +9614,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "center top"
+      ],
+      "segmentSpace": [
+        "center",
+        "top"
+      ]
     },
     {
       "value": "left 10px",
@@ -7814,7 +9647,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "left 10px"
+      ],
+      "segmentSpace": [
+        "left",
+        "10px"
+      ]
     },
     {
       "value": "10px 20px",
@@ -7840,7 +9680,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10px 20px"
+      ],
+      "segmentSpace": [
+        "10px",
+        "20px"
+      ]
     },
     {
       "value": "50% 50%",
@@ -7866,7 +9713,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "50% 50%"
+      ],
+      "segmentSpace": [
+        "50%",
+        "50%"
+      ]
     },
     {
       "value": "center var(--x)",
@@ -7892,7 +9746,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "center var(--x)"
+      ],
+      "segmentSpace": [
+        "center",
+        "var(--x)"
+      ]
     },
     {
       "value": "var(--x)",
@@ -7918,7 +9779,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "var(--x)"
+      ],
+      "segmentSpace": [
+        "var(--x)"
+      ]
     },
     {
       "value": "center nonsense",
@@ -7944,7 +9811,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "center nonsense"
+      ],
+      "segmentSpace": [
+        "center",
+        "nonsense"
+      ]
     },
     {
       "value": "top left bottom",
@@ -7970,7 +9844,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "top left bottom"
+      ],
+      "segmentSpace": [
+        "top",
+        "left",
+        "bottom"
+      ]
     },
     {
       "value": "  ",
@@ -7996,7 +9878,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "  "
+      ],
+      "segmentSpace": [
+        "",
+        "",
+        ""
+      ]
     },
     {
       "value": "center  top",
@@ -8022,7 +9912,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "center  top"
+      ],
+      "segmentSpace": [
+        "center",
+        "",
+        "top"
+      ]
     },
     {
       "value": "cover",
@@ -8048,7 +9946,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cover"
+      ],
+      "segmentSpace": [
+        "cover"
+      ]
     },
     {
       "value": "contain",
@@ -8074,7 +9978,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "contain"
+      ],
+      "segmentSpace": [
+        "contain"
+      ]
     },
     {
       "value": "auto",
@@ -8100,7 +10010,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "auto"
+      ],
+      "segmentSpace": [
+        "auto"
+      ]
     },
     {
       "value": "auto auto",
@@ -8126,7 +10042,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "auto auto"
+      ],
+      "segmentSpace": [
+        "auto",
+        "auto"
+      ]
     },
     {
       "value": "50% auto",
@@ -8152,7 +10075,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "50% auto"
+      ],
+      "segmentSpace": [
+        "50%",
+        "auto"
+      ]
     },
     {
       "value": "10px 20px 30px",
@@ -8178,7 +10108,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10px 20px 30px"
+      ],
+      "segmentSpace": [
+        "10px",
+        "20px",
+        "30px"
+      ]
     },
     {
       "value": "cover, contain",
@@ -8204,7 +10142,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cover",
+        " contain"
+      ],
+      "segmentSpace": [
+        "cover,",
+        "contain"
+      ]
     },
     {
       "value": "cover,nonsense",
@@ -8230,7 +10176,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cover",
+        "nonsense"
+      ],
+      "segmentSpace": [
+        "cover,nonsense"
+      ]
     },
     {
       "value": "cover,a b c",
@@ -8256,7 +10209,16 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cover",
+        "a b c"
+      ],
+      "segmentSpace": [
+        "cover,a",
+        "b",
+        "c"
+      ]
     },
     {
       "value": "auto,",
@@ -8282,7 +10244,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "auto",
+        ""
+      ],
+      "segmentSpace": [
+        "auto,"
+      ]
     },
     {
       "value": "nonsense",
@@ -8308,7 +10277,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "nonsense"
+      ],
+      "segmentSpace": [
+        "nonsense"
+      ]
     },
     {
       "value": "COVER",
@@ -8334,7 +10309,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "COVER"
+      ],
+      "segmentSpace": [
+        "COVER"
+      ]
     },
     {
       "value": "cover contain",
@@ -8360,7 +10341,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cover contain"
+      ],
+      "segmentSpace": [
+        "cover",
+        "contain"
+      ]
     },
     {
       "value": "thin",
@@ -8386,7 +10374,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "thin"
+      ],
+      "segmentSpace": [
+        "thin"
+      ]
     },
     {
       "value": "thick",
@@ -8412,7 +10406,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "thick"
+      ],
+      "segmentSpace": [
+        "thick"
+      ]
     },
     {
       "value": "1px",
@@ -8438,7 +10438,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1px"
+      ],
+      "segmentSpace": [
+        "1px"
+      ]
     },
     {
       "value": "thin thick",
@@ -8464,7 +10470,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "thin thick"
+      ],
+      "segmentSpace": [
+        "thin",
+        "thick"
+      ]
     },
     {
       "value": "1px 2px",
@@ -8490,7 +10503,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1px 2px"
+      ],
+      "segmentSpace": [
+        "1px",
+        "2px"
+      ]
     },
     {
       "value": "thin 1px",
@@ -8516,7 +10536,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "thin 1px"
+      ],
+      "segmentSpace": [
+        "thin",
+        "1px"
+      ]
     },
     {
       "value": "thin nonsense",
@@ -8542,7 +10569,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "thin nonsense"
+      ],
+      "segmentSpace": [
+        "thin",
+        "nonsense"
+      ]
     },
     {
       "value": "THIN",
@@ -8568,7 +10602,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "THIN"
+      ],
+      "segmentSpace": [
+        "THIN"
+      ]
     },
     {
       "value": "thin,thick",
@@ -8594,7 +10634,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "thin",
+        "thick"
+      ],
+      "segmentSpace": [
+        "thin,thick"
+      ]
     },
     {
       "value": "serif",
@@ -8620,7 +10667,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "serif"
+      ],
+      "segmentSpace": [
+        "serif"
+      ]
     },
     {
       "value": "sans-serif",
@@ -8646,7 +10699,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "sans-serif"
+      ],
+      "segmentSpace": [
+        "sans-serif"
+      ]
     },
     {
       "value": "monospace",
@@ -8672,7 +10731,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "monospace"
+      ],
+      "segmentSpace": [
+        "monospace"
+      ]
     },
     {
       "value": "cursive",
@@ -8698,7 +10763,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cursive"
+      ],
+      "segmentSpace": [
+        "cursive"
+      ]
     },
     {
       "value": "fantasy",
@@ -8724,7 +10795,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "fantasy"
+      ],
+      "segmentSpace": [
+        "fantasy"
+      ]
     },
     {
       "value": "system-ui",
@@ -8750,7 +10827,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "system-ui"
+      ],
+      "segmentSpace": [
+        "system-ui"
+      ]
     },
     {
       "value": "ui-serif",
@@ -8776,7 +10859,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "ui-serif"
+      ],
+      "segmentSpace": [
+        "ui-serif"
+      ]
     },
     {
       "value": "ui-sans-serif",
@@ -8802,7 +10891,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "ui-sans-serif"
+      ],
+      "segmentSpace": [
+        "ui-sans-serif"
+      ]
     },
     {
       "value": "ui-monospace",
@@ -8828,7 +10923,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "ui-monospace"
+      ],
+      "segmentSpace": [
+        "ui-monospace"
+      ]
     },
     {
       "value": "ui-rounded",
@@ -8854,7 +10955,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "ui-rounded"
+      ],
+      "segmentSpace": [
+        "ui-rounded"
+      ]
     },
     {
       "value": "emoji",
@@ -8880,7 +10987,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "emoji"
+      ],
+      "segmentSpace": [
+        "emoji"
+      ]
     },
     {
       "value": "fangsong",
@@ -8906,7 +11019,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "fangsong"
+      ],
+      "segmentSpace": [
+        "fangsong"
+      ]
     },
     {
       "value": "SERIF",
@@ -8932,7 +11051,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "SERIF"
+      ],
+      "segmentSpace": [
+        "SERIF"
+      ]
     },
     {
       "value": "Inter",
@@ -8958,7 +11083,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Inter"
+      ],
+      "segmentSpace": [
+        "Inter"
+      ]
     },
     {
       "value": "Inter, sans-serif",
@@ -8984,7 +11115,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Inter",
+        " sans-serif"
+      ],
+      "segmentSpace": [
+        "Inter,",
+        "sans-serif"
+      ]
     },
     {
       "value": "'Comic Sans', serif",
@@ -9010,7 +11149,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "'Comic Sans'",
+        " serif"
+      ],
+      "segmentSpace": [
+        "'Comic Sans',",
+        "serif"
+      ]
     },
     {
       "value": "\"Comic Sans, Bold\", serif",
@@ -9036,7 +11183,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "\"Comic Sans, Bold\"",
+        " serif"
+      ],
+      "segmentSpace": [
+        "\"Comic Sans, Bold\",",
+        "serif"
+      ]
     },
     {
       "value": "1Inter",
@@ -9062,7 +11217,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1Inter"
+      ],
+      "segmentSpace": [
+        "1Inter"
+      ]
     },
     {
       "value": "Inter, 1Bad",
@@ -9088,7 +11249,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Inter",
+        " 1Bad"
+      ],
+      "segmentSpace": [
+        "Inter,",
+        "1Bad"
+      ]
     },
     {
       "value": ",serif",
@@ -9114,7 +11283,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "",
+        "serif"
+      ],
+      "segmentSpace": [
+        ",serif"
+      ]
     },
     {
       "value": "serif,",
@@ -9140,7 +11316,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "serif",
+        ""
+      ],
+      "segmentSpace": [
+        "serif,"
+      ]
     },
     {
       "value": "var(--font), serif",
@@ -9166,7 +11349,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "var(--font)",
+        " serif"
+      ],
+      "segmentSpace": [
+        "var(--font),",
+        "serif"
+      ]
     },
     {
       "value": "var(--font)",
@@ -9192,7 +11383,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "var(--font)"
+      ],
+      "segmentSpace": [
+        "var(--font)"
+      ]
     },
     {
       "value": "Helvetica Neue",
@@ -9218,7 +11415,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Helvetica Neue"
+      ],
+      "segmentSpace": [
+        "Helvetica",
+        "Neue"
+      ]
     },
     {
       "value": "xx-small",
@@ -9244,7 +11448,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "xx-small"
+      ],
+      "segmentSpace": [
+        "xx-small"
+      ]
     },
     {
       "value": "x-small",
@@ -9270,7 +11480,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "x-small"
+      ],
+      "segmentSpace": [
+        "x-small"
+      ]
     },
     {
       "value": "small",
@@ -9296,7 +11512,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "small"
+      ],
+      "segmentSpace": [
+        "small"
+      ]
     },
     {
       "value": "large",
@@ -9322,7 +11544,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "large"
+      ],
+      "segmentSpace": [
+        "large"
+      ]
     },
     {
       "value": "x-large",
@@ -9348,7 +11576,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "x-large"
+      ],
+      "segmentSpace": [
+        "x-large"
+      ]
     },
     {
       "value": "xx-large",
@@ -9374,7 +11608,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "xx-large"
+      ],
+      "segmentSpace": [
+        "xx-large"
+      ]
     },
     {
       "value": "xxx-large",
@@ -9400,7 +11640,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "xxx-large"
+      ],
+      "segmentSpace": [
+        "xxx-large"
+      ]
     },
     {
       "value": "larger",
@@ -9426,7 +11672,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "larger"
+      ],
+      "segmentSpace": [
+        "larger"
+      ]
     },
     {
       "value": "smaller",
@@ -9452,7 +11704,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "smaller"
+      ],
+      "segmentSpace": [
+        "smaller"
+      ]
     },
     {
       "value": "LARGER",
@@ -9478,7 +11736,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "LARGER"
+      ],
+      "segmentSpace": [
+        "LARGER"
+      ]
     },
     {
       "value": "biggest",
@@ -9504,7 +11768,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "biggest"
+      ],
+      "segmentSpace": [
+        "biggest"
+      ]
     },
     {
       "value": "calc(1px + 2px)",
@@ -9530,7 +11800,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "calc(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "calc(1px + 2px)"
+      ]
     },
     {
       "value": "min(1px + 2px)",
@@ -9556,7 +11832,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "min(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "min(1px + 2px)"
+      ]
     },
     {
       "value": "max(1px + 2px)",
@@ -9582,7 +11864,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "max(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "max(1px + 2px)"
+      ]
     },
     {
       "value": "clamp(1px + 2px)",
@@ -9608,7 +11896,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "clamp(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "clamp(1px + 2px)"
+      ]
     },
     {
       "value": "mod(1px + 2px)",
@@ -9634,7 +11928,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "mod(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "mod(1px + 2px)"
+      ]
     },
     {
       "value": "rem(1px + 2px)",
@@ -9660,7 +11960,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "rem(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "rem(1px + 2px)"
+      ]
     },
     {
       "value": "sin(1px + 2px)",
@@ -9686,7 +11992,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "sin(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "sin(1px + 2px)"
+      ]
     },
     {
       "value": "cos(1px + 2px)",
@@ -9712,7 +12024,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cos(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "cos(1px + 2px)"
+      ]
     },
     {
       "value": "tan(1px + 2px)",
@@ -9738,7 +12056,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "tan(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "tan(1px + 2px)"
+      ]
     },
     {
       "value": "asin(1px + 2px)",
@@ -9764,7 +12088,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "asin(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "asin(1px + 2px)"
+      ]
     },
     {
       "value": "acos(1px + 2px)",
@@ -9790,7 +12120,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "acos(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "acos(1px + 2px)"
+      ]
     },
     {
       "value": "atan(1px + 2px)",
@@ -9816,7 +12152,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "atan(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "atan(1px + 2px)"
+      ]
     },
     {
       "value": "atan2(1px + 2px)",
@@ -9842,7 +12184,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "atan2(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "atan2(1px + 2px)"
+      ]
     },
     {
       "value": "pow(1px + 2px)",
@@ -9868,7 +12216,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "pow(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "pow(1px + 2px)"
+      ]
     },
     {
       "value": "sqrt(1px + 2px)",
@@ -9894,7 +12248,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "sqrt(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "sqrt(1px + 2px)"
+      ]
     },
     {
       "value": "hypot(1px + 2px)",
@@ -9920,7 +12280,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "hypot(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "hypot(1px + 2px)"
+      ]
     },
     {
       "value": "log(1px + 2px)",
@@ -9946,7 +12312,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "log(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "log(1px + 2px)"
+      ]
     },
     {
       "value": "exp(1px + 2px)",
@@ -9972,7 +12344,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "exp(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "exp(1px + 2px)"
+      ]
     },
     {
       "value": "round(1px + 2px)",
@@ -9998,7 +12376,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "round(1px + 2px)"
+      ],
+      "segmentSpace": [
+        "round(1px + 2px)"
+      ]
     },
     {
       "value": "calc(100% - 10px)",
@@ -10024,7 +12408,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "calc(100% - 10px)"
+      ],
+      "segmentSpace": [
+        "calc(100% - 10px)"
+      ]
     },
     {
       "value": "calc(1px+2px)",
@@ -10050,7 +12440,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "calc(1px+2px)"
+      ],
+      "segmentSpace": [
+        "calc(1px+2px)"
+      ]
     },
     {
       "value": "CALC(1px)",
@@ -10076,7 +12472,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "CALC(1px)"
+      ],
+      "segmentSpace": [
+        "CALC(1px)"
+      ]
     },
     {
       "value": "calc",
@@ -10102,7 +12504,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "calc"
+      ],
+      "segmentSpace": [
+        "calc"
+      ]
     },
     {
       "value": "calc(",
@@ -10128,7 +12536,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "calc("
+      ],
+      "segmentSpace": [
+        "calc("
+      ]
     },
     {
       "value": "min(1px,2px)",
@@ -10154,7 +12568,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "min(1px,2px)"
+      ],
+      "segmentSpace": [
+        "min(1px,2px)"
+      ]
     },
     {
       "value": "clamp(1px, 2vw, 3px)",
@@ -10180,7 +12600,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "clamp(1px, 2vw, 3px)"
+      ],
+      "segmentSpace": [
+        "clamp(1px, 2vw, 3px)"
+      ]
     },
     {
       "value": "nested calc(1px)",
@@ -10206,7 +12632,14 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "nested calc(1px)"
+      ],
+      "segmentSpace": [
+        "nested",
+        "calc(1px)"
+      ]
     },
     {
       "value": "x_round(1)",
@@ -10232,7 +12665,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "x_round(1)"
+      ],
+      "segmentSpace": [
+        "x_round(1)"
+      ]
     },
     {
       "value": "url(rounded.png)",
@@ -10258,7 +12697,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(rounded.png)"
+      ],
+      "segmentSpace": [
+        "url(rounded.png)"
+      ]
     },
     {
       "value": "rounded(1)",
@@ -10284,7 +12729,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "rounded(1)"
+      ],
+      "segmentSpace": [
+        "rounded(1)"
+      ]
     },
     {
       "value": "var(--a)",
@@ -10310,7 +12761,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "var(--a)"
+      ],
+      "segmentSpace": [
+        "var(--a)"
+      ]
     },
     {
       "value": "var(--a, red)",
@@ -10336,7 +12793,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "var(--a, red)"
+      ],
+      "segmentSpace": [
+        "var(--a, red)"
+      ]
     },
     {
       "value": "var(--a, 10px)",
@@ -10362,7 +12825,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "var(--a, 10px)"
+      ],
+      "segmentSpace": [
+        "var(--a, 10px)"
+      ]
     },
     {
       "value": "var(",
@@ -10388,7 +12857,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "var("
+      ],
+      "segmentSpace": [
+        "var("
+      ]
     },
     {
       "value": "var (--a)",
@@ -10414,7 +12889,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "var (--a)"
+      ],
+      "segmentSpace": [
+        "var",
+        "(--a)"
+      ]
     },
     {
       "value": "VAR(--a)",
@@ -10440,7 +12922,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "VAR(--a)"
+      ],
+      "segmentSpace": [
+        "VAR(--a)"
+      ]
     },
     {
       "value": " var(--a)",
@@ -10466,7 +12954,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        " var(--a)"
+      ],
+      "segmentSpace": [
+        "",
+        "var(--a)"
+      ]
     },
     {
       "value": "xvar(--a)",
@@ -10492,7 +12987,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "xvar(--a)"
+      ],
+      "segmentSpace": [
+        "xvar(--a)"
+      ]
     },
     {
       "value": "var(--a) var(--b)",
@@ -10518,7 +13019,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "var(--a) var(--b)"
+      ],
+      "segmentSpace": [
+        "var(--a)",
+        "var(--b)"
+      ]
     },
     {
       "value": "[color:var(--a)]",
@@ -10544,7 +13052,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[color:var(--a)]"
+      ],
+      "segmentSpace": [
+        "[color:var(--a)]"
+      ]
     },
     {
       "value": "[length:10px]",
@@ -10570,7 +13084,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[length:10px]"
+      ],
+      "segmentSpace": [
+        "[length:10px]"
+      ]
     },
     {
       "value": "[foo_bar]",
@@ -10596,7 +13116,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[foo_bar]"
+      ],
+      "segmentSpace": [
+        "[foo_bar]"
+      ]
     },
     {
       "value": "[\"quoted\"]",
@@ -10622,7 +13148,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[\"quoted\"]"
+      ],
+      "segmentSpace": [
+        "[\"quoted\"]"
+      ]
     },
     {
       "value": "[]",
@@ -10648,7 +13180,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[]"
+      ],
+      "segmentSpace": [
+        "[]"
+      ]
     },
     {
       "value": "[",
@@ -10674,7 +13212,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "["
+      ],
+      "segmentSpace": [
+        "["
+      ]
     },
     {
       "value": "[10px]",
@@ -10700,7 +13244,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[10px]"
+      ],
+      "segmentSpace": [
+        "[10px]"
+      ]
     },
     {
       "value": "[#fff]",
@@ -10726,7 +13276,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[#fff]"
+      ],
+      "segmentSpace": [
+        "[#fff]"
+      ]
     },
     {
       "value": "[red]",
@@ -10752,7 +13308,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[red]"
+      ],
+      "segmentSpace": [
+        "[red]"
+      ]
     },
     {
       "value": "[1/2]",
@@ -10778,7 +13340,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[1/2]"
+      ],
+      "segmentSpace": [
+        "[1/2]"
+      ]
     },
     {
       "value": "[var(--a)]",
@@ -10804,7 +13372,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[var(--a)]"
+      ],
+      "segmentSpace": [
+        "[var(--a)]"
+      ]
     },
     {
       "value": "[url(a.png)]",
@@ -10830,7 +13404,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[url(a.png)]"
+      ],
+      "segmentSpace": [
+        "[url(a.png)]"
+      ]
     },
     {
       "value": "[calc(1px+2px)]",
@@ -10856,7 +13436,13 @@
         "vector": null
       },
       "isLength": true,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[calc(1px+2px)]"
+      ],
+      "segmentSpace": [
+        "[calc(1px+2px)]"
+      ]
     },
     {
       "value": "[--spacing(4)]",
@@ -10882,7 +13468,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[--spacing(4)]"
+      ],
+      "segmentSpace": [
+        "[--spacing(4)]"
+      ]
     },
     {
       "value": "rgb(0, 0, 0), rgb(1, 1, 1)",
@@ -10908,7 +13500,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "rgb(0, 0, 0)",
+        " rgb(1, 1, 1)"
+      ],
+      "segmentSpace": [
+        "rgb(0, 0, 0),",
+        "rgb(1, 1, 1)"
+      ]
     },
     {
       "value": "var(--a, 0 0 1px rgb(0, 0, 0)), 0 0 1px rgb(0, 0, 0)",
@@ -10934,7 +13534,18 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "var(--a, 0 0 1px rgb(0, 0, 0))",
+        " 0 0 1px rgb(0, 0, 0)"
+      ],
+      "segmentSpace": [
+        "var(--a, 0 0 1px rgb(0, 0, 0)),",
+        "0",
+        "0",
+        "1px",
+        "rgb(0, 0, 0)"
+      ]
     },
     {
       "value": "a\\,b",
@@ -10960,7 +13571,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a\\,b"
+      ],
+      "segmentSpace": [
+        "a\\,b"
+      ]
     },
     {
       "value": "'a,b'",
@@ -10986,7 +13603,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "'a,b'"
+      ],
+      "segmentSpace": [
+        "'a,b'"
+      ]
     },
     {
       "value": "\"a,b\"",
@@ -11012,7 +13635,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "\"a,b\""
+      ],
+      "segmentSpace": [
+        "\"a,b\""
+      ]
     },
     {
       "value": "{a,b}",
@@ -11038,7 +13667,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "{a,b}"
+      ],
+      "segmentSpace": [
+        "{a,b}"
+      ]
     },
     {
       "value": "[a,b]",
@@ -11064,7 +13699,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[a,b]"
+      ],
+      "segmentSpace": [
+        "[a,b]"
+      ]
     },
     {
       "value": "(a,b)",
@@ -11090,7 +13731,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "(a,b)"
+      ],
+      "segmentSpace": [
+        "(a,b)"
+      ]
     },
     {
       "value": "a)b,c",
@@ -11116,7 +13763,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a)b",
+        "c"
+      ],
+      "segmentSpace": [
+        "a)b,c"
+      ]
     },
     {
       "value": "a(b,c",
@@ -11142,7 +13796,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a(b,c"
+      ],
+      "segmentSpace": [
+        "a(b,c"
+      ]
     },
     {
       "value": "''",
@@ -11168,7 +13828,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "''"
+      ],
+      "segmentSpace": [
+        "''"
+      ]
     },
     {
       "value": "\"\"",
@@ -11194,7 +13860,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "\"\""
+      ],
+      "segmentSpace": [
+        "\"\""
+      ]
     },
     {
       "value": "'unterminated",
@@ -11220,7 +13892,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "'unterminated"
+      ],
+      "segmentSpace": [
+        "'unterminated"
+      ]
     },
     {
       "value": "a\\",
@@ -11246,7 +13924,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a\\"
+      ],
+      "segmentSpace": [
+        "a\\"
+      ]
     },
     {
       "value": "10px\\ 20px",
@@ -11272,7 +13956,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10px\\ 20px"
+      ],
+      "segmentSpace": [
+        "10px\\ 20px"
+      ]
     },
     {
       "value": "a'b,c",
@@ -11298,7 +13988,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a'b,c"
+      ],
+      "segmentSpace": [
+        "a'b,c"
+      ]
     },
     {
       "value": "a\"b,c",
@@ -11324,7 +14020,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a\"b,c"
+      ],
+      "segmentSpace": [
+        "a\"b,c"
+      ]
     },
     {
       "value": "",
@@ -11350,7 +14052,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        ""
+      ],
+      "segmentSpace": [
+        ""
+      ]
     },
     {
       "value": " ",
@@ -11376,7 +14084,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        " "
+      ],
+      "segmentSpace": [
+        "",
+        ""
+      ]
     },
     {
       "value": "\t",
@@ -11402,7 +14117,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "\t"
+      ],
+      "segmentSpace": [
+        "\t"
+      ]
     },
     {
       "value": "\n",
@@ -11428,7 +14149,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "\n"
+      ],
+      "segmentSpace": [
+        "\n"
+      ]
     },
     {
       "value": "a b",
@@ -11454,7 +14181,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a b"
+      ],
+      "segmentSpace": [
+        "a",
+        "b"
+      ]
     },
     {
       "value": "a  b",
@@ -11480,7 +14214,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a  b"
+      ],
+      "segmentSpace": [
+        "a",
+        "",
+        "b"
+      ]
     },
     {
       "value": " a",
@@ -11506,7 +14248,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        " a"
+      ],
+      "segmentSpace": [
+        "",
+        "a"
+      ]
     },
     {
       "value": " a ",
@@ -11532,7 +14281,15 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        " a "
+      ],
+      "segmentSpace": [
+        "",
+        "a",
+        ""
+      ]
     },
     {
       "value": " 1/2",
@@ -11558,7 +14315,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        " 1/2"
+      ],
+      "segmentSpace": [
+        " 1/2"
+      ]
     },
     {
       "value": "1 / 2",
@@ -11584,7 +14347,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1 / 2"
+      ],
+      "segmentSpace": [
+        "1 / 2"
+      ]
     },
     {
       "value": "foo",
@@ -11610,7 +14379,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "foo"
+      ],
+      "segmentSpace": [
+        "foo"
+      ]
     },
     {
       "value": "foo bar",
@@ -11636,7 +14411,14 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "foo bar"
+      ],
+      "segmentSpace": [
+        "foo",
+        "bar"
+      ]
     },
     {
       "value": "!!!",
@@ -11662,7 +14444,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "!!!"
+      ],
+      "segmentSpace": [
+        "!!!"
+      ]
     },
     {
       "value": "...",
@@ -11688,7 +14476,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "..."
+      ],
+      "segmentSpace": [
+        "..."
+      ]
     },
     {
       "value": "---",
@@ -11714,7 +14508,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "---"
+      ],
+      "segmentSpace": [
+        "---"
+      ]
     },
     {
       "value": "null",
@@ -11740,7 +14540,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "null"
+      ],
+      "segmentSpace": [
+        "null"
+      ]
     },
     {
       "value": "undefined",
@@ -11766,7 +14572,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "undefined"
+      ],
+      "segmentSpace": [
+        "undefined"
+      ]
     },
     {
       "value": "NaN",
@@ -11792,7 +14604,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "NaN"
+      ],
+      "segmentSpace": [
+        "NaN"
+      ]
     },
     {
       "value": "Infinity",
@@ -11818,7 +14636,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "Infinity"
+      ],
+      "segmentSpace": [
+        "Infinity"
+      ]
     },
     {
       "value": "-Infinity",
@@ -11844,7 +14668,13 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "-Infinity"
+      ],
+      "segmentSpace": [
+        "-Infinity"
+      ]
     },
     {
       "value": "true",
@@ -11870,7 +14700,1300 @@
         "vector": null
       },
       "isLength": false,
-      "isPositiveInteger": false
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "true"
+      ],
+      "segmentSpace": [
+        "true"
+      ]
+    },
+    {
+      "value": "url(a.png),var(--b)",
+      "all": "url",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": "url",
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": "image",
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(a.png)",
+        "var(--b)"
+      ],
+      "segmentSpace": [
+        "url(a.png),var(--b)"
+      ]
+    },
+    {
+      "value": "url(a.png),var(--b),var(--c)",
+      "all": "url",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": "url",
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": "image",
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(a.png)",
+        "var(--b)",
+        "var(--c)"
+      ],
+      "segmentSpace": [
+        "url(a.png),var(--b),var(--c)"
+      ]
+    },
+    {
+      "value": "linear-gradient(red,blue),var(--x)",
+      "all": "image",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": "image",
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "linear-gradient(red,blue)",
+        "var(--x)"
+      ],
+      "segmentSpace": [
+        "linear-gradient(red,blue),var(--x)"
+      ]
+    },
+    {
+      "value": "image-set(a),var(--x)",
+      "all": "image",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": "image",
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "image-set(a)",
+        "var(--x)"
+      ],
+      "segmentSpace": [
+        "image-set(a),var(--x)"
+      ]
+    },
+    {
+      "value": "element(x),var(--a)",
+      "all": "image",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": "image",
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "element(x)",
+        "var(--a)"
+      ],
+      "segmentSpace": [
+        "element(x),var(--a)"
+      ]
+    },
+    {
+      "value": "cross-fade(a),var(--b)",
+      "all": "image",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": "image",
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cross-fade(a)",
+        "var(--b)"
+      ],
+      "segmentSpace": [
+        "cross-fade(a),var(--b)"
+      ]
+    },
+    {
+      "value": "url(a.png), var(--b)",
+      "all": "url",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": "url",
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(a.png)",
+        " var(--b)"
+      ],
+      "segmentSpace": [
+        "url(a.png),",
+        "var(--b)"
+      ]
+    },
+    {
+      "value": "nonsense,var(--b)",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "nonsense",
+        "var(--b)"
+      ],
+      "segmentSpace": [
+        "nonsense,var(--b)"
+      ]
+    },
+    {
+      "value": "red,var(--b)",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "red",
+        "var(--b)"
+      ],
+      "segmentSpace": [
+        "red,var(--b)"
+      ]
+    },
+    {
+      "value": "url(a.png),var(--b),url(c.png)",
+      "all": "url",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": "url",
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": "image",
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url(a.png)",
+        "var(--b)",
+        "url(c.png)"
+      ],
+      "segmentSpace": [
+        "url(a.png),var(--b),url(c.png)"
+      ]
+    },
+    {
+      "value": "cover,[a,b]",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cover",
+        "[a,b]"
+      ],
+      "segmentSpace": [
+        "cover,[a,b]"
+      ]
+    },
+    {
+      "value": "[a,b],cover",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[a,b]",
+        "cover"
+      ],
+      "segmentSpace": [
+        "[a,b],cover"
+      ]
+    },
+    {
+      "value": "auto,[a,b]",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "auto",
+        "[a,b]"
+      ],
+      "segmentSpace": [
+        "auto,[a,b]"
+      ]
+    },
+    {
+      "value": "thin,[a,b]",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "thin",
+        "[a,b]"
+      ],
+      "segmentSpace": [
+        "thin,[a,b]"
+      ]
+    },
+    {
+      "value": "cover [a b]",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cover [a b]"
+      ],
+      "segmentSpace": [
+        "cover",
+        "[a b]"
+      ]
+    },
+    {
+      "value": "[10px 20px]",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[10px 20px]"
+      ],
+      "segmentSpace": [
+        "[10px 20px]"
+      ]
+    },
+    {
+      "value": "[a b] cover",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[a b] cover"
+      ],
+      "segmentSpace": [
+        "[a b]",
+        "cover"
+      ]
+    },
+    {
+      "value": "[a b],cover",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[a b]",
+        "cover"
+      ],
+      "segmentSpace": [
+        "[a b],cover"
+      ]
+    },
+    {
+      "value": "10px [20px 30px]",
+      "all": null,
+      "reversed": null,
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": null,
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10px [20px 30px]"
+      ],
+      "segmentSpace": [
+        "10px",
+        "[20px 30px]"
+      ]
+    },
+    {
+      "value": "x[a,b]y, cover",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "x[a,b]y",
+        " cover"
+      ],
+      "segmentSpace": [
+        "x[a,b]y,",
+        "cover"
+      ]
+    },
+    {
+      "value": "url([a,b].png)",
+      "all": "url",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": "url",
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": "image",
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url([a,b].png)"
+      ],
+      "segmentSpace": [
+        "url([a,b].png)"
+      ]
+    },
+    {
+      "value": "url([a,b].png),url(c.png)",
+      "all": "url",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": "url",
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": "image",
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "url([a,b].png)",
+        "url(c.png)"
+      ],
+      "segmentSpace": [
+        "url([a,b].png),url(c.png)"
+      ]
+    },
+    {
+      "value": "[a,b] [c,d]",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "[a,b] [c,d]"
+      ],
+      "segmentSpace": [
+        "[a,b]",
+        "[c,d]"
+      ]
+    },
+    {
+      "value": "1px [2px 3px]",
+      "all": null,
+      "reversed": null,
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": null,
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "1px [2px 3px]"
+      ],
+      "segmentSpace": [
+        "1px",
+        "[2px 3px]"
+      ]
+    },
+    {
+      "value": "center [a b]",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "center [a b]"
+      ],
+      "segmentSpace": [
+        "center",
+        "[a b]"
+      ]
+    },
+    {
+      "value": "cover,{a,b}",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cover",
+        "{a,b}"
+      ],
+      "segmentSpace": [
+        "cover,{a,b}"
+      ]
+    },
+    {
+      "value": "{a b},cover",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "{a b}",
+        "cover"
+      ],
+      "segmentSpace": [
+        "{a b},cover"
+      ]
+    },
+    {
+      "value": "10px {20px 30px}",
+      "all": null,
+      "reversed": null,
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": null,
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "10px {20px 30px}"
+      ],
+      "segmentSpace": [
+        "10px",
+        "{20px 30px}"
+      ]
+    },
+    {
+      "value": "'a,b',cover",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "'a,b'",
+        "cover"
+      ],
+      "segmentSpace": [
+        "'a,b',cover"
+      ]
+    },
+    {
+      "value": "\"a,b\",cover",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "\"a,b\"",
+        "cover"
+      ],
+      "segmentSpace": [
+        "\"a,b\",cover"
+      ]
+    },
+    {
+      "value": "'a b' c",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "'a b' c"
+      ],
+      "segmentSpace": [
+        "'a b'",
+        "c"
+      ]
+    },
+    {
+      "value": "cover,'a,b'",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cover",
+        "'a,b'"
+      ],
+      "segmentSpace": [
+        "cover,'a,b'"
+      ]
+    },
+    {
+      "value": "a\\,b,cover",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a\\,b",
+        "cover"
+      ],
+      "segmentSpace": [
+        "a\\,b,cover"
+      ]
+    },
+    {
+      "value": "cover,a\\,b",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cover",
+        "a\\,b"
+      ],
+      "segmentSpace": [
+        "cover,a\\,b"
+      ]
+    },
+    {
+      "value": "a)b,cover",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a)b",
+        "cover"
+      ],
+      "segmentSpace": [
+        "a)b,cover"
+      ]
+    },
+    {
+      "value": "a]b,cover",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a]b",
+        "cover"
+      ],
+      "segmentSpace": [
+        "a]b,cover"
+      ]
+    },
+    {
+      "value": "cover,a}b",
+      "all": "bg-size",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": "bg-size",
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "cover",
+        "a}b"
+      ],
+      "segmentSpace": [
+        "cover,a}b"
+      ]
+    },
+    {
+      "value": "a(b,cover",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a(b,cover"
+      ],
+      "segmentSpace": [
+        "a(b,cover"
+      ]
+    },
+    {
+      "value": "a[b,cover",
+      "all": "family-name",
+      "reversed": "family-name",
+      "perType": {
+        "color": null,
+        "length": null,
+        "percentage": null,
+        "ratio": null,
+        "number": null,
+        "integer": null,
+        "url": null,
+        "position": null,
+        "bg-size": null,
+        "line-width": null,
+        "image": null,
+        "family-name": "family-name",
+        "generic-name": null,
+        "absolute-size": null,
+        "relative-size": null,
+        "angle": null,
+        "vector": null
+      },
+      "isLength": false,
+      "isPositiveInteger": false,
+      "segmentComma": [
+        "a[b,cover"
+      ],
+      "segmentSpace": [
+        "a[b,cover"
+      ]
     }
   ]
 }
