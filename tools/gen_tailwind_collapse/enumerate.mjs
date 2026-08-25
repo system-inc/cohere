@@ -190,8 +190,6 @@ function parseCandidate(className) {
  * stripped from compiled output, so it cannot be probed and has to come from the source.
  */
 const classOrder = [];
-const knownRoots = new Set();
-const knownStatics = new Set();
 const functionalRoots = new Set();
 const staticUtilities = new Set();
 for (const entry of designSystem.getClassList?.() ?? []) {
@@ -208,7 +206,6 @@ for (const entry of designSystem.getClassList?.() ?? []) {
     const asStatic = parseCandidate(name);
     if (asStatic?.kind === 'static') {
         staticUtilities.add(name);
-        knownStatics.add(name);
     }
 
     const asFunctional = parseCandidate(name + '-4');
@@ -219,7 +216,6 @@ for (const entry of designSystem.getClassList?.() ?? []) {
     // Existence, read from the name as written rather than from a probe value. `from-black/70`
     // parses as root `from`, and `from` never appears with a numeric probe.
     const asWritten = parseCandidate(name);
-    if (asWritten?.kind === 'functional' && asWritten.root) knownRoots.add(asWritten.root);
 }
 
 /*
@@ -246,7 +242,6 @@ for (const entry of designSystem.getClassList?.() ?? []) {
  */
 for (const root of designSystem.utilities?.keys?.('functional') ?? []) {
     if (typeof root !== 'string') continue;
-    knownRoots.add(root);
     functionalRoots.add(root);
 }
 
@@ -1052,8 +1047,6 @@ process.stdout.write(
             orderingByClass,
             sortOverrides: Array.from(new Set(sortOverrides)).sort(),
             variantOrder,
-            knownRoots: Array.from(knownRoots).sort(),
-            knownStatics: Array.from(knownStatics).sort(),
             unreachableRoots: unreachableRoots.sort(),
             rootSelectorShapes,
             composingRoots: composingRoots.sort(),

@@ -98,6 +98,39 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 			"one has been added or removed without its reason being written down", len(ours))
 	}
 
+	// Every exported table in the package is accounted for above, and this is the half the first
+	// version of this test was missing.
+	//
+	// It asserted "exactly four tables of ours" over a list it wrote itself, so `KnownRoots` and
+	// `KnownStatics` sat in the same file, generated on every run, dead since 58fb982 rewired
+	// `HasUtility` off them, and passed. 1,236 entries carried for two commits under a check that
+	// read as clean, which is the same defect class this package keeps finding: a measurement of the
+	// wrong population.
+	//
+	// Naming them here is what makes the assertion mechanical rather than a restatement of the list.
+	// A table added to the package and not to this slice fails, whatever the count says.
+	inPackage := []string{
+		"PropertyOrder", "SortOverrideProperties", "FrameworkVariantRegistrations",
+		"FrameworkStaticDeclarations", "FrameworkFunctionalUtilities", "FrameworkMultiDeclaration",
+		"baseDescriptors", "RootDeclaredProperties", "ComposingRoots", "CollapseFamilies",
+	}
+	accounted := make(map[string]bool, len(upstream)+len(ours))
+	for name := range upstream {
+		accounted[name] = true
+	}
+	for name := range ours {
+		accounted[name] = true
+	}
+	for _, name := range inPackage {
+		if !accounted[name] {
+			t.Errorf("%s is a table in this package with no entry in the inventory above", name)
+		}
+	}
+	if len(accounted) != len(inPackage) {
+		t.Errorf("the inventory accounts for %d tables and the package holds %d; the two lists have "+
+			"drifted, which is how a dead table survives a passing check", len(accounted), len(inPackage))
+	}
+
 	t.Logf("Tailwind's own: %v", upstream)
 	t.Logf("ours, each with a stated reason: %v", ours)
 }

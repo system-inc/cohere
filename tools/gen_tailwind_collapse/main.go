@@ -87,8 +87,6 @@ type enumeration struct {
 	ComposingRoots      []string            `json:"composingRoots"`
 	ClassProperties     []utilityProperties `json:"classProperties"`
 	UnreachableRoots    []string            `json:"unreachableRoots"`
-	KnownRoots          []string            `json:"knownRoots"`
-	KnownStatics        []string            `json:"knownStatics"`
 	PropertyOrder       []string            `json:"propertyOrder"`
 	OrderingByRoot      []utilityProperties `json:"orderingByRoot"`
 	OrderingByStatic    []utilityProperties `json:"orderingByStatic"`
@@ -629,28 +627,19 @@ var ComposingRoots = map[string]bool{
 
 	fmt.Fprintf(&buffer, `}
 
-// KnownRoots is every functional utility root the design system defines.
+// KnownRoots and KnownStatics used to be printed here and are not any more.
 //
-// Existence is a different question from what a class declares, and answering it from the property
-// tables gets 12 real classes wrong on the ahra tree: from-black/70 sets only --tw-gradient-from,
-// container emits several rules, fade-in sets only --enter-opacity. All three are deliberately
-// absent from the property tables and all three exist.
-var KnownRoots = map[string]bool{
-`)
-	for _, root := range result.KnownRoots {
-		fmt.Fprintf(&buffer, "\t%q: true,\n", root)
-	}
-
-	fmt.Fprintf(&buffer, `}
-
-// KnownStatics is every utility whose whole name is its identity.
-var KnownStatics = map[string]bool{
-`)
-	for _, name := range result.KnownStatics {
-		fmt.Fprintf(&buffer, "\t%q: true,\n", name)
-	}
-
-	fmt.Fprintf(&buffer, `}
+// They answered `+"`HasUtility`"+`, which now reads the ported registrations instead: statics from
+// FrameworkStaticDeclarations, functional roots from the union of the wave tables and the descriptor
+// rows. See commit 58fb982 for the measurement, which is why the change was not cosmetic:
+// KnownStatics held 895 names against the 890 the framework registers, and the 27 extra were ahra's
+// own `+"`@utility`"+` blocks sitting in a file headed with a Tailwind version. Two of them,
+// `+"`fade-in`"+` and `+"`fade-out`"+`, are declared by ahra and not by www-connected-app, so the
+// table was telling every other repository that two of one project's animations were framework
+// utilities.
+//
+// Printing them after nothing read them left 1,236 dead entries in this file for two commits. If a
+// consumer ever needs either question again, ask the design system rather than reviving these.
 
 // ColorNames is every color value the design system defines.
 //

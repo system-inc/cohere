@@ -103,7 +103,7 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(t *testing.T) {
 // no families: three synthetic roots sharing a padding shorthand produced 44 families, the same 44.
 // The reason is structural rather than lucky, and it is what this asserts: the outputs are roots the
 // framework itself registers, so a table of them cannot pick up a repository token the way
-// KnownStatics did.
+// KnownStatics did, back when that table existed.
 func TestCollapseFamiliesHoldForRootsTheFrameworkOwns(t *testing.T) {
 	if len(CollapseFamilies) == 0 {
 		t.Fatal("no collapse families, which is a broken table rather than a Tailwind with no shorthands")
@@ -119,7 +119,7 @@ func TestCollapseFamiliesHoldForRootsTheFrameworkOwns(t *testing.T) {
 
 	for _, family := range CollapseFamilies {
 		for _, root := range []string{family.First, family.Second, family.Output} {
-			if !KnownRoots[registryName(root)] {
+			if !frameworkFunctionalRoots[registryName(root)] {
 				t.Errorf(
 					"family %s + %s => %s names %q, which is not a root the design system registers; a family over an unregistered root is a repository token in a framework table",
 					family.First, family.Second, family.Output, root,
@@ -129,25 +129,31 @@ func TestCollapseFamiliesHoldForRootsTheFrameworkOwns(t *testing.T) {
 	}
 }
 
-// TestKnownStaticsCarriesRepositoryTokens is the counterexample that keeps the file honest.
+// TestFrameworkStaticsCarryNoRepositoryTokens is the assertion that replaced a counterexample.
 //
-// `collapse_table.go` says "Source: Tailwind 4.3.3" at the top and `KnownStatics` holds
-// `markdown-content`, one of ahra's own `@utility` blocks. That is already known and tracked as
-// replace-with-live-system, and it is asserted here rather than left as prose because the two
-// tables sit in one file under one header: a reader who checked `CollapseFamilies`, found it
-// genuinely invariant, and generalised to the file would be wrong.
+// `KnownStatics` used to hold `markdown-content`, one of ahra's own `@utility` blocks, in a file
+// headed with a Tailwind version, and a test here measured that leak rather than fixing it. Commit
+// 58fb982 rewired `HasUtility` onto the ported registrations and the leak closed; this commit deleted
+// the table itself.
 //
-// If this test ever fails because the token is gone, the fix is to delete the test along with the
-// header caveat, not to loosen it.
-func TestKnownStaticsCarriesRepositoryTokens(t *testing.T) {
-	repositoryToken := "markdown-content"
+// So the assertion inverts: the framework statics must carry none of the repository's own names. It
+// checks against the blocks this repository declares rather than a hardcoded list, so a repository
+// adding a utility extends the check automatically.
+func TestFrameworkStaticsCarryNoRepositoryTokens(t *testing.T) {
+	system := loadWave1DesignSystem(t)
 
-	if KnownStatics[repositoryToken] {
-		return
+	declared := system.RepositoryStaticUtilityNames()
+	if len(declared) == 0 {
+		t.Fatal("the design system reports no repository static utilities, so this comparison measured nothing")
 	}
 
-	t.Errorf(
-		"%q is no longer in KnownStatics; the file's caveat about carrying repository tokens may now be stale rather than the table being fixed",
-		repositoryToken,
-	)
+	leaked := 0
+	for _, name := range declared {
+		if _, found := FrameworkStaticDeclarations[name]; found {
+			leaked++
+			t.Errorf("%q is declared by this repository and is also in FrameworkStaticDeclarations, so a "+
+				"repository token is being carried as a framework fact", name)
+		}
+	}
+	t.Logf("checked %d repository-declared statics against the framework table, %d leaked", len(declared), leaked)
 }
