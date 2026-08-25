@@ -109,6 +109,17 @@ func TestEnforceConsistentClassOrderStaysSilent(t *testing.T) {
 			source:   `const element = <div className="group flex" />;`,
 		},
 		{
+			// A root whose own prefix is also a root. `ring-offset` exists in the ordering table
+			// and not in the conflict table, so resolving it through the latter answered with
+			// `ring`'s properties and made `ring-offset-1` indistinguishable from `ring-1`. The
+			// engine accepts this literal as written; the rule reported it until the lookup was
+			// pointed at the table it reads.
+			name:     "ring-offset resolves to its own root, not to ring",
+			fileName: "Component.tsx",
+			source: `const element = <div className="focus-visible:ring-1 focus-visible:ring-(--color-content-informative) ` +
+				`focus-visible:ring-offset-1 focus-visible:outline-none" />;`,
+		},
+		{
 			// Both spellings are accepted, which is what pins the tiebreak to source order rather
 			// than to any ordering of our own. An alphabetical tiebreak passes the first and fails
 			// the second, so the pair is the discriminator.
@@ -355,6 +366,31 @@ func TestUnrankedClassesSortFirstRegardlessOfVariant(t *testing.T) {
 	}
 	if classSortsBefore("hover:background--5", "group") {
 		t.Error("the comparator disagrees with itself on the same pair")
+	}
+}
+
+// TestOrderingRootsResolveInTheOrderingTable is the known-dirty control for the table-choice bug.
+//
+// 22 roots exist in the ordering table and not in the conflict table, so a lookup that resolves an
+// ordering question through `functionalRootOf` silently answers with a shorter root's properties.
+// Two classes the engine separates then collapse onto one key, which reads as agreement rather
+// than as a miss.
+//
+// The assertion is that a shadowed root answers with its own properties and not with its prefix's.
+// Both halves are needed: without the second, a lookup returning the prefix's row passes.
+func TestOrderingRootsResolveInTheOrderingTable(t *testing.T) {
+	if root := orderingRootOf("ring-offset-1"); root != "ring-offset" {
+		t.Errorf("ring-offset-1 should resolve to root %q, got %q", "ring-offset", root)
+	}
+
+	offset := declaredPropertiesForOrdering("ring-offset-1")
+	ring := declaredPropertiesForOrdering("ring-1")
+	if len(offset) == 0 || len(ring) == 0 {
+		t.Fatalf("both should declare properties, got %v and %v", offset, ring)
+	}
+	if offset[0] == ring[0] {
+		t.Errorf("ring-offset-1 and ring-1 lead with the same property %q, so the comparator cannot "+
+			"separate them and the engine does", offset[0])
 	}
 }
 

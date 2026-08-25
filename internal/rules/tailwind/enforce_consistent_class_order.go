@@ -317,13 +317,44 @@ func sortOverrideFor(base string) (string, bool) {
 	return sortOverrideProperties[longest], true
 }
 
+// orderingRootOf finds the longest root that prefixes a class base, searched in the ordering
+// table rather than the conflict table.
+//
+// `functionalRootOf` does the same longest-wins walk over `RootDeclaredProperties`, which
+// `no-conflicting-classes` reads. The two tables are generated from different questions and are
+// not the same set: 22 roots exist in the ordering table and not in the conflict one. `ring-offset`
+// is one of them, so resolving an ordering question through the conflict table found `ring` as the
+// longest available match and answered with ring's properties. `ring-offset-1` then reported
+// `[--tw-ring-shadow box-shadow]`, identical to `ring-1`, and two classes the engine separates
+// collapsed onto one key.
+//
+// Longest-wins was never the defect; searching the wrong table for it was. The rule is that a
+// lookup resolves its root in the table it is about to read, because a root that is missing there
+// cannot be the answer no matter how well the walk is written.
+func orderingRootOf(base string) string {
+	longest := ""
+	for root := range tailwindengine.OrderingPropertiesByRoot {
+		if !strings.HasPrefix(base, root) {
+			continue
+		}
+		// The root must be followed by a value separator, so `p` does not match `px-4`.
+		if len(base) > len(root) && base[len(root)] != '-' {
+			continue
+		}
+		if len(root) > len(longest) {
+			longest = root
+		}
+	}
+	return longest
+}
+
 // declaredPropertiesForOrdering resolves a class base to the properties it declares.
 func declaredPropertiesForOrdering(base string) []string {
 	if properties, isStatic := tailwindengine.OrderingPropertiesByStatic[base]; isStatic {
 		return properties
 	}
 
-	root := functionalRootOf(base)
+	root := orderingRootOf(base)
 	if root == "" {
 		return nil
 	}
