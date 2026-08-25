@@ -1,10 +1,12 @@
 package hir
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/verify/internal/reactconformance"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/ruletest"
 )
@@ -313,4 +315,116 @@ func TestPruneNonEscapingScopesResolvesLoadLocalIndirection(t *testing.T) {
 	}
 
 	t.Logf("escapingRoots=%d loadLocalIndirections=%d", roots, definitionsRecorded)
+}
+
+// TestMemoMarkersArePrunedOnlyWhenTheirScopeWas covers the marker pass in both directions.
+//
+// Both directions matter and neither alone is enough. A pass that marks every marker satisfies any
+// assertion phrased only about pruning, and a pass that marks none satisfies any assertion phrased
+// only about survival. This file has produced fixtures that passed for exactly that reason.
+func TestMemoMarkersArePrunedOnlyWhenTheirScopeWas(t *testing.T) {
+	// Measured on the vendored corpus rather than on constructed source: whether a marker's value
+	// carries a scope depends on lowering and on four passes upstream of this one, so a hand-written
+	// fixture would be asserting the pipeline rather than the pass.
+	fixtures, err := reactconformance.Load("../../reactconformance/testdata/fixtures")
+	if err != nil {
+		t.Fatalf("loading the vendored corpus: %v", err)
+	}
+
+	marked, total := 0, 0
+	for _, fixture := range fixtures {
+		if !strings.Contains(fixture.Source, "validatePreserveExistingMemoizationGuarantees") {
+			continue
+		}
+		pruned, seen, ok := memoMarkerCountsForSource(t, fixture.Source)
+		if !ok {
+			continue
+		}
+		marked += pruned
+		total += seen
+	}
+
+	if total == 0 {
+		t.Fatal("no `FinishMemoize` marker was reached on the whole corpus, so this test asserts " +
+			"nothing about the pass; the population is wrong rather than the pass being correct")
+	}
+	if marked == 0 {
+		t.Errorf("no marker was pruned across %d markers, so the pass is inert", total)
+	}
+	if marked == total {
+		t.Errorf("every one of %d markers was pruned, which is unconditional marking rather than "+
+			"a decision about whether the value's scope survived", total)
+	}
+	t.Logf("markers: %d pruned of %d reached", marked, total)
+}
+
+// memoMarkerCountsForSource runs the pipeline through the pruning pass and counts markers.
+func memoMarkerCountsForSource(t *testing.T, source string) (pruned, reached int, ok bool) {
+	t.Helper()
+	probe := rule.Rule{
+		Name:             "memo-marker-counts",
+		NeedsTypeChecker: true,
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			return rule.Listeners{
+				ast.KindSourceFile: func(node *ast.Node) {
+					if ctx.TypeChecker == nil {
+						return
+					}
+					forEachFunctionLike(node, func(functionNode *ast.Node) {
+						function := Lower(functionNode, ctx.TypeChecker)
+						if function == nil {
+							return
+						}
+						Construct(function)
+						markerPruned, markerReached := markerCounts(function, ctx.TypeChecker)
+						pruned += markerPruned
+						reached += markerReached
+						ok = true
+					})
+				},
+			}
+		},
+	}
+	ruletest.RunTypedFiles(t, probe, map[string]string{
+		"/react.d.ts":  reactiveDeclarations,
+		"/fixture.tsx": source,
+	}, "/fixture.tsx")
+	return pruned, reached, ok
+}
+
+func markerCounts(function *Function, checker *shimchecker.Checker) (pruned, reached int) {
+	InferReactive(function, checker)
+	DropManualMemoization(function)
+	ranges := InferMutableRanges(function)
+	disjoint := FindDisjointMutableValuesWithRanges(function, ranges)
+	scopes := AssignReactiveScopesWithSets(function, ranges, disjoint)
+	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
+	identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
+	BuildReactiveScopeTerminals(function, scopes, identity)
+	dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
+	tree, _ := BuildReactiveFunction(function)
+	if tree == nil {
+		return 0, 0
+	}
+	MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, checker)
+	result := PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, checker)
+
+	TransformReactiveFunction(tree, ReactiveTransformer{
+		Instruction: func(statement *ReactiveInstructionStatement,
+			traverse func()) ReactiveTransformed {
+			traverse()
+			if statement == nil || statement.Instruction == nil {
+				return KeepStatement()
+			}
+			plain, isPlain := statement.Instruction.Value.(*ReactiveInstructionValue)
+			if !isPlain || plain == nil {
+				return KeepStatement()
+			}
+			if _, isFinish := plain.Value.(*FinishMemoize); isFinish {
+				reached++
+			}
+			return KeepStatement()
+		},
+	})
+	return result.MarkersPruned, reached
 }

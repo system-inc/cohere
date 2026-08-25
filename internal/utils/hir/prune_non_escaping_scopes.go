@@ -36,6 +36,11 @@ type PruneNonEscapingScopesResult struct {
 	EscapingRoots int
 	// Memoized is how many declarations the propagation held.
 	Memoized int
+	// MarkersPruned is how many `FinishMemoize` markers were marked pruned.
+	//
+	// Zero unless the caller supplied scopes, since the marker pass needs to ask which scope an
+	// identifier belongs to and this IR keeps that in a side table rather than on the identifier.
+	MarkersPruned int
 }
 
 // PruneNonEscapingScopes drops scopes whose values are not held by anything.
@@ -62,13 +67,54 @@ func PruneNonEscapingScopes(tree *ReactiveFunction, function *Function,
 
 	memoized := collector.graph.ComputeMemoized()
 
-	pruned := prunePassOverScopes(tree, function, dependencies, memoized)
+	return pruneNonEscapingScopesWith(tree, function, dependencies, collector, memoized, nil)
+}
+
+// PruneNonEscapingScopesWithScopes is `PruneNonEscapingScopes` plus the memo-marker pass.
+//
+// Separate entry point rather than a changed signature, matching `AssignReactiveScopesWithSets` and
+// `CollectScopeDependenciesWithHoistable`: the marker pass needs to ask which scope an identifier
+// belongs to, and this IR answers that from a side table rather than from the identifier, so the
+// question is not askable from the arguments the original takes.
+//
+// A caller that omits the scopes gets the scope pruning and no marker pruning, which is the state
+// every caller was in before this existed.
+func PruneNonEscapingScopesWithScopes(tree *ReactiveFunction, function *Function,
+	dependencies *ScopeDependencies, scopes *ReactiveScopes,
+	typeChecker *shimchecker.Checker) PruneNonEscapingScopesResult {
+	if tree == nil || function == nil {
+		return PruneNonEscapingScopesResult{}
+	}
+
+	collector := memoizationCollector{
+		function:     function,
+		dependencies: dependencies,
+		graph:        NewMemoizationGraph(),
+		definitions:  map[DeclarationId]DeclarationId{},
+	}
+	for _, parameter := range function.Params {
+		collector.graph.Declare(declarationOf(function, parameter.Identifier))
+	}
+	collector.walk(tree.Body)
+
+	memoized := collector.graph.ComputeMemoized()
+
+	return pruneNonEscapingScopesWith(tree, function, dependencies, collector, memoized, scopes)
+}
+
+func pruneNonEscapingScopesWith(tree *ReactiveFunction, function *Function,
+	dependencies *ScopeDependencies, collector memoizationCollector,
+	memoized map[DeclarationId]bool, scopes *ReactiveScopes) PruneNonEscapingScopesResult {
+	prunedScopes := map[ScopeId]bool{}
+	pruned := prunePassOverScopes(tree, function, dependencies, memoized, prunedScopes)
+	markers := prunePassOverMemoMarkers(tree, function, scopes, prunedScopes)
 
 	return PruneNonEscapingScopesResult{
 		Pruned:        pruned,
 		Declarations:  collector.graph.Len(),
 		EscapingRoots: collector.graph.EscapingCount(),
 		Memoized:      len(memoized),
+		MarkersPruned: markers,
 	}
 }
 
@@ -385,7 +431,8 @@ func (c *memoizationCollector) eachOperand(value ReactiveValue, visit func(Place
 // needs the scope standing. We have no early-return representation, so only the first half applies
 // and the second is why `PropagateEarlyReturns` is still open rather than declined.
 func prunePassOverScopes(tree *ReactiveFunction, function *Function,
-	dependencies *ScopeDependencies, memoized map[DeclarationId]bool) int {
+	dependencies *ScopeDependencies, memoized map[DeclarationId]bool,
+	prunedScopes map[ScopeId]bool) int {
 	pruned := 0
 	TransformReactiveFunction(tree, ReactiveTransformer{
 		Scope: func(scope *ReactiveScopeBlock, traverse func()) ReactiveTransformed {
@@ -409,8 +456,112 @@ func prunePassOverScopes(tree *ReactiveFunction, function *Function,
 				}
 			}
 			pruned++
+			if prunedScopes != nil {
+				prunedScopes[scope.Scope] = true
+			}
 			return ReplaceStatements(scope.Instructions)
 		},
 	})
 	return pruned
+}
+
+// prunePassOverMemoMarkers marks a `FinishMemoize` whose value was never memoized.
+//
+// Upstream's `transformInstruction` in `PruneNonEscapingScopes.ts:1066-1119`, and its doc comment
+// names exactly the symptom this closes: "If we pruned the scope for a non-escaping value, we know
+// it doesn't need to be memoized. Remove associated `Memoize` instructions so that we don't report
+// false positives on 'missing' memoization of these values."
+//
+// # Why this is a second walk here and one walk upstream
+//
+// Upstream overrides `transformInstruction` on the same visitor that prunes the scopes, so the two
+// interleave in one pass. Our transformer takes hooks rather than being subclassed, and the scope
+// hook already runs `traverse()` before deciding, so an instruction hook on the same transformer
+// would see a scope's own instructions before the scope decided its fate. Running the marker pass
+// after the scope pass reads the finished `prunedScopes` set instead, which is the same information
+// without depending on the interleaving.
+//
+// # The reassignment map, which is the half a shorter port would drop
+//
+// A `useMemo` that got inlined stores its result into a temporary and then reassigns, so the
+// marker's own value carries no scope and the question has to be asked of what was assigned INTO
+// it. Upstream builds that map from two instruction shapes and falls back to the marker's own
+// identifier when the map has no entry. Dropping it would leave every inlined memo unmarked, which
+// is the shape `prune-nonescaping-useMemo.ts` and its siblings are built from.
+func prunePassOverMemoMarkers(tree *ReactiveFunction, function *Function, scopes *ReactiveScopes,
+	prunedScopes map[ScopeId]bool) int {
+	if scopes == nil {
+		return 0
+	}
+	marked := 0
+	reassignments := map[DeclarationId][]IdentifierId{}
+
+	// scopeless answers upstream's `decl.identifier.scope == null`. Zero is this tree's "no scope"
+	// sentinel, standing in for upstream's null.
+	scopeless := func(id IdentifierId) bool { return scopes.ScopeOf(id) == 0 }
+
+	TransformReactiveFunction(tree, ReactiveTransformer{
+		Instruction: func(statement *ReactiveInstructionStatement,
+			traverse func()) ReactiveTransformed {
+			traverse()
+			if statement == nil || statement.Instruction == nil {
+				return KeepStatement()
+			}
+			instruction := statement.Instruction
+			plain, isPlain := instruction.Value.(*ReactiveInstructionValue)
+			if !isPlain || plain == nil {
+				return KeepStatement()
+			}
+
+			switch value := plain.Value.(type) {
+			case *StoreLocal:
+				// Upstream keys this arm on `lvalue.kind === 'Reassign'`. This IR has no reassign
+				// kind on a store, so the same population is selected structurally: a store whose
+				// target carries no scope is the inlining temporary upstream is describing.
+				if scopeless(value.LValue.Identifier) {
+					target := declarationOf(function, value.LValue.Identifier)
+					reassignments[target] = append(reassignments[target], value.Value.Identifier)
+				}
+
+			case *LoadLocal:
+				// The simpler inlining shape: a direct assignment to the original lvalue. Upstream
+				// requires the loaded place to HAVE a scope and the lvalue to lack one, which is
+				// what distinguishes it from an ordinary read.
+				if instruction.LValue != nil && !scopeless(value.Place.Identifier) &&
+					scopeless(instruction.LValue.Identifier) {
+					target := declarationOf(function, instruction.LValue.Identifier)
+					reassignments[target] = append(reassignments[target], value.Place.Identifier)
+				}
+
+			case *FinishMemoize:
+				if value.Pruned {
+					return KeepStatement()
+				}
+				declarations := []IdentifierId{value.Value.Identifier}
+				if scopeless(value.Value.Identifier) {
+					if inlined, found :=
+						reassignments[declarationOf(function, value.Value.Identifier)]; found {
+						declarations = inlined
+					}
+				}
+				// Upstream's `every`: a marker is pruned when EVERY declaration it could name is
+				// either scopeless or in a scope this pass just pruned. One surviving memoized
+				// declaration is enough to keep the claim alive.
+				all := true
+				for _, declaration := range declarations {
+					scope := scopes.ScopeOf(declaration)
+					if scope != 0 && !prunedScopes[scope] {
+						all = false
+						break
+					}
+				}
+				if all {
+					value.Pruned = true
+					marked++
+				}
+			}
+			return KeepStatement()
+		},
+	})
+	return marked
 }

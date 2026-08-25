@@ -166,7 +166,15 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 
 	// Every one of these is the rule reporting a lost memoization on a program upstream compiles
 	// clean. A gate that does this gets switched off, which is why the registration is held.
-	const knownFalsePositives = 31
+	// Lowered from 31 by `PruneNonEscapingScopes` marking `FinishMemoize` markers whose value was
+	// never memoized, which upstream does in the same pass and this tree did not do at all.
+	//
+	// The move is smaller than the measured ceiling of 23 and that is the informative part rather
+	// than a shortfall. Forcing every marker to read as pruned reaches 23, so 7 of those 8 belong to
+	// fixtures that ALSO fire the `StartMemoize` condition and stay in the count on that other
+	// finding. The marker pass itself prunes 36 of 68 markers on this corpus and leaves zero
+	// unpruned markers whose value carries no scope, so it is not under-firing.
+	const knownFalsePositives = 30
 	if fired != knownFalsePositives {
 		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
 			"number should be lowered deliberately, and if it went UP something regressed",
@@ -244,7 +252,7 @@ func pipelineFindings(function *Function, checker *shimchecker.Checker) []Preser
 	}
 
 	MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, checker)
-	PruneNonEscapingScopes(tree, function, dependencies, checker)
+	PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, checker)
 	PruneUnusedScopes(tree, dependencies)
 	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 	PruneNonReactiveDependencies(tree, function, dependencies)

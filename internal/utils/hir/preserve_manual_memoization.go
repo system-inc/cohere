@@ -274,7 +274,7 @@ func AnalyzePreservedManualMemoization(function *Function,
 	}
 
 	MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, typeChecker)
-	PruneNonEscapingScopes(tree, function, dependencies, typeChecker)
+	PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, typeChecker)
 	PruneUnusedScopes(tree, dependencies)
 	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 	PruneNonReactiveDependencies(tree, function, dependencies)
