@@ -206,6 +206,19 @@ for (const className of Array.from(classNames).sort()) {
         property: candidate.property ?? '',
         valueKind: candidate.value ? candidate.value.kind : 'none',
         value: candidate.value ? String(candidate.value.value ?? '') : '',
+        /*
+         * The fraction, which the engine reports and this fixture used to drop.
+         *
+         * `-bottom-1/2` parses with value `1`, modifier `2` AND fraction `1/2`, and the fraction is
+         * what makes it resolve: without it the modifier cancels the bare value and the class reads
+         * nothing. Recording only the first two produced a candidate no parser would ever build, so a
+         * consumer that resolves a value declined classes the engine reads while a consumer that
+         * carries a pre-measured reading did not.
+         *
+         * That difference blocked the base table's deletion: the two paths were not comparable on
+         * this corpus, and the gap was in the fixture rather than in either path.
+         */
+        fraction: candidate.value?.fraction ?? '',
         dataType: candidate.value?.dataType ?? '',
         modifierKind: candidate.modifier ? candidate.modifier.kind : 'none',
         modifierValue: candidate.modifier ? String(candidate.modifier.value ?? '') : '',

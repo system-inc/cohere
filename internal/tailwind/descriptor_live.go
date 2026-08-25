@@ -92,6 +92,7 @@ func NewTable(system *LoadedDesignSystem) *Table {
 		Descriptors:     make(map[string]*Descriptor, len(baseDescriptors)+len(system.utilityRoots)),
 		Statics:         make(map[string]Reading, len(FrameworkStaticDeclarations)+len(system.staticUtilityNodes)),
 		PropertyOrder:   PropertyOrder,
+		theme:           system.theme,
 	}
 
 	for root, descriptor := range baseDescriptors {

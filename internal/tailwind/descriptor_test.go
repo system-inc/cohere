@@ -26,6 +26,7 @@ type descriptorFixtureCase struct {
 	Property      string   `json:"property"`
 	ValueKind     string   `json:"valueKind"`
 	Value         string   `json:"value"`
+	Fraction      string   `json:"fraction"`
 	DataType      string   `json:"dataType"`
 	ModifierKind  string   `json:"modifierKind"`
 	ModifierValue string   `json:"modifierValue"`
@@ -88,7 +89,14 @@ func (one descriptorFixtureCase) parsed() *ParsedCandidate {
 
 	switch one.ValueKind {
 	case "named":
-		candidate.Value = &ParsedValue{Kind: ParsedValueKindNamed, Value: one.Value}
+		// The fraction is carried, and it is the field a hand-built candidate forgets.
+		//
+		// `-bottom-1/2` parses with value `1`, modifier `2` and fraction `1/2`. A consumer that
+		// resolves the value needs the fraction, because without it the modifier cancels the bare
+		// value and the class produces nothing; a consumer reading a pre-measured row does not. That
+		// asymmetry is what made the descriptor rows and the ported registration tables incomparable
+		// on this corpus until the fixture recorded it.
+		candidate.Value = &ParsedValue{Kind: ParsedValueKindNamed, Value: one.Value, Fraction: one.Fraction}
 	case "arbitrary":
 		// The engine reports the annotation and the remaining text separately, and so does the
 		// parser, so they are carried across unjoined.

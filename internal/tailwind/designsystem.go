@@ -222,11 +222,22 @@ var frameworkFunctionalRoots = func() map[string]bool {
 	for root := range baseDescriptors {
 		roots[root] = true
 	}
-	for root := range FrameworkFunctionalUtilities {
+	// A root that supports negation registers under both names, which is what upstream does.
+	//
+	// `functionalUtility` calls `utilities.functional('-' + classRoot, ...)` when `supportsNegative`
+	// is set, so `-m` is a registered root rather than a sign applied to `m`. The parser reads
+	// `-skew-3` as root `-skew`, and without the dashed name here it does not parse at all.
+	for root, utility := range FrameworkFunctionalUtilities {
 		roots[root] = true
+		if utility.SupportsNegative {
+			roots["-"+root] = true
+		}
 	}
-	for root := range FrameworkMultiDeclarationUtilities {
+	for root, utility := range FrameworkMultiDeclarationUtilities {
 		roots[root] = true
+		if utility.SupportsNegative {
+			roots["-"+root] = true
+		}
 	}
 	return roots
 }()

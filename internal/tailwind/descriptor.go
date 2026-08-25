@@ -72,6 +72,8 @@
 // its own expectations. See AxisReadings.ByNamespace.
 package tailwind
 
+import "strings"
+
 // Reading is the `{order, count}` pair the class-order comparator sorts on.
 //
 // Order is the sorted property indices a utility declares, and Count is how many declarations it
@@ -262,6 +264,11 @@ type Table struct {
 	// value is a theme key at all. Sets rather than slices because the lookup only ever asks for
 	// membership, and the corpus has namespaces holding 558 keys.
 	KeysByNamespace map[string]map[string]bool
+	// theme is the design system's resolved theme, used by the ported registration tables.
+	//
+	// Unexported because it is an implementation detail of Lookup: the registration tables resolve a
+	// candidate's value themselves, where the descriptor rows carry an already-resolved reading.
+	theme *Theme
 	// PropertyOrder maps a CSS property name to its index in Tailwind's global property order,
 	// which is what an arbitrary property such as `[font:inherit]` needs and nothing else does.
 	PropertyOrder map[string]int
@@ -281,6 +288,20 @@ type Table struct {
 func (table *Table) Lookup(candidate *ParsedCandidate) (Reading, bool) {
 	if candidate == nil {
 		return Reading{}, false
+	}
+
+	// The ported registrations answer first, and the descriptor rows are what remains.
+	//
+	// M6 and M7 replaced 251 of the 315 base roots with tables built from upstream's own registration
+	// shapes: a property name, the theme namespaces, a shared bare-value predicate. Those roots read
+	// the same way for every value they accept, so a registration expresses them exactly.
+	//
+	// The 64 that remain partition their reading on the resolved type of the value: `border-[3px]` is
+	// a width and `border-red-500` is a colour, and no registration shape carries both. That
+	// partition is the descriptor model, so those rows are not leftovers, they are the part with no
+	// simpler form.
+	if reading, answered := table.frameworkReading(candidate); answered {
+		return reading, true
 	}
 
 	switch candidate.Kind {
@@ -415,4 +436,34 @@ func (table *Table) ArbitraryPropertyReading(property string) Reading {
 		return Reading{Order: nil, Count: 1}
 	}
 	return Reading{Order: []int{index}, Count: 1}
+}
+
+// frameworkReading answers from the ported registration tables, and reports whether it could.
+//
+// Negative roots are keyed on their undashed name with the negation carried as a flag, matching how
+// upstream registers `-m` as `m` with `supportsNegative`. A root in neither table is not an error: it
+// is one of the 64 the descriptor rows answer.
+func (table *Table) frameworkReading(candidate *ParsedCandidate) (Reading, bool) {
+	if candidate.Kind != ParsedCandidateKindFunctional || table.theme == nil {
+		return Reading{}, false
+	}
+
+	root, negative := candidate.Root, false
+	if trimmed, cut := strings.CutPrefix(root, "-"); cut {
+		root, negative = trimmed, true
+	}
+
+	if utility, known := FrameworkFunctionalUtilities[root]; known {
+		if negative && !utility.SupportsNegative {
+			return Reading{}, false
+		}
+		return utility.Reading(candidate, table.theme, negative)
+	}
+	if utility, known := FrameworkMultiDeclarationUtilities[root]; known {
+		if negative && !utility.SupportsNegative {
+			return Reading{}, false
+		}
+		return utility.ReadingFor(candidate, table.theme, negative)
+	}
+	return Reading{}, false
 }
