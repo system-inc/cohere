@@ -265,6 +265,57 @@ func (d *ScopeDependencies) OriginOf(identifier IdentifierId) (ScopeId, bool) {
 	return origin, found
 }
 
+// PruneDeclarationsLastUsedBefore drops a scope's declarations that are not read after it ends.
+//
+// Upstream's `updateScopeDeclarations`, which runs after a merge widens a scope's range: a value
+// declared by the survivor but last read inside the range it absorbed is no longer an output of the
+// merged scope, because nothing outside reads it.
+//
+// # Why this is a mutator on a table that is otherwise read-only
+//
+// Everything else here is written once by the collector and read thereafter. This is the exception
+// because the scope range it depends on is not final when the collector runs -- the merge widens it
+// afterwards -- so the pruning cannot happen at collection time. Upstream has the same shape and the
+// same reason.
+//
+// # When this matters, since it did not for the first consumer
+//
+// A wider declaration set is safe wherever declarations are read to permit something:
+// `pruneUnusedScopes` keeps a scope that declares a value of its own, so extra declarations keep
+// extra scopes and cost only granularity.
+//
+// It is not safe where they are read to deny. `pruneAlwaysInvalidatingScopes` uses declarations as a
+// propagation channel -- every declaration naming an always-invalidating value adds that value to
+// the unmemoized set, which prunes further scopes downstream -- so a declaration upstream would have
+// dropped prunes a scope upstream keeps, and the rule reads the pruned set.
+//
+// A declaration with no recorded last usage is kept, which is the conservative direction: a value
+// this pass knows nothing about is not a value proven dead.
+func (d *ScopeDependencies) PruneDeclarationsLastUsedBefore(scope ScopeId, end EvaluationOrder,
+	usage *LastUsage, function *Function) int {
+	if d == nil || d.declarations == nil || usage == nil || function == nil {
+		return 0
+	}
+	held := d.declarations[scope]
+	if len(held) == 0 {
+		return 0
+	}
+
+	kept := make([]IdentifierId, 0, len(held))
+	for _, declared := range held {
+		lastUsedAt, found := usage.LastUsedAt(declarationOf(function, declared))
+		if found && lastUsedAt < end {
+			continue
+		}
+		kept = append(kept, declared)
+	}
+	removed := len(held) - len(kept)
+	if removed > 0 {
+		d.declarations[scope] = kept
+	}
+	return removed
+}
+
 // ReassignmentsOf returns the bindings a scope reassigns.
 func (d *ScopeDependencies) ReassignmentsOf(scope ScopeId) []IdentifierId {
 	if d == nil || d.reassignments == nil {

@@ -351,6 +351,8 @@ type scopeMerger struct {
 	// recognised as the earlier scope's output. See `declaredByOrAliasedFrom`.
 	temporaries map[DeclarationId]DeclarationId
 	merges      int
+	// declarationsPruned counts declarations dropped because the widened range left them dead.
+	declarationsPruned int
 }
 
 // mergeCandidate is a run of statements that may collapse into one scope.
@@ -445,6 +447,16 @@ func (m *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 				}
 				candidate.to = index + 1
 				candidate.lvalues = candidate.lvalues[:0]
+				// Upstream's `updateScopeDeclarations`, called at exactly this point: the survivor's
+				// range has just widened, so a value it declares but which is last read inside the
+				// absorbed range is no longer an output of the merged scope.
+				//
+				// This was left unported when the merge landed, on the reasoning that a wider
+				// declaration set is conservative. That holds only where declarations are read to
+				// permit; `pruneAlwaysInvalidatingScopes` reads them to propagate, which prunes
+				// further scopes downstream, so the debt came due when that pass was written.
+				m.declarationsPruned += m.dependencies.PruneDeclarationsLastUsedBefore(
+					candidate.scope.Scope, candidate.scope.Range.End, m.usage, m.function)
 				if !ScopeIsEligibleForMerging(m.function, shape.Scope, m.dependencies,
 					m.typeChecker) {
 					commit()

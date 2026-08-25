@@ -627,3 +627,64 @@ func TestDeclarationOriginDiffersFromHoldingScope(t *testing.T) {
 	t.Logf("declarations=%d withKnownOrigin=%d originDiffersFromHoldingScope=%d containmentViolations=%d",
 		total, known, differing, containmentViolations)
 }
+
+// TestPruneDeclarationsLastUsedBefore covers a helper the corpus cannot exercise.
+//
+// Measured over 200 files: the merge calls this 132 times, checks 89 declarations, and prunes zero.
+// Every one is still live -- last read at or after the widened range end -- so no corpus fixture
+// discriminates a working implementation from a no-op.
+//
+// That is a fact about our tree rather than about the shape. Upstream runs this because the case
+// arises in React code, and `pruneAlwaysInvalidatingScopes` reads declarations to propagate, so a
+// declaration left in that upstream would have dropped prunes a scope upstream keeps. Given that,
+// leaving the helper untested until the case appears is worse than testing it directly.
+func TestPruneDeclarationsLastUsedBefore(t *testing.T) {
+	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
+	if function == nil {
+		t.Fatal("the source did not lower")
+	}
+	// Identifier 1's declaration, whichever it is, is what the usage table below is keyed on.
+	declaration := declarationOf(function, 1)
+
+	for _, testCase := range []struct {
+		name        string
+		lastUsedAt  EvaluationOrder
+		recorded    bool
+		scopeEnd    EvaluationOrder
+		wantRemoved int
+	}{
+		{name: "last used before the scope ends", lastUsedAt: 5, recorded: true, scopeEnd: 10, wantRemoved: 1},
+		{name: "last used after the scope ends", lastUsedAt: 15, recorded: true, scopeEnd: 10, wantRemoved: 0},
+		{name: "last used exactly at the end", lastUsedAt: 10, recorded: true, scopeEnd: 10, wantRemoved: 0},
+		{name: "no recorded usage keeps it", recorded: false, scopeEnd: 10, wantRemoved: 0},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			dependencies := &ScopeDependencies{
+				declarations: map[ScopeId][]IdentifierId{1: {1}},
+			}
+			usage := &LastUsage{byDeclaration: map[DeclarationId]EvaluationOrder{}}
+			if testCase.recorded {
+				usage.byDeclaration[declaration] = testCase.lastUsedAt
+			}
+
+			removed := dependencies.PruneDeclarationsLastUsedBefore(1, testCase.scopeEnd, usage, function)
+			if removed != testCase.wantRemoved {
+				t.Errorf("removed %d, want %d", removed, testCase.wantRemoved)
+			}
+			if want := 1 - testCase.wantRemoved; len(dependencies.DeclarationsOf(1)) != want {
+				t.Errorf("the scope holds %d declarations, want %d",
+					len(dependencies.DeclarationsOf(1)), want)
+			}
+		})
+	}
+
+	// Nil inputs decline rather than panic, and decline means removing nothing.
+	var nilTable *ScopeDependencies
+	if nilTable.PruneDeclarationsLastUsedBefore(1, 10, nil, function) != 0 {
+		t.Error("a nil table removed something")
+	}
+	live := &ScopeDependencies{declarations: map[ScopeId][]IdentifierId{1: {1}}}
+	if live.PruneDeclarationsLastUsedBefore(1, 10, nil, function) != 0 {
+		t.Error("a nil usage table removed something; missing information must keep declarations")
+	}
+}
