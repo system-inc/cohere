@@ -1,10 +1,14 @@
 // Mutable ranges: over which span of a function's evaluation a value is still being written.
 //
-// This is the half of React's `InferMutationAliasingRanges.ts` that does not read effects, run over
-// this graph to produce a `MutableRanges` table, which nothing in this tree computes today. oxc
+// This is React's `InferMutationAliasingRanges.ts`, run over this graph to produce a
+// `MutableRanges` table. Stage 2 built the half that reads no effects; Stage 2.5 added the half that
+// does, which is the `AliasingState` graph and its `mutate` worklist at the bottom of this file. oxc
 // transcribes the whole pass at
 // `oxc_react_compiler/src/react_compiler_inference/infer_mutation_aliasing_ranges.rs`, 1,107 lines;
 // where the two disagree React wins, and each disagreement is recorded at the line that resolves it.
+// Measured across both halves: React and oxc agree line for line on `mutate` and on the graph
+// builders, so no divergence between THEM was found here. The one divergence from both is the
+// loop-carried inversion, recorded at the line in the lvalue loop.
 //
 // A value's mutable range is the span of program points over which it is still being written. Once
 // the range is closed, the value is settled: nothing after `end` changes it. That is the fact
@@ -86,57 +90,60 @@
 // widening fires, which `TestRangesWidenAStoreIntoACapturedBinding` pins. A zero measured through a
 // checker-less lowering is not a fact about the code.
 //
-// # Stage 1 landed during this work, and it closes the gap rather than shrinking it
+// # Stage 2.5 closed the extension half, and the numbers above are the BEFORE picture
 //
-// The measurements above were taken against a tree where `Place.Effect` was `EffectUnknown`
-// everywhere. Effect inference has since landed in this package as `InferAliasingEffects`, and it
-// supplies exactly the input the extension half needs: an `AliasingEffect` per instruction carrying
-// `Kind`, `From` and `Into`, with `Kind.IsMutation()` naming the four mutation kinds React's
-// `mutations` list is built from.
+// Everything above this heading describes the pass as it stood when only the definition half
+// existed. It is kept because the measurements are real and because the seam it describes is the one
+// that was then closed. What follows is what changed.
 //
-// Measured over the same corpus with that table present: all 12,127 sites `MutationSites` returns
-// carry an effect list, 125,110 effects in total, of which 22,879 are mutations. So the extension
-// half is no longer blocked, and this pass is deliberately NOT extended here - that is Stage 3's
-// work and it is a port of `AliasingState`, a worklist over the alias graph with its own
-// termination argument, rather than a few more lines in this file.
+// Effect inference landed as `InferAliasingEffects`, supplying an `AliasingEffect` per instruction
+// carrying `Kind`, `From` and `Into`. `AliasingState` is now ported below -- the directed edge graph
+// and the `mutate` worklist over it -- and `InferMutableRanges` runs it before the definition half.
 //
-// What this file guarantees for that work: the definition half is exact and mutation-tested, the
-// interval representation is upstream's and pinned, and `MutationSites` is the list to walk. The
-// two `RangeGap` constants are what a Stage 3 pass removes when it lands.
+// # The headline is a DISTRIBUTION, and the count was the number that hid the problem
 //
-// # The direction of the error, which is the property a consumer must know
+// Measured over 400 files of the corpus, lowered with a checker present, before and after:
 //
-// Every gap here makes a range SHORTER than upstream's, never longer. A missing `mutate` call is a
-// missing `max`, and `max` only grows `end`. So `RangeOf` returns an interval contained in
-// upstream's, and `IsMutableAt` answers false where upstream answers true, never the reverse.
+//	                     before      after
+//	setRanges            72,032      75,933
+//	widerThan1               32      40,139
+//	maxWidth                  2         929
+//	invalid                   0           0
 //
-// That is the safe direction for a dead-store consumer and the unsafe direction for a memoization
-// consumer, so it is stated in the API rather than only here: `RangeGaps` names it, and
-// `TestRangesAreAnUnderApproximation` pins the direction with a case whose answer must change when
-// Stage 1 lands.
+// The before column is the one worth dwelling on. `setRanges` at 72,032 reads as a healthy
+// substrate and is what a count-based check would have reported as success. The number that
+// mattered was `maxWidth 2`, and the 32 values reaching it were ALL from `StoreContext`, the single
+// effect-free widening rule -- measured with a `storeContexts` counter that returned exactly 32.
+// Every value in the table carried a valid range of width one, so every downstream predicate reading
+// `end > start + 1` or `inRange` was false for a structural reason rather than a computed one.
 //
-// # Why this does not wait for Stage 1, and what the seam is
+// That is a specific failure shape worth naming: an analysis can be inert because its input is
+// uniformly DEGENERATE rather than absent. A zero from missing input announces itself; a zero from
+// input that is present, well-formed, correct, and uniformly carrying the one value that makes every
+// predicate false looks exactly like a working pass.
 //
-// `MutationSites` returns the instructions whose ranges Stage 1 would widen, computed from the
-// instruction shape alone. When effects land, the extension half is a loop over that list calling
-// `widen`, and nothing in the definition half changes. The interface is therefore already the shape
-// the finished pass needs, and the measurement above says exactly how many cases are waiting.
+// # The direction of the error, restated now that the widening exists
 //
-// # Convergence, and why there is no fixpoint here at all
+// The remaining gap still makes a range SHORTER than upstream's rather than longer, for the same
+// reason as before: every missing widening is a missing `max`, and `max` only grows `end`. The one
+// divergence from both upstreams goes the same way rather than the other: a loop-carried value
+// whose two writes produce an inverted interval is left UNSET rather than carrying the interval
+// upstream ships, which its own validator declares invalid. Documented at the line in the lvalue
+// loop and named by `RangeGapLoopCarriedInversion`, so a consumer that needs those values declines
+// on them rather than reading a range this pass invented. Measured: 48 values across 400 files.
 //
-// This is worth stating because the neighbouring pass has one and the symmetry is misleading.
-// `InferReactive` iterates to a fixpoint because reactivity propagates transitively through phis
-// and control, so marking one value can mark another. Ranges do not propagate that way in the
-// definition half: an lvalue's range depends on its own instruction's order and nothing else, so
-// one ordered walk is exact and a second walk would change nothing. Upstream's own structure agrees
-// - `inferMutationAliasingRanges` is a single pass over blocks, and the only iteration in it is
-// `AliasingState.mutate`'s worklist, which walks the ALIAS graph rather than the control-flow graph
-// and is part of the extension half this declines.
+// # Convergence: there IS a worklist now, and its termination is not a fixpoint argument
 //
-// So there is no round count to bound and no convergence equality to hand-write. If the extension
-// half is added, its worklist is over the alias graph and its termination comes from the
-// `seen`/`kind` monotone check upstream already carries, which is a different mechanism from
-// `InferReactive`'s growing set.
+// The previous version of this comment said there was no fixpoint here and no convergence equality
+// to hand-write. Half of that survives. The definition half still needs one ordered walk and no
+// iteration. The widening half is a worklist, and its termination argument is written out in full on
+// `mutate` rather than summarised here, because it is the part most likely to be got wrong: it does
+// not terminate by the widening reaching a fixpoint, it terminates because the `seen` map admits
+// each identifier at most once per mutation kind and there are two kinds.
+//
+// That distinction is load-bearing and it was verified by mutation rather than asserted: neutralising
+// the `seen` comparison produces a pass that hangs rather than one that gives a wrong answer, which
+// is the failure mode this tree has hit before in other passes and which does not announce itself.
 //
 // # Reverse postorder is the right walk here, and the reason is not the usual one
 //
@@ -203,27 +210,45 @@ func (r MutableRange) IsValid() bool {
 type RangeGap uint8
 
 const (
-	// RangeGapMutationExtension is a range widened by a mutation recorded as an effect.
+	// RangeGapCreateFromPropagation is a range widened because a mutation reached the value through
+	// a `createFrom` edge.
 	//
-	// Upstream's `AliasingState.mutate` extends `end` to one past the mutating instruction, for the
-	// mutated value and everything transitively aliased to it. Its input is `instr.effects`, which
-	// is `EffectUnknown` everywhere in this tree; see `MutationSites` for the count.
-	RangeGapMutationExtension RangeGap = iota
-	// RangeGapAliasPropagation is a range widened because a mutation reached the value through an
-	// alias, a capture, or a `createFrom` edge.
+	// The walk that follows those edges is present and correct in `mutate`, so this is a gap in the
+	// INPUT rather than in this pass: `InferAliasingEffects` never emits an
+	// `AliasingEffectCreateFrom`. Measured over 200 corpus files, 0 such effects against a control
+	// of 41,156 graph nodes built in the same walk. The consequence for a consumer is narrow --
+	// upstream emits `CreateFrom` where a value is created carrying another's kind, and a mutation
+	// of the derived value should widen the original transitively. Here it does not.
 	//
-	// Same missing input. Listed separately because closing the first without the second would give
-	// a value its own mutations and not those of the objects it was aliased into, which is a
-	// different and still-wrong answer rather than a smaller one.
-	RangeGapAliasPropagation
+	// The two gaps this list previously held, `RangeGapMutationExtension` and
+	// `RangeGapAliasPropagation`, were both closed by Stage 2.5 and are gone rather than kept as
+	// no-longer-true constants.
+	RangeGapCreateFromPropagation RangeGap = iota
+
+	// RangeGapLoopCarriedInversion is a loop-carried value left unset because its two writes
+	// produced an inverted interval.
+	//
+	// A loop-carried value is defined at a high evaluation order by the back-edge store, while the
+	// mutation reaching it through the phi happened at a lower one. Upstream's two guards are each
+	// conditioned on their own field being unset, so both writes land independently and the end
+	// falls at or before the start. Measured on this corpus: 48 values across 400 files, every one
+	// loop-carried.
+	//
+	// This pass leaves those unset rather than clamping, because the true range starts before the
+	// back-edge store and how far before is exactly what the folded phi hides. A consumer that
+	// needs those values must decline on them rather than read a range this pass invented. See the
+	// lvalue loop for the full reasoning and `TestRangesStayValidAcrossALoopBackEdge` for the pin.
+	RangeGapLoopCarriedInversion
 )
 
 // RangeGaps are the widening rules InferMutableRanges does not apply. See RangeGap.
 //
 // Returned as a value rather than documented alone so a test can assert on it, which makes closing
-// a gap a visible event rather than a silent improvement.
+// a gap a visible event rather than a silent improvement. Stage 2.5 closed two of the three this
+// list once held, which is exactly the event the mechanism exists to make visible: the test naming
+// them failed and had to be rewritten rather than quietly passing.
 func RangeGaps() []RangeGap {
-	return []RangeGap{RangeGapMutationExtension, RangeGapAliasPropagation}
+	return []RangeGap{RangeGapCreateFromPropagation, RangeGapLoopCarriedInversion}
 }
 
 // MutableRanges is the table this pass produces: one range per value.
@@ -296,17 +321,47 @@ func (m *MutableRanges) set(id IdentifierId, r MutableRange) {
 // the identifier tables are per-function, which the brief names as a trap that has already cost an
 // agent a silent drop. `RangesForNested` walks them explicitly and returns one table each.
 //
-// Reads no effects. The ranges are exact for every value never mutated after its definition and an
-// under-approximation for the rest; see the package comment and `MutationSites`.
+// Infers effects for itself. Stage 2.5 closed the widening gap this comment previously declined:
+// `InferAliasingEffects` runs first, its mutations widen ranges through the alias graph, and the
+// definition half then opens every range that the widening left without a start. A caller holding an
+// effect table already can pass it to `InferMutableRangesWithEffects` and avoid the second inference.
 //
 // Idempotent: every guard tests the range this pass itself wrote, so a second run over the same
 // function produces an equal table. `TestRangesAreIdempotent` pins it.
 func InferMutableRanges(function *Function) *MutableRanges {
+	if function == nil {
+		return &MutableRanges{}
+	}
+	return InferMutableRangesWithEffects(function, InferAliasingEffects(function))
+}
+
+// InferMutableRangesWithEffects is the full pass, taking an effect table the caller already has.
+//
+// # The order of the two halves is upstream's and it is load-bearing
+//
+// Upstream runs the widening (its Part 1) entirely BEFORE the definition half (its Part 2), at React
+// 41851 against 41917 and oxc 668 against 800. That is not incidental sequencing, and interleaving
+// them -- which is what this file did while the widening was absent, harmlessly -- produces different
+// answers once the widening is present.
+//
+// The reason is that every definition-half write is GUARDED on the field being unset. The lvalue
+// loop opens `Start` only `if Start == 0` and `End` only `if End == 0`. So a value whose `End` was
+// already widened past its definition point must NOT have that `End` overwritten by `order + 1`, and
+// running the definition half first would do exactly that for any value mutated before its own
+// defining instruction in evaluation order, which single-assignment form makes ordinary through
+// phis and loops.
+//
+// Reproduced in upstream's order, with the phases split into `widenRanges` and the loop below.
+func InferMutableRangesWithEffects(function *Function, effects *AliasingEffects) *MutableRanges {
 	result := &MutableRanges{}
 	if function == nil {
 		return result
 	}
 
+	// Part 1: build the alias graph and widen every range a mutation reaches.
+	widenRanges(function, effects, result)
+
+	// Part 2: open a range at every definition point that the widening left unopened.
 	for _, block := range function.Blocks {
 		// A phi's range opens at the block's first instruction minus one, but ONLY when the phi is
 		// mutated after creation, which is a fact this pass cannot establish. See the note in
@@ -354,37 +409,80 @@ func InferMutableRanges(function *Function) *MutableRanges {
 					existing.End = maxOrder(order+1, existing.End)
 					changed = true
 				}
+				// DIVERGENCE FROM BOTH UPSTREAMS, in the conservative direction, and it is the only
+				// one this stage introduces. See `TestRangesStayValidAcrossALoopBackEdge`.
+				//
+				// Upstream's two guards above are each conditioned on their own field being unset,
+				// so a value whose `End` was widened by a mutation and whose `Start` is opened here
+				// keeps both writes independently. On a LOOP-CARRIED value that produces an
+				// interval whose end is at or before its start: the back-edge phi operand is
+				// defined at a high evaluation order, while the mutation that reaches it through
+				// the phi happened at a lower one. Measured minimal case, `for (let i = 0; ...;
+				// i++)` with a mutating call in the body: `i`'s last value is defined at order 23
+				// and the `i++` mutation widens its end to 23, giving the empty interval [23,23).
+				//
+				// React asserts against exactly this in `validateMutableRange` (line 20999), and
+				// that assertion is NOT reachable by default -- `assertValidMutableRanges` is a
+				// config flag defaulting to FALSE (line 31643), so upstream ships the state it
+				// declares invalid. Measured on this corpus before the clamp: 48 values across 400
+				// files, every one of them loop-carried.
+				//
+				// Reproducing that faithfully would mean shipping intervals on which `Contains`
+				// answers false at every position: a consumer asking whether the value is still
+				// being written gets a confident no at exactly the positions where it demonstrably
+				// was. So the range is UNSET instead, and `RangeGapLoopCarriedInversion` names it.
+				//
+				// The alternative considered and rejected was clamping the end to `start + 1`.
+				// That keeps the interval non-empty and satisfies the invariant, and it is wrong
+				// for two reasons. It writes down a fact we do not have: the true range of a
+				// loop-carried value starts BEFORE the back-edge store, and how far before is
+				// precisely what the folded phi hides, so `[23,24)` is not a narrower version of
+				// the real range, it is a different range that happens to be non-empty. And a
+				// clamp satisfies `IsValid` by construction, which launders every producer bug
+				// into a valid-looking range and leaves `ValidateMutableRanges` unable to fail.
+				//
+				// Unset costs nothing at the call site, which is what makes it the honest choice
+				// rather than a cautious one: `Contains` already answers false for an unset range,
+				// so every consumer behaves exactly as it would have under the clamp. The only
+				// thing that changes is what this pass claims to know.
+				if existing.IsSet() && existing.End <= existing.Start {
+					existing = MutableRange{}
+					changed = true
+				}
 				if changed {
 					result.set(place.Identifier, existing)
 				}
 			})
 
-			// Upstream has a THIRD loop here, over operands rather than lvalues, opening a range
-			// for any operand whose end is already past this instruction but whose start is unset:
-			// React 41994-41998, oxc 918-926. It is NOT reproduced, and the reason is a measurement
-			// rather than a judgment that it does not matter.
+			// The THIRD loop, over operands rather than lvalues: React 41994-41998, oxc 918-926.
+			// It opens a range for any operand whose end is already past this instruction but whose
+			// start was never opened.
 			//
-			// Its precondition is `End > order && Start == 0`, which requires a value whose end was
-			// widened while its start was never opened. Nothing in this tree can produce that state.
-			// The two writers of `End` are the lvalue loop above, which always sets `Start` and `End`
-			// together, and the `StoreContext` rule below, which only ever widens a value whose start
-			// the lvalue loop already opened. So the two fields are never independently set.
+			// # This loop was deliberately omitted by Stage 2 and its omission verdict has EXPIRED
 			//
-			// Measured two-sided over the corpus, 313,292 values in 4,333 functions: 145,113 carry a
-			// set range and 0 carry an end without a start. The non-zero control is what makes the
-			// zero a measurement rather than a walk that could not see.
+			// Stage 2 measured zero values in that state over the whole corpus and recorded the
+			// verdict with the enumerated writers of `End` that made it true: the lvalue loop above,
+			// which always sets Start and End together, and the StoreContext rule below, which only
+			// widens a value the lvalue loop already opened. It also wrote down the exact condition
+			// under which the verdict would expire, which was a widening pass reaching a value
+			// through the alias graph.
 			//
-			// The writers enumerated when this verdict was taken, because the verdict EXPIRES when one
-			// is added: the lvalue loop above, and the StoreContext rule below. Stage 1's mutation
-			// extension is exactly such a writer - `AliasingState.mutate` widens `End` on a value it
-			// reaches through the alias graph, which can be a value this function never defined, and
-			// that is precisely the state this loop exists for. When Stage 1 lands, this loop has to
-			// come back and the measurement above has to be re-run rather than inherited.
-			//
-			// It is omitted rather than kept-and-inert because a loop that cannot fire reads as
-			// coverage: a mutation neutralising its guard SURVIVED the whole suite, which is what sent
-			// this measurement looking, and a reader would have taken the surviving branch for a
-			// tested one.
+			// That pass is `widenRanges` above and the verdict is now void. The widening writes `End`
+			// on values this function's instructions never define as an lvalue -- a parameter, a
+			// context value, the return value -- so `End > order && Start == 0` is now reachable and
+			// this loop is the only thing that gives those values a start. Re-measured rather than
+			// inherited: the corpus count is in this stage's report, and
+			// `TestRangesThirdLoopOpensAWidenedOperand` pins the state directly.
+			EachInstructionPlace(instruction, func(place Place, role PlaceRole) {
+				if role == PlaceRoleDefine {
+					return
+				}
+				existing := result.Get(place.Identifier)
+				if existing.End > order && existing.Start == 0 {
+					existing.Start = order
+					result.set(place.Identifier, existing)
+				}
+			})
 
 			// StoreContext widens the STORED VALUE's end from the instruction shape alone, with no
 			// effect consulted: React 42002-42004, oxc 960-967. It is the only widening rule in the
@@ -652,4 +750,634 @@ func maxOrder(a, b EvaluationOrder) EvaluationOrder {
 		return a
 	}
 	return b
+}
+
+// =============================================================================
+// AliasingState: the widening that makes a mutable range wider than one
+// =============================================================================
+
+// aliasingEdgeKind is the kind of a directed data-flow edge between two values.
+//
+// React and oxc agree exactly: `Capture`, `Alias`, `MaybeAlias`. A `MaybeAlias` edge DOWNGRADES a
+// definite mutation to a conditional one when it is traversed, which is the only place the kind is
+// read during the walk.
+type aliasingEdgeKind uint8
+
+const (
+	aliasingEdgeCapture aliasingEdgeKind = iota
+	aliasingEdgeAlias
+	aliasingEdgeMaybeAlias
+)
+
+// mutationKind is how certain a mutation is. Ordered, and the order is load-bearing.
+//
+// The worklist's revisit test is `previous >= current -> skip`, so `Conditional < Definite` is what
+// lets a definite mutation re-enter a node a conditional one already reached. Reversing the two
+// constants would make the pass terminate on a strictly smaller fixpoint and still look correct.
+type mutationKind uint8
+
+const (
+	mutationKindConditional mutationKind = 1
+	mutationKindDefinite    mutationKind = 2
+)
+
+// aliasingEdge is one directed edge, tagged with the sequence index at which it came into being.
+//
+// `index` is the whole reason this pass is not a naive graph walk. Every edge and every mutation is
+// stamped with a monotonically increasing counter as the graph is built, and the walk refuses to
+// traverse an edge whose index is at or after the mutation's own index. That is upstream's model of
+// TIME: a mutation cannot flow backwards through an alias that did not exist yet.
+type aliasingEdge struct {
+	index int
+	node  IdentifierId
+	kind  aliasingEdgeKind
+}
+
+// aliasingNodeValue distinguishes a phi from an ordinary object.
+//
+// Upstream carries a third case, `Function`, which it uses only to append that function's deferred
+// diagnostics. This pass reports nothing, so the function case would be an unreachable branch and is
+// not represented. The phi case IS load-bearing: a phi does not propagate a mutation backwards
+// through its alias edges when the mutation arrived travelling forwards, which is the one place the
+// walk consults the node's value at all.
+type aliasingNodeValue uint8
+
+const (
+	aliasingNodeObject aliasingNodeValue = iota
+	aliasingNodePhi
+)
+
+// aliasingNode is one value in the data-flow graph.
+//
+// The four maps are the BACKWARD edges, kept separately because the walk traverses them under
+// different conditions: `createdFrom` always forces a transitive mutation, `captures` is followed
+// only for a transitive mutation, and `aliases`/`maybeAliases` are followed only when the walk is
+// travelling backwards or the node is not a phi. `edges` is the single FORWARD list, traversed
+// unconditionally. Collapsing them into one adjacency list would lose exactly those distinctions.
+//
+// Insertion order matters for the maps upstream (`FxIndexMap` in oxc, a JavaScript `Map` in React),
+// so this keeps an explicit key slice beside each map rather than ranging a Go map. `Phi.Operands`
+// being a Go map has already cost this package one defect, and a nondeterministic traversal order
+// here would produce a range table that differs between runs on any function with two edges.
+type aliasingNode struct {
+	id IdentifierId
+
+	createdFrom      map[IdentifierId]int
+	createdFromOrder []IdentifierId
+	captures         map[IdentifierId]int
+	capturesOrder    []IdentifierId
+	aliases          map[IdentifierId]int
+	aliasesOrder     []IdentifierId
+	maybeAliases     map[IdentifierId]int
+	maybeAliasOrder  []IdentifierId
+
+	edges []aliasingEdge
+
+	value aliasingNodeValue
+}
+
+func newAliasingNode(id IdentifierId, value aliasingNodeValue) *aliasingNode {
+	return &aliasingNode{
+		id:           id,
+		createdFrom:  map[IdentifierId]int{},
+		captures:     map[IdentifierId]int{},
+		aliases:      map[IdentifierId]int{},
+		maybeAliases: map[IdentifierId]int{},
+		value:        value,
+	}
+}
+
+// insertBackEdge records a backward edge, keeping FIRST-WINS semantics and insertion order.
+//
+// Upstream writes `entry(from).or_insert(index)` in Rust and `if (!map.has(k)) map.set(k, v)` in
+// JavaScript: the EARLIEST index for a repeated edge is the one kept. That is not an arbitrary
+// choice. The index is compared against the mutation's index to decide whether the edge already
+// existed, so keeping the earliest makes the edge visible to the widest set of mutations. Keeping
+// the latest would silently narrow every range that flows through a repeated alias.
+func insertBackEdge(into map[IdentifierId]int, order *[]IdentifierId, from IdentifierId, index int) {
+	if _, exists := into[from]; exists {
+		return
+	}
+	into[from] = index
+	*order = append(*order, from)
+}
+
+// aliasingState is the directed edge graph the widening walks.
+//
+// # This is a graph pass, not a per-instruction rule, and that was verified rather than assumed
+//
+// Stage 2's doc comment above describes `AliasingState.mutate` as "one function fed from
+// `instr.effects`", which is accurate about its INPUT and understates its structure. It was checked
+// against both implementations directly rather than taken on trust, because two agents had
+// described it differently and only one had read it.
+//
+// What both implementations actually contain, at React 42186-42280 and oxc 213-393: a node type
+// carrying `created_from`, `captures`, `aliases`, `maybe_aliases` and a forward `edges` list; four
+// builders (`create`, `create_from`/`assign`, `capture`, `maybe_alias`) called from the ranges
+// pass's OWN main loop; and `mutate` as a worklist over that graph. The single widening write in the
+// entire upstream file, `ident.mutable_range.end.max(end_val)`, is inside that worklist. So the
+// characterization is right and the graph is not incidental: remove it and the widening reaches
+// only the directly-named value, which is the counterfactual measured in this stage's report and it
+// is strictly weaker than upstream.
+type aliasingState struct {
+	nodes map[IdentifierId]*aliasingNode
+}
+
+func newAliasingState() *aliasingState {
+	return &aliasingState{nodes: map[IdentifierId]*aliasingNode{}}
+}
+
+// create makes a node, replacing any existing one.
+//
+// Replacement rather than merge is upstream's: `self.nodes.insert(...)` in Rust and
+// `this.nodes.set(...)` in JavaScript both overwrite. A value redefined by a later instruction gets
+// a fresh node with no edges, which is correct in single-assignment form because the redefinition is
+// a different value.
+func (s *aliasingState) create(place Place, value aliasingNodeValue) {
+	s.nodes[place.Identifier] = newAliasingNode(place.Identifier, value)
+}
+
+// createFrom is the `CreateFrom` effect: Into is a NEW value derived from From.
+//
+// Upstream creates the target node unconditionally first, which discards any edges it had. Then it
+// adds a FORWARD alias edge from -> into and records `created_from` on the target. Note the
+// asymmetry with `assign`: `create_from` does not check that the source node exists, because the
+// target is being created here regardless.
+func (s *aliasingState) createFrom(index int, from Place, into Place) {
+	s.create(into, aliasingNodeObject)
+	if fromNode, ok := s.nodes[from.Identifier]; ok {
+		fromNode.edges = append(fromNode.edges, aliasingEdge{index: index, node: into.Identifier, kind: aliasingEdgeAlias})
+	}
+	if toNode, ok := s.nodes[into.Identifier]; ok {
+		insertBackEdge(toNode.createdFrom, &toNode.createdFromOrder, from.Identifier, index)
+	}
+}
+
+// assign is the `Assign` and `Alias` effects: mutating Into implies mutating From.
+//
+// Both endpoints must already exist or the edge is dropped entirely. That guard is upstream's and it
+// is the reason the entry values (params, context, returns) are created before the walk begins:
+// without those nodes, every edge touching a parameter would be silently discarded.
+func (s *aliasingState) assign(index int, from Place, into Place) {
+	fromNode, fromOk := s.nodes[from.Identifier]
+	toNode, toOk := s.nodes[into.Identifier]
+	if !fromOk || !toOk {
+		return
+	}
+	fromNode.edges = append(fromNode.edges, aliasingEdge{index: index, node: into.Identifier, kind: aliasingEdgeAlias})
+	insertBackEdge(toNode.aliases, &toNode.aliasesOrder, from.Identifier, index)
+}
+
+// capture is the `Capture` effect: information flows from From into Into without aliasing.
+//
+// A capture edge is followed BACKWARDS only by a transitive mutation. Mutating a container does not
+// mutate what it holds; mutating it transitively does.
+func (s *aliasingState) capture(index int, from Place, into Place) {
+	fromNode, fromOk := s.nodes[from.Identifier]
+	toNode, toOk := s.nodes[into.Identifier]
+	if !fromOk || !toOk {
+		return
+	}
+	fromNode.edges = append(fromNode.edges, aliasingEdge{index: index, node: into.Identifier, kind: aliasingEdgeCapture})
+	insertBackEdge(toNode.captures, &toNode.capturesOrder, from.Identifier, index)
+}
+
+// maybeAlias is the `MaybeAlias` effect: a possible aliasing relationship, from an unknown callee.
+//
+// Traversing this edge in either direction downgrades the mutation to Conditional, which is the
+// conservative direction: an uncertain alias must not turn into a definite mutation.
+func (s *aliasingState) maybeAlias(index int, from Place, into Place) {
+	fromNode, fromOk := s.nodes[from.Identifier]
+	toNode, toOk := s.nodes[into.Identifier]
+	if !fromOk || !toOk {
+		return
+	}
+	fromNode.edges = append(fromNode.edges, aliasingEdge{index: index, node: into.Identifier, kind: aliasingEdgeMaybeAlias})
+	insertBackEdge(toNode.maybeAliases, &toNode.maybeAliasOrder, from.Identifier, index)
+}
+
+// mutationDirection is whether the walk arrived at a node travelling forwards or backwards.
+//
+// Read in exactly one place: a phi does not propagate a mutation back through its alias edges when
+// the walk reached it travelling FORWARDS. Upstream's condition is
+// `direction === 'backwards' || node.value.kind !== 'Phi'`.
+type mutationDirection uint8
+
+const (
+	mutationDirectionBackwards mutationDirection = iota
+	mutationDirectionForwards
+)
+
+// mutationQueueEntry is one pending visit in the worklist.
+type mutationQueueEntry struct {
+	place      IdentifierId
+	transitive bool
+	direction  mutationDirection
+	kind       mutationKind
+}
+
+// mutate walks the alias graph from one mutated value, widening every range it reaches.
+//
+// This is React 42188-42280 and oxc 213-393, and it is the ONLY function in either implementation
+// that writes a wider `end`. Every other range write opens a range at its definition point.
+//
+// # The termination argument, stated rather than assumed
+//
+// This is a worklist over a graph with a widening that takes a max, which is the shape that fails to
+// terminate when the revisit test is wrong. Three passes in this tree have already needed
+// hand-written equality for related reasons, and the failure mode here is silent: a comparison that
+// includes anything varying meaninglessly between rounds spins forever without failing loudly.
+//
+// The termination is NOT the widening reaching a fixpoint, and reading it that way is the trap. The
+// widening is a side effect of the walk. What bounds the walk is the `seen` map, keyed by identifier
+// and valued by `mutationKind`, with the test `previous >= current -> skip`.
+//
+// The argument in full:
+//
+//   - `seen` maps each identifier to the strongest kind it has been visited with.
+//   - A node is processed only when its kind is STRICTLY GREATER than what `seen` holds, and
+//     processing immediately writes that greater kind back.
+//   - `mutationKind` has exactly two values, Conditional (1) and Definite (2), and the queue never
+//     pushes a kind not derived from an existing one -- an edge either preserves the kind or
+//     downgrades it to Conditional.
+//   - So each identifier can be processed at most twice: once at Conditional, once at Definite.
+//     Never more, because the second Definite visit finds `previous >= current` and skips.
+//   - Identifiers in one function are finite. Therefore the loop runs at most 2N times and halts.
+//
+// The bound is on the number of PROCESSED entries, not on the queue length: the queue can hold
+// duplicates, and they are discarded cheaply at pop. That is upstream's structure exactly.
+//
+// Two consequences worth naming because they are the difference between reproducing this and
+// writing something that merely looks like it:
+//
+// The `seen` map is per-CALL, not per-pass. Each mutation starts a fresh walk. So a value reached by
+// two different mutations is widened twice, once per call, which is exactly what makes `end` grow to
+// the LAST mutation rather than the first. A `seen` map hoisted out to the pass level would look
+// like a sensible optimization and would silently truncate every range to its first mutation.
+//
+// The comparison is on `mutationKind` alone, which is a two-element enum. It deliberately does not
+// include the direction, the transitive flag, or the range value. Including the range would be the
+// convergence-equality failure this tree has hit before: `end` grows monotonically, so a test that
+// re-queued whenever `end` moved would still terminate, but including the DIRECTION would not
+// terminate on a graph with an alias cycle, since a node can be legitimately revisited in the other
+// direction forever.
+//
+// # Why the index test is what keeps this sound rather than merely finite
+//
+// Every edge and mutation carries a sequence index assigned as the graph was built. The walk skips
+// any edge whose index is at or after the mutation's own index, so a mutation only flows through
+// aliases that already existed when it happened. That is upstream's model of time and it is why a
+// value aliased AFTER being mutated does not retroactively widen.
+//
+// Upstream's forward-edge loop uses `break` rather than `continue` on that test, which is correct
+// only because forward edges are appended in index order and therefore sorted. Reproduced as `break`
+// with the sortedness noted here, because a `continue` would be a silent behavior change on any
+// graph where the assumption failed.
+func (s *aliasingState) mutate(
+	ranges *MutableRanges,
+	index int,
+	start IdentifierId,
+	end EvaluationOrder,
+	hasEnd bool,
+	transitive bool,
+	startKind mutationKind,
+) {
+	seen := map[IdentifierId]mutationKind{}
+	queue := []mutationQueueEntry{{
+		place:      start,
+		transitive: transitive,
+		direction:  mutationDirectionBackwards,
+		kind:       startKind,
+	}}
+
+	for len(queue) > 0 {
+		entry := queue[len(queue)-1]
+		queue = queue[:len(queue)-1]
+
+		if previous, ok := seen[entry.place]; ok && previous >= entry.kind {
+			continue
+		}
+		seen[entry.place] = entry.kind
+
+		node, ok := s.nodes[entry.place]
+		if !ok {
+			continue
+		}
+
+		// The widening. This is the whole point of the pass, and it is a max rather than an
+		// assignment because a value mutated at several instructions keeps the LAST one.
+		if hasEnd {
+			existing := ranges.Get(node.id)
+			if end > existing.End {
+				existing.End = end
+				ranges.set(node.id, existing)
+			}
+		}
+
+		// Forward edges: mutating a value mutates what it was aliased or captured INTO.
+		for _, edge := range node.edges {
+			if edge.index >= index {
+				// Sorted by construction; see the note on `break` in the doc comment.
+				break
+			}
+			kind := entry.kind
+			if edge.kind == aliasingEdgeMaybeAlias {
+				kind = mutationKindConditional
+			}
+			queue = append(queue, mutationQueueEntry{
+				place:      edge.node,
+				transitive: entry.transitive,
+				direction:  mutationDirectionForwards,
+				kind:       kind,
+			})
+		}
+
+		// `createdFrom` always forces TRANSITIVE, whatever the incoming entry said. Mutating a value
+		// derived from another reaches everything that other value transitively holds.
+		//
+		// # This branch is live in the code and its INPUT is absent today, which is a different
+		// # verdict from unreachable and it expires differently
+		//
+		// A mutation sweep flipping the `transitive: true` below to `false` SURVIVES, and the reason
+		// is not that the two are equivalent. `createdFrom` is populated only by `createFrom`, which
+		// is called only for an `AliasingEffectCreateFrom`, and this tree's effect inference never
+		// emits one: measured over 200 corpus files, `createFromEffects` is 0 against a control of
+		// 41,156 graph nodes built in the same walk, and a grep for the constant finds it in the
+		// declaration, the String method and two switch arms with no emission site anywhere, against
+		// 22 occurrences for `AliasingEffectCapture` which is emitted.
+		//
+		// Kept rather than deleted for the reason Stage 2 kept `phiOpensBefore`: the branch is
+		// upstream's, it is correct, and it costs nothing, while deleting it would mean re-deriving
+		// it when the input arrives. Following Stage 2's precedent, the writers are enumerated so the
+		// verdict can expire honestly -- the only way `createdFrom` becomes non-empty is an effect
+		// inference that emits `AliasingEffectCreateFrom`, which upstream does for a value created
+		// with the same kind as another. When that lands, this branch becomes reachable, the
+		// surviving mutant becomes killable, and a fixture is owed.
+		for _, alias := range node.createdFromOrder {
+			if node.createdFrom[alias] >= index {
+				continue
+			}
+			queue = append(queue, mutationQueueEntry{
+				place:      alias,
+				transitive: true,
+				direction:  mutationDirectionBackwards,
+				kind:       entry.kind,
+			})
+		}
+
+		// Backward alias edges, suppressed for a phi reached travelling forwards.
+		if entry.direction == mutationDirectionBackwards || node.value != aliasingNodePhi {
+			for _, alias := range node.aliasesOrder {
+				if node.aliases[alias] >= index {
+					continue
+				}
+				queue = append(queue, mutationQueueEntry{
+					place:      alias,
+					transitive: entry.transitive,
+					direction:  mutationDirectionBackwards,
+					kind:       entry.kind,
+				})
+			}
+			for _, alias := range node.maybeAliasOrder {
+				if node.maybeAliases[alias] >= index {
+					continue
+				}
+				queue = append(queue, mutationQueueEntry{
+					place:      alias,
+					transitive: entry.transitive,
+					direction:  mutationDirectionBackwards,
+					kind:       mutationKindConditional,
+				})
+			}
+		}
+
+		// Captures are followed backwards ONLY by a transitive mutation. Mutating a container does
+		// not mutate what it holds; mutating it transitively does.
+		if entry.transitive {
+			for _, capture := range node.capturesOrder {
+				if node.captures[capture] >= index {
+					continue
+				}
+				queue = append(queue, mutationQueueEntry{
+					place:      capture,
+					transitive: entry.transitive,
+					direction:  mutationDirectionBackwards,
+					kind:       entry.kind,
+				})
+			}
+		}
+	}
+}
+
+// pendingMutation is one mutation deferred until the whole graph is built.
+//
+// Upstream collects every mutation during the graph walk and applies them all AFTERWARDS, which is
+// not an optimization. A mutation applied while the graph is half-built would traverse only the
+// edges discovered so far, so a value aliased later in the same function would never be reached. The
+// index test already models time correctly; applying early would model it twice and wrongly.
+type pendingMutation struct {
+	index      int
+	end        EvaluationOrder
+	transitive bool
+	kind       mutationKind
+	place      Place
+}
+
+// buildAliasingGraph constructs the data-flow graph and returns it with the mutations to apply.
+//
+// This is upstream's Part 1, at React 41736-41850 and oxc 473-645. The walk is over blocks in the
+// order `Function.Blocks` holds them, which is reverse postorder, matching upstream's iteration over
+// its block map.
+//
+// # The sequence index is the pass's model of time and it is incremented exactly where upstream does
+//
+// Every edge-creating effect and every mutation takes the current index and increments it. Effects
+// that create a node without an edge (`Create`, `CreateFunction`) do NOT increment, and neither do
+// the effects this pass treats as no-ops. Getting those increments wrong does not fail loudly: it
+// shifts every subsequent index by a constant, which changes only which edges a mutation can see,
+// and the result is a range table that is subtly narrow or subtly wide with no invariant violated.
+// They are transcribed one for one against both implementations for that reason.
+func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasingState, []pendingMutation) {
+	state := newAliasingState()
+	var mutations []pendingMutation
+	index := 0
+
+	// Entry values first. Upstream creates nodes for params, context and the return value before
+	// walking any block, and the `assign`/`capture`/`maybeAlias` builders DROP an edge whose
+	// endpoints do not both exist, so an edge touching a parameter would be silently discarded
+	// without these.
+	for _, param := range function.Params {
+		state.create(param, aliasingNodeObject)
+	}
+	for _, contextValue := range function.Context {
+		state.create(contextValue, aliasingNodeObject)
+	}
+	// The return value is an entry value too. Upstream creates its node beside the params and
+	// context, and adds an alias edge into it at every `return` terminal, so a mutation of a
+	// returned value reaches whatever it was returned from.
+	state.create(function.Returns, aliasingNodeObject)
+
+	seenBlocks := map[BlockId]bool{}
+	type pendingPhiOperand struct {
+		from  Place
+		into  Place
+		index int
+	}
+	pendingPhis := map[BlockId][]pendingPhiOperand{}
+
+	for _, block := range function.Blocks {
+		for _, phi := range block.Phis {
+			state.create(phi.Place, aliasingNodePhi)
+			// Deterministic operand order. `Phi.Operands` is a Go map and ranging it directly would
+			// assign indices nondeterministically, which changes which edges a mutation can see and
+			// therefore produces a different range table between runs of the same input.
+			for _, predecessor := range PhiOperandsInOrder(phi) {
+				operand := phi.Operands[predecessor]
+				if !seenBlocks[predecessor] {
+					// A back edge: the predecessor has not been walked yet, so the operand's node
+					// may not exist. Upstream defers these to the predecessor block and still
+					// consumes an index here, so the deferral does not shift the numbering.
+					pendingPhis[predecessor] = append(pendingPhis[predecessor], pendingPhiOperand{
+						from:  operand,
+						into:  phi.Place,
+						index: index,
+					})
+					index++
+				} else {
+					state.assign(index, operand, phi.Place)
+					index++
+				}
+			}
+		}
+		seenBlocks[block.Id] = true
+
+		for _, instructionId := range block.Instructions {
+			instruction := function.Instructions[instructionId]
+			if instruction == nil {
+				continue
+			}
+			for _, effect := range effects.Get(instructionId) {
+				switch {
+				case effect.Kind == AliasingEffectCreate:
+					state.create(effect.Into, aliasingNodeObject)
+
+				case effect.Kind == AliasingEffectCreateFrom:
+					state.createFrom(index, effect.From, effect.Into)
+					index++
+
+				case effect.Kind == AliasingEffectAssign:
+					// Upstream creates the target if it is absent, which `Alias` does not do.
+					if _, exists := state.nodes[effect.Into.Identifier]; !exists {
+						state.create(effect.Into, aliasingNodeObject)
+					}
+					state.assign(index, effect.From, effect.Into)
+					index++
+
+				case effect.Kind == AliasingEffectAlias:
+					state.assign(index, effect.From, effect.Into)
+					index++
+
+				case effect.Kind == AliasingEffectMaybeAlias:
+					state.maybeAlias(index, effect.From, effect.Into)
+					index++
+
+				case effect.Kind == AliasingEffectCapture:
+					state.capture(index, effect.From, effect.Into)
+					index++
+
+				case effect.Kind == AliasingEffectMutateTransitive,
+					effect.Kind == AliasingEffectMutateTransitiveConditionally:
+					kind := mutationKindDefinite
+					if effect.Kind == AliasingEffectMutateTransitiveConditionally {
+						kind = mutationKindConditional
+					}
+					mutations = append(mutations, pendingMutation{
+						index:      index,
+						end:        instruction.Order + 1,
+						transitive: true,
+						kind:       kind,
+						place:      effect.Into,
+					})
+					index++
+
+				case effect.Kind == AliasingEffectMutate:
+					mutations = append(mutations, pendingMutation{
+						index:      index,
+						end:        instruction.Order + 1,
+						transitive: false,
+						kind:       mutationKindDefinite,
+						place:      effect.Into,
+					})
+					index++
+
+				case effect.Kind == AliasingEffectMutateConditionally:
+					mutations = append(mutations, pendingMutation{
+						index:      index,
+						end:        instruction.Order + 1,
+						transitive: false,
+						kind:       mutationKindConditional,
+						place:      effect.Into,
+					})
+					index++
+
+					// Freeze, ImmutableCapture and Apply are no-ops for range widening, and consume
+					// no index. Upstream's `_ => {}` arm, reproduced deliberately rather than by
+					// omission: an effect reaching here must not shift the numbering.
+				}
+			}
+		}
+
+		// Pending phi operands whose predecessor is this block, now that its values exist.
+		// Upstream applies them with the index recorded at deferral rather than a fresh one.
+		for _, pending := range pendingPhis[block.Id] {
+			state.assign(pending.index, pending.from, pending.into)
+		}
+		delete(pendingPhis, block.Id)
+
+		// A `return` aliases its operand into the function's return value. Upstream does this from
+		// the terminal rather than from an effect, because a return carries no instruction effects.
+		if returnTerminal, ok := block.Terminal.(*Return); ok {
+			state.assign(index, returnTerminal.Value, function.Returns)
+			index++
+		}
+	}
+
+	return state, mutations
+}
+
+// widenRanges is upstream's Part 1: build the alias graph, then apply every mutation through it.
+//
+// Separated from the definition half so the two run in upstream's order rather than interleaved. See
+// `InferMutableRangesWithEffects` for why the order is load-bearing.
+//
+// A mutation is applied only when its instruction carries an evaluation order. An unnumbered
+// instruction means `Finalize` never reached the block, and widening to `0 + 1` there would write a
+// range end of 1 onto a value whose start is unset, producing a value that reads as mutable at
+// position 0 in a function where nothing has an order at all.
+func widenRanges(function *Function, effects *AliasingEffects, result *MutableRanges) {
+	if effects == nil || effects.Len() == 0 {
+		return
+	}
+	state, mutations := buildAliasingGraph(function, effects)
+	for _, mutation := range mutations {
+		if mutation.end == 0 {
+			// `end` is `instruction.Order + 1`, so zero is impossible for a numbered instruction and
+			// this only fires on an unnumbered one, where `Order + 1` is 1. Guarded on the order
+			// itself below rather than here.
+			continue
+		}
+		if mutation.end == 1 {
+			// Order was zero: unnumbered. See the doc comment.
+			continue
+		}
+		state.mutate(
+			result,
+			mutation.index,
+			mutation.place.Identifier,
+			mutation.end,
+			true,
+			mutation.transitive,
+			mutation.kind,
+		)
+	}
 }

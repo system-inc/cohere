@@ -336,26 +336,36 @@ export function f() {
 
 // TestRangeGapsAreNamed pins the declared gaps, so closing one is a visible event.
 //
-// Modelled on `TestReactiveGapsAreNamed` deliberately: the two passes decline for the same missing
-// input, and a reader comparing them should find the same shape.
+// It worked. Stage 2 declared two gaps here, `RangeGapMutationExtension` and
+// `RangeGapAliasPropagation`, and this test failed when Stage 2.5 closed both, which forced the
+// constants and the package comment to be updated together rather than leaving an API that named a
+// gap no longer present. The remaining gap is in the INPUT rather than in this pass: the walk over
+// `createFrom` edges is implemented and correct, and nothing in this tree emits the effect that
+// populates them.
 func TestRangeGapsAreNamed(t *testing.T) {
 	gaps := RangeGaps()
 	if len(gaps) != 2 {
 		t.Fatalf("expected exactly the two declared gaps, got %d", len(gaps))
 	}
-	if gaps[0] != RangeGapMutationExtension || gaps[1] != RangeGapAliasPropagation {
+	if gaps[0] != RangeGapCreateFromPropagation || gaps[1] != RangeGapLoopCarriedInversion {
 		t.Errorf("the declared gaps changed; if one was closed, update the package comment and the "+
 			"RangeGap constants together, got %v", gaps)
 	}
 }
 
-// TestRangesAreAnUnderApproximation pins the DIRECTION of the gap.
+// TestRangesWidenToCoverAMutatingCall is the case Stage 2 wrote as an under-approximation and
+// Stage 2.5 turned positive.
 //
-// Upstream widens `o`'s range to cover the mutation at `mutate(o)`, because the call's effect says
-// the argument is mutated. This pass cannot see that, so `o`'s range ends at its definition. The
-// test asserts the SHORTER answer, which is the honest expectation, and names the input so that a
-// later pass filling effects turns this red and forces the package comment to be revisited.
-func TestRangesAreAnUnderApproximation(t *testing.T) {
+// It was originally `TestRangesAreAnUnderApproximation`, asserting the SHORTER answer and carrying
+// an error message instructing whoever made it fail to update the gap list and the package comment.
+// It failed on the first run of the widening, which is the event it existed to detect, and both were
+// updated. Kept as the positive assertion rather than deleted, because the input is the smallest one
+// on which the whole chain runs: a call effect names the argument mutated, the graph reaches it, and
+// the widening covers the call.
+//
+// Upstream's answer, and now this one: `o` is defined at its literal and still being written at the
+// call, so the interval spans both rather than closing at the definition.
+func TestRangesWidenToCoverAMutatingCall(t *testing.T) {
 	function, _ := rangesFor(t, `
 declare function mutate(target: number[]): void;
 export function f() {
@@ -368,11 +378,71 @@ export function f() {
 	if !r.IsSet() {
 		t.Fatal("`o` has no range at all, so this measured nothing")
 	}
-	if r.End > r.Start+1 {
-		t.Errorf("`o`'s range is [%d,%d), which is WIDER than its definition point. That means "+
-			"mutation extension is now being computed, which is upstream's answer and a real "+
-			"improvement, but RangeGapMutationExtension and the package comment now describe a gap "+
-			"that no longer exists; update both", r.Start, r.End)
+	if r.End <= r.Start+1 {
+		t.Errorf("`o`'s range is [%d,%d), which closes at its definition point. The call to "+
+			"`mutate` carries a mutation effect naming `o`, so the widening should have extended "+
+			"the end past it; a range of width 1 here means the alias graph never reached the value",
+			r.Start, r.End)
+	}
+}
+
+// TestRangesDoNotWidenWithoutAMutation is the two-sided control for the test above.
+//
+// Without it, a widening that extended EVERY range to the end of the function would pass the
+// positive assertion and read as correct.
+//
+// # The first version of this control was WRONG and the code was right
+//
+// It was written as the same source with `mutate(o)` replaced by `read(o)`, on the assumption that a
+// call taking a `readonly` parameter would carry no mutation effect. It failed, and the failure was
+// the fixture rather than the widening: `read` appears in no signature table, so it takes the
+// DEFAULT path, which `effects.go` documents as `MutateTransitiveConditionally` on every operand
+// plus a capture into every other one. An unknown call is assumed to mutate everything handed to it,
+// which is the conservative direction and is upstream's behavior rather than ours.
+//
+// So a call cannot be the control at all: every unknown call widens, correctly. The control has to
+// be a function with no call in it, where the mutation effect count is genuinely zero. Measured on
+// this input: `mutationEffects=0`, and the widest range in the whole function is 1.
+//
+// Recorded at length because the failing version looked exactly like a defect in the widening and
+// the brief's rule -- when a probe says shipped code is broken, the probe is wrong until a control
+// says otherwise -- is what produced the right diagnosis.
+func TestRangesDoNotWidenWithoutAMutation(t *testing.T) {
+	function, ranges := rangesFor(t, `
+export function f() {
+  const o: number[] = [];
+  const n = 1;
+  return n;
+}
+`)
+	effects := InferAliasingEffects(function)
+	mutations := 0
+	for _, block := range function.Blocks {
+		for _, instructionId := range block.Instructions {
+			for _, effect := range effects.Get(instructionId) {
+				if effect.Kind.IsMutation() {
+					mutations++
+				}
+			}
+		}
+	}
+	if mutations != 0 {
+		t.Fatalf("this control assumes the input carries no mutation effect and it carries %d; "+
+			"the control is measuring something other than what it claims", mutations)
+	}
+	for _, identifier := range function.Identifiers {
+		if identifier == nil {
+			continue
+		}
+		r := ranges.Get(identifier.Id)
+		if !r.IsSet() {
+			continue
+		}
+		if r.End > r.Start+1 {
+			t.Errorf("value %d has range [%d,%d) but the function carries no mutation effect at "+
+				"all; a widening that fires here is firing on instruction shape rather than on an "+
+				"effect", identifier.Id, r.Start, r.End)
+		}
 	}
 }
 
@@ -595,5 +665,272 @@ func TestPhiOpensOneBeforeItsBlock(t *testing.T) {
 	}
 	if _, moved := phiOpenedRange(MutableRange{}, 10); moved {
 		t.Error("an unset range must not open a phi early")
+	}
+}
+
+// TestRangesStayValidAcrossALoopBackEdge pins the one divergence Stage 2.5 introduces.
+//
+// A loop-carried value is defined at a HIGH evaluation order by the back-edge store, while the
+// mutation that reaches it through the loop's phi happened at a LOWER one. Both upstreams then write
+// `start` and `end` from independently-guarded branches and produce an interval whose end is at or
+// before its start, which React's own `validateMutableRange` declares invalid and which its config
+// does not check by default.
+//
+// This input is the minimal reproduction, found by shrinking a real corpus case: before the clamp
+// `i` came out as the empty interval [23,23), and 48 values across 400 corpus files were in that
+// state. The assertion is the invariant itself rather than a specific interval, because the exact
+// orders move whenever lowering changes and an assertion on them would fail for the wrong reason.
+func TestRangesStayValidAcrossALoopBackEdge(t *testing.T) {
+	function, ranges := rangesFor(t, `
+declare function mutate(x: number[]): void;
+export function f(items: number[][]) {
+  for (let i = 0; i < items.length; i++) {
+    const row = items[i];
+    mutate(row);
+  }
+  return items;
+}
+`)
+	if invalid := ValidateMutableRanges(ranges); len(invalid) != 0 {
+		for _, id := range invalid {
+			r := ranges.Get(id)
+			t.Errorf("value %d has the invalid range [%d,%d); a loop-carried value whose end was "+
+				"widened below its own definition point must still come out non-empty", id, r.Start, r.End)
+		}
+	}
+
+	// Two-sided: the loop body's value really is widened, so this input exercises the widening
+	// rather than passing because nothing happened.
+	widest := EvaluationOrder(0)
+	for _, identifier := range function.Identifiers {
+		if identifier == nil {
+			continue
+		}
+		if r := ranges.Get(identifier.Id); r.IsSet() && r.End-r.Start > widest {
+			widest = r.End - r.Start
+		}
+	}
+	if widest <= 1 {
+		t.Errorf("the widest range in this function is %d, so nothing was widened and the "+
+			"invariant assertion above passed vacuously", widest)
+	}
+
+	// # The loop counter's range must cross the whole loop, which is what pins the BACK-EDGE PHI
+	//
+	// A phi operand whose predecessor block has not been walked yet is deferred to that block and
+	// applied there with the index recorded at DEFERRAL, which is how a back edge gets an index low
+	// enough for a mutation later in the loop to travel through it. Inverting that deferral test
+	// leaves the loop counter at [3,4) instead of [3,23): the widening never crosses the back edge,
+	// so every value defined before the loop reads as settled inside it.
+	//
+	// # Assert on the NARROWEST counter value, not the widest, and that distinction is the whole test
+	//
+	// A first version of this assertion took the WIDEST range among the values named `i` and
+	// survived the mutation, because single-assignment form gives the counter several identifiers
+	// and the mutant preserves the widest one. Measured on this input, base against mutant:
+	//
+	//	id 25  `i`  base [3,23)   mutant [3,4)    the value `i` is initialised to
+	//	id 26  `i`  base [4,23)   mutant [4,23)   the loop-header phi
+	//
+	// The phi keeps its widening either way, because the mutation inside the loop reaches it
+	// directly. What the back edge carries is the widening travelling BACK to the value the counter
+	// held before the loop, and only the initial value can see that. So the narrowest is the
+	// discriminating quantity and the widest is the one that cannot see the guard at all.
+	//
+	// Recorded because the brief's rule applied twice here: the first fixture written for this
+	// survivor did not kill it, which means the hypothesis rather than the fixture was wrong, and
+	// the fix was to read the two tables side by side instead of writing a second guess.
+	// Counted rather than reduced to an extreme, because neither extreme discriminates: the widest
+	// is preserved by the mutant and the narrowest belongs to the post-increment result, which is
+	// legitimately one wide in both. Two of the four values named `i` cross the loop when the back
+	// edge carries the widening and one does when it does not.
+	wideCounters := 0
+	var sawCounter bool
+	for _, identifier := range function.Identifiers {
+		if identifier == nil || identifier.Name != "i" {
+			continue
+		}
+		r := ranges.Get(identifier.Id)
+		if !r.IsSet() {
+			continue
+		}
+		sawCounter = true
+		if r.End-r.Start >= 10 {
+			wideCounters++
+		}
+	}
+	if !sawCounter {
+		t.Fatal("no value named `i` carries a range, so this measured nothing")
+	}
+	if wideCounters < 2 {
+		t.Errorf("only %d of the values the loop counter `i` takes stay mutable across the loop, "+
+			"want at least 2. The loop-header phi learns it from the mutation directly; the value "+
+			"feeding that phi can only learn it through the BACK EDGE. A phi operand applied with "+
+			"a fresh index instead of its deferred one leaves exactly one", wideCounters)
+	}
+}
+
+// TestRangesThirdLoopOpensAWidenedOperand pins the loop Stage 2 omitted and Stage 2.5 restored.
+//
+// # Why this needs a PARAMETER specifically
+//
+// Stage 2 omitted upstream's third loop, over operands rather than lvalues, after measuring that no
+// value in the corpus reached the state it exists for -- `End > order && Start == 0`, a value whose
+// end was widened while its start was never opened. That measurement was correct, and Stage 2 wrote
+// down the condition on which it would expire: a widening pass reaching a value through the alias
+// graph. Re-measured with the widening present, the state occurs 39,619 times over the same 400
+// files, so the loop is doing real work rather than being restored on principle.
+//
+// A parameter is the clean case and the reason is structural. Every ordinary value is defined by an
+// instruction lvalue, so the lvalue loop opens its start and the third loop has nothing to do. A
+// parameter is never an lvalue of any instruction -- it arrives already defined -- so when a mutation
+// widens its end, NOTHING else can give it a start. Measured on this input: the widening alone
+// leaves `p` at [0,4), which `IsSet` reads as unset because both fields being zero is the unset
+// range, and the third loop is what turns it into [2,4).
+//
+// So the assertion is that `p` carries a range at all, plus that the range is genuinely wide. A
+// version of this test asserting only that some range exists would pass without the widening too.
+func TestRangesThirdLoopOpensAWidenedOperand(t *testing.T) {
+	function, ranges := rangesFor(t, `
+declare function mutate(x: number[]): void;
+export function f(p: number[]) {
+  mutate(p);
+  return p;
+}
+`)
+
+	var parameter IdentifierId
+	var found bool
+	for _, place := range function.Params {
+		for _, identifier := range function.Identifiers {
+			if identifier != nil && identifier.Id == place.Identifier && identifier.Name == "p" {
+				parameter = place.Identifier
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("the parameter `p` was not found among the function's params, so this measured nothing")
+	}
+
+	r := ranges.Get(parameter)
+	if !r.IsSet() {
+		t.Fatalf("the parameter `p` carries no range. Its end was widened by the mutation but only "+
+			"the third loop can give a parameter a start, because a parameter is never an "+
+			"instruction lvalue; without that loop the range stays [0,%d) and reads as unset", r.End)
+	}
+	if r.Start == 0 {
+		t.Errorf("`p`'s range is [%d,%d) with an unopened start, which is exactly the state the "+
+			"third loop exists to repair", r.Start, r.End)
+	}
+	if r.End <= r.Start+1 {
+		t.Errorf("`p`'s range is [%d,%d), so it was never widened and this test would pass without "+
+			"the third loop doing anything", r.Start, r.End)
+	}
+}
+
+// TestRangesDoNotWidenThroughAnEdgeThatDidNotExistYet pins the sequence-index guard.
+//
+// # What the guard is and why a name-based assertion cannot see it
+//
+// Every edge and every mutation is stamped with a monotonically increasing index as the graph is
+// built, and the walk refuses to traverse an edge whose index is at or after the mutation's own.
+// That is upstream's model of time: a mutation flows only through aliases that already existed when
+// it happened, so a value aliased AFTER being mutated is not retroactively widened.
+//
+// Removing that test does not change any NAMED value's range on a small input. It widens two
+// unnamed temporaries that the faithful walk leaves alone, which is invisible to `rangeOfName` and
+// is why a first version of this test, asserting on `inner` and `holder`, passed against the mutant.
+// The assertion is therefore on the SIZE of the widened set, which is the level at which the
+// difference actually appears: ten values here, twelve without the guard.
+//
+// Measured on the corpus rather than argued: over 959 functions in 200 files, dropping this guard
+// changes 5,010 values, so it is load-bearing rather than an optimization.
+func TestRangesDoNotWidenThroughAnEdgeThatDidNotExistYet(t *testing.T) {
+	function, _ := rangesFor(t, `
+declare function deep(x: unknown): void;
+export function f() {
+  const inner: number[] = [];
+  const holder: unknown[] = [inner];
+  deep(holder);
+  return inner;
+}
+`)
+	effects := InferAliasingEffects(function)
+	widened := &MutableRanges{}
+	widenRanges(function, effects, widened)
+
+	// The count is what separates the faithful walk from one that ignores the index. It is asserted
+	// exactly rather than as a bound, because a bound would be satisfied by a walk that widened
+	// nothing at all.
+	const wantWidened = 10
+	if got := widened.Len(); got != wantWidened {
+		t.Errorf("the widening reached %d values, want %d. More than %d means the walk followed an "+
+			"edge created after the mutation it is propagating, which is the sequence-index guard "+
+			"failing; fewer means it stopped early", got, wantWidened, wantWidened)
+	}
+}
+
+// TestRangesFollowCapturesOnlyForATransitiveMutation pins the capture-direction guard.
+//
+// # The distinction the guard makes
+//
+// A capture edge records that information flowed from one value into another without aliasing them.
+// Mutating a container does NOT mutate what it holds, so a plain mutation must not walk a capture
+// edge backwards. A TRANSITIVE mutation does reach everything the value transitively holds, so it
+// must. Upstream gates the backward capture walk on `entry.transitive` for exactly that reason.
+//
+// # Finding an input that can see it took a signature-table method, and that is the point
+//
+// Six hand-written shapes -- an object literal holding an array, a two-level nest, a closure
+// capturing an accumulator -- all failed to distinguish the guarded walk from the unguarded one,
+// because an unknown call takes the default path and emits `MutateTransitiveConditionally` on every
+// operand, which makes the mutation transitive anyway and the guard vacuous.
+//
+// `Map.prototype.set` is in oxc's global signature table with a `Capture` effect, so it produces a
+// real capture edge alongside a NON-transitive mutation, which is the only shape on which the two
+// walks disagree. Measured here: `seed` ends at 15 with the guard and at 21 without it, so dropping
+// the guard over-widens a captured parameter by six positions.
+//
+// Recorded at length because the brief's rule -- name the input on which the two versions produce
+// different output, before writing a fixture -- is what turned this from a survivor into a test. The
+// first four hypotheses about which shape would distinguish them were all wrong.
+func TestRangesFollowCapturesOnlyForATransitiveMutation(t *testing.T) {
+	function, ranges := rangesFor(t, `
+export function f(seed: number[]) {
+  const m = new Map<string, number[]>();
+  m.set("k", seed);
+  const arr = Array.from(m.values());
+  arr.push([1]);
+  return m;
+}
+`)
+
+	var seed IdentifierId
+	var found bool
+	for _, place := range function.Params {
+		for _, identifier := range function.Identifiers {
+			if identifier != nil && identifier.Id == place.Identifier && identifier.Name == "seed" {
+				seed, found = place.Identifier, true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("the parameter `seed` was not found, so this measured nothing")
+	}
+
+	r := ranges.Get(seed)
+	if !r.IsSet() {
+		t.Fatal("`seed` carries no range, so the capture edge never reached it and this test " +
+			"cannot see the guard it exists for")
+	}
+
+	// The later `arr.push` mutates a value `seed` was captured INTO, non-transitively. A walk that
+	// followed the capture edge backwards anyway would carry that mutation back to `seed`.
+	const wantEnd = 15
+	if r.End != wantEnd {
+		t.Errorf("`seed`'s range is [%d,%d), want an end of %d. A larger end means the walk "+
+			"followed a capture edge backwards for a NON-transitive mutation, which widens a "+
+			"contained value on a mutation of its container", r.Start, r.End, wantEnd)
 	}
 }
