@@ -174,7 +174,10 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	// fixtures that ALSO fire the `StartMemoize` condition and stay in the count on that other
 	// finding. The marker pass itself prunes 36 of 68 markers on this corpus and leaves zero
 	// unpruned markers whose value carries no scope, so it is not under-firing.
-	const knownFalsePositives = 30
+	// Lowered from 30 by declaring the four `Object` statics in the effect table. Three fixtures,
+	// exactly the three whose subject they are: `object-keys`, `object-values` and
+	// `repro-object-fromEntries-entries`, all now silent.
+	const knownFalsePositives = 27
 	if fired != knownFalsePositives {
 		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
 			"number should be lowered deliberately, and if it went UP something regressed",

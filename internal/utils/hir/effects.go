@@ -500,6 +500,56 @@ var effectSignatures = map[string]effectSignature{
 	"difference": {Receiver: EffectRead, Positional: []Effect{EffectRead}, Result: EffectValueMutable},
 }
 
+// effectQualifiedMethods is the subset of upstream's table that only makes sense with a receiver.
+//
+// Keyed `Receiver.method`, and consulted BEFORE `effectSignatures`, because the bare-name table
+// answers a different question for three of these names. `entries` is declared there as the Array
+// method, where the receiver is the collection being read and the call takes no arguments. On
+// `Object.entries(x)` the receiver is the `Object` global and the collection is a POSITIONAL
+// argument, so the bare-name lookup gives `x` no declared effect at all and the loop in
+// `effectsForCall` falls through to `EffectConditionallyMutate` for it.
+//
+// That fallthrough is the mechanism behind three fixtures, and `object-keys.js` states it in its own
+// source: "Without a declaration for Object.entries(), this would be assumed to mutate `record`,
+// meaning existing memoization couldn't be preserved."
+//
+// Transcribed from `HIR/Globals.ts:84-140` rather than reasoned about. Upstream keys its whole
+// registry by SHAPE, so a receiver named `Object` that is not the global resolves differently there
+// and identically here. That is `EffectGapTypeDirectedShapes` again, and the direction is the same:
+// this table applies a READ where the default applies a mutation, so a shadowed `Object` would be
+// treated as less mutating than upstream treats it. Bounded by there being four entries, all on a
+// name that is a syntax error to declare as a local in strict-mode module scope.
+var effectQualifiedMethods = map[string]effectSignature{
+	// Effect.Read on the positional param, per `Globals.ts:88-96`.
+	"Object.keys": {
+		Receiver: EffectRead, Positional: []Effect{EffectRead}, Result: EffectValueMutable,
+	},
+	// Effect.CAPTURE, `Globals.ts:177-183`, and not Read. The first spelling of this entry inferred
+	// it from `keys` on the reasoning that the two are siblings returning an array, and that is
+	// wrong at the source: `values` returns the object's own values, so the result may alias them,
+	// exactly as `entries` does. `keys` returns fresh strings and captures nothing.
+	//
+	// The wrong reading cost a real defect and the corpus caught it rather than the fixtures: with
+	// Read here, `recomputeIsValid` lost 6 instructions with no unmatched goto to attribute them to,
+	// breaking the pinned invariant in `reactive_build_test.go` that every unattributed loss
+	// coincides with one. The false-positive score did not move either way.
+	"Object.values": {
+		Receiver: EffectRead, Positional: []Effect{EffectCapture}, Result: EffectValueMutable,
+	},
+	// Effect.Capture, `Globals.ts:115-123`: the returned array holds the receiver's own values, so
+	// the result may alias them. Capture rather than Read for exactly that reason.
+	"Object.entries": {
+		Receiver: EffectRead, Positional: []Effect{EffectCapture}, Result: EffectValueMutable,
+	},
+	// Effect.ConditionallyMutate, `Globals.ts:98-113`. Upstream is deliberately WEAKER here than for
+	// the other three: `fromEntries` walks an iterable, and advancing an iterator can mutate it.
+	// Transcribed rather than strengthened to match its neighbours.
+	"Object.fromEntries": {
+		Receiver: EffectRead, Positional: []Effect{EffectConditionallyMutate},
+		Result: EffectValueMutable,
+	},
+}
+
 // effectGlobalFunctions is the subset of upstream's global FUNCTION table, keyed by callee name.
 //
 // Separate from effectSignatures because these are reached as bare calls rather than as methods, so
@@ -1014,12 +1064,45 @@ func lookupSignature(function *Function, instruction *Instruction, name string) 
 	}
 	switch instruction.Value.(type) {
 	case *MethodCall:
+		// Receiver-qualified first. Three of the four names it carries also exist in the bare table
+		// meaning something else, so consulting the bare table first would answer with the Array
+		// method and never reach this one.
+		if receiver := receiverSyntaxName(instruction); receiver != "" {
+			if signature, found := effectQualifiedMethods[receiver+"."+name]; found {
+				return signature, true
+			}
+		}
 		signature, found := effectSignatures[name]
 		return signature, found
 	default:
 		signature, found := effectGlobalFunctions[name]
 		return signature, found
 	}
+}
+
+// receiverSyntaxName recovers the source name of a method call's receiver, for the qualified table.
+//
+// Syntax rather than the identifier, matching `calleeSyntaxName`: a receiver that is a global is a
+// `LoadGlobal` into a temporary here, so `Identifier.Name` is empty for exactly the population this
+// table is about. Returns empty for anything that is not a plain `receiver.method(...)`, which sends
+// the lookup to the bare-name table.
+func receiverSyntaxName(instruction *Instruction) string {
+	if instruction == nil || instruction.Node == nil {
+		return ""
+	}
+	node := instruction.Node
+	if node.Kind != ast.KindCallExpression {
+		return ""
+	}
+	expression := node.Expression()
+	if expression == nil || expression.Kind != ast.KindPropertyAccessExpression {
+		return ""
+	}
+	receiver := expression.Expression()
+	if receiver == nil || receiver.Kind != ast.KindIdentifier {
+		return ""
+	}
+	return receiver.Text()
 }
 
 // calleeName recovers what the source calls this callee.

@@ -455,8 +455,12 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// These numbers move when the corpus does. That is accepted: a failure here should be read as
 	// "the corpus changed, re-measure" rather than as a defect, and the alternative is a suite that
 	// cannot see the mutations that matter.
-	if deep != 171 || flat != 1434 {
-		t.Errorf("got %d deep and %d flat dependencies, want 171 and 1434; a SMALL move here is "+
+	// `flat` moved 1,434 -> 1,435 when the four `Object` statics were declared in the effect table.
+	// `deep` held at 171, which is the direction that matters: a gain there is over-approximation.
+	// One more dependency became visible because `Object.keys(record)` stopped being assumed to
+	// mutate `record`, which is the fix working rather than the analysis drifting.
+	if deep != 171 || flat != 1435 {
+		t.Errorf("got %d deep and %d flat dependencies, want 171 and 1435; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction", deep, flat)
 	}
