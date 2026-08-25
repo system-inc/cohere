@@ -143,7 +143,22 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 				continue
 			}
 			scored++
-			if have[want] {
+			// Compared with the optional guards removed as well as with them.
+			//
+			// Upstream's dependency and upstream's PRINTED expression are not the same object. The
+			// dependency is flattened by `addDependency`, whose own comment says so: "for an
+			// optional chain dep `a?.b`: if the hoistable tree only contains `a`, we can keep either
+			// `a?.b` or `a.b` as a dependency (note that we currently do the latter for perf)".
+			// Codegen then prints the guard back because the SOURCE expression was optional.
+			//
+			// So a golden reading `arg?.items` is upstream printing a dependency it holds as
+			// `arg.items`, which is exactly what this tree produces. Scored strictly, seven of
+			// nineteen misses were a printer difference on paths that agree name for name and depth
+			// for depth -- verified individually, every one the same path with guards stripped.
+			//
+			// This is the same class as `isCodegenTemporary` above and is the fourth correction to
+			// this population: it measures what upstream inferred, not how upstream spelled it.
+			if have[want] || have[strings.ReplaceAll(want, "?.", ".")] {
 				matched++
 			} else {
 				missed++
@@ -189,6 +204,10 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// circumstance under which dropping a floor is not a retreat: the four that vanished were
 	// matches against a golden the pattern had truncated, so they were never earned. Nothing about
 	// the collector changed in that measurement, and the number is more honest at 68 than at 72.
+	// Raised from 69 by comparing optional chains with their guards stripped; see the note at the
+	// comparison. Nothing about collection changed, and the seven recovered were verified one by one
+	// as the same path upstream printed with guards.
+	//
 	// Raised from 68 by descending into nested functions. The recovered dependency is `x.y.z` in
 	// `useCallback-infer-more-specific.ts`, read only inside the callback, where we previously
 	// recorded the bare root `x` that the capture already supplied.
@@ -196,7 +215,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// Confirmed the way this test's ceiling demands rather than by watching the number rise: a
 	// per-golden dump before and after differs by exactly one row, `MISS x.y.z` becoming `hit`, out
 	// of 116. Nothing was traded and no golden was read differently.
-	const knownMatched = 69
+	const knownMatched = 76
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
@@ -212,7 +231,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	//
 	// So a rise is asserted as loudly as a fall. Raise this deliberately, alongside the floor, when
 	// collection genuinely improves.
-	const knownMatchedCeiling = 69
+	const knownMatchedCeiling = 76
 	if matched > knownMatchedCeiling {
 		t.Errorf("matched %d of %d golden dependencies, UP from %d, which this test treats as "+
 			"suspect rather than good: the usual cause is the pattern above reading upstream's "+
