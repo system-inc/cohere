@@ -238,9 +238,23 @@ func reportComponents(
 		}
 	}
 
-	// A file of nothing but small components is fine however many there are, since a helper read
-	// beside its caller is the point.
-	if len(large) == 0 && len(medium) == 0 {
+	// A large component is what makes a second one a problem, so its absence ends the check.
+	//
+	// This gate used to also pass a file holding two components over the helper size and nothing
+	// large, which contradicted the message the rule then printed. A file whose biggest component
+	// was 32 lines was told that a component exceeded 60, so the number in the finding was below the
+	// threshold the same sentence cited. Measured here before the change: 39 of 52 findings on the
+	// ahra tree named a primary under 60 lines, five of them naming 11.
+	//
+	// `large` is computed a few lines above and was consulted only by the helper check further down,
+	// which is the shape of the defect: the condition carrying the intent already existed and the
+	// first report never asked it. The original was repaired the same way in
+	// `structure@de9d9396`, and the reasoning there is the same one.
+	//
+	// A file of nothing but small components is still fine however many there are, since a helper
+	// read beside its caller is the point. That case is now covered by this gate rather than beside
+	// it.
+	if len(large) == 0 {
 		return
 	}
 

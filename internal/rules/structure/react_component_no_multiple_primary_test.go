@@ -52,9 +52,9 @@ func TestReactComponentNoMultiplePrimaryFires(t *testing.T) {
 		},
 		// No large component needed. Two mediums are still two things a reader has to find.
 		{
-			"two medium components, neither large",
-			component("First", 30) + component("Second", 40),
-			[]string{"noMultiplePrimary"},
+			"two medium components with a large one present",
+			component("Primary", 80) + component("First", 30) + component("Second", 40),
+			[]string{"noMultiplePrimary", "noMultiplePrimary"},
 		},
 		// Every component after the first is reported, not just the second, because the finding is
 		// attached to the thing that should move.
@@ -246,6 +246,20 @@ func TestReactComponentNoMultiplePrimaryStaysSilent(t *testing.T) {
 		},
 
 		{"no components at all", componentFile, "export const value = 1;\n"},
+
+		// The case the gate used to report, and the reason it is here rather than beside the firing
+		// cases. Two components over the helper size and nothing large is a file the rule never
+		// meant to name: it would have printed "a component with 40 lines" against a threshold of
+		// 60, a number below the one the same sentence cites. Measured before the repair, 39 of 52
+		// findings on the ahra tree were this shape, five of them naming 11 lines.
+		//
+		// This must stay on the quiet side rather than be deleted, because the gate that fixes it is
+		// one condition and a fixture asserting the wrong half is what encoded the defect in the
+		// first place.
+		{
+			"two medium components and nothing large", componentFile,
+			component("First", 30) + component("Second", 40),
+		},
 	}
 
 	for _, testCase := range cases {
