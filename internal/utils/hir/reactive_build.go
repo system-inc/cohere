@@ -44,11 +44,25 @@ type reactiveContext struct {
 	emitted map[BlockId]bool
 	// catchHandlers are blocks reached only as a `try` handler, which the walk must not treat as
 	// ordinary successors.
-	catchHandlers  map[BlockId]bool
-	stack          []controlFlowTarget
-	nextScheduleId int
+	catchHandlers map[BlockId]bool
+	// scopeFallthroughs are the blocks a scope terminal falls through to.
+	//
+	// Upstream's `scopeFallthroughs`, and it exists because a break to one of these must be elided
+	// rather than emitted at all. A reactive scope always falls through to its continuation implicitly --
+	// there is no `break` in the source and none belongs in the tree -- so emitting one names a
+	// target that no enclosing construct claims. That is measurable: before this set existed the
+	// walk reported 61 unmatched gotos and 21 double emissions on the corpus, and the four
+	// functions losing instructions were the subset whose orphaned target held any.
+	scopeFallthroughs map[BlockId]bool
+	stack             []controlFlowTarget
+	nextScheduleId    int
 	// unmatchedGotos counts gotos whose target was not on the control-flow stack.
 	unmatchedGotos int
+	// nonImplicitScopeBreaks counts breaks to a scope fallthrough that were NOT implicit, which is
+	// the condition upstream asserts cannot happen. Counted rather than raised.
+	nonImplicitScopeBreaks int
+	// elidedScopeBreaks counts the breaks omitted because their target is a scope fallthrough.
+	elidedScopeBreaks int
 	// doubleEmit counts blocks the walk reached twice. Upstream raises an invariant; a linter
 	// reports, so this is surfaced on the result and asserted at zero rather than panicking.
 	doubleEmit int
@@ -68,11 +82,12 @@ func newReactiveContext(function *Function) *reactiveContext {
 		}
 	}
 	return &reactiveContext{
-		function:      function,
-		scheduled:     map[BlockId]bool{},
-		emitted:       map[BlockId]bool{},
-		catchHandlers: map[BlockId]bool{},
-		blockIndex:    index,
+		function:          function,
+		scheduled:         map[BlockId]bool{},
+		emitted:           map[BlockId]bool{},
+		catchHandlers:     map[BlockId]bool{},
+		scopeFallthroughs: map[BlockId]bool{},
+		blockIndex:        index,
 	}
 }
 
@@ -213,6 +228,14 @@ type ReactiveBuildResult struct {
 	Terminals int
 	// Scopes is how many scope blocks it holds.
 	Scopes int
+	// ElidedScopeBreaks counts breaks to a scope fallthrough that were correctly omitted.
+	//
+	// Surfaced because the elision is the whole of this pass's agreement with upstream on scope
+	// terminals, and a silent zero would mean the set is never populated rather than never needed.
+	ElidedScopeBreaks int
+	// NonImplicitScopeBreaks counts the case upstream asserts cannot happen: a break to a scope
+	// fallthrough whose target was not the innermost construct. Counted rather than raised.
+	NonImplicitScopeBreaks int
 	// MaxDepth is the deepest nesting the tree reaches.
 	MaxDepth int
 	// DoubleEmitted counts blocks the walk reached twice, which upstream treats as a compiler bug.
@@ -248,9 +271,11 @@ func BuildReactiveFunction(function *Function) (*ReactiveFunction, ReactiveBuild
 	context.visitBlock(entry, &body)
 
 	result := ReactiveBuildResult{
-		Blocks:         len(context.emitted),
-		DoubleEmitted:  context.doubleEmit,
-		UnmatchedGotos: context.unmatchedGotos,
+		Blocks:                 len(context.emitted),
+		DoubleEmitted:          context.doubleEmit,
+		UnmatchedGotos:         context.unmatchedGotos,
+		ElidedScopeBreaks:      context.elidedScopeBreaks,
+		NonImplicitScopeBreaks: context.nonImplicitScopeBreaks,
 	}
 	measureBlock(body, 1, &result)
 
@@ -631,7 +656,13 @@ func (c *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) 
 		c.visitFallthrough(fallthroughId, into)
 
 	case *Scope:
-		fallthroughId, _ := c.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
+		fallthroughId, scheduled := c.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
+		if scheduled {
+			// Recorded only when this terminal actually claimed the block. If an enclosing construct
+			// already owns it, the break belongs to that construct and eliding it here would drop a
+			// jump the source really makes.
+			c.scopeFallthroughs[terminal.Fallthrough] = true
+		}
 		body := c.traverse(terminal.Block)
 		c.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveScopeBlock{
@@ -741,6 +772,19 @@ func (c *reactiveContext) emitGoto(terminal *Goto, into *ReactiveBlock) {
 	kind, matched := c.breakTarget(terminal.Block)
 	if !matched {
 		c.unmatchedGotos++
+	}
+	if c.scopeFallthroughs[terminal.Block] {
+		// Upstream's `visitBreak` returns nothing here, and asserts the target is implicit while
+		// doing so. A reactive scope falls through to its continuation with no `break` in the
+		// source, so emitting one invents a jump and names a target no enclosing construct claims.
+		//
+		// The assert is kept as a measurement rather than a panic, which is this package's standing
+		// treatment of upstream invariants: a linter reports where a compiler aborts.
+		if kind != ReactiveTargetImplicit {
+			c.nonImplicitScopeBreaks++
+		}
+		c.elidedScopeBreaks++
+		return
 	}
 	*into = append(*into, &ReactiveTerminalStatement{
 		Terminal: &ReactiveBreak{Target: terminal.Block, TargetKind: kind, Order: terminal.Order},

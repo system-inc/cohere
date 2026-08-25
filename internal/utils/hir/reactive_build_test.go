@@ -122,6 +122,7 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 	converted, lostWithValueTerminal, lostWithout := 0, 0, 0
 	doubleEmitted, unmatchedGotos := 0, 0
+	elidedScopeBreaks, nonImplicitScopeBreaks := 0, 0
 
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
 		// Bring the graph to the state the pipeline actually delivers before converting it.
@@ -149,6 +150,8 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 
 		doubleEmitted += result.DoubleEmitted
 		unmatchedGotos += result.UnmatchedGotos
+		elidedScopeBreaks += result.ElidedScopeBreaks
+		nonImplicitScopeBreaks += result.NonImplicitScopeBreaks
 
 		if graphInstructions > 0 && result.Instructions < graphInstructions {
 			if hasValueTerminal {
@@ -231,8 +234,40 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 			"should be removed, or the measurement stopped reading")
 	}
 
-	t.Logf("converted=%d lostWithValueTerminal=%d lostWithout=%d doubleEmitted=%d unmatchedGotos=%d",
-		converted, lostWithValueTerminal, lostWithout, doubleEmitted, unmatchedGotos)
+	// The scope-fallthrough elision, asserted as a floor because a zero here would mean
+	// `scopeFallthroughs` is never populated rather than never needed -- and that is exactly the
+	// state this pass was in before the set existed, when it emitted 2,842 `break` statements the
+	// source does not contain. Upstream omits every one of them.
+	if elidedScopeBreaks == 0 {
+		t.Errorf("no break to a scope fallthrough was elided across %d functions holding 2,874 "+
+			"scope terminals; the set is not being populated, so the tree carries invented breaks",
+			converted)
+	}
+	// Upstream asserts this is impossible and aborts; a linter counts instead. The count is the
+	// ROOT of everything else this test pins, which is measured rather than argued: over the same
+	// walk, 92 functions carry a non-implicit scope break, 61 carry an unmatched goto, and the
+	// overlap is 61 with zero unmatched-only. The unmatched gotos are therefore a strict subset --
+	// the cases severe enough that `breakTarget` found nothing at all -- and the four instruction
+	// losses are a subset of those in turn.
+	//
+	// So this is ONE defect with three symptoms at three severities, not three defects. Driving
+	// this to zero should take the other two with it.
+	const knownNonImplicitScopeBreaks = 92
+	if nonImplicitScopeBreaks > knownNonImplicitScopeBreaks {
+		t.Errorf("%d break(s) to a scope fallthrough were not implicit, up from the measured %d; "+
+			"upstream raises an invariant here, so this is a control-flow stack the walk built "+
+			"differently", nonImplicitScopeBreaks, knownNonImplicitScopeBreaks)
+	}
+	if nonImplicitScopeBreaks < knownNonImplicitScopeBreaks {
+		t.Errorf("non-implicit scope breaks are %d, down from %d; lower this bound and check "+
+			"whether the unmatched-goto and instruction-loss counts fell with it",
+			nonImplicitScopeBreaks, knownNonImplicitScopeBreaks)
+	}
+
+	t.Logf("converted=%d lostWithValueTerminal=%d lostWithout=%d doubleEmitted=%d unmatchedGotos=%d "+
+		"elidedScopeBreaks=%d nonImplicitScopeBreaks=%d",
+		converted, lostWithValueTerminal, lostWithout, doubleEmitted, unmatchedGotos,
+		elidedScopeBreaks, nonImplicitScopeBreaks)
 }
 
 // TestReactiveFunctionGapsAreDeclared pins the gap list so closing one is a visible event.
