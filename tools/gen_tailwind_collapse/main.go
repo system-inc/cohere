@@ -14,8 +14,17 @@
 // The generator exists so that staleness is visible instead of silent. Today a Tailwind upgrade can
 // change what collapses and nobody finds out, because the only way to notice is a finding that stops
 // being reported. With a generated table, an upgrade produces a diff in a checked-in file, which a
-// human reads in review. `-check` makes that a gate: it regenerates and fails if the committed table
-// disagrees, so a version bump that changes the answers cannot land quietly.
+// human reads in review. `-check` makes that a gate: it regenerates and fails if either committed
+// table disagrees, so a version bump that changes the answers cannot land quietly.
+//
+// It writes two files, and `-check` covers both. `collapse_table.go` is what
+// `enforce-canonical-classes` reads; `property_order_table.go` is what
+// `enforce-consistent-class-order` reads. The check used to return before the second was rendered,
+// so one generated file was gated and the other was written by every normal run and compared by
+// nothing, under a message naming only the file it had actually read.
+//
+// Nothing invokes `-check` automatically yet. It is a manual gate, which is worth knowing before
+// trusting that an upgrade would have been caught.
 //
 // Node is required to run it and never to use the result. The enumeration asks the real Tailwind
 // engine, because a hand-maintained table is a guess and the guesses have been wrong: an earlier
@@ -131,29 +140,49 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: cannot read %s to check it: %v\n", *output, err)
-			os.Exit(1)
-		}
-		if !bytes.Equal(committed, rendered) {
-			fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: %s is stale for Tailwind %s.\n", *output, result.TailwindVersion)
-			fmt.Fprintln(os.Stderr, "  The installed Tailwind collapses a different set of families than the committed table records.")
-			fmt.Fprintln(os.Stderr, "  Regenerate it and read the diff: what changed is what this upgrade changed about canonical class names.")
-			os.Exit(1)
-		}
-		fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: %s is current for Tailwind %s (%d families).\n",
-			*output, result.TailwindVersion, len(result.Families))
-		return
-	}
-
 	orderRendered, err := renderOrder(result)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: %v\n", err)
 		os.Exit(1)
 	}
 	orderPath := filepath.Join(filepath.Dir(*output), "property_order_table.go")
+
+	// Both generated files are checked, because this generator writes two and used to check one.
+	//
+	// The check branch returned before `renderOrder` was ever called, so `property_order_table.go`
+	// was written by a normal run and compared by nothing. A stale property table then reported
+	// "current" in the same breath as the collapse table it does check, which is worse than an
+	// unchecked file: the run says a name that sounds like both.
+	//
+	// Found by a class the ordering table could not place at all. `--enter-opacity` is absent from
+	// the 359 properties while `-check` reported current, and those two facts cannot both be true
+	// of one measured object.
+	if *check {
+		type generatedFile struct {
+			path     string
+			rendered []byte
+			stale    string
+		}
+		for _, file := range []generatedFile{
+			{*output, rendered, "The installed Tailwind collapses a different set of families than the committed table records."},
+			{orderPath, orderRendered, "The installed Tailwind sorts by a different property order than the committed table records."},
+		} {
+			committed, err := os.ReadFile(file.path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: cannot read %s to check it: %v\n", file.path, err)
+				os.Exit(1)
+			}
+			if !bytes.Equal(committed, file.rendered) {
+				fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: %s is stale for Tailwind %s.\n", file.path, result.TailwindVersion)
+				fmt.Fprintf(os.Stderr, "  %s\n", file.stale)
+				fmt.Fprintln(os.Stderr, "  Regenerate it and read the diff: what changed is what this upgrade changed.")
+				os.Exit(1)
+			}
+		}
+		fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: %s and %s are current for Tailwind %s (%d families, %d ordered properties).\n",
+			*output, orderPath, result.TailwindVersion, len(result.Families), len(result.PropertyOrder))
+		return
+	}
 	if err := os.WriteFile(orderPath, orderRendered, 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: %v\n", err)
 		os.Exit(1)
