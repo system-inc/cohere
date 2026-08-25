@@ -1,0 +1,155 @@
+package hir
+
+import "testing"
+
+// TestValidatePreservedManualMemoizationFiresAndStaysSilent is the baseline.
+//
+// A rule that reports on everything and one that reports on nothing both satisfy an assertion
+// phrased about a single side. This one has a further trap: its inputs are markers constructed by a
+// pass that produced zero of them until recently, so a silent run is the expected shape of a broken
+// setup rather than of a clean program.
+func TestValidatePreservedManualMemoizationFiresAndStaysSilent(t *testing.T) {
+	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{1: 7}}
+
+	// The value's scope did not survive: it is memoized in source and not in output.
+	lost := &ReactiveFunction{Body: ReactiveBlock{
+		memoStatement(1, &StartMemoize{ManualMemoId: 1}),
+		memoStatement(2, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
+	}}
+	findings := ValidatePreservedManualMemoization(lost, &Function{}, scopes)
+	if len(findings) != 1 {
+		t.Fatalf("got %d findings, want 1; a value whose scope did not survive is the headline "+
+			"case this rule exists for", len(findings))
+	}
+	if findings[0].Kind != PreserveManualMemoizationValueUnmemoized {
+		t.Errorf("finding kind is %s, want the unmemoized-value condition", findings[0].Kind)
+	}
+
+	// The same program with the scope surviving must be silent, or the case above passes on a rule
+	// that reports unconditionally.
+	preserved := &ReactiveFunction{Body: ReactiveBlock{
+		&ReactiveScopeBlock{Scope: 7},
+		memoStatement(1, &StartMemoize{ManualMemoId: 1}),
+		memoStatement(2, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
+	}}
+	if findings := ValidatePreservedManualMemoization(preserved, &Function{}, scopes); len(findings) != 0 {
+		t.Errorf("got %d findings on a program whose scope survived, want 0", len(findings))
+	}
+}
+
+// TestValidatePreservedManualMemoizationAcceptsAMergedScope is why the merge pass was owed.
+//
+// A scope absorbed by a merge survived under its survivor's identity. Reading only the survivor's
+// own id would report every value that was in an absorbed scope -- a false positive on exactly the
+// programs the merge improved.
+func TestValidatePreservedManualMemoizationAcceptsAMergedScope(t *testing.T) {
+	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{1: 8}}
+
+	// Scope 9 survived and absorbed scope 8, which is where the value lives.
+	tree := &ReactiveFunction{Body: ReactiveBlock{
+		&ReactiveScopeBlock{Scope: 9, Merged: []ScopeId{8}},
+		memoStatement(1, &StartMemoize{ManualMemoId: 1}),
+		memoStatement(2, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
+	}}
+	if findings := ValidatePreservedManualMemoization(tree, &Function{}, scopes); len(findings) != 0 {
+		t.Errorf("got %d findings; the value's scope was absorbed by a surviving scope, so its "+
+			"memoization was preserved under the survivor's identity", len(findings))
+	}
+
+	// The control: the same survivor without the merge record must report, or the case above passes
+	// because surviving scopes are accepted wholesale.
+	unmerged := &ReactiveFunction{Body: ReactiveBlock{
+		&ReactiveScopeBlock{Scope: 9},
+		memoStatement(1, &StartMemoize{ManualMemoId: 1}),
+		memoStatement(2, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
+	}}
+	if findings := ValidatePreservedManualMemoization(unmerged, &Function{}, scopes); len(findings) != 1 {
+		t.Fatalf("the control returned %d findings, want 1; the case above is not testing the "+
+			"merged-scope acceptance", len(findings))
+	}
+}
+
+// TestValidatePreservedManualMemoizationPairsMarkersById covers the nesting case.
+//
+// `ManualMemoId` exists because memo calls nest and, once callbacks are inlined, the markers do not
+// form a simple stack in instruction order. Pairing by proximity lets an inner finish close an outer
+// block, and the outer block's own finish is then dropped as unopened -- so its value is never
+// checked and a real lost memoization goes unreported.
+func TestValidatePreservedManualMemoizationPairsMarkersById(t *testing.T) {
+	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{
+		1: 7, // outer value, scope did not survive
+		2: 8, // inner value, scope did not survive
+	}}
+
+	// Outer opens, inner opens and closes, outer closes. Both values must be reported.
+	tree := &ReactiveFunction{Body: ReactiveBlock{
+		memoStatement(1, &StartMemoize{ManualMemoId: 1}),
+		memoStatement(2, &StartMemoize{ManualMemoId: 2}),
+		memoStatement(3, &FinishMemoize{ManualMemoId: 2, Value: Place{Identifier: 2}}),
+		memoStatement(4, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
+	}}
+
+	findings := ValidatePreservedManualMemoization(tree, &Function{}, scopes)
+	if len(findings) != 2 {
+		t.Errorf("got %d findings, want 2; a boolean open-block flag lets the inner finish close "+
+			"the outer block, so the outer value is never checked", len(findings))
+	}
+}
+
+// TestValidatePreservedManualMemoizationSkipsPrunedAndUnopened covers the two early returns.
+//
+// A pruned memo block was deliberately discarded, so there is nothing to preserve. A finish with no
+// matching start belongs to a block whose dependencies were invalid, which upstream records no state
+// for -- validating it would report against a block that was never opened.
+func TestValidatePreservedManualMemoizationSkipsPrunedAndUnopened(t *testing.T) {
+	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{1: 7}}
+
+	pruned := &ReactiveFunction{Body: ReactiveBlock{
+		memoStatement(1, &StartMemoize{ManualMemoId: 1}),
+		memoStatement(2, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}, Pruned: true}),
+	}}
+	if findings := ValidatePreservedManualMemoization(pruned, &Function{}, scopes); len(findings) != 0 {
+		t.Errorf("got %d findings on a pruned memo block, want 0", len(findings))
+	}
+
+	unopened := &ReactiveFunction{Body: ReactiveBlock{
+		memoStatement(1, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
+	}}
+	if findings := ValidatePreservedManualMemoization(unopened, &Function{}, scopes); len(findings) != 0 {
+		t.Errorf("got %d findings on a finish with no start, want 0", len(findings))
+	}
+}
+
+// TestValidatePreservedManualMemoizationIgnoresUnscopedValues pins upstream's proxy.
+//
+// An identifier with no scope is upstream's proxy for a primitive, a global, or another guaranteed
+// non-allocating value. Those need no memoization, so a rule reporting them would fire on every
+// `useMemo` returning a number.
+func TestValidatePreservedManualMemoizationIgnoresUnscopedValues(t *testing.T) {
+	// No entry for identifier 1, so ScopeOf answers zero.
+	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{}}
+
+	tree := &ReactiveFunction{Body: ReactiveBlock{
+		memoStatement(1, &StartMemoize{ManualMemoId: 1}),
+		memoStatement(2, &FinishMemoize{ManualMemoId: 1, Value: Place{Identifier: 1}}),
+	}}
+	if findings := ValidatePreservedManualMemoization(tree, &Function{}, scopes); len(findings) != 0 {
+		t.Errorf("got %d findings for an unscoped value; no scope is the proxy for a "+
+			"non-allocating value, which needs no memoization", len(findings))
+	}
+
+	if findings := ValidatePreservedManualMemoization(tree, &Function{}, nil); len(findings) != 0 {
+		t.Errorf("got %d findings with no scope table at all, want 0", len(findings))
+	}
+	if findings := ValidatePreservedManualMemoization(nil, &Function{}, scopes); findings != nil {
+		t.Error("a nil tree produced findings")
+	}
+}
+
+// memoStatement wraps a memo marker as a tree statement at the given order.
+func memoStatement(order EvaluationOrder, value InstructionValue) ReactiveStatement {
+	return &ReactiveInstructionStatement{Instruction: &ReactiveInstruction{
+		Order: order,
+		Value: &ReactiveInstructionValue{Value: value},
+	}}
+}
