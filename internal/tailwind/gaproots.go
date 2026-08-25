@@ -28,6 +28,8 @@
 // `border-red-500/50`, `stroke-2/50` against both, `mask-x-from-1.5` against `mask-x-from-3.7`.
 package tailwind
 
+import "strings"
+
 // colorArm is the `resolveThemeColor(candidate, theme, keys)` block these closures share.
 func colorArm(keys ...string) FunctionalUtilityArm {
 	return FunctionalUtilityArm{ThemeKeys: keys, IsColor: true}
@@ -175,7 +177,10 @@ var GapRootDescriptions = map[string]*FunctionalUtilityDescription{
 	// The colour-then-scale closures. A named value is a colour first and a size second, which is
 	// what separates `text-red-500` from `text-lg` and `shadow-red-500` from `shadow-lg`.
 	"text": {
-		Arms: []FunctionalUtilityArm{colorArm("--text-color", "--color"), themeArm("--text")},
+		// A modifier on `text` is the line height, resolved through `--leading` or as a spacing
+		// multiplier, so `text-[10px]/6` and `text-[10px]/relaxed` compile.
+		AcceptsModifierOnArbitrary: true,
+		Arms:                       []FunctionalUtilityArm{colorArm("--text-color", "--color"), themeArm("--text")},
 	},
 	"bg": {
 		Arms: []FunctionalUtilityArm{colorArm("--background-color", "--color"), themeArm("--background-image")},
@@ -247,7 +252,16 @@ var GapRootDescriptions = map[string]*FunctionalUtilityDescription{
 	// They take no value, so their description is empty and the emitter answers the static form.
 	"block":  {},
 	"inline": {},
-	"flex":   {},
+
+	// `flex` is not valueless: utilities.ts:1189 takes a fraction whose halves are positive integers
+	// and :1195 takes a bare positive integer, refusing a modifier on the latter. `flex-1` is 116 of
+	// the corpus occurrences this rule sees, so treating the root as valueless reported it 116 times.
+	"flex": {
+		SupportsFractions: true,
+		Arms: []FunctionalUtilityArm{
+			{BareValue: BareValuePositiveInteger, RefusesModifier: true},
+		},
+	},
 
 	// The negative spellings. Upstream registers each as a second root whose resolved value is
 	// negated, and the description is the positive root's with the flag set, which is what
@@ -257,4 +271,108 @@ var GapRootDescriptions = map[string]*FunctionalUtilityDescription{
 	"-rotate":   {SupportsNegative: true, Arms: []FunctionalUtilityArm{{ThemeKeys: []string{"--rotate"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "deg"}}},
 	"rotate":    {Arms: []FunctionalUtilityArm{{ThemeKeys: []string{"--rotate"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "deg"}}},
 	"-bg-conic": {SupportsNegative: true, DefaultValue: "in oklab", DefaultValuePresent: true, Arms: []FunctionalUtilityArm{{ThemeKeys: []string{"--conic"}, BareValue: BareValuePositiveInteger}}},
+}
+
+// ClassValueResolvesIn reports whether a parsed class resolves to a value the engine would compile.
+//
+// The parser answers a different question and answers it correctly: it decides where a root ends and
+// whether the variants read, which is structure. `text-ss` parses as root `text` with the named value
+// `ss` and compiles to nothing, so a caller that stops at the parser cannot tell it from `text-lg`.
+//
+// # What this asks, and of whom
+//
+// Only a framework functional root is answered here. A repository `@utility` root is compiled by the
+// evaluator, which knows the block; a static is a whole name rather than a root plus a value, so
+// there is no value to resolve; an arbitrary property carries its own declaration. Each of those
+// returns true, which is a decline rather than an endorsement: this function's job is to catch a
+// value that resolves nowhere, and a root it does not describe has no such value to catch.
+//
+// Declining is the safe direction and it is the one this rule already takes. The gap it leaves is a
+// class this port cannot answer going unreported, which is the state before this function existed.
+// The gap it must never open is a working class reported, which is why an undescribed root returns
+// true rather than false.
+func ClassValueResolvesIn(candidate *ParsedCandidate, system *LoadedDesignSystem) bool {
+	if candidate == nil || system == nil {
+		return true
+	}
+	if candidate.Kind != ParsedCandidateKindFunctional {
+		return true
+	}
+
+	root := candidate.Root
+	negative := false
+	if trimmed, cut := strings.CutPrefix(root, "-"); cut {
+		root, negative = trimmed, true
+	}
+
+	// A root this repository declares is the evaluator's, and it answers shapes no framework
+	// description covers: `shadow--3` is `@utility shadow--*` with a `--shadow--3` scale behind it.
+	//
+	// `DeclaresFunctionalUtility` rather than `HasUtility`, which answers whether a root exists at
+	// all and so says yes to every framework root. Measured with the wrong one: `text` reads as
+	// repository-declared, every class returns early, and the rule reports nothing at all.
+	//
+	// This guard is redundant on every root measured so far and is kept deliberately. `shadow--3`
+	// reads as root `shadow-`, which no framework description covers, so the decline below already
+	// answers it; removing this check leaves the whole suite green. It stays because the two reasons
+	// are not equally durable. The decline below is a side effect of nobody having written a
+	// description named `shadow-`; this states the actual rule, which is that a root the repository
+	// declared belongs to the evaluator. A repository declaring `@utility text-*` would collide with
+	// a framework description by name, and then only this would hold.
+	if system.DeclaresFunctionalUtility(candidate.Root) || system.DeclaresFunctionalUtility(root) {
+		return true
+	}
+
+	description := descriptionForRoot(root)
+	if description == nil {
+		return true
+	}
+
+	_, produced := ResolveFunctionalUtilityValue(candidate, description, system.Theme(), negative)
+	return produced
+}
+
+// descriptionForRoot returns the resolution description of a framework functional root.
+//
+// The three slices partition the framework's functional roots and do not overlap, which
+// TestEmitterSlicesDoNotOverlap holds, so the order here is not a precedence.
+func descriptionForRoot(root string) *FunctionalUtilityDescription {
+	if utility, known := FrameworkFunctionalUtilities[root]; known {
+		return utility.Description()
+	}
+	if utility, known := FrameworkMultiDeclarationUtilities[root]; known {
+		description := utility.Description()
+
+		// A root that consults a colour namespace reads a modifier as the alpha, which upstream
+		// composes onto an arbitrary value rather than refusing: `divide-[#abc]/10` compiles.
+		// Detected from the namespaces rather than listed, so a root added upstream is covered.
+		for _, key := range utility.ThemeKeys {
+			if strings.HasSuffix(key, "-color") || key == "--color" {
+				description.AcceptsModifierOnArbitrary = true
+				break
+			}
+		}
+
+		// The root-defined keywords, which `Description` does not carry because the reading path
+		// answers them before resolution runs: `ReadingFor` checks `LiteralReadings` first and
+		// returns, so a keyword never reaches the pipeline there.
+		//
+		// This caller has no reading to short-circuit and asks resolution directly, so the keywords
+		// have to be visible to it or every one reads as an unresolvable value. Measured with them
+		// absent: 335 corpus classes reported, `flex-1`, `rounded-full`, `transition-colors` and
+		// `aspect-square` among them, every one a class the engine compiles.
+		if len(utility.LiteralReadings) > 0 {
+			if description.StaticValueNames == nil {
+				description.StaticValueNames = make(map[string]bool, len(utility.LiteralReadings))
+			}
+			for literal := range utility.LiteralReadings {
+				description.StaticValueNames[literal] = true
+			}
+		}
+		return description
+	}
+	if description, known := GapRootDescriptions[root]; known {
+		return description
+	}
+	return nil
 }

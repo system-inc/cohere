@@ -107,5 +107,10 @@ func classExistsIn(className string, system *tailwindengine.LoadedDesignSystem) 
 	// The whole class rather than its base, so the variants are parsed by the same design system
 	// that answers for the utility. A variant this repository never declared makes the class
 	// unreadable, which is correct: `notavariant:flex` compiles to nothing.
-	return len(tailwindengine.ParseCandidate(className, system)) > 0
+	candidates := tailwindengine.ParseCandidate(className, system)
+	if len(candidates) == 0 {
+		return false
+	}
+
+	return tailwindengine.ClassValueResolvesIn(&candidates[0], system)
 }

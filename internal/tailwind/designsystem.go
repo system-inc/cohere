@@ -259,6 +259,20 @@ func (system *LoadedDesignSystem) RepositoryStaticUtilityNames() []string {
 	return names
 }
 
+// DeclaresFunctionalUtility reports whether the repository itself declared this functional root.
+//
+// Narrower than `HasUtility`, and the difference is the whole point: `HasUtility` answers whether a
+// root exists at all, framework roots included, so it says yes to `text` and `border`. This answers
+// only what `collectStylesheets` recorded while parsing the repository's own `@utility` blocks.
+//
+// Needed by any caller that must treat a repository root differently from a framework one.
+// `ClassValueResolvesIn` is the case: a framework root has a checked-in description saying how its
+// values resolve, and a repository root has an `@utility` block the evaluator compiles instead, so
+// asking a framework description about `shadow--3` would report a working class.
+func (system *LoadedDesignSystem) DeclaresFunctionalUtility(root string) bool {
+	return system.utilityRoots[root] == UtilityKindFunctional
+}
+
 // HasVariant reports whether root is a registered variant.
 //
 // The registry holds the framework's registrations and every `@custom-variant` the repository

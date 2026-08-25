@@ -375,30 +375,30 @@ func TestExistenceIsNotReadFromPropertyTables(t *testing.T) {
 		lostByShortcut, len(realButUndeclared))
 }
 
-// TestKnownRootWithUnknownValueIsNotReported pins a deliberate gap.
+// TestKnownRootWithUnknownValueIsReported is what the pinned gap became.
 //
-// `text-huge` has root `text` and does not compile, so it is genuinely unknown and this rule stays
-// quiet. Catching it needs the theme's per-root value scales plus the arbitrary-value grammar, which
-// is closer to reimplementing the utility resolver than to reading a table.
+// The gap this replaces said `text-huge` had root `text`, did not compile, and was not reported,
+// because catching it "needs the theme's per-root value scales plus the arbitrary-value grammar,
+// which is closer to reimplementing the utility resolver than to reading a table". Its own comment
+// asked for the assertion to be deleted deliberately when that changed.
 //
-// The gap survives the swap unchanged, which is worth stating because the swap looks like it should
-// have closed it. `ParseCandidate` accepts `text-huge` as root `text` with the named value `huge`
-// because the parser's job is structure rather than resolution: it decides where a root ends, not
-// whether the theme has a value at the other end. Measured on the live system, `text-huge` returns
-// one reading and compiles to nothing.
+// It changed. `ResolveFunctionalUtilityValue` is that resolver, ported, and #31bbwty gave it a
+// description for all 57 closure-registered roots, so `classExistsIn` asks whether the value resolves
+// rather than stopping at whether the class parses.
 //
-// Pinned as a test rather than left as a comment so that a future change closing the gap has to
-// delete an assertion deliberately, rather than discovering the behavior by surprise.
-func TestKnownRootWithUnknownValueIsNotReported(t *testing.T) {
+// The complement is asserted beside it, since a rule that reports everything would pass the first
+// half alone.
+func TestKnownRootWithUnknownValueIsReported(t *testing.T) {
 	system := unknownFixtureLiveSystem(t)
 
-	if !classExistsIn("text-huge", system) {
-		t.Fatal("this rule now validates values against the theme's scales, which is a real improvement " +
-			"and means this assertion should be replaced rather than kept")
+	if classExistsIn("text-huge", system) {
+		t.Error("`text-huge` has root `text` and compiles to nothing, so the rule must report it")
+	}
+	if !classExistsIn("text-lg", system) {
+		t.Error("`text-lg` compiles, so reporting it would be a false positive on working code")
 	}
 
-	// The complement: an unknown root is still caught, so the gap is about values rather than about
-	// the rule being unable to report at all.
+	// An unknown root is still caught, which is the half that worked before this change.
 	if classExistsIn("txt-huge", system) {
 		t.Error("an unknown root must still be reported, or the rule catches nothing")
 	}
@@ -663,4 +663,44 @@ func independentLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 		t.Fatalf("loading the independent design system: %v", err)
 	}
 	return system
+}
+
+// A repository's own `@utility` root is never reported, whatever its value looks like.
+//
+// `shadow--3` is the control this rule needs and the one a value check gets wrong most easily. It
+// reads as root `shadow-`, declared by `@utility shadow--*` with a `--shadow---3` through
+// `--shadow--9` scale behind it, and no framework description covers that shape. Asking a framework
+// description about it would report a class this repository writes and the engine compiles.
+//
+// `content--0`, `border--0` and `background--0` are the same family, the trailing-dash roots
+// `4f23e9f` and `7a72125` found sitting in generated tables headed with a Tailwind version.
+//
+// Read from the design system rather than listed, so a repository adding an `@utility` block joins
+// this test rather than needing to be added to it.
+func TestRepositoryUtilityRootsAreNeverReported(t *testing.T) {
+	system := unknownFixtureLiveSystem(t)
+	if system == nil {
+		t.Skip("no design system loaded")
+	}
+
+	var checked int
+	for _, className := range []string{"shadow--3", "content--0", "border--0", "background--0"} {
+		candidates := tailwindengine.ParseCandidate(className, system)
+		if len(candidates) == 0 {
+			continue
+		}
+		if !system.DeclaresFunctionalUtility(candidates[0].Root) {
+			continue
+		}
+		checked++
+		if !classExistsIn(className, system) {
+			t.Errorf("%s reads as the repository root %q and is reported, which is a false positive on a declared utility",
+				className, candidates[0].Root)
+		}
+	}
+
+	t.Logf("repository utility classes checked: %d", checked)
+	if checked == 0 {
+		t.Skip("this design system declares none of these roots")
+	}
 }

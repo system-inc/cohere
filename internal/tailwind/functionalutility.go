@@ -77,6 +77,17 @@ type FunctionalUtilityDescription struct {
 	HandleNegativeBareValue func(value *ParsedValue) (string, bool)
 	// StaticValueNames are the names `staticValues` defines, as a set.
 	StaticValueNames map[string]bool
+	// AcceptsModifierOnArbitrary lets an arbitrary value carry a modifier.
+	//
+	// False for every root registered through `functionalUtility`, where upstream's
+	// `if (candidate.modifier) return` guards the arbitrary branch outright. True for the closures
+	// that read a modifier themselves: a colour root takes it as the alpha, so `divide-[#abc]/10`
+	// compiles, and `text` takes it as the line height, so `text-[10px]/6` and `text-[10px]/relaxed`
+	// compile.
+	//
+	// Measured rather than reasoned: with the guard unconditional, those seven classes were the last
+	// false positives `no-unknown-classes` produced on the corpus.
+	AcceptsModifierOnArbitrary bool
 	// Arms are the additional resolution paths a root tries, in the order it tries them.
 	//
 	// Empty for the 185 roots registered through `functionalUtility`, which consult one namespace
@@ -195,7 +206,11 @@ func ResolveFunctionalUtilityValue(
 		resolved.Value = value
 
 	case candidate.Value.Kind == ParsedValueKindArbitrary:
-		if candidate.Modifier != nil {
+		// A modifier on an arbitrary value cancels the utility for the roots this pipeline was
+		// written against, and does not for a root whose closure reads one. `divide-[#abc]/10` is an
+		// alpha and `text-[10px]/6` is a line height, both of which upstream composes onto the
+		// arbitrary value rather than refusing.
+		if candidate.Modifier != nil && !description.AcceptsModifierOnArbitrary {
 			return ResolvedUtilityValue{}, false
 		}
 		resolved.Value = candidate.Value.Value
@@ -242,7 +257,7 @@ func resolveNamedValue(
 	// theme for `1/2` before it asks for `1`, so a theme declaring `--width-1\/2` wins over the
 	// fraction arithmetic below.
 	lookup := candidate.Value.Value
-	if candidate.Value.Fraction != "" {
+	if candidate.Value.Fraction != "" && !description.AcceptsModifierOnArbitrary {
 		lookup = candidate.Value.Fraction
 	}
 	if value, found := theme.Resolve(lookup, true, description.ThemeKeys, 0); found {
