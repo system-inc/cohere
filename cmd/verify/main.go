@@ -191,6 +191,14 @@ func run() error {
 	// The lint config is loaded here because fixing needs to know which rules apply to which files,
 	// and loading it once serves both this phase and lint below.
 	var lintConfig *config.Config
+
+	// The fix phase's walk, kept when it is still valid for the lint phase to reuse.
+	//
+	// Nil means lint must walk for itself: either the fix phase did not run, or it rewrote a file and
+	// the graph was rebuilt underneath these diagnostics. Both cases are the same instruction, which
+	// is why one nil check covers them.
+	var reusableWalk *program.Result
+
 	if runFix || runLint {
 		// A config that cannot be read is a hard failure and never a permissive default. Linting
 		// everything with nothing configured produces output indistinguishable from a clean run, and
@@ -277,7 +285,7 @@ func run() error {
 		}
 
 		fixStart := time.Now()
-		fixSummary, err := applyProposedFixes(
+		fixSummary, fixWalk, err := applyProposedFixes(
 			ctx, graph, projectFiles, registry.All(),
 			scopedTransform(formatTransform(formatter), scope),
 			scope.formatCandidates(),
@@ -318,6 +326,20 @@ func run() error {
 				"graph rebuilt in %s — %d files changed, so every later phase reads the new text\n",
 				round(rebuildDuration), fixSummary.FilesChanged,
 			)
+		}
+
+		// The fix phase's walk is reusable by lint only when nothing was rewritten.
+		//
+		// The condition is the same one the rebuild above turns on, and deliberately so: if any file
+		// changed, the graph those diagnostics came from has been replaced and they describe bytes
+		// that no longer exist. That is the stale-read the rebuild exists to prevent, and reusing the
+		// walk across it would reintroduce it one level up while looking like an optimisation.
+		//
+		// When nothing changed, the graph is provably the same object the walk ran against, so the
+		// result is exactly what a second walk would produce. Measured on the ahra tree: a run costs
+		// about 0.9s fixed plus 1.1s per walk, so this removes roughly a third of a default run.
+		if fixSummary.FilesChanged == 0 {
+			reusableWalk = &fixWalk
 		}
 	}
 
@@ -369,11 +391,45 @@ func run() error {
 		graph.CollectTimings = *showTiming
 
 		lintStart := time.Now()
-		result, err := graph.Walk(ctx, projectFiles, rules)
-		if err != nil {
-			return fmt.Errorf("running rules: %w", err)
+
+		// Reuse the fix phase's walk when it is still valid, rather than walking the same graph with
+		// the same rules a second time.
+		//
+		// Two walks over one graph was the largest single cost in a default run: measured on the ahra
+		// tree, roughly 0.9s fixed plus 1.1s per walk, and the fix phase's own comment described its
+		// walk as cheap on the assumption that a reporting walk had already happened. It had not.
+		// Fix is phase 2 and this runs after phase 3, so the fix walk was the first and this was the
+		// repeat.
+		//
+		// Validity is decided at the fix phase, not here, because only it knows whether a file was
+		// rewritten. See where reusableWalk is set.
+		//
+		// A run with --timing still walks here, because per-rule timings are collected during the
+		// walk and the fix phase ran before CollectTimings was set. Reusing that walk would print an
+		// empty timing table, which is a report that looks like a measurement.
+		var result program.Result
+		reusedWalk := reusableWalk != nil && !*showTiming
+		if reusedWalk {
+			result = *reusableWalk
+		} else {
+			walked, err := graph.Walk(ctx, projectFiles, rules)
+			if err != nil {
+				return fmt.Errorf("running rules: %w", err)
+			}
+			result = walked
 		}
 		lintDuration := time.Since(lintStart)
+
+		// How the walk was paid for, rather than a duration that would read as this phase's cost.
+		//
+		// A reused walk timed here measures the pointer copy, so it prints as `in 0s`: a coverage line
+		// stating that 212 rules visited 2 million nodes for free. The counts are real and the
+		// duration is the lie, which is the harder kind to spot because everything around it checks
+		// out. Naming the phase that did the walking keeps the line checkable.
+		lintWalkCost := fmt.Sprintf("in %s", round(lintDuration))
+		if reusedWalk {
+			lintWalkCost = "walked by the fix phase (nothing was rewritten, so its findings still hold)"
+		}
 
 		for _, diagnostic := range result.Diagnostics {
 			printRuleDiagnostic(diagnostic)
@@ -384,9 +440,9 @@ func run() error {
 		// checked nothing must not be able to look like a run that found nothing, and the only way to
 		// guarantee that is to make the population as visible as the findings.
 		fmt.Printf(
-			"lint: %d findings — %d rules over %d files, %d nodes visited, in %s\n",
+			"lint: %d findings — %d rules over %d files, %d nodes visited, %s\n",
 			len(result.Diagnostics), result.Coverage.RulesRun, result.Coverage.FilesWalked,
-			result.Coverage.NodesVisited, round(lintDuration),
+			result.Coverage.NodesVisited, lintWalkCost,
 		)
 		printParityCoverage(rules, lintConfig)
 		printRuleCoverage(rules, result.Coverage)
@@ -416,7 +472,13 @@ func run() error {
 			}
 		}
 
-		report.record(phaseLint, outcomeRan, lintDuration, "")
+		if reusedWalk {
+			// Zero elapsed on purpose: the walk's cost belongs to the phase that performed it, and
+			// recording it here too would bill one walk to two rows.
+			report.record(phaseLint, outcomeReused, 0, "the fix phase's walk (nothing was rewritten)")
+		} else {
+			report.record(phaseLint, outcomeRan, lintDuration, "")
+		}
 	}
 
 	// Phase 5: unused. A report, run only when asked for, and never a reason to fail a build.

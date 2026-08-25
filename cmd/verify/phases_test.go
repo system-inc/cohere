@@ -210,3 +210,65 @@ func TestMarkingDoesNotDuplicateAnAlreadyRecordedPhase(t *testing.T) {
 		t.Fatalf("marking after the fact turned a complete run incomplete: %q", got)
 	}
 }
+
+// A reused phase says whose work it reused, and does not claim to have run in zero time.
+//
+// `lint ran in 0s` was the first version of this line and it stated two false things at once: that
+// the walk happened in the lint phase, and that it was free. The walk happened in the fix phase and
+// cost about a second. The counts printed beside it were real, which is what made the zero hard to
+// see — everything around it checked out.
+func TestAReusedPhaseNamesWhatItReused(t *testing.T) {
+	report := &pipelineReport{}
+	report.record(phaseFix, outcomeRan, 1500*time.Millisecond, "")
+	report.record(phaseTypes, outcomeRan, 200*time.Millisecond, "")
+	report.record(phaseLint, outcomeReused, 0, "the fix phase's walk (nothing was rewritten)")
+
+	got := render(report)
+	want := "phases: fix ran in 1.5s · types ran in 200ms · lint reused the fix phase's walk (nothing was rewritten)\n"
+	if got != want {
+		t.Fatalf("the phase line reads wrong:\n  want %q\n  got  %q", want, got)
+	}
+}
+
+// A reused phase is a complete phase, so it must not warn.
+//
+// Reused and not-reached both leave a phase having done no walking of its own, and they mean
+// opposite things: one has findings that are complete, the other has none at all. A warning on a
+// reused phase would send a reader looking for a gap that is not there, which is the same
+// false-alarm failure this file's warnings exist to avoid in the other direction.
+func TestAReusedPhaseDoesNotWarn(t *testing.T) {
+	report := &pipelineReport{}
+	report.record(phaseFix, outcomeRan, 1500*time.Millisecond, "")
+	report.record(phaseTypes, outcomeRan, 200*time.Millisecond, "")
+	report.record(phaseLint, outcomeReused, 0, "the fix phase's walk (nothing was rewritten)")
+
+	if got := render(report); strings.Contains(got, "warning") {
+		t.Fatalf("a reused phase warned, but its findings are complete:\n  %q", got)
+	}
+}
+
+// A reused phase contributes nothing to the accounted total, because its work is already counted.
+//
+// One walk billed to two rows is the defect this whole change exists to remove. Adding a reused
+// phase's elapsed time back into the sum would reintroduce it in the accounting line while the
+// phase line reads correctly, which is the harder half to notice.
+func TestAReusedPhaseIsNotDoubleCounted(t *testing.T) {
+	withReuse := &pipelineReport{processStart: time.Now().Add(-3 * time.Second)}
+	withReuse.graph = 500 * time.Millisecond
+	withReuse.record(phaseFix, outcomeRan, 1500*time.Millisecond, "")
+	withReuse.record(phaseLint, outcomeReused, 1500*time.Millisecond, "the fix phase's walk")
+
+	// The reused row carries a non-zero elapsed on purpose: even if a caller records one, the
+	// accounting must ignore it rather than trust it.
+	//
+	// Asserted on the exact phases figure rather than on the absence of a wrong one. The first
+	// version of this check looked for a string the buggy version would not have printed either, so
+	// it passed against the defect it was written to catch — a guard that could not fail, which is
+	// the shape this tree keeps producing. The value is checked directly now: fix's 1.5s and nothing
+	// from the reused row.
+	got := render(withReuse)
+	if !strings.Contains(got, "phases 1.5s") {
+		t.Fatalf("expected the accounted phases to be fix's 1.5s alone, with the reused row "+
+			"contributing nothing:\n  %q", got)
+	}
+}

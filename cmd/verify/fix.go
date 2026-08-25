@@ -33,13 +33,24 @@ func applyProposedFixes(
 	transform fix.Transform,
 	formatCandidates []string,
 	maxPasses int,
-) (fix.Summary, error) {
-	// The first walk already happened for reporting; this asks again because the caller does not hand
-	// the diagnostics down. Asking is cheap relative to the fix loop and keeps this function honest
-	// about what it is fixing: the state of the tree right now.
+) (fix.Summary, program.Result, error) {
+	// This walk is the run's FIRST walk over the program, and it is returned so the lint phase can
+	// reuse it rather than repeat it.
+	//
+	// An earlier version of this comment said the opposite: that a reporting walk had already
+	// happened and this one merely asked again, cheaply. Both halves were wrong. Fix is phase 2 and
+	// lint runs after phase 3, so nothing walks before this; and measured on the ahra tree a run
+	// costs roughly a fixed 0.9s plus 1.1s per walk, so this is about a third of a default run
+	// rather than a cheap repeat. The judgment was disclosed at the call site, which is the only
+	// reason it was checkable at all.
+	//
+	// Returning the result rather than dropping it is what lets the caller decide. That decision is
+	// the caller's and not this function's, because only the caller knows whether anything was
+	// rewritten afterward: a file rewritten here makes these diagnostics describe bytes that no
+	// longer exist.
 	result, err := graph.Walk(ctx, projectFiles, rules)
 	if err != nil {
-		return fix.Summary{}, fmt.Errorf("collecting proposals: %w", err)
+		return fix.Summary{}, program.Result{}, fmt.Errorf("collecting proposals: %w", err)
 	}
 
 	// Group proposals by the file they belong to. A diagnostic carries its source file, so the
@@ -85,7 +96,7 @@ func applyProposedFixes(
 	if len(candidates) == 0 {
 		// An empty run still reports its population, so "nothing proposed a fix" cannot be confused
 		// with "the fixer never ran".
-		return fix.Summarize(nil), nil
+		return fix.Summarize(nil), result, nil
 	}
 
 	// Sorted so a run is reproducible and a diff of two runs is readable.
@@ -129,7 +140,7 @@ func applyProposedFixes(
 		results = append(results, fileResult)
 	}
 
-	return fix.Summarize(results), nil
+	return fix.Summarize(results), result, nil
 }
 
 // proposalsForText re-runs the rules against rewritten text.

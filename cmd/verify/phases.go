@@ -70,6 +70,19 @@ const (
 	// reader who cannot tell them apart reads "no lint findings" off a run where lint never
 	// executed.
 	outcomeNotReached phaseOutcome = "not reached"
+
+	// outcomeReused is a phase whose work another phase already did, and whose findings are therefore
+	// complete without this phase having walked.
+	//
+	// Distinct from ran for the same reason notReached is distinct from skipped. The lint phase can
+	// reuse the fix phase's walk when nothing was rewritten, and reporting that as `ran in 0s` states
+	// two false things at once: that the walk happened here, and that it was free. The walk happened,
+	// it cost about a second, and it was billed to the phase that performed it.
+	//
+	// This is the same accounting defect the phase table already had one level down, where every row
+	// was conditional on what ran before it. A reused phase reporting a zero would have reintroduced
+	// it in a new place: a number that is arithmetically consistent and describes nothing.
+	outcomeReused phaseOutcome = "reused"
 )
 
 // phaseRecord is one phase's outcome, and what it cost.
@@ -223,6 +236,10 @@ func (r *pipelineReport) Write(out io.Writer) {
 				parts = append(parts, fmt.Sprintf("%s skipped (%s)", record.Name, record.Detail))
 			case outcomeNotReached:
 				parts = append(parts, fmt.Sprintf("%s did not run (%s)", record.Name, record.Detail))
+			case outcomeReused:
+				// Says whose work it was, because "reused" without a source is an unfalsifiable claim:
+				// a reader cannot check a number that names no owner.
+				parts = append(parts, fmt.Sprintf("%s reused %s", record.Name, record.Detail))
 			}
 		}
 	}
@@ -261,6 +278,9 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 	total := time.Since(r.processStart)
 	accounted := r.graph
 	for _, record := range r.records {
+		// Only phases that actually spent the time are summed. A reused phase records a zero elapsed
+		// because its work is already counted under the phase that performed it, and adding anything
+		// for it here would double-count a single walk across two rows.
 		if record.Outcome == outcomeRan {
 			accounted += record.Elapsed
 		}
