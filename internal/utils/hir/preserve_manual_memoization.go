@@ -433,9 +433,19 @@ func (v *manualMemoValidator) compareInferredDependencies(scope *ReactiveScopeBl
 	// is exactly one, and if it ever does not hold this compares against each rather than silently
 	// picking one.
 	for id, sourceDependencies := range v.sourceDeps {
-		if !v.openMemoBlocks[id] || len(sourceDependencies) == 0 {
+		if !v.openMemoBlocks[id] {
 			continue
 		}
+		// An empty source array is not "nothing to compare against", it is the strictest thing a
+		// developer can write. `useCallback(fn, [])` promises the value never changes, so every
+		// inferred dependency contradicts it and upstream reports each one with "Inferred
+		// dependency not present in source". Skipping the comparison here silenced exactly the
+		// case the rule should report hardest.
+		//
+		// Measured: for a `[]` source array the `StartMemoize` carries a non-nil, zero-length
+		// `Deps`, so the block does get an entry in `sourceDeps` and the loop below reaches it.
+		// The matching check falls through with `matched` false for every inferred dependency,
+		// which is the intended answer.
 		for _, inferred := range v.dependencies.DependenciesOf(scope.Scope) {
 			normalized, ok := v.dependencies.NormalizeInferredDependency(v.function, inferred)
 			if !ok {
