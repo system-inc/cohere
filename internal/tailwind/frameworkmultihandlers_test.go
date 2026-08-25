@@ -164,7 +164,15 @@ func TestSortLatchIsObservableInTheMultiTable(t *testing.T) {
 			continue
 		}
 		emitted := utility.Emit(root, "", ResolvedUtilityValue{Value: "zzsentinel"})
-		if len(emitted) == 0 || emitted[0].Property != "--tw-sort" {
+
+		// All six of these wrap their declarations in a nested rule, so the leading `--tw-sort` is
+		// inside it. Descending here rather than asserting on `emitted[0]` matches what
+		// `PropertySort` does, which is the behaviour this test is about.
+		leading := emitted
+		if len(leading) == 1 && leading[0].Kind == KindRule {
+			leading = leading[0].Nodes
+		}
+		if len(leading) == 0 || leading[0].Property != "--tw-sort" {
 			t.Errorf("%s does not lead with a --tw-sort declaration, so its order cannot latch", root)
 			continue
 		}

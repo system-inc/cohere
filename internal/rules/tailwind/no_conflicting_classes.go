@@ -249,42 +249,29 @@ func conflictFindingsIn(distinct []string, designSystem DesignSystemResult) []co
 
 // selectorShapeOf returns the selector a utility emits under, defaulting to a bare class.
 //
-// Only non-default shapes are stored, so an absent entry means the utility lands on the element
-// itself rather than on a descendant or a pseudo-element.
+// Read off the ported handle bodies rather than from a table. Six framework roots wrap their
+// declarations in a nested rule upstream, `divide`, `divide-x`, `divide-y`, `space-x` and `space-y`
+// under `:where(& > :not(:last-child))` and `placeholder` under `&::placeholder`, and
+// `SelectorShapeForRoot` returns what the emitter produced.
 //
-// # This is the last generated table the rule holds, and it stays deliberately
+// # Why this stopped being a table
 //
-// Decided rather than left, because "eight entries that look like framework data" is the reasoning
-// that put `markdown-content` into a table headed `Source: Tailwind 4.3.3`.
+// `RootSelectorShapes` held those eight entries and its own comment worked out why that was not
+// enough: the invariance measurement, 327 roots on ahra against 302 on an independent system both
+// yielding the same 8, was "necessary and insufficient", because a repository `@utility` block can
+// declare a nested selector that no corpus writes. The argument for keeping it was that such a class
+// resolves to false before any pairing, so the gap cannot produce a wrong finding.
 //
-// Measured invariant, and that is NOT the reason it stays. Generated against
-// `tools/gen_tailwind_descriptor_base/testdata/independent_theme.css` and diffed, which is two
-// observations rather than one wearing two names: 327 roots and 53,301 pairs on ahra against 302 and
-// 45,451 on the independent system, both producing the same 8 entries with none on either side
-// alone.
+// That is true and it is a reason the defect is survivable rather than a reason the table is right.
+// The handle bodies are ported, the wrapper is in them, so the shape is computable and the question
+// of what a table might be missing does not arise.
 //
-// That measurement is necessary and insufficient, and treating it as sufficient is the failure it
-// was meant to catch. A repository `@utility` block can declare a nested selector, and a synthetic
-// one that does contributes a ninth entry: `@utility gutter-*` wrapping `& > :not(:last-child)`
-// enumerates as `gutter -> .CLASS > :not(:last-child)`. Neither corpus repository writes such a
-// block, so the diff above could not have detected it. The table is invariant across the systems
-// that exist rather than by construction.
-//
-// It stays because a shape it cannot carry cannot produce a wrong finding. Such a class never
-// reaches the comparison this function feeds: a nested block compiles to a single `rule` node
-// carrying no property, `repositoryClassFacts` counts only top-level declarations, so the class
-// resolves to false and is skipped before any pairing. Measured on that fixture, `gutter-small`
-// beside `me-4` and beside `mr-4`, both `margin-inline-end` on the element itself, produces zero
-// findings.
-//
-// So the cost is a finding the rule was never going to make, rather than a finding on correct code.
-// `TestSelectorShapeCannotProduceAWrongFinding` holds that, and a mutation descending into nested
-// rules makes the class resolve and fails it.
+// A repository `@utility` block still answers `.CLASS`, and that is upstream's answer rather than a
+// default: `@utility` takes a declaration list, not a selector, so a block has no way to declare a
+// wrapper. A nested selector written inside one compiles to a rule node carrying no top-level
+// declaration, which `repositoryClassFacts` declines before this is consulted.
 func selectorShapeOf(rootOrName string) string {
-	if shape, hasShape := tailwindengine.RootSelectorShapes[rootOrName]; hasShape {
-		return shape
-	}
-	return ".CLASS"
+	return tailwindengine.SelectorShapeForRoot(rootOrName)
 }
 
 // looksLikeLength reports whether an arbitrary value is a measurement rather than a color.

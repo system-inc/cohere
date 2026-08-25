@@ -85,22 +85,15 @@ type enumeration struct {
 	// the ported handle bodies instead. Decoding a field nothing prints is how a JSON producer and
 	// its consumer drift without either one failing, so they are removed here as well as in
 	// enumerate.mjs.
-	RootSelectorShapes []rootSelectorShape `json:"rootSelectorShapes"`
-	UnreachableRoots   []string            `json:"unreachableRoots"`
-	PropertyOrder      []string            `json:"propertyOrder"`
-	SortOverrides      []string            `json:"sortOverrides"`
-	VariantOrder       []string            `json:"variantOrder"`
+	UnreachableRoots []string `json:"unreachableRoots"`
+	PropertyOrder    []string `json:"propertyOrder"`
+	SortOverrides    []string `json:"sortOverrides"`
+	VariantOrder     []string `json:"variantOrder"`
 
 	// VerifiedAgainst is the design systems CollapseFamilies was re-measured against on this run,
 	// filled in by the Go side rather than read from the enumeration. Rendered into the generated
 	// file so the header states what was checked instead of what someone believed.
 	VerifiedAgainst []string `json:"-"`
-}
-
-// rootSelectorShape is a root whose utilities emit under something other than a bare class selector.
-type rootSelectorShape struct {
-	Root  string `json:"root"`
-	Shape string `json:"shape"`
 }
 
 // utilityProperties is one utility and the CSS property names it declares.
@@ -543,42 +536,11 @@ var CollapseFamilies = []CollapseFamily{
 
 	fmt.Fprintf(&buffer, `}
 
-// RootSelectorShapes is the selector a root's utilities emit under, when it is not a bare class.
+// RootSelectorShapes used to be printed here and is not any more.
 //
-// divide-neutral-200 and border-neutral-200 both declare border-color and do not conflict, because
-// divide emits under :where(.CLASS > :not(:last-child)) and targets child elements while border
-// emits on the element itself. Two classes can only collide when they land on the same element.
-//
-// Only non-default shapes are stored: a root absent here emits under a bare .CLASS selector.
-var RootSelectorShapes = map[string]string{
-`)
-	for _, entry := range result.RootSelectorShapes {
-		fmt.Fprintf(&buffer, "\t%q: %q,\n", entry.Root, entry.Shape)
-	}
-
-	fmt.Fprintf(&buffer, `}
-
-// ComposingRoots used to be printed here and is not any more.
-//
-// It answered whether two utilities of one root layer or overwrite. internal/tailwind's ComposesFor
-// computes that from the ported handle bodies, running the same two-value comparison this generator
-// ran against the real engine. Measured before the deletion: 81 of its 82 rows answered and all 81
-// agreed. The generator's answers are kept as a fixture in composes_test.go so the computation stays
-// checked against an independent measurement.
-
-// KnownRoots and KnownStatics used to be printed here and are not any more.
-//
-// They answered `+"`HasUtility`"+`, which now reads the ported registrations instead: statics from
-// FrameworkStaticDeclarations, functional roots from the union of the wave tables and the descriptor
-// rows. See commit 58fb982 for the measurement, which is why the change was not cosmetic:
-// KnownStatics held 895 names against the 890 the framework registers, and the 27 extra were ahra's
-// own `+"`@utility`"+` blocks sitting in a file headed with a Tailwind version. Two of them,
-// `+"`fade-in`"+` and `+"`fade-out`"+`, are declared by ahra and not by www-connected-app, so the
-// table was telling every other repository that two of one project's animations were framework
-// utilities.
-//
-// Printing them after nothing read them left 1,236 dead entries in this file for two commits. If a
-// consumer ever needs either question again, ask the design system rather than reviving these.
+// internal/tailwind's SelectorShapeForRoot reads the nested-rule wrapper off the ported handle
+// bodies, which is where upstream keeps it. The eight shapes this printed are reproduced exactly,
+// and a repository block that declares a nested selector is answered rather than missed.
 
 // ColorNames used to be printed here and is not any more.
 //

@@ -50,11 +50,6 @@ import (
 //	                              shorthand relationships between declared properties, so deriving
 //	                              it means carrying a shorthand table of equal size, one layer
 //	                              further from the question.
-//	RootSelectorShapes        8   the selector a root emits under when it is not a bare class.
-//	                              Upstream stores nothing and writes `:where(& > :not(:last-child))`
-//	                              inline in the handler bodies, which this port has now ported. So
-//	                              this is derivable from code already here, and its reason is
-//	                              weaker than the other three rather than absent.
 //
 // `RootDeclaredProperties` and its three companions were here until #mz0m6k8, carried for exactly the
 // reason the paragraph below rejected. The emitting half is now ported, so the answer is computed by
@@ -97,9 +92,8 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 		"baseStatics":                        len(baseStatics),
 	}
 	ours := map[string]int{
-		"baseDescriptors":    len(baseDescriptors),
-		"CollapseFamilies":   len(CollapseFamilies),
-		"RootSelectorShapes": len(RootSelectorShapes),
+		"baseDescriptors":  len(baseDescriptors),
+		"CollapseFamilies": len(CollapseFamilies),
 	}
 
 	for name, count := range upstream {
@@ -117,8 +111,8 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	// The count of tables, not their contents. A fifth table of ours appearing without an entry in
 	// the doc comment above is the thing this catches: the inventory going stale is how a table ends
 	// up carried for no stated reason, which is what this package started with.
-	if len(ours) != 3 {
-		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 3, so "+
+	if len(ours) != 2 {
+		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 2, so "+
 			"one has been added or removed without its reason being written down", len(ours))
 	}
 

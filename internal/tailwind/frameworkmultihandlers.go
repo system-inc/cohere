@@ -86,6 +86,36 @@ func declareSorted(sortValue string, properties ...string) FrameworkEmitter {
 	}
 }
 
+// declareWrapped is the emitter for a root whose declarations land inside a nested rule.
+//
+// Upstream a handle body can wrap its declarations in `rule(selector, [...])`, and six roots do:
+// `divide`, `divide-x`, `divide-y`, `space-x` and `space-y` write into
+// `:where(& > :not(:last-child))`, and `placeholder` into `&::placeholder`. Everything else emits
+// onto the element itself.
+//
+// The wrapper is what decides whether two classes can collide at all. `space-x-4` sets
+// `margin-inline-start` on an element's children and `ms-4` sets it on the element, so the two are
+// not in conflict however identical their declarations look. Reading that off the handle body is
+// what lets `selectorShapeOf` stop consulting a generated table.
+//
+// `PropertySort` descends into a rule node and reads the declarations inside it, which
+// TestWrappedRootsReadTheSameAsBefore holds across all six: the wrapper changes what a caller can
+// see about placement and changes no reading.
+func declareWrapped(selector string, inner FrameworkEmitter) FrameworkEmitter {
+	return func(resolved ResolvedUtilityValue) []*Node {
+		return []*Node{StyleRule(selector, inner(resolved)...)}
+	}
+}
+
+// The nested selectors framework handle bodies emit, read from the shipped 4.3.3 source.
+//
+// Written with `&` the way upstream writes them. `selectorShapeOf`'s callers want `.CLASS`, and
+// `SelectorShapeOfNodes` does that substitution once rather than storing a second spelling.
+const (
+	cssChildrenSelector    = ":where(& > :not(:last-child))"
+	cssPlaceholderSelector = "&::placeholder"
+)
+
 // declareComposing is the emitter for a root that contributes through its own custom property.
 //
 // # Why this one carries real value text where the rest carry a sentinel
@@ -367,15 +397,15 @@ var frameworkMultiEmitters = map[string]FrameworkEmitter{
 	//
 	// The declarations after the latch are still emitted rather than elided. They cannot change
 	// Order, but each one is a declaration the engine counts, and Count is half the sort key.
-	"divide":   declareSorted("divide-color", "border-color"),
-	"divide-x": declareSorted("divide-x-width", "--tw-divide-x-reverse", "border-inline-style", "border-inline-start-width", "border-inline-end-width"),
-	"divide-y": declareSorted("divide-y-width", "--tw-divide-y-reverse", "border-bottom-style", "border-top-style", "border-top-width", "border-bottom-width"),
-	"space-x":  declareSorted("row-gap", "--tw-space-x-reverse", "margin-inline-start", "margin-inline-end"),
-	"space-y":  declareSorted("column-gap", "--tw-space-y-reverse", "margin-block-start", "margin-block-end"),
+	"divide":   declareWrapped(cssChildrenSelector, declareSorted("divide-color", "border-color")),
+	"divide-x": declareWrapped(cssChildrenSelector, declareSorted("divide-x-width", "--tw-divide-x-reverse", "border-inline-style", "border-inline-start-width", "border-inline-end-width")),
+	"divide-y": declareWrapped(cssChildrenSelector, declareSorted("divide-y-width", "--tw-divide-y-reverse", "border-bottom-style", "border-top-style", "border-top-width", "border-bottom-width")),
+	"space-x":  declareWrapped(cssChildrenSelector, declareSorted("row-gap", "--tw-space-x-reverse", "margin-inline-start", "margin-inline-end")),
+	"space-y":  declareWrapped(cssChildrenSelector, declareSorted("column-gap", "--tw-space-y-reverse", "margin-block-start", "margin-block-end")),
 
 	// `placeholder` sorts at `placeholder-color` and declares plain `color` inside `&::placeholder`.
 	// Without the redirect it would read at 297 with the rest of the colour utilities.
-	"placeholder": declareSorted("placeholder-color", "color"),
+	"placeholder": declareWrapped(cssPlaceholderSelector, declareSorted("placeholder-color", "color")),
 
 	// `transition` is the branching root. Its ordinary path and five of its six static values emit
 	// three declarations; `transition-none` emits one. There is no single list for it, so the branch

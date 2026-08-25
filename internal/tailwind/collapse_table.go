@@ -85,23 +85,17 @@ var CollapseFamilies = []CollapseFamily{
 	{First: "translate-x", Second: "translate-y", Output: "translate"},
 }
 
-// RootSelectorShapes is the selector a root's utilities emit under, when it is not a bare class.
+// RootSelectorShapes used to be printed here and is not any more.
 //
-// divide-neutral-200 and border-neutral-200 both declare border-color and do not conflict, because
-// divide emits under :where(.CLASS > :not(:last-child)) and targets child elements while border
-// emits on the element itself. Two classes can only collide when they land on the same element.
+// It held the eight roots whose utilities land somewhere other than the element itself. Upstream
+// stores no such table: a handle body wraps its declarations in `rule(selector, [...])` and six
+// roots do. Those bodies are ported, so `SelectorShapeForRoot` reads the wrapper off what the
+// emitter produced and returns the same eight shapes, byte for byte.
 //
-// Only non-default shapes are stored: a root absent here emits under a bare .CLASS selector.
-var RootSelectorShapes = map[string]string{
-	"-space-x":    ":where(.CLASS > :not(:last-child))",
-	"-space-y":    ":where(.CLASS > :not(:last-child))",
-	"divide":      ":where(.CLASS > :not(:last-child))",
-	"divide-x":    ":where(.CLASS > :not(:last-child))",
-	"divide-y":    ":where(.CLASS > :not(:last-child))",
-	"placeholder": ".CLASS::placeholder",
-	"space-x":     ":where(.CLASS > :not(:last-child))",
-	"space-y":     ":where(.CLASS > :not(:last-child))",
-}
+// Its own comment had already found the reason a table cannot be right here: the invariance
+// measurement across an independent design system was "necessary and insufficient", because a
+// repository `@utility` block can declare a nested selector no corpus writes. Computing the shape
+// removes the question rather than bounding it.
 
 // ComposingRoots used to be printed here and is not any more.
 //
