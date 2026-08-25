@@ -120,8 +120,10 @@
 //
 // The first two are what `alignReactiveScopesToBlockScopes` exists to fix, and it runs immediately
 // before this pass upstream (line 50201) for exactly that reason: it widens each scope out to the
-// block boundaries it straddles, so a scope and a block subtree can no longer cross. That pass is
-// NOT ported here and this file does not attempt it. See `MergeGapBlockScopeAlignment`.
+// block boundaries it straddles, so a scope and a block subtree can no longer cross. It is now
+// ported, in `align_scopes.go`, and running it IN FRONT of this pass takes the full assertion to 1.
+// Running it behind instead reaches only 30, because widening creates overlaps that this pass is no
+// longer there to close. `MergeGapBlockScopeAlignment` records what that means for a caller.
 //
 // The third is neither pass's to fix and the control says so: measured with the scope items removed
 // entirely, the same violation is still there, so it is a property of this lowering's fallthrough
@@ -180,12 +182,15 @@ const (
 	MergeGapPrimitiveOperandSkip MergeGap = iota
 
 	// MergeGapBlockScopeAlignment is `alignReactiveScopesToBlockScopes`, which upstream runs
-	// immediately before this pass and which is not ported here.
+	// immediately before this pass.
 	//
-	// Without it a scope can still cross a program block boundary, so `assertValidBlockNesting`
-	// still fails: measured, this pass takes the scope-against-scope violations from 40 to 0 and
-	// leaves 166 scope-against-block ones. A consumer that needs the full assertion to hold -- which
-	// is anything building reactive scope terminals -- must treat this gap as blocking.
+	// It is now ported, as `AlignReactiveScopesToBlockScopes`, so this gap is about ORDER rather
+	// than absence. Run this pass ALONE and a scope can still cross a program block boundary:
+	// measured, it takes scope-against-scope violations to 0 and leaves 163 scope-against-block
+	// ones. Run alignment in front of it -- `AlignThenMergeReactiveScopes` is the composed spelling
+	// -- and the full assertion reaches 1, which is a block-against-block residue neither pass can
+	// reach. A consumer that needs the full assertion to hold must call the composed spelling; this
+	// pass on its own is still gapped.
 	MergeGapBlockScopeAlignment
 )
 
@@ -580,13 +585,13 @@ func (s *mergeSweepState) visitInstructionId(id EvaluationOrder) {
 		// them there. Measured on the synthetic case that exercises it: with this union removed
 		// entirely, `sameStartSameEnd` still collapses to one scope with one union.
 		//
-		// It is also unreachable on the corpus rather than merely redundant: this branch fires 0
-		// times over 400 files, because no two scopes in this tree share both endpoints. That is
-		// TWO independent reasons the mutation cannot be caught, and the corpus half of it EXPIRES
-		// the moment scopes gain a producer that can mint coincident ranges -- alignment is exactly
-		// such a producer, since widening scopes out to block boundaries is what would make two of
-		// them land on the same pair of endpoints. The callers enumerated when this verdict was
-		// taken: `AssignReactiveScopes` is the only producer of the scope table this reads.
+		// The corpus half of that verdict has now EXPIRED, exactly as predicted. It fired 0 times
+		// when it was written, because no two scopes shared both endpoints. `AlignReactiveScopesToBlockScopes`
+		// landed as the producer this paragraph named and runs in front of this pass, and over the
+		// aligned table 251 adjacent pairs share both a start and an end. So the branch is now
+		// REACHABLE on the corpus and only the subsumption argument still explains the survival --
+		// which is the stronger of the two reasons anyway, and it rests on the end branch's
+		// ordering rather than on what the corpus happens to contain.
 		//
 		// Kept rather than deleted because it is upstream's and because the subsumption argument
 		// rests on the end branch's ordering, which the same alignment pass could also change.
@@ -733,12 +738,17 @@ func (s *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 // survives correctly. It is kept rather than deleted because it is upstream's and because it is what
 // makes the stack ordering meaningful the moment two scopes can start together.
 //
-// That verdict EXPIRES when a producer able to mint coincident starts lands. The callers enumerated
-// when it was taken: `AssignReactiveScopes` is the only producer of the scope table this reads, and
-// it derives each scope's start from a hull over its own members. `alignReactiveScopesToBlockScopes`
-// -- `MergeGapBlockScopeAlignment` -- is exactly such a producer, since widening scopes out to block
-// boundaries is what would make several of them start at the same instruction. Whoever ports it must
-// re-take this measurement rather than inheriting the zero.
+// That verdict has now EXPIRED, exactly as predicted, and this note is the re-measurement rather
+// than an inherited zero. `AlignReactiveScopesToBlockScopes` landed as the producer this paragraph
+// named, and it runs IN FRONT of this pass, so the table this sorts is the aligned one. Measured
+// over the same corpus after alignment: 92 start positions hold several scopes, the widest holding
+// 29, against 0 before. `sortByEndDescending` is therefore REACHABLE and load-bearing now.
+//
+// It also changes real answers, and the check that shows it is not the obvious one. Reversing the
+// comparator leaves the union COUNT identical at 412, so a count assertion still reads as equivalent;
+// the scope partition differs in 5 functions, which is only visible by comparing groups and ranges.
+// `TestAlignVoidsTheMergesComparatorVerdicts` runs that comparison with the unaligned table as its
+// control, where the two spellings still agree on every function.
 func sortByStartDescending(scopes []ScopeId, rangeOf func(ScopeId) MutableRange) {
 	sort.SliceStable(scopes, func(i, j int) bool {
 		return rangeOf(scopes[i]).Start > rangeOf(scopes[j]).Start
