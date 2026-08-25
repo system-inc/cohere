@@ -59,6 +59,8 @@ func TestDescriptorRowsAgreeWithTheEmitters(t *testing.T) {
 		if _, isGapRoot := gapEmitters[root]; !isGapRoot {
 			continue
 		}
+		// Only the unmodified axis is compared here. The Alpha and Themed axes are the same rows
+		// read through a modifier, and `TestModifierAxesAgreeWithTheEmitters` below covers them.
 		axis := descriptor.Absent
 
 		for dataType, want := range axis.ByType {
@@ -131,11 +133,21 @@ func fallbackBranchFor(descriptor *Descriptor) UtilityBranch {
 
 // Cells the emitters answer differently from the row, each measured rather than waved through.
 //
-// One entry. `text/--drop` stores `{[] 1}`: one declaration contributing no position. `--drop` is not
-// a namespace `text` branches on, so the row records what the engine emitted for a value resolving
-// through a namespace this root ignores, and the emitters take the ordinary named arm and produce
-// `font-size` and `line-height`. That is a row describing a resolution path rather than a handle
-// body's arm, which is the one thing in these rows that is not a fact about the ported bodies.
+// One entry, and it is dead data rather than a fact the emitters lack.
+//
+// `text/--drop` stores `{[] 1}`. The generator reached it by compiling `text-shadow-lg`, whose value
+// is a key in the `--drop` namespace, and filing the result under root `text`. The parser reads that
+// class as root `text-shadow`, which has its own descriptor row whose fallback is `{[] 1}`, the same
+// reading. So the cell is a second copy of a row that already exists, attributed to the wrong root.
+//
+// Measured: of the seven keys the `--drop` namespace holds in this repository, spelled as `text-*`
+// classes, 0 parse as root `text` and 7 parse as root `text-shadow`. No class can reach this cell
+// through `Lookup`'s precedence, so no answer depends on it and the emitters disagreeing with it
+// changes nothing.
+//
+// Deleting it belongs to whoever owns `gen_tailwind_descriptor_base`, since the row is printed rather
+// than written, and the same probe would reproduce it. Recorded here with the measurement so the
+// disagreement is a known-dead cell rather than an unexplained one.
 //
 // An entry here is a claim that a cell is genuinely unreachable, not a way to quiet a failure. The
 // test below asserts each one still disagrees, so an entry that stops being needed fails rather than
@@ -190,5 +202,200 @@ func TestDescriptorExemptionsAreStillNeeded(t *testing.T) {
 		if fmt.Sprint(PropertySort(nodes)) == fmt.Sprint(want) {
 			t.Errorf("%s now agrees, so the exemption is stale and should be deleted", cell)
 		}
+	}
+}
+
+// No class can reach the `text/--drop` cell, which is why the emitters disagreeing with it is free.
+//
+// The exemption above claims the cell is dead. This measures that claim against the live parser
+// rather than restating it: every key in the `--drop` namespace, spelled as a `text-*` class, must
+// parse as some other root. A key that parsed as `text` would reach the cell and the disagreement
+// would stop being harmless.
+func TestNoClassReachesTheTextDropCell(t *testing.T) {
+	system, _ := liveTableFor(t, corpusRepositories[0].entryPoint)
+	if system == nil {
+		t.Skip("no design system loaded")
+	}
+
+	keys := system.Theme().KeysInNamespaces([]string{"--drop"})
+	if len(keys) == 0 {
+		t.Skip("this theme declares no --drop keys, so there is nothing to reach the cell with")
+	}
+
+	var reachedText int
+	for _, key := range keys {
+		parsed := ParseCandidate("text-"+key, system)
+		if len(parsed) == 0 {
+			continue
+		}
+		if parsed[0].Root == "text" {
+			reachedText++
+			t.Errorf("text-%s parses as root `text`, so it reaches the text/--drop cell the exemption calls dead", key)
+		}
+	}
+
+	t.Logf("--drop keys spelled as text-*: %d checked, %d reaching root text", len(keys), reachedText)
+}
+
+// The Alpha and Themed axes, which are the same rows read through a modifier.
+//
+// A modifier changes which arm several of these roots take: the shadow family writes its alpha
+// declaration with a real value rather than an absent one, and `text` turns a font size into a font
+// size plus a line height. `UtilityBranch` carries `HasModifier` for exactly that, so the axes are
+// reachable and this measures whether they agree.
+//
+// Split from the unmodified measurement rather than folded into it, because the two axes have
+// different populations and a combined total would hide one of them being empty.
+func TestModifierAxesAgreeWithTheEmitters(t *testing.T) {
+	type counter struct{ compared, agreed int }
+	counts := map[string]*counter{"Alpha": {}, "Themed": {}}
+	var disagreements []string
+
+	for root, descriptor := range baseDescriptors {
+		if _, isGapRoot := gapEmitters[root]; !isGapRoot {
+			continue
+		}
+
+		for _, axisCase := range []struct {
+			name     string
+			readings AxisReadings
+			// hasModifier is whether a class on this axis writes a modifier the handle body reacts
+			// to, which is not the same as whether it wrote one at all.
+			//
+			// The Alpha axis is a real alpha, `shadow-md/50`, and the shadow family writes its
+			// `--tw-shadow-alpha` declaration with a value rather than absent, which PropertySort
+			// counts. The Themed axis is `/none`, a `--leading` key: it means something to `text`
+			// and nothing to `shadow`, so a root that does not consult the theme for its modifier
+			// emits what it would with no modifier at all. Measured: `shadow/--shadow` reads `#3` on
+			// Alpha and `#2` on Themed, and `#2` is the unmodified emission.
+			//
+			// Which roots do is per-root and is `rootConsultsTheThemeForItsModifier` below.
+			hasModifier bool
+		}{
+			{name: "Alpha", readings: descriptor.Alpha, hasModifier: true},
+			{name: "Themed", readings: descriptor.Themed, hasModifier: rootConsultsTheThemeForItsModifier[root]},
+		} {
+			for dataType, want := range axisCase.readings.ByType {
+				branch := UtilityBranch{HasValue: true, IsArbitrary: true, DataType: dataType, HasModifier: axisCase.hasModifier}
+				branch.ResolvedAsColor = dataType == DataTypeColor
+				nodes := EmitGapRoot(root, branch)
+				if len(nodes) == 0 {
+					continue
+				}
+				counts[axisCase.name].compared++
+				got := PropertySort(nodes)
+				if fmt.Sprint(got) == fmt.Sprint(want) {
+					counts[axisCase.name].agreed++
+					continue
+				}
+				disagreements = append(disagreements,
+					fmt.Sprintf("%s %s/%s: row %v, emitters %v", axisCase.name, root, dataType, want, got))
+			}
+
+			for namespace, want := range axisCase.readings.ByNamespace {
+				branch := UtilityBranch{HasValue: true, ResolvedNamespace: namespace, HasModifier: axisCase.hasModifier}
+				branch.ResolvedAsColor = namespace == "--color" || namespace == namespaceColorKeyword
+				if namespace == namespaceNone {
+					branch.ResolvedNamespace = ""
+				}
+				nodes := EmitGapRoot(root, branch)
+				if len(nodes) == 0 {
+					continue
+				}
+				counts[axisCase.name].compared++
+				got := PropertySort(nodes)
+				if fmt.Sprint(got) == fmt.Sprint(want) {
+					counts[axisCase.name].agreed++
+					continue
+				}
+				disagreements = append(disagreements,
+					fmt.Sprintf("%s %s/%s: row %v, emitters %v", axisCase.name, root, namespace, want, got))
+			}
+		}
+	}
+
+	sort.Strings(disagreements)
+	var totalCompared, totalAgreed int
+	for _, name := range []string{"Alpha", "Themed"} {
+		totalCompared += counts[name].compared
+		totalAgreed += counts[name].agreed
+		t.Logf("%-8s %3d compared, %3d agreed", name, counts[name].compared, counts[name].agreed)
+	}
+	t.Logf("modifier-axis cells: %d compared, %d agreed, %d disagreed", totalCompared, totalAgreed, totalCompared-totalAgreed)
+
+	// The same dead cell the unmodified measurement exempts, on both modifier axes. `text/--drop` is
+	// a `text-shadow` reading filed under root `text`, and no class reaches it on any axis.
+	for _, disagreement := range disagreements {
+		if strings.Contains(disagreement, "text/--drop") {
+			continue
+		}
+		t.Errorf("%s", disagreement)
+	}
+	if totalCompared == 0 {
+		t.Fatal("no modifier cell was compared, so this test measured nothing")
+	}
+}
+
+// Roots whose handle body reacts to a themed modifier, which is `/none` in Tailwind 4.3.3.
+//
+// `none` is a `--leading` key, so it means something to a root that consults `--leading` for its
+// modifier and nothing to one that does not. `text/lg/none` is a font size whose line height the
+// modifier supplied, so it emits both declarations; `shadow-md/none` writes no alpha, because
+// `shadow` reads its modifier as an alpha and `none` is not one, and its Themed readings equal its
+// unmodified ones.
+//
+// `UtilityBranch` carries `HasModifier` as a bool and cannot express the difference. That is a real
+// limit of the port rather than a probe detail: an emitter for a root that reacted to both kinds
+// would need to know which was written. Measured across every gap root with a Themed axis, exactly
+// one does, so a per-root set expresses it exactly today and
+// `TestThemedModifierRootsAreTheOnesThatDiffer` fails if a second appears.
+var rootConsultsTheThemeForItsModifier = map[string]bool{
+	"text": true,
+}
+
+// The themed-modifier set holds exactly the roots whose Themed readings differ from their unmodified
+// ones.
+//
+// A root in the set whose axes agree is a stale entry; one outside it whose axes differ is a missing
+// entry, and either would make the measurement above pass while comparing the wrong arm.
+func TestThemedModifierRootsAreTheOnesThatDiffer(t *testing.T) {
+	var checked int
+
+	for root, descriptor := range baseDescriptors {
+		if _, isGapRoot := gapEmitters[root]; !isGapRoot {
+			continue
+		}
+		if len(descriptor.Themed.ByNamespace) == 0 && len(descriptor.Themed.ByType) == 0 {
+			continue
+		}
+		checked++
+
+		// Both maps, because a root's themed difference can live in either. `text` reads the same
+		// for every namespace it carries and differs on four types, so a namespace-only comparison
+		// called it unchanged and the entry stale.
+		differs := false
+		for namespace, themed := range descriptor.Themed.ByNamespace {
+			if unmodified, has := descriptor.Absent.ByNamespace[namespace]; has && fmt.Sprint(themed) != fmt.Sprint(unmodified) {
+				differs = true
+			}
+		}
+		for dataType, themed := range descriptor.Themed.ByType {
+			if unmodified, has := descriptor.Absent.ByType[dataType]; has && fmt.Sprint(themed) != fmt.Sprint(unmodified) {
+				differs = true
+			}
+		}
+
+		if differs && !rootConsultsTheThemeForItsModifier[root] {
+			t.Errorf("%s reads differently on the Themed axis and is not in the set, so its cells are compared on the unmodified arm", root)
+		}
+		if !differs && rootConsultsTheThemeForItsModifier[root] {
+			t.Errorf("%s is in the set and reads the same on both axes, so the entry is stale", root)
+		}
+	}
+
+	t.Logf("gap roots with a Themed axis: %d checked, %d in the set", checked, len(rootConsultsTheThemeForItsModifier))
+
+	if checked == 0 {
+		t.Fatal("no root carried a Themed axis, so this test measured nothing")
 	}
 }
