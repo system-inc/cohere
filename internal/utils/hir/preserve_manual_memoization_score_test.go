@@ -70,6 +70,38 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 		t.Errorf("the rule fired on none of %d fixtures whose golden expects it; every one of "+
 			"these is a program where upstream reports a lost memoization", len(mine))
 	}
+
+	// The count is pinned, and `fired > 0` above is not enough on its own.
+	//
+	// # This assertion exists because its absence nearly shipped a regression as an improvement
+	//
+	// The clean-fixture rate below is pinned exactly and this side was not, so the two instruments
+	// were asymmetric in the one direction that matters: a change trading true positives away for
+	// false-positive removals moved the pinned number DOWN, which reads as the rule improving, while
+	// this side stayed green because it only asked for a non-zero.
+	//
+	// That is not hypothetical. Freezing component parameters in the aliasing graph took the clean
+	// rate from 31 to 19 and this number from 15 to 9 in the same run. Reported through the
+	// instruments as they stood, that is "false positives down 39%" with no signal at all that six
+	// programs upstream reports on had gone silent.
+	//
+	// The six were `error.useMemo-aliased-var` plus five optional-member-expression fixtures, and
+	// what they show is that the repair was in the wrong pass. Freezing a parameter suppressed the
+	// walk that carries a mutation ONWARD, so `x.push(props?.items)` stopped widening `x`, which is
+	// mutated, rather than `props`, which is not. Upstream does not do this: oxc's `NodeValue` in
+	// `infer_mutation_aliasing_ranges.rs:72` is `Object | Phi` with no third element, and the
+	// parameter freeze lives in `InferMutationAliasingEffects` as a `MutateFrozen` EFFECT rather
+	// than as a node value this pass reads.
+	//
+	// So both directions are pinned, and a change moving either one has to say which it moved and
+	// why. Silence is not the right answer on ANY of these 33: each is a program where upstream
+	// reports a lost memoization.
+	const knownTruePositives = 15
+	if fired != knownTruePositives {
+		t.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
+			"should be raised deliberately, and if it went DOWN the rule stopped reporting programs "+
+			"upstream reports on, which the clean-fixture rate cannot see", fired, knownTruePositives)
+	}
 	// Non-degeneracy in the other direction is not asserted: a rule that fires on all 33 could be
 	// correct, since all 33 are error fixtures. Over-firing is caught by the clean-fixture check
 	// below instead, where silence is the right answer.
