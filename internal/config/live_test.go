@@ -179,6 +179,21 @@ func ruleNamesInFile(path string) (map[string]RuleSetting, error) {
 	if err != nil {
 		return nil, err
 	}
+	return ruleNamesInContents(contents)
+}
+
+// ruleNamesInContents is the same read, over bytes rather than a path.
+//
+// Split out so the guard above can be exercised against a modified config WITHOUT writing one. That
+// matters more than it looks: the config this guards is untracked and shared, so any check needing a
+// mutated copy on disk would have to mutate the artifact it guards, or write one somewhere and hope
+// the two stay comparable.
+//
+// Stated as a property to keep rather than an accident of how this was written: **a guard that can be
+// fed its own defect in-process is verifiable by anyone, at any time, without touching what it
+// protects.** `TestTheGuardCatchesARemovedLine` is what that buys, and it is the difference between
+// running a guard and verifying one.
+func ruleNamesInContents(contents []byte) (map[string]RuleSetting, error) {
 	var raw struct {
 		Rules map[string]json.RawMessage `json:"rules"`
 	}
@@ -200,4 +215,68 @@ func ruleNamesInFile(path string) (map[string]RuleSetting, error) {
 		}
 	}
 	return named, nil
+}
+
+// TestTheGuardCatchesARemovedLine feeds the guard the defect it exists to catch.
+//
+// `TestBothPathsAgreeOnEveryPluginDefault` is the condition on removing the forty `error` lines, and
+// an earlier version of it could not fail: it read `Load`'s result, where the two paths have already
+// been merged, so a rule arriving only through the declaration was indistinguishable from one named
+// by hand. Three lines were deleted from a copy of the live config and it passed, reporting all
+// forty still named.
+//
+// Running a guard and seeing green is not verifying a guard. This verifies it, by reproducing the
+// removal in-process and asserting the count moves.
+//
+// It writes nothing. The config being guarded is untracked and shared, so a check that needed a
+// mutated copy on disk would either touch the artifact it guards or drift from it; `ruleNamesInContents`
+// exists so this one does neither.
+func TestTheGuardCatchesARemovedLine(t *testing.T) {
+	if _, err := os.Stat(liveConfigPath); err != nil {
+		t.Skipf("the live config is not present at %s", liveConfigPath)
+	}
+	contents, err := os.ReadFile(liveConfigPath)
+	if err != nil {
+		t.Fatalf("reading the live config: %v", err)
+	}
+
+	intact, err := ruleNamesInContents(contents)
+	if err != nil {
+		t.Fatalf("reading the rules block: %v", err)
+	}
+	unnamed := func(named map[string]RuleSetting) int {
+		missing := 0
+		for ruleName := range PluginDefaultRules {
+			if _, present := named[ruleName]; !present {
+				missing++
+			}
+		}
+		return missing
+	}
+
+	// The control: as shipped, every plugin-default rule is named by hand. If this is ever not true
+	// the mutation below proves nothing, because the count was already moving.
+	if before := unnamed(intact); before != 0 {
+		t.Fatalf("%d plugin-default rules are already unnamed before any mutation, so this test "+
+			"cannot attribute a change to the removal", before)
+	}
+
+	// Remove three by hand, the way a cleanup pass believing them redundant would.
+	removed := []string{"no-const-assign", "getter-return", "constructor-super"}
+	stripped := map[string]RuleSetting{}
+	for name, setting := range intact {
+		stripped[name] = setting
+	}
+	for _, name := range removed {
+		if _, present := stripped[name]; !present {
+			t.Fatalf("%q is not named in the live config, so removing it models nothing; pick a "+
+				"rule the config actually carries", name)
+		}
+		delete(stripped, name)
+	}
+
+	if after := unnamed(stripped); after != len(removed) {
+		t.Errorf("after removing %d plugin-default lines the guard counts %d unnamed; it must count "+
+			"exactly the removals or it cannot tell a cleanup from a no-op", len(removed), after)
+	}
 }
