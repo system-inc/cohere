@@ -12,6 +12,10 @@
 // 25 ported functions because there is nothing per-root to port: the property name, the theme
 // namespaces, and which shared bare-value predicate applies are the entire difference between them.
 //
+// 33 rows, and the count moved as the extraction was corrected rather than as the wave grew. Earlier
+// revisions of this comment said 25, which was the count before four guard-form roots and four
+// suffix-bearing ones were placed here; that number is corrected rather than left standing.
+//
 // # Why the boundary is the handler's shape, not its line count
 //
 // The milestone body proposed waves of 15 / 71 / 28 by line count, from a measurement that counted
@@ -31,13 +35,20 @@
 // through. That is `BareValuePositiveInteger` here, referenced by name from the table rather than
 // duplicated, so a correction to the predicate cannot reach 11 roots and miss the twelfth.
 //
-// # What this file deliberately does not do
+// # What this file does, and what frameworkhandlers.go does
 //
-// It does not emit CSS. `Property` is the declaration a root produces, and the reading is PropertySort
-// over one declaration carrying that property, because `getPropertySort` reads `node.property` and
-// counts and never reads a value. `StaticValues` carry their own property for the same reason: a
-// static value can declare a different property than the root's ordinary path, and the count is what
-// the reading needs rather than the text.
+// This file resolves a value. It no longer decides what a root declares: the ported handle bodies in
+// frameworkhandlers.go emit the declarations, and `Reading` runs `PropertySort` over what they emit.
+// Before that port, `Reading` built one declaration from `Property` and sorted it, which was a claim
+// about the handle body rather than the body itself.
+//
+// `Property` is therefore no longer read on the ordinary path. It stays because it is the
+// independent measurement the acceptance test compares the emitters against, and because
+// `TestFrameworkFunctionalUtilitiesCoverTheUnprobableRoots` asserts on it. Two statements of one
+// fact are only worth carrying while something forces them to agree, and something does.
+//
+// `StaticValues` carry their own property because a static value can declare a different one than
+// the root's ordinary path; the static emitter looks it up rather than inheriting.
 package tailwind
 
 import (
@@ -212,42 +223,32 @@ func (utility FrameworkFunctionalUtility) Description() *FunctionalUtilityDescri
 
 // Reading returns what a candidate reads against this root, and whether it reads anything.
 //
-// One declaration either way. A static value declares its own property and the ordinary path
-// declares the root's, and both are a single declaration, so the count is 1 wherever a value
-// resolved at all. That is not a simplification of the engine: it is what a single-declaration
-// handle body means, and it is the reason these 25 roots are a table.
-func (utility FrameworkFunctionalUtility) Reading(candidate *ParsedCandidate, theme *Theme, negative bool) (Reading, bool) {
+// Computed rather than named. The root's ported handle body emits declarations and `PropertySort`
+// reads them, which is the same two steps the engine takes, so the reading here is a consequence of
+// the emission rather than a second claim about it. That is what makes the acceptance test in
+// frameworkhandlers_test.go worth running: `Property` on the row and the emitter in
+// frameworkhandlers.go are two independent statements of the same fact, and this method uses only
+// one of them.
+//
+// The root name is a parameter because the emitters are keyed by root, the way the table is. It is
+// not derivable from the row: two roots can declare the same property, so a reverse lookup by
+// property would be ambiguous.
+//
+// An unported root emits nothing and reads nothing, rather than falling back to `Property`. A silent
+// fallback would make a missing emitter look like a working one at every call site and leave the
+// acceptance test as the only thing that could ever notice.
+func (utility FrameworkFunctionalUtility) Reading(root string, candidate *ParsedCandidate, theme *Theme, negative bool) (Reading, bool) {
 	resolved, produced := ResolveFunctionalUtilityValue(candidate, utility.Description(), theme, negative)
 	if !produced {
 		return Reading{}, false
 	}
 
-	// A static value carries its own property, and in this wave it is always the root's own.
-	//
-	// Measured across all 16 wave-1 roots that declare staticValues: zero entries name a property
-	// different from their root's. So this branch is unreachable here, and mutating it away does not
-	// fail the suite. That is recorded rather than hidden, because the alternative readings are both
-	// wrong: it is not dead code, since wave 2 has roots whose static entries do diverge, and it is
-	// not tested, since nothing in this wave can exercise it.
-	//
-	// Kept rather than deferred because inheriting the root's property would be an assumption the
-	// table cannot check, and the shape has to be right before wave 2 lands on it.
-	property := utility.Property
-	if resolved.IsStaticValue {
-		for _, static := range utility.StaticValues {
-			if static.Name == resolved.StaticValueName {
-				property = static.Property
-				break
-			}
-		}
+	nodes := utility.Emit(root, resolved)
+	if len(nodes) == 0 {
+		return Reading{}, false
 	}
 
-	sorted := PropertySort([]*Node{{
-		Kind:         KindDeclaration,
-		Property:     property,
-		Value:        resolved.Value,
-		ValuePresent: true,
-	}})
+	sorted := PropertySort(nodes)
 	return Reading{Order: sorted.Order, Count: sorted.Count}, true
 }
 
@@ -257,7 +258,7 @@ func (utility FrameworkFunctionalUtility) Reading(candidate *ParsedCandidate, th
 // then spot-checked against the source. That check found a defect in the extractor rather than in the
 // source: an indentation-sensitive pattern had classified `outline-offset` as a pass-through when its
 // bare handler returns `${value}px`, which moved it and three others out of this table and into wave
-// 2. The count here is 25 because of that correction, not 29.
+// 2. The count moved because of that correction rather than because the wave grew.
 var FrameworkFunctionalUtilities = map[string]FrameworkFunctionalUtility{
 	"align":              {Property: "vertical-align"},
 	"animate":            {Property: "animation", ThemeKeys: []string{"--animate"}, StaticValues: []FrameworkStaticValue{{Name: "none", Property: "animation", Value: "none"}}},

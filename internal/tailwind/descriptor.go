@@ -457,7 +457,7 @@ func (table *Table) frameworkReading(candidate *ParsedCandidate) (Reading, bool)
 		if negative && !utility.SupportsNegative {
 			return Reading{}, false
 		}
-		return utility.Reading(candidate, table.theme, negative)
+		return utility.Reading(root, candidate, table.theme, negative)
 	}
 	if utility, known := FrameworkMultiDeclarationUtilities[root]; known {
 		if negative && !utility.SupportsNegative {

@@ -64,7 +64,7 @@ func TestFrameworkFunctionalUtilitiesMatchTheEngine(t *testing.T) {
 				negative = true
 			}
 			if parsedRoot == testCase.Root {
-				reading, produced = utility.Reading(&candidates[0], system.Theme(), negative)
+				reading, produced = utility.Reading(testCase.Root, &candidates[0], system.Theme(), negative)
 			}
 		}
 
@@ -199,16 +199,21 @@ func loadWave1DesignSystem(t *testing.T) *LoadedDesignSystem {
 	return system
 }
 
-// TestFrameworkStaticValuesDeclareTheirRootsProperty records why one branch cannot be mutation-tested.
+// TestFrameworkStaticValuesDeclareTheirRootsProperty records what the static lookup can and cannot show.
 //
-// `Reading` looks a static value's property up rather than inheriting the root's, and mutating that
-// lookup away does not fail the wave-1 suite. This is why: across all 16 wave-1 roots that declare
-// staticValues, no entry names a different property. The branch is unreachable in this wave rather
-// than untested, and the distinction is worth an assertion because the two look identical from a
-// green run.
+// The static emitter looks a static value's property up rather than inheriting the root's. That the
+// lookup runs at all is now covered: removing it from `Emit` fails
+// TestStaticValuesEmitTheirOwnProperty, because the ordinary handle body then answers `order-first`
+// with the resolved value instead of the stored -9999. What no test in this wave can show is the
+// lookup mattering, since across all 16 roots here that declare staticValues no entry names a
+// property different from its root.
 //
-// If this test ever fails, a wave-1 root gained a diverging static value and the lookup it exercises
-// is now load-bearing here. That is the moment to add the mutation, not to loosen this.
+// So the divergence is what this test measures, and it measures it because unreachable and untested
+// look identical from a green run.
+//
+// If this test ever fails, a root in this wave gained a diverging static value and the property half
+// of the lookup became load-bearing here. That is the moment to add a mutation covering it, not to
+// loosen this.
 func TestFrameworkStaticValuesDeclareTheirRootsProperty(t *testing.T) {
 	withStatics, diverging := 0, 0
 	for root, utility := range FrameworkFunctionalUtilities {
@@ -284,8 +289,8 @@ func TestFrameworkBareValueSuffixIsUnobservableInAReading(t *testing.T) {
 	utility := FrameworkFunctionalUtilities["delay"]
 	long := ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: "delay", Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "150"}}
 	short := ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: "delay", Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "1"}}
-	longReading, _ := utility.Reading(&long, theme, false)
-	shortReading, _ := utility.Reading(&short, theme, false)
+	longReading, _ := utility.Reading("delay", &long, theme, false)
+	shortReading, _ := utility.Reading("delay", &short, theme, false)
 	if !readingsEqual(longReading, shortReading) {
 		t.Errorf("delay-150 and delay-1 read differently (%v#%d and %v#%d); if that is now true, a reading-based test can cover the suffix",
 			longReading.Order, longReading.Count, shortReading.Order, shortReading.Count)
