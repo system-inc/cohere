@@ -40,6 +40,12 @@
 // the reading needs rather than the text.
 package tailwind
 
+import (
+	"math"
+	"strconv"
+	"strings"
+)
+
 // BareValueKind names one of the shared bare-value predicates.
 //
 // A named kind rather than a func field, because the table is data and the predicates are code: a
@@ -58,7 +64,44 @@ const (
 	// kind rather than a flag on the integer one because the predicate accepts values the integer
 	// one rejects: `opacity-2.5` is valid and `z-2.5` is not.
 	BareValueOpacity BareValueKind = "Opacity"
+	// BareValueStrictPositiveInteger excludes zero. `grid-cols-0` is not a grid.
+	BareValueStrictPositiveInteger BareValueKind = "StrictPositiveInteger"
+	// BareValueSpacingMultiplier accepts a multiple of 0.25 and rewrites it as `--spacing(<value>)`.
+	//
+	// Upstream also requires the theme to declare `--spacing` at all, and returns nothing when it
+	// does not. That check is not reproduced here and it does not need to be: this kind is used by
+	// `auto-cols` and `auto-rows`, whose reading is one declaration either way, so a theme without
+	// `--spacing` changes whether the class compiles and never changes what it reads. Stated rather
+	// than silently omitted, because a caller wanting the resolved value rather than the reading
+	// would need it.
+	BareValueSpacingMultiplier BareValueKind = "SpacingMultiplier"
+	// BareValueFontStretchPercentage is `font-stretch`'s own predicate: a percentage between 50 and
+	// 200 inclusive. The range is a CSS constraint rather than a Tailwind one.
+	BareValueFontStretchPercentage BareValueKind = "FontStretchPercentage"
+	// BareValueGridRepeat accepts a strict positive integer and rewrites it as a `repeat()` call.
+	BareValueGridRepeat BareValueKind = "GridRepeat"
+	// BareValueFraction accepts a fraction whose halves are both spacing multipliers, and is the one
+	// predicate reading `Fraction` rather than `Value`. `aspect-16/9` resolves and `aspect-16` does
+	// not, because the parser only sets Fraction when a slash was written.
+	BareValueFraction BareValueKind = "Fraction"
 )
+
+// bareValueTransform returns the rewrite a kind applies to an accepted value.
+//
+// Separate from the predicate because three kinds accept a value and hand back something else:
+// `--spacing(4)`, `repeat(3, minmax(0, 1fr))`. A single func returning (string, bool) would work and
+// would hide which kinds are pure predicates and which rewrite, which is the distinction a reader of
+// the table needs.
+func bareValueTransform(kind BareValueKind, value string) string {
+	switch kind {
+	case BareValueSpacingMultiplier:
+		return "--spacing(" + value + ")"
+	case BareValueGridRepeat:
+		return "repeat(" + value + ", minmax(0, 1fr))"
+	default:
+		return value
+	}
+}
 
 // bareValuePredicate returns the predicate a kind names.
 //
@@ -70,9 +113,43 @@ func bareValuePredicate(kind BareValueKind) func(string) bool {
 		return isPositiveInteger
 	case BareValueOpacity:
 		return isValidOpacityValue
+	case BareValueStrictPositiveInteger, BareValueGridRepeat:
+		return isStrictPositiveInteger
+	case BareValueSpacingMultiplier:
+		return isValidSpacingMultiplier
+	case BareValueFontStretchPercentage:
+		return isFontStretchPercentage
+	case BareValueFraction:
+		// Never reached: the fraction kind reads Fraction rather than Value, so it is handled at the
+		// call site. Named here so the switch is exhaustive and a future kind cannot fall through to
+		// nil by omission.
+		return nil
 	default:
 		return nil
 	}
+}
+
+// isFontStretchPercentage is `font-stretch`'s own bare-value predicate.
+//
+// A percentage whose number is a positive integer between 50 and 200 inclusive. The range is a CSS
+// constraint on `font-stretch` rather than a Tailwind one, and upstream cites the MDN page for it.
+//
+// Upstream applies `isPositiveInteger` to `Number(value.slice(0, -1))`, a number rather than a
+// string, so the round-trip clause compares a number against its own printed form and always holds.
+// `50.0%` therefore passes upstream and would fail a string-level check, which is why this converts
+// first rather than testing the text.
+func isFontStretchPercentage(value string) bool {
+	if !strings.HasSuffix(value, "%") {
+		return false
+	}
+	number, err := strconv.ParseFloat(strings.TrimSuffix(value, "%"), 64)
+	if err != nil {
+		return false
+	}
+	if number != math.Trunc(number) || number < 50 || number > 200 {
+		return false
+	}
+	return true
 }
 
 // FrameworkStaticValue is one entry of a root's `staticValues` map.
@@ -122,15 +199,7 @@ func (utility FrameworkFunctionalUtility) Description() *FunctionalUtilityDescri
 		DefaultValuePresent: utility.DefaultValuePresent,
 	}
 
-	if predicate := bareValuePredicate(utility.BareValue); predicate != nil {
-		suffix := utility.BareValueSuffix
-		description.HandleBareValue = func(value *ParsedValue) (string, bool) {
-			if value == nil || !predicate(value.Value) {
-				return "", false
-			}
-			return value.Value + suffix, true
-		}
-	}
+	description.HandleBareValue = bareValueHandler(utility.BareValue, utility.BareValueSuffix)
 
 	if len(utility.StaticValues) > 0 {
 		description.StaticValueNames = make(map[string]bool, len(utility.StaticValues))
@@ -223,4 +292,43 @@ var FrameworkFunctionalUtilities = map[string]FrameworkFunctionalUtility{
 	"will-change":        {Property: "will-change"},
 	"z":                  {Property: "z-index", ThemeKeys: []string{"--z-index"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, StaticValues: []FrameworkStaticValue{{Name: "auto", Property: "z-index", Value: "auto"}}},
 	"zoom":               {Property: "zoom", BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
+}
+
+// bareValueHandler builds the bare-value closure a kind describes, or nil when there is none.
+//
+// Shared by both framework tables, so the two cannot drift about what a kind means.
+func bareValueHandler(kind BareValueKind, suffix string) func(*ParsedValue) (string, bool) {
+	if kind == BareValueFraction {
+		// The one kind reading Fraction rather than Value. `aspect-16/9` resolves and `aspect-16`
+		// does not, because the parser sets Fraction only when a slash was written, so testing Value
+		// here would accept a bare number the engine rejects.
+		//
+		// The `Fraction == ""` half is an early exit rather than a guard, and mutating it away does
+		// not fail the suite. That is measured rather than assumed: `segment("", '/')` returns one
+		// element, so the length check below rejects the same input one line later. It is kept
+		// because it states the precondition at the top where a reader looks for it, and removed it
+		// would leave the function's correctness resting on a property of `segment` that nothing
+		// here mentions.
+		return func(value *ParsedValue) (string, bool) {
+			if value == nil || value.Fraction == "" {
+				return "", false
+			}
+			parts := segment(value.Fraction, '/')
+			if len(parts) != 2 || !isValidSpacingMultiplier(parts[0]) || !isValidSpacingMultiplier(parts[1]) {
+				return "", false
+			}
+			return value.Fraction, true
+		}
+	}
+
+	predicate := bareValuePredicate(kind)
+	if predicate == nil {
+		return nil
+	}
+	return func(value *ParsedValue) (string, bool) {
+		if value == nil || !predicate(value.Value) {
+			return "", false
+		}
+		return bareValueTransform(kind, value.Value) + suffix, true
+	}
 }

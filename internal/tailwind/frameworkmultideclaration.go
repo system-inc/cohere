@@ -1,8 +1,12 @@
 // The framework's multi-declaration functional utilities.
 //
-// Wave 2b of #271785y: the 21 roots that emit more than one declaration, all of them building a
-// `--tw-*` custom property and then declaring the real property that reads it. The filter family,
-// the backdrop-filter family, the skews, and `ease`.
+// Waves 2b and 2c of #271785y: every framework root whose reading was measured rather than derived
+// from the shape of its handler. The filter and backdrop-filter families, the skews, `ease`, the
+// mask gradients, the grid templates, `transition`, `divide-x` and `divide-y`, and the rest.
+//
+// Not all of these emit several declarations. `aspect` and `col-span` emit one, and they are here
+// rather than in frameworkutility.go because their bare-value handlers rewrite the value rather than
+// pass it through, so the table that carries a property name has nothing to say about them.
 //
 // # Why these carry a reading and waves 1 and 2a carry a property
 //
@@ -68,15 +72,11 @@ func (utility FrameworkMultiDeclarationUtility) Description() *FunctionalUtility
 		DefaultValue:        utility.DefaultValue,
 		DefaultValuePresent: utility.DefaultValuePresent,
 	}
-	if predicate := bareValuePredicate(utility.BareValue); predicate != nil {
-		suffix := utility.BareValueSuffix
-		description.HandleBareValue = func(value *ParsedValue) (string, bool) {
-			if value == nil || !predicate(value.Value) {
-				return "", false
-			}
-			return value.Value + suffix, true
-		}
-	}
+	// Shared with FrameworkFunctionalUtility rather than duplicated, so the two tables cannot drift
+	// about what a BareValueKind means. An inline copy here is what left `aspect` with a nil handler
+	// after BareValueFraction was added: the kind existed, the table row named it, and this function
+	// had never heard of it.
+	description.HandleBareValue = bareValueHandler(utility.BareValue, utility.BareValueSuffix)
 	return description
 }
 
@@ -102,6 +102,9 @@ func (utility FrameworkMultiDeclarationUtility) ReadingFor(candidate *ParsedCand
 
 // FrameworkMultiDeclarationUtilities is the table.
 var FrameworkMultiDeclarationUtilities = map[string]FrameworkMultiDeclarationUtility{
+	"aspect":              {Reading: Reading{Order: []int{41}, Count: 1}, ThemeKeys: []string{"--aspect"}, BareValue: BareValueFraction, LiteralReadings: map[string]Reading{"auto": Reading{Order: []int{41}, Count: 1}, "square": Reading{Order: []int{41}, Count: 1}, "video": Reading{Order: []int{41}, Count: 1}}},
+	"auto-cols":           {Reading: Reading{Order: []int{117}, Count: 1}, ThemeKeys: []string{"--grid-auto-columns"}, BareValue: BareValueSpacingMultiplier, LiteralReadings: map[string]Reading{"auto": Reading{Order: []int{117}, Count: 1}, "fr": Reading{Order: []int{117}, Count: 1}, "max": Reading{Order: []int{117}, Count: 1}, "min": Reading{Order: []int{117}, Count: 1}}},
+	"auto-rows":           {Reading: Reading{Order: []int{119}, Count: 1}, ThemeKeys: []string{"--grid-auto-rows"}, BareValue: BareValueSpacingMultiplier, LiteralReadings: map[string]Reading{"auto": Reading{Order: []int{119}, Count: 1}, "fr": Reading{Order: []int{119}, Count: 1}, "max": Reading{Order: []int{119}, Count: 1}, "min": Reading{Order: []int{119}, Count: 1}}},
 	"backdrop-blur":       {Reading: Reading{Order: []int{340, 349}, Count: 3}, ThemeKeys: []string{"--backdrop-blur", "--blur"}, LiteralReadings: map[string]Reading{"none": Reading{Order: []int{340, 349}, Count: 3}}},
 	"backdrop-brightness": {Reading: Reading{Order: []int{341, 349}, Count: 3}, ThemeKeys: []string{"--backdrop-brightness", "--brightness"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
 	"backdrop-contrast":   {Reading: Reading{Order: []int{342, 349}, Count: 3}, ThemeKeys: []string{"--backdrop-contrast", "--contrast"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
@@ -113,14 +116,29 @@ var FrameworkMultiDeclarationUtilities = map[string]FrameworkMultiDeclarationUti
 	"backdrop-sepia":      {Reading: Reading{Order: []int{348, 349}, Count: 3}, ThemeKeys: []string{"--backdrop-sepia", "--sepia"}, DefaultValue: "100%", DefaultValuePresent: true, BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
 	"blur":                {Reading: Reading{Order: []int{330, 339}, Count: 2}, ThemeKeys: []string{"--blur"}, LiteralReadings: map[string]Reading{"none": Reading{Order: []int{330, 339}, Count: 2}}},
 	"brightness":          {Reading: Reading{Order: []int{331, 339}, Count: 2}, ThemeKeys: []string{"--brightness"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
+	"col-span":            {Reading: Reading{Order: []int{18}, Count: 1}, BareValue: BareValuePositiveInteger, LiteralReadings: map[string]Reading{"full": Reading{Order: []int{18}, Count: 1}}},
+	"content":             {Reading: Reading{Order: []int{357}, Count: 2}, ThemeKeys: []string{"--content"}},
 	"contrast":            {Reading: Reading{Order: []int{332, 339}, Count: 2}, ThemeKeys: []string{"--contrast"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
+	"divide-x":            {Reading: Reading{Order: []int{135}, Count: 5}, DefaultValue: "1px", DefaultValuePresent: true, ThemeKeys: []string{"--divide-width", "--border-width"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "px"},
+	"divide-y":            {Reading: Reading{Order: []int{136}, Count: 6}, DefaultValue: "1px", DefaultValuePresent: true, ThemeKeys: []string{"--divide-width", "--border-width"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "px"},
 	"ease":                {Reading: Reading{Order: []int{354}, Count: 2}, ThemeKeys: []string{"--ease"}, LiteralReadings: map[string]Reading{"linear": Reading{Order: []int{354}, Count: 2}, "initial": Reading{Order: nil, Count: 1}}},
+	"font-stretch":        {Reading: Reading{Order: []int{300}, Count: 1}, BareValue: BareValueFontStretchPercentage, LiteralReadings: map[string]Reading{"100%": Reading{Order: []int{300}, Count: 1}, "105%": Reading{Order: []int{300}, Count: 1}, "110%": Reading{Order: []int{300}, Count: 1}, "125%": Reading{Order: []int{300}, Count: 1}, "150%": Reading{Order: []int{300}, Count: 1}, "200%": Reading{Order: []int{300}, Count: 1}, "50%": Reading{Order: []int{300}, Count: 1}, "75%": Reading{Order: []int{300}, Count: 1}, "90%": Reading{Order: []int{300}, Count: 1}, "95%": Reading{Order: []int{300}, Count: 1}}},
 	"grayscale":           {Reading: Reading{Order: []int{334, 339}, Count: 2}, ThemeKeys: []string{"--grayscale"}, DefaultValue: "100%", DefaultValuePresent: true, BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
+	"grid-cols":           {Reading: Reading{Order: []int{120}, Count: 1}, ThemeKeys: []string{"--grid-template-columns"}, BareValue: BareValueGridRepeat, LiteralReadings: map[string]Reading{"none": Reading{Order: []int{120}, Count: 1}, "subgrid": Reading{Order: []int{120}, Count: 1}}},
+	"grid-rows":           {Reading: Reading{Order: []int{121}, Count: 1}, ThemeKeys: []string{"--grid-template-rows"}, BareValue: BareValueGridRepeat, LiteralReadings: map[string]Reading{"none": Reading{Order: []int{121}, Count: 1}, "subgrid": Reading{Order: []int{121}, Count: 1}}},
 	"hue-rotate":          {Reading: Reading{Order: []int{335, 339}, Count: 2}, ThemeKeys: []string{"--hue-rotate"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, BareValueSuffix: "deg"},
 	"invert":              {Reading: Reading{Order: []int{336, 339}, Count: 2}, ThemeKeys: []string{"--invert"}, DefaultValue: "100%", DefaultValuePresent: true, BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
+	"line-clamp":          {Reading: Reading{Order: []int{39, 143}, Count: 4}, ThemeKeys: []string{"--line-clamp"}, BareValue: BareValuePositiveInteger, LiteralReadings: map[string]Reading{"none": Reading{Order: []int{39, 143}, Count: 4}}},
+	"mask-conic":          {BareValue: BareValuePositiveInteger, BareValueSuffix: "deg", Reading: Reading{Order: []int{209, 244, 245, 257}, Count: 4}, SupportsNegative: true},
+	"mask-linear":         {BareValue: BareValuePositiveInteger, BareValueSuffix: "deg", Reading: Reading{Order: []int{209, 230, 231, 257}, Count: 4}, SupportsNegative: true},
+	"mask-radial":         {Reading: Reading{Order: []int{209, 236, 238, 257}, Count: 4}},
+	"row-span":            {Reading: Reading{Order: []int{21}, Count: 1}, BareValue: BareValuePositiveInteger, LiteralReadings: map[string]Reading{"full": Reading{Order: []int{21}, Count: 1}}},
 	"saturate":            {Reading: Reading{Order: []int{337, 339}, Count: 2}, ThemeKeys: []string{"--saturate"}, BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
 	"sepia":               {Reading: Reading{Order: []int{338, 339}, Count: 2}, ThemeKeys: []string{"--sepia"}, DefaultValue: "100%", DefaultValuePresent: true, BareValue: BareValuePositiveInteger, BareValueSuffix: "%"},
 	"skew":                {Reading: Reading{Order: []int{69, 70, 71}, Count: 3}, ThemeKeys: []string{"--skew"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, BareValueSuffix: "deg"},
 	"skew-x":              {Reading: Reading{Order: []int{69, 71}, Count: 2}, ThemeKeys: []string{"--skew"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, BareValueSuffix: "deg"},
 	"skew-y":              {Reading: Reading{Order: []int{70, 71}, Count: 2}, ThemeKeys: []string{"--skew"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, BareValueSuffix: "deg"},
+	"tracking":            {Reading: Reading{Order: []int{289}, Count: 2}, ThemeKeys: []string{"--tracking"}, SupportsNegative: true, LiteralReadings: map[string]Reading{"normal": Reading{Order: []int{289}, Count: 2}, "tight": Reading{Order: []int{289}, Count: 2}, "tighter": Reading{Order: []int{289}, Count: 2}, "wide": Reading{Order: []int{289}, Count: 2}, "wider": Reading{Order: []int{289}, Count: 2}, "widest": Reading{Order: []int{289}, Count: 2}}},
+	"transition":          {Reading: Reading{Order: []int{350, 353, 354}, Count: 3}, ThemeKeys: []string{"--transition-property"}, DefaultValue: "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events", DefaultValuePresent: true, LiteralReadings: map[string]Reading{"all": Reading{Order: []int{350, 353, 354}, Count: 3}, "colors": Reading{Order: []int{350, 353, 354}, Count: 3}, "none": Reading{Order: []int{350}, Count: 1}, "opacity": Reading{Order: []int{350, 353, 354}, Count: 3}, "shadow": Reading{Order: []int{350, 353, 354}, Count: 3}, "transform": Reading{Order: []int{350, 353, 354}, Count: 3}}},
+	"underline-offset":    {Reading: Reading{Order: []int{306}, Count: 1}, ThemeKeys: []string{"--text-underline-offset"}, SupportsNegative: true, BareValue: BareValuePositiveInteger, BareValueSuffix: "px", LiteralReadings: map[string]Reading{"auto": Reading{Order: []int{306}, Count: 1}}},
 }

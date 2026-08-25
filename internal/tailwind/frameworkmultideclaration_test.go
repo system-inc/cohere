@@ -29,8 +29,13 @@ type wave2bFixture struct {
 // Scored as a lattice for the same reason wave 1 is: mutual silence is counted apart from agreement,
 // because a table that stopped answering scores perfectly on any comparison that folds the two.
 func TestFrameworkMultiDeclarationUtilitiesMatchTheEngine(t *testing.T) {
-	fixture := loadWave2bFixture(t, "wave2b_fixtures.json")
 	system := loadWave1DesignSystem(t)
+	for _, name := range []string{"wave2b_fixtures.json", "wave2c_fixtures.json"} {
+		t.Run(name, func(t *testing.T) { runMultiDeclarationComparison(t, loadWave2bFixture(t, name), system) })
+	}
+}
+
+func runMultiDeclarationComparison(t *testing.T, fixture wave2bFixture, system *LoadedDesignSystem) {
 
 	var agreed, bothDeclined, tableSilent, engineSilent int
 	var disagreements, silentNames []string
@@ -79,8 +84,17 @@ func TestFrameworkMultiDeclarationUtilitiesMatchTheEngine(t *testing.T) {
 	sort.Strings(silentNames)
 	t.Logf("wave 2b: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, engine-silent %d, disagreed %d",
 		fixture.RootCount, fixture.CaseCount, agreed, bothDeclined, tableSilent, engineSilent, len(disagreements))
+	// A silence is only allowed when the static table answers the class instead. `content-none` is
+	// the case: upstream registers it as its own `staticUtility` and `ParseCandidate` reads it as a
+	// static, so the functional path is right to decline and M1's table is what answers it. Anything
+	// else is a gap in this table wearing the same shape as a correct decline.
+	for _, className := range silentNames {
+		if _, found := FrameworkStaticDeclarations[className]; !found {
+			t.Errorf("%s: the engine reads it, this table declines, and no static registration covers it", className)
+		}
+	}
 	if len(silentNames) > 0 {
-		t.Logf("table-silent: %v", silentNames)
+		t.Logf("table-silent, all covered by the static table: %v", silentNames)
 	}
 
 	if agreed < 200 {
