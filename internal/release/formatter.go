@@ -145,12 +145,33 @@ func ResolveFormatterSource() (FormatterSource, error) {
 // present but unnamed. A stray bundle on disk changes nothing here, which is correct -- it is not
 // loaded, so it is not part of what this binary formats with.
 func digestBundles(bundleDirectory string) (string, error) {
+	files := make(map[string][]byte, len(FormatterBundleNames))
+
+	for _, name := range FormatterBundleNames {
+		content, err := os.ReadFile(filepath.Join(bundleDirectory, filepath.FromSlash(name)))
+		if err != nil {
+			return "", fmt.Errorf("reading the Prettier bundle %s for its digest: %w", name, err)
+		}
+		files[name] = content
+	}
+
+	return DigestBundleFiles(files)
+}
+
+// DigestBundleFiles hashes bundles already in memory, which is how a running binary digests the
+// bytes it embeds rather than a directory it may not have.
+//
+// It is the same function the build stamps with, deliberately. Two hash implementations over the
+// same bytes is the drift that makes a digest comparison meaningless: the check would fail on
+// correct bundles, someone would relax it, and the stamp would stop meaning anything. One function,
+// two sources of bytes.
+func DigestBundleFiles(files map[string][]byte) (string, error) {
 	hash := sha256.New()
 
 	for _, name := range FormatterBundleNames {
-		content, err := os.ReadFile(filepath.Join(bundleDirectory, name))
-		if err != nil {
-			return "", fmt.Errorf("reading the Prettier bundle %s for its digest: %w", name, err)
+		content, present := files[name]
+		if !present {
+			return "", fmt.Errorf("the Prettier bundle %s is absent, so these bytes cannot be digested", name)
 		}
 
 		fmt.Fprintf(hash, "%s\x00%d\x00", name, len(content))
