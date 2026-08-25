@@ -168,6 +168,61 @@ func (registry *VariantRegistry) nextOrder() int {
 	return registry.lastOrder + 1
 }
 
+// RegisterFrameworkVariants replays a generated registry: names, kinds, and the order numbers the
+// engine itself assigned.
+//
+// Separate from Register, and the separation is the point. Register computes the next order, which
+// is right for a `@custom-variant` appending past the framework and wrong for replaying the
+// framework: the engine shares order numbers across the roots registered inside one
+// `Variants.group`, and 88 registrations hold only 82 distinct numbers in a default build. Feeding
+// those 88 through Register in sequence would give each its own number, which reads as a harmless
+// off-by-a-few and is not. A shared order is the only place a comparison function is consulted, so
+// splitting the six roots at order 64 apart means `sm` through `2xl` never reach
+// `CompareBreakpoints` at all and fall through to a root-name comparison, where `2xl` precedes
+// `sm`. Every responsive class in the tree would sort wrongly, from a table that looked correct.
+//
+// `lastOrder` is advanced past the highest replayed order, so a repository's `@custom-variant`
+// under a new name appends after the framework rather than colliding with it. That is upstream's
+// own sequencing: the framework registers first, the stylesheet's own variants after.
+//
+// Re-registering a name already present keeps its order, matching Register and upstream's
+// `Variants.set`. Calling this twice is therefore idempotent in position rather than shifting
+// everything, though nothing in the shipped path calls it twice.
+func (registry *VariantRegistry) RegisterFrameworkVariants(registrations []FrameworkVariantRegistration) {
+	for _, registration := range registrations {
+		if existing, isRegistered := registry.registrations[registration.Name]; isRegistered {
+			existing.Kind = registration.Kind
+			registry.registrations[registration.Name] = existing
+			continue
+		}
+		registry.registrations[registration.Name] = VariantRegistration{
+			Name:  registration.Name,
+			Order: registration.Order,
+			Kind:  registration.Kind,
+		}
+		if registration.Order > registry.lastOrder {
+			registry.lastOrder = registration.Order
+		}
+	}
+}
+
+// AttachComparison registers a comparison function against one order number.
+//
+// Upstream reaches this state only through `Variants.group`, which cannot be used here: replaying a
+// generated registry supplies the order numbers rather than computing them, so there is no group
+// window to register inside. The two paths write the same map, and Compare cannot tell which put an
+// entry there.
+//
+// An order with no registration behind it is accepted rather than rejected, because the caller that
+// would notice is the generator's validation, which already refuses to render one. Rejecting here
+// would mean a second, quieter copy of that rule in a place with no way to report it.
+func (registry *VariantRegistry) AttachComparison(order int, comparison VariantComparison) {
+	if comparison == nil {
+		return
+	}
+	registry.comparisons[order] = comparison
+}
+
 // Has reports whether a root is registered.
 func (registry *VariantRegistry) Has(name string) bool {
 	_, isRegistered := registry.registrations[name]
