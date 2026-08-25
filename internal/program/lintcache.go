@@ -30,15 +30,41 @@ import (
 // under-declaring serves a stale finding silently and forever, over-declaring costs a cache
 // miss. One of those is a correctness failure and the other is a performance one.
 //
-// The measured prize, re-measured 2026-08-25 on the ahra tree at load 5-7, medians over several
-// runs: lint is roughly 635ms of a ~3s run, 212 rules over 3,481 files producing 29 findings.
-// Most files produce nothing, and an empty result is a real cached answer rather than an absence.
+// THIS CACHE IS BUILT AND DELIBERATELY NOT WIRED. The reachable saving was measured at about 9%
+// of total wall clock, which does not pay for the failure mode. Read the verdict below before
+// wiring it, because everything above describes a correct cache and none of it argues that the
+// cache is worth having.
 //
-// Those numbers replace an earlier note here reading 323ms of a 1.57s run, 95 rules over 3,407
-// files, 129 findings across 73 files. Every figure had drifted, and the direction matters: the
-// rule count more than doubled as parity landed (214 of 215 rules the config asks for now run),
-// so lint roughly doubled in cost and became the second-largest phase. The prize this cache is
-// aimed at grew; it did not shrink.
+// The measurement, 2026-08-25 on the ahra tree at load 4.2-4.4, verify at 5603f83. A perfect cache
+// skips exactly the cacheable rules and still runs the uncacheable ones, so running with only the
+// 50 uncacheable enabled is the upper bound on any cache here: no build cost, no invalidation, no
+// read or write. Strictly better than the real thing could be.
+//
+//	lint phase, all 212 rules       1.496 / 1.517 / 1.557s
+//	lint phase, only the 50         1.353 / 1.353 / 1.353s
+//	total wall clock, all 212       median ~2.98s
+//	total wall clock, only the 50   median ~2.71s
+//
+// About 170ms off the phase and 270ms off the total.
+//
+// The reason is the one worth carrying, and it is this package's own architecture working as
+// designed: nodesVisited is IDENTICAL in both runs, 2,096,943. Dropping 162 of 212 rules did not
+// remove a single node from the walk. That is not a coincidence in the data, it falls out of the
+// traversal by construction: `walk` increments its count unconditionally and recurses over every
+// child, so nodesVisited is a property of the tree rather than of which listeners registered. One traversal serves every rule, so the tree is walked
+// because any rule listens, and 50 still listen on every file; a rule's per-node cost is a map
+// lookup. The walk is the cost, and a findings cache cannot touch the walk. It can only skip
+// lookups the design already made nearly free.
+//
+// So a cache that pays here has to reach the walk rather than the findings. That is a different
+// design with a different coverage story, and it should carry its own measured number before any
+// of it is built. Do not revive this one by assuming the prize grew.
+//
+// Two earlier prize figures in this comment were both wrong, in opposite directions, which is why
+// the verdict is stated as a measurement rather than a conclusion. It first read 323ms of a 1.57s
+// run over 95 rules and 3,407 files, which had drifted stale as parity doubled the rule count. It
+// then read 635ms of a ~3s run, which was accurate about the PHASE and irrelevant to the CACHE,
+// because most of that phase is a walk no findings cache can skip.
 //
 // Re-measure before pricing work against this. A cost recorded next to a cache is read as the
 // reason the cache exists, so a stale one argues for building something the tree no longer wants.
