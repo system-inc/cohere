@@ -116,8 +116,8 @@ func classOrderCases(system *classOrderSystem) SystemCases {
 			cases = append(cases, aCase)
 		}
 	}
-	appendCases(system.RegistryCases, "registry")
-	appendCases(system.CorpusCases, "corpus")
+	appendCases(system.RegistryCases, PopulationRegistry)
+	appendCases(system.CorpusCases, PopulationCorpus)
 	return SystemCases{SystemName: system.Name, Cases: cases}
 }
 

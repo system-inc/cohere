@@ -39,12 +39,12 @@ func classOrderSyntheticPopulation(registryCount, corpusCount, engineNullCount i
 	for index := 0; index < registryCount; index++ {
 		className := "reg-" + itoa(index)
 		reading := Reading{Order: []int{index % 300}, Count: 1}
-		cases = append(cases, ClassCase{ClassName: className, Population: "registry", EngineReading: reading, EngineAnswered: true})
+		cases = append(cases, ClassCase{ClassName: className, Population: PopulationRegistry, EngineReading: reading, EngineAnswered: true})
 		readings[className] = reading
 	}
 	for index := 0; index < corpusCount; index++ {
 		className := "cor-" + itoa(index)
-		aCase := ClassCase{ClassName: className, Population: "corpus"}
+		aCase := ClassCase{ClassName: className, Population: PopulationCorpus}
 		if index >= engineNullCount {
 			reading := Reading{Order: []int{index % 300}, Count: 2}
 			aCase.EngineReading, aCase.EngineAnswered = reading, true
@@ -88,7 +88,7 @@ func TestClassOrderHarnessScoresMutualSilenceAsFailure(t *testing.T) {
 	// Silence both sides on the same classes: a tenth of the registry, well over the ceiling.
 	silenced := 0
 	for index := range systems[0].Cases {
-		if systems[0].Cases[index].Population != "registry" || index%10 != 0 {
+		if systems[0].Cases[index].Population != PopulationRegistry || index%10 != 0 {
 			continue
 		}
 		systems[0].Cases[index].EngineAnswered = false
@@ -496,6 +496,36 @@ func TestClassOrderReadingEqualComparesBothAxes(t *testing.T) {
 	}
 	if empty.Equal(Reading{Order: nil, Count: 2}) {
 		t.Error("empty-order readings differing in Count compared equal")
+	}
+}
+
+// TestClassOrderHarnessRefusesAnUnknownPopulation proves a miscounted population is loud.
+//
+// The counting switch used to have a `default` that folded anything unrecognised into the registry.
+// That is the silent-miscount shape the floors exist to catch, arriving through the code that feeds
+// them: a run whose corpus was mislabelled would report a full registry, an empty corpus, and fail
+// on the corpus floor while naming the wrong cause.
+func TestClassOrderHarnessRefusesAnUnknownPopulation(t *testing.T) {
+	systems, readings := classOrderSyntheticPopulation(minimumPlausibleRegistryClasses+1, minimumPlausibleCorpusClasses+1, 5)
+	systems[0].Cases = append(systems[0].Cases, ClassCase{
+		ClassName:      "mislabelled",
+		Population:     "registryy",
+		EngineReading:  Reading{Order: []int{1}, Count: 1},
+		EngineAnswered: true,
+	})
+
+	report := Compare("4.3.3", systems, classOrderHealthyDivergence(),
+		classOrderStubSource{name: "stub", readings: readings}, nil)
+
+	if unknown := report.Populations[0].UnknownPopulationClasses; unknown != 1 {
+		t.Fatalf("expected 1 class in an unknown population, got %d", unknown)
+	}
+	if report.Populations[0].RegistryClasses != minimumPlausibleRegistryClasses+1 {
+		t.Error("the mislabelled class was folded into the registry count")
+	}
+	_, reasons := report.Trustworthy()
+	if !classOrderAnyReasonContains(reasons, "a population this package does not know") {
+		t.Errorf("expected the unknown-population reason, got %v", reasons)
 	}
 }
 

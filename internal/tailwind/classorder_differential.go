@@ -149,13 +149,23 @@ type Population struct {
 	// EngineNullReadings is how many classes the engine itself declined, across both populations.
 	// A run where this is zero on the corpus has almost certainly lost its corpus.
 	EngineNullReadings int
+	// UnknownPopulationClasses is how many classes named a population this package does not know.
+	//
+	// Never zero by accident: it can only be non-zero if a caller invented a population name, and
+	// that miscounts the two floors below. Reported rather than absorbed, because absorbing it into
+	// the registry count is exactly the shape of silent miscount the floors exist to catch.
+	UnknownPopulationClasses int
 	// ByOutcome counts every class by where it landed. The five sum to the two class counts.
 	ByOutcome map[Outcome]int
 }
 
-// Total is every class this population covered.
+// Total is every class this population covered, unknown ones included.
+//
+// Included rather than dropped so that the both-silent rate is computed over what was actually
+// walked. A denominator that quietly excluded some classes would understate every rate derived from
+// it, which is the direction that makes a run look better than it was.
 func (population Population) Total() int {
-	return population.RegistryClasses + population.CorpusClasses
+	return population.RegistryClasses + population.CorpusClasses + population.UnknownPopulationClasses
 }
 
 // Answered is the classes on which both sides produced a reading.
@@ -352,6 +362,12 @@ func (report Report) Trustworthy() (bool, []string) {
 				))
 			}
 		}
+		if population.UnknownPopulationClasses > 0 {
+			reasons = append(reasons, fmt.Sprintf(
+				"%s: %d classes named a population this package does not know, so the registry and corpus floors were measured against the wrong counts",
+				population.SystemName, population.UnknownPopulationClasses,
+			))
+		}
 		if population.EngineNullReadings == 0 {
 			// The engine declines classes in both design systems and always has. Zero means the
 			// fixture stopped carrying the classes it declines, which removes exactly the population
@@ -494,11 +510,25 @@ func (reading Reading) Format() string {
 	return "[" + strings.Join(parts, ",") + "]#" + fmt.Sprint(reading.Count)
 }
 
+// PopulationRegistry and PopulationCorpus are the two populations, named rather than spelled at each
+// use site.
+//
+// They answer different questions and the difference is load-bearing. The registry is what the
+// engine advertises, which is the population; the corpus is what someone happened to write, which is
+// a sample, and an earlier table in this slice built from a corpus missed nine families. They also
+// carry different evidence: the corpus is where the engine's null readings live, so a run that lost
+// it still compares 190,000 registry classes and looks healthy while having stopped testing the case
+// this harness exists for.
+const (
+	PopulationRegistry = "registry"
+	PopulationCorpus   = "corpus"
+)
+
 // ClassCase is one class and the engine's answer for it.
 type ClassCase struct {
 	// ClassName is the class as an author would write it.
 	ClassName string
-	// Population is `registry` or `corpus`.
+	// Population is PopulationRegistry or PopulationCorpus.
 	Population string
 	// EngineReading is what the engine computed, valid only when EngineAnswered.
 	EngineReading Reading
@@ -533,11 +563,17 @@ func Compare(tailwindVersion string, systems []SystemCases, divergence SystemDiv
 		population := Population{SystemName: system.SystemName, ByOutcome: map[Outcome]int{}}
 
 		for _, aCase := range system.Cases {
+			// Counted by an exhaustive switch rather than by a default, so a population this
+			// function does not know is a loud unknown instead of a silent registry class. A
+			// miscounted population moves the floors that decide whether the run is trustworthy at
+			// all, which is the one number that must not be quietly wrong.
 			switch aCase.Population {
-			case "corpus":
+			case PopulationCorpus:
 				population.CorpusClasses++
-			default:
+			case PopulationRegistry:
 				population.RegistryClasses++
+			default:
+				population.UnknownPopulationClasses++
 			}
 			if !aCase.EngineAnswered {
 				population.EngineNullReadings++
