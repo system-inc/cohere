@@ -31,6 +31,17 @@ var allowedUppercaseTokens = map[string]bool{
 	"ANSI": true, "AOV": true, "API": true, "APK": true, "APNS": true, "ARIA": true, "ARN": true,
 	"ARR": true, "ASAP": true, "ASCII": true, "ASIN": true, "ASN": true, "AST": true, "AVI": true,
 	"AVIF": true, "AWS": true, "B2B": true, "BCP": true, "BEL": true, "BEM": true, "BOM": true, "BTC": true,
+	// The six filename and environment tokens below arrived from the TypeScript original after this
+	// port was written. They are separated out because they are the one group here that is not an
+	// acronym: every one is a pronounceable English word, which is exactly why the vowel heuristic
+	// reads them as shouting and why they need naming rather than inferring.
+	//
+	// Backticking them at the call site is the wrong repair. A filename in the middle of a sentence
+	// is the subject being discussed rather than a literal to match character for character, and
+	// code font would say the opposite. `PATH` earns its place by the same noun test the operating
+	// system entries already pass; the home directory, shell and terminal variables are deliberately
+	// absent because those are read for their value instead of named as a thing.
+	"AGENTS": true, "CHANGELOG": true, "CLAUDE": true, "LICENSE": true, "PATH": true, "README": true,
 	"CAC": true, "CAPI": true, "CCPA": true, "CD": true, "CDN": true, "CDT": true, "CFA": true, "CFO": true,
 	"CGI": true, "CHIPS": true, "CI": true, "CJS": true, "CLI": true, "CMYK": true, "COA": true,
 	"COGS": true, "CORS": true, "CPA": true, "CPM": true, "CPU": true, "CRUD": true, "CSS": true,
