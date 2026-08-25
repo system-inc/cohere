@@ -134,9 +134,15 @@ type LoadedDesignSystem struct {
 	// there is nowhere else to get it: the framework's static table does not know a name the
 	// repository invented. This is the whole of what NewTable adds to `Statics`.
 	staticUtilityNodes map[string][]*Node
-	// utilityRoots is every `@utility` root the repository declared, as a set, so HasUtility is a
-	// map lookup rather than a walk.
-	utilityRoots map[string]UtilityKind
+	// utilityRoots is every `@utility` root the repository declared, mapped to the kinds it was
+	// declared as, so HasUtility is a map lookup rather than a walk.
+	//
+	// A set of kinds rather than one kind, because a root can be declared both ways and sixteen in
+	// this repository are: `@utility fade-in` and `@utility fade-in-*` are two blocks naming one
+	// root, a static form taking no value and a functional form taking one. Storing a single kind
+	// let the second block overwrite the first, which lost the static form silently and left
+	// `fade-in` answerable by neither the table nor the evaluator.
+	utilityRoots map[string]map[UtilityKind]bool
 	// customVariants is every `@custom-variant` name the repository declared.
 	customVariants map[string]bool
 	// frameworkVariants is the set of names the framework registered, so Contributions can tell an
@@ -188,7 +194,7 @@ func (system *LoadedDesignSystem) Prefix() string { return system.theme.Prefix }
 // carries the `-*` suffix, which is what collectStylesheets recorded when it parsed the block.
 func (system *LoadedDesignSystem) HasUtility(root string, kind UtilityKind) bool {
 	if declared, isDeclared := system.utilityRoots[root]; isDeclared {
-		return declared == kind
+		return declared[kind]
 	}
 	switch kind {
 	case UtilityKindStatic:
@@ -251,8 +257,8 @@ var frameworkFunctionalRoots = func() map[string]bool {
 // accidentally include a framework name.
 func (system *LoadedDesignSystem) RepositoryStaticUtilityNames() []string {
 	names := make([]string, 0, len(system.staticUtilityNodes))
-	for name, kind := range system.utilityRoots {
-		if kind == UtilityKindStatic {
+	for name, kinds := range system.utilityRoots {
+		if kinds[UtilityKindStatic] {
 			names = append(names, name)
 		}
 	}
@@ -270,7 +276,7 @@ func (system *LoadedDesignSystem) RepositoryStaticUtilityNames() []string {
 // values resolve, and a repository root has an `@utility` block the evaluator compiles instead, so
 // asking a framework description about `shadow--3` would report a working class.
 func (system *LoadedDesignSystem) DeclaresFunctionalUtility(root string) bool {
-	return system.utilityRoots[root] == UtilityKindFunctional
+	return system.utilityRoots[root][UtilityKindFunctional]
 }
 
 // HasVariant reports whether root is a registered variant.
@@ -450,7 +456,7 @@ func LoadDesignSystem(options LoadOptions) (*LoadedDesignSystem, error) {
 		resolve:            resolve,
 		visiting:           map[string]bool{},
 		staticUtilityNodes: map[string][]*Node{},
-		utilityRoots:       map[string]UtilityKind{},
+		utilityRoots:       map[string]map[UtilityKind]bool{},
 		customVariants:     map[string]bool{},
 	}
 	if err := collector.loadFile(entryPoint); err != nil {
@@ -570,7 +576,7 @@ type stylesheetCollector struct {
 	stylesheets        []string
 	utilityDefinitions []*UtilityDefinition
 	staticUtilityNodes map[string][]*Node
-	utilityRoots       map[string]UtilityKind
+	utilityRoots       map[string]map[UtilityKind]bool
 	customVariants     map[string]bool
 }
 
@@ -772,7 +778,10 @@ func (collector *stylesheetCollector) ingestUtilityBlock(node *Node, path string
 		)
 	}
 
-	collector.utilityRoots[root] = kind
+	if collector.utilityRoots[root] == nil {
+		collector.utilityRoots[root] = make(map[UtilityKind]bool, 2)
+	}
+	collector.utilityRoots[root][kind] = true
 	// Only functional blocks reach the evaluator. A static `@utility` takes no value, so it has no
 	// `--value()` to resolve and Compile would reject it by its own first post-condition; its
 	// reading is a constant that PropertySort answers directly from the block body. Registering it
@@ -790,9 +799,10 @@ func (collector *stylesheetCollector) ingestUtilityBlock(node *Node, path string
 	// Sixteen roots here are that shape. Letting the functional block clear the static body would
 	// lose the static reading entirely, which is a class an author can write going unanswered.
 	//
-	// `utilityRoots` cannot express both, since it maps a root to one kind, and it is not changed
-	// here: it exists so HasUtility can answer the parser's question, and the parser asks about one
-	// kind at a time.
+	// `utilityRoots` records both kinds for such a root. It used to map a root to one kind, so the
+	// second block overwrote the first and the static form was lost: `fade-in` read as functional
+	// only, which left it answerable by neither the table nor the evaluator and unanswered on the
+	// corpus.
 	if kind == UtilityKindFunctional {
 		collector.utilityDefinitions = append(collector.utilityDefinitions, &UtilityDefinition{
 			Name:  root,

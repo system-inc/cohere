@@ -212,8 +212,8 @@ func (table *Table) addRepositoryStatics(system *LoadedDesignSystem) {
 // a wrong row would cost a wrong sort with no way to notice.
 // TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers holds that, so it cannot decay into a claim.
 func (table *Table) addRepositoryFunctionalRoots(system *LoadedDesignSystem) {
-	for root, kind := range system.utilityRoots {
-		if kind != UtilityKindFunctional {
+	for root, kinds := range system.utilityRoots {
+		if !kinds[UtilityKindFunctional] {
 			continue
 		}
 		table.Descriptors[root] = &Descriptor{Root: root, PerDeclaration: true}

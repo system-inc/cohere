@@ -141,3 +141,41 @@ func unseenDesignSystem(t *testing.T) *LoadedDesignSystem {
 	}
 	return system
 }
+
+// A root declared both as a static and as a functional `@utility` keeps both.
+//
+// `@utility fade-in` and `@utility fade-in-*` are two blocks naming one root: a static form taking
+// no value and a functional form taking one. Sixteen roots in the corpus have that shape, every
+// `fade-*`, `slide-*` and `zoom-*` animation.
+//
+// `utilityRoots` mapped a root to one kind, so the second block overwrote the first. The static form
+// was lost silently, and since the parser reads `fade-in` as functional while the evaluator holds
+// only functional definitions, the class was answerable by neither: `readingFor` declined it after
+// consulting both. Measured on the corpus, `fade-in` and `fade-out` were the only two classes of 799
+// that nothing could answer.
+//
+// Asserted on the live system rather than a list, so a repository adding such a pair joins this test.
+func TestARootDeclaredBothWaysKeepsBothKinds(t *testing.T) {
+	system, _ := liveTableFor(t, corpusRepositories[0].entryPoint)
+	if system == nil {
+		t.Skip("no design system loaded")
+	}
+
+	var bothKinds int
+	for _, root := range []string{"fade-in", "fade-out", "zoom-in", "zoom-out"} {
+		staticForm := system.HasUtility(root, UtilityKindStatic)
+		functionalForm := system.HasUtility(root, UtilityKindFunctional)
+
+		if !staticForm || !functionalForm {
+			t.Errorf("`@utility %s` and `@utility %s-*` are both declared and the system reports static=%v functional=%v",
+				root, root, staticForm, functionalForm)
+			continue
+		}
+		bothKinds++
+	}
+
+	t.Logf("roots declared both ways: %d checked", bothKinds)
+	if bothKinds == 0 {
+		t.Skip("this repository declares no root both ways")
+	}
+}

@@ -205,14 +205,18 @@ func TestLiveTableCarriesTheRepositoryTheme(t *testing.T) {
 			// The repository's own contributions, by count rather than by name, so the assertion
 			// holds on a repository this test has never seen.
 			staticRoots, functionalRoots := 0, 0
-			for root, kind := range system.utilityRoots {
-				switch kind {
-				case UtilityKindStatic:
+			// Each kind separately rather than a switch, because a root can be declared both ways:
+			// `@utility fade-in` and `@utility fade-in-*` are two blocks naming one root, and
+			// sixteen roots in this repository have that shape. A switch counted each such root once
+			// and checked only whichever kind happened to win.
+			for root, kinds := range system.utilityRoots {
+				if kinds[UtilityKindStatic] {
 					if _, found := table.Statics[root]; !found {
 						t.Errorf("static `@utility %s` is missing from the table's statics", root)
 					}
 					staticRoots++
-				case UtilityKindFunctional:
+				}
+				if kinds[UtilityKindFunctional] {
 					descriptor, found := table.Descriptors[root]
 					if !found {
 						t.Errorf("functional `@utility %s` is missing from the table's descriptors", root)
