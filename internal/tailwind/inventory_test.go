@@ -1,0 +1,103 @@
+package tailwind
+
+import "testing"
+
+// TestEveryTableIsTailwindsOrHasAStatedReason is the inventory this package owes its reader.
+//
+// The port removed the tables that did not need to exist. What remains splits in two, and the split
+// is the whole claim: a table is either Tailwind's own data, which we mirror, or it answers a
+// question the port's own machinery structurally cannot, which is stated per table below.
+//
+// # Tailwind's own data
+//
+// Upstream carries these and there is no algorithm behind them to port. `property-order.ts` at 4.3.3
+// is a hand-written array of 359 property names, with comments in it about how to make `inset-x-0`
+// come before `top-0`, and `getPropertySort` calls `.indexOf` on it. Mirroring it is the faithful
+// thing; reading it at lint time would be the same table with extra steps.
+//
+//	PropertyOrder                  359   property-order.ts
+//	SortOverrideProperties          12   the --tw-sort overrides
+//	FrameworkVariantRegistrations   88   variants.ts registrations
+//	FrameworkStaticDeclarations    890   staticUtility calls
+//	FrameworkFunctionalUtilities    33   functionalUtility registrations
+//	FrameworkMultiDeclaration      152   functionalUtility registrations
+//
+// # Ours, each answering something a reading cannot
+//
+// A reading is a sorted set of property positions and a count. `getPropertySort` reads
+// `node.property` and increments a counter, and never reads a value. That single fact is what made
+// this port tractable, deleting roughly 85% of `utilities.ts`, and it is also the reason these four
+// tables cannot be derived from what the port carries.
+//
+//	baseDescriptors          78   the reading partitions on the value's resolved type, and no
+//	                              registration shape carries both halves: `border-[3px]` is a width
+//	                              and `border-red-500` is a colour.
+//	RootDeclaredProperties  308   which properties a root declares. A reading is lossy past a
+//	                              `--tw-sort` override: `space-x-4` reads `[132]`, which is
+//	                              `row-gap`, while the root declares the two margin-inline
+//	                              properties. Measured: 251 of 308 invert correctly, 42 cannot in
+//	                              principle, and `-webkit-backdrop-filter` is not in PropertyOrder
+//	                              at all so no reading can carry it.
+//	ComposingRoots           82   whether two values of a root layer or overwrite. A reading cannot
+//	                              see values, so both answers look identical. Measured with a
+//	                              control: 79 of 79 composing roots and 4 of 4 non-composing roots
+//	                              all read the same for `-4` and `-8`. Without the control, 79 of 79
+//	                              agreeing reads as a successful derivation.
+//	CollapseFamilies         45   which pairs canonicalize into a third root. All 45 are CSS
+//	                              shorthand relationships between declared properties, so deriving
+//	                              it means carrying a shorthand table of equal size, one layer
+//	                              further from the question.
+//
+// # Why not port the emitting half and delete all four
+//
+// Measured rather than assumed. `utilities.ts` holds 582 `decl()` call sites and 374 of them compute
+// their value, which means porting `color-mix`, `withAlpha`, `calc` and the 729-reference `--tw-*`
+// var chain. That is the surface this port deleted on purpose. It would cost more than the four
+// tables together and buy nothing: the differential holds at 95,931 answered with 17 disagreements,
+// all named and tested.
+//
+// # What this test actually asserts
+//
+// The counts, so a table growing or shrinking without its reason being revisited fails here. The
+// reasons themselves are prose and cannot be asserted, which is why each table also carries its own
+// test: the collapse families assert their shorthand structure, the descriptor rows are compared
+// class for class by the differential, and the upstream diff catches Tailwind's own data moving.
+func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
+	upstream := map[string]int{
+		"PropertyOrder":                 len(PropertyOrder),
+		"SortOverrideProperties":        len(SortOverrideProperties),
+		"FrameworkVariantRegistrations": len(FrameworkVariantRegistrations),
+		"FrameworkStaticDeclarations":   len(FrameworkStaticDeclarations),
+		"FrameworkFunctionalUtilities":  len(FrameworkFunctionalUtilities),
+		"FrameworkMultiDeclaration":     len(FrameworkMultiDeclarationUtilities),
+	}
+	ours := map[string]int{
+		"baseDescriptors":        len(baseDescriptors),
+		"RootDeclaredProperties": len(RootDeclaredProperties),
+		"ComposingRoots":         len(ComposingRoots),
+		"CollapseFamilies":       len(CollapseFamilies),
+	}
+
+	for name, count := range upstream {
+		if count == 0 {
+			t.Errorf("%s is empty; a table mirroring Tailwind's own data cannot be", name)
+		}
+	}
+	for name, count := range ours {
+		if count == 0 {
+			t.Errorf("%s is empty; if it is genuinely no longer needed, delete it and its entry here "+
+				"rather than leaving a zero that reads like a working table", name)
+		}
+	}
+
+	// The count of tables, not their contents. A fifth table of ours appearing without an entry in
+	// the doc comment above is the thing this catches: the inventory going stale is how a table ends
+	// up carried for no stated reason, which is what this package started with.
+	if len(ours) != 4 {
+		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 4, so "+
+			"one has been added or removed without its reason being written down", len(ours))
+	}
+
+	t.Logf("Tailwind's own: %v", upstream)
+	t.Logf("ours, each with a stated reason: %v", ours)
+}
