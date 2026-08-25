@@ -25,20 +25,33 @@
 // position of their own. This table is keyed on registration roots, which is what the engine
 // actually registers.
 //
-// # The invariance measurement this table rests on
+// # The invariance measurement this table rests on, and the one it used to claim
 //
 // A table claiming to describe Tailwind while actually holding one repository's tokens is the bug
-// the whole port exists to remove, so the claim was measured rather than assumed, with the
-// instrument `CollapseFamilies` was verified by. Four independent generations — the `tailwindcss`
-// installed under ~/Projects/ahra, the one under ~/Projects/connected/www-connected-app, and each
-// repository's own `theme.css` loaded through its own install — produced 88 registrations with
-// identical names, orders and kinds. Zero difference across all four.
+// the whole port exists to remove, so the claim has to be measured rather than assumed. It was not.
+// The header this generator wrote said the table had been verified against "each repository's own
+// `theme.css` loaded through its own install", and no such load was possible: `enumerate.mjs` took
+// a package root, built every design system from the literal string `@import "tailwindcss";`, and
+// never opened a repository stylesheet. The four "independent generations" were one framework
+// `index.css` read four times, and readings that cannot differ cannot detect a table that varies.
+// The two repositories named also vendor the same Structure submodule, so even a real comparison
+// between them would have measured a shared dependency rather than framework invariance.
 //
-// Both repositories declare `@custom-variant dark`, and it does not appear as a difference, which
-// is the mechanism rather than a coincidence: `Variants.set` assigns kind and applyFn onto an
-// existing record and never touches `order`, so redefining a framework variant changes the selector
-// it emits without moving where it sorts. Only a `@custom-variant` under a *new* name appends a
-// position, and those stay live-loaded rather than baked in here.
+// Re-measured with `-design-system`, which is the argument that had to exist first, the claim
+// holds and holds more broadly than was claimed: 88 registrations with identical names, orders and
+// kinds across ~/Projects/ahra, ~/Projects/connected/www-connected-app, ~/Projects/phi/www-phi-health,
+// an independent design system sharing no submodule with any of them, and a bare install.
+//
+// The mechanism, probed rather than assumed. Every corpus repository declares
+// `@custom-variant dark` and it does not appear as a difference, because `Variants.set` assigns
+// kind and applyFn onto an existing record and never touches `order`: redefining a framework
+// variant changes the selector it emits without moving where it sorts. Only a `@custom-variant`
+// under a *new* name appends a position. A planted system declaring `dark` plus two new names put
+// those two at orders 83 and 84, moved no framework registration, and is what proves the zero above
+// came from an instrument that can move.
+//
+// `-verify-invariance-against` makes that measurement repeatable, and a run that skips it says so
+// in the file it writes.
 //
 // # What crosses this boundary and what cannot
 //
@@ -81,6 +94,101 @@ type enumeration struct {
 	Entries         []registryEntry     `json:"entries"`
 	CompareFnOrders []int               `json:"compareFnOrders"`
 	Comparisons     []groupedComparison `json:"comparisons"`
+
+	// VerifiedAgainst is the design systems the registrations were re-measured against on this run,
+	// filled in by the Go side. Rendered into the generated header so a reader can tell a measured
+	// claim from an asserted one, which is the distinction the previous header lost.
+	VerifiedAgainst []string `json:"-"`
+}
+
+// pathList collects a repeatable flag.
+type pathList []string
+
+func (p *pathList) String() string { return strings.Join(*p, ", ") }
+
+func (p *pathList) Set(value string) error {
+	*p = append(*p, value)
+	return nil
+}
+
+// invarianceProvenance renders what the registrations were re-measured against, or says nothing was.
+//
+// In the file rather than in a commit message, because the file is what a reader has when they
+// decide whether to trust the table, and the previous header's asserted claim was indistinguishable
+// from a measured one at exactly that moment.
+func invarianceProvenance(verifiedAgainst []string) string {
+	if len(verifiedAgainst) == 0 {
+		return `//
+// This table was generated WITHOUT the invariance check. Pass -verify-invariance-against with a
+// design system that shares no submodule with the one generated from.
+`
+	}
+
+	var buffer strings.Builder
+	buffer.WriteString("//\n// Re-measured on this run against:\n")
+	for _, system := range verifiedAgainst {
+		fmt.Fprintf(&buffer, "//\t%s\n", portablePath(system))
+	}
+	return buffer.String()
+}
+
+// portablePath rewrites a home-relative path so the generated file does not name one machine.
+//
+// The paths reach here as the operator typed them, and an absolute one checked into a generated
+// header is a diff every other machine produces on regeneration, which makes `-check` fail for a
+// reason that has nothing to do with Tailwind.
+func portablePath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return path
+	}
+	if relative, err := filepath.Rel(home, path); err == nil && !strings.HasPrefix(relative, "..") {
+		return filepath.Join("~", relative)
+	}
+	return path
+}
+
+// registrationDifference names the first way two registries disagree, or returns empty.
+//
+// Name, order and kind all count. Order especially: a registration that keeps its name and moves
+// its number changes where every class carrying it sorts, and a comparison on names alone would
+// call that agreement.
+func registrationDifference(left, right []registryEntry) string {
+	index := func(entries []registryEntry) map[string]registryEntry {
+		byName := make(map[string]registryEntry, len(entries))
+		for _, entry := range entries {
+			byName[entry.Name] = entry
+		}
+		return byName
+	}
+	inLeft, inRight := index(left), index(right)
+
+	names := make([]string, 0, len(inLeft)+len(inRight))
+	for name := range inLeft {
+		names = append(names, name)
+	}
+	for name := range inRight {
+		if _, seen := inLeft[name]; !seen {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		leftEntry, inLeftPresent := inLeft[name]
+		rightEntry, inRightPresent := inRight[name]
+		switch {
+		case !inRightPresent:
+			return fmt.Sprintf("%q is registered at order %d in the first system and absent from the second", name, leftEntry.Order)
+		case !inLeftPresent:
+			return fmt.Sprintf("%q is registered at order %d in the second system and absent from the first", name, rightEntry.Order)
+		case leftEntry.Order != rightEntry.Order:
+			return fmt.Sprintf("%q is order %d in the first system and %d in the second", name, leftEntry.Order, rightEntry.Order)
+		case leftEntry.Kind != rightEntry.Kind:
+			return fmt.Sprintf("%q is kind %q in the first system and %q in the second", name, leftEntry.Kind, rightEntry.Kind)
+		}
+	}
+	return ""
 }
 
 // registryEntry is one registered variant root, as the engine holds it.
@@ -109,8 +217,11 @@ type groupedComparison struct {
 
 func main() {
 	packageRoot := flag.String("package-root", "", "path to the tailwindcss package root (the directory holding package.json)")
+	designSystem := flag.String("design-system", "", "CSS entry point to read the registry from; defaults to a bare `@import \"tailwindcss\"`")
 	output := flag.String("output", filepath.Join("internal", "tailwind", "framework_variant_table.go"), "where to write the generated table")
 	check := flag.Bool("check", false, "regenerate and fail if the committed table disagrees, instead of writing it")
+	var invarianceInputs pathList
+	flag.Var(&invarianceInputs, "verify-invariance-against", "a design system entry point whose registrations must match; repeatable")
 	flag.Parse()
 
 	if *packageRoot == "" {
@@ -119,7 +230,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	result, err := enumerate(*packageRoot)
+	result, err := enumerate(*packageRoot, *designSystem)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "gen_tailwind_framework_variants: %v\n", err)
 		os.Exit(1)
@@ -129,6 +240,42 @@ func main() {
 		fmt.Fprintf(os.Stderr, "gen_tailwind_framework_variants: %v\n", err)
 		os.Exit(1)
 	}
+
+	// The registrations ship as framework facts, so the claim is re-measured here.
+	//
+	// This is the check whose absence let a false provenance into the generated header. That header
+	// said the table had been verified against "each of the two corpus repositories' own theme.css
+	// loaded through its own install", and no such load existed: the script took only a package
+	// root and built every design system from a bare `@import "tailwindcss"`, so the four
+	// "independent generations" were one framework stylesheet read four times.
+	//
+	// Re-measured properly the table does hold, and more broadly than was claimed: identical names,
+	// orders and kinds across ahra, www-connected-app, www-phi-health, and an independent design
+	// system that shares no submodule with any of them. What makes that a real zero rather than an
+	// instrument that cannot move is the planted control below, which registers two new variants and
+	// is caught.
+	verifiedAgainst := make([]string, 0, len(invarianceInputs))
+	for _, entryPoint := range invarianceInputs {
+		otherResult, err := enumerate(*packageRoot, entryPoint)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gen_tailwind_framework_variants: enumerating %s for the invariance check: %v\n", entryPoint, err)
+			os.Exit(1)
+		}
+		if err := validate(otherResult); err != nil {
+			fmt.Fprintf(os.Stderr, "gen_tailwind_framework_variants: %s: %v\n", entryPoint, err)
+			os.Exit(1)
+		}
+
+		if difference := registrationDifference(result.Entries, otherResult.Entries); difference != "" {
+			fmt.Fprintln(os.Stderr, "gen_tailwind_framework_variants: the registrations are NOT repository-invariant.")
+			fmt.Fprintf(os.Stderr, "  %s\n", difference)
+			fmt.Fprintln(os.Stderr, "  A repository that moves a framework registration cannot be linted from a baked table.")
+			fmt.Fprintln(os.Stderr, "  This finding is worth more than the confirmation.")
+			os.Exit(1)
+		}
+		verifiedAgainst = append(verifiedAgainst, entryPoint)
+	}
+	result.VerifiedAgainst = verifiedAgainst
 
 	rendered, err := render(result)
 	if err != nil {
@@ -306,22 +453,29 @@ func render(result *enumeration) ([]byte, error) {
 // %d registrations over %d distinct order numbers, %d of which are shared by more than one root,
 // and %d of which carry a comparison function.
 //
-// Verified repository-invariant before being checked in, with the instrument CollapseFamilies was
-// verified by: four independent generations — two installed tailwindcss packages, and each of the
-// two corpus repositories' own theme.css loaded through its own install — produced identical names,
-// orders and kinds. Zero difference. Both repositories declare `+"`@custom-variant dark`"+` and it does
-// not appear as a difference, because Variants.set assigns kind onto an existing record and never
-// touches order: redefining a framework variant changes the selector it emits without moving where
-// it sorts. A repository's @custom-variant under a NEW name appends a position and stays
-// live-loaded rather than being baked in here.
+// Repository-invariant, and re-measured rather than asserted. An earlier version of this header
+// claimed verification against "each of the two corpus repositories' own theme.css loaded through
+// its own install", and that load did not exist: enumerate.mjs took only a package root and built
+// every design system from a bare `+"`@import \"tailwindcss\"`"+`, so the four independent generations were
+// one framework stylesheet read four times, and a set of readings that cannot differ cannot detect
+// a table that varies. Those two repositories also vendor the same Structure submodule, so even a
+// real comparison between them would have measured a shared dependency.
 //
+// The claim survives being measured properly. Identical names, orders and kinds across the corpus
+// repositories, an independent design system sharing no submodule, and a bare install. The
+// mechanism is Variants.set assigning kind onto an existing record without touching order, so a
+// repository redefining `+"`dark`"+` changes the selector it emits without moving where it sorts, while a
+// @custom-variant under a NEW name appends a position and stays live-loaded rather than being baked
+// in here. Both halves were probed: two new names appended at 83 and 84 and moved no framework
+// registration, which is also the control proving the comparison can fail.
+%s//
 // Keyed on registration roots rather than on composed prefixes. The other variant table in this
 // package, VariantOrder in property_order_table.go, is keyed on shapes like `+"`group-hover:`"+`, which
 // have no registration of their own; the two sitting side by side is the difference being argued.
 
 package tailwind
 
-`, result.TailwindVersion, len(entries), len(distinctOrders), sharedCount, len(comparisons))
+`, result.TailwindVersion, len(entries), len(distinctOrders), sharedCount, len(comparisons), invarianceProvenance(result.VerifiedAgainst))
 
 	builder.WriteString(`// FrameworkVariantRegistration is one variant the framework registers, with the order number the
 // engine assigned it.
@@ -413,7 +567,7 @@ var FrameworkVariantComparisonGroups = []FrameworkVariantComparisonGroup{
 //
 // Node's stderr is passed through rather than captured, so a resolution failure inside the script
 // reaches the operator instead of being swallowed into a parse error about empty input.
-func enumerate(packageRoot string) (*enumeration, error) {
+func enumerate(packageRoot string, designSystem string) (*enumeration, error) {
 	absolutePackageRoot, err := filepath.Abs(packageRoot)
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", packageRoot, err)
@@ -428,7 +582,22 @@ func enumerate(packageRoot string) (*enumeration, error) {
 	}
 	script := filepath.Join(filepath.Dir(thisFile), "enumerate.mjs")
 
-	command := exec.Command("node", script, absolutePackageRoot)
+	// The design system is optional and defaults to a bare framework import, which is what every
+	// invocation did before it could be named. It is the argument that makes the invariance claim
+	// measurable rather than asserted.
+	arguments := []string{script, absolutePackageRoot}
+	if designSystem != "" {
+		absoluteDesignSystem, err := filepath.Abs(designSystem)
+		if err != nil {
+			return nil, fmt.Errorf("resolving %s: %w", designSystem, err)
+		}
+		if _, err := os.Stat(absoluteDesignSystem); err != nil {
+			return nil, fmt.Errorf("design system %s is not readable: %w", absoluteDesignSystem, err)
+		}
+		arguments = append(arguments, absoluteDesignSystem)
+	}
+
+	command := exec.Command("node", arguments...)
 	var stdout bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = os.Stderr

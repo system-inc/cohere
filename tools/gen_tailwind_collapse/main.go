@@ -3,6 +3,32 @@
 // Usage:
 //
 //	go run ./tools/gen_tailwind_collapse -entry-point <theme.css> [-output <file.go>] [-check]
+//	    [-resolve-root <dir>] [-verify-invariance-against <theme.css>[:<resolve-root>]]
+//
+// # The one invariance claim in this file, and how to re-measure it
+//
+// `CollapseFamilies` ships as a fact about Tailwind. Everything else this generator writes is a
+// per-repository extraction, and `KnownStatics` proves it by carrying `markdown-content`, one of
+// ahra's own `@utility` blocks.
+//
+// That claim was first verified by generating against ~/Projects/ahra and
+// ~/Projects/connected/www-connected-app and diffing to zero. The instrument could not support the
+// conclusion: both vendor the Structure submodule and import its `global.css`, so they share its
+// `@theme` and `@utility` blocks and are one observation wearing two names. Re-measured against a
+// system sharing nothing, the claim does hold — the same 44 families, identical down to the value
+// each was discovered at, across a registry differing by 25 functional roots and 7,850 probed
+// pairs. `-verify-invariance-against` is that measurement made repeatable, and it refuses a second
+// system whose registry matches the first, since two systems that cannot differ cannot detect a
+// table that varies.
+//
+//	go run ./tools/gen_tailwind_collapse \
+//	    -entry-point ~/Projects/ahra/app/_theme/styles/theme.css \
+//	    -verify-invariance-against tools/gen_tailwind_descriptor_base/testdata/independent_theme.css:tools/gen_tailwind_descriptor_base/testdata
+//
+// `-resolve-root` is what makes that second path work at all. Bare specifiers such as `tailwindcss`
+// used to resolve from the entry point's own directory, which is correct for every repository and
+// impossible for a design system checked in under `tools/` with no `node_modules` above it. The two
+// are separate inputs now, defaulting to the old behaviour.
 //
 // The table it writes is what lets `enforce-canonical-classes` run in Go without a JavaScript engine
 // at lint time. Tailwind's own collapse logic is a signature-equivalence search over the whole
@@ -40,6 +66,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -70,6 +97,11 @@ type enumeration struct {
 	VariantOrder        []string            `json:"variantOrder"`
 	ColorNames          []string            `json:"colorNames"`
 	StaticProperties    []utilityProperties `json:"staticProperties"`
+
+	// VerifiedAgainst is the design systems CollapseFamilies was re-measured against on this run,
+	// filled in by the Go side rather than read from the enumeration. Rendered into the generated
+	// file so the header states what was checked instead of what someone believed.
+	VerifiedAgainst []string `json:"-"`
 }
 
 // rootSelectorShape is a root whose utilities emit under something other than a bare class selector.
@@ -100,10 +132,135 @@ type family struct {
 	DiscoveredAtValue string   `json:"discoveredAtValue"`
 }
 
+// pathList collects a repeatable flag.
+type pathList []string
+
+func (p *pathList) String() string { return strings.Join(*p, ", ") }
+
+func (p *pathList) Set(value string) error {
+	*p = append(*p, value)
+	return nil
+}
+
+// designSystemInput is one design system to enumerate: a CSS entry point, and where its bare
+// specifiers resolve from.
+//
+// The two are separate because they stop coinciding for the file that matters. Written
+// `<theme.css>` when the CSS sits inside the tree that installed Tailwind, and
+// `<theme.css>:<resolve-root>` when it does not.
+type designSystemInput struct {
+	entryPoint  string
+	resolveRoot string
+}
+
+// parseDesignSystemInput splits `<theme.css>[:<resolve-root>]`.
+//
+// Split on the last colon rather than the first, so an absolute Windows-style path or a directory
+// with a colon in its name still names a file rather than a truncated one. A value with no colon is
+// an entry point whose resolve root defaults to its own directory, which is every repository.
+func parseDesignSystemInput(value string) designSystemInput {
+	if index := strings.LastIndex(value, ":"); index > 0 {
+		candidate := value[:index]
+		if _, err := os.Stat(candidate); err == nil {
+			return designSystemInput{entryPoint: candidate, resolveRoot: value[index+1:]}
+		}
+	}
+	return designSystemInput{entryPoint: value}
+}
+
+// familySignature is the comparable form of the invariant table.
+//
+// Only the families, and deliberately not the rest of the enumeration. `collapse_table.go` also
+// carries KnownStatics, KnownRoots and ColorNames, which are repository facts by construction:
+// KnownStatics holds `markdown-content`, one of ahra's own `@utility` blocks, in a file whose
+// header says "Source: Tailwind 4.3.3". Comparing whole files across two design systems would
+// therefore always fail and would say nothing about the families. What is claimed invariant is what
+// gets checked.
+func familySignature(families []family) string {
+	lines := make([]string, 0, len(families))
+	for _, entry := range families {
+		lines = append(lines, fmt.Sprintf("%s => %s @ %s", strings.Join(entry.Inputs, " + "), entry.Output, entry.DiscoveredAtValue))
+	}
+	sort.Strings(lines)
+	return strings.Join(lines, "\n")
+}
+
+// invarianceProvenance renders what the invariance claim was checked against, or says it was not.
+//
+// Written into the generated header rather than into a commit message, because the header is what a
+// reader has in front of them when they decide whether to trust the table. The previous version of
+// this file asserted invariance in prose that no run had produced, and a reader had no way to tell
+// an asserted claim from a measured one. A run that skipped the check now says so in the file it
+// wrote.
+func invarianceProvenance(verifiedAgainst []string) string {
+	if len(verifiedAgainst) == 0 {
+		return `//
+// This table was generated WITHOUT the invariance check. Pass -verify-invariance-against with a
+// design system that shares no submodule with the entry point, and the header will record it.
+`
+	}
+
+	var buffer strings.Builder
+	buffer.WriteString("//\n// CollapseFamilies re-measured on this run against:\n")
+	for _, system := range verifiedAgainst {
+		fmt.Fprintf(&buffer, "//\t%s\n", system)
+	}
+	buffer.WriteString("//\n// Identical families, down to the value each was discovered at.\n")
+	return buffer.String()
+}
+
+// portablePath rewrites a home-relative path so the generated file does not name one machine.
+//
+// The paths reach here as the operator typed them, and an absolute one checked into a generated
+// header is a diff every other machine produces on regeneration, which makes `-check` fail for a
+// reason that has nothing to do with Tailwind.
+func portablePath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return path
+	}
+	if relative, err := filepath.Rel(home, path); err == nil && !strings.HasPrefix(relative, "..") {
+		return filepath.Join("~", relative)
+	}
+	return path
+}
+
+// differingFamilies names what the two systems disagree about, in both directions.
+//
+// Both directions, because a family present in one and absent in the other is the interesting case
+// and a count alone cannot distinguish "two systems, one family each" from "one system, both".
+func differingFamilies(left, right []family) []string {
+	lines := func(families []family) map[string]bool {
+		present := make(map[string]bool, len(families))
+		for _, entry := range families {
+			present[fmt.Sprintf("%s => %s @ %s", strings.Join(entry.Inputs, " + "), entry.Output, entry.DiscoveredAtValue)] = true
+		}
+		return present
+	}
+	inLeft, inRight := lines(left), lines(right)
+
+	differences := make([]string, 0)
+	for line := range inLeft {
+		if !inRight[line] {
+			differences = append(differences, "only in the first system:  "+line)
+		}
+	}
+	for line := range inRight {
+		if !inLeft[line] {
+			differences = append(differences, "only in the second system: "+line)
+		}
+	}
+	sort.Strings(differences)
+	return differences
+}
+
 func main() {
 	entryPoint := flag.String("entry-point", "", "path to the Tailwind CSS entry point, such as app/_theme/styles/theme.css")
+	resolveRoot := flag.String("resolve-root", "", "directory bare specifiers such as `tailwindcss` resolve from; defaults to the entry point's directory")
 	output := flag.String("output", "internal/tailwind/collapse_table.go", "where to write the generated table")
 	check := flag.Bool("check", false, "regenerate and fail if the committed table disagrees, instead of writing it")
+	var invarianceInputs pathList
+	flag.Var(&invarianceInputs, "verify-invariance-against", "a second design system, as `<theme.css>[:<resolve-root>]`, whose CollapseFamilies must match; repeatable")
 	flag.Parse()
 
 	if *entryPoint == "" {
@@ -112,7 +269,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	result, err := enumerate(*entryPoint)
+	result, err := enumerate(*entryPoint, *resolveRoot)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: %v\n", err)
 		os.Exit(1)
@@ -133,6 +290,66 @@ func main() {
 		fmt.Fprintln(os.Stderr, "  A table built from a partial registry is silently missing families.")
 		os.Exit(1)
 	}
+
+	// CollapseFamilies is shipped as a framework fact, so the claim is re-measured here rather than
+	// at review time.
+	//
+	// The claim was once verified by generating against ~/Projects/ahra and
+	// ~/Projects/connected/www-connected-app and diffing to zero. Both vendor the Structure
+	// submodule and both import its global.css, so they share its `@theme` and its `@utility`
+	// blocks: that diff measured a shared dependency, and two repositories that cannot differ
+	// cannot detect a table that varies. Re-measured against
+	// tools/gen_tailwind_descriptor_base/testdata/independent_theme.css, which shares nothing, the
+	// families do hold — the same 44, identical down to the value each was discovered at, across a
+	// registry that differs by 25 functional roots and 7,850 probed pairs. The claim is true. The
+	// instrument that had been asserting it was not measuring it.
+	//
+	// It is opt-in rather than required, which is where this differs from gen_tailwind_descriptor_base.
+	// That generator's entire job is to separate framework from repository, so one system leaves it
+	// nothing to do and it refuses. This one's job is to print families, and the families are only
+	// one of several tables it writes: the rest are per-repository by construction and a second
+	// system cannot speak to them. Refusing one system here would make the ordinary regeneration
+	// impossible in service of a check that covers a fraction of the output. So the flag is a gate
+	// an upgrade runs, and the file records whether it was run.
+	verifiedAgainst := make([]string, 0, len(invarianceInputs))
+	for _, raw := range invarianceInputs {
+		other := parseDesignSystemInput(raw)
+		otherResult, err := enumerate(other.entryPoint, other.resolveRoot)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: enumerating %s for the invariance check: %v\n", other.entryPoint, err)
+			os.Exit(1)
+		}
+		if otherResult.TailwindVersion != result.TailwindVersion {
+			fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: %s is Tailwind %s and %s is Tailwind %s; refusing to compare engines.\n",
+				*entryPoint, result.TailwindVersion, other.entryPoint, otherResult.TailwindVersion)
+			os.Exit(1)
+		}
+
+		// A second system that produced the same registry is the same observation wearing two
+		// names, which is the exact failure this check exists to have caught. Refused rather than
+		// counted, because a zero from it looks identical to a real one.
+		if otherResult.FunctionalRoots == result.FunctionalRoots && otherResult.PairsProbed == result.PairsProbed {
+			fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: %s and %s produce the same registry (%d roots, %d pairs).\n",
+				*entryPoint, other.entryPoint, result.FunctionalRoots, result.PairsProbed)
+			fmt.Fprintln(os.Stderr, "  Two design systems that cannot differ cannot verify invariance; they are one observation under two names.")
+			fmt.Fprintln(os.Stderr, "  Every repository here vendors the Structure submodule and imports its global.css, so any two of them share a @theme.")
+			fmt.Fprintln(os.Stderr, "  Use tools/gen_tailwind_descriptor_base/testdata/independent_theme.css, which shares nothing.")
+			os.Exit(1)
+		}
+
+		if familySignature(otherResult.Families) != familySignature(result.Families) {
+			fmt.Fprintf(os.Stderr, "gen_tailwind_collapse: CollapseFamilies is NOT repository-invariant.\n")
+			fmt.Fprintf(os.Stderr, "  %s reports %d families; %s reports %d.\n",
+				*entryPoint, len(result.Families), other.entryPoint, len(otherResult.Families))
+			for _, line := range differingFamilies(result.Families, otherResult.Families) {
+				fmt.Fprintf(os.Stderr, "  %s\n", line)
+			}
+			fmt.Fprintln(os.Stderr, "  The table cannot ship as a framework fact. This finding is worth more than the confirmation.")
+			os.Exit(1)
+		}
+		verifiedAgainst = append(verifiedAgainst, fmt.Sprintf("%s (%d roots, %d pairs)", portablePath(other.entryPoint), otherResult.FunctionalRoots, otherResult.PairsProbed))
+	}
+	result.VerifiedAgainst = verifiedAgainst
 
 	rendered, err := render(result)
 	if err != nil {
@@ -213,7 +430,7 @@ func main() {
 //
 // Node's stderr is passed through rather than captured, so a resolution failure inside the script
 // reaches the operator instead of being swallowed into a parse error about empty input.
-func enumerate(entryPoint string) (*enumeration, error) {
+func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
 	absoluteEntryPoint, err := filepath.Abs(entryPoint)
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", entryPoint, err)
@@ -227,7 +444,23 @@ func enumerate(entryPoint string) (*enumeration, error) {
 		return nil, err
 	}
 
-	command := exec.Command("node", scriptPath, absoluteEntryPoint)
+	// The resolve root defaults to the entry point's directory, which is what every repository
+	// invocation gets and what the script did unconditionally before. It is named explicitly only
+	// for a design system that lives outside the tree holding the `node_modules` it needs, which is
+	// the checked-in independent theme and nothing else so far.
+	arguments := []string{scriptPath, absoluteEntryPoint}
+	if resolveRoot != "" {
+		absoluteResolveRoot, err := filepath.Abs(resolveRoot)
+		if err != nil {
+			return nil, fmt.Errorf("resolving %s: %w", resolveRoot, err)
+		}
+		if _, err := os.Stat(filepath.Join(absoluteResolveRoot, "node_modules")); err != nil {
+			return nil, fmt.Errorf("resolve root %s has no node_modules, so `tailwindcss` cannot resolve from it: %w", absoluteResolveRoot, err)
+		}
+		arguments = append(arguments, absoluteResolveRoot)
+	}
+
+	command := exec.Command("node", arguments...)
 	command.Stderr = os.Stderr
 
 	stdout, err := command.Output()
@@ -277,7 +510,12 @@ func render(result *enumeration) ([]byte, error) {
 // codebase. Enumerated from the design system's own class list rather than from any codebase's
 // usage, because a table built from observed classes is silently missing every family nobody has
 // written yet.
-
+//
+// Only CollapseFamilies is claimed invariant. The other tables in this file are per-repository by
+// construction, and KnownStatics is the proof: it carries markdown-content, one of ahra's own
+// @utility blocks, under a header naming only a Tailwind version. Read this file as one framework
+// fact sitting beside several repository extractions, not as framework data throughout.
+%s
 package tailwind
 
 // CollapseFamily is two utility roots that merge into a third.
@@ -300,6 +538,7 @@ var CollapseFamilies = []CollapseFamily{
 		result.PairsProbed,
 		len(result.Families),
 		exampleFamily(result.Families),
+		invarianceProvenance(result.VerifiedAgainst),
 	)
 
 	for _, entry := range result.Families {

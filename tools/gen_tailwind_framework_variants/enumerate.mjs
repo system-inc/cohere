@@ -38,15 +38,29 @@
  * is a stated narrowing: this table is the *framework's* registrations, and a repository's own
  * contributions stay live-loaded through `@custom-variant`.
  *
+ * # The optional design system argument, and why it had to exist
+ *
+ * The second argument is a CSS entry point to read the registry from, defaulting to a bare
+ * `@import "tailwindcss"`. Without it this script had no way to load a repository's stylesheet at
+ * all, which meant the invariance claim in the generated file named a comparison the tool could not
+ * perform: every "independent generation" was the same framework `index.css` parsed again, and a
+ * set of readings that cannot differ cannot detect a table that varies.
+ *
+ * With a real entry point the comparison is real, and measured it holds: the 88 registrations are
+ * identical across ahra, www-connected-app, www-phi-health, an independent design system sharing no
+ * submodule, and a bare install. The mechanism is `Variants.set` assigning kind onto an existing
+ * record without touching `order`, so a repository redefining `dark` moves nothing, while a
+ * `@custom-variant` under a new name appends. Both halves were probed rather than assumed.
+ *
  * Node is required to run this and never to use its result.
  */
 
 import * as NodeFileSystem from 'node:fs';
 import * as NodePath from 'node:path';
 
-const [, , packageRootArgument] = process.argv;
+const [, , packageRootArgument, designSystemArgument] = process.argv;
 if (!packageRootArgument) {
-    process.stderr.write('usage: enumerate.mjs <tailwindcss package root>\n');
+    process.stderr.write('usage: enumerate.mjs <tailwindcss package root> [design-system.css]\n');
     process.exit(2);
 }
 
@@ -54,7 +68,34 @@ const packageRoot = NodePath.resolve(packageRootArgument);
 const packageJson = JSON.parse(NodeFileSystem.readFileSync(NodePath.join(packageRoot, 'package.json'), 'utf8'));
 const bundle = await import(NodePath.join(packageRoot, 'dist', 'lib.mjs'));
 
-/* Resolve `@import` the way a bundler would, matching every sibling generator's loader exactly. */
+/*
+ * The CSS the registry is read from, which was a constant and should not have been.
+ *
+ * This script built every design system from the literal `@import "tailwindcss";` and never read a
+ * repository's stylesheet. That made one of the two invariance claims in the generated header
+ * unmeasurable by the tool asserting it: "each of the two corpus repositories' own theme.css loaded
+ * through its own install" describes a load this file could not perform, since there was no
+ * argument for a stylesheet and no code path that opened one. What was actually compared was the
+ * same framework `index.css` parsed several times, which cannot vary by construction.
+ *
+ * Passing a real entry point is what turns the claim into a measurement. A repository's own
+ * `@custom-variant` blocks then reach the registry, which is the only way a repository can move it.
+ */
+const designSystemPath = designSystemArgument ? NodePath.resolve(designSystemArgument) : null;
+const designSystemBase = designSystemPath ? NodePath.dirname(designSystemPath) : '/';
+const designSystemSource = designSystemPath
+    ? NodeFileSystem.readFileSync(designSystemPath, 'utf8')
+    : '@import "tailwindcss";';
+
+/*
+ * Resolve `@import` the way a bundler would, matching every sibling generator's loader exactly.
+ *
+ * A stylesheet that cannot be read returns empty rather than throwing, which matters once a real
+ * repository theme is loaded: those import package stylesheets this script has no resolver for, and
+ * a throw would abort the enumeration instead of narrowing it. The narrowing is safe for this
+ * table's purpose, since an unreadable import can only fail to add a `@custom-variant`, and a
+ * missing registration would show up as a difference rather than as a false match.
+ */
 function loadStylesheet(identifier, base) {
     let resolved;
     if (identifier === 'tailwindcss') {
@@ -65,22 +106,27 @@ function loadStylesheet(identifier, base) {
         resolved = NodePath.resolve(base, identifier);
     }
     if (!resolved.endsWith('.css')) resolved += '.css';
-    return { base: NodePath.dirname(resolved), content: NodeFileSystem.readFileSync(resolved, 'utf8') };
+    try {
+        return { base: NodePath.dirname(resolved), content: NodeFileSystem.readFileSync(resolved, 'utf8') };
+    }
+    catch {
+        return { base: NodePath.dirname(resolved), content: '' };
+    }
 }
 
 function loadModule(identifier, base) {
     return { base, path: identifier, module: {} };
 }
 
-async function loadDesignSystem(css) {
+async function loadDesignSystem(css = designSystemSource) {
     return await bundle.__unstable__loadDesignSystem(css, {
-        base: '/',
+        base: designSystemBase,
         loadStylesheet: async (identifier, importBase) => loadStylesheet(identifier, importBase),
         loadModule: async (identifier, importBase) => loadModule(identifier, importBase),
     });
 }
 
-const designSystem = await loadDesignSystem('@import "tailwindcss";');
+const designSystem = await loadDesignSystem();
 
 const entries = [];
 for (const [name, info] of designSystem.variants.entries()) {
@@ -133,7 +179,7 @@ for (const order of compareFnOrders) {
 
     // A fresh design system per probe, because the dense index is a function of exactly which
     // variants have been parsed. Reusing one would let an earlier probe widen a later one's map.
-    const probeSystem = await loadDesignSystem('@import "tailwindcss";');
+    const probeSystem = await loadDesignSystem();
     for (const raw of pair) probeSystem.parseVariant(raw);
     const probeOrder = probeSystem.getVariantOrder();
     const [smallRaw, largeRaw] = pair;

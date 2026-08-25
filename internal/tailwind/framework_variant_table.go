@@ -8,14 +8,26 @@
 // 88 registrations over 82 distinct order numbers, 2 of which are shared by more than one root,
 // and 4 of which carry a comparison function.
 //
-// Verified repository-invariant before being checked in, with the instrument CollapseFamilies was
-// verified by: four independent generations — two installed tailwindcss packages, and each of the
-// two corpus repositories' own theme.css loaded through its own install — produced identical names,
-// orders and kinds. Zero difference. Both repositories declare `@custom-variant dark` and it does
-// not appear as a difference, because Variants.set assigns kind onto an existing record and never
-// touches order: redefining a framework variant changes the selector it emits without moving where
-// it sorts. A repository's @custom-variant under a NEW name appends a position and stays
-// live-loaded rather than being baked in here.
+// Repository-invariant, and re-measured rather than asserted. An earlier version of this header
+// claimed verification against "each of the two corpus repositories' own theme.css loaded through
+// its own install", and that load did not exist: enumerate.mjs took only a package root and built
+// every design system from a bare `@import "tailwindcss"`, so the four independent generations were
+// one framework stylesheet read four times, and a set of readings that cannot differ cannot detect
+// a table that varies. Those two repositories also vendor the same Structure submodule, so even a
+// real comparison between them would have measured a shared dependency.
+//
+// The claim survives being measured properly. Identical names, orders and kinds across the corpus
+// repositories, an independent design system sharing no submodule, and a bare install. The
+// mechanism is Variants.set assigning kind onto an existing record without touching order, so a
+// repository redefining `dark` changes the selector it emits without moving where it sorts, while a
+// @custom-variant under a NEW name appends a position and stays live-loaded rather than being baked
+// in here. Both halves were probed: two new names appended at 83 and 84 and moved no framework
+// registration, which is also the control proving the comparison can fail.
+//
+// Re-measured on this run against:
+//	tools/gen_tailwind_descriptor_base/testdata/independent_theme.css
+//	~/Projects/connected/www-connected-app/app/_theme/styles/theme.css
+//	~/Projects/phi/www-phi-health/app/_theme/styles/theme.css
 //
 // Keyed on registration roots rather than on composed prefixes. The other variant table in this
 // package, VariantOrder in property_order_table.go, is keyed on shapes like `group-hover:`, which

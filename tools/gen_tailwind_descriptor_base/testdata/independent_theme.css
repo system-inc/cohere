@@ -22,8 +22,26 @@
  * classes a repository writes and there is no repository here. The table it writes is complete, and
  * the assertions that matter — 23,391 registry classes, the planted dirty descriptor proven — pass.
  *
- * `@import "tailwindcss"` resolves through whichever `node_modules` is reachable from wherever this
- * file is placed, so run it from a directory that has one.
+ * # Resolving `tailwindcss` from a file with no `node_modules` above it
+ *
+ * This directory has none, and the `verify` repository has no `package.json` at all, so a bare
+ * `@import 'tailwindcss'` cannot resolve from here. That used to be worked around by copying this
+ * file into a repository and generating there, which is a ritual nobody checked in and which
+ * quietly puts the file inside a tree whose own `@theme` it was written to share nothing with.
+ *
+ * `gen_tailwind_collapse` takes `-resolve-root` instead: the CSS entry point and the directory bare
+ * specifiers resolve from are two inputs rather than one. The install is borrowed from a repository
+ * that already has it, and nothing about that repository's design system reaches this file, because
+ * only the CSS named here is loaded.
+ *
+ *   go run ./tools/gen_tailwind_collapse \
+ *       -entry-point ~/Projects/ahra/app/_theme/styles/theme.css \
+ *       -verify-invariance-against tools/gen_tailwind_descriptor_base/testdata/independent_theme.css:<any repo with tailwindcss>
+ *
+ * Borrowing rather than vendoring is deliberate. A second `node_modules` checked in beside this
+ * file would be a second Tailwind version to keep in step with the repositories being linted, and
+ * an invariance check run against a different engine than the table was generated from proves
+ * nothing. The generator refuses a version mismatch for that reason.
  */
 
 @import 'tailwindcss';

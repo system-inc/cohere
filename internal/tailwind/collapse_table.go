@@ -12,6 +12,16 @@
 // codebase. Enumerated from the design system's own class list rather than from any codebase's
 // usage, because a table built from observed classes is silently missing every family nobody has
 // written yet.
+//
+// Only CollapseFamilies is claimed invariant. The other tables in this file are per-repository by
+// construction, and KnownStatics is the proof: it carries markdown-content, one of ahra's own
+// @utility blocks, under a header naming only a Tailwind version. Read this file as one framework
+// fact sitting beside several repository extractions, not as framework data throughout.
+//
+// CollapseFamilies re-measured on this run against:
+//	tools/gen_tailwind_descriptor_base/testdata/independent_theme.css (302 roots, 45451 pairs)
+//
+// Identical families, down to the value each was discovered at.
 
 package tailwind
 

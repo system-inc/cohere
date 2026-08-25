@@ -40,6 +40,22 @@ if (!entryPointArgument) {
 }
 
 const entryPointPath = NodePath.resolve(entryPointArgument);
+
+/*
+ * The project root, which is both where reported paths are relative to and where bare specifiers
+ * resolve from. That second job is the one it did not have and needed.
+ *
+ * Where the CSS lives and where `tailwindcss` resolves from are different questions, and for a
+ * repository they have the same answer: its theme.css sits inside the tree that installed Tailwind,
+ * so anchoring resolution on the entry point's own directory worked and the distinction stayed
+ * invisible. It stops working for exactly the file that matters most here. An independent design
+ * system checked in under `tools/`, written to share no `@theme` with the corpus, has no
+ * `node_modules` above it, so `@import 'tailwindcss'` could not resolve and the file was
+ * ungenerable. The invariance check it exists for was a copy-it-somewhere-else ritual that was
+ * never checked in.
+ *
+ * Still defaulting to the entry point's directory, so every repository invocation is unchanged.
+ */
 const projectRoot = NodePath.resolve(projectRootArgument ?? NodePath.dirname(entryPointPath));
 
 /*
@@ -62,11 +78,17 @@ function resolveModuleUrl(specifier, directory) {
     return NodeUrl.pathToFileURL(resolvedPath).href;
 }
 
+/*
+ * A relative `@import` resolves against the importing file, and a bare one against the project
+ * root. Keeping those two separate is what lets a design system live outside the tree that
+ * installed Tailwind: `./tokens.css` still means the file beside it, while `tailwindcss` means the
+ * package the caller named.
+ */
 function resolveStylesheet(specifier, directory) {
     if (specifier.startsWith('.') || NodePath.isAbsolute(specifier)) {
         return NodePath.resolve(directory, specifier);
     }
-    const requireFromDirectory = NodeModule.createRequire(NodePath.join(directory, 'noop.js'));
+    const requireFromDirectory = NodeModule.createRequire(NodePath.join(projectRoot, 'noop.js'));
     if (specifier.endsWith('.css')) return requireFromDirectory.resolve(specifier);
 
     const packageJsonPath = requireFromDirectory.resolve(specifier + '/package.json');
@@ -78,7 +100,7 @@ function resolveStylesheet(specifier, directory) {
 }
 
 const entryDirectory = NodePath.dirname(entryPointPath);
-const tailwindModule = await import(resolveModuleUrl('tailwindcss', entryDirectory));
+const tailwindModule = await import(resolveModuleUrl('tailwindcss', projectRoot));
 
 const designSystem = await tailwindModule.__unstable__loadDesignSystem(
     NodeFileSystem.readFileSync(entryPointPath, 'utf8'),
@@ -294,7 +316,7 @@ const variantOrder = [];
 
 {
     const tailwindRoot = NodePath.dirname(
-        NodeModule.createRequire(NodePath.join(entryDirectory, 'noop.js')).resolve('tailwindcss/package.json'),
+        NodeModule.createRequire(NodePath.join(projectRoot, 'noop.js')).resolve('tailwindcss/package.json'),
     );
 
     /*
@@ -981,7 +1003,7 @@ for (const name of Array.from(staticUtilities).sort()) {
 
 const tailwindVersion = JSON.parse(
     NodeFileSystem.readFileSync(
-        NodeModule.createRequire(NodePath.join(entryDirectory, 'noop.js')).resolve('tailwindcss/package.json'),
+        NodeModule.createRequire(NodePath.join(projectRoot, 'noop.js')).resolve('tailwindcss/package.json'),
         'utf8',
     ),
 ).version;
