@@ -30,6 +30,44 @@
 //	    -input <b.json> -context <b-context.json> \
 //	    -output internal/tailwind/descriptor_base_table.go
 
+// # What `verify` answers on a repository it has never seen, and what it does not
+//
+// The question `#twany` asked, answered at the end of that tree rather than left in commit messages.
+// Measured against `tools/gen_tailwind_descriptor_base/testdata/independent_theme.css`, a design
+// system sharing no submodule with either corpus repository.
+//
+// Answered correctly on an arbitrary repository:
+//
+//   - What a class declares. `no-conflicting-classes` computes it from the ported handle bodies
+//     rather than reading `RootDeclaredProperties`, which knew only the repository it was generated
+//     from. The two roots that file declares were 2 of 2 invisible when `#twany` opened and are 2 of
+//     2 answered now.
+//   - Whether two utilities of one root layer or overwrite. Computed from two emissions rather than
+//     read from `ComposingRoots`, 81 of that table's 82 rows reproduced before it was deleted.
+//   - Whether a value names a colour. Asked of the theme in front of the linter, which is what
+//     upstream does; the generated `ColorNames` was missing three keys www-connected-app declares.
+//   - The selector a utility lands under, read off the nested rule its handle body emits.
+//   - Whether a class resolves at all. `no-unknown-classes` asks the resolution pipeline, so a root
+//     that exists with a value that does not is reported.
+//
+// Not answered, and the honest statement of it:
+//
+//   - A repository `@utility` root's reading. `synthetic-fn-small` parses and its value resolves,
+//     and `Table.Lookup` declines it, because a measured row needs the engine and nothing in shipped
+//     Go can probe 527 value shapes. `addRepositoryFunctionalRoots` makes that an explicit decline
+//     rather than a wrong answer, and the `@utility` evaluator answers it instead. Measured:
+//     declining moves 180 fixture cases from answered to declined and every one is recoverable.
+//   - The 18 `PerDeclaration` roots, where a value can satisfy several resolution paths at once so
+//     no row can answer them. That is #4f04x54 and is unchanged by this tree.
+//   - This file's own rows. `baseDescriptors` stays because `InferDataType` returns the first match
+//     in `TypeList` and the order decides which cell a class lands in: `bg` infers `3px` as a
+//     position and `border` as a length. The readings in these rows are redundant, measured at 396
+//     of 399 cells agreeing with the emitters, and the type lists are not.
+//
+// So the claim is: every question a generated table used to answer for one repository is now
+// computed for the repository in front of the linter, and the two things still read from a table are
+// Tailwind's own data and a set of ordered type lists that no emitter can rank.
+
 package tailwind
 
 // baseReadings holds every distinct reading in the invariant table exactly once.
