@@ -115,8 +115,10 @@ func TestPrintTerminalCoversEveryTerminal(t *testing.T) {
 // and 22 terminals of which 2 are React. If the sets drift without the reasoning being revisited,
 // the package comment becomes a claim about a program that no longer exists.
 //
-// The terminal count is 20 rather than upstream's 22 BY DESIGN: `Scope` and `PrunedScope` are
-// deliberately absent. See the terminal.go header.
+// The terminal count is 21 rather than upstream's 22 BY DESIGN: `PrunedScope` is deliberately
+// absent. `Scope` was absent for the same reason until `scope_terminals.go` landed to construct it,
+// and was added in that same commit -- which is what this guard is for. It went red, was read, and
+// the count was moved deliberately rather than by a compiler error. See the terminal.go header.
 func TestInstructionSetSizeIsWhatWeSaidItIs(t *testing.T) {
 	values := markerImplementers(t, "instructionValue")
 	if len(values) != 43 {
@@ -124,8 +126,8 @@ func TestInstructionSetSizeIsWhatWeSaidItIs(t *testing.T) {
 	}
 
 	terminals := markerImplementers(t, "terminal")
-	if len(terminals) != 20 {
-		t.Errorf("the terminal set holds %d variants, want 20 (upstream's 22 minus Scope and PrunedScope): %v",
+	if len(terminals) != 21 {
+		t.Errorf("the terminal set holds %d variants, want 21 (upstream's 22 minus PrunedScope): %v",
 			len(terminals), terminals)
 	}
 
@@ -136,12 +138,18 @@ func TestInstructionSetSizeIsWhatWeSaidItIs(t *testing.T) {
 			t.Errorf("%s is missing from the instruction set; see the package comment on why it belongs here", name)
 		}
 	}
-	// The reactive-scope terminals are deliberately absent. Adding one without reading the argument
-	// puts a permanent hole in every switch over Terminal.
-	for _, name := range []string{"Scope", "PrunedScope"} {
-		if contains(terminals, name) {
-			t.Errorf("%s was added to the terminal set; see terminal.go for why it was excluded", name)
-		}
+	// `Scope` is present because `scope_terminals.go` constructs it. Asserting it is present stops a
+	// later cleanup from removing the variant while its producer still builds one.
+	if !contains(terminals, "Scope") {
+		t.Error("Scope is missing from the terminal set, but scope_terminals.go constructs one")
+	}
+	// `PrunedScope` is still deliberately absent. The four passes that construct it upstream are not
+	// ported, so adding it would put a variant in the set that nothing here produces -- the same
+	// shape as `Optional`, which this package already carries as a warning. A stage that ports one of
+	// those passes adds the variant in that commit and updates this line.
+	if contains(terminals, "PrunedScope") {
+		t.Error("PrunedScope was added to the terminal set but nothing in this tree constructs one; " +
+			"see ScopeTerminalsGapPrunedScope")
 	}
 }
 

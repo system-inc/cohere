@@ -337,6 +337,8 @@ func printTerminal(function *Function, terminal Terminal) string {
 			handler = fmt.Sprintf("bb%d", t.Handler)
 		}
 		return fmt.Sprintf("MaybeThrow continuation=bb%d handler=%s", t.Continuation, handler)
+	case *Scope:
+		return fmt.Sprintf("Scope @%d block=bb%d fallthrough=bb%d", t.Scope, t.Block, t.Fallthrough)
 	}
 	return "<unknown terminal>"
 }

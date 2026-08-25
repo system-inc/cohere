@@ -88,7 +88,10 @@
 // (`JsxExpression`, `JsxFragment`, `JsxText`, `StartMemoize`, `FinishMemoize`), and 22 terminals of
 // which 2 are React (`Scope`, `PrunedScope`).
 //
-// All 5 instruction values are HERE, in the core set. The 2 terminals are NOT.
+// All 5 instruction values are HERE, in the core set. Of the 2 terminals, `Scope` is now here and
+// `PrunedScope` is not. The paragraphs below describe the state before reactive scopes were built
+// and the rule that governed it; they are kept because the rule still governs `PrunedScope`, and
+// because the condition they name is exactly the one that was met. See the end of this section.
 //
 // The split is not a compromise between them, and the asymmetry is the point.
 //
@@ -109,6 +112,16 @@
 // pass can interpret would put a permanent hole in every `switch` over `Terminal` for a pass that
 // may never be written. If reactive scopes are ever built, they add two variants then, and every
 // exhaustive switch goes red and gets read by a human. That is the correct time to pay it.
+//
+// THAT MOMENT ARRIVED, for one of the two. Reactive scopes are built: `scopes.go` assigns them,
+// `align_scopes.go` and `merge_scopes.go` bring them to the shape upstream's own
+// `assertValidBlockNesting` demands, and `scope_terminals.go` rewrites the graph to carry them.
+// `Scope` is therefore in the core set, added in the same commit as the pass that constructs it.
+// Every exhaustive switch did go red and was read; two more had a `default` arm and were found by
+// enumeration rather than by the compiler, which is the failure mode this paragraph did not
+// anticipate and the next person adding a variant should expect. `PrunedScope` stays out under the
+// unchanged rule: the four passes that construct it are not ported, so it would be a variant nothing
+// produces -- the exact shape of `Optional`, which this package already carries as a warning.
 //
 // The rule this follows, stated so the next person can apply it rather than re-litigate it: a
 // variant belongs in the core set when LOWERING must produce it, and belongs behind a seam when

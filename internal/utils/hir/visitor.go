@@ -317,6 +317,10 @@ func EachSuccessor(terminal Terminal, visit func(block BlockId)) {
 	case *MaybeThrow:
 		visitReal(t.Continuation)
 		visitReal(t.Handler)
+	case *Scope:
+		// The scope body is a real edge. The fallthrough is not, exactly as for every other
+		// structured terminal: control reaches it by leaving the body, not from here.
+		visitReal(t.Block)
 	}
 }
 
@@ -360,6 +364,8 @@ func Fallthrough(terminal Terminal) (BlockId, bool) {
 	case *Label:
 		block = t.Fallthrough
 	case *Try:
+		block = t.Fallthrough
+	case *Scope:
 		block = t.Fallthrough
 	default:
 		return InvalidBlock, false
@@ -427,6 +433,8 @@ func TerminalOrder(terminal Terminal) EvaluationOrder {
 	case *Try:
 		return t.Order
 	case *MaybeThrow:
+		return t.Order
+	case *Scope:
 		return t.Order
 	}
 	return 0

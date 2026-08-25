@@ -1,8 +1,11 @@
 // The terminal set.
 //
-// 20 variants. Upstream has 22; the two absent are `Scope` and `PrunedScope`, which are the output
-// of reactive-scope construction. See hir.go's package comment for the rule that puts JSX in the
-// core instruction set and these outside it.
+// 21 variants. Upstream has 22; the one absent is `PrunedScope`, which later passes
+// (`flattenReactiveLoopsHIR`, `flattenScopesWithHooksOrUseHIR`, `pruneUnusedScopes`,
+// `pruneAlwaysInvalidatingScopes`) construct and none of which exists here. `Scope` was absent for
+// the same reason until `BuildReactiveScopeTerminals` landed to construct it; see that terminal's
+// comment for why the cost was paid at that moment and not earlier. See hir.go's package comment for
+// the rule that puts JSX in the core instruction set and kept these outside it.
 //
 // # Fallthrough, and why every structured terminal carries one
 //
@@ -279,6 +282,46 @@ type MaybeThrow struct {
 }
 
 // ---------------------------------------------------------------------------
+// Reactive scopes
+// ---------------------------------------------------------------------------
+
+// Scope begins a reactive scope: the values in it are memoized together as one unit.
+//
+// Built by `BuildReactiveScopeTerminals`, which is the only thing that constructs one. Before that
+// pass runs a function contains none, and every consumer written against a freshly lowered graph
+// may still assume the terminal set it knew.
+//
+// # Why this variant exists now, when the package comment said it might never
+//
+// `hir.go` records the rule: a variant belongs in the core set when LOWERING must produce it, and
+// behind a seam when only a LATER PASS would, and it names the moment to pay the cost as "if
+// reactive scopes are ever built". They are built. Four stages before this one declined to add the
+// variant early and were right to: a terminal nothing constructs is worse than no terminal, because
+// consumers switch on it and get an arm that never fires. `Optional` is the standing example in this
+// package. This variant is added in the same commit as its producer, and `TestScopeTerminalsAreBuilt`
+// pins the constructed count so it can never quietly become a second one.
+//
+// # The shape, and the one divergence from React
+//
+// Upstream's terminal embeds the scope OBJECT (`scope: ReactiveScope`); oxc holds a `ScopeId`
+// (`react_compiler_hir/mod.rs:452`). This holds the id, matching oxc, for a reason that is about
+// this tree rather than a preference between them: reactive scopes live in a side table here
+// (`ReactiveScopes`, `AlignedScopes`, `MergedScopes`) precisely so a widening is one write rather
+// than a fan-out, and embedding the object would reintroduce the aliasing that `scopes.go` declined
+// and put two copies of a range in the graph. A consumer wanting the range asks the table it already
+// holds. Recorded as a divergence because a reader diffing against the bundle will see it.
+//
+// `Block` is where the scope's body begins and is a real successor. `Fallthrough` is where control
+// resumes after the scope completes, and is NOT an edge, exactly as for every other structured
+// terminal. See this file's header.
+type Scope struct {
+	Scope       ScopeId
+	Block       BlockId
+	Fallthrough BlockId
+	Order       EvaluationOrder
+}
+
+// ---------------------------------------------------------------------------
 
 func (*Return) terminal()      {}
 func (*Throw) terminal()       {}
@@ -300,3 +343,4 @@ func (*Sequence) terminal()    {}
 func (*Label) terminal()       {}
 func (*Try) terminal()         {}
 func (*MaybeThrow) terminal()  {}
+func (*Scope) terminal()       {}

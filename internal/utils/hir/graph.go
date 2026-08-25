@@ -187,5 +187,7 @@ func setTerminalOrder(terminal Terminal, order EvaluationOrder) {
 		t.Order = order
 	case *MaybeThrow:
 		t.Order = order
+	case *Scope:
+		t.Order = order
 	}
 }
