@@ -874,6 +874,9 @@ type dependencyCollector struct {
 	// `CollectHoistablePropertyLoads`. Nil is a valid and meaningful value: it truncates every
 	// dependency path to its root, which is exactly what this pass did before that analysis existed.
 	hoistable map[ScopeId][]ReactiveScopeDependency
+	// nestedHoistable is the prototype seam: paths that exist only inside a nested function, which
+	// `CollectHoistablePropertyLoads` never sees because it does not descend either.
+	nestedHoistable map[ScopeId][]ReactiveScopeDependency
 }
 
 func (c *dependencyCollector) currentScope() (ScopeId, bool) {
@@ -1271,6 +1274,10 @@ func (c *dependencyCollector) handleInstruction(instruction *Instruction) {
 	}
 
 	switch value := instruction.Value.(type) {
+	case *FunctionExpression:
+		// The recursion REPLACES the bare capture visit: `EachPlace` would record each capture as
+		// a rootless access, and that bare root prunes away every deeper path in the same subtree.
+		c.visitNestedFunction(value.Function, value.Captures)
 	case *PropertyLoad:
 		c.visitDependency(c.temporaries.getProperty(value.Object, value.Property, value.Optional))
 	case *StoreLocal:
@@ -1314,6 +1321,145 @@ func (c *dependencyCollector) handleInstruction(instruction *Instruction) {
 			}
 		})
 	}
+}
+
+// visitNestedFunction records what a nested function reads through its captures.
+//
+// PROTOTYPE. The dependency a closure creates lives inside the closure body: `useCallback(() =>
+// ref.current)` produces the `.current` load only in the nested function's instruction table, and
+// nothing else in this file walks in there.
+//
+// The translation at the boundary is `lowerNestedFunction`'s pairing: `Captures[i]` and
+// `nested.Context[i]` name the same source binding from the two sides. Measured across the corpus,
+// 324 pairs with zero length or name mismatches, so the map is total.
+//
+// Roots that do not translate are nested-local values and are dropped rather than guessed at.
+func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Place) {
+	if int(id) >= len(c.function.Functions) {
+		return
+	}
+	nested := c.function.Functions[id]
+	if nested == nil || len(captures) != len(nested.Context) {
+		return
+	}
+
+	// Inner identifier -> the place in THIS function naming the same binding.
+	translate := map[IdentifierId]Place{}
+	for i := range captures {
+		translate[nested.Context[i].Identifier] = captures[i]
+	}
+
+	// The nested function's own temporaries, which `collectTemporariesInto` builds and discards.
+	nestedTemporaries := temporaries{}
+	collectTemporariesInto(nested, map[DeclarationId]bool{}, nestedTemporaries)
+
+	accesses := nestedAccesses(nested, nestedTemporaries)
+	// A root is suppressed only when some OTHER access names it with a deeper path: that bare
+	// root is the redundant evidence that prunes the path away in `collectMinimalInSubtree`.
+	deepRoots := map[IdentifierId]bool{}
+	for _, dep := range accesses {
+		if len(dep.Path) > 0 {
+			if outer, ok := translate[dep.Identifier]; ok {
+				deepRoots[outer.Identifier] = true
+			}
+		}
+	}
+	for _, dep := range accesses {
+		outer, ok := translate[dep.Identifier]
+		if !ok {
+			continue
+		}
+		if len(dep.Path) == 0 && deepRoots[outer.Identifier] {
+			continue
+		}
+		translated := ReactiveScopeDependency{
+			Identifier: outer.Identifier,
+			Reactive:   outer.Reactive,
+			Path:       dep.Path,
+		}
+		if len(dep.Path) > 0 && c.checkValidDependency(translated) {
+			if scope, ok := c.currentScope(); ok {
+				if c.nestedHoistable == nil {
+					c.nestedHoistable = map[ScopeId][]ReactiveScopeDependency{}
+				}
+				c.nestedHoistable[scope] = append(c.nestedHoistable[scope], translated)
+			}
+		}
+		c.visitDependency(translated)
+	}
+}
+
+// nestedAccesses returns every access a nested function makes, rooted at its own identifiers.
+func nestedAccesses(function *Function, temps temporaries) []ReactiveScopeDependency {
+	var accesses []ReactiveScopeDependency
+	deferred := func(instruction *Instruction) bool {
+		_, ok := temps[instruction.LValue.Identifier]
+		return ok
+	}
+	for _, block := range function.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			instruction := function.Instructions[instructionId]
+			if instruction == nil || deferred(instruction) {
+				continue
+			}
+			switch value := instruction.Value.(type) {
+			case *FunctionExpression:
+				// A closure inside a closure. The pairing composes, so translate through this
+				// function's own context and let the caller translate again.
+				if int(value.Function) >= len(function.Functions) {
+					continue
+				}
+				inner := function.Functions[value.Function]
+				if inner == nil || len(value.Captures) != len(inner.Context) {
+					continue
+				}
+				translate := map[IdentifierId]Place{}
+				for i := range value.Captures {
+					translate[inner.Context[i].Identifier] = value.Captures[i]
+				}
+				innerTemporaries := temporaries{}
+				collectTemporariesInto(inner, map[DeclarationId]bool{}, innerTemporaries)
+				for _, dep := range nestedAccesses(inner, innerTemporaries) {
+					outer, ok := translate[dep.Identifier]
+					if !ok {
+						continue
+					}
+					accesses = append(accesses, temps.resolveWithPath(outer, dep.Path))
+				}
+			case *PropertyLoad:
+				accesses = append(accesses,
+					temps.getProperty(value.Object, value.Property, value.Optional))
+			default:
+				EachPlace(instruction.Value, func(place Place, role PlaceRole) {
+					if role != PlaceRoleDefine {
+						accesses = append(accesses, temps.resolve(place))
+					}
+				})
+			}
+		}
+		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {
+			if role != PlaceRoleDefine {
+				accesses = append(accesses, temps.resolve(place))
+			}
+		})
+	}
+	return accesses
+}
+
+// resolveWithPath resolves a place and appends a suffix path to whatever it resolved to.
+func (t temporaries) resolveWithPath(place Place, suffix []DependencyPathEntry) ReactiveScopeDependency {
+	base := t.resolve(place)
+	if len(suffix) == 0 {
+		return base
+	}
+	path := make([]DependencyPathEntry, 0, len(base.Path)+len(suffix))
+	path = append(path, base.Path...)
+	path = append(path, suffix...)
+	base.Path = path
+	return base
 }
 
 // isDeferredDependency reports whether this instruction's accesses are recorded at the site of USE
@@ -1370,7 +1516,11 @@ func (c *dependencyCollector) reduce(identity ScopeIdentity) {
 		// The hoistable set for this scope, which is what decides how DEEP each dependency path
 		// may go. Empty when `hoistable` was not supplied, which is the pre-5b behaviour and
 		// truncates every path to its root; see `DependencyGapNullPropagation`.
-		hoistable, conflicts := hoistableTreeFor(c.hoistable[scope])
+		seed := c.hoistable[scope]
+		if extra := c.nestedHoistable[scope]; len(extra) > 0 {
+			seed = append(append([]ReactiveScopeDependency{}, seed...), extra...)
+		}
+		hoistable, conflicts := hoistableTreeFor(seed)
 		c.result.conflicts += conflicts
 		tree := newDependencyTree(hoistable)
 		for _, access := range accesses {

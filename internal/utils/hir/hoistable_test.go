@@ -501,8 +501,19 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// That is the opposite of over-approximation -- a scope that invalidated on all of `properties`
 	// now invalidates on the one field it reads -- and it is why the total rises while the answer
 	// gets narrower. One bare root that swallowed N deep paths becomes N paths.
-	if deep != 386 || flat != 2136 {
-		t.Errorf("got %d deep and %d flat dependencies, want 386 and 2136; a SMALL move here is "+
+	// # And again when the dependency collector learned to descend into nested functions
+	//
+	// 386 deep to 589, 2,136 flat to 2,088. Larger than either previous move, and this time the
+	// heading's own condition is satisfied: an oracle does say otherwise. The dependency oracle
+	// rises 68 to 69, and a per-golden dump before and after differs by exactly one row out of 116 --
+	// `x.y.z` in `useCallback-infer-more-specific.ts` going from miss to hit. Nothing was traded.
+	//
+	// The direction is the same narrowing as the entry above, for the same reason. `useCallback(() =>
+	// [x.y.z], [x])` reads `x.y.z` only inside the callback, so the outer function saw the capture
+	// and recorded bare `x`. The walk recovers the path, and one root that swallowed a deep path
+	// becomes the deep path.
+	if deep != 589 || flat != 2088 {
+		t.Errorf("got %d deep and %d flat dependencies, want 589 and 2088; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

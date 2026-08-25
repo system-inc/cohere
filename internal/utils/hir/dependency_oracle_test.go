@@ -189,7 +189,14 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// circumstance under which dropping a floor is not a retreat: the four that vanished were
 	// matches against a golden the pattern had truncated, so they were never earned. Nothing about
 	// the collector changed in that measurement, and the number is more honest at 68 than at 72.
-	const knownMatched = 68
+	// Raised from 68 by descending into nested functions. The recovered dependency is `x.y.z` in
+	// `useCallback-infer-more-specific.ts`, read only inside the callback, where we previously
+	// recorded the bare root `x` that the capture already supplied.
+	//
+	// Confirmed the way this test's ceiling demands rather than by watching the number rise: a
+	// per-golden dump before and after differs by exactly one row, `MISS x.y.z` becoming `hit`, out
+	// of 116. Nothing was traded and no golden was read differently.
+	const knownMatched = 69
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
@@ -205,7 +212,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	//
 	// So a rise is asserted as loudly as a fall. Raise this deliberately, alongside the floor, when
 	// collection genuinely improves.
-	const knownMatchedCeiling = 68
+	const knownMatchedCeiling = 69
 	if matched > knownMatchedCeiling {
 		t.Errorf("matched %d of %d golden dependencies, UP from %d, which this test treats as "+
 			"suspect rather than good: the usual cause is the pattern above reading upstream's "+
