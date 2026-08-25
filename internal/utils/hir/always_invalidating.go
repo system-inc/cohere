@@ -11,8 +11,8 @@
 //
 // # We do not owe that port, and this file is the measurement rather than the claim
 //
-// `Identifier.Node` carries the real TypeScript node -- 60,819 of 61,738 corpus identifiers have
-// one, 98.5% -- and verify runs the checker in the same process. So the question goes to
+// `Identifier.Node` carries the real TypeScript node -- when measured, 60,819 of 61,738 corpus
+// identifiers had one, 98.5% -- and verify runs the checker in the same process. So the question goes to
 // `GetTypeAtLocation` and comes back with the answer the compiler actually computed, through
 // imports and generics, which no amount of local inference recovers. `reactive.go` established this
 // pattern; this is its second consumer.
@@ -58,8 +58,8 @@ func IsAlwaysInvalidatingType(function *Function, id IdentifierId,
 	if identifier == nil || identifier.Node == nil {
 		// Not defensive: `GetTypeAtLocation` dereferences the node and segfaults on nil. Measured
 		// by deleting this guard, which crashes the corpus test rather than returning a wrong
-		// answer. 645 of 40,241 corpus identifiers have no node -- the values `hir.go` documents
-		// as having no direct syntactic source.
+		// answer. When measured, 645 of 40,241 corpus identifiers had no node -- the values `hir.go`
+		// documents as having no direct syntactic source.
 		return false
 	}
 	valueType := typeChecker.GetTypeAtLocation(identifier.Node)

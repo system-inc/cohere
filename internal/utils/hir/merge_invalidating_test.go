@@ -264,13 +264,20 @@ func TestFindLastUsageCorpus(t *testing.T) {
 	// walk's highest order, which a last-write-wins implementation also satisfies. A mutation
 	// replacing `order > previous` with an unconditional overwrite survived it.
 	//
-	// It survives only if the walk is monotonic, and it is not: 473 of 26,331 place visits over 100
-	// corpus files arrive at a LOWER order than the visit before them. So a last-write table is
-	// genuinely wrong on those, and the property that separates the two is stated directly -- every
-	// recorded entry must be the maximum over all visits naming that declaration, not the last one.
+	// It survives only if the walk is monotonic, and it is not: a meaningful fraction of place
+	// visits arrive at a lower order than the visit before them. So a last-write table is genuinely
+	// wrong on those, and the property that separates the two is stated directly -- every recorded
+	// entry must be the maximum over all visits naming that declaration, not the last one.
+	//
+	// The counts are deliberately not written down here. An earlier version cited "473 of 26,331"
+	// from one corpus pass while the test printed 549 of 39,028 from another, and that stale pair
+	// sat inside the failure message whose whole job is to tell a reader the assertion still
+	// discriminates. A number hardcoded beside the code that computes it drifts, and this is the one
+	// place where a phantom discrepancy would cost the most. The live values are interpolated below.
 	if outOfOrder == 0 {
-		t.Fatal("no place visit arrived out of order, so a last-write table would be identical to " +
-			"a max table here and this assertion cannot discriminate; 473 of 26,331 were measured")
+		t.Fatalf("no place visit arrived out of order across %d visits in %d functions, so a "+
+			"last-write table would be identical to a max table here and this assertion cannot "+
+			"discriminate", declarationsSeen, functions)
 	}
 	for declaration, recorded := range highestPerDeclaration {
 		if held, found := recordedTable[declaration]; !found || held != recorded {

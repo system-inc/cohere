@@ -113,7 +113,7 @@ func TestIsAlwaysInvalidatingTypeDeclinesWithoutAChecker(t *testing.T) {
 //
 // Every identifier in a small fixture has a syntactic source, so the nil-node guard is unexercised
 // there -- a mutation sweep confirmed it: deleting that guard passes every other test in this file.
-// The corpus is where the case actually lives: 645 of 40,241 identifiers over 100 files carry no
+// The corpus is where the case actually lives: 645 of 40,241 identifiers over 100 files carried no
 // node, which is the 1.5% that `hir.go` documents as having no direct syntactic source.
 //
 // The assertion is that the predicate answers rather than panicking, and that it answers false. A
@@ -139,8 +139,12 @@ func TestIsAlwaysInvalidatingTypeHandlesNodelessIdentifiers(t *testing.T) {
 	})
 
 	if nodeless == 0 {
-		t.Fatal("no nodeless identifier was found in the corpus, so this guard is unexercised and " +
-			"the test proves nothing; 645 of 40,241 were measured over 100 files")
+		// The count is not written into this message. A hardcoded figure beside the code that
+		// computes it drifts as the corpus moves, and a stale number in the failure message of a
+		// coverage guard is the worst place for one: it hands a future reader a phantom
+		// discrepancy inside the very assertion meant to prove the guard is exercised.
+		t.Fatal("no nodeless identifier was found in the corpus, so this guard is unexercised " +
+			"and the test proves nothing")
 	}
 	if answeredTrue != 0 {
 		t.Errorf("%d of %d nodeless identifiers answered true; a value with no type must decline, "+
