@@ -442,7 +442,15 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// The survivor is in the 150-file project corpus rather than in the React fixtures -- measured,
 	// the fixture corpus reports none -- so it is a real mixed path in real code rather than a
 	// construct this analysis mishandles. Pinned as a ceiling so a rise is a visible event.
-	const knownConflicts = 1
+	// Raised from 1 to 3 by the entry-block read in `invokedNonNullPaths`, which changes what the
+	// nested seed contains and so changes which paths the prefix dedup sees together.
+	//
+	// Located rather than absorbed: all of the rise is one file,
+	// `libraries/structure/source/api/web-sockets/providers/WebSocketViaSharedWorkerProvider.tsx`,
+	// which reports +2. It is in the 150-file project corpus, not in the React fixtures, which
+	// report none -- so this is the same class as the existing survivor above, a real mixed path in
+	// real code, rather than a construct this analysis mishandles.
+	const knownConflicts = 3
 	if conflicts > knownConflicts {
 		t.Errorf("%d conflicting access types across the corpus, want at most %d; upstream raises "+
 			"on any, and a rise here means two paths disagree about the same access in a way the "+
@@ -550,8 +558,24 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	//
 	// A FALL in `deep` is the direction this heading calls safe, and the oracle agrees it cost
 	// nothing: 78 matched of 88 with `ours` at 158, identical before and after.
-	if deep != 595 || flat != 2092 {
-		t.Errorf("got %d deep and %d flat dependencies, want 595 and 2092; a SMALL move here is "+
+	// # And again when the dependency array stopped being evidence
+	//
+	// 595 deep to 574, 2,092 flat to 2,097. Twenty-one paths truncated toward their roots, and this
+	// is the change's point rather than a side effect: the loads that built a memo call's written
+	// dependency array were seeding the non-null set, so a path the developer merely declared was
+	// licensing the walk to descend past it. Upstream's elimination deletes those loads two hundred
+	// lines before its dependency analysis runs, so it never has the option.
+	//
+	// The scale is the informative part. Every earlier attempt on this cluster suppressed evidence
+	// at the collector instead -- a spine walk and then a post-dominance predicate over the whole
+	// function -- and took this number to 120 and then 268, four fifths and half of all path depth
+	// corpus-wide. Fixing the set that licenses depth rather than the walk that consumes it moves it
+	// 3.5%, and the paths that truncate are ones a memo call declared.
+	//
+	// The dependency oracle falls by exactly one row and it is named at `knownMatched`: the same
+	// fixture that gains a false positive, for the optional-chain reason recorded there.
+	if deep != 574 || flat != 2097 {
+		t.Errorf("got %d deep and %d flat dependencies, want 574 and 2097; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

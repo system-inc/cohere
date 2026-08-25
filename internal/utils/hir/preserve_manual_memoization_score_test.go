@@ -176,7 +176,31 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	//
 	// The four recovered are the fixtures whose golden says the inferred dependency did not match
 	// the written one, which is the only condition that can report them.
-	const knownTruePositives = 19
+	// Raised from 19 by two changes in `hoistable.go` that are inert apart and worth six together:
+	// the developer's own dependency array stops seeding the non-null set, and an invoked callback
+	// contributes what its entry block proves rather than what any of its blocks prove.
+	//
+	// The first is a pipeline difference. Upstream drops manual memoization at `Pipeline.ts:168`,
+	// eliminates dead code at 230 and analyses dependencies at 428, and its elimination keeps the
+	// memo markers while pruning `PropertyLoad` and `ArrayExpression`. So the loads that built the
+	// array are gone before anything reads them. This tree keeps them, and reading them treats the
+	// developer's declared `propB.x.y` as proof that `propB.x` is non-null -- then infers a deeper
+	// dependency than they wrote and reports the disagreement it just manufactured.
+	//
+	// The second is `CollectHoistablePropertyLoads.ts:449`, which takes one block's answer from the
+	// nested analysis. That block's set is post-propagation, and propagation intersects across
+	// neighbours, so it holds exactly what the callback reads on every path. It is the only thing
+	// that separates `useMemo-conditional-access-noAlloc.ts`, whose body reads `propB?.x.y`
+	// unconditionally and where upstream keeps the deep path, from
+	// `useMemo-infer-less-specific-conditional-access.ts`, whose body reads it under an `if` and
+	// where upstream infers bare `propB`. Their outer functions are nearly identical; only the
+	// callback's control flow tells them apart.
+	//
+	// Measured apart: the array exclusion alone is 20, the entry-block read alone is 19, together
+	// 25. The `dependencies.go` block gate in the same commit reads flat on its own and drops this
+	// to 20 when removed from the combined state, so it is latent rather than inert -- it only pays
+	// once the hoistable set stops over-approximating.
+	const knownTruePositives = 25
 	if fired != knownTruePositives {
 		t.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
 			"should be raised deliberately, and if it went DOWN the rule stopped reporting programs "+
@@ -296,7 +320,26 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	// Four true positives for one false positive is the first net-positive reading this trade has
 	// ever had. It was plus six for thirteen when the ungating task was re-measured, and every step
 	// between is recorded on that task.
-	const knownFalsePositives = 28
+	// Raised from 28 by the change described at `knownTruePositives`, and the cost is one fixture
+	// family rather than three defects:
+	//
+	//	useMemo-conditional-access-alloc.ts
+	//	useMemo-conditional-access-noAlloc.ts
+	//	useMemo-conditional-access-own-scope.ts
+	//
+	// All three read `propB?.x.y`, and an optional load proves nothing about its object, so
+	// `maybeNonNullInInstruction` refuses it on purpose. Upstream reaches the deep path a different
+	// way: `collectOptionalChainSidemap` keys its hoistable set by optional block, and that pass is
+	// driven by `Optional` terminals this lowering does not produce. The refusal is correct and the
+	// route around it is missing, which is the gap already recorded at that arm.
+	//
+	// `own-scope` is also the single row the dependency oracle loses in this change, `propB.x.y`,
+	// so that oracle's fall and one of these three are the same fixture rather than two findings.
+	//
+	// Six true positives for three false positives, with `under` in the scope oracle unmoved at
+	// 5 fixtures / 7 scopes and the corpus depth distribution moving 595 to 574 rather than
+	// collapsing the way every truncation attempt on this cluster did.
+	const knownFalsePositives = 31
 	if fired != knownFalsePositives {
 		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
 			"number should be lowered deliberately, and if it went UP something regressed",

@@ -221,7 +221,18 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// Confirmed the way this test's ceiling demands rather than by watching the number rise: a
 	// per-golden dump before and after differs by exactly one row, `MISS x.y.z` becoming `hit`, out
 	// of 116. Nothing was traded and no golden was read differently.
-	const knownMatched = 78
+	// Lowered from 78 by the hoistable change recorded at `knownTruePositives` in the score test,
+	// and the row is named rather than absorbed: `propB.x.y` in
+	// `useMemo-conditional-access-own-scope.ts`. A per-golden dump before and after differs by
+	// exactly that one row out of 116, with nothing gained and nothing else lost.
+	//
+	// Lowering a floor is a retreat unless the row was never earned or the trade is named, and this
+	// is the second: the same fixture is one of the three false positives that change adds, so this
+	// fall and that rise are one fixture rather than two findings. It reads `propB?.x.y`, and the
+	// optional route upstream uses to keep the depth -- `collectOptionalChainSidemap`, keyed by
+	// optional block -- is the gap already recorded at `maybeNonNullInInstruction`. The floor
+	// returns to 78 when that lands.
+	const knownMatched = 77
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)

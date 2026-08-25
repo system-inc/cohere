@@ -371,6 +371,10 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 		known[registry.identifierNode(function.Params[0].Identifier, true)] = true
 	}
 
+	// The loads that exist only to build a memo call's dependency array, which must not be read as
+	// evidence. See `dependencyArrayInstructions`.
+	written := dependencyArrayInstructions(function)
+
 	blocks := map[BlockId]map[int]bool{}
 	for _, block := range function.Blocks {
 		if block == nil {
@@ -399,6 +403,9 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 					ranges, identity, scopes, instruction.Order) {
 					assumed[registry.pathIndex(path)] = true
 				}
+				continue
+			}
+			if written[instructionId] {
 				continue
 			}
 			path, ok := maybeNonNullInInstruction(instruction.Value, temporaries)
@@ -902,35 +909,199 @@ func invokedNonNullPaths(parent *Function, expression *FunctionExpression,
 		return nil
 	}
 
-	// The callback's own temporaries, so a path assembled across several loads inside it resolves
-	// to one access rather than to an anonymous intermediate.
-	nestedTemporaries := temporaries{}
-	collectTemporariesInto(nested, map[DeclarationId]bool{}, nestedTemporaries)
+	// # What the callback proves is read at its ENTRY block, not gathered from all of them
+	//
+	// Upstream runs the whole analysis on the callback and takes one block's answer:
+	//
+	//	const innerHoistables = assertNonNull(
+	//	  innerHoistableMap.get(innerFn.func.body.entry));
+	//
+	// `CollectHoistablePropertyLoads.ts:449`. The entry's set is what survived propagation, and
+	// propagation intersects across neighbours, so it holds exactly the accesses that happen on
+	// every path through the callback. A read inside a branch reaches that branch's set and no
+	// further.
+	//
+	// Gathering every block instead asserts a conditionally-read object is non-null in the caller,
+	// which is the over-approximating direction: it licenses the dependency walk to descend past a
+	// property that may never have been loaded. That is the whole difference between
+	// `useMemo-conditional-access-noAlloc.ts`, whose callback reads `propB?.x.y` unconditionally and
+	// where upstream's guard is `$[1] !== t1`, and
+	// `useMemo-infer-less-specific-conditional-access.ts`, whose callback reads it only under an
+	// `if` and where upstream infers bare `propB`. The two lower to nearly identical outer
+	// functions, so the caller cannot tell them apart -- only the callback's own control flow can.
+	nestedAnalysis := analyseHoistableLoads(nested, scopes, identity, ranges)
+	if nestedAnalysis == nil || len(nested.Blocks) == 0 || nested.Blocks[0] == nil {
+		return nil
+	}
 
 	var paths []ReactiveScopeDependency
-	for _, block := range nested.Blocks {
+	for _, path := range nestedAnalysis.hoistableAt(nested.Blocks[0].Id) {
+		outer, translatable := translate[path.Identifier]
+		if !translatable {
+			continue
+		}
+		paths = append(paths, ReactiveScopeDependency{
+			Identifier: outer.Identifier,
+			Reactive:   outer.Reactive,
+			Path:       path.Path,
+		})
+	}
+	return paths
+}
+
+// dependencyArrayInstructions returns the loads that exist only to build a memo dependency array.
+//
+// # Why reading them is circular
+//
+// `useMemo(() => ..., [propA?.a, propB.x.y])` lowers its dependency array to ordinary loads, so
+// `propB.x.y` appears as a `PropertyLoad` chain in the enclosing function. `collectNonNullsInBlocks`
+// would read that chain as proof that `propB.x` is non-null, and the dependency walk then descends
+// past `x` and infers `propB.x.y` where upstream infers bare `propB`. The developer's own answer
+// becomes the evidence for a deeper answer, and the rule reports a disagreement it manufactured.
+//
+// # Why upstream never sees these instructions
+//
+// Its pipeline drops manual memoization at `Pipeline.ts:168`, runs dead-code elimination at line
+// 230, and runs the dependency analysis at line 428. `DeadCodeElimination.ts:371` keeps
+// `StartMemoize` and `FinishMemoize` -- "we can't DCE without losing the memoization guarantees" --
+// while `PropertyLoad`, `ArrayExpression` and `LoadGlobal` fall through to the prunable list. So
+// what the developer declared survives in the marker, and the instructions that built the array do
+// not. This tree keeps them: `drop_manual_memoization.go` leaves them deliberately, matching
+// upstream's pass, and the elimination upstream relies on afterwards is not written here.
+//
+// Excluding them at the seed rather than deleting them keeps that difference contained. No
+// instruction is removed, so numbering, terminals and every block-keyed analysis are untouched.
+//
+// # Reached from the array, not matched by path
+//
+// The elements are walked back through the values feeding them, and only a load whose result
+// nothing else reads is taken. Matching by declared path instead was measured and is wrong:
+// `useMemo-conditional-access-noAlloc.ts` both reads `propB?.x.y` in the callback body and declares
+// it, and upstream's compiled guard is `$[1] !== t1` where `t1 = propB?.x.y` -- so the body's own
+// load is real evidence that must survive. Only the copy the array made for itself is dead.
+func dependencyArrayInstructions(function *Function) map[InstructionId]bool {
+	written := map[InstructionId]bool{}
+	if function == nil {
+		return written
+	}
+
+	// Without a memo marker no array here is a dependency array. This is also what keeps the walk
+	// off every array literal in the corpus: a mutation removing it does not change the answer but
+	// does not finish either, which is the shape of a guard that is doing real work.
+	hasMarker := false
+	for _, block := range function.Blocks {
 		if block == nil {
 			continue
 		}
 		for _, instructionId := range block.Instructions {
-			instruction := nested.Instructions[instructionId]
+			instruction := function.Instructions[instructionId]
 			if instruction == nil {
 				continue
 			}
-			path, ok := maybeNonNullInInstruction(instruction.Value, nestedTemporaries)
-			if !ok {
-				continue
+			if _, isStart := instruction.Value.(*StartMemoize); isStart {
+				hasMarker = true
 			}
-			outer, translatable := translate[path.Identifier]
-			if !translatable {
-				continue
-			}
-			paths = append(paths, ReactiveScopeDependency{
-				Identifier: outer.Identifier,
-				Reactive:   outer.Reactive,
-				Path:       path.Path,
-			})
 		}
 	}
-	return paths
+	if !hasMarker {
+		return written
+	}
+
+	producer := map[IdentifierId]InstructionId{}
+	reads := map[IdentifierId]int{}
+	countRead := func(place Place, role PlaceRole) {
+		if role != PlaceRoleDefine {
+			reads[place.Identifier]++
+		}
+	}
+	for _, block := range function.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			instruction := function.Instructions[instructionId]
+			if instruction == nil {
+				continue
+			}
+			producer[instruction.LValue.Identifier] = instructionId
+			EachPlace(instruction.Value, countRead)
+		}
+		EachTerminalPlace(block.Terminal, countRead)
+	}
+
+	var walk func(id IdentifierId, depth int)
+	walk = func(id IdentifierId, depth int) {
+		// Bounded by the longest access path. Re-entry cannot occur because an instruction is
+		// marked before its operands are walked.
+		if depth > 64 {
+			return
+		}
+		instructionId, produced := producer[id]
+		if !produced || written[instructionId] {
+			return
+		}
+		// A value read more than once is not the array's private copy: something else consumes it,
+		// so upstream's elimination would keep it and so does this.
+		//
+		// # A mutation removing this guard SURVIVES, and it is recorded rather than covered
+		//
+		// Measured: dropping it moves nothing on this corpus, because a dependency array's elements
+		// are lowered fresh for the array in every fixture here -- the callback body's own read of
+		// the same property is a separate instruction inside the nested function, which this walk
+		// never reaches. So no load is currently reachable from an array AND read elsewhere.
+		//
+		// Kept because the property it protects is soundness rather than score, and because the
+		// direction matters: without it, a load that real code also consumes would stop being
+		// evidence, which is the under-approximating direction and would drop dependency depth that
+		// upstream keeps. The verdict EXPIRES the moment a lowering shares one load between an
+		// array element and a body read, which is what upstream's own elimination already assumes
+		// can happen -- it prunes by use count rather than by position.
+		if reads[id] > 1 {
+			return
+		}
+		instruction := function.Instructions[instructionId]
+		if instruction == nil {
+			return
+		}
+		switch instruction.Value.(type) {
+		case *PropertyLoad, *LoadLocal, *LoadGlobal, *ComputedLoad:
+		default:
+			// Any other value is a real computation the array merely names, and it is evidence in
+			// its own right.
+			//
+			// A mutation widening this list SURVIVES on this corpus, since no fixture writes a
+			// dependency array over anything but a load -- `[props.a, x]` rather than
+			// `[f(x)]`, which upstream's own dependency extraction refuses to parse anyway. It is
+			// still the list rather than a bare accept, because the walk exists to find loads that
+			// upstream's dead-code elimination would delete, and that pass keeps every value with a
+			// live use. Accepting a call here would stop a real computation from being evidence.
+			return
+		}
+		written[instructionId] = true
+		EachPlace(instruction.Value, func(place Place, role PlaceRole) {
+			if role != PlaceRoleDefine {
+				walk(place.Identifier, depth+1)
+			}
+		})
+	}
+
+	for _, block := range function.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			instruction := function.Instructions[instructionId]
+			if instruction == nil {
+				continue
+			}
+			array, isArray := instruction.Value.(*ArrayExpression)
+			if !isArray {
+				continue
+			}
+			for _, element := range array.Elements {
+				walk(element.Place.Identifier, 0)
+			}
+		}
+	}
+	return written
 }

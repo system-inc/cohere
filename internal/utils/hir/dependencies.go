@@ -1410,7 +1410,20 @@ func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Plac
 	nestedTemporaries := temporaries{}
 	collectTemporariesInto(nested, map[DeclarationId]bool{}, nestedTemporaries)
 
-	accesses := nestedAccesses(nested, nestedTemporaries)
+	accesses, accessBlocks := nestedAccessesByBlock(nested, nestedTemporaries)
+	// Which of the nested function's blocks run on every path through it. A deep path read only in a
+	// branch still becomes a dependency below -- the value is read there -- but it does not seed the
+	// hoistable set, because `nestedHoistable` is keyed by scope and would otherwise offer a
+	// branch's fact to the whole scope. The CFG-derived set beside it is keyed by block already.
+	//
+	// # This is inert alone and worth five true positives beside the hoistable change
+	//
+	// Measured on its own, this moves nothing: the array loads in the enclosing function were still
+	// seeding `propB.x` as non-null, so the walk descended past `x` whatever the seed here held.
+	// With `dependencyArrayInstructions` excluding those loads, removing this drops the board from
+	// 25 to 20. Latent rather than inert, and recorded because it read as a failed change for a
+	// whole cycle before the other half landed.
+	alwaysReached := blocksAlwaysReached(nested)
 	// A root is suppressed only when some OTHER access names it with a deeper path: that bare
 	// root is the redundant evidence that prunes the path away in `collectMinimalInSubtree`.
 	deepRoots := map[IdentifierId]bool{}
@@ -1421,7 +1434,7 @@ func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Plac
 			}
 		}
 	}
-	for _, dep := range accesses {
+	for index, dep := range accesses {
 		outer, ok := translate[dep.Identifier]
 		if !ok {
 			continue
@@ -1434,7 +1447,8 @@ func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Plac
 			Reactive:   outer.Reactive,
 			Path:       dep.Path,
 		}
-		if len(dep.Path) > 0 && c.checkValidDependency(translated) {
+		if len(dep.Path) > 0 && alwaysReached[accessBlocks[index]] &&
+			c.checkValidDependency(translated) {
 			if scope, ok := c.currentScope(); ok {
 				if c.nestedHoistable == nil {
 					c.nestedHoistable = map[ScopeId][]ReactiveScopeDependency{}
@@ -1448,7 +1462,24 @@ func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Plac
 
 // nestedAccesses returns every access a nested function makes, rooted at its own identifiers.
 func nestedAccesses(function *Function, temps temporaries) []ReactiveScopeDependency {
+	accesses, _ := nestedAccessesByBlock(function, temps)
+	return accesses
+}
+
+// nestedAccessesByBlock is `nestedAccesses` plus the block each access was read in.
+//
+// The block matters because a deep path read inside a branch is a dependency -- the value is read
+// there -- but is not evidence the object is safe to load early. Upstream keys its non-null sets by
+// block for exactly this reason, and a scope reads the set at its own block, so a fact established
+// inside a branch is available in that branch and nowhere else.
+func nestedAccessesByBlock(function *Function, temps temporaries) ([]ReactiveScopeDependency,
+	[]BlockId) {
 	var accesses []ReactiveScopeDependency
+	var blocks []BlockId
+	record := func(block BlockId, dependency ReactiveScopeDependency) {
+		accesses = append(accesses, dependency)
+		blocks = append(blocks, block)
+	}
 	deferred := func(instruction *Instruction) bool {
 		_, ok := temps[instruction.LValue.Identifier]
 		return ok
@@ -1484,26 +1515,51 @@ func nestedAccesses(function *Function, temps temporaries) []ReactiveScopeDepend
 					if !ok {
 						continue
 					}
-					accesses = append(accesses, temps.resolveWithPath(outer, dep.Path))
+					record(block.Id, temps.resolveWithPath(outer, dep.Path))
 				}
 			case *PropertyLoad:
-				accesses = append(accesses,
+				record(block.Id,
 					temps.getProperty(value.Object, value.Property, value.Optional))
 			default:
 				EachPlace(instruction.Value, func(place Place, role PlaceRole) {
 					if role != PlaceRoleDefine {
-						accesses = append(accesses, temps.resolve(place))
+						record(block.Id, temps.resolve(place))
 					}
 				})
 			}
 		}
 		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {
 			if role != PlaceRoleDefine {
-				accesses = append(accesses, temps.resolve(place))
+				record(block.Id, temps.resolve(place))
 			}
 		})
 	}
-	return accesses
+	return accesses, blocks
+}
+
+// blocksAlwaysReached returns the blocks of a function that run on every path through it.
+//
+// Post-dominance is the exact relation: a block runs on every path from entry to exit precisely when
+// every such path passes through it.
+func blocksAlwaysReached(function *Function) map[BlockId]bool {
+	always := map[BlockId]bool{}
+	if function == nil || len(function.Blocks) == 0 || function.Blocks[0] == nil {
+		return always
+	}
+	entry := function.Blocks[0].Id
+	always[entry] = true
+	tree := computePostDominance(function)
+	if tree == nil {
+		return always
+	}
+	for current := entry; ; {
+		next, found := tree.immediate[current]
+		if !found || next == current {
+			return always
+		}
+		always[next] = true
+		current = next
+	}
 }
 
 // resolveWithPath resolves a place and appends a suffix path to whatever it resolved to.
