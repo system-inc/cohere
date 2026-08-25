@@ -100,3 +100,61 @@ func TestNoDupeClassMembersSeparatesPrivateNames(t *testing.T) {
 	ruletest.ExpectFindings(t, ruletest.Run(t, NoDupeClassMembers, dupeClassMembersFile,
 		"class A { #foo() {} #foo() {} }"), "noDupeClassMembers")
 }
+
+// TypeScript overload signatures are one member, not several.
+//
+// Cases written because somebody ran the binary rather than because the corpus asked, which is the
+// same reason `TestNoDupeClassMembersSeparatesPrivateNames` exists. The corpus is oxc's and is
+// JavaScript-shaped: a class member there always has a body, so nothing in it can reach this.
+//
+// A method may carry several signatures and one implementation, and only the implementation has a
+// body. The signatures are erased and generate no code, so reporting them says the earlier
+// declaration is dead code that reads as live, which is the reverse of what an overload is.
+//
+// Found on `BaseSchema.ts` in a real repository, which overloads `is` and `in` twice each: four
+// reports on code `tsc --noEmit` accepts without a diagnostic.
+func TestNoDupeClassMembersAllowsOverloadSignatures(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+	}{
+		{"a method with two signatures",
+			"class A { is(a: string): string; is(a: number): number; is(a: unknown): unknown { return a; } }"},
+		{"a getter with a signature",
+			"class A { get foo(): string; get foo(): unknown { return 1; } }"},
+		{"the shape BaseSchema writes",
+			"class A { in<const T extends readonly unknown[]>(v: T): this; in(v: readonly unknown[]): this; in(v: readonly unknown[]): unknown { return v; } }"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ruletest.ExpectClean(t,
+				ruletest.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText))
+		})
+	}
+}
+
+// A real duplicate is still reported, including one standing beside overload signatures.
+//
+// The half that makes the test above mean something: skipping every body-less member would let a
+// genuine duplicate through, and the third case is the one that catches it, since a class can carry
+// signatures and a duplicate implementation at once.
+func TestNoDupeClassMembersStillReportsDuplicatesBesideOverloads(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+	}{
+		{"two implementations after a signature",
+			"class A { is(a: string): string; is(a: unknown): unknown { return a; } is() {} }"},
+		{"two properties, which carry no body to confuse this",
+			"class A { foo = 1; foo = 2; }"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ruletest.ExpectFindings(t,
+				ruletest.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText),
+				"noDupeClassMembers")
+		})
+	}
+}

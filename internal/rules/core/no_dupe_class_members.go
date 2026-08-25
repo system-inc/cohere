@@ -66,6 +66,21 @@ var NoDupeClassMembers = rule.Rule{
 				if name == nil {
 					continue
 				}
+				// An overload signature is not a member, it is a way of describing one.
+				//
+				// TypeScript lets a method carry several signatures and one implementation, and only
+				// the implementation has a body. The signatures declare nothing on their own: they
+				// are erased, they generate no code, and the implementation is what the class ends
+				// up with. Reporting them says the earlier declaration is dead code that reads as
+				// live, which is the opposite of true.
+				//
+				// The corpus this rule inherited is oxc's and is JavaScript-shaped, where a class
+				// member always has a body, so no case in it could reach this. Found by running the
+				// binary over a repository: `BaseSchema.ts` overloads `is` and `in` twice each, four
+				// reports on code `tsc --noEmit` accepts.
+				if isOverloadSignature(member) {
+					continue
+				}
 				key, ok := classMemberKeyOf(member, name)
 				if !ok {
 					continue
@@ -103,6 +118,24 @@ var NoDupeClassMembers = rule.Rule{
 			},
 		}
 	},
+}
+
+// isOverloadSignature reports whether a class member declares a signature without implementing it.
+//
+// A method or accessor with no body, which in a class is only ever an overload signature: every
+// other body-less member kind is filtered out before this runs, since `classMemberName` answers for
+// four kinds and a property declaration cannot carry a body at all.
+//
+// `abstract` members are body-less too and are deliberately included in that: two `abstract foo()`
+// declarations are a genuine duplicate, and this returns true for each, so neither is reported. That
+// is a real gap and it is smaller than the one it replaces, because a repeated abstract member is a
+// compile error TypeScript reports itself while an overload is legal code this rule was flagging.
+func isOverloadSignature(member *ast.Node) bool {
+	switch member.Kind {
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		return member.Body() == nil
+	}
+	return false
 }
 
 // isAccessorKind reports whether a member is a getter or a setter.
