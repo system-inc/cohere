@@ -52,13 +52,18 @@ type Options struct {
 	// Targets are the platforms to build. Empty means every target.
 	Targets []Target
 
-	// EmbedFormatter pulls the Prettier fork's bundles into the binary and stamps which commit
-	// built them.
+	// EmbedFormatter requires a built fork, so a release can refuse to ship bundles it cannot vouch
+	// for.
 	//
-	// Off by default because the formatter is not wired into verify yet, and a release that
-	// demanded a built fork before anything could use it would block every build for a feature
-	// nobody reaches. When it is on, a fork that is absent, unbuilt, or stale fails the release
-	// rather than embedding whatever is on disk.
+	// It no longer decides whether the bundles are embedded. They are vendored into the repository
+	// and pulled in by a `go:embed` directive with no build tag, so every binary carries them and
+	// every binary can format. The name is now narrower than it reads and the flag is kept because
+	// what it still controls is real: with it on, a fork that is absent, unbuilt or stale fails the
+	// release before any target is cross-compiled.
+	//
+	// Off by default because a release does not need a fork to produce a working formatter any
+	// more. The cost of off is a binary whose formatter stamp is empty, which says plainly that it
+	// cannot name the Prettier it formats with.
 	EmbedFormatter bool
 
 	// Signing configures macOS codesigning. A zero value stages unsigned binaries, which is a
@@ -120,12 +125,26 @@ func Build(options Options) (Result, error) {
 
 	// Resolved once, before any target is built, so a stale or missing fork fails the release
 	// immediately rather than after six cross-compilations.
+	//
+	// Resolved whatever EmbedFormatter says, because the bundles are embedded by a `go:embed`
+	// directive with no build tag on it: every binary carries them, and a binary built with the
+	// flag off still formats. Gating the stamp on the flag produced a binary that formatted a file
+	// and reported no formatter at all, which was measured rather than supposed -- `--format` on an
+	// unstamped build rewrote `const   x:number=1` to `const x: number = 1;` while `--version`
+	// printed zero formatter lines. The stamp describes the bytes that ship, so it has to follow
+	// the bytes rather than an option about them.
+	//
+	// The flag still decides whether a fork is required. With it on, a fork that is absent, unbuilt
+	// or stale fails the release. With it off, an unavailable fork leaves the stamp empty, which
+	// reports honestly as "this binary cannot name its formatter" rather than blocking a build for
+	// a fork the release was not asking for.
 	formatter := FormatterSource{}
-	if options.EmbedFormatter {
-		formatter, err = ResolveFormatterSource()
-		if err != nil {
+	formatter, err = ResolveFormatterSource()
+	if err != nil {
+		if options.EmbedFormatter {
 			return Result{}, err
 		}
+		formatter = FormatterSource{}
 	}
 
 	result := Result{}

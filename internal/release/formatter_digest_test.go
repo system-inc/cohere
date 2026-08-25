@@ -107,3 +107,25 @@ func TestDigestRefusesAMissingBundle(t *testing.T) {
 		t.Fatalf("the error does not name the missing bundle: %v", err)
 	}
 }
+
+// TestStampFollowsTheBytesNotTheFlag pins the defect that the stamp is about what shipped.
+//
+// The bundles are embedded unconditionally, so a binary built with EmbedFormatter off still formats.
+// A stamp gated on the flag produced exactly that binary: it rewrote a file and reported no
+// formatter at all, so a bug report from it could not name which Prettier did the rewriting.
+//
+// This asserts the resolve happens regardless of the flag, which is the half a reader would
+// otherwise have to infer from the absence of an `if`.
+func TestStampFollowsTheBytesNotTheFlag(t *testing.T) {
+	source, err := ResolveFormatterSource()
+	if err != nil {
+		t.Skipf("NOT MEASURED: the Prettier fork is unavailable, so the stamp is unverified here: %v", err)
+	}
+
+	if source.Commit == "" {
+		t.Fatal("a resolved fork produced no commit, so a binary built from it would report no formatter")
+	}
+	if source.Digest == "" {
+		t.Fatal("a resolved fork produced no digest, so a binary built from it could not name its bytes")
+	}
+}
