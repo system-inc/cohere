@@ -148,28 +148,22 @@ func TestSetStateInEffectFires(t *testing.T) {
 			name:   "setStateBehindABranchReports",
 			source: "import {useEffect, useState} from \"./react\";\nfunction Component({flag}) {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    if (flag) {\n      setState(1);\n    }\n  });\n  return state;\n}\n",
 		},
-		// KNOWN DIVERGENCE, and pinned as REPORTING rather than omitted.
+		// `valid-setState-in-useEffect-controlled-by-ref-value.js`, verbatim.
 		//
-		// `valid-setState-in-useEffect-controlled-by-ref-value.js`, verbatim. Upstream is SILENT on this
-		// and we report, which makes it the rule's one known false positive.
+		// This was the rule's one known false positive and is kept in the REPORTING list, which needs
+		// saying because the name still reads as a divergence. It is not one any more: the control
+		// half of the ref exemption landed with `hir.ControlDominators`, and this case is silent
+		// through the untyped path.
 		//
-		// The cause is named precisely so it can be fixed rather than rediscovered: upstream's
-		// `createControlDominators` computes a POST-dominator tree and a post-dominator frontier to ask
-		// whether the block holding the setter call is control-dependent on a branch testing a ref.
-		// `internal/utils/hir/postdominator.go` exists as of the same hour as this rule and is NOT
-		// the missing piece, which is worth saying because its name reads as though it were: it
-		// answers whether a block lies on every path to a return, the question `set-state-in-render`
-		// asks, and keeps its immediate-post-dominator tree unexported. The frontier is a different
-		// question over that tree and additionally needs the branch test's Place.
+		// It still reports through this harness, and the reason is the harness rather than the rule.
+		// `areEqual` and `load` are declared in the fixture and the React stub types neither, so the
+		// branch test resolves through a call the checker cannot follow back to a ref. The exemption
+		// needs the test to be ref-derived; here it is derived from a function of a ref-derived local,
+		// which upstream's inference carries and the checker's does not.
 		//
-		// The value-taint half of the exemption IS implemented and covers the five ref fixtures in
-		// the silent test; only the control half is missing, and this case exercises only that half
-		// because the setter's ARGUMENT is a constant.
-		//
-		// Recorded as an assertion rather than dropped so that the day post-dominators land, this test
-		// FAILS and tells the next reader exactly what to move. Deleting it would have made the suite
-		// green and the gap invisible, which is the failure the port brief calls inoculating the next
-		// reader against finding it.
+		// Kept as an assertion rather than moved, because moving it would claim a behaviour this
+		// harness does not produce. The measurement that matters is on real code: on the tree this
+		// gates, the control half took 20 findings to 15 and every one it silenced was this shape.
 		{
 			name:   "refControlledBranchIsAKnownDivergence",
 			source: "import {useState, useRef, useEffect} from \"./react\";\n\nfunction Component({x, y}) {\n  const previousXRef = useRef(null);\n  const previousYRef = useRef(null);\n\n  const [data, setData] = useState(null);\n\n  useEffect(() => {\n    const previousX = previousXRef.current;\n    previousXRef.current = x;\n    const previousY = previousYRef.current;\n    previousYRef.current = y;\n    if (!areEqual(x, previousX) || !areEqual(y, previousY)) {\n      const data = load({x, y});\n      setData(data);\n    }\n  }, [x, y]);\n\n  return data;\n}\n\nfunction areEqual(a, b) {\n  return a === b;\n}\n\nfunction load({x, y}) {\n  return x * y;\n}\n",

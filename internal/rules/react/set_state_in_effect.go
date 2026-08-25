@@ -131,28 +131,20 @@ var messageSetStateInEffect = rule.Message{
 // The third line is the control that makes the first two mean something: merely mentioning a ref
 // in the effect does not exempt it.
 //
-// **The value-taint half is implemented here. The control-dominance half is not**, and this is the
-// rule's one knowing divergence. Upstream's `createControlDominators` computes a POST-dominator
-// tree and then a post-dominator FRONTIER, asking whether the block holding the setter call is
-// control-dependent on a branch whose test is ref-derived.
+// **Both halves are implemented here.** The value-taint half tracks a `refDerivedValues` set through
+// the effect's blocks; the control-dominance half asks `hir.ControlDominators` whether the block
+// holding the setter is control-dependent on a branch whose test is ref-derived.
 //
-// `internal/utils/hir/postdominator.go` landed in the same hour as this rule, from the sibling
-// porting `set-state-in-render`, and it is NOT the missing piece — which is worth saying precisely,
-// because its name reads as though it were. It exposes `UnconditionalBlocks`, answering "does this
-// block lie on every path from entry to a return", and it keeps its `immediate` tree unexported.
-// That is the question `set-state-in-render` asks. The frontier is a different question over the
-// same tree, and it additionally needs the branch test's Place so its ref-ness can be asked.
+// The control half was missing for a while and the file said so, because
+// `internal/utils/hir/postdominator.go` had the tree and kept it unexported: it exposed
+// `UnconditionalBlocks`, which answers "does this block lie on every path to a return", the question
+// `set-state-in-render` asks. The frontier is a different question over the same tree and
+// additionally needs the branch test's Place, so `ControlDominators` sits beside it on the shelf
+// rather than inside this rule.
 //
-// So the remaining work is: export the immediate post-dominator relation, add the frontier over it,
-// and consult the terminal's test. That belongs in the shelf beside `UnconditionalBlocks` rather
-// than inside a rule, and it is deliberately not done here while a sibling holds that file.
-//
-// The consequence is stated exactly rather than left as a hedge: a setter guarded by a branch on a
-// ref, whose ARGUMENTS are not themselves ref-derived, reports here and is silent upstream. That is
-// a false positive, it is the only known one, and `upstreamRefControlled` in the test file is that
-// exact case, recorded as reporting with the reason at the line. It is pinned as a fixture rather
-// than omitted so that the day post-dominators land, the fixture fails and tells the next reader
-// what to change. Omitting it would have made the suite green and the gap invisible.
+// Measured on the tree this gates: the control half alone moved 20 findings to 15, and every one it
+// silenced was the ref-sentinel shape, `if (previousReference.current !== value) setValue(value)`,
+// which is what upstream exempts.
 //
 // # Behaviours that look like defects and are upstream's
 //
@@ -425,6 +417,15 @@ func findSetStateCall(
 		return refDerived[place.Identifier] || isRefTyped(ctx, function, place)
 	}
 
+	// The control-dominance half of the ref exemption, upstream's `isRefControlledBlock`.
+	//
+	// Built here rather than per call so its per-block cache is shared, and built over a closure
+	// that reads `refDerived` live: the taint map is still filling as the blocks below are walked,
+	// and a branch on `reference.current` taints through the same loop that later reaches the
+	// setter. The predicate is only ever CALLED at a setter, by which point every instruction above
+	// it in the walk has been seen.
+	isRefControlledBlock := hir.ControlDominators(function, isDerivedFromRef)
+
 	for _, block := range function.Blocks {
 		// A phi joining a ref-derived operand is ref-derived. Upstream does the same, and it is
 		// what carries the exemption across an `if` that assigns from a ref on one path.
@@ -534,6 +535,13 @@ func findSetStateCall(
 				// The value-taint half of the ref exemption: a setter fed a ref-derived value is
 				// synchronizing React with something outside it, which is what effects are for.
 				if argument, ok := firstIdentifierArgument(value.Args); ok && refDerived[argument] {
+					return hir.Place{}, false
+				}
+				// The control-dominance half: a setter that only runs when a branch on a ref says
+				// so is the same synchronization written the other way. `if (previous.current !==
+				// value) setValue(value)` reaches here with an argument that is not ref-derived,
+				// and upstream is silent on it because the ref decides whether the call happens.
+				if isRefControlledBlock(block.Id) {
 					return hir.Place{}, false
 				}
 				return value.Callee, true

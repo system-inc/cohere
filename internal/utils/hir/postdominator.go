@@ -240,3 +240,159 @@ func reversePostorderFrom(root BlockId, successors map[BlockId][]BlockId) []Bloc
 	}
 	return postorder
 }
+
+// ControlDominators reports, for a block, whether it is control-dependent on a branch whose test
+// satisfies isControlValue.
+//
+// This is upstream's `createControlDominators` from the React compiler's `Dominator.ts`. It answers
+// a different question from `UnconditionalBlocks` over the same tree, and the difference is why both
+// live here: that one asks whether a block runs on every path, this one asks which branches decide
+// whether it runs at all.
+//
+// `set-state-in-effect` is the caller. A setter inside `if (previousReference.current !== value)` is
+// exempt upstream because the branch that decides whether it runs tests a ref, which is React's
+// evidence that the effect is synchronizing against something render cannot see. The exemption has
+// two halves and this is the second: the first, value taint, is the setter's own arguments being
+// ref-derived, and it needs no control flow at all.
+//
+// The returned predicate caches per block, because a rule asks it once per setter call and several
+// setters commonly share a block.
+//
+// Nil-safe: a nil function yields a predicate that answers false, which is the correct answer for a
+// function with no blocks rather than a special case.
+func ControlDominators(function *Function, isControlValue func(place Place) bool) func(block BlockId) bool {
+	if function == nil || isControlValue == nil {
+		return func(BlockId) bool { return false }
+	}
+
+	tree := computePostDominance(function)
+	cache := map[BlockId]bool{}
+
+	return func(block BlockId) bool {
+		if answer, known := cache[block]; known {
+			return answer
+		}
+
+		answer := false
+		for frontierBlock := range postDominatorFrontier(function, tree, block) {
+			source := blockById(function, frontierBlock)
+			if source == nil {
+				continue
+			}
+			if terminalTestSatisfies(source.Terminal, isControlValue) {
+				answer = true
+				break
+			}
+		}
+
+		cache[block] = answer
+		return answer
+	}
+}
+
+// terminalTestSatisfies asks whether a terminal branches on a value the caller cares about.
+//
+// Three terminal kinds carry a test, matching upstream's switch over `if`, `branch` and `switch`. A
+// switch is asked about its subject and about every case test, because `switch (reference.current)`
+// and `case reference.current:` are both a branch on a ref, and upstream checks both.
+//
+// Every other terminal leaves control unconditionally, so a block downstream of one is not control
+// dependent on it and there is nothing to test.
+func terminalTestSatisfies(terminal Terminal, isControlValue func(place Place) bool) bool {
+	switch typed := terminal.(type) {
+	case *If:
+		return isControlValue(typed.Test)
+	case *Branch:
+		return isControlValue(typed.Test)
+	case *Switch:
+		if isControlValue(typed.Test) {
+			return true
+		}
+		for _, kase := range typed.Cases {
+			if kase.Test != nil && isControlValue(*kase.Test) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// postDominatorFrontier is the set of blocks that decide whether target runs.
+//
+// Upstream's `postDominatorFrontier`. A predecessor of anything target post-dominates, which target
+// does NOT post-dominate, is a block where control could have gone elsewhere: that is exactly a
+// branch target depends on.
+//
+// The walk covers target itself as well as its post-dominated set, because a branch immediately
+// above target is a frontier block and target does not post-dominate itself in `postDominatorsOf`'s
+// result.
+func postDominatorFrontier(function *Function, tree *postDominanceTree, target BlockId) map[BlockId]bool {
+	postDominated := postDominatorsOf(function, tree, target)
+
+	frontier := map[BlockId]bool{}
+	visited := map[BlockId]bool{}
+
+	walk := func(id BlockId) {
+		if visited[id] {
+			return
+		}
+		visited[id] = true
+
+		block := blockById(function, id)
+		if block == nil {
+			return
+		}
+		for _, predecessor := range block.Predecessors {
+			if !postDominated[predecessor] {
+				frontier[predecessor] = true
+			}
+		}
+	}
+
+	for id := range postDominated {
+		walk(id)
+	}
+	walk(target)
+
+	return frontier
+}
+
+// postDominatorsOf is every block target post-dominates.
+//
+// Upstream's `postDominatorsOf`, walking predecessors from target and keeping a block when its own
+// immediate post-dominator is target or is already known to be post-dominated by it. A block with no
+// entry in the tree reaches no return, and upstream falls back to the block itself there, which this
+// reproduces rather than skipping: the fallback makes such a block its own post-dominator, so it
+// joins the set only if it IS the target.
+func postDominatorsOf(function *Function, tree *postDominanceTree, target BlockId) map[BlockId]bool {
+	result := map[BlockId]bool{}
+	visited := map[BlockId]bool{}
+
+	queue := []BlockId{target}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		if visited[current] {
+			continue
+		}
+		visited[current] = true
+
+		block := blockById(function, current)
+		if block == nil {
+			continue
+		}
+		for _, predecessor := range block.Predecessors {
+			immediate, known := tree.immediate[predecessor]
+			if !known {
+				immediate = predecessor
+			}
+			if immediate == target || result[immediate] {
+				result[predecessor] = true
+			}
+			queue = append(queue, predecessor)
+		}
+	}
+
+	return result
+}
