@@ -1,10 +1,71 @@
 package tailwind
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/system-inc/verify/internal/ruletest"
 )
+
+// # Why every fixture here runs through a program
+//
+// Same reason the other three migrated rules' fixtures give. The rule now reads the live design
+// system to resolve a class to its declared properties, so it declares `ReadsProgram` and returns
+// nil listeners when the Program is nil. `ruletest.Run` hands it exactly that, so a fixture left on
+// it would exercise the nil-Program branch: the reporting half fails loudly and the silent half —
+// which this rule's own header calls the load-bearing one — passes while proving nothing.
+//
+// `TestConflictFixturesActuallyRan` is what stops the converted file from going green on nothing in
+// the other direction, where the walk for an installed tailwindcss finds none and every fixture
+// skips while `go test` prints ok.
+
+// runConflictFixture runs the rule against a one-file program that has a real design system.
+//
+// The fixture stylesheet declares no tokens of its own. This rule's subject is what a class declares,
+// and the classes these fixtures use are the framework's, so a fixture theme adding tokens would test
+// the fixture. The repository half is measured against the real corpus in live_placement_test.go,
+// where 913 class occurrences are answered by compiling an `@utility` block.
+func runConflictFixture(t *testing.T, fileName string, source string) ruletest.Result {
+	t.Helper()
+	return runConflictFixtureWithOptions(t, fileName, source, nil)
+}
+
+// runConflictFixtureWithOptions is runConflictFixture for the cases that configure the surfaces.
+func runConflictFixtureWithOptions(
+	t *testing.T,
+	fileName string,
+	source string,
+	options any,
+) ruletest.Result {
+	t.Helper()
+
+	packageRoot := unknownFixturePackageRoot()
+	if packageRoot == "" {
+		t.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
+			"built and these fixtures would measure a decline rather than a conflict")
+	}
+
+	files := map[string]string{
+		fileName:                     source,
+		unknownFixtureStylesheetPath: `@import "tailwindcss";`,
+	}
+	plantPackage := func(root string) {
+		modules := filepath.Join(root, "node_modules")
+		if err := os.MkdirAll(modules, 0o755); err != nil {
+			t.Fatalf("creating the fixture node_modules: %v", err)
+		}
+		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
+			t.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+		}
+	}
+
+	if options == nil {
+		return ruletest.RunTypedFilesWithSetup(t, NoConflictingClasses, files, fileName, plantPackage)
+	}
+	return ruletest.RunTypedFilesWithSetupAndOptions(
+		t, NoConflictingClasses, files, fileName, options, plantPackage)
+}
 
 // Expectations measured by running `better-tailwindcss/no-conflicting-classes` over probe fixtures
 // against the real plugin. Each line is a verdict, and the silent ones are the load-bearing half:
@@ -77,7 +138,7 @@ func TestNoConflictingClassesReportsSymmetrically(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoConflictingClasses, testCase.fileName, testCase.source)
+			result := runConflictFixture(t, testCase.fileName, testCase.source)
 			ruletest.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
@@ -184,7 +245,7 @@ func TestNoConflictingClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoConflictingClasses, testCase.fileName, testCase.source)
+			result := runConflictFixture(t, testCase.fileName, testCase.source)
 			ruletest.ExpectClean(t, result)
 		})
 	}
@@ -201,7 +262,7 @@ func TestNoConflictingClassesStaysSilent(t *testing.T) {
 // This was caught by `@system_verify_lint_fix`'s research pass rather than by reading the source,
 // where the `autofix` flag reads as an instruction.
 func TestConflictingClassesProposeSuggestionsNotFixes(t *testing.T) {
-	result := ruletest.Run(t, NoConflictingClasses, "Component.tsx",
+	result := runConflictFixture(t, "Component.tsx",
 		`const element = <div className="flex block" />;`)
 
 	if len(result.Diagnostics) == 0 {
@@ -225,9 +286,11 @@ func TestConflictingClassesProposeSuggestionsNotFixes(t *testing.T) {
 // That is the same shortcut, in a different guise, that silently stopped `border-x` being reported
 // during the migration.
 func TestPropertyLookupUsesTheLongestRoot(t *testing.T) {
+	designSystem := DesignSystemResult{System: unknownFixtureLiveSystem(t)}
+
 	// The real lookup.
-	left, canResolveLeft := resolveClassFacts("border-l-4")
-	right, canResolveRight := resolveClassFacts("border-r-4")
+	left, canResolveLeft := resolveClassFactsIn("border-l-4", designSystem)
+	right, canResolveRight := resolveClassFactsIn("border-r-4", designSystem)
 	if !canResolveLeft || !canResolveRight {
 		t.Fatal("border-l-4 or border-r-4 did not resolve, so this control proves nothing")
 	}
@@ -242,17 +305,151 @@ func TestPropertyLookupUsesTheLongestRoot(t *testing.T) {
 			"are different edges and must not be reported as conflicting.", leftProperties, rightProperties)
 	}
 
-	// And the shortcut it guards against: taking the first segment gives both the same root.
-	if functionalRootOf("border-l-4") == "border" {
+	// And the shortcut it guards against: taking the first segment gives both the same root. The
+	// root now comes from `parseCandidate` rather than a longest-prefix walk over a generated table,
+	// so this asserts the parser's answer rather than the walk's.
+	if root, _ := functionalRootIn("border-l-4", designSystem.System); root == "border" {
 		t.Error("the root lookup returned the shortest match rather than the longest, which gives " +
 			"every border edge the same properties")
 	}
 
 	// The lookup must also not let a shorter root match across a value boundary.
-	if functionalRootOf("px-4") == "p" {
+	if root, _ := functionalRootIn("px-4", designSystem.System); root == "p" {
 		t.Error("`p` matched `px-4`, so padding and padding-inline would be conflated and `p-4 px-8` " +
 			"would report a conflict upstream does not report")
 	}
+
+	// A root the shipped prefix walk got wrong on real code. `bg-linear-to-r` is root `bg-linear`,
+	// which sets `background-image`; the walk read root `bg` and answered `background-color`, a
+	// property the class does not declare and which collides with every real `bg-*` color class.
+	if root, isFunctional := functionalRootIn("bg-linear-to-r", designSystem.System); !isFunctional ||
+		root != "bg-linear" {
+		t.Errorf("bg-linear-to-r resolved to root %q, want bg-linear", root)
+	}
+}
+
+// TestRepositoryUtilitiesAreCompiledRatherThanLookedUp pins the half of this rule that went live.
+//
+// A repository's own `@utility` block is answered by compiling it, which is the only source that can
+// answer for a repository this port has never seen. The framework's utilities stay on the generated
+// tables because nothing in shipped Go compiles them, and conflict_facts.go's file comment records
+// why a sort reading is not a substitute.
+//
+// Asserted against a stylesheet that declares its own utility, so the compiled answer cannot be
+// coming from a table: `synthetic-static` sets `display` and `opacity`, and no generated table in
+// this repository contains the name.
+func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(t *testing.T) {
+	packageRoot := unknownFixturePackageRoot()
+	if packageRoot == "" {
+		t.Skip("no installed tailwindcss on this machine")
+	}
+
+	// Two classes under one design system: one the repository declares, one the framework does.
+	result := runConflictFixture(t, "Component.tsx",
+		`const element = <div className="flex block" />;`)
+	ruletest.ExpectFindings(t, result, "conflictingClasses", "conflictingClasses")
+
+	// And the repository half, against a class the corpus repository declares and no framework
+	// contains. `background--0` is a functional `@utility` block in ahra's own stylesheet, compiled
+	// here rather than looked up.
+	ahra := DesignSystemResult{System: unknownFixtureLiveSystem(t)}
+	facts, canResolve := resolveClassFactsIn("background--0", ahra)
+	if !canResolve {
+		t.Fatal("background--0 did not resolve, so the repository half is not being compiled")
+	}
+	if len(facts.Properties) != 1 || facts.Properties[0] != "background-color" {
+		t.Errorf("background--0 resolved to %v, want [background-color] from compiling its @utility "+
+			"block", facts.Properties)
+	}
+
+	// The population, so this is not one lucky class. Every corpus class the repository half answers
+	// is one whose properties come from compiling a block rather than from any table.
+	compiled := 0
+	for _, className := range []string{
+		"background--0", "background--1", "background--2", "background--3",
+		"content--0", "content--1", "content--placeholder", "content--positive",
+		"border--0", "border--focus", "hover:background--1", "dark:content--2",
+	} {
+		if _, wasCompiled := repositoryClassFacts(className, "", ahra); wasCompiled {
+			compiled++
+		}
+	}
+	if compiled < 10 {
+		t.Errorf("only %d of 12 repository utilities were answered by compiling their @utility "+
+			"block; the repository half is not carrying the population it should", compiled)
+	}
+
+	// The complement, and it asserts the SOURCE rather than the answer. `background--0` still
+	// resolves against a design system that does not declare it, because `RootDeclaredProperties`
+	// carries the root `background-` — the same generated-table leak
+	// TestRepositoryNamesInTheFrameworkTablesAreStillVouchedFor pins for `KnownStatics`. What must
+	// differ is which half answered: the repository's compiled block on ahra, the framework table
+	// elsewhere.
+	independent := DesignSystemResult{System: independentLiveSystem(t)}
+	if _, compiledHere := repositoryClassFacts("background--0", "", ahra); !compiledHere {
+		t.Error("background--0 was not answered by compiling ahra's own @utility block, so the " +
+			"repository half is not being consulted")
+	}
+	if _, compiledElsewhere := repositoryClassFacts("background--0", "", independent); compiledElsewhere {
+		t.Error("background--0 was answered by compiling a block on a design system that declares " +
+			"none, so the repository half is not reading the repository in front of the rule")
+	}
+}
+
+// TestStaticRepositoryUtilitiesStillReadFromTheFrameworkTables pins a gap this task did not close.
+//
+// The repository half of the resolution compiles functional `@utility` blocks, which is where 913 of
+// the corpus's class occurrences are answered. A STATIC `@utility` block cannot be compiled from
+// here: `LoadedDesignSystem.staticUtilityNodes` is unexported and has no accessor, and the only path
+// to it is `Table.Statics`, which holds a `{order, count}` reading rather than property names.
+// conflict_facts.go's file comment records why a reading is not a substitute for a declaration list.
+//
+// So `synthetic-static` and its kind fall through to `StaticDeclaredProperties`, which carries 16
+// names ahra declares in its own stylesheet and nothing from any other repository. The consequence
+// is that a repository's static `@utility` blocks are resolvable exactly when the generated table
+// happens to contain them.
+//
+// Not closed here because the accessor belongs to `internal/tailwind` and the seam it would cross is
+// the same one #gnqbn4b tracks. The error direction is the safe one: an unresolvable class is skipped
+// rather than reported, so the rule under-reports on a repository whose statics it cannot see.
+//
+// Pinned on the CURRENT behaviour so closing it upstream breaks this test deliberately.
+func TestStaticRepositoryUtilitiesStillReadFromTheFrameworkTables(t *testing.T) {
+	independent := DesignSystemResult{System: independentLiveSystem(t)}
+
+	if _, canResolve := resolveClassFactsIn("synthetic-static", independent); canResolve {
+		t.Error("a static @utility block now resolves against the repository that declares it, which " +
+			"means the design system grew a way to reach static utility bodies. That is the fix this " +
+			"test exists to notice: delete it and assert the corrected behaviour instead")
+	}
+
+	// The complement: a FUNCTIONAL block on the same stylesheet does resolve, so the gap is about
+	// static blocks specifically rather than about the repository half being inert.
+	if _, canResolve := resolveClassFactsIn("synthetic-fn-small", independent); !canResolve {
+		t.Error("a functional @utility block did not resolve either, so the repository half is not " +
+			"working at all and this test is measuring the wrong thing")
+	}
+}
+
+// TestConflictFixturesActuallyRan is what stops this file from going green on nothing.
+//
+// Every fixture above skips when no installed tailwindcss can be found, and `go test` prints ok for a
+// package whose every case skipped, so a mistake in where the walk starts looks identical to a
+// machine that lacks the package.
+func TestConflictFixturesActuallyRan(t *testing.T) {
+	packageRoot := unknownFixturePackageRoot()
+	if packageRoot == "" {
+		t.Fatalf(
+			"no installed tailwindcss found from %s, so every fixture in this file skipped and the "+
+				"package still reported ok. Either the search root is wrong or this machine has no "+
+				"Tailwind to test against; both need a human, and neither should read as a pass",
+			unknownFixtureSearchRoot,
+		)
+	}
+
+	result := runConflictFixture(t, "Component.tsx",
+		`const element = <div className="flex block" />;`)
+	ruletest.ExpectFindings(t, result, "conflictingClasses", "conflictingClasses")
 }
 
 // TestVariantsAreComparedNotStripped pins the distinction that decides false positives.
@@ -260,13 +457,13 @@ func TestPropertyLookupUsesTheLongestRoot(t *testing.T) {
 // Two classes conflict only in the same state. Comparing bare names reports `flex hover:block`,
 // which is correct code, and a rule that fires on correct code is one somebody turns off.
 func TestVariantsAreComparedNotStripped(t *testing.T) {
-	sameVariant := ruletest.Run(t, NoConflictingClasses, "Component.tsx",
+	sameVariant := runConflictFixture(t, "Component.tsx",
 		`const element = <div className="hover:flex hover:block" />;`)
 	if len(sameVariant.Diagnostics) == 0 {
 		t.Fatal("two display utilities under the same variant do collide and must be reported")
 	}
 
-	differentVariant := ruletest.Run(t, NoConflictingClasses, "Component.tsx",
+	differentVariant := runConflictFixture(t, "Component.tsx",
 		`const element = <div className="flex hover:block" />;`)
 	if len(differentVariant.Diagnostics) != 0 {
 		t.Fatalf("classes in different states both take effect where they belong, so this is correct "+

@@ -1,6 +1,7 @@
 package tailwind
 
 import (
+	"errors"
 	"sort"
 	"strings"
 
@@ -73,9 +74,25 @@ type NoConflictingClassesOptions struct {
 // picks for them.
 var NoConflictingClasses = rule.Rule{
 	Name: "no-conflicting-classes",
+	// Declared because the rule reaches ctx.Program for the design system. The stylesheet graph
+	// reaches files the program does not contain, so a findings cache keyed on the linted file alone
+	// is stale whenever an `@utility` block changes what a class declares and the `.tsx` file does
+	// not.
+	ReadsProgram: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil
+		}
+
+		// Resolved once per file and before the listeners are built, matching the other migrated
+		// rules. A project with no Tailwind is silence with nothing wrong; a project whose CSS will
+		// not parse is reported once per file rather than swallowed.
+		designSystem := DesignSystemForProgram(ctx)
+		if designSystem.Err != nil {
+			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) || ctx.Program == nil {
+				return nil
+			}
+			return declineListeners(ctx, "no-conflicting-classes", designSystem)
 		}
 
 		settings := DefaultClassLiteralSettings()
@@ -95,7 +112,7 @@ var NoConflictingClasses = rule.Rule{
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportConflicts(ctx, literal)
+				reportConflicts(ctx, literal, designSystem)
 			}
 		}
 
@@ -129,7 +146,7 @@ type classFacts struct {
 }
 
 // reportConflicts finds classes in one literal that collide on the same element in the same state.
-func reportConflicts(ctx rule.Context, literal ClassLiteral) {
+func reportConflicts(ctx rule.Context, literal ClassLiteral, designSystem DesignSystemResult) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) < 2 {
 		return
@@ -147,15 +164,41 @@ func reportConflicts(ctx rule.Context, literal ClassLiteral) {
 		distinct = append(distinct, className)
 	}
 
+	for _, finding := range conflictFindingsIn(distinct, designSystem) {
+		// Reported per class rather than per pair, which is what makes the output symmetric and
+		// matches upstream: `flex block` produces two findings, one anchored at each class.
+		ctx.ReportRange(literal.Range, messageConflictingClasses(
+			finding.ClassName, finding.Conflicting, finding.Properties))
+	}
+}
+
+// conflictFinding is one class that collides, and what it collides with.
+//
+// Split out of `reportConflicts` so the corpus measurement in live_placement_test.go can count what
+// the rule would report without building a Context and walking a tree. A measurement that
+// reimplemented the pairing would be measuring its own copy, which is how a regression check comes
+// to agree with a rule that changed.
+type conflictFinding struct {
+	ClassName   string
+	Conflicting []string
+	Properties  []string
+}
+
+// conflictFindingsIn resolves a class list and returns every collision in it.
+//
+// The classes must already be deduplicated: a repeated class is `no-duplicate-classes`'s finding,
+// and pairing one with itself would report every duplicate in the tree as a conflict.
+func conflictFindingsIn(distinct []string, designSystem DesignSystemResult) []conflictFinding {
 	resolved := make([]classFacts, 0, len(distinct))
 	for _, className := range distinct {
-		facts, canResolve := resolveClassFacts(className)
+		facts, canResolve := resolveClassFactsIn(className, designSystem)
 		if !canResolve {
 			continue
 		}
 		resolved = append(resolved, facts)
 	}
 
+	findings := make([]conflictFinding, 0, len(resolved))
 	for index, subject := range resolved {
 		if subject.Composes {
 			continue
@@ -195,54 +238,13 @@ func reportConflicts(ctx rule.Context, literal ClassLiteral) {
 		}
 		sort.Strings(properties)
 
-		// Reported per class rather than per pair, which is what makes the output symmetric and
-		// matches upstream: `flex block` produces two findings, one anchored at each class.
-		ctx.ReportRange(literal.Range, messageConflictingClasses(subject.ClassName, conflictingNames, properties))
+		findings = append(findings, conflictFinding{
+			ClassName:   subject.ClassName,
+			Conflicting: conflictingNames,
+			Properties:  properties,
+		})
 	}
-}
-
-// resolveClassFacts reads a class's four deciding facts out of the generated tables.
-func resolveClassFacts(className string) (classFacts, bool) {
-	variants, base, _ := dissectClass(className)
-
-	if properties, isStatic := tailwindengine.StaticDeclaredProperties[base]; isStatic {
-		return classFacts{
-			ClassName:     className,
-			Variants:      variants,
-			SelectorShape: selectorShapeOf(base),
-			Properties:    properties,
-			Composes:      tailwindengine.ComposingRoots[base],
-		}, true
-	}
-
-	root := functionalRootOf(base)
-	if root == "" {
-		return classFacts{}, false
-	}
-
-	properties := tailwindengine.RootDeclaredProperties[root]
-
-	// A root's entry is the common case, and two kinds of class take a different reading. A color
-	// value, handled per root because the color scale is large and uniform. And a handful of named
-	// values whose properties simply differ: `font-medium` declares `font-weight` while `font-mono`
-	// declares `font-family`, and both parse as root `font`. Taking the root's reading for those
-	// reported `font-medium font-mono` as a conflict on correct code.
-	if classProperties, hasClassReading := tailwindengine.ClassDeclaredProperties[base]; hasClassReading {
-		properties = classProperties
-	} else if colorProperties, hasColorReading := tailwindengine.RootColorProperties[root]; hasColorReading && valueIsColor(base, root) {
-		properties = colorProperties
-	}
-	if len(properties) == 0 {
-		return classFacts{}, false
-	}
-
-	return classFacts{
-		ClassName:     className,
-		Variants:      variants,
-		SelectorShape: selectorShapeOf(root),
-		Properties:    properties,
-		Composes:      tailwindengine.ComposingRoots[root],
-	}, true
+	return findings
 }
 
 // selectorShapeOf returns the selector a utility emits under, defaulting to a bare class.
@@ -256,32 +258,6 @@ func selectorShapeOf(rootOrName string) string {
 	return ".CLASS"
 }
 
-// valueIsColor reports whether a class's value names one of the theme's colors.
-//
-// Read from the generated palette rather than guessed, because a project that customises its colors
-// has different names and hardcoding Tailwind's defaults would be wrong for it. An arbitrary value
-// is judged by its shape: `[#fff]` and `[red]` are colors while `[3px]` is a length, which matches
-// what the engine does with them.
-func valueIsColor(base string, root string) bool {
-	if len(base) <= len(root) {
-		return false
-	}
-	value := strings.TrimPrefix(base[len(root):], "-")
-
-	// An opacity modifier is part of the color, not of the name: `white/30` is `white`.
-	if slash := strings.Index(value, "/"); slash >= 0 {
-		value = value[:slash]
-	}
-
-	if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
-		inner := strings.TrimSuffix(strings.TrimPrefix(value, "["), "]")
-		// A length carries a unit or is bare digits; anything else in brackets reads as a color.
-		return !looksLikeLength(inner)
-	}
-
-	return tailwindengine.ColorNames[value]
-}
-
 // looksLikeLength reports whether an arbitrary value is a measurement rather than a color.
 func looksLikeLength(value string) bool {
 	if value == "" {
@@ -293,29 +269,6 @@ func looksLikeLength(value string) bool {
 	// Leading digit or sign covers `3px`, `0`, `-2rem`, `50%`.
 	first := value[0]
 	return first == '-' || first == '.' || (first >= '0' && first <= '9')
-}
-
-// functionalRootOf finds the longest registered root that prefixes a class base.
-//
-// Longest wins, and that is the whole reason this is not a dash-split: `border-l-4` has root
-// `border-l` rather than `border`, and taking the shorter match would give it `border-width`
-// instead of `border-left-width`, which changes what it conflicts with. The same mistake in a
-// different guise is what silently stopped `border-x` being reported during the migration.
-func functionalRootOf(base string) string {
-	longest := ""
-	for root := range tailwindengine.RootDeclaredProperties {
-		if !strings.HasPrefix(base, root) {
-			continue
-		}
-		// The root must be followed by a value separator, so `p` does not match `px-4`.
-		if len(base) > len(root) && base[len(root)] != '-' {
-			continue
-		}
-		if len(root) > len(longest) {
-			longest = root
-		}
-	}
-	return longest
 }
 
 // sharedProperties returns the properties two classes both declare.

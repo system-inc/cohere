@@ -102,6 +102,25 @@ func RunTypedFilesWithSetup(
 	return runTypedFiles(t, subject, files, subjectFileName, nil, setup)
 }
 
+// RunTypedFilesWithSetupAndOptions is RunTypedFilesWithSetup for a rule that also reads
+// configuration.
+//
+// Both axes at once, because a rule can need both and the two existing entry points each drop one.
+// `no-unknown-classes` is the case: it needs the symlinked package RunTypedFilesWithSetup exists for
+// AND its `ignore` option, and without this its ignore-list fixtures would have to run through a
+// harness that leaves the Program nil, where the rule declines and every assertion passes vacuously.
+func RunTypedFilesWithSetupAndOptions(
+	t *testing.T,
+	subject rule.Rule,
+	files map[string]string,
+	subjectFileName string,
+	options any,
+	setup func(directory string),
+) Result {
+	t.Helper()
+	return runTypedFiles(t, subject, files, subjectFileName, options, setup)
+}
+
 // RunTypedFilesWithOptions is the full form the others delegate to.
 func RunTypedFilesWithOptions(
 	t *testing.T,

@@ -1,12 +1,10 @@
 package tailwind
 
 import (
-	"regexp"
-	"strings"
+	"errors"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
 )
 
 func messageUnknownClass(className string) rule.Message {
@@ -52,9 +50,11 @@ type NoUnknownClassesOptions struct {
 // sets only `--enter-opacity`; all three are deliberately absent from those tables and all three are
 // real. Measured on the ahra tree, that mistake produced 12 findings on valid classes.
 //
-// So existence reads its own tables, generated as the union of every functional root and every
-// static name the design system defines. Absence from a properties table is not evidence a class
-// does not exist.
+// So existence is asked of the design system rather than of a table. See class_existence.go: the
+// question is whether the repository in front of the linter can read the class as a candidate, which
+// is the only form of the question that answers correctly for a repository this port has never seen.
+// Absence from a properties table is not evidence a class does not exist, and presence in a
+// generated one is not evidence that it does.
 //
 // # What it deliberately does not check
 //
@@ -68,9 +68,28 @@ type NoUnknownClassesOptions struct {
 // in particular gets turned off the first time it flags a working class.
 var NoUnknownClasses = rule.Rule{
 	Name: "no-unknown-classes",
+	// Declared because the rule reaches ctx.Program for the design system. The stylesheet graph
+	// reaches files the program does not contain, so a findings cache keyed on the linted file alone
+	// is stale whenever a `@utility` block is added and the `.tsx` file does not change: the new
+	// class reads as unknown forever, which is the shape of finding an author trusts least.
+	ReadsProgram: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil
+		}
+
+		// Resolved once per file and before the listeners are built, matching
+		// `enforce-consistent-class-order`. The two failure states are told apart rather than
+		// collapsed: a project with no Tailwind is silence with nothing wrong, and a project whose
+		// CSS will not parse is reported once per file. This rule needs that distinction more than
+		// the others do, because a design system that failed to load would otherwise make every
+		// class in the tree read as unknown.
+		designSystem := DesignSystemForProgram(ctx)
+		if designSystem.Err != nil {
+			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) || ctx.Program == nil {
+				return nil
+			}
+			return declineListeners(ctx, "no-unknown-classes", designSystem)
 		}
 
 		settings := DefaultClassLiteralSettings()
@@ -94,7 +113,7 @@ var NoUnknownClasses = rule.Rule{
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
 				for _, className := range SplitClasses(literal.Text) {
-					if isIgnored(className, ignored) || classExists(className) {
+					if isIgnored(className, ignored) || classExistsIn(className, designSystem.System) {
 						continue
 					}
 					ctx.ReportRange(literal.Range, messageUnknownClass(className))
@@ -108,64 +127,4 @@ var NoUnknownClasses = rule.Rule{
 		}
 		return listeners
 	},
-}
-
-// alwaysKnownClasses are markers Tailwind treats specially rather than as utilities.
-//
-// `group` and `peer` generate no CSS of their own: they exist to be referenced by `group-hover:` and
-// `peer-checked:` variants on other elements. Upstream ignores them by explicit regular expression
-// for exactly this reason, and a port that omitted them would report two of the most common classes
-// in any real codebase.
-var alwaysKnownClasses = regexp.MustCompile(`^(group|peer)(/\S*)?$`)
-
-// arbitraryPropertyPattern matches a whole-property escape hatch such as `[font:inherit]`.
-//
-// These have no root to look up: the author wrote the CSS declaration directly. Tailwind accepts any
-// syntactically valid one, so there is nothing to check against and reporting them would flag a
-// deliberate feature.
-var arbitraryPropertyPattern = regexp.MustCompile(`^\[[^\]]+:[^\]]*\]$`)
-
-// classExists reports whether Tailwind defines a class, by name rather than by what it declares.
-func classExists(className string) bool {
-	// Checked before variants are stripped: `dissectClass` splits on the last colon, and an
-	// arbitrary property carries one inside its own brackets, so `[font:inherit]` would be cut into
-	// a variant `[font:` and a base `inherit]`. The brackets are the class, not a prefix.
-	if arbitraryPropertyPattern.MatchString(className) {
-		return true
-	}
-
-	_, base, _ := dissectClass(className)
-	if base == "" {
-		return true
-	}
-
-	if alwaysKnownClasses.MatchString(base) {
-		return true
-	}
-	if arbitraryPropertyPattern.MatchString(base) {
-		return true
-	}
-	if tailwindengine.KnownStatics[base] {
-		return true
-	}
-
-	// A functional class is its root plus a value. The root must end at a value boundary, so `p`
-	// does not claim `px-4`: taking a shorter match would make every misspelling that happens to
-	// start with a real root look valid.
-	for root := range tailwindengine.KnownRoots {
-		if !strings.HasPrefix(base, root) {
-			continue
-		}
-		if len(base) == len(root) {
-			return true
-		}
-		remainder := base[len(root):]
-		// `from-black/70` is root `from` with value `black/70`; `w-[13px]` is root `w` with an
-		// arbitrary value; `bg-(--custom)` is root `bg` with a custom-property value.
-		if remainder[0] == '-' || remainder[0] == '/' || remainder[0] == '[' || remainder[0] == '(' {
-			return true
-		}
-	}
-
-	return false
 }

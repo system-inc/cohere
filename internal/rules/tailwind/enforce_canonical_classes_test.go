@@ -1,6 +1,8 @@
 package tailwind
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,6 +11,64 @@ import (
 
 // The fixture corpus is the one the migration earned, and every entry in it was a real finding at
 // some point. Several are the specific finding a cheaper approach silently lost.
+//
+// # Why every fixture here runs through a program
+//
+// Same reason `enforce_consistent_class_order_test.go` and `no_unknown_classes_test.go` give. The
+// rule now reads the live design system to split a class into root and value, so it declares
+// `ReadsProgram` and returns nil listeners when the Program is nil. `ruletest.Run` hands it exactly
+// that, so a fixture left on it would exercise the nil-Program branch: the reporting half fails
+// loudly and the silent half passes while proving nothing.
+//
+// `TestCanonicalFixturesActuallyRan` is what stops the converted file from going green on nothing in
+// the other direction, where the walk for an installed tailwindcss finds none and every fixture
+// skips while `go test` prints ok.
+
+// runCanonicalFixture runs the rule against a one-file program that has a real design system.
+//
+// The fixture stylesheet declares no tokens of its own. Unlike `no-unknown-classes`, whose whole
+// subject is what a repository adds, this rule's subject is the collapse families, and those are
+// framework facts: 44 on ahra and 44 on www-connected-app, with none on either side alone.
+func runCanonicalFixture(t *testing.T, fileName string, source string) ruletest.Result {
+	t.Helper()
+	return runCanonicalFixtureWithOptions(t, fileName, source, nil)
+}
+
+// runCanonicalFixtureWithOptions is runCanonicalFixture for the cases that configure the ignore list.
+func runCanonicalFixtureWithOptions(
+	t *testing.T,
+	fileName string,
+	source string,
+	options any,
+) ruletest.Result {
+	t.Helper()
+
+	packageRoot := unknownFixturePackageRoot()
+	if packageRoot == "" {
+		t.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
+			"built and these fixtures would measure a decline rather than a collapse")
+	}
+
+	files := map[string]string{
+		fileName:                     source,
+		unknownFixtureStylesheetPath: `@import "tailwindcss";`,
+	}
+	plantPackage := func(root string) {
+		modules := filepath.Join(root, "node_modules")
+		if err := os.MkdirAll(modules, 0o755); err != nil {
+			t.Fatalf("creating the fixture node_modules: %v", err)
+		}
+		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
+			t.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+		}
+	}
+
+	if options == nil {
+		return ruletest.RunTypedFilesWithSetup(t, EnforceCanonicalClasses, files, fileName, plantPackage)
+	}
+	return ruletest.RunTypedFilesWithSetupAndOptions(
+		t, EnforceCanonicalClasses, files, fileName, options, plantPackage)
+}
 
 func TestEnforceCanonicalClassesReportsCollapses(t *testing.T) {
 	testCases := []struct {
@@ -106,7 +166,7 @@ func TestEnforceCanonicalClassesReportsCollapses(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, EnforceCanonicalClasses, testCase.fileName, testCase.source)
+			result := runCanonicalFixture(t, testCase.fileName, testCase.source)
 			ruletest.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
@@ -179,7 +239,7 @@ func TestEnforceCanonicalClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, EnforceCanonicalClasses, testCase.fileName, testCase.source)
+			result := runCanonicalFixture(t, testCase.fileName, testCase.source)
 			ruletest.ExpectClean(t, result)
 		})
 	}
@@ -204,7 +264,7 @@ func TestCanonicalMessageNamesTheShorterSpelling(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.want, func(t *testing.T) {
-			result := ruletest.Run(t, EnforceCanonicalClasses, "Component.tsx", testCase.source)
+			result := runCanonicalFixture(t, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("expected a finding, got none")
 			}
@@ -222,7 +282,7 @@ func TestCanonicalMessageNamesTheShorterSpelling(t *testing.T) {
 // resulting order is `enforce-consistent-class-order`'s concern and a rewrite that also reordered
 // would fight it.
 func TestCanonicalProposesNoFix(t *testing.T) {
-	result := ruletest.Run(t, EnforceCanonicalClasses, "Component.tsx",
+	result := runCanonicalFixture(t, "Component.tsx",
 		`const element = <div className="px-4 py-4" />;`)
 
 	if len(result.Diagnostics) != 1 {
@@ -251,7 +311,7 @@ func TestPreconditionsAreCheckedNotAssumed(t *testing.T) {
 	}
 
 	for _, testCase := range correctCode {
-		result := ruletest.Run(t, EnforceCanonicalClasses, "Component.tsx", testCase.source)
+		result := runCanonicalFixture(t, "Component.tsx", testCase.source)
 		if len(result.Diagnostics) != 0 {
 			t.Errorf("%s: reported %d findings on correct code, so a precondition is not being checked",
 				testCase.name, len(result.Diagnostics))
@@ -259,7 +319,7 @@ func TestPreconditionsAreCheckedNotAssumed(t *testing.T) {
 
 		// And the control has to be able to fail: the same roots with everything matching must
 		// report, or the silence above proves only that the table lookup is broken.
-		matching := ruletest.Run(t, EnforceCanonicalClasses, "Component.tsx",
+		matching := runCanonicalFixture(t, "Component.tsx",
 			`const element = <div className="px-4 py-4" />;`)
 		if len(matching.Diagnostics) == 0 {
 			t.Fatal("the rule stayed silent on a real collapse, so the silent cases above prove nothing")
@@ -272,8 +332,15 @@ func TestPreconditionsAreCheckedNotAssumed(t *testing.T) {
 // `border-l` is a root in its own right, not `border` with value `l`. Taking the shorter match
 // makes `border-l` and `border-r` look like the same root with different values, which fails the
 // merge-key test and silently stops reporting `border-x`.
+//
+// The boundary is now `parseCandidate`'s rather than a prefix walk over a generated table, which is
+// the correction the migration carries: the walk re-derived where a root ends, and re-deriving it is
+// what lost `border-x` in the first place. `bg-linear-to-b` is the case that shows the difference on
+// real code — the walk read it as root `bg` with value `linear-to-b`, and `bg-linear` is a root.
 func TestLongestRootWinsInCollapse(t *testing.T) {
-	parts, canParse := splitCandidate("border-l")
+	system := unknownFixtureLiveSystem(t)
+
+	parts, canParse := splitCandidateIn("border-l", system)
 	if !canParse {
 		t.Fatal("border-l did not resolve to a root at all")
 	}
@@ -287,7 +354,7 @@ func TestLongestRootWinsInCollapse(t *testing.T) {
 	}
 
 	// And the value boundary: `p` must not claim `px-4`.
-	pxParts, canParsePx := splitCandidate("px-4")
+	pxParts, canParsePx := splitCandidateIn("px-4", system)
 	if !canParsePx {
 		t.Fatal("px-4 did not resolve to a root")
 	}
@@ -295,6 +362,134 @@ func TestLongestRootWinsInCollapse(t *testing.T) {
 		t.Errorf("px-4 resolved to root %q, want px. A root matching across a value boundary would "+
 			"conflate padding with padding-inline.", pxParts.Root)
 	}
+
+	// A root the shipped prefix walk could not find, because it is longer than the one it settled on.
+	linearParts, canParseLinear := splitCandidateIn("bg-linear-to-b", system)
+	if !canParseLinear {
+		t.Fatal("bg-linear-to-b did not resolve to a root")
+	}
+	if linearParts.Root != "bg-linear" {
+		t.Errorf("bg-linear-to-b resolved to root %q, want bg-linear. The prefix walk read this as "+
+			"root bg with value linear-to-b, which buckets it with every other bg utility.",
+			linearParts.Root)
+	}
+}
+
+// TestSplitValueCarriesEverythingAfterTheRoot pins the two pieces a parsed value does not include.
+//
+// Both were found by differencing the live split against the shipped prefix walk over the corpus,
+// and both are the permissive direction: a value missing a piece makes two different classes compare
+// equal on the merge precondition, which reports correct code.
+//
+// Measured before the fix: 88 of the corpus's classes split differently, 84 of them because the
+// modifier was dropped.
+func TestSplitValueCarriesEverythingAfterTheRoot(t *testing.T) {
+	system := unknownFixtureLiveSystem(t)
+
+	testCases := []struct {
+		className string
+		wantRoot  string
+		wantValue string
+		why       string
+	}{
+		{
+			className: "bg-black/20",
+			wantRoot:  "bg",
+			wantValue: "black/20",
+			why: "the modifier is a sibling field of the value, so dropping it makes bg-black/20 " +
+				"and bg-black/60 compare equal",
+		},
+		{
+			className: "-translate-x-1/2",
+			wantRoot:  "-translate-x",
+			wantValue: "1/2",
+			why: "a fraction is carried beside the value rather than inside it, because the slash " +
+				"is ambiguous and the parser refuses to guess",
+		},
+		{
+			className: "bg-emerald-500/[0.07]",
+			wantRoot:  "bg",
+			wantValue: "emerald-500/[0.07]",
+			why: "an ARBITRARY modifier is the only shape the modifier branch is reachable for, " +
+				"because a named one is mirrored into Fraction and taken by the branch above it",
+		},
+		{
+			className: "border-l",
+			wantRoot:  "border-l",
+			wantValue: "",
+			why:       "a root with nothing after it, which rebuildClass must not append a dash for",
+		},
+	}
+
+	for _, testCase := range testCases {
+		parts, canParse := splitCandidateIn(testCase.className, system)
+		if !canParse {
+			t.Errorf("%s did not resolve to a root", testCase.className)
+			continue
+		}
+		if parts.Root != testCase.wantRoot || parts.Value != testCase.wantValue {
+			t.Errorf("%s split to root %q value %q, want root %q value %q: %s",
+				testCase.className, parts.Root, parts.Value,
+				testCase.wantRoot, testCase.wantValue, testCase.why)
+		}
+	}
+}
+
+// TestRebuiltClassIsWritable pins that a suggested class can actually be typed into a class list.
+//
+// `parseCandidate` decodes arbitrary values: `grid-cols-[1fr_auto]` becomes `1fr auto` and
+// `ring-(--x)` becomes `[var(--x)]`. Those decodings are correct and are what the merge precondition
+// must compare, and printing either back would name a class nobody can write — the first has a space
+// in it, and a class attribute is split on whitespace.
+//
+// So the parts carry both forms. Measured on the corpus: 16 classes decode to something different
+// from what was written, every one an arbitrary value carrying `_` or the `(--x)` shorthand.
+func TestRebuiltClassIsWritable(t *testing.T) {
+	system := unknownFixtureLiveSystem(t)
+
+	for _, className := range []string{
+		"grid-cols-[1fr_auto]",
+		"ring-(--color-content--2)",
+		"hover:bg-(--background--1)",
+		"px-4",
+		"bg-black/20",
+		"-translate-x-1/2",
+		"px-[3px]",
+		"px-4!",
+	} {
+		parts, canParse := splitCandidateIn(className, system)
+		if !canParse {
+			t.Errorf("%s did not resolve to a root", className)
+			continue
+		}
+		// Rebuilt around its own root, so the only thing that can differ is the spelling.
+		if rebuilt := rebuildClass(parts, parts.Root); rebuilt != className {
+			t.Errorf("%s rebuilds as %q, which is not the class the author wrote. A suggestion "+
+				"spelled this way cannot be pasted into a class attribute.", className, rebuilt)
+		}
+	}
+}
+
+// TestCanonicalFixturesActuallyRan is what stops this file from going green on nothing.
+//
+// Every fixture above skips when no installed tailwindcss can be found, and `go test` prints ok for
+// a package whose every case skipped, so a mistake in where the walk starts looks identical to a
+// machine that lacks the package. That was not hypothetical for the class-order fixtures and this
+// file uses the same helper shape.
+func TestCanonicalFixturesActuallyRan(t *testing.T) {
+	packageRoot := unknownFixturePackageRoot()
+	if packageRoot == "" {
+		t.Fatalf(
+			"no installed tailwindcss found from %s, so every fixture in this file skipped and the "+
+				"package still reported ok. Either the search root is wrong or this machine has no "+
+				"Tailwind to test against; both need a human, and neither should read as a pass",
+			unknownFixtureSearchRoot,
+		)
+	}
+
+	result := runCanonicalFixture(t, "Component.tsx",
+		`const element = <div className="px-4 py-4" />;`)
+	ruletest.ExpectFindings(t, result, "canonicalCollapse")
 }
 
 // TestIgnoredClassesAreExempt covers the option the oxlint configuration actually supplies.
@@ -304,7 +499,7 @@ func TestLongestRootWinsInCollapse(t *testing.T) {
 func TestIgnoredClassesAreExempt(t *testing.T) {
 	options := EnforceCanonicalClassesOptions{Ignore: []string{`^px-4$`}}
 
-	result := ruletest.RunWithOptions(t, EnforceCanonicalClasses, "Component.tsx",
+	result := runCanonicalFixtureWithOptions(t, "Component.tsx",
 		`const element = <div className="px-4 py-4" />;`, options)
 	if len(result.Diagnostics) != 0 {
 		t.Errorf("an ignored class should not participate in a collapse, got %d findings",
@@ -313,7 +508,7 @@ func TestIgnoredClassesAreExempt(t *testing.T) {
 
 	// Without the exemption the same source reports, so the test above is not passing because the
 	// rule is broken.
-	unignored := ruletest.Run(t, EnforceCanonicalClasses, "Component.tsx",
+	unignored := runCanonicalFixture(t, "Component.tsx",
 		`const element = <div className="px-4 py-4" />;`)
 	if len(unignored.Diagnostics) == 0 {
 		t.Fatal("the rule stayed silent without any ignore option, so the exemption proves nothing")

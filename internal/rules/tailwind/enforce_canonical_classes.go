@@ -1,6 +1,7 @@
 package tailwind
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 
@@ -84,9 +85,24 @@ type EnforceCanonicalClassesOptions struct {
 // author to act on.
 var EnforceCanonicalClasses = rule.Rule{
 	Name: "enforce-canonical-classes",
+	// Declared because the rule reaches ctx.Program for the design system. The stylesheet graph
+	// reaches files the program does not contain, so a findings cache keyed on the linted file alone
+	// is stale whenever a `@utility` block changes which roots exist and the `.tsx` file does not.
+	ReadsProgram: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil
+		}
+
+		// Resolved once per file and before the listeners are built, matching the other two migrated
+		// rules. A project with no Tailwind is silence with nothing wrong; a project whose CSS will
+		// not parse is reported once per file rather than swallowed.
+		designSystem := DesignSystemForProgram(ctx)
+		if designSystem.Err != nil {
+			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) || ctx.Program == nil {
+				return nil
+			}
+			return declineListeners(ctx, "enforce-canonical-classes", designSystem)
 		}
 
 		settings := DefaultClassLiteralSettings()
@@ -109,7 +125,7 @@ var EnforceCanonicalClasses = rule.Rule{
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportCollapses(ctx, literal, ignored)
+				reportCollapses(ctx, literal, ignored, designSystem)
 			}
 		}
 
@@ -128,8 +144,23 @@ type candidateParts struct {
 	Prefix string
 	Root   string
 	// Value is the text after the root, empty for a class like `border-l`.
-	Value     string
-	Important bool
+	//
+	// Decoded rather than verbatim, because it decides equality: `parseCandidate` resolves
+	// `bg-(--x)` and `bg-[var(--x)]` to the same value, and they ARE the same class, so the merge
+	// precondition must see them as equal. SourceValue is the half that gets printed.
+	Value string
+	// SourceValue is the same value as the author spelled it, for printing back.
+	//
+	// Two fields rather than one because the decoded form is unwritable. `grid-cols-[1fr_auto]`
+	// decodes to `1fr auto`, and a rewrite suggesting `grid-cols-[1fr auto]` names a class with a
+	// space in it, which cannot appear in a class attribute at all. Measured on the corpus: 16
+	// classes decode to something different from what was written, all of them arbitrary values
+	// carrying `_` or the `(--x)` custom-property shorthand.
+	//
+	// Empty means "same as Value", which is the common case and keeps every caller that builds these
+	// by hand correct by default.
+	SourceValue string
+	Important   bool
 }
 
 // mergeKey is everything except the root. Two classes can only merge when this matches.
@@ -141,12 +172,28 @@ func (c candidateParts) mergeKey() string {
 	return c.Prefix + "|" + importance + "|" + c.Value
 }
 
+// printedValue is the value to write into a rebuilt class name.
+//
+// SourceValue when the decoded form differs from what the author wrote, Value otherwise. See the
+// field comment: the decoded form is what decides equality and is not always writable.
+func (c candidateParts) printedValue() string {
+	if c.SourceValue != "" {
+		return c.SourceValue
+	}
+	return c.Value
+}
+
 // reportCollapses finds mergeable sets in one literal and reports the shorter spelling.
 //
 // Applied repeatedly, because collapses compose: `mt-1 mb-1 ml-1 mr-1` becomes `m-1` only through
 // `mt+mb => my`, then `ml+mr => mx`, then `my+mx => m`. Verified against the engine, which produces
 // the same single finding for the four-class case.
-func reportCollapses(ctx rule.Context, literal ClassLiteral, ignored []*ignorePattern) {
+func reportCollapses(
+	ctx rule.Context,
+	literal ClassLiteral,
+	ignored []*ignorePattern,
+	designSystem DesignSystemResult,
+) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) < 2 {
 		return
@@ -167,7 +214,7 @@ func reportCollapses(ctx rule.Context, literal ClassLiteral, ignored []*ignorePa
 	// real chain, which is the three steps of `m-1` plus one to notice there is nothing left.
 	const maximumPasses = 6
 	for pass := 0; pass < maximumPasses; pass++ {
-		inputs, output, didMerge := mergeOnce(remaining)
+		inputs, output, didMerge := mergeOnce(remaining, designSystem)
 		if !didMerge {
 			return
 		}
@@ -187,10 +234,10 @@ func reportCollapses(ctx rule.Context, literal ClassLiteral, ignored []*ignorePa
 }
 
 // mergeOnce finds the first mergeable pair and returns what it becomes.
-func mergeOnce(classes []string) ([]string, string, bool) {
+func mergeOnce(classes []string, designSystem DesignSystemResult) ([]string, string, bool) {
 	parsed := make([]candidateParts, 0, len(classes))
 	for _, className := range classes {
-		parts, canParse := splitCandidate(className)
+		parts, canParse := splitCandidateIn(className, designSystem.System)
 		if !canParse {
 			continue
 		}
@@ -232,54 +279,12 @@ func collapseOutputFor(left string, right string) (string, bool) {
 	return "", false
 }
 
-// splitCandidate breaks a class into prefix, root, value and importance.
-//
-// The root is found by longest match against the generated table's own root list rather than by
-// splitting on dashes. That distinction is load-bearing and has bitten this rule three times: a
-// dash-splitter reads `border-l` as root `border` with value `l`, buckets it away from `border-r`,
-// and silently stops reporting `border-x`.
-func splitCandidate(className string) (candidateParts, bool) {
-	prefix, base, important := dissectClass(className)
-
-	longestRoot := ""
-	longestValue := ""
-	for root := range tailwindengine.RootDeclaredProperties {
-		if !strings.HasPrefix(base, root) {
-			continue
-		}
-		value := base[len(root):]
-		// The root must end at a value boundary, so `p` does not claim `px-4`.
-		if value != "" {
-			if value[0] != '-' {
-				continue
-			}
-			value = value[1:]
-		}
-		if len(root) > len(longestRoot) {
-			longestRoot = root
-			longestValue = value
-		}
-	}
-
-	if longestRoot == "" {
-		return candidateParts{}, false
-	}
-
-	return candidateParts{
-		ClassName: className,
-		Prefix:    prefix,
-		Root:      longestRoot,
-		Value:     longestValue,
-		Important: important,
-	}, true
-}
-
 // rebuildClass reassembles a class around a new root, keeping everything the merge required to
 // match.
 func rebuildClass(parts candidateParts, root string) string {
 	rebuilt := parts.Prefix + root
-	if parts.Value != "" {
-		rebuilt += "-" + parts.Value
+	if value := parts.printedValue(); value != "" {
+		rebuilt += "-" + value
 	}
 	if parts.Important {
 		rebuilt += "!"
