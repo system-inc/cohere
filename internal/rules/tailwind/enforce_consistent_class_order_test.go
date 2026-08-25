@@ -33,11 +33,20 @@ func TestEnforceConsistentClassOrderReportsMisordering(t *testing.T) {
 			wantIds:  []string{"inconsistentClassOrder"},
 		},
 		{
-			// `group` is unranked and sorts last. Writing it first is the case that took the corpus
-			// differential from 2,462 to 2,465.
-			name:     "unranked class written first",
+			// `group` is unranked and sorts first, so writing it last is the violation. The reverse
+			// of this pair was asserted until the ecosystem convention was checked: Tailwind's
+			// Prettier plugin and `better-tailwindcss` both hoist the markers.
+			name:     "unranked class written last",
 			fileName: "Component.tsx",
-			source:   `const element = <div className="group flex" />;`,
+			source:   `const element = <div className="flex group" />;`,
+			wantIds:  []string{"inconsistentClassOrder"},
+		},
+		{
+			// Two unranked classes keep the order they were written in. Alphabetical would rewrite
+			// this one, and `better-tailwindcss` accepts it as written.
+			name:     "two unranked classes in non-alphabetical source order",
+			fileName: "Component.tsx",
+			source:   `const element = <div className="flex peer group" />;`,
 			wantIds:  []string{"inconsistentClassOrder"},
 		},
 		{
@@ -95,9 +104,22 @@ func TestEnforceConsistentClassOrderStaysSilent(t *testing.T) {
 			source:   `const element = <div className="pointer-events-none hidden md:absolute md:inset-x-0 md:flex md:w-full" />;`,
 		},
 		{
-			name:     "unranked class last",
+			name:     "unranked class first",
 			fileName: "Component.tsx",
-			source:   `const element = <div className="flex group" />;`,
+			source:   `const element = <div className="group flex" />;`,
+		},
+		{
+			// Both spellings are accepted, which is what pins the tiebreak to source order rather
+			// than to any ordering of our own. An alphabetical tiebreak passes the first and fails
+			// the second, so the pair is the discriminator.
+			name:     "two unranked classes, alphabetical source order",
+			fileName: "Component.tsx",
+			source:   `const element = <div className="group peer flex" />;`,
+		},
+		{
+			name:     "two unranked classes, reverse-alphabetical source order",
+			fileName: "Component.tsx",
+			source:   `const element = <div className="peer group flex" />;`,
 		},
 		{
 			// `font-mono` and `text-[10px]` share no root and their relative order is not guessable
@@ -188,7 +210,7 @@ func TestClassOrderProposesNoFix(t *testing.T) {
 // Three simpler comparators each looked right and each was measured wrong against the engine:
 // ordering by root alone agreed on 51% of the corpus, adding variants took it to 58% while
 // representatives still carried their own prefixes, and unprefixing them took it to 91%. The last
-// 9% was unranked classes being stored with a position instead of pushed to the end.
+// 9% was unranked classes being stored with a position instead of being separated out entirely.
 //
 // So each dimension is exercised by a pair that only it can order correctly.
 func TestComparatorDimensionsAreAllUsed(t *testing.T) {
@@ -211,9 +233,9 @@ func TestComparatorDimensionsAreAllUsed(t *testing.T) {
 			dimension: "variant position; without it the two interleave by class position alone",
 		},
 		{
-			name:      "unranked last",
-			first:     "flex",
-			second:    "group",
+			name:      "unranked first",
+			first:     "group",
+			second:    "flex",
 			dimension: "the unranked check; `group` has no position and must not sort by one",
 		},
 	}
@@ -321,17 +343,33 @@ func TestOrderingPropertiesKeepCustomProperties(t *testing.T) {
 	}
 }
 
-// TestUnrankedClassesSortLastRegardlessOfVariant covers the interaction that produced the final
+// TestUnrankedClassesSortFirstRegardlessOfVariant covers the interaction that produced the final
 // three corpus divergences.
 //
 // `group` is unranked and a variant class has a position, so a comparator checking variants before
-// rankedness puts `group` in the middle of the list. The engine puts it at the end.
-func TestUnrankedClassesSortLastRegardlessOfVariant(t *testing.T) {
-	if !classSortsBefore("hover:background--5", "group") {
-		t.Error("an unranked class must sort after a variant-prefixed ranked one, which means the " +
+// rankedness puts `group` in the middle of the list. It belongs at the front, ahead of both.
+func TestUnrankedClassesSortFirstRegardlessOfVariant(t *testing.T) {
+	if !classSortsBefore("group", "hover:background--5") {
+		t.Error("an unranked class must sort before a variant-prefixed ranked one, which means the " +
 			"rankedness check has to come before the variant check")
 	}
-	if classSortsBefore("group", "hover:background--5") {
+	if classSortsBefore("hover:background--5", "group") {
 		t.Error("the comparator disagrees with itself on the same pair")
+	}
+}
+
+// TestUnrankedClassesKeepSourceOrder pins the tiebreak.
+//
+// The comparator must express no preference between two unranked classes, in either direction, so
+// that a stable sort leaves them as written. An alphabetical tiebreak satisfies the first assertion
+// and fails the second, which is exactly the bug a blind reversal of the rankedness check leaves
+// behind: `better-tailwindcss` accepts both `peer group` and `group peer`.
+func TestUnrankedClassesKeepSourceOrder(t *testing.T) {
+	if classSortsBefore("group", "peer") {
+		t.Error("the comparator must not order two unranked classes; alphabetical would rewrite " +
+			"`peer group`, which the reference accepts as written")
+	}
+	if classSortsBefore("peer", "group") {
+		t.Error("the comparator must not order two unranked classes in either direction")
 	}
 }

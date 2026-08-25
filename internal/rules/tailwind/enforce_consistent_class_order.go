@@ -43,8 +43,20 @@ type EnforceConsistentClassOrderOptions struct {
 // Three dimensions, and each was found by a differential against the engine rather than by reading
 // upstream, which delegates the whole question to `getClassOrder` in three lines.
 //
-// Unranked classes sort last. `group` and `peer` generate no CSS of their own and exist to be
-// referenced by `group-hover:` on other elements, so the engine ranks them null.
+// Unranked classes sort first, and their source order is preserved. `group` and `peer` generate no
+// CSS of their own and exist to be referenced by `group-hover:` on other elements, so the engine
+// ranks them null and expresses no opinion about where they go.
+//
+// That the engine has no opinion is the whole point: this dimension is not ported from
+// `getClassOrder`, it is a convention chosen on top of it, and the corpus measurement below cannot
+// speak to it. The convention is taken from Tailwind's own Prettier plugin and
+// `better-tailwindcss`, verified against the latter directly: `flex peer group items-center` is
+// rewritten to `peer group flex items-center`, while both `peer group` and `group peer` are
+// accepted as written. Sorting the nulls alphabetically would reject `peer group`, so the
+// tiebreak is source order rather than any ordering of our own.
+//
+// This reversed a previous convention of sorting them last. Nothing measured it in either
+// direction; it was stated in this comment and then read back as though it had been.
 //
 // Then variant position, because the engine groups by variant before anything else. Ordering by
 // root first agreed with the engine on 51% of the corpus; adding the variant dimension and taking
@@ -54,7 +66,10 @@ type EnforceConsistentClassOrderOptions struct {
 // 1,210 root groups are non-contiguous in the global order and those 84 hold 18,936 of the 37,643
 // ranked classes, so a root table with an exception list saves nothing.
 //
-// Measured over the whole corpus: 2,465 of 2,465 literals ordered identically to the engine.
+// Measured over the whole corpus: 2,465 of 2,465 literals ordered identically to the engine. That
+// number covers the ranked dimensions only. `getClassOrder` returns null for the markers, so a
+// literal containing one has no engine answer to be identical to, and the agreement was never
+// evidence about their placement in either direction.
 //
 // # No fix, and this one is a closer call than the others
 //
@@ -147,12 +162,19 @@ func classSortsBefore(left string, right string) bool {
 	leftKey := sortKeyFor(left)
 	rightKey := sortKeyFor(right)
 
-	// A class the tables cannot place sorts last, and consistently rather than arbitrarily.
+	// A class the tables cannot place sorts first, matching Tailwind's own Prettier plugin and
+	// `better-tailwindcss`. The engine ranks `group` and `peer` null and so expresses no opinion;
+	// the placement is the consumer's convention, and agreeing with the ecosystem's is worth more
+	// than a defensible convention of our own that reorders every file the other tools accept.
 	if leftKey.placeable != rightKey.placeable {
-		return leftKey.placeable
+		return !leftKey.placeable
 	}
+
+	// Two unplaceable classes keep their source order. The sort is stable, so returning false for
+	// every such pair leaves them as written. Ordering them alphabetically instead was measurably
+	// wrong: `peer group` is accepted by the reference and alphabetical would rewrite it.
 	if !leftKey.placeable {
-		return left < right
+		return false
 	}
 
 	// Compared through the segment comparator rather than as a single position, because a compound
