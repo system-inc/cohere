@@ -316,6 +316,37 @@ func (d *ScopeDependencies) PruneDeclarationsLastUsedBefore(scope ScopeId, end E
 	return removed
 }
 
+// PruneNonReactiveDependenciesOf drops a scope's dependencies whose root is not reactive.
+//
+// Upstream's deletion inside `pruneNonReactiveDependencies`. A mutator on an otherwise read-only
+// table for the same reason `PruneDeclarationsLastUsedBefore` is one: the fact it depends on --
+// whether a value can change between renders -- is not known when the collector runs.
+//
+// This is the only pass in phase 6 that changes a value the rule reads directly. The rule compares
+// dependency sets, so a set left wider than upstream's is a set that will not correspond.
+func (d *ScopeDependencies) PruneNonReactiveDependenciesOf(scope ScopeId,
+	reactive map[IdentifierId]bool) int {
+	if d == nil || d.dependencies == nil || reactive == nil {
+		return 0
+	}
+	held := d.dependencies[scope]
+	if len(held) == 0 {
+		return 0
+	}
+
+	kept := make([]ReactiveScopeDependency, 0, len(held))
+	for _, dependency := range held {
+		if reactive[dependency.Identifier] {
+			kept = append(kept, dependency)
+		}
+	}
+	removed := len(held) - len(kept)
+	if removed > 0 {
+		d.dependencies[scope] = kept
+	}
+	return removed
+}
+
 // ReassignmentsOf returns the bindings a scope reassigns.
 func (d *ScopeDependencies) ReassignmentsOf(scope ScopeId) []IdentifierId {
 	if d == nil || d.reassignments == nil {
