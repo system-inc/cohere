@@ -30,7 +30,7 @@ type wave2bFixture struct {
 // because a table that stopped answering scores perfectly on any comparison that folds the two.
 func TestFrameworkMultiDeclarationUtilitiesMatchTheEngine(t *testing.T) {
 	system := loadWave1DesignSystem(t)
-	for _, name := range []string{"wave2b_fixtures.json", "wave2c_fixtures.json", "wave4_fixtures.json"} {
+	for _, name := range []string{"wave2b_fixtures.json", "wave2c_fixtures.json", "wave4_fixtures.json", "wave5_fixtures.json"} {
 		t.Run(name, func(t *testing.T) { runMultiDeclarationComparison(t, loadWave2bFixture(t, name), system) })
 	}
 }
