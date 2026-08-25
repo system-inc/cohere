@@ -77,6 +77,19 @@
 //	          entirely unimported barrel produces this, and in that case reporting its contents dead
 //	          is the right answer rather than a false positive.
 //
+//	          Re-checked against upstream and the answer stands, because the two tools are not asked
+//	          the same question. `no-unused-vars` treats `export { X } from './x'` as clean, and it is
+//	          right to: it asks whether a binding is referenced within its scope, and a re-export
+//	          references it. This asks whether a symbol is REACHABLE FROM A ROOT, and an unimported
+//	          barrel does not make it reachable. Both answers are correct for their own question, so
+//	          a disagreement here is not evidence that either is wrong.
+//
+//	          Both halves are pinned: `TestReExportIsAPassThrough` asserts the unimported barrel's
+//	          contents are reported, and probing the imported-barrel case on a live binary confirms
+//	          the alias chain spares them. The header's warning that this analysis and a future
+//	          no-unused-vars "could disagree forever without either noticing" is the thing to hold
+//	          onto — this is that disagreement, and it is the benign kind.
+//
 //	          A barrel's own `export ... from` statements are additionally not examined AS exports:
 //	          `exportedDeclarations` handles declaration statements and an ExportDeclaration is not
 //	          one, so a pure barrel file contributes zero exports and never appears in the report
@@ -88,11 +101,32 @@
 //	          annotation mark T referenced exactly like a value would. A type nothing uses at runtime
 //	          is still a type someone reads, and treating type positions as non-uses would report
 //	          every interface in a types file. oxc separates these behind an option; this does not.
-//	JUDGMENT  A reference from inside code that is ITSELF dead does not count, and this is what the
-//	          closure buys. In the flat set it counts, which is why the flat set cannot see an
-//	          island. The claim is strictly stronger and a wrong root cascades through it rather than
-//	          mis-reporting one file, which is why the closure is opt-in behind `--unused-deep`
-//	          rather than replacing the flat view.
+//	MEASURED  A reference from inside code that is ITSELF unreachable DOES count, in the flat set and
+//	          in the closure alike. This entry previously claimed the opposite — that the closure
+//	          discounts such a reference, and that discounting it was what the closure bought — and
+//	          that was never true of the code.
+//
+//	          `closure.go` has no reachability input; the word does not appear in it. `Unreachable`
+//	          is a report field, collected by a separate analysis and printed, and never read back
+//	          into the reference walk. The header above says the two questions are "separable on
+//	          purpose", which is right about the design and is precisely why this entry could not
+//	          have been true: nothing joins them.
+//
+//	          Pinned by `TestDeadCodeReferenceStillCountsAsAUse`, on a fixture where reachability is
+//	          the only difference between two constants — same importer, one reference each, both
+//	          reached from a framework-spared page. Both are spared. The unreachable statement is
+//	          still reported, by the analysis that owns that question.
+//
+//	          What the closure actually buys is transitivity: it finds a cluster that is dead
+//	          TOGETHER, which the flat set cannot see because each member references the others. That
+//	          is a strictly stronger claim than the flat set makes and a wrong root cascades through
+//	          it rather than mis-reporting one file, which is why it stays opt-in behind
+//	          `--unused-deep`.
+//
+//	          Whether it SHOULD discount unreachable references is open and is not a documentation
+//	          question. Doing so would mean the closure's answer depends on the CFG's, so a CFG bug
+//	          would silently delete live code from the report — the direction that costs trust. The
+//	          entry is recorded as measured behaviour rather than resolved policy.
 //	JUDGMENT  A default export is not examined as a finding, though references FROM inside one are
 //	          recorded normally. The name at the declaration site is not the name at the use site, so
 //	          the symbol identity this index is keyed on does not carry across reliably, and a false

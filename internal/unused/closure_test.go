@@ -219,3 +219,77 @@ func TestReExportIsAPassThrough(t *testing.T) {
 			report.ExportsAnalyzed)
 	}
 }
+
+// TestDeadCodeReferenceStillCountsAsAUse contradicts a JUDGMENT claim in `roots.go`.
+//
+// The claim reads: "A reference from inside code that is ITSELF dead does not count, and this is
+// what the closure buys. In the flat set it counts, which is why the flat set cannot see an island."
+//
+// The closure does not do this. It has no reachability input at all -- `closure.go` contains no
+// mention of reachability, and `Unreachable` is a report field that is collected and printed and
+// never read back into the reference walk. `roots.go`'s own header says the two questions are
+// "separable on purpose", which is exactly right about the design and is why the JUDGMENT entry
+// describing the closure as consuming one of them cannot be true.
+//
+// The fixture is built so reachability is the ONLY difference. Both constants are imported by the
+// same file, each referenced exactly once, from two exported functions that a framework-spared page
+// calls. If the claim held, `ReachedOnlyAfterReturn` would be reported and `ReachedNormally` spared.
+// Both are spared.
+//
+// Written as a test asserting what the code DOES rather than what the comment says it does, and the
+// comment is corrected alongside it. A doc comment making a falsifiable claim needs a test or it
+// needs deleting -- this one survived being labelled considered judgment for exactly as long as
+// nothing checked it.
+func TestDeadCodeReferenceStillCountsAsAUse(t *testing.T) {
+	deadrefFixture := fixturePath(t, "deadref")
+	graph, err := program.Build(program.Options{
+		ConfigFileName:   deadrefFixture + "/tsconfig.json",
+		CurrentDirectory: deadrefFixture,
+		SingleThreaded:   true,
+	})
+	if err != nil {
+		t.Fatalf("building the deadref fixture: %v", err)
+	}
+	report, err := Run(context.Background(), graph, graph.ProjectFiles(), true)
+	if err != nil {
+		t.Fatalf("running the report: %v", err)
+	}
+
+	reported := map[string]bool{}
+	for _, island := range report.Islands {
+		for _, declaration := range island.Members {
+			reported[declaration.Name] = true
+		}
+	}
+	for _, file := range report.Files {
+		if strings.HasSuffix(file.FileName, "icons.ts") {
+			t.Error("icons.ts was reported as wholly unreferenced; both of its exports are " +
+				"referenced once, so this fixture is not testing what it believes it is")
+		}
+	}
+
+	if reported["ReachedNormally"] {
+		t.Error("ReachedNormally was reported dead; it is referenced from a live path reached by a " +
+			"spared root, so the fixture's control is broken rather than the claim being confirmed")
+	}
+	if reported["ReachedOnlyAfterReturn"] {
+		t.Error("ReachedOnlyAfterReturn was reported dead, so the closure now discounts references " +
+			"from unreachable code. That would make the JUDGMENT entry in roots.go true and this " +
+			"test is what should be updated -- but note that discounting is a strictly stronger " +
+			"claim than reference analysis, and a wrong answer cascades through the whole closure")
+	}
+
+	// The unreachable statement is still reported, by the separate analysis that owns that question.
+	// Asserted here so the two cannot be conflated: the reference survives AND the statement is
+	// named, which is the design `roots.go`'s header describes.
+	unreachableInUses := 0
+	for _, unreachable := range report.Unreachable {
+		if strings.HasSuffix(unreachable.FileName, "uses.ts") {
+			unreachableInUses++
+		}
+	}
+	if unreachableInUses != 1 {
+		t.Errorf("unreachable statements reported in uses.ts = %d, want 1; the reachability half "+
+			"of this fixture is what makes the reference half meaningful", unreachableInUses)
+	}
+}
