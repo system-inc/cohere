@@ -399,3 +399,59 @@ func TestThemedModifierRootsAreTheOnesThatDiffer(t *testing.T) {
 		t.Fatal("no root carried a Themed axis, so this test measured nothing")
 	}
 }
+
+// The rows are computable and the table is not deletable, and the difference is `TypeList`.
+//
+// 396 of 399 cells agree with the emitters, so every reading a row stores can be produced from a
+// ported handle body. That answers "is the stored reading redundant" and does not answer "can the
+// table go", because a cell is only reachable once something has decided which cell a class lands in,
+// and that decision is `InferDataType` against the root's own ordered type list.
+//
+// The order is the whole of it. `InferDataType` returns the first match, so:
+//
+//	bg      InferDataType("3px") = position   list starts [percentage url position length]
+//	border  InferDataType("3px") = length     list starts [length line-width percentage ratio]
+//
+// One value, two roots, different types, decided by nothing but list order. An emitter cannot supply
+// it: it answers "given this type, what is emitted", which is the arm after the decision. Asked with
+// each of `bg`'s ten types it returns a property for every one, and four distinct properties across
+// them, with nothing distinguishing the order they should be tried in.
+//
+// So deleting `baseDescriptors` means moving the type lists somewhere else rather than dropping them,
+// and `TypeList` is read at three live sites: `Lookup`'s arbitrary arm, `bareReading`'s inference
+// step, and `gapTypeListFor`, which hands it to `UtilityBranchFor` so the rule's own computation
+// infers the same way. A table of 78 ordered lists is what those three need, whatever it is called.
+//
+// This test pins the fact rather than the conclusion: if a future change makes the order derivable,
+// it fails and the conclusion above is due a re-read.
+func TestTypeListOrderDecidesTheCellAndEmittersCannotSupplyIt(t *testing.T) {
+	background, hasBackground := baseDescriptors["bg"]
+	border, hasBorder := baseDescriptors["border"]
+	if !hasBackground || !hasBorder {
+		t.Fatal("bg and border are the two roots this contrast is built on and one is missing")
+	}
+
+	const sharedValue = "3px"
+	backgroundType := InferDataType(sharedValue, background.TypeList)
+	borderType := InferDataType(sharedValue, border.TypeList)
+
+	if backgroundType == borderType {
+		t.Errorf("bg and border both infer %q as %s; the contrast this rests on is gone and the "+
+			"conclusion that TypeList is not derivable needs re-measuring", sharedValue, backgroundType)
+	}
+	t.Logf("%q infers as %s for bg and %s for border, decided by list order alone",
+		sharedValue, backgroundType, borderType)
+
+	// And the emitters answer every one of those types, which is why they cannot rank them.
+	var answered int
+	for _, dataType := range background.TypeList {
+		if len(EmitGapRoot("bg", UtilityBranch{HasValue: true, IsArbitrary: true, DataType: dataType})) > 0 {
+			answered++
+		}
+	}
+	if answered != len(background.TypeList) {
+		t.Errorf("the emitter answered %d of bg's %d types; this test assumes it answers all of them, "+
+			"which is what makes the ordering unrecoverable from it", answered, len(background.TypeList))
+	}
+	t.Logf("bg's emitter answers %d of %d types, so nothing in it ranks them", answered, len(background.TypeList))
+}

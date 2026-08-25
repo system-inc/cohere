@@ -43,9 +43,18 @@ import (
 // this port tractable, deleting roughly 85% of `utilities.ts`, and it is also the reason these two
 // tables cannot be derived from what the port carries.
 //
-//	baseDescriptors          78   the reading partitions on the value's resolved type, and no
-//	                              registration shape carries both halves: `border-[3px]` is a width
-//	                              and `border-red-500` is a colour.
+//	baseDescriptors          78   the ordered type list each root infers against. The stated reason
+//	                              used to be that the reading partitions on the resolved type and no
+//	                              registration carries both halves; the emitting half is ported now
+//	                              and that claim is measured rather than argued: 396 of 399 cells
+//	                              agree with the emitters across all three axes, and the 3 that do
+//	                              not are one dead cell no class can reach. So the readings are
+//	                              redundant and the table is not, because `InferDataType` returns the
+//	                              first match in `TypeList` and the order decides which cell a class
+//	                              lands in. `bg` infers `3px` as a position and `border` as a length
+//	                              from the same value. An emitter answers every type it is asked and
+//	                              so cannot rank them; see
+//	                              TestTypeListOrderDecidesTheCellAndEmittersCannotSupplyIt.
 //	CollapseFamilies         45   which pairs canonicalize into a third root. All 45 are CSS
 //	                              shorthand relationships between declared properties, so deriving
 //	                              it means carrying a shorthand table of equal size, one layer
