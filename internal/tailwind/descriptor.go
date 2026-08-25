@@ -463,7 +463,7 @@ func (table *Table) frameworkReading(candidate *ParsedCandidate) (Reading, bool)
 		if negative && !utility.SupportsNegative {
 			return Reading{}, false
 		}
-		return utility.ReadingFor(candidate, table.theme, negative)
+		return utility.ReadingFor(root, candidate, table.theme, negative)
 	}
 	return Reading{}, false
 }

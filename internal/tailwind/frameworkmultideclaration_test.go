@@ -57,7 +57,7 @@ func runMultiDeclarationComparison(t *testing.T, fixture wave2bFixture, system *
 				negative = true
 			}
 			if parsedRoot == testCase.Root {
-				reading, produced = utility.ReadingFor(&candidates[0], system.Theme(), negative)
+				reading, produced = utility.ReadingFor(testCase.Root, &candidates[0], system.Theme(), negative)
 			}
 		}
 
@@ -157,7 +157,7 @@ func TestFrameworkMultiDeclarationLiteralReadingsBeatTheTheme(t *testing.T) {
 		Root:  "ease",
 		Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "initial"},
 	}
-	reading, produced := utility.ReadingFor(&candidate, theme, false)
+	reading, produced := utility.ReadingFor("ease", &candidate, theme, false)
 	if !produced {
 		t.Fatal("ease-initial produced nothing")
 	}

@@ -33,6 +33,10 @@
 // reading. `grayscale` reading `[334,339]#2` rather than `#15` is the confirmation: thirteen
 // `@property` declarations are structurally invisible.
 //
+// Counted at the tag while porting the handle bodies: there are 21 such wrappers, not the ten an
+// earlier scoping named, and every one returns `atRoot` and contains no `decl(` call. None of them
+// needed a representation in frameworkmultihandlers.go.
+//
 // # Repository-invariant, and checked rather than claimed
 //
 // Generated against ahra and against www-connected-app, which resolve different themes. Zero roots
@@ -44,16 +48,25 @@ package tailwind
 // FrameworkMultiDeclarationUtility is one root whose reading was measured rather than derived.
 //
 // The value axes (theme keys, bare-value predicate, default) are here for the same reason they are in
-// FrameworkFunctionalUtility: they decide whether a class resolves at all. What they do not decide is
-// the reading, which is why Reading is a field rather than a computation.
+// FrameworkFunctionalUtility: they decide whether a class resolves at all.
+//
+// Reading no longer decides what a candidate reads. The ported handle bodies in
+// frameworkmultihandlers.go emit declarations and `readingOf` runs PropertySort over them, the same
+// two steps the engine takes. Reading stays because it is the independent measurement the acceptance
+// test compares those emitters against: corrupting one row fails that test while leaving the
+// differential at full agreement, which is what makes the two sides genuinely separate claims.
 type FrameworkMultiDeclarationUtility struct {
-	// Reading is what this root reads for any value that resolves.
-	Reading Reading
-	// LiteralReadings are the root-defined keywords that read differently from everything else.
+	// Reading is what this root reads for any value that resolves, as measured against the engine.
 	//
-	// One root uses this: `ease-initial` reads `[]#1` where every other `ease-*` reads `[354]#2`,
-	// because `initial` is a literal the handler answers directly rather than a value it wraps. It is
-	// a map rather than a flag so a second such literal costs a row and not a field.
+	// Read by the acceptance test rather than by the resolution path. See the type's doc comment.
+	Reading Reading
+	// LiteralReadings are the root-defined keywords the handler answers directly.
+	//
+	// Most read exactly as their root does and are carried so the resolution path knows the keyword
+	// is answered without a theme lookup. Four read differently: `ease-initial` reads `[]#1` where
+	// every other `ease-*` reads `[354]#2`, and `divide-none`, `transition-none` and `translate-none`
+	// each emit a shorter list than their root's ordinary path. Those four have an entry in
+	// frameworkMultiLiteralEmitters; the rest deliberately do not.
 	LiteralReadings map[string]Reading
 
 	ThemeKeys        []string
@@ -101,13 +114,13 @@ func (utility FrameworkMultiDeclarationUtility) Description() *FunctionalUtility
 // The literal check runs before resolution, matching upstream: a root-defined keyword is answered by
 // the handler directly and never reaches the theme. Checking after would let a repository declaring
 // `--ease-initial` shadow the literal, which the engine does not allow.
-func (utility FrameworkMultiDeclarationUtility) ReadingFor(candidate *ParsedCandidate, theme *Theme, negative bool) (Reading, bool) {
+func (utility FrameworkMultiDeclarationUtility) ReadingFor(root string, candidate *ParsedCandidate, theme *Theme, negative bool) (Reading, bool) {
 	if candidate == nil {
 		return Reading{}, false
 	}
 	if candidate.Value != nil && candidate.Value.Kind == ParsedValueKindNamed {
-		if reading, found := utility.LiteralReadings[candidate.Value.Value]; found {
-			return reading, true
+		if _, found := utility.LiteralReadings[candidate.Value.Value]; found {
+			return utility.readingOf(root, candidate.Value.Value, ResolvedUtilityValue{})
 		}
 		// The universal colour keywords, which are in no theme namespace and infer as nothing.
 		//
@@ -117,7 +130,7 @@ func (utility FrameworkMultiDeclarationUtility) ReadingFor(candidate *ParsedCand
 		// the table declines eighteen classes the engine reads. Same bucket `bareReading` carries in
 		// descriptor.go, for the same reason.
 		if utility.AcceptsColorKeywords && colorKeywords[candidate.Value.Value] {
-			return utility.Reading, true
+			return utility.readingOf(root, "", ResolvedUtilityValue{})
 		}
 	}
 	// A valueless candidate is a per-root fact, not a consequence of the other fields.
@@ -137,10 +150,29 @@ func (utility FrameworkMultiDeclarationUtility) ReadingFor(candidate *ParsedCand
 	if utility.RefusesArbitraryValue && candidate.Value != nil && candidate.Value.Kind == ParsedValueKindArbitrary {
 		return Reading{}, false
 	}
-	if _, produced := ResolveFunctionalUtilityValue(candidate, utility.Description(), theme, negative); !produced {
+	resolved, produced := ResolveFunctionalUtilityValue(candidate, utility.Description(), theme, negative)
+	if !produced {
 		return Reading{}, false
 	}
-	return utility.Reading, true
+	return utility.readingOf(root, "", resolved)
+}
+
+// readingOf runs the root's ported handle body and sorts what it emits.
+//
+// The one place `Reading` is no longer read on the ordinary path. It stays on the row because it is
+// the independent measurement frameworkmultihandlers_test.go compares the emitters against, and two
+// statements of one fact are worth carrying only while something forces them to agree.
+//
+// An unported root reads nothing rather than falling back to the stored `Reading`, for the reason
+// the single-declaration Emit gives: a fallback makes a missing emitter indistinguishable from a
+// working one everywhere except the acceptance test.
+func (utility FrameworkMultiDeclarationUtility) readingOf(root, literal string, resolved ResolvedUtilityValue) (Reading, bool) {
+	nodes := utility.Emit(root, literal, resolved)
+	if len(nodes) == 0 {
+		return Reading{}, false
+	}
+	sorted := PropertySort(nodes)
+	return Reading{Order: sorted.Order, Count: sorted.Count}, true
 }
 
 // FrameworkMultiDeclarationUtilities is the table.

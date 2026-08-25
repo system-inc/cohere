@@ -166,7 +166,15 @@ func TestFrameworkFunctionalUtilitiesShareOneBarePredicate(t *testing.T) {
 	}
 }
 
+// formatReading renders a reading as its order list and count.
+//
+// An empty order prints as `[]` rather than as `null`. A root that reads no position is a real and
+// common state here, and a failure message reading `null#1` describes a nil slice rather than the
+// reading it stands for.
 func formatReading(reading Reading) string {
+	if len(reading.Order) == 0 {
+		return "[]#" + itoa(reading.Count)
+	}
 	raw, _ := json.Marshal(reading.Order)
 	return string(raw) + "#" + itoa(reading.Count)
 }
