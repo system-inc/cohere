@@ -232,9 +232,15 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// this file's entire walk against every other file's. Measured: about 50% of the lint
 				// phase, 366-417ms against 557-575ms on the same tree at controlled load.
 				//
-				// Nothing pays that today. 93 rules run and none reads the checker, so this guard skips
-				// the acquisition on every file in the current catalog. When the tsgolint adapter
-				// registers, only the files its rules apply to will pay.
+				// This is paid now. Measured against the live registry on 2026-08-25: 212 rules
+				// registered, 44 of them declaring NeedsTypeChecker, so the guard acquires on any file
+				// one of those 44 applies to rather than skipping every file. The comment here
+				// previously read "93 rules run and none reads the checker", which was true when the
+				// tsgolint adapter had not registered and became false the moment it did.
+				//
+				// Left as a measurement with its date rather than a standing claim: a count of rules
+				// is exactly the kind of number that decays silently, and the previous version of this
+				// sentence is the proof.
 				//
 				// Declared rather than lazy on purpose. A getter that acquired on first use would work
 				// until two rules on one file both asked, and the second acquisition would happen inside
