@@ -151,6 +151,25 @@ func (v *manualMemoValidator) visitInstruction(instruction *ReactiveInstruction)
 
 	switch marker := plain.Value.(type) {
 	case *StartMemoize:
+		// Upstream carries two early returns here that this port deliberately does not.
+		//
+		// `value.deps == null` needs no code: upstream's null check exists because iterating null
+		// throws in JavaScript, and ranging a nil slice below iterates zero times. Same behaviour,
+		// no branch, and a branch added to mirror the source would be dead.
+		//
+		// `value.hasInvalidDeps` is unreachable rather than unported, which is a different verdict
+		// and expires differently. Measured at the source: the flag is written in exactly one place,
+		// `ValidateExhaustiveDependencies.ts:146`, inside `onFinishMemoize`, and only when
+		// `env.config.validateExhaustiveMemoizationDependencies` is on and `validateDependencies`
+		// already produced a diagnostic. It is a duplicate-error suppressor for a rule that has
+		// already reported, not a false-positive guard.
+		//
+		// This tree does not run that pass at all -- `internal/rules/react/exhaustive_deps.go` is
+		// the ESLint rule of the same subject, not the compiler validation -- so nothing here could
+		// set the flag and a port of the guard would read as protection it does not provide.
+		//
+		// The verdict expires if that validation is ever ported: at that point this guard becomes
+		// live and must land with it, or every program failing exhaustive-deps reports twice.
 		v.openMemoBlocks[marker.ManualMemoId] = true
 		// A dependency belonging to a scope that neither survived nor was pruned may be mutated
 		// after this point, so the memoization cannot be trusted.
