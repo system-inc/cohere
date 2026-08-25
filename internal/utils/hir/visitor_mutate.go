@@ -232,3 +232,94 @@ func eachPatternPlacePointer(pattern Pattern, visit func(place *Place, role Plac
 		}
 	}
 }
+
+// EachBlockReferencePointer visits every block id a terminal names, by pointer so it can be rewritten.
+//
+// The read-only pair is `EachSuccessor` plus `Fallthrough`, and this is deliberately BOTH of them at
+// once rather than a mutating mirror of either. A pass that renames blocks has to rewrite every
+// reference a terminal holds, and a fallthrough is a reference even where it is not an edge: a
+// `Switch` with a default reaches its fallthrough only through a case, and `EachSuccessor` correctly
+// omits it, but a rename that skipped it would leave the terminal pointing at a block that no longer
+// exists.
+//
+// # Why this is not the same shape as `EachSuccessor`
+//
+// `EachSuccessor` filters through `HasBlock`, because an unset block id means "no such edge" to a
+// consumer walking the graph. This does not filter: an unset reference is not a reference to rewrite,
+// and passing it through would let a caller write a real id into a slot that means absence.
+//
+// `TestEachBlockReferencePointerCoversEveryTerminal` guards the arm set the same way its read-only
+// siblings are guarded, by scanning this switch against the declared terminals.
+func EachBlockReferencePointer(terminal Terminal, visit func(block *BlockId)) {
+	visitReal := func(block *BlockId) {
+		if block != nil && HasBlock(*block) {
+			visit(block)
+		}
+	}
+	switch t := terminal.(type) {
+	case *Return, *Throw, *Unreachable, *Unsupported:
+		// Control leaves the function; no block is named.
+	case *Goto:
+		visitReal(&t.Block)
+	case *If:
+		visitReal(&t.Consequent)
+		visitReal(&t.Alternate)
+		visitReal(&t.Fallthrough)
+	case *Branch:
+		visitReal(&t.Consequent)
+		visitReal(&t.Alternate)
+	case *Switch:
+		for index := range t.Cases {
+			visitReal(&t.Cases[index].Block)
+		}
+		visitReal(&t.Fallthrough)
+	case *While:
+		visitReal(&t.Test)
+		visitReal(&t.Loop)
+		visitReal(&t.Fallthrough)
+	case *DoWhile:
+		visitReal(&t.Loop)
+		visitReal(&t.Test)
+		visitReal(&t.Fallthrough)
+	case *For:
+		visitReal(&t.Init)
+		visitReal(&t.Test)
+		visitReal(&t.Loop)
+		visitReal(&t.Update)
+		visitReal(&t.Fallthrough)
+	case *ForOf:
+		visitReal(&t.Init)
+		visitReal(&t.Test)
+		visitReal(&t.Loop)
+		visitReal(&t.Fallthrough)
+	case *ForIn:
+		visitReal(&t.Init)
+		visitReal(&t.Loop)
+		visitReal(&t.Fallthrough)
+	case *Logical:
+		visitReal(&t.Test)
+		visitReal(&t.Fallthrough)
+	case *Ternary:
+		visitReal(&t.Test)
+		visitReal(&t.Fallthrough)
+	case *Optional:
+		visitReal(&t.Test)
+		visitReal(&t.Fallthrough)
+	case *Sequence:
+		visitReal(&t.Block)
+		visitReal(&t.Fallthrough)
+	case *Label:
+		visitReal(&t.Block)
+		visitReal(&t.Fallthrough)
+	case *Try:
+		visitReal(&t.Block)
+		visitReal(&t.Handler)
+		visitReal(&t.Fallthrough)
+	case *MaybeThrow:
+		visitReal(&t.Continuation)
+		visitReal(&t.Handler)
+	case *Scope:
+		visitReal(&t.Block)
+		visitReal(&t.Fallthrough)
+	}
+}

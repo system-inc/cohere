@@ -305,3 +305,86 @@ func TestClassifyFunction(t *testing.T) {
 		}
 	}
 }
+
+// TestEachBlockReferencePointerCoversEveryTerminal guards the rewriting walker.
+//
+// A terminal with no case keeps whatever block ids it held, which is invisible to a caller: the
+// rewrite reports success, the graph still builds, and the terminal points at a block from a
+// different id space. That is the same failure mode `EachSuccessor` is guarded against, one step
+// worse, because a missed edge reads as unreachable while a missed rewrite reads as reachable and
+// wrong.
+func TestEachBlockReferencePointerCoversEveryTerminal(t *testing.T) {
+	declared := markerImplementers(t, "terminal")
+	if len(declared) < 18 {
+		t.Fatalf("found only %d terminals, expected the full set; the source scan is broken",
+			len(declared))
+	}
+	covered := typeSwitchCases(t, "visitor_mutate.go", "EachBlockReferencePointer")
+
+	for _, name := range declared {
+		if !covered[name] {
+			t.Errorf("EachBlockReferencePointer has no case for %s, so a pass renaming blocks "+
+				"leaves it pointing into the old id space", name)
+		}
+	}
+}
+
+// TestEachBlockReferencePointerSeesEveryReadOnlyReference is the cross-check against its siblings.
+//
+// The arm list above is guarded against the declared terminals; this is guarded against what the
+// read-only walkers actually yield, which is the stronger question. A terminal can have a case here
+// and still miss one of its own fields.
+func TestEachBlockReferencePointerSeesEveryReadOnlyReference(t *testing.T) {
+	terminals := everyTerminalSample(t)
+	if len(terminals) < 18 {
+		t.Fatalf("only %d terminal samples; the comparison below would not cover the set",
+			len(terminals))
+	}
+	for _, terminal := range terminals {
+		expected := map[BlockId]bool{}
+		EachSuccessorAndFallthrough(terminal, func(block BlockId) { expected[block] = true })
+
+		seen := map[BlockId]bool{}
+		EachBlockReferencePointer(terminal, func(block *BlockId) { seen[*block] = true })
+
+		for block := range expected {
+			if !seen[block] {
+				t.Errorf("%T names block %d through the read-only walkers and "+
+					"EachBlockReferencePointer does not reach it", terminal, block)
+			}
+		}
+	}
+}
+
+// everyTerminalSample builds one of each terminal with a distinct block id in every slot.
+//
+// Distinct ids are the whole point: a walker that reads `t.Consequent` twice instead of reading
+// `t.Alternate` passes any sample where the two are equal.
+func everyTerminalSample(t *testing.T) []Terminal {
+	t.Helper()
+	next := BlockId(0)
+	block := func() BlockId {
+		next++
+		return next
+	}
+	return []Terminal{
+		&Return{}, &Throw{}, &Unreachable{}, &Unsupported{},
+		&Goto{Block: block()},
+		&If{Consequent: block(), Alternate: block(), Fallthrough: block()},
+		&Branch{Consequent: block(), Alternate: block()},
+		&Switch{Cases: []SwitchCase{{Block: block()}, {Block: block()}}, Fallthrough: block()},
+		&While{Test: block(), Loop: block(), Fallthrough: block()},
+		&DoWhile{Loop: block(), Test: block(), Fallthrough: block()},
+		&For{Init: block(), Test: block(), Loop: block(), Update: block(), Fallthrough: block()},
+		&ForOf{Init: block(), Test: block(), Loop: block(), Fallthrough: block()},
+		&ForIn{Init: block(), Loop: block(), Fallthrough: block()},
+		&Logical{Test: block(), Fallthrough: block()},
+		&Ternary{Test: block(), Fallthrough: block()},
+		&Optional{Test: block(), Fallthrough: block()},
+		&Sequence{Block: block(), Fallthrough: block()},
+		&Label{Block: block(), Fallthrough: block()},
+		&Try{Block: block(), Handler: block(), Fallthrough: block()},
+		&MaybeThrow{Continuation: block(), Handler: block()},
+		&Scope{Block: block(), Fallthrough: block()},
+	}
+}
