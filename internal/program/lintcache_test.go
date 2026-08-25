@@ -2,6 +2,8 @@ package program_test
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -266,5 +268,139 @@ func TestLintCacheFindingHasNoUncheckedFields(t *testing.T) {
 	// pointing at a field that no longer exists, which makes it decorative.
 	for name := range compared {
 		t.Errorf("this check names %q but LintCacheFinding has no such field, so the list is stale", name)
+	}
+}
+
+// TestLintCacheStoreReplacesRatherThanAppends pins the property Lookup depends on.
+//
+// A path stored twice must leave one entry, not two. Two entries make Lookup's answer depend on
+// which copy the index happened to keep, and the stale one would win or lose by insertion order,
+// which is exactly the kind of nondeterminism that reads as a flaky cache rather than a bug.
+func TestLintCacheStoreReplacesRatherThanAppends(t *testing.T) {
+	cache := &program.LintCache{RuleSetHash: program.HashRuleSet([]string{"no-debugger"})}
+	path := "/project/source/edited.ts"
+
+	first := program.HashContent("debugger;\n")
+	cache.Store(path, first, []program.LintCacheFinding{{
+		RuleName: "no-debugger", Start: 0, End: 9,
+		MessageId: "unexpectedDebugger", MessageDescription: "Unexpected debugger statement.",
+	}})
+
+	// The same file, edited clean. The second store must supersede the first.
+	second := program.HashContent("export const value = 1;\n")
+	cache.Store(path, second, nil)
+
+	if len(cache.Entries) != 1 {
+		t.Fatalf("entries: %d, so Store appended instead of replacing", len(cache.Entries))
+	}
+
+	// The superseded content hash must no longer be a hit, or the cache would serve findings for
+	// bytes that are gone.
+	if _, hit := cache.Lookup(path, first, cache.RuleSetHash); hit {
+		t.Error("the replaced content hash is still a hit, so stale findings survived a Store")
+	}
+
+	findings, hit := cache.Lookup(path, second, cache.RuleSetHash)
+	if !hit {
+		t.Fatal("the current content hash is a miss, so the replacement did not take")
+	}
+	if len(findings) != 0 {
+		t.Errorf("findings: %d, want 0 for the cleaned file", len(findings))
+	}
+}
+
+// TestLintCacheStoreRecordsCleanFiles is the case worth caching, and the one easiest to skip.
+//
+// Most files produce nothing. If Store dropped empty results, every clean file would be a miss
+// forever and the cache would save nothing on exactly the population it exists for, while looking
+// like it worked.
+func TestLintCacheStoreRecordsCleanFiles(t *testing.T) {
+	cache := &program.LintCache{RuleSetHash: program.HashRuleSet([]string{"no-debugger"})}
+	contentHash := program.HashContent("export const value = 1;\n")
+	cache.Store("/project/source/clean.ts", contentHash, nil)
+
+	findings, hit := cache.Lookup("/project/source/clean.ts", contentHash, cache.RuleSetHash)
+	if !hit {
+		t.Fatal("a stored clean file is a miss, so clean files would never be cached")
+	}
+	if len(findings) != 0 {
+		t.Errorf("findings: %d, want 0", len(findings))
+	}
+}
+
+// TestLintCacheSurvivesDisk round-trips through the real filesystem rather than through Encode
+// alone, because the write path is where a cache is truncated or half-visible.
+func TestLintCacheSurvivesDisk(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "lint.cache")
+	original := sampleLintCache()
+
+	if err := program.WriteLintCache(path, original); err != nil {
+		t.Fatalf("writing: %v", err)
+	}
+
+	decoded, err := program.ReadLintCache(path)
+	if err != nil {
+		t.Fatalf("reading back: %v", err)
+	}
+	if len(decoded.Entries) != len(original.Entries) {
+		t.Fatalf("entries: %d back from %d", len(decoded.Entries), len(original.Entries))
+	}
+
+	// The interpolated description is the one that cannot be rebuilt, so it is the one worth
+	// asserting survived a real write.
+	findings, hit := decoded.Lookup(
+		original.Entries[0].Path, original.Entries[0].ContentHash, original.RuleSetHash)
+	if !hit {
+		t.Fatal("an entry written to disk came back as a miss")
+	}
+	if len(findings) != 2 {
+		t.Fatalf("findings: %d back from 2", len(findings))
+	}
+	if findings[1].MessageDescription != original.Entries[0].Findings[1].MessageDescription {
+		t.Errorf("description did not survive disk:\n  got  %q\n  want %q",
+			findings[1].MessageDescription, original.Entries[0].Findings[1].MessageDescription)
+	}
+}
+
+// TestLintCacheWriteLeavesNoPartialArtifact pins the atomic-rename property.
+//
+// Several verify runs can share a tree, so a reader must never observe a half-written cache. The
+// temporary file is written in the destination directory and renamed, and this asserts the
+// directory holds exactly the finished artifact afterward: a leftover temporary is the tell that a
+// failure path forgot to clean up, and it accumulates silently across runs.
+func TestLintCacheWriteLeavesNoPartialArtifact(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "lint.cache")
+
+	if err := program.WriteLintCache(path, sampleLintCache()); err != nil {
+		t.Fatalf("writing: %v", err)
+	}
+
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		t.Fatalf("listing %s: %v", directory, err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "lint.cache" {
+		names := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			names = append(names, entry.Name())
+		}
+		t.Errorf("the directory holds %v, want exactly [lint.cache]: a leftover temporary means a "+
+			"failure path did not clean up", names)
+	}
+}
+
+// TestReadLintCacheTreatsAMissingFileAsAMiss pins that a first run is not an error.
+//
+// A missing cache and an unparseable one both mean run cold. Reporting either as fatal would make
+// the first run in a fresh checkout fail, which is the loudest possible way to be wrong about
+// something harmless.
+func TestReadLintCacheTreatsAMissingFileAsAMiss(t *testing.T) {
+	cache, err := program.ReadLintCache(filepath.Join(t.TempDir(), "absent.cache"))
+	if err == nil {
+		t.Error("reading an absent cache returned no error, so a caller cannot say why it was cold")
+	}
+	if cache != nil {
+		t.Error("reading an absent cache returned a cache, which would be used as if it were real")
 	}
 }

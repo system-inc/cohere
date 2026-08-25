@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
 // The lint findings cache: what each rule reported about one file, replayed when neither the
@@ -385,4 +387,96 @@ func (c *LintCache) Lookup(path string, contentHash [sha256.Size]byte, ruleSetHa
 		return nil, false
 	}
 	return c.Entries[position].Findings, true
+}
+
+// Store records one file's findings, replacing any earlier entry for the same path.
+//
+// Replace rather than append, because a path appearing twice makes Lookup's answer depend on which
+// copy the index happened to keep. The index is invalidated rather than patched: Store is called
+// once per file during a walk and Lookup runs afterward, so rebuilding once on the next lookup
+// costs less than maintaining the map through every insert.
+//
+// Empty findings are stored deliberately. A clean file is the most valuable thing this cache holds,
+// because most files are clean, and an entry saying "these bytes produce nothing" is a real answer.
+// Skipping it would make a clean file indistinguishable from an unknown one, which is the exact
+// ambiguity Lookup's second return exists to destroy.
+func (c *LintCache) Store(path string, contentHash [sha256.Size]byte, findings []LintCacheFinding) {
+	if c == nil {
+		return
+	}
+	if c.index != nil {
+		if position, found := c.index[path]; found {
+			c.Entries[position] = LintCacheEntry{Path: path, ContentHash: contentHash, Findings: findings}
+			return
+		}
+	}
+	for position := range c.Entries {
+		if c.Entries[position].Path == path {
+			c.Entries[position] = LintCacheEntry{Path: path, ContentHash: contentHash, Findings: findings}
+			c.index = nil
+			return
+		}
+	}
+	c.Entries = append(c.Entries, LintCacheEntry{Path: path, ContentHash: contentHash, Findings: findings})
+	c.index = nil
+}
+
+// WriteLintCache persists the cache, creating the directory if it is missing.
+//
+// Written to a temporary file in the same directory and renamed into place, because several verify
+// runs can share a tree and a reader must never see a half-written artifact. Rename is atomic
+// within a filesystem; writing directly to the destination is not, and a truncated cache is the
+// shape that decodes into offsets pointing at the wrong strings.
+//
+// A failure here is returned rather than swallowed. The next run being cold is a cost someone
+// should be told about, since the symptom otherwise is a saving that quietly never appears.
+func WriteLintCache(path string, cache *LintCache) error {
+	if cache == nil {
+		return fmt.Errorf("writing the lint cache: no cache to write")
+	}
+	directory := filepath.Dir(path)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return fmt.Errorf("creating %s: %w", directory, err)
+	}
+
+	temporary, err := os.CreateTemp(directory, ".lintcache-*")
+	if err != nil {
+		return fmt.Errorf("creating a temporary file in %s: %w", directory, err)
+	}
+	temporaryName := temporary.Name()
+	// Best-effort cleanup on every failure path below, so a failed write does not leave the
+	// directory filling with partial artifacts across runs.
+	defer func() {
+		if temporaryName != "" {
+			os.Remove(temporaryName)
+		}
+	}()
+
+	if _, err := temporary.Write(cache.Encode()); err != nil {
+		temporary.Close()
+		return fmt.Errorf("writing %s: %w", temporaryName, err)
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("closing %s: %w", temporaryName, err)
+	}
+	if err := os.Rename(temporaryName, path); err != nil {
+		return fmt.Errorf("renaming %s into place at %s: %w", temporaryName, path, err)
+	}
+	temporaryName = ""
+	return nil
+}
+
+// ReadLintCache loads a cache from disk.
+//
+// A missing file and an unreadable one are both reported as a miss with no error, because neither
+// is a failure: the first run has no cache, and an artifact this build cannot parse is exactly what
+// the version byte exists to produce. Both mean the same thing to the caller, which is to run cold.
+//
+// The error is returned anyway, for a caller that wants to say why. Nothing may treat it as fatal.
+func ReadLintCache(path string) (*LintCache, error) {
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return DecodeLintCache(contents)
 }
