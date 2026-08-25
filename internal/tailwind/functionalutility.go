@@ -47,6 +47,7 @@
 package tailwind
 
 import (
+	"strconv"
 	"strings"
 )
 
@@ -225,8 +226,16 @@ func resolveNamedValue(
 
 // isPositiveInteger is upstream's `isPositiveInteger` from `src/utils/infer-data-type.ts`.
 //
-// Digits only: a leading sign, a decimal point and an empty string are all rejected, which is what
-// keeps `w-1.5/2` and `w--1/2` out of the fraction branch.
+// Upstream is `Number.isInteger(num) && num >= 0 && String(num) === String(value)`, and that last
+// clause is the whole predicate: it rejects every spelling JavaScript would coerce to a number but
+// not print back identically. A digits-only scan agrees with it on `007`, `1.0`, `1e3`, `+1`, `-1`,
+// ` 1` and `0x10`, all measured, and disagrees in exactly one place.
+//
+// That place is precision. `9007199254740993` is past 2^53, so `Number(value)` rounds it to
+// `9007199254740992`, `String(num)` prints the rounded form, and upstream returns false. A
+// digits-only scan returns true. The round-trip below reproduces the rejection rather than
+// approximating it, because a bare value that large is a value the engine refuses and this port
+// would otherwise resolve.
 func isPositiveInteger(input string) bool {
 	if input == "" {
 		return false
@@ -236,5 +245,17 @@ func isPositiveInteger(input string) bool {
 			return false
 		}
 	}
-	return true
+	// The float round-trip, matching `String(Number(value)) === String(value)`. Parsed as a float
+	// rather than an integer on purpose: the question is what JavaScript's single numeric type does
+	// to this string, and a Go int64 parse would accept values JavaScript cannot represent.
+	parsed, err := strconv.ParseFloat(input, 64)
+	if err != nil {
+		return false
+	}
+	return strconv.FormatFloat(parsed, 'f', -1, 64) == input
+}
+
+// isStrictPositiveInteger is upstream's `isStrictPositiveInteger`: the same predicate, excluding zero.
+func isStrictPositiveInteger(input string) bool {
+	return isPositiveInteger(input) && input != "0"
 }

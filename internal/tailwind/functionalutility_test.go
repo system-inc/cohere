@@ -273,3 +273,36 @@ func TestFunctionalResolutionThemeBeforeStaticValues(t *testing.T) {
 		t.Errorf("resolved to %q, expected the theme's own var() reference", resolved.Value)
 	}
 }
+
+// TestIsPositiveIntegerMatchesTheEngineIncludingPrecision pins the predicate against measured answers.
+//
+// Upstream is `Number.isInteger(num) && num >= 0 && String(num) === String(value)`, and the
+// round-trip clause is the whole predicate. Every case below was run against that JavaScript rather
+// than reasoned about, because the interesting ones are where a digits-only scan agrees by accident.
+//
+// `9007199254740993` is the one that separates them. It is past 2^53, so `Number(value)` rounds it
+// and `String(num)` prints the rounded form, and upstream returns false where a digit scan returns
+// true. It is the only disagreement in this corpus, which is exactly why it needs to be here: a port
+// that dropped the round-trip would pass every other case in this test.
+func TestIsPositiveIntegerMatchesTheEngineIncludingPrecision(t *testing.T) {
+	cases := map[string]bool{
+		"0": true, "1": true, "10": true,
+		"007": false, "1.0": false, "1e3": false, " 1": false, "": false,
+		"1 ": false, "+1": false, "-1": false, "0.5": false,
+		"9007199254740993": false, "1_0": false, "Infinity": false, "0x10": false,
+	}
+	for input, expected := range cases {
+		if actual := isPositiveInteger(input); actual != expected {
+			t.Errorf("isPositiveInteger(%q) = %v, the engine says %v", input, actual, expected)
+		}
+	}
+
+	// The strict form differs from the loose one on exactly one input, so that is what is asserted
+	// rather than the whole corpus a second time.
+	if isStrictPositiveInteger("0") {
+		t.Error(`isStrictPositiveInteger("0") = true, the engine says false`)
+	}
+	if !isStrictPositiveInteger("1") {
+		t.Error(`isStrictPositiveInteger("1") = false, the engine says true`)
+	}
+}
