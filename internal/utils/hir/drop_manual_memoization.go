@@ -425,10 +425,29 @@ func extractManualMemoArguments(
 	for _, element := range elements {
 		dependency, ok := sidemap.deps[element.Identifier]
 		if !ok {
-			// An entry that is not a simple access path, such as `[a + b]`. Upstream reports each
-			// one; here they are counted, and the entry is DROPPED rather than guessed at.
+			// An entry that is not a simple access path, such as `[a + b]` or `[x[0]]`.
+			//
+			// Upstream calls `env.recordError` here (`DropManualMemoization.ts:356`), which is a
+			// COMPILE ERROR: the function bails and `ValidatePreservedManualMemoization` never runs
+			// on it. Counting the entry and continuing turns "this list could not be read" into
+			// "this list was empty", and those are different claims -- an empty list means the
+			// developer promised no dependencies, so every inferred one is reported as a
+			// disagreement they never made.
+			//
+			// A nil `Deps` is the closest faithful equivalent available here, and this file already
+			// documents it as the signal that disables the comparison: "no dependency array. `Deps`
+			// stays nil, which is a different fact from an empty array". So the whole list is
+			// abandoned rather than the entry silently removed from it.
+			//
+			// Measured on `useMemo-dep-array-literal-access.ts`, whose source is `[x[0]]` and whose
+			// own comment says upstream only recognises "hoistable" values in a deps list: we
+			// extracted zero of one entry and handed the validator an empty list, which then
+			// reported `props` against nothing. Upstream compiles it with no error at all.
 			result.UnextractableDeps++
-			continue
+			return extractedMemoArguments{
+				callback:       extracted.callback,
+				inlineFunction: extracted.inlineFunction,
+			}, true
 		}
 		dependencies = append(dependencies, dependency)
 	}
