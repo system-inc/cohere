@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -81,6 +83,17 @@ func TestAgainstTheLiveConfig(t *testing.T) {
 // Without this the removal IS the change, and a silent disagreement between the two paths looks
 // exactly like a successful migration.
 //
+// # This guard was vacuous once, and the reason generalises
+//
+// The first version read `Load`'s result. `Load` merges the plugin defaults into `Rules`, so a rule
+// arriving only through the declaration is indistinguishable there from one named by hand -- the
+// exact distinction this test exists to measure. Checked by deleting three plugin-default lines from
+// a copy of the live config: the test passed and reported all forty still named by hand.
+//
+// The shape: a test comparing two paths cannot read the surface where they have already been merged,
+// and that surface is usually the convenient one because it is what every consumer uses. Reading the
+// file directly is why this can now fail.
+//
 // # The severity difference, which is real and is the reason nothing is being removed yet
 //
 // The two paths agree on WHICH rules run and disagree on how loudly. The hand-written lines say
@@ -108,9 +121,18 @@ func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
 			len(fromPlugins), len(PluginDefaultRules))
 	}
 
+	// Read what the FILE names rather than what `Load` returned. `Load` merges the plugin defaults
+	// into `Rules`, so a rule arriving only through the declaration is indistinguishable there from
+	// one named by hand -- which is exactly the distinction this test exists to measure. Reading the
+	// merged map made this guard pass on a config with three lines deliberately removed.
+	namedInFile, err := ruleNamesInFile(liveConfigPath)
+	if err != nil {
+		t.Fatalf("reading the rules block: %v", err)
+	}
+
 	missingByHand, severityDiffers := 0, 0
 	for ruleName := range PluginDefaultRules {
-		byHand, named := asWritten.Rules[ruleName]
+		byHand, named := namedInFile[ruleName]
 		if !named {
 			// Reachable through the declaration and not named by hand. Not a failure -- it is the
 			// state this whole change is heading toward -- but counted so the number is visible.
@@ -122,18 +144,60 @@ func TestBothPathsAgreeOnEveryPluginDefault(t *testing.T) {
 		}
 	}
 
-	if missingByHand != 0 {
-		t.Logf("%d plugin-default rules are already unnamed in the config and arrive only through "+
-			"the declaration", missingByHand)
-	}
 	t.Logf("plugin-default rules: %d resolved from the declaration, %d also named by hand, "+
 		"%d of those at a severity the declaration would not contribute",
 		len(fromPlugins), len(PluginDefaultRules)-missingByHand, severityDiffers)
 
 	if severityDiffers > 0 {
 		t.Logf("the hand-written lines set %d rules to a severity `warn_correctness` does not "+
-			"contribute; removing them would LOWER those rules to warn, which is a behaviour "+
-			"change and must be a deliberate one rather than a side effect of this cleanup",
+			"contribute, so removing them would lower those rules to warn. Ruled 2026-08-25 that "+
+			"they stay at error: parity is the criterion for which rules run rather than how "+
+			"loudly, and this set holds no rule whose violation is arguably fine. See "+
+			"`PluginDefaultSeverity` for the full reasoning before deleting any of them.",
 			severityDiffers)
 	}
+
+	// The forty are a deliberate override, so all forty being named is the expected state and a
+	// drop is what wants attention. Asserted rather than logged: if a cleanup pass removes some of
+	// these lines believing them redundant, this is the check that says otherwise, and a log line
+	// in a passing test is not something anyone reads.
+	if missingByHand != 0 {
+		t.Errorf("%d plugin-default rules are no longer named in the config, so they have dropped "+
+			"from error to warn. If that was deliberate, update this test and say so; if it was a "+
+			"cleanup removing lines that looked redundant, the lines were load-bearing and the "+
+			"reasoning is on `PluginDefaultSeverity`", missingByHand)
+	}
+}
+
+// ruleNamesInFile returns the rules the config's own rules block names, before any plugin default is
+// merged in.
+//
+// Separate from `Load` on purpose. `Load` returns the resolved result, which is the right answer for
+// every consumer and the wrong one for a test asking which of two paths a rule arrived by.
+func ruleNamesInFile(path string) (map[string]RuleSetting, error) {
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var raw struct {
+		Rules map[string]json.RawMessage `json:"rules"`
+	}
+	if err := json.Unmarshal(contents, &raw); err != nil {
+		return nil, err
+	}
+
+	named := map[string]RuleSetting{}
+	for name, value := range raw.Rules {
+		setting, err := parseRuleSetting(value)
+		if err != nil {
+			return nil, err
+		}
+		// The config writes `react/no-children-prop` and the table keys on the same spelling the
+		// inventory uses, so both are recorded and a lookup finds either.
+		named[name] = setting
+		if _, bare, namespaced := strings.Cut(name, "/"); namespaced {
+			named[bare] = setting
+		}
+	}
+	return named, nil
 }

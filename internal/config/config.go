@@ -109,9 +109,33 @@ func pluginContributing(ruleName string) string {
 // PluginDefaultSeverity is the severity a plugin declaration contributes at.
 //
 // `Warn`, and not by choice: `warn_correctness` inserts `AllowWarnDeny::Warn` and the inventory
-// records all forty as `warn` today. This matters because the hand-written lines currently in the
-// config set them to `error`, so the two paths agree on WHICH rules run and disagree on how loudly.
-// See `RulesFromPlugins` for why that difference is surfaced rather than smoothed over.
+// records all forty as `warn`. This is a faithful statement of what a declaration contributes and is
+// deliberately not bent to encode a house preference; see below for where the preference lives.
+//
+// # The forty `error` lines in the config are deliberate, and removing them is a downgrade
+//
+// The config names all forty of these rules at `error`. They look like redundant leftovers now that
+// a declaration resolves the same forty, and they are not: **the declaration contributes `warn`, so
+// deleting those lines lowers all forty rather than changing nothing.**
+//
+// Ruled 2026-08-25 that they stay, and the reasoning is recorded here because this is where the next
+// cleanup pass will look before deleting them:
+//
+//   - Parity is the acceptance criterion for WHICH rules run, not for how loudly. Those are separable
+//     and only the first is what this migration promised.
+//   - The set does not contain a rule whose violation is arguably fine, which is what `warn` would
+//     assert. `no-const-assign` is a runtime TypeError, `no-this-before-super` is a crash,
+//     `no-obj-calls` calls a non-function, `react/no-direct-mutation-state` silently drops a render.
+//   - The tool being replaced is the floor rather than the target. verify exists because that gate
+//     was insufficient, so inheriting its severity because it is the incumbent proves too much.
+//
+// The choice was originally made by someone who left no note, and `VerifySettings.json` is untracked
+// so there is no author or date to recover. That is a gap in the record rather than evidence the
+// choice was careless: reverting an undocumented decision to a weaker one BECAUSE it is undocumented
+// is how a codebase loses hard-won strictness one blameless commit at a time.
+//
+// `TestBothPathsAgreeOnEveryPluginDefault` reports the divergence on every run, so this cannot go
+// quiet.
 const PluginDefaultSeverity = SeverityWarn
 
 // RulesFromPlugins returns the settings a `plugins` declaration contributes, given what the rules
