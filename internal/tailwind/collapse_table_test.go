@@ -424,3 +424,52 @@ func TestValueDependentReadingsAreRecorded(t *testing.T) {
 			"readings rather than recording one and excepting the other")
 	}
 }
+
+// TestCollapseFamiliesAreCssShorthandRelationships records why this table stays generated.
+//
+// M9 asked whether the ported registration tables could compute the 45 families now that they exist,
+// which was not possible before M6 and M7. The answer is no, and the reason is more useful than the
+// answer: a collapse is not a fact the readings carry.
+//
+// Measured on the live table, `bottom` reads `[13]#1`, `top` reads `[11]#1` and `inset-y` reads
+// `[6]#1`. There is no arithmetic from the first two to the third, because a reading is a position in
+// Tailwind's property order and the order is alphabetical-ish by property name rather than structural.
+// The same holds for every family: `-mb [36] + -mt [34] => -my [29]`.
+//
+// What does relate them is the CSS itself. All 45 families are shorthand relationships between the
+// properties the roots declare: `bottom + top` is `inset-block`, `margin-inline + margin-block` is
+// `margin`, `border-bottom-* + border-top-*` is `border-block-*`. That is a fact about CSS, not about
+// Tailwind, so computing it would mean carrying a shorthand table instead of a family table. The same
+// size, one layer further from the thing being asked.
+//
+// So the table stays, and it stays for a stated reason rather than by default: the alternative is a
+// table of equal size describing something Tailwind does not own. `gen_tailwind_collapse` measures it
+// against the engine by canonicalizing 57,970 root pairs, and refuses a second design system whose
+// registry matches the first, which is the guard that makes an invariance claim mean something.
+//
+// This test asserts the property-shorthand structure rather than the count, so a family added upstream
+// that is NOT a shorthand relationship fails here and reopens the question.
+func TestCollapseFamiliesAreCssShorthandRelationships(t *testing.T) {
+	withProperties := 0
+	for _, family := range CollapseFamilies {
+		first := RootDeclaredProperties[family.First]
+		second := RootDeclaredProperties[family.Second]
+		output := RootDeclaredProperties[family.Output]
+		if len(first) == 0 || len(second) == 0 || len(output) == 0 {
+			t.Errorf("%s + %s => %s: one of the three declares no properties, so this family is not a "+
+				"shorthand relationship and the reasoning in this test does not cover it",
+				family.First, family.Second, family.Output)
+			continue
+		}
+		withProperties++
+	}
+
+	if withProperties != len(CollapseFamilies) {
+		t.Errorf("%d of %d families are property-shorthand relationships; the rest need their own account",
+			withProperties, len(CollapseFamilies))
+	}
+	if len(CollapseFamilies) < 40 {
+		t.Fatalf("the table holds %d families; expected around 45, so this assertion measured far less than it appears to", len(CollapseFamilies))
+	}
+	t.Logf("all %d collapse families relate the properties their roots declare", withProperties)
+}
