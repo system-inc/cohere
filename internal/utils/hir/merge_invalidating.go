@@ -327,9 +327,9 @@ func mergeAllowedInstruction(value InstructionValue) bool {
 // done when the outer scan reaches the statement containing it. Reversing that order would scan a
 // block whose contents are about to change.
 func MergeReactiveScopesThatInvalidateTogether(tree *ReactiveFunction, function *Function,
-	dependencies *ScopeDependencies, typeChecker *shimchecker.Checker) int {
+	dependencies *ScopeDependencies, typeChecker *shimchecker.Checker) MergeScopesResult {
 	if tree == nil || function == nil || dependencies == nil {
-		return 0
+		return MergeScopesResult{}
 	}
 	merger := scopeMerger{
 		function:     function,
@@ -339,7 +339,28 @@ func MergeReactiveScopesThatInvalidateTogether(tree *ReactiveFunction, function 
 		temporaries:  map[DeclarationId]DeclarationId{},
 	}
 	tree.Body = merger.mergeBlock(tree.Body)
-	return merger.merges
+	return MergeScopesResult{
+		Merges:                merger.merges,
+		DeclarationPruneCalls: merger.declarationPruneCalls,
+		DeclarationsPruned:    merger.declarationsPruned,
+	}
+}
+
+// MergeScopesResult reports what the merge did, for measurement and for one invariant.
+//
+// `DeclarationPruneCalls` exists because `DeclarationsPruned` is zero on our corpus and a zero has
+// two readings: the helper is correct and no declaration is prunable, or the helper stopped being
+// called. The call count separates them, and a test asserts it equals `Merges` -- upstream calls
+// `updateScopeDeclarations` exactly once per merge, so any refactor that drops the call or moves it
+// behind a guard breaks that equality rather than passing silently.
+type MergeScopesResult struct {
+	// Merges is how many scopes were absorbed into a survivor.
+	Merges int
+	// DeclarationPruneCalls is how many times the declaration pruning ran, which must equal Merges.
+	DeclarationPruneCalls int
+	// DeclarationsPruned is how many declarations it dropped. Zero on our corpus; see the type
+	// comment for why the call count is reported beside it.
+	DeclarationsPruned int
 }
 
 type scopeMerger struct {
@@ -353,6 +374,9 @@ type scopeMerger struct {
 	merges      int
 	// declarationsPruned counts declarations dropped because the widened range left them dead.
 	declarationsPruned int
+	// declarationPruneCalls counts how many times the pruning ran, which is the control on the
+	// zero above.
+	declarationPruneCalls int
 }
 
 // mergeCandidate is a run of statements that may collapse into one scope.
@@ -455,6 +479,7 @@ func (m *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 				// declaration set is conservative. That holds only where declarations are read to
 				// permit; `pruneAlwaysInvalidatingScopes` reads them to propagate, which prunes
 				// further scopes downstream, so the debt came due when that pass was written.
+				m.declarationPruneCalls++
 				m.declarationsPruned += m.dependencies.PruneDeclarationsLastUsedBefore(
 					candidate.scope.Scope, candidate.scope.Range.End, m.usage, m.function)
 				if !ScopeIsEligibleForMerging(m.function, shape.Scope, m.dependencies,

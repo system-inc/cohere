@@ -544,6 +544,7 @@ func withInvalidatingScopes(t *testing.T, visit func(*Function, *shimchecker.Che
 // therefore asserted nonzero first.
 func TestMergeReactiveScopesPreservesEveryStatement(t *testing.T) {
 	functions, totalMerges, lost := 0, 0, 0
+	pruneCalls, declarationsPruned := 0, 0
 
 	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
 		ranges := InferMutableRanges(function)
@@ -561,7 +562,10 @@ func TestMergeReactiveScopesPreservesEveryStatement(t *testing.T) {
 		functions++
 
 		before := countReactiveInstructionNodes(tree.Body)
-		merges := MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, checker)
+		result := MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, checker)
+		merges := result.Merges
+		pruneCalls += result.DeclarationPruneCalls
+		declarationsPruned += result.DeclarationsPruned
 		after := countReactiveInstructionNodes(tree.Body)
 
 		totalMerges += merges
@@ -586,7 +590,28 @@ func TestMergeReactiveScopesPreservesEveryStatement(t *testing.T) {
 			"statements between scopes and must never lose one", lost, functions)
 	}
 
-	t.Logf("functions=%d merges=%d functionsLosingStatements=%d", functions, totalMerges, lost)
+	// # The control on a zero, which is the whole reason the call count is reported
+	//
+	// `DeclarationsPruned` is zero on this corpus: every declaration of every merged scope is still
+	// read at or after the widened range end, so nothing is prunable. A zero has two readings --
+	// the helper is correct and no case exists, or the helper stopped being called -- and only the
+	// second is a defect.
+	//
+	// Upstream calls `updateScopeDeclarations` exactly once per merge, so the call count equals the
+	// merge count. Asserted as an equality between live values rather than against a recorded
+	// number, for the reason the drift fix in this file records: a figure written beside the code
+	// that computes it goes stale.
+	//
+	// A refactor that drops the call, or moves it behind a guard that stops firing, breaks this
+	// equality. Without it every test still passes and the pruning silently stops happening.
+	if pruneCalls != totalMerges {
+		t.Errorf("the declaration pruning ran %d times across %d merges; upstream runs it once per "+
+			"merge, so an inequality means the call was dropped or guarded and the zero below "+
+			"stops meaning anything", pruneCalls, totalMerges)
+	}
+
+	t.Logf("functions=%d merges=%d functionsLosingStatements=%d pruneCalls=%d declarationsPruned=%d",
+		functions, totalMerges, lost, pruneCalls, declarationsPruned)
 }
 
 // TestMergeReactiveScopesRecordsAbsorbedIds pins the field the rule reads.
@@ -615,7 +640,7 @@ func TestMergeReactiveScopesRecordsAbsorbedIds(t *testing.T) {
 			return
 		}
 		functions++
-		merges += MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, checker)
+		merges += MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, checker).Merges
 
 		VisitReactiveFunction(tree, ReactiveVisitor{
 			Scope: func(scope *ReactiveScopeBlock, traverse func()) {
