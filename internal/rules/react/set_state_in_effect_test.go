@@ -148,26 +148,6 @@ func TestSetStateInEffectFires(t *testing.T) {
 			name:   "setStateBehindABranchReports",
 			source: "import {useEffect, useState} from \"./react\";\nfunction Component({flag}) {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    if (flag) {\n      setState(1);\n    }\n  });\n  return state;\n}\n",
 		},
-		// `valid-setState-in-useEffect-controlled-by-ref-value.js`, verbatim.
-		//
-		// This was the rule's one known false positive and is kept in the REPORTING list, which needs
-		// saying because the name still reads as a divergence. It is not one any more: the control
-		// half of the ref exemption landed with `hir.ControlDominators`, and this case is silent
-		// through the untyped path.
-		//
-		// It still reports through this harness, and the reason is the harness rather than the rule.
-		// `areEqual` and `load` are declared in the fixture and the React stub types neither, so the
-		// branch test resolves through a call the checker cannot follow back to a ref. The exemption
-		// needs the test to be ref-derived; here it is derived from a function of a ref-derived local,
-		// which upstream's inference carries and the checker's does not.
-		//
-		// Kept as an assertion rather than moved, because moving it would claim a behaviour this
-		// harness does not produce. The measurement that matters is on real code: on the tree this
-		// gates, the control half took 20 findings to 15 and every one it silenced was this shape.
-		{
-			name:   "refControlledBranchIsAKnownDivergence",
-			source: "import {useState, useRef, useEffect} from \"./react\";\n\nfunction Component({x, y}) {\n  const previousXRef = useRef(null);\n  const previousYRef = useRef(null);\n\n  const [data, setData] = useState(null);\n\n  useEffect(() => {\n    const previousX = previousXRef.current;\n    previousXRef.current = x;\n    const previousY = previousYRef.current;\n    previousYRef.current = y;\n    if (!areEqual(x, previousX) || !areEqual(y, previousY)) {\n      const data = load({x, y});\n      setData(data);\n    }\n  }, [x, y]);\n\n  return data;\n}\n\nfunction areEqual(a, b) {\n  return a === b;\n}\n\nfunction load({x, y}) {\n  return x * y;\n}\n",
-		},
 		// KNOWN DIVERGENCE in the same direction, found by probing rather than by any fixture.
 		//
 		// A setter laundered through a custom hook is SILENT upstream, measured on this exact input with a
@@ -201,6 +181,20 @@ func TestSetStateInEffectFires(t *testing.T) {
 
 func TestSetStateInEffectStaysSilent(t *testing.T) {
 	cases := []setStateInEffectCase{
+		// `valid-setState-in-useEffect-controlled-by-ref-value.js`, verbatim.
+		//
+		// This was the rule's one known false positive, pinned in the reporting list so that the day
+		// the ref exemption's control half landed it would fail and say what to change. It did, twice:
+		// `hir.ControlDominators` supplied the frontier, and tainting a store's own lvalue supplied the
+		// value half for `const previousX = previousXRef.current`.
+		//
+		// Moved here rather than deleted, because the fixture is upstream's and its passing is the
+		// measurement that the two halves together reproduce upstream's behaviour on the shape they
+		// were written for.
+		{
+			name:   "refControlledBranchIsAKnownDivergence",
+			source: "import {useState, useRef, useEffect} from \"./react\";\n\nfunction Component({x, y}) {\n  const previousXRef = useRef(null);\n  const previousYRef = useRef(null);\n\n  const [data, setData] = useState(null);\n\n  useEffect(() => {\n    const previousX = previousXRef.current;\n    previousXRef.current = x;\n    const previousY = previousYRef.current;\n    previousYRef.current = y;\n    if (!areEqual(x, previousX) || !areEqual(y, previousY)) {\n      const data = load({x, y});\n      setData(data);\n    }\n  }, [x, y]);\n\n  return data;\n}\n\nfunction areEqual(a, b) {\n  return a === b;\n}\n\nfunction load({x, y}) {\n  return x * y;\n}\n",
+		},
 		// valid-setState-in-useEffect-listener.js. The setter is PASSED to setTimeout, never called in the
 		// 	// body, which is the distinction the whole rule exists to draw.
 		{

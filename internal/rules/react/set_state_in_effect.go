@@ -142,9 +142,10 @@ var messageSetStateInEffect = rule.Message{
 // additionally needs the branch test's Place, so `ControlDominators` sits beside it on the shelf
 // rather than inside this rule.
 //
-// Measured on the tree this gates: the control half alone moved 20 findings to 15, and every one it
-// silenced was the ref-sentinel shape, `if (previousReference.current !== value) setValue(value)`,
-// which is what upstream exempts.
+// Measured on the tree this gates: the control half moved 20 findings to 15, silencing the
+// ref-sentinel shape `if (previousReference.current !== value) setValue(value)`. Tainting a store's
+// own lvalue took it to 10, silencing the measure idiom, `const element = reference.current` and
+// then a read of `element.scrollHeight`, which cannot be computed during render at all.
 //
 // # Behaviours that look like defects and are upstream's
 //
@@ -457,6 +458,23 @@ func findSetStateCall(
 			// what makes `r.current + 1` and `arr[r.current]` exempt.
 			if instructionReadsRefDerived(instruction, isDerivedFromRef) {
 				refDerived[target] = true
+
+				// A store binds through its OWN lvalue as well as the instruction's, and both have
+				// to be tainted. Upstream reaches them together through `eachInstructionLValue`,
+				// which yields `instr.lvalue` and then the value's own lvalue; marking only the
+				// first loses the binding a reader actually named.
+				//
+				// The gap was measured rather than reasoned about: `setV(r.current.scrollHeight)`
+				// was exempt while `const e = r.current; setV(e.scrollHeight)` reported, which is
+				// the same code with a name on the intermediate. Four sites in the tree this gates
+				// are the second spelling, all of them the measure idiom, and `scrollHeight` cannot
+				// be read during render at all.
+				//
+				// The setter map two hundred lines up already does this for its own `StoreLocal`
+				// arm, which is what makes the omission here a slip rather than a decision.
+				if store, isStore := instruction.Value.(*hir.StoreLocal); isStore {
+					refDerived[store.LValue.Identifier] = true
+				}
 
 				// A destructure binds through a PATTERN rather than through the instruction's
 				// LValue, so tainting only the LValue loses every binding it introduced. That gap
