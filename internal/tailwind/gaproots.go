@@ -372,7 +372,29 @@ func descriptionForRoot(root string) *FunctionalUtilityDescription {
 		return description
 	}
 	if description, known := GapRootDescriptions[root]; known {
-		return description
+		// Copied rather than mutated, because the map holds one description per root and several
+		// roots share one: every `borderSideUtility` root returns the same pointer.
+		resolved := *description
+		resolved.AcceptsModifierOnArbitrary = gapRootAcceptsModifierOnArbitrary(description)
+		return &resolved
 	}
 	return nil
+}
+
+// gapRootAcceptsModifierOnArbitrary is whether any of a gap root's arms resolves a colour.
+//
+// A colour arm reads a modifier as the alpha, and upstream's `asColor` composes it onto an arbitrary
+// value rather than refusing: `bg-[#FD555E]/15` is a hex with fifteen percent alpha and compiles.
+//
+// Derived from the arms rather than set per root, so a root gaining a colour arm is covered without
+// a second list to keep in step. Measured by running the linter over this repository with it absent:
+// `bg-[#FD555E]/15`, `bg-[#FEA625]/15`, `bg-[#FEA625]/5` and `border-[#FEA625]/40` were reported as
+// unknown, and all four compile.
+func gapRootAcceptsModifierOnArbitrary(description *FunctionalUtilityDescription) bool {
+	for index := range description.Arms {
+		if description.Arms[index].IsColor {
+			return true
+		}
+	}
+	return false
 }

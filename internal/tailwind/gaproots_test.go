@@ -192,3 +192,51 @@ func TestEveryGapRootIsDescribed(t *testing.T) {
 			len(missingEmitter), strings.Join(missingEmitter, ", "))
 	}
 }
+
+// An arbitrary colour carrying an alpha modifier resolves, on every root with a colour arm.
+//
+// `bg-[#FD555E]/15` is a hex with fifteen percent alpha and the engine compiles it. The check that
+// decides this reads the arms, and a first version read only the multi-declaration table's theme
+// keys, so it never reached a gap root: `bg`, `border`, `text` and their kin refused every arbitrary
+// colour that carried a modifier.
+//
+// Found by building the linter and running it over this repository rather than by a test, which is
+// why it is a test now: `bg-[#FD555E]/15`, `bg-[#FEA625]/15`, `bg-[#FEA625]/5` and
+// `border-[#FEA625]/40` were reported as unknown classes in live markup.
+//
+// The population is every gap root with a colour arm rather than a list, so a root gaining one joins
+// this test.
+func TestArbitraryColorsWithAnAlphaResolveOnEveryColorRoot(t *testing.T) {
+	system, _ := liveTableFor(t, corpusRepositories[0].entryPoint)
+	if system == nil {
+		t.Skip("no design system loaded")
+	}
+
+	var checked int
+	for root, description := range GapRootDescriptions {
+		if !gapRootAcceptsModifierOnArbitrary(description) {
+			continue
+		}
+
+		className := root + "-[#FD555E]/15"
+		candidates := ParseCandidate(className, system)
+		if len(candidates) == 0 {
+			continue
+		}
+		// Only where the root reads as itself; a spelling the parser splits differently is a
+		// different root's case.
+		if candidates[0].Root != root {
+			continue
+		}
+		checked++
+
+		if !ClassValueResolvesIn(&candidates[0], system) {
+			t.Errorf("%s is an arbitrary colour with an alpha and does not resolve, which reports working markup", className)
+		}
+	}
+
+	t.Logf("colour roots checked with an arbitrary value and an alpha: %d", checked)
+	if checked == 0 {
+		t.Fatal("no colour root was checked, so this test measured nothing")
+	}
+}
