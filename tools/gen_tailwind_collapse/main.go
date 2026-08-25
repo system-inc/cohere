@@ -78,23 +78,20 @@ type enumeration struct {
 	StaticUtilities int      `json:"staticUtilities"`
 	PairsProbed     int      `json:"pairsProbed"`
 	Families        []family `json:"families"`
-	// RootProperties and StaticProperties are what `no-conflicting-classes` needs: the CSS property
-	// names each utility declares. Measured as a fact about roots rather than about classes, so
-	// `px-4` and `px-8` share an entry and the table does not grow with the theme's scale.
-	RootProperties      []utilityProperties `json:"rootProperties"`
-	RootColorProperties []utilityProperties `json:"rootColorProperties"`
-	RootSelectorShapes  []rootSelectorShape `json:"rootSelectorShapes"`
-	ComposingRoots      []string            `json:"composingRoots"`
-	ClassProperties     []utilityProperties `json:"classProperties"`
-	UnreachableRoots    []string            `json:"unreachableRoots"`
-	PropertyOrder       []string            `json:"propertyOrder"`
-	OrderingByRoot      []utilityProperties `json:"orderingByRoot"`
-	OrderingByStatic    []utilityProperties `json:"orderingByStatic"`
-	OrderingByClass     []utilityProperties `json:"orderingByClass"`
-	SortOverrides       []string            `json:"sortOverrides"`
-	VariantOrder        []string            `json:"variantOrder"`
-	ColorNames          []string            `json:"colorNames"`
-	StaticProperties    []utilityProperties `json:"staticProperties"`
+	// The declared-property fields are gone along with the tables they printed.
+	//
+	// RootProperties, RootColorProperties, ClassProperties and StaticProperties fed
+	// `no-conflicting-classes`'s four property tables until #mz0m6k8, which computes the answer from
+	// the ported handle bodies instead. Decoding a field nothing prints is how a JSON producer and
+	// its consumer drift without either one failing, so they are removed here as well as in
+	// enumerate.mjs.
+	RootSelectorShapes []rootSelectorShape `json:"rootSelectorShapes"`
+	ComposingRoots     []string            `json:"composingRoots"`
+	UnreachableRoots   []string            `json:"unreachableRoots"`
+	PropertyOrder      []string            `json:"propertyOrder"`
+	SortOverrides      []string            `json:"sortOverrides"`
+	VariantOrder       []string            `json:"variantOrder"`
+	ColorNames         []string            `json:"colorNames"`
 
 	// VerifiedAgainst is the design systems CollapseFamilies was re-measured against on this run,
 	// filled in by the Go side rather than read from the enumeration. Rendered into the generated
@@ -548,39 +545,6 @@ var CollapseFamilies = []CollapseFamily{
 
 	fmt.Fprintf(&buffer, `}
 
-// RootDeclaredProperties is the CSS property names each functional utility root declares.
-//
-// Two classes conflict when they declare the same property, which is what no-conflicting-classes
-// reports. Property names rather than values, and the distinction inverts both answers: w-8 and
-// h-8 declare the same value under different properties and do not conflict, while px-4 and px-8
-// declare different values under one property and do.
-//
-// Shorthands are deliberately not normalised. padding and padding-inline are different names, and
-// upstream reports no conflict between p-4 and px-8 even though they visually overlap.
-var RootDeclaredProperties = map[string][]string{
-`)
-	for _, entry := range result.RootProperties {
-		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.Root, quotedList(entry.Properties))
-	}
-
-	fmt.Fprintf(&buffer, `}
-
-// RootColorProperties is what a root declares when its value is a color rather than a length.
-//
-// border is border-width plus border-style with a number and border-color with a color, so border
-// and border-neutral-200 declare different things despite sharing a root. Reporting them as
-// conflicting produced 347 findings on a tree whose real count is zero.
-//
-// Recorded per root rather than per class: the exceptions are the color scale multiplied by the
-// roots that accept it, which is 7,854 entries resolving to 14 distinct property sets.
-var RootColorProperties = map[string][]string{
-`)
-	for _, entry := range result.RootColorProperties {
-		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.Root, quotedList(entry.Properties))
-	}
-
-	fmt.Fprintf(&buffer, `}
-
 // RootSelectorShapes is the selector a root's utilities emit under, when it is not a bare class.
 //
 // divide-neutral-200 and border-neutral-200 both declare border-color and do not conflict, because
@@ -592,22 +556,6 @@ var RootSelectorShapes = map[string]string{
 `)
 	for _, entry := range result.RootSelectorShapes {
 		fmt.Fprintf(&buffer, "\t%q: %q,\n", entry.Root, entry.Shape)
-	}
-
-	fmt.Fprintf(&buffer, `}
-
-// ClassDeclaredProperties overrides a root's entry for classes whose properties depend on their
-// value.
-//
-// font-medium declares font-weight and font-mono declares font-family, and both parse as root
-// font. A per-root table picks one reading and is then wrong about every class taking the other,
-// which showed up as font-medium font-mono being reported as a conflict on correct code.
-//
-// Only exceptions are stored: a class absent here takes its root's entry.
-var ClassDeclaredProperties = map[string][]string{
-`)
-	for _, entry := range result.ClassProperties {
-		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.Root, quotedList(entry.Properties))
 	}
 
 	fmt.Fprintf(&buffer, `}
@@ -650,15 +598,6 @@ var ColorNames = map[string]bool{
 `)
 	for _, name := range result.ColorNames {
 		fmt.Fprintf(&buffer, "\t%q: true,\n", name)
-	}
-
-	fmt.Fprintf(&buffer, `}
-
-// StaticDeclaredProperties is the same, for utilities whose whole name is their identity.
-var StaticDeclaredProperties = map[string][]string{
-`)
-	for _, entry := range result.StaticProperties {
-		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.Root, quotedList(entry.Properties))
 	}
 
 	fmt.Fprintf(&buffer, `}
@@ -731,42 +670,16 @@ var SortOverrideProperties = map[string]bool{
 		fmt.Fprintf(&buffer, "\t%q: true,\n", property)
 	}
 
-	fmt.Fprintf(&buffer, `}
-
-// OrderingPropertiesByRoot is the declarations a root's utilities emit, in source order, custom
-// properties included.
-//
-// Deliberately different from the conflict tables, which strip --tw-* because two classes both
-// setting --tw-border-style are not in conflict about anything an author sees. Tailwind's sort
-// indexes custom properties, and they are what separates classes sharing a visible one: shadow-lg
-// emits --tw-shadow then box-shadow, ring-1 emits --tw-ring-shadow then box-shadow. Stripping the
-// first left both with the key [box-shadow] and ten real class lists came out wrong.
-var OrderingPropertiesByRoot = map[string][]string{
-`)
-	for _, entry := range result.OrderingByRoot {
-		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.key(), quotedList(entry.Properties))
-	}
-
-	fmt.Fprintf(&buffer, `}
-
-// OrderingPropertiesByStatic is the same for utilities whose whole name is their identity.
-var OrderingPropertiesByStatic = map[string][]string{
-`)
-	for _, entry := range result.OrderingByStatic {
-		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.key(), quotedList(entry.Properties))
-	}
-
-	fmt.Fprintf(&buffer, `}
-
-// OrderingPropertiesByClass overrides a root's entry where the value changes what is emitted.
-//
-// 65 of 312 roots vary this way and contribute these entries. A class absent here takes its root's.
-var OrderingPropertiesByClass = map[string][]string{
-`)
-	for _, entry := range result.OrderingByClass {
-		fmt.Fprintf(&buffer, "\t%q: {%s},\n", entry.key(), quotedList(entry.Properties))
-	}
-
+	// The three ordering tables used to be printed between here and VariantOrder.
+	//
+	// OrderingPropertiesByRoot, OrderingPropertiesByStatic and OrderingPropertiesByClass held 312,
+	// 893 and 65 entries and nothing read any of them. The class-order comparator moved onto the live
+	// design system in cccaed1 and left them behind, and printing a table nobody reads is how 1,270
+	// dead entries survive a passing build.
+	//
+	// If a consumer needs a root's emitted declarations again, ask an emitter in
+	// internal/tailwind/frameworkhandlers.go rather than reviving these: an emitter branches on the
+	// resolved value, which a table keyed on a root cannot.
 	fmt.Fprintf(&buffer, `}
 
 // VariantOrder is the position of each variant prefix in Tailwind's sort order.
