@@ -242,6 +242,23 @@ var frameworkFunctionalRoots = func() map[string]bool {
 	return roots
 }()
 
+// RepositoryStaticUtilityNames is every static utility the repository itself declares.
+//
+// Exposed for the upstream check, which compares the installed engine's registry against the
+// checked-in framework tables and must subtract the repository's own blocks first. Reading them from
+// `utilityRoots` rather than from the engine is what makes that subtraction exact: this is the set
+// `collectStylesheets` recorded while parsing the repository's `@utility` blocks, so it cannot
+// accidentally include a framework name.
+func (system *LoadedDesignSystem) RepositoryStaticUtilityNames() []string {
+	names := make([]string, 0, len(system.staticUtilityNodes))
+	for name, kind := range system.utilityRoots {
+		if kind == UtilityKindStatic {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
 // HasVariant reports whether root is a registered variant.
 //
 // The registry holds the framework's registrations and every `@custom-variant` the repository
