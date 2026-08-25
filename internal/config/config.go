@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -74,6 +76,10 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("reading lint config %s: %w", path, err)
 	}
 
+	if err := checkTopLevelKeys(contents, path); err != nil {
+		return nil, err
+	}
+
 	var raw rawConfig
 	if err := json.Unmarshal(contents, &raw); err != nil {
 		return nil, fmt.Errorf("parsing lint config %s: %w", path, err)
@@ -117,6 +123,116 @@ type rawConfig struct {
 	Rules          map[string]json.RawMessage `json:"rules"`
 	IgnorePatterns []string                   `json:"ignorePatterns"`
 	Overrides      []rawOverride              `json:"overrides"`
+}
+
+// parsedTopLevelKeys are the keys `rawConfig` decodes and the loader acts on.
+var parsedTopLevelKeys = map[string]bool{
+	"rules":          true,
+	"ignorePatterns": true,
+	"overrides":      true,
+}
+
+// ignoredTopLevelKeys are the keys the loader deliberately does not act on, each with the reason.
+//
+// A reason is required, and the requirement is enforced below rather than left to convention. An
+// entry with no reason says only that somebody wanted the config to load, which is the move this
+// whole guard exists to stop -- the same defect one level down.
+var ignoredTopLevelKeys = map[string]string{
+	"$schema": "editor metadata; nothing in the linter reads it and nothing should, so it is " +
+		"ignored on purpose rather than by omission",
+
+	"jsPlugins": "paths to the JavaScript rule implementations the gate being replaced loads at " +
+		"runtime. This linter compiles its rules in, so there is nothing to load and nothing to " +
+		"honour. Ignored deliberately, and it stays in the config because oxlint still reads it " +
+		"while both tools run side by side.",
+
+	"plugins": "the namespaces whose rules oxlint enables by declaration rather than by a rules " +
+		"block. Forty inventory entries carry `enabledBy: pluginDefault` and depend on it, and it " +
+		"is currently reproduced by naming all forty by hand in `rules`. Ignoring it is therefore " +
+		"correct only for as long as those hand-written lines exist. Owned by `#0ympke3`, which is " +
+		"ruled to implement it; when that lands this entry moves out of this map and into " +
+		"`rawConfig`, and the gate on that change is that both paths agree for all forty.",
+
+	"settings": "per-plugin configuration for the JavaScript plugins above, and it is the entry " +
+		"most worth re-reading. `settings.better-tailwindcss.entryPoint` names this repository's " +
+		"root stylesheet, and `findTailwindEntryPoint` does not read it -- it probes a hardcoded " +
+		"candidate list whose first entry is that same path. All three repositories we lint hit " +
+		"that first candidate, so the divergence is latent rather than live: there is no known " +
+		"case of it producing a wrong answer, and a project whose stylesheet is elsewhere gets a " +
+		"loud decline rather than a wrong reading. Ignored on that basis, and the shape is worth " +
+		"naming -- right on the population we write, wrong on the mechanism, invisible to a corpus " +
+		"differential.",
+}
+
+// checkTopLevelKeys refuses a config carrying a key the loader does not implement.
+//
+// # Why this refuses rather than warning
+//
+// `encoding/json` drops an unlisted key silently and returns no error, so a config could declare
+// something and have it do nothing with every check passing. Four keys were in exactly that state:
+// `plugins`, `jsPlugins` and `settings` were all being discarded, and `settings` named a Tailwind
+// entry point that a hardcoded candidate list happened to probe first.
+//
+// None of them was found by a mechanism. `plugins` surfaced while someone investigated why 40
+// rules ran on zero files; the other two surfaced only because that investigation prompted a read of
+// the whole file. Nothing would have surfaced the next one.
+//
+// That is the same defect as a rule offered no files, sitting in this tool's own front door: the
+// author believes something is configured, every check is green, and nothing runs. Refusing is the
+// shape the rest of the tool already takes -- `Load` errors rather than returning an empty config for
+// exactly this reason, and its comment says three configurations in the gate verify replaces "ran
+// successfully having loaded zero plugins."
+//
+// Warning was the alternative and it was rejected on the tool's own thesis. A warning goes into an
+// output that already carries two hundred coverage notes, and a config author who edits one key does
+// not re-read that output. A warning nobody reads is the silence this is meant to break, with a
+// line of text in front of it. The kindness argument for warning is real, and the answer is that
+// the error names the key and the file, so the fix is one edit rather than an investigation.
+func checkTopLevelKeys(contents []byte, path string) error {
+	var keyed map[string]json.RawMessage
+	if err := json.Unmarshal(contents, &keyed); err != nil {
+		// Not this function's error to report. Returning nil hands the real parse failure to the
+		// caller's own Unmarshal, which produces the better message for a malformed file.
+		return nil
+	}
+
+	var unimplemented []string
+	for key := range keyed {
+		if parsedTopLevelKeys[key] {
+			continue
+		}
+		reason, ignored := ignoredTopLevelKeys[key]
+		if !ignored {
+			unimplemented = append(unimplemented, key)
+			continue
+		}
+		if reason == "" {
+			return fmt.Errorf(
+				"lint config %s declares %q, which is listed as deliberately ignored with no reason "+
+					"given: an entry with no reason says only that somebody wanted this to load",
+				path, key)
+		}
+	}
+	if len(unimplemented) == 0 {
+		return nil
+	}
+	sort.Strings(unimplemented)
+
+	return fmt.Errorf(
+		"lint config %s declares %s, which this loader does not implement: the key would be "+
+			"discarded silently and whatever it configures would never take effect. Either "+
+			"implement it in `rawConfig` and act on it, or add it to `ignoredTopLevelKeys` "+
+			"with a note saying why ignoring it is correct",
+		path, strings.Join(quoteEach(unimplemented), ", "))
+}
+
+// quoteEach quotes each name so a multi-key message reads unambiguously.
+func quoteEach(names []string) []string {
+	quoted := make([]string, 0, len(names))
+	for _, name := range names {
+		quoted = append(quoted, strconv.Quote(name))
+	}
+	return quoted
 }
 
 type rawOverride struct {

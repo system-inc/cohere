@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"os"
 	"path/filepath"
 	"testing"
@@ -273,5 +274,91 @@ func TestAnUnknownSeverityIsRefused(t *testing.T) {
 	}
 	if _, err := Load(path); err == nil {
 		t.Fatal("an unknown severity was accepted, which would disable the rule silently")
+	}
+}
+
+// TestUnimplementedTopLevelKeyIsRefused proves the front-door guard fires.
+//
+// `encoding/json` drops an unlisted key with no error, so before this guard a config could declare
+// something and have it do nothing while every check passed. Three keys were in that state at once:
+// `plugins`, `jsPlugins` and `settings`. None was found by a mechanism -- `plugins` surfaced while
+// someone investigated why 40 rules ran on zero files, and the other two only because that
+// investigation prompted a read of the whole file.
+//
+// The fixture uses a key nobody would add by accident, so a future config gaining a real key does
+// not make this test wrong. What it asserts is the mechanism, not a particular key.
+func TestUnimplementedTopLevelKeyIsRefused(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "VerifySettings.json")
+	contents := `{"rules": {"a-rule": "error"}, "notAKeyThisLoaderKnows": {"anything": 1}}`
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatalf("writing the config: %v", err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("a config declaring an unimplemented top-level key loaded successfully, so the key " +
+			"was discarded silently and whatever it configures would never take effect")
+	}
+	if !strings.Contains(err.Error(), "notAKeyThisLoaderKnows") {
+		t.Errorf("the error does not name the offending key, so a reader cannot act on it: %v", err)
+	}
+
+	// The control. The same config without the key must load, or the test above passes for the
+	// wrong reason and this guard would reject every config equally.
+	controlPath := filepath.Join(directory, "control.json")
+	if err := os.WriteFile(controlPath, []byte(`{"rules": {"a-rule": "error"}}`), 0o644); err != nil {
+		t.Fatalf("writing the control config: %v", err)
+	}
+	if _, err := Load(controlPath); err != nil {
+		t.Fatalf("the control config failed to load, so the guard rejects more than it should: %v", err)
+	}
+}
+
+// TestIgnoredKeyWithoutAReasonIsRefused is the guard on the guard.
+//
+// The escape hatch for an unimplemented key is to record it as deliberately ignored. That hatch is
+// only worth anything if using it costs a sentence of justification -- otherwise the fix for this
+// error is to add a name to a map, which is the same silence with one more step.
+//
+// The map is package state rather than a parameter, so this exercises the check by adding an entry
+// with an empty reason and removing it again. That is a mutation of shared state in a test, and it
+// is done here rather than by restructuring the maps because the alternative is threading a
+// parameter through `Load` for the sole benefit of this assertion.
+func TestIgnoredKeyWithoutAReasonIsRefused(t *testing.T) {
+	const key = "keyRecordedWithNoReason"
+	ignoredTopLevelKeys[key] = ""
+	t.Cleanup(func() { delete(ignoredTopLevelKeys, key) })
+
+	directory := t.TempDir()
+	path := filepath.Join(directory, "VerifySettings.json")
+	contents := `{"rules": {"a-rule": "error"}, "keyRecordedWithNoReason": true}`
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatalf("writing the config: %v", err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("a key listed as ignored with no reason loaded successfully; an entry with no " +
+			"reason says only that somebody wanted the config to load")
+	}
+	if !strings.Contains(err.Error(), "no reason") {
+		t.Errorf("the error does not say the reason is what is missing: %v", err)
+	}
+}
+
+// TestEveryIgnoredKeyCarriesAReason holds the map itself to the standard the guard enforces.
+//
+// The test above proves an empty reason is refused at load time, which only helps if someone
+// actually loads a config carrying that key. This asserts the invariant directly, so an entry added
+// with no reason fails immediately rather than whenever a config happens to use it.
+func TestEveryIgnoredKeyCarriesAReason(t *testing.T) {
+	if len(ignoredTopLevelKeys) == 0 {
+		t.Fatal("no ignored keys are recorded, so this test asserts nothing")
+	}
+	for key, reason := range ignoredTopLevelKeys {
+		if strings.TrimSpace(reason) == "" {
+			t.Errorf("ignored key %q carries no reason", key)
+		}
 	}
 }
