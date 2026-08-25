@@ -1,12 +1,11 @@
 package tailwind
 
 import (
-	"sort"
+	"errors"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
 )
 
 func messageInconsistentClassOrder(ordered string) rule.Message {
@@ -80,9 +79,34 @@ type EnforceConsistentClassOrderOptions struct {
 // the noise of the repair can exceed the cost of the problem.
 var EnforceConsistentClassOrder = rule.Rule{
 	Name: "enforce-consistent-class-order",
+	// Declared because the rule reaches ctx.Program to get the design system. The stylesheet graph
+	// reaches files the program does not contain at all, so a findings cache keyed on the linted
+	// file alone is stale whenever `theme.css` changes and the `.tsx` file does not: zero findings,
+	// forever, indistinguishable from a clean tree.
+	ReadsProgram: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil
+		}
+
+		// The design system is resolved once per file rather than once per literal, and before the
+		// listeners are built so a repository whose CSS will not parse costs one lookup rather than
+		// one per class attribute. `DesignSystemForProgram` is itself cached on the program, so this
+		// is a mutex and a pointer compare.
+		//
+		// The two failures are told apart rather than collapsed, which is what `ErrNoTailwindEntryPoint`
+		// exists for. A project with no Tailwind at all is silence with nothing wrong: this rule is
+		// registered unconditionally, so reporting there would put a finding on every file of every
+		// repository that does not use Tailwind. A project that HAS Tailwind and whose CSS would not
+		// read is the loud case, and it is reported once per file rather than swallowed, because a
+		// rule reporting zero findings over unreadable CSS is indistinguishable from a clean tree
+		// and that is the one failure verify exists to remove.
+		designSystem := DesignSystemForProgram(ctx)
+		if designSystem.Err != nil {
+			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) || ctx.Program == nil {
+				return nil
+			}
+			return declineListeners(ctx, "enforce-consistent-class-order", designSystem)
 		}
 
 		settings := DefaultClassLiteralSettings()
@@ -102,7 +126,7 @@ var EnforceConsistentClassOrder = rule.Rule{
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				reportClassOrder(ctx, literal)
+				reportClassOrder(ctx, literal, designSystem)
 			}
 		}
 
@@ -114,8 +138,36 @@ var EnforceConsistentClassOrder = rule.Rule{
 	},
 }
 
-// reportClassOrder compares a literal's class order against Tailwind's.
-func reportClassOrder(ctx rule.Context, literal ClassLiteral) {
+// declineListeners reports, once per file, that the rule could not read this project's Tailwind.
+//
+// Attached to the source file rather than to the class literals, so a project whose stylesheet
+// broke gets one finding per file instead of one per class attribute, and gets it even in a file
+// that carries no classes at all. The second half matters more than it looks: a repository whose
+// CSS stopped parsing would otherwise announce the problem only in the files that happen to hold a
+// className, which is the subset a reader is least likely to open first.
+func declineListeners(ctx rule.Context, ruleName string, designSystem DesignSystemResult) rule.Listeners {
+	reported := false
+	return rule.Listeners{
+		ast.KindSourceFile: func(node *ast.Node) {
+			if reported {
+				return
+			}
+			reported = true
+			ctx.ReportNode(node, rule.Message{
+				Id:          "designSystemUnavailable",
+				Description: DesignSystemDeclineMessage(ruleName, designSystem),
+			})
+		},
+	}
+}
+
+// reportClassOrder compares a literal's class order against this repository's own design system.
+//
+// The whole literal is resolved in one population before anything is sorted, which is the shape the
+// engine's own ordering requires rather than a convenience. See class_order_key.go: a variant's
+// index is a rank among exactly the variants this list contains, so there is no per-class key to
+// compute and no pairwise comparator that could compute one.
+func reportClassOrder(ctx rule.Context, literal ClassLiteral, designSystem DesignSystemResult) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) < 2 {
 		return
@@ -131,21 +183,27 @@ func reportClassOrder(ctx rule.Context, literal ClassLiteral) {
 		seen[className] = true
 	}
 
-	// A class Tailwind does not rank at all, other than the deliberately-unranked markers, means the
-	// literal holds something outside the design system. Ordering it would be guessing, and
-	// `no-unknown-classes` is the rule that has something to say about it.
-	for _, className := range classes {
-		if !isRankableClass(className) {
-			return
-		}
+	// The markers are separated out before anything is parsed, because the engine ranks them null
+	// and so expresses no opinion about where they go. `ParseCandidate` returns nothing for them for
+	// the same reason, so leaving them in the population would read as "this class is outside the
+	// design system" and silence the literal.
+	//
+	// Where they go is therefore this consumer's convention rather than a ported fact, and it is
+	// taken from the ecosystem: Tailwind's own Prettier plugin and `better-tailwindcss` both hoist
+	// them, and both accept `peer group` and `group peer` as written. So they lead, in source order.
+	markers, placeable := partitionMarkers(classes)
+
+	// The class that could not be placed is deliberately not reported here, only used to decide.
+	// `no-unknown-classes` is the rule that says which class is unknown, and two rules naming the
+	// same class in two different sentences is how an author ends up fixing it twice.
+	keys, _, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
+	if !resolved {
+		// A class this repository's design system cannot place means the literal holds something
+		// outside it. Ordering the rest around it would be guessing.
+		return
 	}
 
-	ordered := make([]string, len(classes))
-	copy(ordered, classes)
-	sort.SliceStable(ordered, func(left int, right int) bool {
-		return classSortsBefore(ordered[left], ordered[right])
-	})
-
+	ordered := append(markers, sortClassesByKey(placeable, keys)...)
 	if strings.Join(ordered, " ") == strings.Join(classes, " ") {
 		return
 	}
@@ -153,347 +211,36 @@ func reportClassOrder(ctx rule.Context, literal ClassLiteral) {
 	ctx.ReportRange(literal.Range, messageInconsistentClassOrder(strings.Join(ordered, " ")))
 }
 
-// classSortsBefore is Tailwind's own comparator, ported.
+// partitionMarkers splits the deliberately-unranked markers off the front of a class list.
 //
-// From the `astNodes.sort` in Tailwind's `compile.ts`: variant, then the first differing index into
-// the property order, then more declarations first, then alphabetically. Porting the comparator
-// rather than tabulating its answers is the difference between 359 rows and 37,643.
-func classSortsBefore(left string, right string) bool {
-	leftKey := sortKeyFor(left)
-	rightKey := sortKeyFor(right)
-
-	// A class the tables cannot place sorts first, matching Tailwind's own Prettier plugin and
-	// `better-tailwindcss`. The engine ranks `group` and `peer` null and so expresses no opinion;
-	// the placement is the consumer's convention, and agreeing with the ecosystem's is worth more
-	// than a defensible convention of our own that reorders every file the other tools accept.
-	if leftKey.placeable != rightKey.placeable {
-		return !leftKey.placeable
-	}
-
-	// Two unplaceable classes keep their source order. The sort is stable, so returning false for
-	// every such pair leaves them as written. Ordering them alphabetically instead was measurably
-	// wrong: `peer group` is accepted by the reference and alphabetical would rewrite it.
-	if !leftKey.placeable {
-		return false
-	}
-
-	// Compared through the segment comparator rather than as a single position, because a compound
-	// prefix has no position of its own: `dark:placeholder:` and `dark:focus:` both fall to the
-	// unknown fallback and would tie, then be separated by their properties instead of their
-	// variants. That was four real class lists.
-	if variantComparison := compareVariants(leftKey.variants, rightKey.variants); variantComparison != 0 {
-		return variantComparison < 0
-	}
-
-	// The first position where the two property lists differ decides. Both are ascending, so this
-	// walks them in lockstep exactly as the engine does.
-	offset := 0
-	for offset < len(leftKey.order) && offset < len(rightKey.order) && leftKey.order[offset] == rightKey.order[offset] {
-		offset++
-	}
-	leftIndex := propertyIndexBeyond(leftKey.order, offset)
-	rightIndex := propertyIndexBeyond(rightKey.order, offset)
-	if leftIndex != rightIndex {
-		return leftIndex < rightIndex
-	}
-
-	// Both tiebreaks are load-bearing. `space-x-1` and `me-0.5` reach here with the same first index
-	// and are separated by count.
-	if leftKey.count != rightKey.count {
-		return leftKey.count > rightKey.count
-	}
-	return left < right
-}
-
-// classSortKey is everything the comparator needs about one class.
-type classSortKey struct {
-	placeable bool
-	variant   int
-	// order is the class's property indices, deduplicated and ascending, matching what Tailwind's
-	// getPropertySort builds.
-	order []int
-	// count is every declaration including custom properties, which is what the engine counts.
-	count int
-	// variants is the prefix as written, kept so compounds compare segment by segment.
-	variants string
-}
-
-// propertyIndexBeyond returns the index at a position, or a value past every real one.
-//
-// The engine uses Infinity here, so a class that ran out of properties sorts after one that has more.
-func propertyIndexBeyond(order []int, offset int) int {
-	if offset < len(order) {
-		return order[offset]
-	}
-	return 1 << 30
-}
-
-// sortKeyFor reads a class's sort key from the generated tables.
-func sortKeyFor(className string) classSortKey {
-	variants, base := splitVariants(className)
-
-	// The override is checked first, because a utility that declares `--tw-sort` sorts at that
-	// property regardless of what else it declares, and some of them declare nothing this table
-	// records: `container` emits several rules and is deliberately absent from the property tables,
-	// so resolving properties first bailed before the override could apply.
-	if overrideProperty, hasOverride := sortOverrideFor(base); hasOverride {
-		if position, isOrdered := tailwindengine.PropertyOrder[overrideProperty]; isOrdered {
-			return classSortKey{placeable: true, variant: variantPosition(variants), variants: variants, order: []int{position}, count: 1}
-		}
-	}
-
-	properties := declaredPropertiesForOrdering(base)
-	if len(properties) == 0 {
-		return classSortKey{placeable: false}
-	}
-
-	order := make([]int, 0, len(properties))
-	seen := make(map[int]bool, len(properties))
-	for _, property := range properties {
-		position, isOrdered := tailwindengine.PropertyOrder[property]
-		if !isOrdered || seen[position] {
+// `group` and `peer` generate no CSS of their own and exist to be referenced by `group-hover:` on
+// another element, so `getClassOrder` returns null for them and the engine's corpus agreement says
+// nothing about where they belong. Both slices keep source order, which is what makes the tiebreak
+// source order rather than an ordering of our own: sorting the markers alphabetically would rewrite
+// `peer group`, and the reference implementations accept it.
+func partitionMarkers(classes []string) (markers []string, placeable []string) {
+	markers = make([]string, 0, 2)
+	placeable = make([]string, 0, len(classes))
+	for _, className := range classes {
+		if isMarkerClass(className) {
+			markers = append(markers, className)
 			continue
 		}
-		seen[position] = true
-		order = append(order, position)
+		placeable = append(placeable, className)
 	}
-	sort.Ints(order)
-
-	// A class whose properties are all outside the order still has a place: it sorts after every
-	// class that has one, but before anything unplaceable. `outline-none` declares only
-	// `--tw-outline-style`, which the order does not list, and treating it as unplaceable sent it to
-	// the very end instead of just after its neighbours.
-	if len(order) == 0 {
-		order = []int{1 << 29}
-	}
-
-	return classSortKey{placeable: true, variant: variantPosition(variants), variants: variants, order: order, count: len(properties)}
+	return markers, placeable
 }
 
-// sortOverrideProperties maps a utility root to the property its `--tw-sort` names.
+// isMarkerClass reports whether a class is one of the markers the engine ranks null.
 //
-// The values are also generated into `SortOverrideProperties`, read out of Tailwind's bundle; the
-// roots live here because the minified bundle does not pair them with their utility in any
-// recoverable way. Sixteen exist across the whole framework, and a generated value the map below
-// does not cover is a signal that a new one was added.
-var sortOverrideProperties = map[string]string{
-	"space-x":          "row-gap",
-	"space-y":          "column-gap",
-	"space-x-reverse":  "row-gap",
-	"space-y-reverse":  "column-gap",
-	"divide":           "divide-color",
-	"divide-x":         "divide-x-width",
-	"divide-y":         "divide-y-width",
-	"divide-y-reverse": "divide-style",
-	"placeholder":      "placeholder-color",
-	"from":             "--tw-gradient-from",
-	"via":              "--tw-gradient-via",
-	"to":               "--tw-gradient-to",
-	"container":        "--tw-container-component",
-	"size":             "size",
-}
-
-// sortOverrideFor finds the `--tw-sort` property for a class base, by longest matching root.
-func sortOverrideFor(base string) (string, bool) {
-	if property, isOverridden := sortOverrideProperties[base]; isOverridden {
-		return property, true
-	}
-
-	longest := ""
-	for root := range sortOverrideProperties {
-		if !strings.HasPrefix(base, root) {
-			continue
-		}
-		if len(base) > len(root) && base[len(root)] != '-' {
-			continue
-		}
-		if len(root) > len(longest) {
-			longest = root
-		}
-	}
-	if longest == "" {
-		return "", false
-	}
-	return sortOverrideProperties[longest], true
-}
-
-// orderingRootOf finds the longest root that prefixes a class base, searched in the ordering
-// table rather than the conflict table.
-//
-// `functionalRootOf` does the same longest-wins walk over `RootDeclaredProperties`, which
-// `no-conflicting-classes` reads. The two tables are generated from different questions and are
-// not the same set: 22 roots exist in the ordering table and not in the conflict one. `ring-offset`
-// is one of them, so resolving an ordering question through the conflict table found `ring` as the
-// longest available match and answered with ring's properties. `ring-offset-1` then reported
-// `[--tw-ring-shadow box-shadow]`, identical to `ring-1`, and two classes the engine separates
-// collapsed onto one key.
-//
-// Longest-wins was never the defect; searching the wrong table for it was. The rule is that a
-// lookup resolves its root in the table it is about to read, because a root that is missing there
-// cannot be the answer no matter how well the walk is written.
-func orderingRootOf(base string) string {
-	longest := ""
-	for root := range tailwindengine.OrderingPropertiesByRoot {
-		if !strings.HasPrefix(base, root) {
-			continue
-		}
-		// The root must be followed by a value separator, so `p` does not match `px-4`.
-		if len(base) > len(root) && base[len(root)] != '-' {
-			continue
-		}
-		if len(root) > len(longest) {
-			longest = root
-		}
-	}
-	return longest
-}
-
-// declaredPropertiesForOrdering resolves a class base to the properties it declares.
-func declaredPropertiesForOrdering(base string) []string {
-	if properties, isStatic := tailwindengine.OrderingPropertiesByStatic[base]; isStatic {
-		return properties
-	}
-
-	root := orderingRootOf(base)
-	if root == "" {
-		return nil
-	}
-
-	// A root whose emitted declarations depend on its value has one row per distinct reading,
-	// keyed by the root and that value. `font-medium` emits `font-weight` and `font-sans` emits
-	// `font-family`, so the root's own entry cannot answer for both.
-	// A colour value matches one row covering the whole palette; any other value matches its own.
-	//
-	// A `(--custom-property)` value counts as a colour here when the root has a colour reading at
-	// all. `ring-(--color-content--3)` is the theme's own colour token and the engine sorts it at
-	// `--tw-ring-color`, but the name is a variable rather than a palette entry so a colour-name
-	// lookup misses it, and it fell back to the width reading.
-	if valueIsColor(base, root) || isCustomPropertyValue(base, root) {
-		if properties, hasReading := tailwindengine.OrderingPropertiesByClass[root+"\x00\x01color"]; hasReading {
-			return properties
-		}
-	}
-	if properties, hasReading := tailwindengine.OrderingPropertiesByClass[root+"\x00"+valueTextOfClass(base, root)]; hasReading {
-		return properties
-	}
-
-	return tailwindengine.OrderingPropertiesByRoot[root]
-}
-
-// variantPosition ranks a variant prefix, from the generated order.
-//
-// Bare classes come first. A first version ranked by prefix length, which put `focus:` before
-// `hover:` because it is shorter and is not the order Tailwind emits them in.
-func variantPosition(variants string) int {
-	if variants == "" {
-		return -1
-	}
-	if position, isOrdered := tailwindengine.VariantOrder[variants]; isOrdered {
-		return position
-	}
-	// A variant the table has never seen sorts after every known one, consistently, so two classes
-	// sharing it still compare by their own properties rather than arbitrarily.
-	return 1 << 30
-}
-
-// variantSegments splits a variant prefix into its parts, outermost first.
-//
-// `dark:placeholder:` is two variants stacked, and the table holds only single ones. Ranking the
-// whole prefix gives every compound the same unknown position, so `dark:placeholder:` and
-// `dark:focus:` could not be separated at all and four real class lists came out wrong. Comparing
-// segment by segment resolves them on the first that differs, which is what the engine does.
-func variantSegments(variants string) []int {
-	if variants == "" {
-		return nil
-	}
-
-	positions := make([]int, 0, 2)
-	for _, segment := range strings.Split(strings.TrimSuffix(variants, ":"), ":") {
-		if segment == "" {
-			continue
-		}
-		positions = append(positions, variantPosition(namedGroupBase(segment)+":"))
-	}
-	return positions
-}
-
-// compareVariants orders two variant prefixes, resolving compounds on their first differing part.
-//
-// A prefix that is a proper prefix of the other sorts first, so `dark:` precedes `dark:focus:`,
-// matching how a shorter selector precedes the one that narrows it.
-func compareVariants(left string, right string) int {
-	if left == right {
-		return 0
-	}
-
-	// The whole prefix wins when the table knows it, because a compound Tailwind names itself is
-	// ranked directly rather than assembled.
-	leftWhole, leftKnown := tailwindengine.VariantOrder[left]
-	rightWhole, rightKnown := tailwindengine.VariantOrder[right]
-	if leftKnown && rightKnown {
-		switch {
-		case leftWhole < rightWhole:
-			return -1
-		case leftWhole > rightWhole:
-			return 1
-		default:
-			return 0
-		}
-	}
-
-	leftParts, rightParts := variantSegments(left), variantSegments(right)
-	leftNames, rightNames := variantSegmentNames(left), variantSegmentNames(right)
-
-	// Depth first: every single variant precedes every stacked one, whatever they start with. The
-	// engine emits `group-hover:` and `disabled:` before `group-hover:disabled:`, because a stacked
-	// variant narrows an already-narrowed selector and lands in a later layer. Comparing the first
-	// segment instead groups `group-hover:disabled:` with `group-hover:`, which put two classes in
-	// the wrong place.
-	if len(leftParts) != len(rightParts) {
-		if len(leftParts) < len(rightParts) {
-			return -1
-		}
-		return 1
-	}
-	for index := 0; index < len(leftParts) && index < len(rightParts); index++ {
-		if leftParts[index] != rightParts[index] {
-			if leftParts[index] < rightParts[index] {
-				return -1
-			}
-			return 1
-		}
-		// Two variants the table does not know tie on position, and the engine still groups each
-		// one's classes together. Ordering them by their own text keeps that grouping: without it
-		// `data-[show=false]:` and `data-[show=true]:` interleave and their classes are sorted by
-		// property across both groups.
-		if leftParts[index] == 1<<30 && leftNames[index] != rightNames[index] {
-			if leftNames[index] < rightNames[index] {
-				return -1
-			}
-			return 1
-		}
-	}
-
-	switch {
-	case len(leftParts) < len(rightParts):
-		return -1
-	case len(leftParts) > len(rightParts):
-		return 1
-	default:
-		return 0
-	}
-}
-
-// isRankableClass reports whether ordering this class is something the tables can answer.
-func isRankableClass(className string) bool {
+// Checked against the whole class and against its base, because `dark:group` is still the marker
+// and a variant prefix does not give it a reading.
+func isMarkerClass(className string) bool {
 	if alwaysKnownClasses.MatchString(className) {
 		return true
 	}
 	_, base := splitVariants(className)
-	if alwaysKnownClasses.MatchString(base) {
-		return true
-	}
-	return sortKeyFor(className).placeable
+	return alwaysKnownClasses.MatchString(base)
 }
 
 // splitVariants separates a class's variant prefix from the rest.
@@ -507,62 +254,4 @@ func splitVariants(className string) (string, string) {
 		return "", className
 	}
 	return className[:index+1], className[index+1:]
-}
-
-// valueTextOfClass renders the value a class carries, as the ordering exceptions key it.
-//
-// An opacity modifier is part of the colour rather than the name, and an arbitrary value has no
-// stable text to key on, so both reduce to the plain value the table recorded.
-func valueTextOfClass(base string, root string) string {
-	if len(base) <= len(root) {
-		return ""
-	}
-	value := strings.TrimPrefix(base[len(root):], "-")
-	if slash := strings.Index(value, "/"); slash >= 0 {
-		value = value[:slash]
-	}
-	if strings.HasPrefix(value, "[") || strings.HasPrefix(value, "(") {
-		return ""
-	}
-	return value
-}
-
-// isCustomPropertyValue reports whether a class's value is a `(--name)` reference.
-func isCustomPropertyValue(base string, root string) bool {
-	if len(base) <= len(root) {
-		return false
-	}
-	value := strings.TrimPrefix(base[len(root):], "-")
-	return strings.HasPrefix(value, "(--")
-}
-
-// namedGroupBase strips the name from a named group or peer variant.
-//
-// `group-hover/csv-download:` is `group-hover:` applied to a specific named group, and it sorts
-// where `group-hover:` sorts. The table holds the unnamed forms, so an unstripped name falls to the
-// unknown position and ties with every other named variant.
-func namedGroupBase(segment string) string {
-	if slash := strings.Index(segment, "/"); slash >= 0 {
-		return segment[:slash]
-	}
-	return segment
-}
-
-// variantSegmentNames is variantSegments' companion, returning the text of each part.
-//
-// Needed only for variants the table cannot rank, where the text is the sole stable thing to order
-// by. Kept alongside rather than merged into one slice of pairs, so the common path stays integers.
-func variantSegmentNames(variants string) []string {
-	if variants == "" {
-		return nil
-	}
-
-	names := make([]string, 0, 2)
-	for _, segment := range strings.Split(strings.TrimSuffix(variants, ":"), ":") {
-		if segment == "" {
-			continue
-		}
-		names = append(names, segment)
-	}
-	return names
 }

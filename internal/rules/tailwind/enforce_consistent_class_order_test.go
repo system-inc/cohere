@@ -1,15 +1,132 @@
 package tailwind
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/system-inc/verify/internal/ruletest"
 )
 
-// Expectations measured by diffing the comparator against the engine's own sort over the whole
-// corpus, not by reading upstream: upstream delegates the entire question to `getClassOrder` in
-// three lines, so its source says nothing about how the order is built.
+// Expectations measured by diffing the rule against the engine's own sort over the whole corpus,
+// not by reading upstream: upstream delegates the entire question to `getClassOrder` in three
+// lines, so its source says nothing about how the order is built.
+//
+// # Why every fixture here runs through a program
+//
+// The rule reads the live design system, so it declares `ReadsProgram` and takes `ctx.Program` to
+// find the repository's stylesheet. `ruletest.Run` hands a rule a nil Program, and the rule's own
+// decline path returns nil listeners for that case rather than reporting. So every fixture in this
+// file that used `ruletest.Run` after the swap would have exercised the nil-Program branch: the
+// reporting half would have failed loudly, and the whole silent half would have passed while
+// proving nothing at all.
+//
+// That is the vacuous-probe shape `ruletest.RunTyped`'s own comment describes one level up, and it
+// is worth naming because it is the failure that hides: a suite going green on a rule that never
+// ran. So the fixtures run through `RunTypedFiles`, which writes a real tsconfig and a real
+// stylesheet into a temp directory, and the rule finds that stylesheet through the same entry-point
+// search it uses on a real repository.
+//
+// The fixture stylesheet declares no tokens of its own, deliberately. A fixture theme that added
+// tokens would test the fixture rather than the framework, and per-repository behaviour is what the
+// differential in `internal/tailwind` measures against two real design systems.
+//
+// # The `@import` has to reach a real package, and a skip is the only honest alternative
+//
+// `findTailwindPackageRoot` walks upward from the stylesheet looking for `node_modules/tailwindcss`.
+// A fixture written into `t.TempDir()` sits under the system temp directory, where that walk finds
+// nothing, so `@import "tailwindcss"` cannot resolve and the rule declines.
+//
+// That decline is the rule behaving correctly, and it is exactly why it had to be fixed rather than
+// accommodated: every fixture in the silent half would have passed on a `designSystemUnavailable`
+// finding instead of on the order being right. Measured before the fix, this file reported
+// `designSystemUnavailable` on 11 of the silent cases and on both message fixtures.
+//
+// So the import is pointed at the installed package by absolute path. When there is no installed
+// tailwindcss to point at, the fixtures skip: a suite that cannot build a design system has not
+// measured this rule, and saying "not measured" is the difference between an honest gap and a green
+// run over nothing.
+//
+// # A skip is honest and it is still not free, so it is loud
+//
+// `verify` vendors no `node_modules` of its own, so the walk has to start somewhere that has one. It
+// starts at the corpus repository, which is where the class-order fixtures in `internal/tailwind`
+// were captured from and the only installed 4.3.3 on this machine.
+//
+// The first version of this helper walked upward from `.`, the package directory. That finds nothing,
+// so every fixture in this file skipped, and `go test` reports a file whose every case skipped as
+// `ok`. Measured: 7 of 7 reporting cases and 13 of 13 silent ones skipped while the package printed
+// PASS. A skip that reads as a pass is the same failure as silence that reads as agreement, one layer
+// out, so `TestClassOrderFixturesActuallyRan` below fails rather than skips when the package cannot
+// be found, and that test is the one that makes the rest of this file's greenness mean something.
+//
+// # The package is symlinked into the fixture rather than imported by absolute path
+//
+// Pointing the fixture's `@import` at an absolute path does not work, and the reason is worth stating
+// because it looks like it should. The rule does not resolve the import itself: it calls
+// `findTailwindPackageRoot`, which walks UP from the stylesheet's own directory looking for
+// `node_modules/tailwindcss`, and hands the result to `LoadDesignSystem` as the resolver's root. A
+// fixture in `t.TempDir()` has nothing above it, so that walk fails and the rule declines before it
+// ever reads what the stylesheet imports. Measured: every reporting fixture came back
+// `designSystemUnavailable` while the stylesheet held a perfectly good absolute import.
+//
+// So the fixture gets a real `node_modules/tailwindcss`, symlinked to the installed one. That makes
+// the rule take exactly the path it takes on a repository — its own upward walk, its own resolver,
+// the bare `tailwindcss` specifier — rather than a path arranged for the test.
+const classOrderFixtureStylesheetPath = "app/_theme/styles/theme.css"
+
+// classOrderFixturePackageRoot is the installed tailwindcss the fixture stylesheets import.
+//
+// Empty when there is none, which every caller must handle rather than assume away.
+func classOrderFixturePackageRoot() string {
+	return findTailwindPackageRoot(classOrderFixtureSearchRoot)
+}
+
+// classOrderFixtureStylesheet is the fixture's root stylesheet.
+//
+// The bare specifier a real repository writes, resolved through the symlink `runClassOrderFixture`
+// plants. Nothing here is arranged for the test beyond the symlink itself.
+const classOrderFixtureStylesheet = `@import "tailwindcss";`
+
+// classOrderFixtureSearchRoot is where the upward walk for `node_modules/tailwindcss` begins.
+//
+// The corpus repository rather than this checkout, because `verify` installs no npm packages and the
+// walk would find nothing from anywhere inside it. Same path the class-order corpus in
+// `internal/tailwind/testdata` was captured against, so the fixtures and the corpus agree on which
+// engine version they mean.
+const classOrderFixtureSearchRoot = "/Users/kirkouimet/Projects/ahra/app/_theme/styles"
+
+// runClassOrderFixture runs the rule against a one-file program that has a real design system.
+//
+// Every caller passes source for one file, so the stylesheet is added here rather than at each call
+// site: a fixture that forgot it would not fail, it would decline, and a declining rule reports
+// nothing on the silent half.
+//
+// The symlink is planted before the program is built, into the same temp directory
+// `ruletest.RunTypedFiles` writes the fixture files to, so the rule's own upward walk finds it.
+func runClassOrderFixture(t *testing.T, fileName string, source string) ruletest.Result {
+	t.Helper()
+
+	packageRoot := classOrderFixturePackageRoot()
+	if packageRoot == "" {
+		t.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
+			"built and these fixtures would measure a decline rather than an order")
+	}
+
+	return ruletest.RunTypedFilesWithSetup(t, EnforceConsistentClassOrder, map[string]string{
+		fileName:                        source,
+		classOrderFixtureStylesheetPath: classOrderFixtureStylesheet,
+	}, fileName, func(root string) {
+		modules := filepath.Join(root, "node_modules")
+		if err := os.MkdirAll(modules, 0o755); err != nil {
+			t.Fatalf("creating the fixture node_modules: %v", err)
+		}
+		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
+			t.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+		}
+	})
+}
 
 func TestEnforceConsistentClassOrderReportsMisordering(t *testing.T) {
 	testCases := []struct {
@@ -71,7 +188,7 @@ func TestEnforceConsistentClassOrderReportsMisordering(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, EnforceConsistentClassOrder, testCase.fileName, testCase.source)
+			result := runClassOrderFixture(t, testCase.fileName, testCase.source)
 			ruletest.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
@@ -172,7 +289,7 @@ func TestEnforceConsistentClassOrderStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, EnforceConsistentClassOrder, testCase.fileName, testCase.source)
+			result := runClassOrderFixture(t, testCase.fileName, testCase.source)
 			ruletest.ExpectClean(t, result)
 		})
 	}
@@ -184,7 +301,7 @@ func TestEnforceConsistentClassOrderStaysSilent(t *testing.T) {
 // A finding that says only "these are misordered" leaves the reader to run the formatter and diff
 // the result.
 func TestClassOrderMessageNamesTheOrder(t *testing.T) {
-	result := ruletest.Run(t, EnforceConsistentClassOrder, "Component.tsx",
+	result := runClassOrderFixture(t, "Component.tsx",
 		`const element = <div className="gap-2 items-center flex" />;`)
 
 	if len(result.Diagnostics) != 1 {
@@ -204,7 +321,7 @@ func TestClassOrderMessageNamesTheOrder(t *testing.T) {
 // the diff of the repair would be larger than the defect. Reordering is the one finding here where
 // the noise of fixing can exceed the cost of the problem.
 func TestClassOrderProposesNoFix(t *testing.T) {
-	result := ruletest.Run(t, EnforceConsistentClassOrder, "Component.tsx",
+	result := runClassOrderFixture(t, "Component.tsx",
 		`const element = <div className="items-center flex" />;`)
 
 	if len(result.Diagnostics) != 1 {
@@ -216,15 +333,29 @@ func TestClassOrderProposesNoFix(t *testing.T) {
 	}
 }
 
-// TestComparatorDimensionsAreAllUsed is the known-dirty control.
+// The dimension tests below replace five that read the deleted generated tables directly.
 //
-// Three simpler comparators each looked right and each was measured wrong against the engine:
-// ordering by root alone agreed on 51% of the corpus, adding variants took it to 58% while
-// representatives still carried their own prefixes, and unprefixing them took it to 91%. The last
-// 9% was unranked classes being stored with a position instead of being separated out entirely.
+// Each one asserted a real property and asserted it through `classSortsBefore`, `compareVariants`,
+// `declaredPropertiesForOrdering` or `orderingRootOf`, all of which were the pairwise-comparator path
+// that #4q5dsn3 removed. The properties survive; what changed is that they are now asked of the live
+// design system and their expected answers are quoted from the engine rather than from the port.
 //
-// So each dimension is exercised by a pair that only it can order correctly.
-func TestComparatorDimensionsAreAllUsed(t *testing.T) {
+// Two of them asserted something that is simply false, and those are corrected rather than
+// translated. See TestClassOrderDepthIsNotADimension.
+
+// TestClassOrderDimensionsAreAllUsed is the known-dirty control, on the live path.
+//
+// Replaces TestComparatorDimensionsAreAllUsed. Three simpler orderings each looked right and each was
+// measured wrong against the engine: ordering by root alone agreed on 51% of the corpus, adding
+// variants took it to 58% while representatives still carried their own prefixes, and unprefixing
+// them took it to 91%. The last 9% was the markers being given a position instead of being separated
+// out entirely.
+//
+// So each dimension is exercised by a pair only it can order correctly. The pairs are unchanged from
+// the test this replaces; the mechanism asked is the live sort rather than the pairwise comparator.
+func TestClassOrderDimensionsAreAllUsed(t *testing.T) {
+	designSystem := classOrderLiveRepositorySystem(t)
+
 	testCases := []struct {
 		name      string
 		first     string
@@ -235,177 +366,304 @@ func TestComparatorDimensionsAreAllUsed(t *testing.T) {
 			name:      "class position",
 			first:     "flex",
 			second:    "items-center",
-			dimension: "the per-class table; their roots share no ordering that names would suggest",
+			dimension: "the design system's own readings; their roots share no ordering the names suggest",
 		},
 		{
 			name:      "variant grouping",
 			first:     "px-4",
 			second:    "hover:px-8",
-			dimension: "variant position; without it the two interleave by class position alone",
+			dimension: "the variant mask; without it the two interleave by property alone",
 		},
 		{
-			name:      "unranked first",
+			name:      "markers first",
 			first:     "group",
 			second:    "flex",
-			dimension: "the unranked check; `group` has no position and must not sort by one",
+			dimension: "the marker partition; `group` has no reading and must not be sorted by one",
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if !classSortsBefore(testCase.first, testCase.second) {
-				t.Errorf("%q should sort before %q, decided by %s",
-					testCase.first, testCase.second, testCase.dimension)
+			forward := classOrderLiveSort(t, designSystem, []string{testCase.first, testCase.second})
+			reverse := classOrderLiveSort(t, designSystem, []string{testCase.second, testCase.first})
+			want := []string{testCase.first, testCase.second}
+
+			if strings.Join(forward, " ") != strings.Join(want, " ") {
+				t.Errorf("got %v, expected %v, decided by %s", forward, want, testCase.dimension)
 			}
-			if classSortsBefore(testCase.second, testCase.first) {
-				t.Errorf("the comparator is not antisymmetric for %q and %q, so a sort using it is "+
-					"not well defined", testCase.first, testCase.second)
+			// Sorted from the other input too, because a sort that merely preserves its input would
+			// pass the first assertion and order nothing.
+			if strings.Join(reverse, " ") != strings.Join(want, " ") {
+				t.Errorf("from reversed input got %v, expected %v; the sort is not deciding, it is "+
+					"preserving", reverse, want)
 			}
 		})
 	}
 }
 
-// TestVariantComparisonDimensions pins the four things that decide variant order, each of which was
-// a real divergence against the engine before it was handled.
+// TestClassOrderVariantDimensions pins the variant dimensions, with the engine's answers.
 //
-// The corpus differential is the measurement behind every one: 2,761 real literals and 2,385
-// shuffled ones, and each of these cost between one and four of them.
-func TestVariantComparisonDimensions(t *testing.T) {
+// Replaces TestVariantComparisonDimensions. Three of its five cases asserted properties that hold and
+// are kept; the expected orders here are quoted from `variant_fixtures.json`, which recorded what
+// `getClassOrder` returned, rather than restated from the port.
+//
+// The two dropped cases are the subject of TestClassOrderDepthIsNotADimension below.
+func TestClassOrderVariantDimensions(t *testing.T) {
+	designSystem := classOrderLiveRepositorySystem(t)
+
 	testCases := []struct {
-		name   string
-		before string
-		after  string
-		why    string
+		name     string
+		input    []string
+		expected []string
+		fixture  string
+		why      string
 	}{
 		{
-			name:   "compound resolves on its inner segment",
-			before: "dark:placeholder:",
-			after:  "dark:focus:",
-			why:    "the table holds single variants only, so a compound has no position of its own and both tie",
+			name:     "compound resolves on its inner variant",
+			input:    []string{"dark:focus:flex", "dark:placeholder:flex"},
+			expected: []string{"dark:placeholder:flex", "dark:focus:flex"},
+			fixture:  "class-order/compound-inner-segment",
+			why:      "both are `dark:` compounds, so only the inner variant separates them",
 		},
 		{
-			// Compared against a DIFFERENT unnamed variant, not against a compound of itself. Pairing
-			// it with `dark:group-hover/csv-download:` passes on depth alone, so the mutant that
-			// stops stripping the name survives. `group-focus:` is position 30 and `group-hover:` is
-			// 29, so this pair can only order correctly if the name is stripped first.
-			name:   "named group sorts where its unnamed form does",
-			before: "group-hover/csv-download:",
-			after:  "group-focus:",
-			why:    "an unstripped name falls to the unknown position and sorts after every ranked variant",
+			name:     "a named group sorts where its unnamed form does",
+			input:    []string{"group-hover/pdf:flex", "group-hover/csv:flex", "group-hover:flex"},
+			expected: []string{"group-hover:flex", "group-hover/csv:flex", "group-hover/pdf:flex"},
+			fixture:  "class-order/named-groups",
+			why:      "the name is a modifier on the variant, and an unnamed compound precedes a named one",
 		},
 		{
-			name:   "unknown variants order by their own text",
-			before: "data-[show=false]:",
-			after:  "data-[show=true]:",
-			why:    "two unrankable variants tie on position, and the engine still groups each one's classes",
-		},
-		{
-			// The pair that only depth resolves. Both start with `group-hover:`, so a comparison that
-			// walks segments first finds them equal on segment 0 and then compares `disabled:`
-			// against nothing, which is the case depth exists for.
-			name:   "depth before segments",
-			before: "group-hover:",
-			after:  "group-hover:disabled:",
-			why:    "a stacked variant narrows an already-narrowed selector and lands in a later layer",
-		},
-		{
-			// And depth must beat a lower first segment: `disabled:` is position 118 and
-			// `group-hover:` is 29, so segment-first ordering would put the compound first.
-			name:   "depth outranks a lower first segment",
-			before: "disabled:",
-			after:  "group-hover:disabled:",
-			why:    "every single variant precedes every stacked one, whatever it starts with",
+			name:     "unknown functional variants order by their own value",
+			input:    []string{"data-[show=true]:flex", "data-[show=false]:flex", "hover:flex"},
+			expected: []string{"hover:flex", "data-[show=false]:flex", "data-[show=true]:flex"},
+			fixture:  "class-order/functional-data",
+			why:      "two `data-` variants tie on registration order and separate on their value text",
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if compareVariants(testCase.before, testCase.after) >= 0 {
-				t.Errorf("%q should sort before %q: %s", testCase.before, testCase.after, testCase.why)
-			}
-			if compareVariants(testCase.after, testCase.before) <= 0 {
-				t.Errorf("the comparison is not antisymmetric for %q and %q, so a sort using it is not "+
-					"well defined", testCase.before, testCase.after)
+			ordered := classOrderLiveSort(t, designSystem, testCase.input)
+			if strings.Join(ordered, " ") != strings.Join(testCase.expected, " ") {
+				t.Errorf("got %v, %s says %v: %s",
+					ordered, testCase.fixture, testCase.expected, testCase.why)
 			}
 		})
 	}
 }
 
-// TestOrderingPropertiesKeepCustomProperties pins the distinction between the two property tables.
+// TestClassOrderDepthIsNotADimension is the correction, and it is the point of this task.
 //
-// The conflict tables strip `--tw-*`, because two classes both setting `--tw-border-style` are not
-// in conflict about anything an author sees. Ordering indexes them, and they are what separates
-// classes sharing a visible property: `shadow-lg` emits `--tw-shadow` then `box-shadow` while
-// `ring-1` emits `--tw-ring-shadow` then `box-shadow`. Reading the conflict tables here left both
-// with the key `[box-shadow]` and ten real class lists came out wrong.
-func TestOrderingPropertiesKeepCustomProperties(t *testing.T) {
-	shadow := declaredPropertiesForOrdering("shadow-lg")
-	ring := declaredPropertiesForOrdering("ring-1")
+// Two cases in the test this replaces asserted the opposite of what the engine does, and they passed
+// because the code under test asserted the same wrong thing. Quoted from the deleted
+// TestVariantComparisonDimensions:
+//
+//	{ before: "group-hover:",  after: "group-hover:disabled:",
+//	  why: "a stacked variant narrows an already-narrowed selector and lands in a later layer" }
+//	{ before: "disabled:",     after: "group-hover:disabled:",
+//	  why: "every single variant precedes every stacked one, whatever it starts with" }
+//
+// The second is false as stated, and the first is true only by coincidence. The engine ORs one bit
+// per variant into a mask and compares masks numerically, so a class's position is decided by its
+// HIGHEST-ranked variant. A stacked variant sorts first whenever the class it is compared against
+// carries a higher bit.
+//
+// The evidence is the engine's own, from `class-order/stacked-against-single` and
+// `class-order/stacked-between-singles` in variant_fixtures.json: `group-hover:disabled:flex` (mask 5)
+// precedes `dark:flex` (mask 8), and in a four-class list it lands third rather than last. That is
+// the same divergence `#nr3wtj1` filed and `TestDepthFirstDisagreesWithTheEngineOnTheCorpus` measured
+// at 15 pairs of 4,265.
+//
+// The first case is kept, with its reason corrected: `group-hover:` does precede
+// `group-hover:disabled:`, not because it is shorter but because the two share the `group-hover` bit
+// and the stacked one carries `disabled` on top of it, so its mask is strictly larger.
+func TestClassOrderDepthIsNotADimension(t *testing.T) {
+	designSystem := classOrderLiveRepositorySystem(t)
 
-	if len(shadow) < 2 || len(ring) < 2 {
-		t.Fatalf("expected both to declare a custom property and box-shadow, got %v and %v", shadow, ring)
+	t.Run("a superset mask sorts after the subset it extends", func(t *testing.T) {
+		ordered := classOrderLiveSort(t, designSystem,
+			[]string{"group-hover:disabled:flex", "group-hover:flex"})
+		expected := []string{"group-hover:flex", "group-hover:disabled:flex"}
+		if strings.Join(ordered, " ") != strings.Join(expected, " ") {
+			t.Errorf("got %v, expected %v: both carry the `group-hover` bit and the stacked class "+
+				"carries `disabled` on top of it, so its mask is strictly larger", ordered, expected)
+		}
+	})
+
+	t.Run("but a stacked variant precedes a higher-ranked single one", func(t *testing.T) {
+		ordered := classOrderLiveSort(t, designSystem,
+			[]string{"dark:flex", "group-hover:disabled:flex"})
+		expected := []string{"group-hover:disabled:flex", "dark:flex"}
+		if strings.Join(ordered, " ") != strings.Join(expected, " ") {
+			t.Errorf("got %v, class-order/stacked-against-single says %v; the deleted rule asserted "+
+				"'every single variant precedes every stacked one' and the engine does no such thing",
+				ordered, expected)
+		}
+	})
+}
+
+// TestClassOrderReadingsKeepCustomProperties pins that `--tw-*` properties stay in a reading.
+//
+// Replaces TestOrderingPropertiesKeepCustomProperties, and the assertion is corrected rather than
+// translated, because the original was right about the property and wrong about where it shows.
+//
+// The original asserted that `shadow-lg` and `ring-1` "lead with the same property" is the defect.
+// The engine says otherwise. From classorder_fixtures.json, the readings it captured on this
+// repository:
+//
+//	shadow-lg   {order: [315, 316], count: 2}
+//	ring-1      {order: [315, 318], count: 2}
+//
+// They SHARE their leading index and separate on the second. Index 315 is the `--tw-*` custom
+// property they both emit; 316 and 318 are their differing second declarations. So the property that
+// matters is that the reading holds more than one index at all: a lookup that dropped custom
+// properties, the way the conflict tables do, would leave both as a single `[box-shadow]` index and
+// they would tie completely. Ten real class lists came out wrong when a previous version read the
+// conflict tables here.
+//
+// Asserting on `order[0]` differing, as the original did, is an assertion the engine fails. It passed
+// only because the deleted `declaredPropertiesForOrdering` returned property NAMES from a different
+// table with a different shape, so the two tests were never asking the same question.
+func TestClassOrderReadingsKeepCustomProperties(t *testing.T) {
+	designSystem := classOrderLiveRepositorySystem(t)
+
+	keys, unplaceable, resolved := classOrderKeys(
+		[]string{"shadow-lg", "ring-1"}, designSystem.System, designSystem.Table)
+	if !resolved {
+		t.Fatalf("could not place %q", unplaceable)
 	}
-	if shadow[0] == ring[0] {
-		t.Errorf("shadow-lg and ring-1 lead with the same property %q, so they cannot be separated",
-			shadow[0])
+
+	shadow, ring := keys["shadow-lg"], keys["ring-1"]
+	// Both indices, because one index each is what dropping the custom property would leave.
+	if len(shadow.order) < 2 || len(ring.order) < 2 {
+		t.Fatalf("expected both to declare a custom property and box-shadow, got %v and %v; a single "+
+			"index each means the `--tw-*` property was dropped and the two cannot be separated",
+			shadow.order, ring.order)
 	}
-	if !strings.HasPrefix(shadow[0], "--") || !strings.HasPrefix(ring[0], "--") {
-		t.Errorf("the ordering tables should keep custom properties, got %v and %v", shadow, ring)
+	// And they must still differ somewhere, which for these two is the second index.
+	if shadow.order[0] == ring.order[0] && shadow.order[1] == ring.order[1] {
+		t.Errorf("shadow-lg %v and ring-1 %v are identical readings, so the sort cannot separate "+
+			"them and the engine does", shadow.order, ring.order)
+	}
+	// The engine's own numbers, quoted so a drift in either reading fails here rather than silently
+	// changing every class list that holds a shadow and a ring.
+	if shadow.order[0] != 315 || shadow.order[1] != 316 {
+		t.Errorf("shadow-lg reads %v; classorder_fixtures.json recorded [315 316]", shadow.order)
+	}
+	if ring.order[0] != 315 || ring.order[1] != 318 {
+		t.Errorf("ring-1 reads %v; classorder_fixtures.json recorded [315 318]", ring.order)
 	}
 }
 
-// TestUnrankedClassesSortFirstRegardlessOfVariant covers the interaction that produced the final
-// three corpus divergences.
+// TestClassOrderRootsResolveAgainstTheDesignSystem is the known-dirty control for the table-choice bug.
 //
-// `group` is unranked and a variant class has a position, so a comparator checking variants before
-// rankedness puts `group` in the middle of the list. It belongs at the front, ahead of both.
-func TestUnrankedClassesSortFirstRegardlessOfVariant(t *testing.T) {
-	if !classSortsBefore("group", "hover:background--5") {
-		t.Error("an unranked class must sort before a variant-prefixed ranked one, which means the " +
-			"rankedness check has to come before the variant check")
+// Replaces TestOrderingRootsResolveInTheOrderingTable. That bug was a lookup resolving an ordering
+// question through the conflict table, where `ring-offset` does not exist, so the longest-wins walk
+// found `ring` and answered with ring's properties; `ring-offset-1` then read identically to `ring-1`
+// and two classes the engine separates collapsed onto one key.
+//
+// The live path cannot make that mistake in the same way, because `ParseCandidate` resolves the root
+// against the design system's own registrations rather than by walking a table of names. The property
+// is still worth pinning, and it is pinned the same way: the two classes must not share a reading.
+func TestClassOrderRootsResolveAgainstTheDesignSystem(t *testing.T) {
+	designSystem := classOrderLiveRepositorySystem(t)
+
+	keys, unplaceable, resolved := classOrderKeys(
+		[]string{"ring-offset-1", "ring-1"}, designSystem.System, designSystem.Table)
+	if !resolved {
+		t.Fatalf("could not place %q", unplaceable)
 	}
-	if classSortsBefore("hover:background--5", "group") {
-		t.Error("the comparator disagrees with itself on the same pair")
+
+	offset, ring := keys["ring-offset-1"], keys["ring-1"]
+	if len(offset.order) == 0 || len(ring.order) == 0 {
+		t.Fatalf("both should declare properties, got %v and %v", offset.order, ring.order)
+	}
+	if offset.order[0] == ring.order[0] {
+		t.Errorf("ring-offset-1 and ring-1 lead with the same property index %d, so the sort cannot "+
+			"separate them and the engine does", offset.order[0])
 	}
 }
 
-// TestOrderingRootsResolveInTheOrderingTable is the known-dirty control for the table-choice bug.
+// TestClassOrderMarkersLeadRegardlessOfVariant covers the interaction that produced the final three
+// corpus divergences.
 //
-// 22 roots exist in the ordering table and not in the conflict table, so a lookup that resolves an
-// ordering question through `functionalRootOf` silently answers with a shorter root's properties.
-// Two classes the engine separates then collapse onto one key, which reads as agreement rather
-// than as a miss.
-//
-// The assertion is that a shadowed root answers with its own properties and not with its prefix's.
-// Both halves are needed: without the second, a lookup returning the prefix's row passes.
-func TestOrderingRootsResolveInTheOrderingTable(t *testing.T) {
-	if root := orderingRootOf("ring-offset-1"); root != "ring-offset" {
-		t.Errorf("ring-offset-1 should resolve to root %q, got %q", "ring-offset", root)
-	}
+// Replaces TestUnrankedClassesSortFirstRegardlessOfVariant. `group` has no reading and a
+// variant-prefixed class has a mask, so an ordering that consulted the mask before the marker
+// partition would put `group` in the middle of the list. It belongs at the front, ahead of both.
+func TestClassOrderMarkersLeadRegardlessOfVariant(t *testing.T) {
+	designSystem := classOrderLiveRepositorySystem(t)
 
-	offset := declaredPropertiesForOrdering("ring-offset-1")
-	ring := declaredPropertiesForOrdering("ring-1")
-	if len(offset) == 0 || len(ring) == 0 {
-		t.Fatalf("both should declare properties, got %v and %v", offset, ring)
-	}
-	if offset[0] == ring[0] {
-		t.Errorf("ring-offset-1 and ring-1 lead with the same property %q, so the comparator cannot "+
-			"separate them and the engine does", offset[0])
+	ordered := classOrderLiveSort(t, designSystem, []string{"hover:px-8", "group", "flex"})
+	if ordered[0] != "group" {
+		t.Errorf("got %v: a marker must lead even when the other classes carry variants, which "+
+			"means the partition has to happen before the mask is consulted", ordered)
 	}
 }
 
-// TestUnrankedClassesKeepSourceOrder pins the tiebreak.
+// TestClassOrderMarkersKeepSourceOrder pins the tiebreak.
 //
-// The comparator must express no preference between two unranked classes, in either direction, so
-// that a stable sort leaves them as written. An alphabetical tiebreak satisfies the first assertion
-// and fails the second, which is exactly the bug a blind reversal of the rankedness check leaves
-// behind: `better-tailwindcss` accepts both `peer group` and `group peer`.
-func TestUnrankedClassesKeepSourceOrder(t *testing.T) {
-	if classSortsBefore("group", "peer") {
-		t.Error("the comparator must not order two unranked classes; alphabetical would rewrite " +
-			"`peer group`, which the reference accepts as written")
+// Replaces TestUnrankedClassesKeepSourceOrder. The sort must express no preference between two
+// markers in either direction, so both `peer group` and `group peer` survive: `better-tailwindcss`
+// accepts both, and an alphabetical tiebreak would rewrite the first.
+func TestClassOrderMarkersKeepSourceOrder(t *testing.T) {
+	designSystem := classOrderLiveRepositorySystem(t)
+
+	for _, input := range [][]string{{"group", "peer", "flex"}, {"peer", "group", "flex"}} {
+		ordered := classOrderLiveSort(t, designSystem, input)
+		if strings.Join(ordered, " ") != strings.Join(input, " ") {
+			t.Errorf("got %v from %v: two markers must keep the order they were written in, and "+
+				"alphabetical would rewrite `peer group`", ordered, input)
+		}
 	}
-	if classSortsBefore("peer", "group") {
-		t.Error("the comparator must not order two unranked classes in either direction")
+}
+
+// classOrderLiveSort runs the rule's own ordering over a class list.
+//
+// The same two calls `reportClassOrder` makes, in the same order, so a test cannot pass against a
+// path the rule does not take. Fails rather than skips on an unplaceable class: every class these
+// tests use is one this repository's design system knows, so a decline is a defect in the port and
+// not a property of the input.
+func classOrderLiveSort(t *testing.T, designSystem DesignSystemResult, classes []string) []string {
+	t.Helper()
+
+	markers, placeable := partitionMarkers(classes)
+	keys, unplaceable, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
+	if !resolved {
+		t.Fatalf("the rule could not place %q out of %v, so this case proves nothing",
+			unplaceable, classes)
 	}
+	return append(markers, sortClassesByKey(placeable, keys)...)
+}
+
+// TestClassOrderFixturesActuallyRan is what stops this file from going green on nothing.
+//
+// Every fixture above skips when no installed tailwindcss can be found, and a skip is the honest
+// answer for a machine that genuinely has none. The problem is that `go test` prints `ok` for a
+// package whose every case skipped, so a mistake in where the walk STARTS looks identical to a
+// machine that lacks the package.
+//
+// That was not hypothetical. The first version of the helper walked upward from `.`, which is this
+// package's own directory inside a repository that vendors no `node_modules`. Every fixture skipped,
+// the package reported PASS, and the swap under test was never exercised by a single one of them.
+//
+// So this test fails where the others skip. It asserts the package is findable and that the rule can
+// actually build a design system from the fixture stylesheet, which together are the precondition
+// every other fixture in this file silently depends on.
+func TestClassOrderFixturesActuallyRan(t *testing.T) {
+	packageRoot := classOrderFixturePackageRoot()
+	if packageRoot == "" {
+		t.Fatalf(
+			"no installed tailwindcss found from %s, so every fixture in this file skipped and the "+
+				"package still reported ok. Either the search root is wrong or this machine has no "+
+				"Tailwind to test against; both need a human, and neither should read as a pass",
+			classOrderFixtureSearchRoot,
+		)
+	}
+
+	// And the stylesheet the fixtures write must actually produce findings, which is the end-to-end
+	// version of the same claim: a design system that builds but resolves nothing would let the
+	// silent half pass while the reporting half failed.
+	result := runClassOrderFixture(t, "Component.tsx",
+		`const element = <div className="items-center flex" />;`)
+	ruletest.ExpectFindings(t, result, "inconsistentClassOrder")
 }

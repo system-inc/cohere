@@ -79,6 +79,29 @@ func RunTypedFiles(t *testing.T, subject rule.Rule, files map[string]string, sub
 	return RunTypedFilesWithOptions(t, subject, files, subjectFileName, nil)
 }
 
+// RunTypedFilesWithSetup is RunTypedFiles with a hook that runs against the fixture directory.
+//
+// The hook is called after the fixture files are written and before the program is built, and it is
+// handed the temp directory they were written into. It exists for the one thing a map of file
+// contents cannot express: something on disk that is not a file with text in it.
+//
+// The case that motivated it is a symlink. A rule reading a Tailwind design system finds the
+// installed package by walking UP from the stylesheet looking for `node_modules/tailwindcss`, and a
+// fixture in `t.TempDir()` has nothing above it, so the rule declines before it reads a line of the
+// fixture's CSS. Writing an absolute import into the stylesheet does not help, because the rule never
+// resolves the import itself. Linking a real package into the fixture does, and it makes the rule
+// take the same path it takes on a repository rather than one arranged for the test.
+func RunTypedFilesWithSetup(
+	t *testing.T,
+	subject rule.Rule,
+	files map[string]string,
+	subjectFileName string,
+	setup func(directory string),
+) Result {
+	t.Helper()
+	return runTypedFiles(t, subject, files, subjectFileName, nil, setup)
+}
+
 // RunTypedFilesWithOptions is the full form the others delegate to.
 func RunTypedFilesWithOptions(
 	t *testing.T,
@@ -86,6 +109,19 @@ func RunTypedFilesWithOptions(
 	files map[string]string,
 	subjectFileName string,
 	options any,
+) Result {
+	t.Helper()
+	return runTypedFiles(t, subject, files, subjectFileName, options, nil)
+}
+
+// runTypedFiles is the body both public forms share.
+func runTypedFiles(
+	t *testing.T,
+	subject rule.Rule,
+	files map[string]string,
+	subjectFileName string,
+	options any,
+	setup func(directory string),
 ) Result {
 	t.Helper()
 
@@ -105,6 +141,12 @@ func RunTypedFilesWithOptions(
 		if err := os.WriteFile(path, []byte(strings.TrimSpace(contents)+"\n"), 0o644); err != nil {
 			t.Fatalf("writing the fixture %s: %v", name, err)
 		}
+	}
+
+	// After the files exist and before the program is built, so a hook can add something to the
+	// directory that the program or a rule will then find.
+	if setup != nil {
+		setup(directory)
 	}
 
 	configPath := filepath.Join(directory, "tsconfig.json")

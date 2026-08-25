@@ -528,16 +528,34 @@ func TestVariantBitmaskIsNotDepthFirst(t *testing.T) {
 
 // TestDepthFirstDisagreesWithTheEngineOnTheCorpus quantifies the divergence.
 //
-// The open question this component was dispatched to answer is whether the segment comparison in
-// enforce_consistent_class_order.go and upstream's bitmask are the same rule. They are not, and a
-// disagreement is only worth reporting with a population attached, so this walks every ordered pair
-// in every class list in the corpus and counts the pairs on which a depth-first rule and the mask
-// comparison disagree.
+// The open question this component was dispatched to answer is whether the segment comparison that
+// enforce_consistent_class_order.go used to carry and upstream's bitmask are the same rule. They are
+// not, and a disagreement is only worth reporting with a population attached, so this walks every
+// ordered pair in every class list in the corpus and counts the pairs on which a depth-first rule and
+// the mask comparison disagree.
 //
 // The count is logged rather than asserted to be zero, because a nonzero count is the finding. What
 // is asserted is that the corpus was actually walked and that the disagreement is real on at least
 // the synthetic probes, so a future change that silently emptied the corpus could not read as
 // agreement.
+//
+// # This measures a rule, not the shipped code, and that stayed true on purpose
+//
+// #4q5dsn3 swapped the rule onto the live design system, so the depth-first comparison this counts
+// against no longer ships anywhere: `compareVariants`, `variantSegments` and the rest of that path
+// were deleted with it. What this test compares is a depth-first rule REIMPLEMENTED here, in the loop
+// below, against the engine's masks from the fixture.
+//
+// It is kept in that form rather than repointed at the new code, because the two answer different
+// questions and both are worth keeping. This one is the standing statement that depth-first is wrong
+// and by how much: 15 pairs of 4,265, the number #nr3wtj1 filed. Repointing it at the live sort would
+// turn it into a second copy of
+// `internal/rules/tailwind`'s TestClassOrderLiveMatchesTheEngineOverTheCorpus, which measures the
+// shipped path over the same corpus and reports 0 of 28,133, and this file would lose the record of
+// what the divergence was.
+//
+// So a nonzero count here is correct and expected forever. A zero would mean the corpus lost its
+// stacked-variant cases, which is what the assertion at the bottom exists to catch.
 func TestDepthFirstDisagreesWithTheEngineOnTheCorpus(t *testing.T) {
 	corpus := loadVariantOrderCorpus(t)
 
