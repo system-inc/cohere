@@ -41,15 +41,24 @@
 //	                      name. All of it parsed out of the repository's own stylesheet graph by
 //	                      the components that landed tonight.
 //	still generated       which roots the framework itself registers, carried as `KnownRoots` and
-//	                      `KnownStatics`. Framework-invariant — the descriptor generator measured
-//	                      byte-identical `roots` arrays across both corpus repositories — so a
-//	                      table is the correct shape for it, unlike the theme.
-//	still injected        the framework's own variant registrations. There is no shipped Go table
-//	                      of them: `VariantOrder` in property_order_table.go is keyed on composed
-//	                      prefixes (`group-hover:`) rather than on registration roots, which is
-//	                      precisely the shape variant.go's file comment argues against, and the
-//	                      engine-measured registrations exist only as testdata. So LoadOptions
-//	                      takes them rather than this file inventing them. See FrameworkVariants.
+//	                      `KnownStatics`, and their readings, carried as `baseDescriptors` in
+//	                      descriptor_base_table.go. Framework-invariant, and that was re-measured
+//	                      rather than inherited: byte-identical `roots` arrays across the two corpus
+//	                      repositories is *not* evidence, because they share the Structure submodule
+//	                      and so share its `@theme` and its `@utility` blocks. Against a third,
+//	                      synthetic design system sharing neither, 258 of 301 shared roots differ,
+//	                      and every one differs only in its namespace maps. With those removed all
+//	                      three agree exactly, which is the seam descriptor_live.go composes across.
+//	also generated        the framework's own variant registrations, carried as
+//	                      `FrameworkVariantRegistrations` and keyed on registration roots. Verified
+//	                      repository-invariant across two installs and both corpus repositories
+//	                      before being checked in, so a table is the correct shape for it. The
+//	                      comparison functions those registrations reference are *not* generated:
+//	                      they resolve breakpoint widths out of the live theme, because a repository
+//	                      that redefines `--breakpoint-sm` reorders its own responsive classes.
+//	                      `VariantOrder` in property_order_table.go is a different table, keyed on
+//	                      composed prefixes (`group-hover:`) rather than on registration roots,
+//	                      which is the shape variant.go's file comment argues against.
 //
 // A reader should be able to see that boundary without running anything, which is why
 // `RepositoryContributions` reports what the repository added on top of the framework rather than
@@ -118,6 +127,13 @@ type LoadedDesignSystem struct {
 	variants *VariantRegistry
 	utility  *UtilityEvaluator
 
+	// staticUtilityNodes is the body of every static `@utility` block the repository declared,
+	// keyed by root.
+	//
+	// Kept because a static utility's reading is a constant PropertySort answers from its body, and
+	// there is nowhere else to get it: the framework's static table does not know a name the
+	// repository invented. This is the whole of what NewTable adds to `Statics`.
+	staticUtilityNodes map[string][]*Node
 	// utilityRoots is every `@utility` root the repository declared, as a set, so HasUtility is a
 	// map lookup rather than a walk.
 	utilityRoots map[string]UtilityKind
@@ -303,18 +319,26 @@ type LoadOptions struct {
 	// graph supplies its own.
 	Resolve StylesheetResolver
 
-	// FrameworkVariants is the framework's own variant registrations, in the order the framework
-	// registers them.
+	// FrameworkVariants overrides the framework's variant registrations with a caller-supplied set.
 	//
-	// Injected rather than read from a table, and that is a gap named rather than papered over.
-	// The engine-measured registrations exist in this package's testdata and nowhere in shipped Go,
-	// because the one shipped variant table is keyed on composed prefixes rather than registration
-	// roots. Generating a real one is variant work, not seam work.
+	// Nil, which is what every shipped caller passes, means the generated
+	// FrameworkVariantRegistrations: the installed Tailwind's own 88 roots with the order numbers
+	// the engine assigned them, plus the four comparison groups that order breakpoints by their
+	// resolved widths. That table was verified repository-invariant before being checked in; see
+	// framework_variant_table.go's header for the measurement.
 	//
-	// Empty is legal and it is not silently degraded: HasVariant then answers false for `hover`,
-	// which is a loud wrong answer rather than a quiet one, and `Contributions().NewVariantNames`
-	// reports every repository variant as new. A caller that wants the framework's variants must
-	// supply them, which is the honest shape until the table exists.
+	// A non-nil value replaces the table entirely and is registered in sequence, so each root takes
+	// its own order and no comparison groups are attached. That is the right shape for a test
+	// building a small registry over a fixture stylesheet, and the wrong shape for a repository:
+	// sequential registration cannot express the six roots that share order 64, and splitting them
+	// apart means the breakpoints never reach a comparison function and fall through to a root-name
+	// comparison, where `2xl` precedes `sm`.
+	//
+	// An explicitly empty non-nil slice is honoured rather than treated as absent, and it is not
+	// silently degraded: HasVariant then answers false for `hover`, `ParseVariant` returns nil for
+	// every framework root, and `Contributions().NewVariantNames` reports every repository variant
+	// as new. That is a loud wrong answer rather than a quiet one, which is what a caller asking for
+	// no framework variants at all should get.
 	FrameworkVariants []FrameworkVariant
 }
 
@@ -349,21 +373,43 @@ func LoadDesignSystem(options LoadOptions) (*LoadedDesignSystem, error) {
 	}
 
 	collector := &stylesheetCollector{
-		theme:          NewTheme(),
-		resolve:        resolve,
-		visiting:       map[string]bool{},
-		utilityRoots:   map[string]UtilityKind{},
-		customVariants: map[string]bool{},
+		theme:              NewTheme(),
+		resolve:            resolve,
+		visiting:           map[string]bool{},
+		staticUtilityNodes: map[string][]*Node{},
+		utilityRoots:       map[string]UtilityKind{},
+		customVariants:     map[string]bool{},
 	}
 	if err := collector.loadFile(entryPoint); err != nil {
 		return nil, err
 	}
 
 	variants := NewVariantRegistry()
-	frameworkNames := make(map[string]bool, len(options.FrameworkVariants))
-	for _, variant := range options.FrameworkVariants {
-		variants.Register(variant.Name, variant.Kind)
-		frameworkNames[variant.Name] = true
+	// The framework registers first and the repository's `@custom-variant` names after, which is
+	// upstream's sequencing and the reason a redefinition keeps its original position.
+	//
+	// The default path replays the generated table, carrying the engine's own order numbers rather
+	// than recomputing them. That distinction is load-bearing: 88 registrations hold 82 distinct
+	// orders, and a shared order is the only place a comparison function is consulted. See
+	// RegisterFrameworkVariants.
+	frameworkNames := map[string]bool{}
+	if options.FrameworkVariants == nil {
+		variants.RegisterFrameworkVariants(FrameworkVariantRegistrations)
+		// A `@theme { --breakpoint-tablet: ... }` registers `tablet` as a static variant on the
+		// engine, joining the breakpoint group rather than appending past it. Registered before the
+		// repository's `@custom-variant` names for the same reason the framework is: it is
+		// breakpoint machinery rather than a stylesheet-declared variant, and it must not consume
+		// an appended position.
+		registerThemeBreakpointVariants(variants, collector.theme)
+		attachFrameworkVariantComparisons(variants, collector.theme)
+		for _, registration := range FrameworkVariantRegistrations {
+			frameworkNames[registration.Name] = true
+		}
+	} else {
+		for _, variant := range options.FrameworkVariants {
+			variants.Register(variant.Name, variant.Kind)
+			frameworkNames[variant.Name] = true
+		}
 	}
 	// The repository's `@custom-variant` names register after the framework's, which is upstream's
 	// order and the reason a redefinition keeps its original position: Register updates in place
@@ -379,17 +425,18 @@ func LoadDesignSystem(options LoadOptions) (*LoadedDesignSystem, error) {
 	}
 
 	return &LoadedDesignSystem{
-		EntryPoint:        entryPoint,
-		TailwindVersion:   TailwindVersion,
-		Stylesheets:       collector.stylesheets,
-		SkippedDirectives: collector.skipped,
-		BuildCount:        nextBuildCount(),
-		theme:             collector.theme,
-		variants:          variants,
-		utility:           evaluator,
-		utilityRoots:      collector.utilityRoots,
-		customVariants:    collector.customVariants,
-		frameworkVariants: frameworkNames,
+		EntryPoint:         entryPoint,
+		TailwindVersion:    TailwindVersion,
+		Stylesheets:        collector.stylesheets,
+		SkippedDirectives:  collector.skipped,
+		BuildCount:         nextBuildCount(),
+		theme:              collector.theme,
+		variants:           variants,
+		utility:            evaluator,
+		staticUtilityNodes: collector.staticUtilityNodes,
+		utilityRoots:       collector.utilityRoots,
+		customVariants:     collector.customVariants,
+		frameworkVariants:  frameworkNames,
 	}, nil
 }
 
@@ -449,6 +496,7 @@ type stylesheetCollector struct {
 
 	stylesheets        []string
 	utilityDefinitions []*UtilityDefinition
+	staticUtilityNodes map[string][]*Node
 	utilityRoots       map[string]UtilityKind
 	customVariants     map[string]bool
 }
@@ -657,12 +705,29 @@ func (collector *stylesheetCollector) ingestUtilityBlock(node *Node, path string
 	// reading is a constant that PropertySort answers directly from the block body. Registering it
 	// here anyway would put a definition in the evaluator that can never compile, which reads to a
 	// caller as a defect in the evaluator rather than as a shape it does not handle.
+	//
+	// The body is kept either way, and for the static case that is the whole point: the constant
+	// PropertySort answers is the only place a repository's own static utility can get a reading
+	// from. `markdown-content` and `typing-dots` are ahra's, they are not in the framework's static
+	// table, and NewTable reads them from here.
+	//
+	// The two kinds are recorded independently, and they must be. `@utility fade-in` and `@utility
+	// fade-in-*` are both declared in this repository and they are two different utilities that
+	// share a name, not a redefinition: the static reads `[]#1` and the functional resolves a value.
+	// Sixteen roots here are that shape. Letting the functional block clear the static body would
+	// lose the static reading entirely, which is a class an author can write going unanswered.
+	//
+	// `utilityRoots` cannot express both, since it maps a root to one kind, and it is not changed
+	// here: it exists so HasUtility can answer the parser's question, and the parser asks about one
+	// kind at a time.
 	if kind == UtilityKindFunctional {
 		collector.utilityDefinitions = append(collector.utilityDefinitions, &UtilityDefinition{
 			Name:  root,
 			Nodes: node.Nodes,
 		})
+		return nil
 	}
+	collector.staticUtilityNodes[root] = node.Nodes
 	return nil
 }
 
