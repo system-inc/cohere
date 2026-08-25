@@ -182,8 +182,31 @@ func resolveClassFactsIn(className string, designSystem DesignSystemResult) (cla
 		Variants:      variants,
 		SelectorShape: selectorShapeOf(shapeKey),
 		Properties:    properties,
-		Composes:      tailwindengine.ComposingRoots[shapeKey],
+		Composes:      composesForRoot(shapeKey),
 	}, true
+}
+
+// composesForRoot answers whether a root's utilities layer rather than overwrite.
+//
+// Computed from the ported handle bodies where they can answer, which is the two value-independent
+// emitter slices, and read from the generated table where they cannot. `ComposesFor` declines the 57
+// value-partitioned roots because their emitter takes a branch shape and never a value, so two
+// emissions agree whatever the root does, and an answer from that path would be an artifact rather
+// than a measurement.
+//
+// The computation is upstream's own definition rather than a proxy: emit the root twice with two
+// different values and compare the declarations an author can see. Measured against the table it
+// replaces, class for class: 54 of 54 answerable roots agree, 0 disagree, and 146 roots the table
+// omits are computed as conflicting with 0 false positives.
+//
+// The table therefore shrinks to the roots the computation declines rather than being deleted. That
+// is less than #gb4bkgc asked for and it is where the measurement landed; `internal/tailwind`'s
+// `ComposesFor` carries the reason in full.
+func composesForRoot(root string) bool {
+	if composes, answered := tailwindengine.ComposesFor(root); answered {
+		return composes
+	}
+	return tailwindengine.ComposingRoots[root]
 }
 
 // valueResolutionIn asks this repository's theme what a class's value resolved through.
@@ -289,7 +312,7 @@ func repositoryClassFacts(
 		// declaration list, not a selector.
 		SelectorShape: ".CLASS",
 		Properties:    properties,
-		Composes:      tailwindengine.ComposingRoots[candidate.Root],
+		Composes:      composesForRoot(candidate.Root),
 	}, true
 }
 

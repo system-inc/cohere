@@ -32,11 +32,15 @@ import "testing"
 //	baseDescriptors          78   the reading partitions on the value's resolved type, and no
 //	                              registration shape carries both halves: `border-[3px]` is a width
 //	                              and `border-red-500` is a colour.
-//	ComposingRoots           82   whether two values of a root layer or overwrite. A reading cannot
-//	                              see values, so both answers look identical. Measured with a
-//	                              control: 79 of 79 composing roots and 4 of 4 non-composing roots
-//	                              all read the same for `-4` and `-8`. Without the control, 79 of 79
-//	                              agreeing reads as a successful derivation.
+//	ComposingRoots           82   whether two values of a root layer or overwrite. `ComposesFor` now
+//	                              computes this for the 54 roots the two value-independent emitter
+//	                              slices answer, agreeing 54 of 54 with 0 false positives across 146
+//	                              controls, so the rule reads the computation first. The table stays
+//	                              for the 28 it cannot answer: a gap root's emitter takes a branch
+//	                              shape and never a value, so two emissions agree whatever the root
+//	                              does. Measured: 27 of 27 composing gap roots compare identical and
+//	                              so do 25 of 30 non-composing ones, which is a measurement of
+//	                              nothing. Shrinking it further needs the branch to carry a value.
 //	CollapseFamilies         45   which pairs canonicalize into a third root. All 45 are CSS
 //	                              shorthand relationships between declared properties, so deriving
 //	                              it means carrying a shorthand table of equal size, one layer

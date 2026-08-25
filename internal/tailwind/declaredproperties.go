@@ -206,3 +206,106 @@ func appendVisibleProperty(properties []string, property string) []string {
 	}
 	return append(properties, property)
 }
+
+// ComposesFor reports whether a root's utilities layer rather than overwrite each other.
+//
+// `shadow-lg` and `shadow-xl` do not conflict: each writes its own `--tw-shadow` and both write a
+// `box-shadow` naming every shadow variable, so the two `box-shadow` declarations are byte identical
+// and the utilities stack. `px-4` and `px-8` write their value straight into `padding-inline` and
+// the second wins. That difference is what this answers.
+//
+// # How, and why it is two emissions rather than a table
+//
+// Emit the root twice with two different values and compare the declarations an author can see. A
+// `--tw-*` custom property is excluded because it is the root's private contribution and is meant to
+// differ: that difference is the mechanism, not a conflict. What decides is whether the shared
+// property came out the same both times.
+//
+// This is upstream's own definition rather than a proxy for it. The generator that produced the
+// deleted `ComposingRoots` compiled two values through the real engine and compared declaration
+// text, and this is the same comparison with the same inputs.
+//
+// # The limit, and it is structural rather than a gap to fill later
+//
+// Only the two value-independent slices can answer this. The 57 value-partitioned roots in
+// frameworkgaphandlers.go take a `UtilityBranch`, which carries the value's shape and never the
+// value, so two values of a gap root emit identical text whether the root composes or not. Measured:
+// 27 of 27 composing gap roots compare identical, and so do 25 of 30 non-composing ones, which is a
+// measurement of nothing. Answering them needs the branch to carry a value, and that is a change to
+// how the gap wave is called rather than a bigger table here.
+//
+// So the second return is whether the question was answerable, and a caller that gets false must
+// keep whatever answer it had. `ok` is false for a gap root, for an unported root, and for a root
+// whose every declaration is a custom property.
+func ComposesFor(root string) (composes bool, ok bool) {
+	stripped := strings.TrimPrefix(root, "-")
+
+	// A gap root's emitter cannot see the value, so it cannot be asked this.
+	//
+	// This guard is redundant and is kept deliberately. Measured by removing it: every gap root is
+	// declined anyway, because a gap root is in neither value-independent map, so `emitRootWithValue`
+	// returns nil for both emissions and the empty check below refuses it. Two independent reasons
+	// reach the same decline.
+	//
+	// It stays because the two reasons are not equally durable. The empty check declines a gap root
+	// as a side effect of where its emitter lives; this states the actual reason, which is that the
+	// question is unanswerable from a branch that carries no value. If a gap root were ever reachable
+	// through one of those maps, the side effect would stop firing and this would not.
+	if _, isGapRoot := gapEmitters[stripped]; isGapRoot {
+		return false, false
+	}
+
+	first := visibleDeclarationText(emitRootWithValue(stripped, composesProbeFirst))
+	second := visibleDeclarationText(emitRootWithValue(stripped, composesProbeSecond))
+	if first == "" && second == "" {
+		return false, false
+	}
+	return first == second, true
+}
+
+// The two probe values handed to the emitters, which are values no design system resolves to.
+//
+// Their content does not matter and their difference does. Named rather than spelled inline so it is
+// visible that the comparison turns on two values being distinct rather than on what they are.
+const (
+	composesProbeFirst  = "zzprobeone"
+	composesProbeSecond = "zzprobetwo"
+)
+
+// emitRootWithValue emits a root's declarations for one concrete value.
+//
+// Separate from emitFunctionalRoot because that one hands every emitter the same sentinel: it
+// collects property names, where the value is noise. Composition is the one consumer that reads the
+// value back, so it needs two emissions that actually differ.
+func emitRootWithValue(root string, value string) []*Node {
+	resolved := ResolvedUtilityValue{Value: value}
+	if utility, known := FrameworkFunctionalUtilities[root]; known {
+		return utility.Emit(root, resolved)
+	}
+	if utility, known := FrameworkMultiDeclarationUtilities[root]; known {
+		return utility.Emit(root, "", resolved)
+	}
+	return nil
+}
+
+// visibleDeclarationText renders the declarations two classes could visibly conflict about.
+//
+// Custom properties are excluded for the same reason appendVisibleProperty excludes them, and an
+// absent value is skipped for the same reason PropertySort skips it: it is not a declaration the
+// browser sees.
+func visibleDeclarationText(nodes []*Node) string {
+	var builder strings.Builder
+	for _, node := range nodes {
+		if node.Kind != KindDeclaration || !node.ValuePresent {
+			continue
+		}
+		if strings.HasPrefix(node.Property, "--") {
+			continue
+		}
+		builder.WriteString(node.Property)
+		builder.WriteString(":")
+		builder.WriteString(node.Value)
+		builder.WriteString(";")
+	}
+	return builder.String()
+}

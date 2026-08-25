@@ -47,9 +47,14 @@ package tailwind
 // `utilities.ts` line by line, and the sorting stays the one place that does the sorting.
 //
 // Every declaration carries the resolved value, including the ones whose upstream value is a
-// computed expression such as `skewX(${value})` or a shared constant such as `cssFilterValue`. The
-// value is not read by either consumer, so reproducing the expressions would add 374 sites of
-// arithmetic that nothing checks and that could drift from upstream silently.
+// computed expression such as `skewX(${value})`. The value is not read by the reading or the
+// declared-property list, so reproducing those expressions would add 374 sites of arithmetic that
+// nothing checks and that could drift from upstream silently.
+//
+// The shared constants are the exception and they are not emitted here. A root whose family layers
+// through a shared property uses `declareComposing` instead, because that property's value is what
+// decides composition and it has to be upstream's constant rather than the resolved value. This
+// helper is for the roots where nothing reads a value back.
 func declareProperties(properties ...string) FrameworkEmitter {
 	return func(resolved ResolvedUtilityValue) []*Node {
 		nodes := make([]*Node, 0, len(properties))
@@ -80,6 +85,92 @@ func declareSorted(sortValue string, properties ...string) FrameworkEmitter {
 		return nodes
 	}
 }
+
+// declareComposing is the emitter for a root that contributes through its own custom property.
+//
+// # Why this one carries real value text where the rest carry a sentinel
+//
+// Everything else in this file passes the resolved value into every declaration, because neither the
+// reading nor the declared-property list reads a value. Composition does. Upstream, `blur` emits
+// `decl('--tw-blur', ...)` carrying the value and then `decl('filter', cssFilterValue)`, where
+// `cssFilterValue` is a constant naming all nine filter variables and mentioning no value at all.
+// That constant is the entire mechanism: two blurs write different `--tw-blur` values and byte
+// identical `filter` declarations, so they layer instead of overwriting. `px-4` and `px-8` write
+// their value straight into `padding-inline` and collide.
+//
+// So "do two values of this root produce identical declaration text" is answerable only if the
+// aggregate declaration reproduces upstream's constant rather than the value. That is what this
+// emits, and it is the one place in the port where the value expression is load-bearing.
+//
+// The variables carry the raw resolved value rather than upstream's wrapper: upstream writes
+// `blur(${value})` and this writes the value. Composition compares two values of the same root
+// through the same wrapper, so the wrapper cancels and its absence changes no comparison. The
+// aggregate constant does not cancel, which is why it is reproduced exactly.
+//
+// aggregateProperty is the shorthand every utility in the family shares, aggregateValue is the
+// constant it always carries, and variables are the per-root custom properties that take the value.
+func declareComposing(aggregateProperty string, aggregateValue string, variables ...string) FrameworkEmitter {
+	return func(resolved ResolvedUtilityValue) []*Node {
+		nodes := make([]*Node, 0, len(variables)+1)
+		for _, variable := range variables {
+			nodes = append(nodes, Declaration(variable, resolved.Value))
+		}
+		nodes = append(nodes, Declaration(aggregateProperty, aggregateValue))
+		return nodes
+	}
+}
+
+// declareComposingWebkit is declareComposing for the backdrop family, which emits a third
+// declaration.
+//
+// `-webkit-backdrop-filter` carries the same constant as `backdrop-filter` and is a real declaration
+// PropertyOrder does not know, so it counts and contributes no position. Kept in upstream's source
+// order, which puts the prefixed one first.
+func declareComposingWebkit(prefixedProperty string, aggregateProperty string, aggregateValue string, variables ...string) FrameworkEmitter {
+	return func(resolved ResolvedUtilityValue) []*Node {
+		nodes := make([]*Node, 0, len(variables)+2)
+		for _, variable := range variables {
+			nodes = append(nodes, Declaration(variable, resolved.Value))
+		}
+		nodes = append(nodes, Declaration(prefixedProperty, aggregateValue))
+		nodes = append(nodes, Declaration(aggregateProperty, aggregateValue))
+		return nodes
+	}
+}
+
+// declareComposingMask is declareComposing for the three mask gradient roots.
+//
+// Same mechanism, different source order: upstream emits the two shared declarations before the
+// root's own variables rather than after. `mask-composite` carries the keyword `intersect` on every
+// one of them, which is constant and so composes for the same reason the var chains do.
+func declareComposingMask(maskImageValue string, variables ...string) FrameworkEmitter {
+	return func(resolved ResolvedUtilityValue) []*Node {
+		nodes := make([]*Node, 0, len(variables)+2)
+		nodes = append(nodes, Declaration("mask-image", maskImageValue))
+		nodes = append(nodes, Declaration("mask-composite", "intersect"))
+		for _, variable := range variables {
+			nodes = append(nodes, Declaration(variable, resolved.Value))
+		}
+		return nodes
+	}
+}
+
+// The aggregate constants, read from the shipped Tailwind 4.3.3 source rather than reconstructed.
+//
+// Each is a fixed string naming every variable in its family. None mentions a value, which is the
+// property that makes the family compose.
+const (
+	cssFilterValue         = "var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,)"
+	cssBackdropFilterValue = "var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,)"
+	cssTransformValue      = "var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,)"
+	cssTranslateValue      = "var(--tw-translate-x) var(--tw-translate-y)"
+	cssTranslateZValue     = "var(--tw-translate-x) var(--tw-translate-y) var(--tw-translate-z)"
+	cssScaleValue          = "var(--tw-scale-x) var(--tw-scale-y)"
+	cssScaleZValue         = "var(--tw-scale-x) var(--tw-scale-y) var(--tw-scale-z)"
+	cssBorderSpacingValue  = "var(--tw-border-spacing-x) var(--tw-border-spacing-y)"
+	cssScrollbarColorValue = "var(--tw-scrollbar-thumb) var(--tw-scrollbar-track)"
+	cssMaskImageValue      = "var(--tw-mask-linear), var(--tw-mask-radial), var(--tw-mask-conic)"
+)
 
 // frameworkMultiEmitters is the ported body of each multi-declaration root.
 var frameworkMultiEmitters = map[string]FrameworkEmitter{
@@ -173,47 +264,47 @@ var frameworkMultiEmitters = map[string]FrameworkEmitter{
 	// The filter family. Each wraps `filterProperties()`, which is atRoot and contributes nothing,
 	// then declares its own `--tw-*` and the shared `filter`. Two visible declarations, and the
 	// `--tw-*` one is in PropertyOrder so both carry a position.
-	"blur":       declareProperties("--tw-blur", "filter"),
-	"brightness": declareProperties("--tw-brightness", "filter"),
-	"contrast":   declareProperties("--tw-contrast", "filter"),
-	"grayscale":  declareProperties("--tw-grayscale", "filter"),
-	"hue-rotate": declareProperties("--tw-hue-rotate", "filter"),
-	"invert":     declareProperties("--tw-invert", "filter"),
-	"saturate":   declareProperties("--tw-saturate", "filter"),
-	"sepia":      declareProperties("--tw-sepia", "filter"),
+	"blur":       declareComposing("filter", cssFilterValue, "--tw-blur"),
+	"brightness": declareComposing("filter", cssFilterValue, "--tw-brightness"),
+	"contrast":   declareComposing("filter", cssFilterValue, "--tw-contrast"),
+	"grayscale":  declareComposing("filter", cssFilterValue, "--tw-grayscale"),
+	"hue-rotate": declareComposing("filter", cssFilterValue, "--tw-hue-rotate"),
+	"invert":     declareComposing("filter", cssFilterValue, "--tw-invert"),
+	"saturate":   declareComposing("filter", cssFilterValue, "--tw-saturate"),
+	"sepia":      declareComposing("filter", cssFilterValue, "--tw-sepia"),
 
 	// The backdrop-filter family emits three, not two. `-webkit-backdrop-filter` is a real
 	// declaration that PropertyOrder does not know, so it counts and contributes no position, which
 	// is why these read two positions at count three where the plain filters read two at two.
-	"backdrop-blur":       declareProperties("--tw-backdrop-blur", "-webkit-backdrop-filter", "backdrop-filter"),
-	"backdrop-brightness": declareProperties("--tw-backdrop-brightness", "-webkit-backdrop-filter", "backdrop-filter"),
-	"backdrop-contrast":   declareProperties("--tw-backdrop-contrast", "-webkit-backdrop-filter", "backdrop-filter"),
-	"backdrop-grayscale":  declareProperties("--tw-backdrop-grayscale", "-webkit-backdrop-filter", "backdrop-filter"),
-	"backdrop-hue-rotate": declareProperties("--tw-backdrop-hue-rotate", "-webkit-backdrop-filter", "backdrop-filter"),
-	"backdrop-invert":     declareProperties("--tw-backdrop-invert", "-webkit-backdrop-filter", "backdrop-filter"),
-	"backdrop-opacity":    declareProperties("--tw-backdrop-opacity", "-webkit-backdrop-filter", "backdrop-filter"),
-	"backdrop-saturate":   declareProperties("--tw-backdrop-saturate", "-webkit-backdrop-filter", "backdrop-filter"),
-	"backdrop-sepia":      declareProperties("--tw-backdrop-sepia", "-webkit-backdrop-filter", "backdrop-filter"),
+	"backdrop-blur":       declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-blur"),
+	"backdrop-brightness": declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-brightness"),
+	"backdrop-contrast":   declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-contrast"),
+	"backdrop-grayscale":  declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-grayscale"),
+	"backdrop-hue-rotate": declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-hue-rotate"),
+	"backdrop-invert":     declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-invert"),
+	"backdrop-opacity":    declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-opacity"),
+	"backdrop-saturate":   declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-saturate"),
+	"backdrop-sepia":      declareComposingWebkit("-webkit-backdrop-filter", "backdrop-filter", cssBackdropFilterValue, "--tw-backdrop-sepia"),
 
 	// The transform family. `transformProperties()` is atRoot, so only the `--tw-*` axes and the
 	// shared `transform` are visible.
-	"skew":     declareProperties("--tw-skew-x", "--tw-skew-y", "transform"),
-	"skew-x":   declareProperties("--tw-skew-x", "transform"),
-	"skew-y":   declareProperties("--tw-skew-y", "transform"),
-	"rotate-x": declareProperties("--tw-rotate-x", "transform"),
-	"rotate-y": declareProperties("--tw-rotate-y", "transform"),
-	"rotate-z": declareProperties("--tw-rotate-z", "transform"),
+	"skew":     declareComposing("transform", cssTransformValue, "--tw-skew-x", "--tw-skew-y"),
+	"skew-x":   declareComposing("transform", cssTransformValue, "--tw-skew-x"),
+	"skew-y":   declareComposing("transform", cssTransformValue, "--tw-skew-y"),
+	"rotate-x": declareComposing("transform", cssTransformValue, "--tw-rotate-x"),
+	"rotate-y": declareComposing("transform", cssTransformValue, "--tw-rotate-y"),
+	"rotate-z": declareComposing("transform", cssTransformValue, "--tw-rotate-z"),
 
 	// Scale and translate declare the shared shorthand last in source order, and it sorts first
 	// because PropertySort sorts positions rather than preserving visit order. `scale` is 61 and
 	// `--tw-scale-x` is 62, so `scale-x` reads [61 62] from a list that emitted them the other way.
-	"scale-x":     declareProperties("--tw-scale-x", "scale"),
-	"scale-y":     declareProperties("--tw-scale-y", "scale"),
-	"scale-z":     declareProperties("--tw-scale-z", "scale"),
-	"translate":   declareProperties("--tw-translate-x", "--tw-translate-y", "translate"),
-	"translate-x": declareProperties("--tw-translate-x", "translate"),
-	"translate-y": declareProperties("--tw-translate-y", "translate"),
-	"translate-z": declareProperties("--tw-translate-z", "translate"),
+	"scale-x":     declareComposing("scale", cssScaleValue, "--tw-scale-x"),
+	"scale-y":     declareComposing("scale", cssScaleValue, "--tw-scale-y"),
+	"scale-z":     declareComposing("scale", cssScaleZValue, "--tw-scale-z"),
+	"translate":   declareComposing("translate", cssTranslateValue, "--tw-translate-x", "--tw-translate-y"),
+	"translate-x": declareComposing("translate", cssTranslateValue, "--tw-translate-x"),
+	"translate-y": declareComposing("translate", cssTranslateValue, "--tw-translate-y"),
+	"translate-z": declareComposing("translate", cssTranslateZValue, "--tw-translate-z"),
 
 	// The border-radius family maps a property list, so a corner root emits one and an edge root
 	// emits two. Source order is the list's order; the reading sorts it.
@@ -240,19 +331,24 @@ var frameworkMultiEmitters = map[string]FrameworkEmitter{
 	"ease":            declareProperties("--tw-ease", "transition-timing-function"),
 	"leading":         declareProperties("--tw-leading", "line-height"),
 	"tracking":        declareProperties("--tw-tracking", "letter-spacing"),
-	"scrollbar-thumb": declareProperties("--tw-scrollbar-thumb", "scrollbar-color"),
-	"scrollbar-track": declareProperties("--tw-scrollbar-track", "scrollbar-color"),
+	"scrollbar-thumb": declareComposing("scrollbar-color", cssScrollbarColorValue, "--tw-scrollbar-thumb"),
+	"scrollbar-track": declareComposing("scrollbar-color", cssScrollbarColorValue, "--tw-scrollbar-track"),
 
 	// The border-spacing family writes both axes and then the shorthand, or one axis and the
 	// shorthand. Both `--tw-border-spacing-*` are outside PropertyOrder, so all three read [55].
-	"border-spacing":   declareProperties("--tw-border-spacing-x", "--tw-border-spacing-y", "border-spacing"),
-	"border-spacing-x": declareProperties("--tw-border-spacing-x", "border-spacing"),
-	"border-spacing-y": declareProperties("--tw-border-spacing-y", "border-spacing"),
+	"border-spacing":   declareComposing("border-spacing", cssBorderSpacingValue, "--tw-border-spacing-x", "--tw-border-spacing-y"),
+	"border-spacing-x": declareComposing("border-spacing", cssBorderSpacingValue, "--tw-border-spacing-x"),
+	"border-spacing-y": declareComposing("border-spacing", cssBorderSpacingValue, "--tw-border-spacing-y"),
 
 	// The mask gradients. Each wraps two atRoot helpers and then declares four visible ones.
-	"mask-linear": declareProperties("mask-image", "mask-composite", "--tw-mask-linear", "--tw-mask-linear-position"),
-	"mask-radial": declareProperties("mask-image", "mask-composite", "--tw-mask-radial", "--tw-mask-radial-size"),
-	"mask-conic":  declareProperties("mask-image", "mask-composite", "--tw-mask-conic", "--tw-mask-conic-position"),
+	//
+	// These compose the same way the filter family does and for the same reason, but the two shared
+	// declarations come first in source order rather than last, and `mask-composite` carries a bare
+	// keyword rather than a var chain. Both shared values are constant, which is what makes the
+	// family layer.
+	"mask-linear": declareComposingMask(cssMaskImageValue, "--tw-mask-linear", "--tw-mask-linear-position"),
+	"mask-radial": declareComposingMask(cssMaskImageValue, "--tw-mask-radial", "--tw-mask-radial-size"),
+	"mask-conic":  declareComposingMask(cssMaskImageValue, "--tw-mask-conic", "--tw-mask-conic-position"),
 
 	// `size` writes an unlatching `--tw-sort`. `size` is not a CSS property, so PropertyOrder does
 	// not know it, the latch does not engage, and the declaration still counts. Three declarations,
