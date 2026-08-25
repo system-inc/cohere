@@ -471,6 +471,24 @@ func maybeNonNullInInstruction(value InstructionValue,
 	temporaries temporaries) (ReactiveScopeDependency, bool) {
 	switch shape := value.(type) {
 	case *PropertyLoad:
+		if shape.Optional {
+			// An OPTIONAL load proves nothing about its object. `arg?.items` is the guard against
+			// `arg` being null, so reading it is not evidence that `arg` is non-null -- it is
+			// evidence the program expects it might be.
+			//
+			// Recording it anyway makes the dependency tree's cursor non-null at that step, which
+			// takes the `hoistableCursor.nonNull` arm in `addDependency` and flattens `arg?.items`
+			// to `arg.items`. The comparison then reports an optionality mismatch against a source
+			// that wrote `arg?.items`, which is a disagreement this pass manufactured.
+			//
+			// Upstream reaches the same answer differently. Its hoistable set is keyed by optional
+			// BLOCK -- `collectOptionalChainSidemap` builds `optionalBlock -> baseObject?.a`
+			// (`CollectHoistablePropertyLoads.ts:94`) -- so the guard survives into the tree and the
+			// optional arm fires. That 418-line pass is driven by `Optional` TERMINALS, which this
+			// lowering does not produce: measured on the fixture, the only terminals are `Return`.
+			// Optionality lives on the instruction here, so the same fact is read from the flag.
+			return ReactiveScopeDependency{}, false
+		}
 		if resolved, ok := temporaries[shape.Object.Identifier]; ok {
 			return resolved, true
 		}

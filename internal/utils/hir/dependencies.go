@@ -89,6 +89,11 @@
 // See `TestDependencyDistributionIsReal`, which pins the shape rather than the corpus numbers.
 package hir
 
+import (
+	"strconv"
+	"strings"
+)
+
 // DependencyPathEntry is one step in an access path: the `.b` in `props.a.b`.
 //
 // `Optional` records that this step came from `?.` rather than `.`. It is part of the entry's
@@ -710,7 +715,7 @@ func collectTemporariesInto(function *Function, usedOutside map[DeclarationId]bo
 			switch value := instruction.Value.(type) {
 			case *PropertyLoad:
 				into[instruction.LValue.Identifier] =
-					into.getProperty(value.Object, value.Property, false)
+					into.getProperty(value.Object, value.Property, value.Optional)
 			case *LoadLocal:
 				source := function.Identifiers[value.Place.Identifier]
 				if lvalue.Name == "" && source != nil && source.Name != "" {
@@ -1570,7 +1575,7 @@ func (c *dependencyCollector) reduce(identity ScopeIdentity) {
 		// truncates every path to its root; see `DependencyGapNullPropagation`.
 		seed := c.hoistable[scope]
 		if extra := c.nestedHoistable[scope]; len(extra) > 0 {
-			seed = append(append([]ReactiveScopeDependency{}, seed...), extra...)
+			seed = appendWithoutOptionalDuplicates(seed, extra)
 		}
 		hoistable, conflicts := hoistableTreeFor(seed)
 		c.result.conflicts += conflicts
@@ -1655,4 +1660,84 @@ func (d *ScopeDependencies) NormalizeInferredDependency(function *Function,
 			Reactive: dependency.Reactive}},
 		Path: path,
 	}, true
+}
+
+// appendWithoutOptionalDuplicates adds paths to a hoistable seed, dropping any whose prefixes
+// disagree with one already committed about optionality.
+//
+// `ReactiveScopeDependencyTreeHIR`'s constructor states the precondition this maintains: "we expect
+// these to not contain duplicates (e.g. both `a?.b` and `a.b`) only because
+// `CollectHoistablePropertyLoads` merges duplicates when traversing the CFG". Upstream gets the
+// invariant for free because every path it hands the tree came through `reduceMaybeOptionalChains`
+// first.
+//
+// Paths recovered from inside a nested function do not. They are collected by walking the closure
+// body directly, so `y.a?.b` from a callback can meet `y.a.b` from the enclosing function in one
+// seed and the tree then reports a conflicting access type on an access the two agree about.
+// Measured: with the nested seed disabled the corpus reports zero conflicts, with it enabled and
+// unguarded eleven. Every conflict is this seam rather than the collector.
+//
+// The comparison is per PREFIX rather than per whole path, which is what the tree keys on. Two
+// paths can share a prefix and diverge after it -- `[a][b?]` against `[a][b][c?]` -- and the tree
+// walks entry by entry, so it sees `b` twice with different nullability while a whole-path key sees
+// two unrelated strings. Measured: keying on the whole path took conflicts 11 to 5, and every
+// survivor was a prefix disagreement of exactly that shape.
+//
+// The existing path wins. `reduceOptionalChains` has already run over the CFG-derived set and
+// flipped every guard it could prove redundant, so its answer for a shared prefix is at least as
+// resolved as anything the closure walk produces.
+func appendWithoutOptionalDuplicates(seed []ReactiveScopeDependency,
+	extra []ReactiveScopeDependency) []ReactiveScopeDependency {
+	if len(extra) == 0 {
+		return seed
+	}
+	// Every prefix already committed, and whether its last step reads optionally. Grown as paths
+	// are admitted rather than built once, so two paths within `extra` are checked against each
+	// other as well as against the seed.
+	committed := map[string]bool{}
+	for _, path := range seed {
+		recordPrefixOptionality(path, committed)
+	}
+
+	combined := append([]ReactiveScopeDependency{}, seed...)
+	for _, path := range extra {
+		if prefixesDisagree(path, committed) {
+			continue
+		}
+		recordPrefixOptionality(path, committed)
+		combined = append(combined, path)
+	}
+	return combined
+}
+
+// recordPrefixOptionality notes, for every prefix of a path, whether its last step was optional.
+//
+// First writer wins per prefix, matching `hoistableTreeFor`, which keeps the node it already built
+// and only counts a disagreement.
+func recordPrefixOptionality(path ReactiveScopeDependency, into map[string]bool) {
+	var builder strings.Builder
+	builder.WriteString(strconv.Itoa(int(path.Identifier)))
+	for _, entry := range path.Path {
+		builder.WriteByte('.')
+		builder.WriteString(entry.Property)
+		key := builder.String()
+		if _, seen := into[key]; !seen {
+			into[key] = entry.Optional
+		}
+	}
+}
+
+// prefixesDisagree reports whether any prefix of a path reads its step with the opposite
+// optionality to what is already committed for that same prefix.
+func prefixesDisagree(path ReactiveScopeDependency, committed map[string]bool) bool {
+	var builder strings.Builder
+	builder.WriteString(strconv.Itoa(int(path.Identifier)))
+	for _, entry := range path.Path {
+		builder.WriteByte('.')
+		builder.WriteString(entry.Property)
+		if optional, seen := committed[builder.String()]; seen && optional != entry.Optional {
+			return true
+		}
+	}
+	return false
 }
