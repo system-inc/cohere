@@ -27,7 +27,23 @@ import (
 // quietly ceasing to discriminate:
 //
 //	import-require-path-alias      verify has it; the oxlint plugin does not define it at all
-//	consistency-organize-imports   the gate has it; verify does not implement it
+//	exhaustive-deps                the gate has it; verify implements no react-hooks rule at all
+//
+// The gate-side control used to be `consistency-organize-imports`, on the ground that verify did not
+// implement it. Verify implements it now, at `internal/rules/structure/consistency_organize_imports.go`,
+// so that asymmetry is gone and this comment named a control that had already been replaced. The
+// replacement is not a documentation detail: a control resting on "not ported yet" expires the moment
+// somebody ports it, and the expiry is silent, because a control that has stopped discriminating still
+// reports Detected against whichever side happens to flag first.
+//
+// `ControlsProven` was made to key on `ExpectedSide` rather than on a rule name for exactly this
+// reason, so the port could not flip the verdict without anyone noticing. That predicate is why the
+// stale name here cost nothing. It is still worth reading as the warning it is.
+//
+// The replacement's own ground, and the one caveat on it, are recorded at the control itself in
+// `cmd/verify-differential/main.go`. Read it before treating this control as permanent: it rests on
+// nobody porting a 4,477-line rule, which is a judgment about effort rather than a fact about the
+// tools, and the note there names the sturdier ground to move to if that stops holding.
 //
 // A third, shared control asserts a finding both sides must report. It proves the pipeline end to
 // end without claiming direction, and ControlsProven ignores it deliberately so the weaker proof
