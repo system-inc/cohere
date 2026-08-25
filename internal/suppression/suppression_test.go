@@ -387,3 +387,68 @@ func offsetOfLine(source string, line int) int {
 	}
 	return offset
 }
+
+// Every honored spelling suppresses, and they share one grammar.
+//
+// Four spellings reach this parser and the corpus above exercises only `eslint-disable`, so a
+// spelling could be dropped from `disableDirectives` and every other test here would still pass.
+//
+// `cohere-disable` is what new code writes. `verify-disable` is what this tool's own directives were
+// called before the rename, and it is honored so a comment written under the old name does not start
+// failing because the binary was renamed. `eslint-disable` and `oxlint-disable` are the corpus and
+// the gate being replaced, 387 of the first alone, and they are permanent rather than transitional.
+//
+// The rule name, the ` -- ` reason and the scope suffix are identical across all four, which is the
+// property that keeps this from becoming four code paths that drift. Asserted here rather than
+// stated, since nothing downstream of parsing knows which spelling it read.
+func TestEveryHonoredSpellingSuppresses(t *testing.T) {
+	for _, directive := range []string{"cohere-disable", "verify-disable", "eslint-disable", "oxlint-disable"} {
+		t.Run(directive, func(t *testing.T) {
+			source := strings.Join([]string{
+				"const before = 1;",
+				"// " + directive + "-next-line nexus/consistency-no-enum -- the fixture has to be a real enum.",
+				"enum Suppressed {}",
+				"enum Reported {}",
+			}, "\n")
+
+			index := Build(source)
+
+			if !index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 2)) {
+				t.Fatalf("`%s-next-line` did not suppress the line below it", directive)
+			}
+			if index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 3)) {
+				t.Fatalf("`%s-next-line` reached two lines down", directive)
+			}
+			if index.Suppresses("nexus/other-rule", offsetOfLine(source, 2)) {
+				t.Fatalf("`%s` naming one rule silenced another", directive)
+			}
+		})
+	}
+}
+
+// A block directive closes on its own spelling's `-enable`.
+//
+// The disable and enable lists are separate slices rather than pairs, so a spelling can be added to
+// one and forgotten in the other. That would leave a block that opens and never closes, which reads
+// as a working suppression while silencing the rest of the file.
+func TestEveryHonoredSpellingClosesItsBlock(t *testing.T) {
+	for _, directive := range []string{"cohere", "verify", "eslint", "oxlint"} {
+		t.Run(directive, func(t *testing.T) {
+			source := strings.Join([]string{
+				"/* " + directive + "-disable nexus/consistency-no-enum */",
+				"enum Suppressed {}",
+				"/* " + directive + "-enable nexus/consistency-no-enum */",
+				"enum Reported {}",
+			}, "\n")
+
+			index := Build(source)
+
+			if !index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 1)) {
+				t.Fatalf("`%s-disable` did not suppress inside its own block", directive)
+			}
+			if index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 3)) {
+				t.Fatalf("`%s-enable` did not close the block, so the rest of the file is silenced", directive)
+			}
+		})
+	}
+}

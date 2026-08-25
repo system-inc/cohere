@@ -132,7 +132,7 @@ var NoForInArray = rule.Rule{
 	// It is not cosmetic. verify keys the catalog, the config, and suppression comments on this
 	// string, so shipping upstream's spelling would register a rule no `VerifySettings.json` entry
 	// enables, that the inventory's `typescript/no-for-in-array` never matches, and that no
-	// `verify-disable` comment an author would actually write could silence.
+	// `cohere-disable` comment an author would actually write could silence.
 	//
 	// Measured rather than assumed before editing: all 38 rules in tsgolint's `internal/rules/` were
 	// fetched and their Name compared against their directory, and this is the ONLY one that

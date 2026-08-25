@@ -6,7 +6,7 @@ import (
 
 // intentionalMarker is what a person writes to say "yes, I know, keep it".
 //
-// The spelling follows the `verify-disable` directive this tool already understands, because a
+// The spelling follows the `cohere-disable` directive this tool already understands, because a
 // codebase with two suppression vocabularies makes people guess and guessing wrong is silent.
 //
 // # Why a marker exists at all

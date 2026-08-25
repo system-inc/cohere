@@ -28,11 +28,15 @@ import "strings"
 
 // Directive spellings verify honors, with identical grammar.
 //
-// `verify-disable` is what new code writes. `eslint-disable` keeps working because 387 of them
-// already exist across the codebase this tool gates, written by the linter verify replaces, and
+// `cohere-disable` is what new code writes. `eslint-disable` keeps working because 387 of them
+// already exist across the codebase this tool gates, written by the linter this replaces, and
 // rewriting that corpus is not worth what it would cost. Kirk decided this directly: both forms,
 // all three shapes, no codemod, no migration, no flag day. `oxlint-disable` is honored on the same
 // reasoning, since oxlint is the gate actually being replaced.
+//
+// `verify-disable` is honored too, and for a smaller reason than the other two: it is what this tool
+// was called before it was called Cohere, and a directive already written under the old name should
+// not start failing because the binary was renamed. New code writes `cohere-disable`.
 //
 // Honoring the old spellings is not deference to the old tools. It is refusing to make a mechanical
 // rename the price of switching linters — the same reasoning that keeps a rule enabled by giving it
@@ -41,21 +45,24 @@ import "strings"
 // The grammar does not vary by spelling, so nothing downstream of parsing knows which one it read.
 // That is the property that keeps this from becoming several code paths that drift.
 const (
-	// DirectiveVerify is the spelling new code should use.
+	// DirectiveCohere is the spelling new code should use.
+	DirectiveCohere = "cohere-disable"
+
+	// DirectiveVerify is what this tool's directives were called before the rename to Cohere.
 	DirectiveVerify = "verify-disable"
 
 	// DirectiveEslint is the spelling the existing corpus uses. Permanent, not transitional.
 	DirectiveEslint = "eslint-disable"
 
-	// DirectiveOxlint is the spelling of the gate verify replaces.
+	// DirectiveOxlint is the spelling of the gate Cohere replaces.
 	DirectiveOxlint = "oxlint-disable"
 )
 
 // disableDirectives is every honored disable spelling.
-var disableDirectives = []string{DirectiveVerify, DirectiveEslint, DirectiveOxlint}
+var disableDirectives = []string{DirectiveCohere, DirectiveVerify, DirectiveEslint, DirectiveOxlint}
 
 // enableDirectives closes a block, one per disable spelling.
-var enableDirectives = []string{"verify-enable", "eslint-enable", "oxlint-enable"}
+var enableDirectives = []string{"cohere-enable", "verify-enable", "eslint-enable", "oxlint-enable"}
 
 // Kind is the scope a directive covers.
 type Kind int
