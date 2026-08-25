@@ -280,6 +280,25 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				localSuppressed.add(silenced)
 			}
 
+			// Findings are appended in whichever order the workers finish, so `diagnostics` carries
+			// scheduling order rather than any property of the tree. The SET is stable — every finding
+			// is appended exactly once — and only the order moves. Measured on the shipped binary:
+			// three runs over ~/Projects/ahra gave three distinct raw hashes and one identical hash
+			// after sorting.
+			//
+			// Deliberately not sorted. Nobody depends on the order today and sorting costs something
+			// on a path that runs over 3,481 files, so this stays incidental rather than becoming a
+			// guarantee.
+			//
+			// Written down because the cost falls on the next reader, not on this code: anything
+			// comparing two runs MUST sort first, and a walk-order change will produce a diff that
+			// looks like a regression it did not cause. That already happened once, and it took three
+			// runs of the previous binary to establish the reordering was pre-existing.
+			//
+			// If anything ever depends on the order — a cache keyed on it, a golden file, a
+			// differential that reads position — this decision flips, because at that point the
+			// output stops being incidentally unsorted and becomes a silent dependency on goroutine
+			// scheduling.
 			mutex.Lock()
 			diagnostics = append(diagnostics, localDiagnostics...)
 			for name, count := range localOffered {
