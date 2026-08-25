@@ -102,6 +102,26 @@ func (c *memoizationCollector) walk(block ReactiveBlock) {
 
 		case *ReactiveScopeBlock:
 			c.scopeStack = append(c.scopeStack, shape.Scope)
+			// A variable reassigned inside a scope takes the whole chain of enclosing scopes as
+			// scopes of its own, this one included.
+			//
+			// Upstream's `CollectDependenciesVisitor.visitScope`. Without it a reassigned value that
+			// escapes does not force the scopes whose evaluation produced the new value, so their
+			// dependencies go unmemoized and the reassignment is invisible to the propagation.
+			//
+			// Measured inert today, and recorded as inert rather than described by what it is for:
+			// on `error.invalid-useCallback-captures-reassigned-context` the lowering produces a
+			// `StoreLocal` with `InstructionKindReassign`, but `ScopeDependencies.ReassignmentsOf`
+			// returns empty for every scope in that program, so this loop has nothing to iterate.
+			// The gate is `checkValidDependency`, one stage upstream in dependency collection, and
+			// it is a faithful transcription of upstream's own gate -- so the divergence is further
+			// up still and is not this pass's to fix. Filed as its own question rather than worked
+			// around here, because making this arm fire by loosening a gate it does not own would
+			// be fixture-shaped development.
+			for _, reassigned := range c.dependencies.ReassignmentsOf(shape.Scope) {
+				declaration := c.resolve(declarationOf(c.function, reassigned))
+				c.associateChain(declaration)
+			}
 			c.walk(shape.Instructions)
 			c.scopeStack = c.scopeStack[:len(c.scopeStack)-1]
 
@@ -126,8 +146,17 @@ func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction
 		}
 	}
 
+	// Places split by role, because an instruction's assignment targets are lvalues and only the
+	// places it reads are dependencies. Collapsing the two inverts every store's edge: the binding
+	// written to would become a dependency of the temporary rather than a value depending on what
+	// was stored into it, and the propagation then walks away from the value it is looking for.
 	var operands []DeclarationId
-	c.eachOperand(instruction.Value, func(place Place) {
+	var defines []Place
+	c.eachOperand(instruction.Value, func(place Place, role PlaceRole) {
+		if role == PlaceRoleDefine {
+			defines = append(defines, place)
+			return
+		}
 		operands = append(operands, c.resolve(declarationOf(c.function, place.Identifier)))
 	})
 
@@ -136,6 +165,19 @@ func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction
 		c.graph.Record(lvalue, level, operands)
 		c.associate(lvalue)
 	}
+
+	// The assignment targets a value carries in addition to the instruction's own lvalue.
+	//
+	// Upstream returns `{lvalues, rvalues}` per kind, and seven kinds put a second place in
+	// `lvalues`: `StoreLocal`, `StoreContext`, `DeclareLocal`, `DeclareContext`, `PrefixUpdate`,
+	// `PostfixUpdate`, and every place bound by a `Destructure` pattern. Each carries its own level,
+	// which is not the level of the instruction that produced it.
+	for _, place := range defines {
+		declaration := c.resolve(declarationOf(c.function, place.Identifier))
+		c.graph.Record(declaration, memoizationLevelOfDefine(instruction.Value, place), operands)
+		c.associate(declaration)
+	}
+
 	for _, operand := range operands {
 		c.graph.Declare(operand)
 		c.associate(operand)
@@ -173,12 +215,31 @@ func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction
 	}
 }
 
-// associate records that a declaration belongs to every scope currently open.
+// associate records that a declaration belongs to the innermost scope currently open.
 func (c *memoizationCollector) associate(declaration DeclarationId) {
 	if len(c.scopeStack) == 0 || c.dependencies == nil {
 		return
 	}
-	scope := c.scopeStack[len(c.scopeStack)-1]
+	c.associateScope(declaration, c.scopeStack[len(c.scopeStack)-1])
+}
+
+// associateChain records that a declaration belongs to every scope currently open.
+//
+// Distinct from `associate`, which records only the innermost, and the difference is the point. An
+// ordinary value belongs to the scope it was computed in. A value that escapes from inside a nest of
+// scopes -- returned, or reassigned -- depends on all of them having been evaluated, so forcing it
+// has to force the whole chain or the outer scopes' dependencies are never held.
+func (c *memoizationCollector) associateChain(declaration DeclarationId) {
+	if c.dependencies == nil {
+		return
+	}
+	for _, scope := range c.scopeStack {
+		c.associateScope(declaration, scope)
+	}
+}
+
+// associateScope records that a declaration belongs to one named scope.
+func (c *memoizationCollector) associateScope(declaration DeclarationId, scope ScopeId) {
 	var scopeDependencies []DeclarationId
 	for _, dependency := range c.dependencies.DependenciesOf(scope) {
 		scopeDependencies = append(scopeDependencies,
@@ -191,7 +252,13 @@ func (c *memoizationCollector) associate(declaration DeclarationId) {
 func (c *memoizationCollector) visitTerminal(statement *ReactiveTerminalStatement) {
 	switch shape := statement.Terminal.(type) {
 	case *ReactiveReturn:
-		c.graph.MarkEscaping(c.resolve(declarationOf(c.function, shape.Value.Identifier)))
+		returned := c.resolve(declarationOf(c.function, shape.Value.Identifier))
+		c.graph.MarkEscaping(returned)
+		// A return inside scopes makes those scopes dependencies of the returned value, because they
+		// have to be evaluated for the return to happen. Upstream's `CollectDependenciesVisitor`
+		// arm for `ReturnTerminal`; without it the enclosing scopes' own dependencies are never
+		// forced and a returned value can be held while what produced it is not.
+		c.associateChain(returned)
 	case *ReactiveIf:
 		c.walk(shape.Consequent)
 		if shape.Alternate != nil {
@@ -221,12 +288,81 @@ func (c *memoizationCollector) visitTerminal(statement *ReactiveTerminalStatemen
 	}
 }
 
-// eachOperand visits every place a reactive value names, composites included.
-func (c *memoizationCollector) eachOperand(value ReactiveValue, visit func(Place)) {
+// memoizationLevelOfDefine returns the level upstream assigns to an assignment target.
+//
+// It is deliberately not `MemoizationLevelOf` of the enclosing value. Upstream's classification
+// returns a list of lvalues each carrying its own level, and for five of the seven kinds the target
+// and the instruction's own lvalue are given *different* levels -- a `DeclareContext` writes a
+// binding at `Memoized` while its temporary is `Unmemoized`. Reusing the value's level would flatten
+// that distinction in the direction that holds too much, which costs granularity silently.
+//
+// The default is `Conditional` rather than `Never`, because every remaining way a place is defined
+// is an indirection: it is memoized exactly when what flows into it is. `Never` would terminate the
+// propagation at an assignment, which is the failure this function exists to prevent.
+func memoizationLevelOfDefine(value ReactiveValue, place Place) MemoizationLevel {
+	plain, isPlain := value.(*ReactiveInstructionValue)
+	if !isPlain || plain.Value == nil {
+		return MemoizationConditional
+	}
+	switch shape := plain.Value.(type) {
+	// A context binding outlives the instruction that wrote it, so it is never pruned.
+	case *DeclareContext, *StoreContext:
+		return MemoizationMemoized
+
+	// Declared and not held: not comparable with `Object.is`, and left alone unless forced.
+	case *DeclareLocal:
+		return MemoizationUnmemoized
+
+	// A destructured pattern binds at `Conditional`, except a rest element, which allocates a fresh
+	// object or array every evaluation and so must be held on its own account.
+	case *Destructure:
+		if isRestPlaceOfPattern(shape.LValue, place) {
+			return MemoizationMemoized
+		}
+		return MemoizationConditional
+
+	default:
+		return MemoizationConditional
+	}
+}
+
+// isRestPlaceOfPattern reports whether a place is a pattern's rest element.
+//
+// Upstream's `computePatternLValues` reaches `Memoized` for `Spread` in an array pattern and for a
+// non-`ObjectProperty` in an object pattern, which are the same thing this tree spells as `Rest`.
+func isRestPlaceOfPattern(pattern Pattern, place Place) bool {
+	switch shape := pattern.(type) {
+	case *ObjectPattern:
+		if shape.Rest != nil && shape.Rest.Identifier == place.Identifier {
+			return true
+		}
+		for _, property := range shape.Properties {
+			if isRestPlaceOfPattern(property.Value, place) {
+				return true
+			}
+		}
+	case *ArrayPattern:
+		if shape.Rest != nil && shape.Rest.Identifier == place.Identifier {
+			return true
+		}
+		for _, element := range shape.Elements {
+			if element.Value != nil && isRestPlaceOfPattern(element.Value, place) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// eachOperand visits every place a reactive value names, composites included, with its role.
+//
+// The role is carried rather than dropped because this pass reads it: a `PlaceRoleDefine` place is
+// an assignment target and becomes an lvalue, and everything else is a dependency.
+func (c *memoizationCollector) eachOperand(value ReactiveValue, visit func(Place, PlaceRole)) {
 	switch shape := value.(type) {
 	case *ReactiveInstructionValue:
 		if shape.Value != nil {
-			EachPlace(shape.Value, func(place Place, role PlaceRole) { visit(place) })
+			EachPlace(shape.Value, visit)
 		}
 	case *ReactiveLogicalValue:
 		c.eachOperand(shape.Left, visit)
