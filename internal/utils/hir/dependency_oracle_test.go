@@ -75,7 +75,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 		t.Fatalf("loading the vendored corpus: %v", err)
 	}
 
-	scored, matched, missed := 0, 0, 0
+	scored, matched, missed, unmatchable := 0, 0, 0, 0
 	for _, fixture := range fixtures {
 		if !strings.Contains(fixture.Source, "validatePreserveExistingMemoizationGuarantees") {
 			continue
@@ -93,6 +93,13 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 			have[one] = true
 		}
 		for _, want := range expected {
+			if isCodegenTemporary(want) {
+				// Codegen named a temporary where upstream chose not to spell the expression out.
+				// Nothing this package produces could match it, so counting it as a miss would put
+				// a floor under the score that no correct implementation could ever clear.
+				unmatchable++
+				continue
+			}
 			scored++
 			if have[want] {
 				matched++
@@ -125,7 +132,8 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
 	}
-	t.Logf("golden cache slots: %d scored, %d matched, %d missed", scored, matched, missed)
+	t.Logf("golden cache slots: %d scored, %d matched, %d missed, %d unmatchable",
+		scored, matched, missed, unmatchable)
 }
 
 // inferredDependencyStrings renders every scope dependency the way source would spell it.
@@ -181,6 +189,17 @@ func inferredDependencyStrings(t *testing.T, source string) ([]string, bool) {
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")
 	return rendered, ran
+}
+
+// codegenTemporaryPattern matches a name React's codegen invented rather than took from source.
+//
+// `t0`, `t1` and `rest_0` are printer artifacts: upstream inferred a dependency it chose not to
+// spell out as an expression, so the golden names the slot after the temporary holding it. Measured
+// on this corpus, 29 of 123 cache slots are one of these.
+var codegenTemporaryPattern = regexp.MustCompile(`^(t[0-9]+|rest_[0-9]+)(\.|$)`)
+
+func isCodegenTemporary(dependency string) bool {
+	return codegenTemporaryPattern.MatchString(dependency)
 }
 
 func identifierName(function *Function, id IdentifierId) string {
