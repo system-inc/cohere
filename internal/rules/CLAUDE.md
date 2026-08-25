@@ -305,3 +305,27 @@ reported as violations. None of it was visible from outside.
 Say what compiles, say what has run, and keep those separate. **If you inherit work described as
 complete, run it first and expect failures.** A paused artifact that compiles is a plausible
 artifact, not a verified one.
+
+## Check the thing you were just credited for
+
+The defects most worth finding live past the point where anyone else would look. Review reaches work
+on its way in. It cannot reach work that has already been accepted, praised, and moved on from, and
+that is where this repository keeps finding its real defects.
+
+Measured over one night, 91 commits, four of them carrying the author's own defect in the subject
+line. A guard cited as a task's closing condition that could not fail, because it read a surface
+where the two things it compared had already been merged. A doc comment stating a false premise about
+another package, whose conclusion happened to survive on different grounds. A diagnosis two nodes
+independently confirmed that named the wrong compiler pass. Three comments quoting a rule count that
+had been accurate and silently stopped being.
+
+**None was found by review.** Every one was found by the author re-checking something already
+credited.
+
+So the discipline is not more review, it is a habit: after you are told the work is good, go check the
+thing the praise attached to. **Applause means everyone else has stopped looking**, which makes it
+simultaneously the cheapest moment to find what remains and the moment least likely to feel like it
+needs checking.
+
+This only works if reporting a defect in your own accepted work is costless. It is, here. The only
+person who can reach that population is the author, and only after the applause.
