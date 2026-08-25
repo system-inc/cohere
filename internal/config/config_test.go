@@ -362,3 +362,44 @@ func TestEveryIgnoredKeyCarriesAReason(t *testing.T) {
 		}
 	}
 }
+
+// TestTheThreeRealKeysWouldHaveBeenCaught is the known-dirty control.
+//
+// The refusal test above uses a synthetic key, which proves the mechanism and not that it would have
+// caught the defect that motivated it. This runs the guard against the three keys that were actually
+// being discarded from the live config -- `plugins`, `jsPlugins` and `settings` -- with each one
+// temporarily removed from the ignored set, so a reader can see the guard produce the finding rather
+// than trust that it would have.
+//
+// Without a control like this, the guard and a guard that fires only on names nobody uses look
+// identical from a green suite.
+func TestTheThreeRealKeysWouldHaveBeenCaught(t *testing.T) {
+	for _, key := range []string{"plugins", "jsPlugins", "settings"} {
+		t.Run(key, func(t *testing.T) {
+			reason, recorded := ignoredTopLevelKeys[key]
+			if !recorded {
+				t.Fatalf("%q is no longer recorded as ignored, so this control is testing a key "+
+					"that is not the one that was being dropped; either it was implemented, in "+
+					"which case remove it from this list, or the entry was deleted", key)
+			}
+			delete(ignoredTopLevelKeys, key)
+			t.Cleanup(func() { ignoredTopLevelKeys[key] = reason })
+
+			directory := t.TempDir()
+			path := filepath.Join(directory, "VerifySettings.json")
+			contents := `{"rules": {"a-rule": "error"}, "` + key + `": ["something"]}`
+			if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+				t.Fatalf("writing the config: %v", err)
+			}
+
+			_, err := Load(path)
+			if err == nil {
+				t.Fatalf("a config declaring %q loaded successfully with the key unaccounted for; "+
+					"this is the exact state the live config was in and nothing reported it", key)
+			}
+			if !strings.Contains(err.Error(), key) {
+				t.Errorf("the error does not name %q: %v", key, err)
+			}
+		})
+	}
+}
