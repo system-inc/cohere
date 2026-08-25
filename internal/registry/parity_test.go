@@ -119,6 +119,25 @@ func TestParityAgainstInventory(t *testing.T) {
 // Green when it lands, and that is deliberate rather than a weakness: nothing registers namespaced
 // today. It exists so the next rule that does is refused by name at the moment it is written, rather
 // than counted as ported and found by the seventh person to measure this area.
+//
+// # Reproducing the evidence, and not the way it was first produced
+//
+// A guard that has never failed is worth nothing, so this one was checked by planting
+// `Name: "react/unsupported-syntax"` in `internal/rules/react/unsupported_syntax.go`. Both guards
+// were then run: parity reported `213 of 214` and passed, unchanged by the mutation, while this test
+// failed and named the rule. That pair is the whole argument -- the count cannot see the mistake and
+// this can.
+//
+// The mutation was installed by copying a backup over the file and copying it back, which is the
+// two-step blind write the domain body forbids for exactly this tree. Nothing was lost, and a peer
+// committed twice inside the window, so that is ordering luck rather than safety.
+//
+// The safe way to repeat it is to not write into the shared tree at all: ask the file's owner to run
+// the mutation, or copy the package elsewhere and mutate the copy. If a reference to the original is
+// needed for comparison, take it from the committed blob rather than from a backup, because the blob
+// is immutable and a backup is a write waiting to happen:
+//
+//	git show HEAD:internal/rules/react/unsupported_syntax.go > "$scratch/original.go"
 func TestRegisteredNamesAreBare(t *testing.T) {
 	registered := registeredRuleNames()
 	if len(registered) == 0 {
