@@ -35,6 +35,13 @@ import (
 //	FrameworkNamespaces             14   the theme namespaces a root consumes, all Tailwind's own
 //	baseReadings                   374   readings of Tailwind's own utilities, held by the differential
 //	baseStatics                    869   readings of Tailwind's own statics, same
+//	GapRootDescriptions             57   how each closure-registered root resolves a value, read
+//	                                     from utilities.ts at the tag. Tailwind's own registration
+//	                                     data, in the same sense as the 185 in the two tables above:
+//	                                     these 57 are registered as bare closures rather than through
+//	                                     `functionalUtility`, so the shape had to be written out
+//	                                     instead of extracted, and gaproots_test.go holds all 57
+//	                                     against `candidatesToCss` on a live design system.
 //
 // # Ours, each answering something a reading cannot
 //
@@ -109,6 +116,7 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 		"FrameworkNamespaces":                len(FrameworkNamespaces),
 		"baseReadings":                       len(baseReadings),
 		"baseStatics":                        len(baseStatics),
+		"GapRootDescriptions":                len(GapRootDescriptions),
 	}
 	ours := map[string]int{
 		"baseDescriptors":  len(baseDescriptors),
