@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/system-inc/verify/internal/rule"
 )
 
 // The lint findings cache: what each rule reported about one file, replayed when neither the
@@ -479,4 +481,40 @@ func ReadLintCache(path string) (*LintCache, error) {
 		return nil, err
 	}
 	return DecodeLintCache(contents)
+}
+
+// CacheableRules splits a rule set into the rules whose findings may be cached per file and the
+// rules that must run on every file regardless.
+//
+// The property being tested is purity with respect to one file's bytes. This cache keys on a
+// content hash, so a rule that reads anything else can have its answer changed by an edit the key
+// cannot see, and replaying it then serves a stale finding forever: zero findings on a file that
+// now has one, indistinguishable from a clean tree.
+//
+// Two declarations disqualify a rule.
+//
+// ReadsProgram is the direct one. A rule touching ctx.Program reaches every source file in the run,
+// so another file changing invalidates its answer while this file's hash is unmoved. Eleven rules
+// declare it today, and a structural test in internal/dispatch fails any rule that reads the
+// program without saying so, which is what keeps this list honest as rules are added.
+//
+// NeedsTypeChecker is the less obvious one, and it is included deliberately. A type-aware rule's
+// answer depends on the types its file imports, so editing a dependency changes what the rule
+// should report while the importing file's bytes stay identical. That is the same staleness as
+// ReadsProgram arriving by a different route, and a per-file content hash cannot see either.
+//
+// The split is asymmetric on purpose, the same way the two declarations themselves are: including a
+// rule wrongly serves stale findings silently and forever, excluding one wrongly costs a cache
+// miss. Those are not comparable, so anything not provably pure is excluded. A future rule with a
+// new way of reading outside its file is excluded by default only if its property is declared, so
+// the declarations are the load-bearing part and this function is only the consequence.
+func CacheableRules(rules []rule.Rule) (cacheable []rule.Rule, uncacheable []rule.Rule) {
+	for _, subject := range rules {
+		if subject.ReadsProgram || subject.NeedsTypeChecker {
+			uncacheable = append(uncacheable, subject)
+			continue
+		}
+		cacheable = append(cacheable, subject)
+	}
+	return cacheable, uncacheable
 }

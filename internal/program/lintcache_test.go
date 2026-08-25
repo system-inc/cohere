@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/program"
+	"github.com/system-inc/verify/internal/rule"
 )
 
 func sampleLintCache() *program.LintCache {
@@ -402,5 +403,64 @@ func TestReadLintCacheTreatsAMissingFileAsAMiss(t *testing.T) {
 	}
 	if cache != nil {
 		t.Error("reading an absent cache returned a cache, which would be used as if it were real")
+	}
+}
+
+// TestCacheableRulesExcludesImpureRules pins the split the cache's correctness rests on.
+//
+// A rule is cacheable only if its findings are a function of the linted file's bytes, because that
+// is what the content-hash key covers. Both declarations below describe a rule whose answer can
+// change while that hash does not, and replaying such a rule serves zero findings forever on a file
+// that now has one.
+func TestCacheableRulesExcludesImpureRules(t *testing.T) {
+	pure := rule.Rule{Name: "pure"}
+	readsProgram := rule.Rule{Name: "reads-program", ReadsProgram: true}
+	needsChecker := rule.Rule{Name: "needs-checker", NeedsTypeChecker: true}
+	both := rule.Rule{Name: "both", ReadsProgram: true, NeedsTypeChecker: true}
+
+	cacheable, uncacheable := program.CacheableRules(
+		[]rule.Rule{pure, readsProgram, needsChecker, both})
+
+	if len(cacheable) != 1 || cacheable[0].Name != "pure" {
+		names := make([]string, 0, len(cacheable))
+		for _, subject := range cacheable {
+			names = append(names, subject.Name)
+		}
+		t.Errorf("cacheable = %v, want exactly [pure]: anything reading outside its own file can "+
+			"have its answer changed by an edit the content hash cannot see", names)
+	}
+	if len(uncacheable) != 3 {
+		t.Errorf("uncacheable = %d, want 3", len(uncacheable))
+	}
+}
+
+// TestCacheableRulesDefaultsToExcluding is the asymmetry, stated as a test rather than a comment.
+//
+// Including a rule wrongly serves stale findings silently and forever; excluding one wrongly costs
+// a cache miss. Those are not comparable, so a rule carrying any impurity declaration is excluded
+// even when it also looks pure by every other measure.
+func TestCacheableRulesDefaultsToExcluding(t *testing.T) {
+	// A rule that declares an impurity and nothing else must still be turned away, so a future
+	// declaration added to rule.Rule cannot quietly become cacheable by omission here.
+	for _, subject := range []rule.Rule{
+		{Name: "reads-program", ReadsProgram: true},
+		{Name: "needs-checker", NeedsTypeChecker: true},
+	} {
+		cacheable, _ := program.CacheableRules([]rule.Rule{subject})
+		if len(cacheable) != 0 {
+			t.Errorf("%s was admitted to the cache despite declaring an impurity", subject.Name)
+		}
+	}
+}
+
+// TestCacheableRulesHandlesAnEmptySet pins that no rules means no cacheable rules.
+//
+// An empty input returning a nil cacheable set matters because the caller uses emptiness to decide
+// whether to consult the cache at all, and a non-nil empty slice and a nil one must behave the same
+// at that decision.
+func TestCacheableRulesHandlesAnEmptySet(t *testing.T) {
+	cacheable, uncacheable := program.CacheableRules(nil)
+	if len(cacheable) != 0 || len(uncacheable) != 0 {
+		t.Errorf("empty input produced %d cacheable and %d uncacheable", len(cacheable), len(uncacheable))
 	}
 }
