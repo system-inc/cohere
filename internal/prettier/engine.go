@@ -24,13 +24,42 @@ import (
  * Prettier handles, including the four our own fork customizes.
  */
 
-// bundleDirectory is where the fork's build output is read from.
+// ForkPathVariable overrides where the Prettier fork is read from.
 //
-// This is the seam the build step replaces. Today it points at a local checkout; the vendoring step
+// It lives here rather than in the package that first defined it, and that relocation is the fix
+// rather than a tidy-up. The fork was reachable by two independent paths -- this engine's own
+// constant, and the release guard's environment lookup -- and neither consulted the other. The
+// defect was not that either path was wrong. It was that they existed separately, so overriding one
+// left the other pinned: a CI runner that set this variable got a release guard reporting green over
+// an engine still reading a home directory on one laptop. Measured, not reasoned: with the variable
+// pointed at a nonexistent path, `New` returned a working engine.
+//
+// So the engine that loads the bundles owns the name, and every other consumer resolves through it.
+// `prettier` imports nothing internal, which is what makes it the safe home; `release` already
+// depends on it, so the reference points down rather than sideways. Anyone adding a third consumer
+// of the fork should find one place here rather than guess which of two to copy.
+const ForkPathVariable = "VERIFY_PRETTIER_FORK"
+
+// DefaultForkPath is where the fork lives on the machine this was built on.
+//
+// A default rather than a requirement: the common case is Kirk's laptop, and making everyone set a
+// variable to reproduce the common case is friction that buys nothing. The variable exists for every
+// other machine.
+const DefaultForkPath = "/Users/kirkouimet/Projects/system/prettier"
+
+// BundleDirectory returns where the fork's build output is read from.
+//
+// This is the seam the build step replaces. Today it resolves a local checkout; the vendoring step
 // will generate the bundles into the package and embed them, the same way typescript-go generates
-// and embeds its lib files rather than committing them. Keeping every path decision inside
-// loadBundles means that change is one function body rather than a rewrite.
-const bundleDirectory = "/Users/kirkouimet/Projects/system/prettier/dist/prettier"
+// and embeds its lib files rather than committing them. Keeping every path decision behind this
+// function means that change is one function body rather than a rewrite.
+func BundleDirectory() string {
+	forkPath := strings.TrimSpace(os.Getenv(ForkPathVariable))
+	if forkPath == "" {
+		forkPath = DefaultForkPath
+	}
+	return filepath.Join(forkPath, "dist", "prettier")
+}
 
 // BundleFiles are the Prettier bundles the engine evaluates, in dependency order.
 //
@@ -57,9 +86,10 @@ var BundleFiles = []string{
 // seven of eight would format the eighth's files by falling through to no parser at all, and the
 // failure would look like a file type nobody formats rather than a broken build.
 func loadBundles() ([]namedSource, error) {
+	directory := BundleDirectory()
 	sources := make([]namedSource, 0, len(BundleFiles))
 	for _, name := range BundleFiles {
-		text, err := os.ReadFile(filepath.Join(bundleDirectory, name))
+		text, err := os.ReadFile(filepath.Join(directory, name))
 		if err != nil {
 			return nil, fmt.Errorf("reading prettier bundle %s: %w", name, err)
 		}

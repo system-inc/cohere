@@ -16,10 +16,16 @@ import (
 // The default is a path on one machine, which is the whole problem this file exists to bound. A CI
 // runner or a second developer needs to say where their checkout is, and saying it explicitly is
 // better than a search that might find the wrong one.
-const FormatterForkPathVariable = "VERIFY_PRETTIER_FORK"
+//
+// It is the engine's own name rather than a copy of it, for the same reason FormatterBundleNames is
+// the engine's own list. This guard vouches for the bundles the engine loads, so it has to read the
+// variable the engine reads: a second declaration of the same string would let the two drift, and
+// the drift would be silent in the worst direction -- a guard reporting green about a directory
+// nothing loads from. That was the defect this replaced, measured rather than supposed.
+const FormatterForkPathVariable = prettier.ForkPathVariable
 
 // DefaultFormatterForkPath is where the fork lives on the machine it was built on.
-const DefaultFormatterForkPath = "/Users/kirkouimet/Projects/system/prettier"
+const DefaultFormatterForkPath = prettier.DefaultForkPath
 
 // FormatterBundleNames are the JavaScript bundles a release must provide.
 //

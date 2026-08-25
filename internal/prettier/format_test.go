@@ -11,10 +11,28 @@ import (
 // Skipping rather than failing because the bundle path is still a local checkout until the build
 // step vendors them. A skip says "not measured here"; a pass would say "measured and fine", and the
 // difference is the whole reason this package exists.
+//
+// But a skip is only truthful to a reader who reads it, and the reader that matters is a CI summary
+// that prints `ok  internal/prettier` and swallows the line. On any machine without the fork, every
+// test in this file skips and the package reports as passing over an engine that cannot load a
+// single bundle -- which is the exact shape the coverage line exists to prevent, a run that checked
+// nothing looking like a run that found nothing, sitting inside our own suite.
+//
+// So the skip names the count and the consequence rather than the path alone. It cannot make `go
+// test` print red, and it should not: the honest state today is genuinely "not measured here". What
+// it can do is make the reason unmissable to anyone who does look, and say what would end it. That
+// ends when the bundles are vendored into the package and this becomes a hard failure.
 func newTestEngine(t *testing.T) *Engine {
 	t.Helper()
-	if _, err := os.Stat(bundleDirectory); err != nil {
-		t.Skipf("prettier bundles not present at %s", bundleDirectory)
+	directory := BundleDirectory()
+	if _, err := os.Stat(directory); err != nil {
+		t.Skipf(
+			"NOT MEASURED: the Prettier engine was never built, so every formatter assertion in this "+
+				"package is unverified on this machine. All %d bundles are absent from %s. "+
+				"This package reporting `ok` means nothing was checked, not that it passed. "+
+				"Set %s to a built fork, or wait for the bundles to be vendored.",
+			len(BundleFiles), directory, ForkPathVariable,
+		)
 	}
 	engine, err := New(DefaultOptions())
 	if err != nil {
