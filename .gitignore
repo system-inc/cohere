@@ -22,3 +22,27 @@
 
 # Local caches — the graph snapshot and the rebuild cache both live here
 /.cache/
+
+# Operating systems and editors
+#
+# These are the only entries carried over from the ahra tree's ignore file. The rest of it covers a
+# TypeScript application — node_modules, .next, .env, wrangler, a Python venv — and none of that can
+# appear in a Go repository, so copying it whole would leave a reader guessing which lines are load
+# bearing and which are inherited.
+#
+# .DS_Store is here because Finder writes one into any directory it displays, and two appeared at
+# the root and under internal/ while this repository was being read rather than edited.
+.DS_Store
+Thumbs.db
+.localized
+*.swp
+*.swo
+*~
+.idea/
+
+# Stray logs
+#
+# Nothing here writes a .log on purpose. The entry exists because a long command redirected to a
+# file at the repository root is the ordinary way to read output that a pipe would truncate, and
+# that file should never reach a commit.
+*.log
