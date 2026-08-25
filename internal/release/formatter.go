@@ -166,9 +166,36 @@ func digestBundles(bundleDirectory string) (string, error) {
 // correct bundles, someone would relax it, and the stamp would stop meaning anything. One function,
 // two sources of bytes.
 func DigestBundleFiles(files map[string][]byte) (string, error) {
+	return digestNamedBundles(FormatterBundleNames, files)
+}
+
+// digestNamedBundles is the hash itself, over a caller-supplied name list.
+//
+// The list is a parameter rather than a reference to FormatterBundleNames so the framing can be
+// tested. With the names hardcoded, no test could vary them, and a mutation dropping the name from
+// the hash passed the whole package -- the property was untestable through the exported function
+// and so was unverified despite having a test named for it.
+//
+// Each bundle is preceded by its name and its length, and only the name is load-bearing. That is
+// worth stating plainly because two earlier versions of this comment claimed otherwise.
+//
+// The name defends a rename: the same bytes moving from `plugins/yaml.js` to `plugins/yml.js` at
+// the same position digest identically without it, and BundleFiles is a hand-edited list where a
+// rename is an ordinary edit. TestDigestKeysByName is its sole detector, confirmed by mutation.
+//
+// The length defends a boundary shift -- "AB" then "C" concatenating identically to "A" then "BC" --
+// but only when the names cannot already separate the halves, and in this list they always can,
+// because the names are distinct. Measured: with the length dropped and the names kept, no boundary
+// shift over distinct names collides. So it is redundant here rather than load-bearing, and it is
+// kept because it costs nothing and stops being redundant the moment two entries could share a name.
+//
+// It is not covered by a test, deliberately. A test for it would have to construct a name collision
+// this list cannot contain, which would assert a property of the test's own fixture rather than of
+// anything that ships.
+func digestNamedBundles(names []string, files map[string][]byte) (string, error) {
 	hash := sha256.New()
 
-	for _, name := range FormatterBundleNames {
+	for _, name := range names {
 		content, present := files[name]
 		if !present {
 			return "", fmt.Errorf("the Prettier bundle %s is absent, so these bytes cannot be digested", name)

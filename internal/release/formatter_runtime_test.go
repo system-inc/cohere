@@ -94,34 +94,34 @@ func TestDigestFilesRefusesAnAbsentBundle(t *testing.T) {
 	}
 }
 
-// TestDigestFramesEachBundle is the control for why the hash writes a name and a length before each
-// bundle rather than concatenating the bytes.
+// TestDigestKeysByName covers the half of the framing the length does not.
 //
-// The case it defends is a boundary shift: two bundles holding "AB" and "C" produce the same
-// concatenated stream as the same two holding "A" and "BC". A digest over the raw concatenation
-// cannot tell those apart, so a vendoring step that truncated one bundle and lengthened the next by
-// the same amount would digest identically to a correct set.
+// Length framing is injective over a fixed ordered list, so it catches boundary shifts on its own
+// and the name looks redundant. The case the name defends is a rename: a bundle moving from
+// `plugins/yaml.js` to `plugins/yml.js` with identical bytes at the same position digests
+// identically under length framing alone.
 //
-// Verified as load-bearing by mutation rather than by argument: with the framing removed this test
-// fails and the swap and changed-byte tests all still pass, so it is the only one covering it.
-func TestDigestFramesEachBundle(t *testing.T) {
-	shifted := func(first, second []byte) string {
-		t.Helper()
-		files := make(map[string][]byte, len(FormatterBundleNames))
-		for _, name := range FormatterBundleNames {
-			files[name] = []byte{}
-		}
-		files[FormatterBundleNames[0]] = first
-		files[FormatterBundleNames[1]] = second
+// That is not hypothetical. BundleFiles is a hand-edited list and a rename is an ordinary edit to
+// it. Without the name, a binary built before such a rename and one built after carry the same
+// digest while loading differently-named files.
+//
+// It goes through digestNamedBundles rather than re-implementing the hash, because the first
+// version of this test hashed inline and passed while a mutation dropping the name from the real
+// function went undetected -- a test of its own arithmetic rather than of the code.
+func TestDigestKeysByName(t *testing.T) {
+	content := []byte("the same bytes under either name")
 
-		digest, err := DigestBundleFiles(files)
-		if err != nil {
-			t.Fatalf("digesting: %v", err)
-		}
-		return digest
+	before, err := digestNamedBundles([]string{"plugins/yaml.js"}, map[string][]byte{"plugins/yaml.js": content})
+	if err != nil {
+		t.Fatalf("digesting under the first name: %v", err)
 	}
 
-	if shifted([]byte("AB"), []byte("C")) == shifted([]byte("A"), []byte("BC")) {
-		t.Fatal("two bundle sets with the same concatenated bytes and different boundaries digested identically")
+	after, err := digestNamedBundles([]string{"plugins/yml.js"}, map[string][]byte{"plugins/yml.js": content})
+	if err != nil {
+		t.Fatalf("digesting under the second name: %v", err)
+	}
+
+	if before == after {
+		t.Fatal("the same bytes under two different names digested identically, so the name is not in the hash")
 	}
 }
