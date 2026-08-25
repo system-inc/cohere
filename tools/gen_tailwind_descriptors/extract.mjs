@@ -132,6 +132,37 @@ for (const entry of designSystem.getClassList?.() ?? []) {
     }
 }
 
+/*
+ * The registry's own functional roots, which the class list does not advertise.
+ *
+ * `getClassList()` enumerates *classes*, and a root that advertises none is invisible to it however
+ * the names are probed. Fourteen roots are in exactly that state here: `filter`, `backdrop-filter`,
+ * `bg-size`, `bg-position`, `mask-position`, `font-features`, `flex-grow`, `flex-shrink`,
+ * `max-w-screen`, `-col`, `-row`, `-hue-rotate` and `-backdrop-hue-rotate`. Every one is registered
+ * functional and compiles — `filter-[var(--a)]` reads `[339]#1` — and none appears in the 37,643
+ * entries the class list returns, so a root set derived from those entries structurally cannot
+ * contain them and no probe suffix recovers them.
+ *
+ * `utilities.keys('functional')` is the registry's own enumeration and is the authority for which
+ * roots exist. It reports 341 where the class list yields 327, and the 14 it adds are exactly the
+ * ones above.
+ *
+ * They were not merely absent, they were absent *invisibly*: a class naming one of them parses to
+ * the root correctly and then finds no descriptor row, so `Lookup` declines, which reads in every
+ * summary as the model's own declared boundary rather than as a table gap. Only `max-w-screen`
+ * surfaced, on www-connected-app, and only because that registry advertises `max-w-screen-sm` while
+ * ahra's does not. The other thirteen were latent, waiting on a repository writing a class that
+ * happened to reach one.
+ *
+ * `max-w-screen` is also the case that shows why both sources are needed rather than one replacing
+ * the other. It is registered as a static utility *and* as a functional root; the class list route
+ * records the static, the registry route records the functional, and dropping either loses a real
+ * reading.
+ */
+for (const root of designSystem.utilities?.keys?.('functional') ?? []) {
+    if (typeof root === 'string') functionalRoots.add(root);
+}
+
 const roots = Array.from(functionalRoots).sort();
 
 /*
@@ -1402,6 +1433,33 @@ if (report.corpus.distinctClasses < 100) {
 }
 if (!report.controls.plantedDirty.proven) {
     assertionFailures.push('the planted-dirty control did not flag every probe, so this harness has not been shown to be able to fail.');
+}
+
+/*
+ * Every functional root the registry knows has a descriptor.
+ *
+ * A volume floor cannot catch what this catches, and that is the whole reason it is written as a set
+ * difference rather than as a count. 327 roots and 341 roots both clear "expected 300 or so"
+ * comfortably, so the fourteen missing ones sat under a passing assertion for the life of this
+ * table. The failure they produce downstream is a decline, which is indistinguishable in any summary
+ * from the model's own declared boundary — the model declines 407 classes on purpose here — so the
+ * gap is invisible on both sides at once unless the two populations are compared directly.
+ *
+ * Named per root rather than counted, because the point is which one is missing.
+ */
+const registryFunctionalRoots = Array.from(designSystem.utilities?.keys?.('functional') ?? [])
+    .filter((root) => typeof root === 'string');
+const rootsWithoutDescriptor = registryFunctionalRoots.filter((root) => !descriptors.has(root)).sort();
+if (registryFunctionalRoots.length === 0) {
+    assertionFailures.push('the registry reported no functional roots at all, so the coverage check below compared nothing and cannot have failed.');
+} else if (rootsWithoutDescriptor.length > 0) {
+    assertionFailures.push(
+        rootsWithoutDescriptor.length +
+            ' of ' +
+            registryFunctionalRoots.length +
+            ' registered functional roots have no descriptor, so a class naming one declines and reads as the model\'s boundary rather than as this gap: ' +
+            rootsWithoutDescriptor.join(', '),
+    );
 }
 
 /*
