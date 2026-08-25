@@ -99,6 +99,43 @@ func TestParityAgainstInventory(t *testing.T) {
 	}
 }
 
+// TestRegisteredNamesAreBare refuses a namespaced registration, which parity cannot see.
+//
+// `matchRegistered` tries `entry == name` first. An inventory entry `react/unsupported-syntax` and a
+// rule registered under that same slash spelling match on that branch exactly, so parity credits the
+// rule and reports the identical count either way. The mistake is invisible in the one number the
+// project is judged on, which is worse than a mistake the number reports.
+//
+// Five porters measured this area independently and each reported that the slash spelling survives
+// all three guards. It does, and survival was not the finding: the sixth measured what a reader
+// actually sees and found the count could not distinguish the two spellings at all.
+//
+// The rule is bare, and the reason is not taste. `verify --rules` prints names with no namespace,
+// every rule in the catalog registers bare, and `config.settingFor` performs the same split on the
+// `/` boundary when it resolves an inventory entry against a registration. A namespaced name is
+// therefore inconsistent with its siblings in output a user reads, and the only signal that would
+// have caught it is a number that cannot.
+//
+// Green when it lands, and that is deliberate rather than a weakness: nothing registers namespaced
+// today. It exists so the next rule that does is refused by name at the moment it is written, rather
+// than counted as ported and found by the seventh person to measure this area.
+func TestRegisteredNamesAreBare(t *testing.T) {
+	registered := registeredRuleNames()
+	if len(registered) == 0 {
+		t.Fatal("registry.All() returned no rules, so this test checked nothing")
+	}
+
+	for _, name := range registered {
+		if !strings.Contains(name, "/") {
+			continue
+		}
+		bare := name[strings.LastIndex(name, "/")+1:]
+		t.Errorf("rule %q is registered with a namespace; register it as %q instead. The parity "+
+			"guard counts both spellings the same, so this would have been credited as ported "+
+			"while `verify --rules` printed it inconsistently with every other rule", name, bare)
+	}
+}
+
 // readInventory returns every rule name the inventory lists.
 //
 // The path is resolved from this file's package directory rather than the working directory,
