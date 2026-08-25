@@ -141,6 +141,18 @@ type ReactiveScopeBlock struct {
 	// `flattenScopesWithHooksOrUseHIR` and `pruneAlwaysInvalidatingScopes` -- are all downstream of
 	// this one and none exists here.
 	Pruned bool
+
+	// Merged are the scopes this one absorbed, by id.
+	//
+	// Upstream's `scope.merged`, written in exactly one place in the whole compiler --
+	// `mergeReactiveScopesThatInvalidateTogether` -- and read by
+	// `validatePreservedManualMemoization` to fold absorbed ids into the scope set it tracks. It is
+	// a field here rather than a side table because it is produced and consumed as part of the
+	// block, and a merge that rewrites the block would have to keep a parallel table in step.
+	//
+	// Nil until that pass runs, which is the ordinary state: a scope that absorbed nothing carries
+	// no set rather than an empty one.
+	Merged []ScopeId
 }
 
 func (*ReactiveInstructionStatement) reactiveStatement() {}

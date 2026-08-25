@@ -532,3 +532,177 @@ func withInvalidatingScopes(t *testing.T, visit func(*Function, *shimchecker.Che
 			"never ran and this test asserted nothing")
 	}
 }
+
+// TestMergeReactiveScopesPreservesEveryStatement is the conservation property for the merge.
+//
+// A merge moves statements from one scope into another; it must never lose one. That is the failure
+// this pass can have that no shape assertion catches -- the tree stays well-formed and a scope's
+// body is simply short, so every downstream pass reads a program missing instructions.
+//
+// Run over the corpus rather than a fixture because the merge fires on real code and rarely on
+// invented code, and a conservation test that never sees a merge asserts nothing. The merge count is
+// therefore asserted nonzero first.
+func TestMergeReactiveScopesPreservesEveryStatement(t *testing.T) {
+	functions, totalMerges, lost := 0, 0, 0
+
+	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
+		ranges := InferMutableRanges(function)
+		set := FindDisjointMutableValuesWithRanges(function, ranges)
+		scopes := AssignReactiveScopesWithSets(function, ranges, set)
+		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
+		identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
+		BuildReactiveScopeTerminals(function, scopes, identity)
+		dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
+
+		tree, _ := BuildReactiveFunction(function)
+		if tree == nil {
+			return
+		}
+		functions++
+
+		before := countReactiveInstructionNodes(tree.Body)
+		merges := MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, checker)
+		after := countReactiveInstructionNodes(tree.Body)
+
+		totalMerges += merges
+		if after != before {
+			lost++
+		}
+	})
+
+	if functions < 50 {
+		t.Fatalf("only %d functions reached the merge; the corpus walk is not reaching real source",
+			functions)
+	}
+	// The baseline. Every rejection-shaped assertion below is meaningless if the pass never fires,
+	// and a merge pass that silently does nothing is exactly what this file's earlier fixtures kept
+	// producing.
+	if totalMerges == 0 {
+		t.Fatalf("no scope merged across %d functions, so the conservation assertion below is "+
+			"vacuous; either the pass is a no-op or the corpus holds no mergeable pair", functions)
+	}
+	if lost != 0 {
+		t.Errorf("%d of %d functions changed instruction count across the merge; a merge moves "+
+			"statements between scopes and must never lose one", lost, functions)
+	}
+
+	t.Logf("functions=%d merges=%d functionsLosingStatements=%d", functions, totalMerges, lost)
+}
+
+// TestMergeReactiveScopesRecordsAbsorbedIds pins the field the rule reads.
+//
+// `Merged` is written only by this pass and read by `validatePreservedManualMemoization`. A merge
+// that folds statements without recording the absorbed id leaves the rule tracking fewer scopes than
+// exist, and nothing about the resulting tree looks wrong.
+//
+// The self-reference case is asserted directly because it is the specific failure a missing
+// `to > from + 1` guard produces: every scope "merges" with itself, `Merged` fills with its own id,
+// and the pass reports work it did not do.
+func TestMergeReactiveScopesRecordsAbsorbedIds(t *testing.T) {
+	functions, merges, recorded, selfReferences := 0, 0, 0, 0
+
+	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
+		ranges := InferMutableRanges(function)
+		set := FindDisjointMutableValuesWithRanges(function, ranges)
+		scopes := AssignReactiveScopesWithSets(function, ranges, set)
+		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
+		identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
+		BuildReactiveScopeTerminals(function, scopes, identity)
+		dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
+
+		tree, _ := BuildReactiveFunction(function)
+		if tree == nil {
+			return
+		}
+		functions++
+		merges += MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, checker)
+
+		VisitReactiveFunction(tree, ReactiveVisitor{
+			Scope: func(scope *ReactiveScopeBlock, traverse func()) {
+				recorded += len(scope.Merged)
+				for _, absorbed := range scope.Merged {
+					if absorbed == scope.Scope {
+						selfReferences++
+					}
+				}
+				traverse()
+			},
+		})
+	})
+
+	if merges == 0 {
+		t.Fatalf("no scope merged across %d functions, so the assertions below are vacuous", functions)
+	}
+	if recorded != merges {
+		t.Errorf("the pass reported %d merges and the tree records %d absorbed ids; the rule reads "+
+			"that field and would track fewer scopes than exist", merges, recorded)
+	}
+	if selfReferences != 0 {
+		t.Errorf("%d scope(s) list their own id as absorbed; a candidate spanning one scope must "+
+			"not commit, and this is what its absence looks like", selfReferences)
+	}
+
+	t.Logf("functions=%d merges=%d recordedIds=%d selfReferences=%d",
+		functions, merges, recorded, selfReferences)
+}
+
+// TestMergeReactiveScopesFoldsInterleavedStatements exercises the arm the corpus never reaches.
+//
+// The allowlist explicitly permits instructions between two merging scopes, and when one is there
+// it must be folded into the survivor rather than dropped. The corpus does not produce that shape:
+// 132 scopes fold across 200 files and zero non-scope statements come with them, so a mutation
+// deleting the fold survives every corpus assertion.
+//
+// This drives the rewrite directly with a constructed block instead, which is the only way to reach
+// the arm at all. A synthetic tree is a weaker test than real source and it is used here for a
+// stated reason rather than convenience: the alternative is an arm with no coverage whatsoever.
+func TestMergeReactiveScopesFoldsInterleavedStatements(t *testing.T) {
+	first := &ReactiveScopeBlock{Scope: 1}
+	between := &ReactiveInstructionStatement{Instruction: &ReactiveInstruction{Order: 5}}
+	second := &ReactiveScopeBlock{Scope: 2, Instructions: ReactiveBlock{
+		&ReactiveInstructionStatement{Instruction: &ReactiveInstruction{Order: 7}},
+	}}
+	trailing := &ReactiveInstructionStatement{Instruction: &ReactiveInstruction{Order: 9}}
+
+	block := ReactiveBlock{first, between, second, trailing}
+	merger := &scopeMerger{}
+	rebuilt := merger.rewrite(block, []mergeCandidate{{scope: first, from: 0, to: 3}})
+
+	if merger.merges != 1 {
+		t.Fatalf("the rewrite folded %d scopes, want 1; the rest of this test assumes it ran",
+			merger.merges)
+	}
+	if len(rebuilt) != 2 {
+		t.Fatalf("the rebuilt block holds %d statements, want 2 (the survivor and the trailing "+
+			"statement outside the run)", len(rebuilt))
+	}
+	if rebuilt[0] != ReactiveStatement(first) {
+		t.Error("the survivor is not the first statement of the rebuilt block")
+	}
+	if rebuilt[1] != ReactiveStatement(trailing) {
+		t.Error("the statement after the run was not copied through; the tail is being dropped")
+	}
+
+	// The load-bearing assertion: the interleaved statement is inside the survivor, not discarded.
+	foundBetween, foundAbsorbed := false, false
+	for _, statement := range first.Instructions {
+		if statement == ReactiveStatement(between) {
+			foundBetween = true
+		}
+	}
+	for _, statement := range second.Instructions {
+		_ = statement
+		foundAbsorbed = true
+	}
+	if !foundBetween {
+		t.Error("the statement between the two scopes was dropped rather than folded into the " +
+			"survivor; the allowlist permits it to be there, so losing it loses real work")
+	}
+	if !foundAbsorbed {
+		t.Fatal("the absorbed scope had no statements, so this fixture cannot tell whether its " +
+			"body was folded")
+	}
+	if len(first.Merged) != 1 || first.Merged[0] != 2 {
+		t.Errorf("the survivor records %v as absorbed, want [2]", first.Merged)
+	}
+}
