@@ -160,7 +160,11 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// The 17 remaining misses are real, and they split roughly evenly between a dependency this
 	// collector never produces and one it produces too shallow. The shortfall is not a single defect
 	// and is not mostly about depth.
-	const knownMatched = 70
+	// Raised from 70 by porting React's `fixScopeAndIdentifierRanges` as `fixScopeRanges`. The two
+	// recovered are `cb` and `shouldShowMessage`, both `useCallback` results upstream names as
+	// dependencies and we were rejecting because the holding scope's range had not been restated
+	// after the terminals pass renumbered every instruction.
+	const knownMatched = 72
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
@@ -202,7 +206,11 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// Read the 151 as "what collection produces", not as "what the rule sees". Which population
 	// upstream's slots correspond to is unsettled and is upstream of every count comparison here.
 	const knownUpstreamTotal = 115
-	const knownOursTotal = 151
+	// Raised from 151 in the same change, and this is its cost. Two of the seven additional
+	// dependencies are upstream's; five are not. Recorded rather than buried: the trade was taken
+	// because it also recovered a broken invariant, 2,345 of 3,357 scopes covering none of their own
+	// members before the fix and 0 after.
+	const knownOursTotal = 158
 	if upstreamTotal != knownUpstreamTotal {
 		t.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
 			"every count below is against a different population", upstreamTotal, knownUpstreamTotal)
