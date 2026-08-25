@@ -75,9 +75,17 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 		t.Fatalf("loading the vendored corpus: %v", err)
 	}
 
-	scored, matched, missed, unmatchable := 0, 0, 0, 0
+	scored, matched, missed, unmatchable, flowExcluded := 0, 0, 0, 0, 0
 	for _, fixture := range fixtures {
 		if !strings.Contains(fixture.Source, "validatePreserveExistingMemoizationGuarantees") {
+			continue
+		}
+		if fixture.RequiresFlow() {
+			// The corpus already classifies these as `VerdictFlowSyntax`, and this test was not
+			// asking. A Flow fixture lowers to nothing here, so every dependency upstream inferred
+			// in it scores as a miss and reads as a collector defect. Measured: one fixture, three
+			// slots, all bare roots, which was a seventh of the entire remaining shortfall.
+			flowExcluded++
 			continue
 		}
 		expected := goldenDependencies(t, fixture.ExpectPath)
@@ -114,26 +122,38 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 			"section or the cache-slot spelling changed rather than the collector being correct")
 	}
 
-	// Measured floor. Raise it when dependency collection improves; a drop is a regression and the
-	// message says which.
+	// Measured floor: 70 of 87 matchable slots, 80 percent. Raise it when dependency collection
+	// improves; a drop is a regression and the message says which.
 	//
-	// 72 of 123 today. Two things this number has already settled, neither of which the corpus
-	// distribution test could answer:
+	// # The denominator was wrong twice, and neither correction touched the collector
 	//
-	// Truncating every path to its root scores 61, so the 11-point gap is what path depth is
-	// currently worth and the oracle is shown able to fail rather than assumed to work.
+	// The first score was 72 of 123. Then 29 codegen temporaries came out, and then 9 Flow fixtures.
+	// Both populations were scoring as collector defects while being facts about what this harness
+	// can read at all, and both were found by reading the misses rather than by suspecting them.
 	//
-	// Upstream's `isDeferredDependency` guard, ported and measured, scores 72 -- IDENTICAL. It moves
-	// the corpus distribution from 171 deep to 322, and matches no additional upstream answer. That
-	// is a movement detector reporting a large win on a change worth nothing, which is why this test
-	// exists and why that guard stayed reverted.
-	const knownMatched = 72
+	// That is the failure this test was built to prevent, arriving in the test itself: a number that
+	// moves for a reason unrelated to the thing it claims to measure.
+	//
+	// # What this number has already settled
+	//
+	// Truncating every path to its root scores 61 against 70, so the 9-point gap is what path depth
+	// is currently worth and the test is shown able to fail rather than assumed to work.
+	//
+	// Upstream's `isDeferredDependency` guard, ported and measured, scores IDENTICALLY. It moves the
+	// corpus distribution from 171 deep to 322 and matches no additional upstream answer. A movement
+	// detector reported a large win on a change worth nothing, which is why this exists and why that
+	// guard stayed reverted.
+	//
+	// The 17 remaining misses are real, and they split roughly evenly between a dependency this
+	// collector never produces and one it produces too shallow. The shortfall is not a single defect
+	// and is not mostly about depth.
+	const knownMatched = 70
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
 	}
-	t.Logf("golden cache slots: %d scored, %d matched, %d missed, %d unmatchable",
-		scored, matched, missed, unmatchable)
+	t.Logf("golden cache slots: %d scored, %d matched, %d missed, %d unmatchable; "+
+		"%d flow fixtures excluded", scored, matched, missed, unmatchable, flowExcluded)
 }
 
 // inferredDependencyStrings renders every scope dependency the way source would spell it.
