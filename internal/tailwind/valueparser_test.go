@@ -29,6 +29,11 @@ type valueParserCorpus struct {
 	ParseSymbol string            `json:"parseSymbol"`
 	ToCssSymbol string            `json:"toCssSymbol"`
 	Cases       []valueParserCase `json:"cases"`
+	// ExhaustiveAlphabet and ExhaustiveCases hold every string of length 1 to 3 over an alphabet
+	// chosen to stress the interacting branches. They answer what the hand-written corpus cannot:
+	// questions about shapes nobody thought to name.
+	ExhaustiveAlphabet []string          `json:"exhaustiveAlphabet"`
+	ExhaustiveCases    []valueParserCase `json:"exhaustiveCases"`
 }
 
 // valueParserCase is one value, the tree the engine built for it, and what that tree prints as.
@@ -59,6 +64,9 @@ func loadValueParserCorpus(t *testing.T) valueParserCorpus {
 	}
 	if corpus.ParseSymbol == "" {
 		t.Fatalf("fixture does not record which bundle symbol it was generated from")
+	}
+	if len(corpus.ExhaustiveCases) < 2000 {
+		t.Fatalf("fixture holds only %d exhaustive cases; the enumeration is meant to be thousands", len(corpus.ExhaustiveCases))
 	}
 	return corpus
 }
@@ -95,6 +103,46 @@ func TestParseValueMatchesEngine(t *testing.T) {
 	t.Logf("compared %d parse trees (%d nodes, max depth %d) and %d reprints against Tailwind %s (%s, symbols %s/%s)",
 		comparedValues, comparedNodes, maximumDepth, comparedValues,
 		corpus.TailwindVersion, corpus.Bundle, corpus.ParseSymbol, corpus.ToCssSymbol)
+}
+
+// TestParseValueMatchesEngineExhaustively parses every string of length 1 to 3 over an alphabet of
+// the characters whose branches interact: the escape, both quote kinds, both parens, separators,
+// the slash, and multi-byte characters of two, three and four UTF-8 bytes.
+//
+// The hand-written corpus covers shapes someone thought of, and it is where the interesting values
+// live. This covers the ones nobody thought of, and it is what settles questions the corpus cannot
+// see. Whether the escape branch consumes one byte or one whole character is invisible across every
+// value in the corpus, and both rules are correct only because a UTF-8 continuation byte can match
+// no separator, quote, or paren and so reaches the buffer either way. That is an argument; this is
+// the measurement behind it.
+func TestParseValueMatchesEngineExhaustively(t *testing.T) {
+	corpus := loadValueParserCorpus(t)
+
+	disagreements := 0
+	for _, testCase := range corpus.ExhaustiveCases {
+		got := ParseValue(testCase.Value)
+		if difference := diffValueNodes(got, testCase.Ast, ""); difference != "" {
+			// Bounded output: a broken branch disagrees on hundreds of these at once, and the
+			// first handful name the shape as well as all of them would.
+			if disagreements < 10 {
+				t.Errorf("ParseValue(%q):\n  %s\n  got:    %s\n  engine: %s",
+					testCase.Value, difference, renderValueNodes(got), renderValueNodes(testCase.Ast))
+			}
+			disagreements++
+		}
+		if printed := ValueToCss(got); printed != testCase.Css {
+			if disagreements < 10 {
+				t.Errorf("ValueToCss(ParseValue(%q)) = %q, engine prints %q", testCase.Value, printed, testCase.Css)
+			}
+			disagreements++
+		}
+	}
+	if disagreements > 10 {
+		t.Errorf("%d disagreements in total; only the first were printed", disagreements)
+	}
+
+	t.Logf("compared %d exhaustive inputs over the alphabet %q against Tailwind %s",
+		len(corpus.ExhaustiveCases), corpus.ExhaustiveAlphabet, corpus.TailwindVersion)
 }
 
 // TestCorpusExercisesEveryBranch guards the corpus itself.
@@ -286,18 +334,45 @@ func TestNestedFunctionsNestStructurally(t *testing.T) {
 	}
 }
 
-// TestStringsSwallowTheirContents covers the branch that keeps a quoted font name intact. An
-// unterminated string swallows the rest of the input rather than reparsing it.
-func TestStringsSwallowTheirContents(t *testing.T) {
+// TestQuotedStringsHoldTheirContents covers the branch that keeps a quoted font name intact, and
+// the boundary where a quote stops protecting anything.
+func TestQuotedStringsHoldTheirContents(t *testing.T) {
 	got := ParseValue(`"Comic Sans, Bold", sans-serif`)
 	if len(got) != 3 || got[0].Value != `"Comic Sans, Bold"` {
 		t.Errorf("quoted family = %s", renderValueNodes(got))
 	}
 
-	for _, input := range []string{`"unterminated`, `'unterminated`, `foo("ab`} {
-		printed := ValueToCss(ParseValue(input))
-		if !strings.Contains(printed, "unterminated") && !strings.Contains(printed, `"ab`) {
-			t.Errorf("ParseValue(%q) lost its string: %q", input, printed)
+	// An unterminated quote consumes only itself: parsing resumes at the next character rather
+	// than swallowing the tail. `"unterminated` is one word because it holds no separator, and
+	// that single shape is not enough to pin the behavior. `"a b` is the case that discriminates,
+	// and its absence from the corpus hid a real bug in this port: an implementation that jumped
+	// to the end of input agreed with the engine on the first and disagreed on the second.
+	for _, testCase := range []struct {
+		input string
+		want  []ValueNode
+	}{
+		{`"unterminated`, []ValueNode{{Kind: ValueNodeKindWord, Value: `"unterminated`}}},
+		{`"a b`, []ValueNode{
+			{Kind: ValueNodeKindWord, Value: `"a`},
+			{Kind: ValueNodeKindSeparator, Value: " "},
+			{Kind: ValueNodeKindWord, Value: "b"},
+		}},
+		{`"a,b`, []ValueNode{
+			{Kind: ValueNodeKindWord, Value: `"a`},
+			{Kind: ValueNodeKindSeparator, Value: ","},
+			{Kind: ValueNodeKindWord, Value: "b"},
+		}},
+		// The quote does not suppress the paren either: an unterminated string can still open a
+		// function, whose name carries the quote.
+		{`"a(b`, []ValueNode{
+			{Kind: ValueNodeKindFunction, Value: `"a`, Nodes: []ValueNode{}},
+			{Kind: ValueNodeKindWord, Value: "b"},
+		}},
+	} {
+		got := ParseValue(testCase.input)
+		if difference := diffValueNodes(got, testCase.want, ""); difference != "" {
+			t.Errorf("ParseValue(%q) = %s, want %s (%s)",
+				testCase.input, renderValueNodes(got), renderValueNodes(testCase.want), difference)
 		}
 	}
 

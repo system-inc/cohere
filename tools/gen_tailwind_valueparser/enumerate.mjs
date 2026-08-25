@@ -186,6 +186,35 @@ if (toCss(parse('calc(var(--a) * 2)')) !== 'calc(var(--a) * 2)') {
 
 const corpus = JSON.parse(NodeFileSystem.readFileSync(new URL('./corpus.json', import.meta.url), 'utf8'));
 
+/*
+ * Beyond the hand-written corpus, enumerate every string of length 1 to 3 over an alphabet chosen
+ * to stress the branches that interact: the escape, both quote kinds, both parens, separators, the
+ * slash, and multi-byte characters of two, three and four UTF-8 bytes.
+ *
+ * The hand-written corpus names shapes someone thought of. This names shapes nobody thought of, and
+ * it is what settles questions the corpus cannot. Whether the escape branch consumes one byte or
+ * one whole character is invisible on every value in the corpus, and exhaustion over this alphabet
+ * is what shows the two rules agree on all of them rather than merely on the ones tried.
+ */
+const exhaustiveAlphabet = ['\\', 'a', ' ', ',', '(', ')', '"', "'", '/', ':', 'é', '日', '\u{1F600}'];
+const exhaustive = [];
+(function enumerateStrings(prefix, remaining) {
+    if (remaining === 0) {
+        if (prefix !== '') exhaustive.push(prefix);
+        return;
+    }
+    for (const character of exhaustiveAlphabet) enumerateStrings(prefix + character, remaining - 1);
+})('', 1);
+for (let length = 2; length <= 3; length++) {
+    (function enumerateStrings(prefix, remaining) {
+        if (remaining === 0) {
+            exhaustive.push(prefix);
+            return;
+        }
+        for (const character of exhaustiveAlphabet) enumerateStrings(prefix + character, remaining - 1);
+    })('', length);
+}
+
 const cases = [];
 for (const value of corpus) {
     const ast = parse(value);
@@ -202,10 +231,18 @@ for (const value of corpus) {
     });
 }
 
+const exhaustiveCases = [];
+for (const value of exhaustive) {
+    const ast = parse(value);
+    exhaustiveCases.push({ value, ast, css: toCss(ast) });
+}
+
 process.stdout.write(JSON.stringify({
     tailwindVersion: packageJson.version,
     bundle: NodePath.basename(bundlePath),
     parseSymbol: parseDeclaration[1],
     toCssSymbol: toCssDeclaration[1],
+    exhaustiveAlphabet,
     cases,
+    exhaustiveCases,
 }, null, 2) + '\n');
