@@ -39,10 +39,63 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// business and scoring against it would measure the wrong thing.
 	const ruleMessage = "Existing memoization could not be preserved"
 	var mine []reactconformance.Fixture
+	var flowOnly int
 	for _, fixture := range fixtures {
-		if strings.Contains(fixture.Expected.Raw, ruleMessage) {
-			mine = append(mine, fixture)
+		if !strings.Contains(fixture.Expected.Raw, ruleMessage) {
+			continue
 		}
+		// Flow's `component Component(id) { ... }` declaration form is EXCLUDED, deliberately,
+		// because the vendored TypeScript parser does not model it and no work in this package can
+		// recover it.
+		//
+		// # What the parser actually produces, measured rather than assumed
+		//
+		// There is no `KindComponentDeclaration` anywhere in `typescript-go`, and the parser does
+		// not reject the syntax either -- it RECOVERS, into three unrelated top-level nodes:
+		//
+		//	component            ->  ExpressionStatement(Identifier)
+		//	Component(id)        ->  ExpressionStatement(CallExpression)
+		//	{ ... }              ->  Block                       (a detached block, not a body)
+		//
+		// So `ForEachFunctionLike` finds no function for the component. It descends into that
+		// detached `Block` and reaches the `useMemo`/`useCallback` CALLBACKS, which are ordinary
+		// arrow functions, and lowers each one as though it were itself a top-level component. That
+		// is why these two fixtures report `lowered=true` with reactive scopes and yet record zero
+		// written dependencies: the `useMemo` CALL SITES live in the detached block, which is never
+		// lowered, so `DropManualMemoization` is never handed a call to recognise and no
+		// `StartMemoize` marker is ever constructed. The identical program written as
+		// `function Component(id)` lowers to one function with two markers carrying their deps,
+		// which is the control.
+		//
+		// # Why this is not repairable downstream
+		//
+		// Lowering is keyed on `*ast.Symbol` identity throughout -- `builder.declarations`,
+		// `.identifiers` and `.captured` are all symbol-keyed. The binder never created a parameter
+		// binding for `id`, because there is no function to bind one into, so
+		// `GetSymbolAtLocation(id)` returns nil at its declaration site AND at its use inside the
+		// dependency array, while resolving at an unrelated use. A dependency-array entry with no
+		// symbol cannot be built into a `ManualMemoDependency` and cannot be compared against an
+		// inferred dependency, so synthesising a function node here would produce a marker whose
+		// operands name nothing. The gap is in the parser, above `Lower`, and closing it means
+		// teaching `typescript-go` a Flow production.
+		//
+		// # Why they are counted as unsupported rather than filtered out
+		//
+		// Dropping them would move the denominator to 31 and hide the exclusion inside a number.
+		// They stay in `len(mine)` and land in `unsupported`, which is the bucket this test already
+		// uses for a program it declines to judge, so the 33 keeps matching the corpus and the cost
+		// of the exclusion stays visible on the log line.
+		//
+		// Both are named `todo-repro` upstream, and the second's own comments describe a capture
+		// chain widening a mutable range through an invoked function -- work `#t28gsec` addresses --
+		// so it would likely stay silent even with a parser that handled the declaration.
+		//
+		// `RequiresFlow` is upstream's own test (the substring `@flow`), and on THIS population it
+		// is exact: it selects these two fixtures and no others.
+		if fixture.RequiresFlow() {
+			flowOnly++
+		}
+		mine = append(mine, fixture)
 	}
 	if len(mine) == 0 {
 		t.Fatal("no fixture in the vendored corpus carries this rule's message; the corpus or the " +
@@ -51,6 +104,13 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 
 	fired, silent, unsupported := 0, 0, 0
 	for _, fixture := range mine {
+		// The Flow-declaration exclusion documented above. This is checked BEFORE lowering rather
+		// than after, because these fixtures do lower -- into the wrong thing -- and so the `!ok`
+		// decline below cannot see them.
+		if fixture.RequiresFlow() {
+			unsupported++
+			continue
+		}
 		findings, ok := findingsForSource(t, fixture.Source)
 		if !ok {
 			unsupported++
@@ -63,8 +123,19 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 		}
 	}
 
-	t.Logf("fixtures=%d fired=%d silent=%d unsupported=%d",
-		len(mine), fired, silent, unsupported)
+	t.Logf("fixtures=%d fired=%d silent=%d unsupported=%d (of unsupported, %d are Flow declarations)",
+		len(mine), fired, silent, unsupported, flowOnly)
+
+	// The exclusion is pinned to the exact population it was measured against. If the corpus is
+	// re-vendored and a THIRD Flow fixture appears -- or one of these two is rewritten in the
+	// ordinary `function` form -- this fires, and whoever sees it has to re-make the judgment above
+	// rather than inherit it. An exclusion that silently widens is how a denominator rots.
+	const knownFlowDeclarationFixtures = 2
+	if flowOnly != knownFlowDeclarationFixtures {
+		t.Errorf("Flow-declaration fixtures = %d, want %d; the exclusion documented above was "+
+			"measured against a population that has changed, and it has to be re-justified rather "+
+			"than widened", flowOnly, knownFlowDeclarationFixtures)
+	}
 
 	if fired == 0 {
 		t.Errorf("the rule fired on none of %d fixtures whose golden expects it; every one of "+
