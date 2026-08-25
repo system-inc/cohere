@@ -100,6 +100,31 @@ type UtilityBranch struct {
 	// An input for the same reason `ResolvedAsColor` is: which keys are in `--font` is this
 	// repository's `@theme`, not Tailwind's.
 	ResolvedNamespace string
+	// Value is the resolved value the class carried, when a caller needs the declarations to differ
+	// between two values of one root.
+	//
+	// Empty for every caller that reads property names, which is all of them but one: the branch
+	// decides which arm runs and the arm decides the properties, and neither consults this. It
+	// exists for `ComposesFor`, which emits a root twice and asks whether the declarations an author
+	// can see came out the same, and that question is meaningless if both emissions carry one
+	// sentinel.
+	//
+	// A root's own `--tw-*` variables take this. The shared property its family layers through does
+	// not: `box-shadow` carries a constant naming every shadow variable whatever the value was, and
+	// that constant is what makes two shadows stack rather than overwrite. Emitting the value there
+	// instead is exactly the flattening that made composition unanswerable from these bodies.
+	Value string
+}
+
+// valueOr returns the branch's value, falling back to the sentinel every property-name caller wants.
+//
+// One place rather than a check at each `Declaration` call, so a new arm gets the behaviour by
+// construction instead of by remembering.
+func (branch UtilityBranch) valueOr() string {
+	if branch.Value != "" {
+		return branch.Value
+	}
+	return gapEmitterValue
 }
 
 // UtilityBranchFor builds a branch from a parsed candidate and the root's own type list.
@@ -660,5 +685,129 @@ func EmitGapRoot(root string, branch UtilityBranch) []*Node {
 	if !ported {
 		return nil
 	}
-	return emitter(branch)
+	nodes := emitter(branch)
+	if branch.Value == "" {
+		return nodes
+	}
+	return withResolvedValue(root, nodes, branch.Value)
 }
+
+// withResolvedValue restates a gap root's declarations for one concrete value.
+//
+// The 58 `declarations` call sites in this file all carry the sentinel, because every consumer but
+// one reads property names. Rewriting here rather than threading a value through all 58 keeps one
+// seam: an arm added later gets this by construction, and the arms stay readable against upstream's
+// source, which is the property this file was built for.
+//
+// Two rules, and the split is the whole of composition. A `--tw-*` custom property is the root's own
+// contribution and takes the value, so `shadow-sm` and `shadow-lg` write different `--tw-shadow`.
+// A shared property its family layers through takes that family's constant, which names every
+// sibling variable and mentions no value, so both write an identical `box-shadow` and stack rather
+// than overwrite. A property in neither set is an ordinary declaration and takes the value, which is
+// what makes `border-2` and `border-4` collide.
+//
+// The declarations are copied rather than mutated. The emitters build fresh nodes per call today,
+// and a caller that reads property names must not observe a value another caller asked for.
+func withResolvedValue(root string, nodes []*Node, value string) []*Node {
+	rewritten := make([]*Node, 0, len(nodes))
+	for _, node := range nodes {
+		if node.Kind != KindDeclaration || !node.ValuePresent {
+			rewritten = append(rewritten, node)
+			continue
+		}
+		replacement := *node
+		if constant, shared := composedAggregateValues[composedAggregate{root: root, property: node.Property}]; shared {
+			replacement.Value = constant
+		} else {
+			replacement.Value = value
+		}
+		rewritten = append(rewritten, &replacement)
+	}
+	return rewritten
+}
+
+// composedAggregateValues is the constant each layering family writes to its shared property.
+//
+// Read out of the shipped Tailwind 4.3.3 source rather than reconstructed, the same way the multi
+// declaration slice's constants were. Every one names its family's variables and none mentions a
+// value, which is the mechanism: two utilities of one root write different variables and the same
+// shared declaration, so the browser sees both.
+//
+// `mask-composite` is here for the same reason with a different shape: it is a bare keyword rather
+// than a var chain, and it is constant across every mask root, so it composes for the same reason.
+//
+// # Keyed on the root as well as the property, because a property is not constant everywhere
+//
+// A first version keyed on the property alone and was wrong on two roots, both caught by the
+// non-composing gap controls rather than by reading. `bg` emits `background-image` carrying a
+// gradient name for a named non-colour value, so `bg-linear-to-r` and `bg-conic` genuinely differ
+// there, while `bg-conic` emits the same property carrying a constant. `filter` emits `filter`
+// carrying the chain only when the class is the bare `filter`; with a value it carries the value.
+//
+// So the constant belongs to a root's use of a property rather than to the property. A pair absent
+// from this map takes the value, which is the correct default: a root that writes its value into
+// the shared property overwrites rather than layers, which is what `bg-red-500` against
+// `bg-blue-500` does.
+var composedAggregateValues = map[composedAggregate]string{
+	{root: "shadow", property: "box-shadow"}:               cssBoxShadowValue,
+	{root: "inset-shadow", property: "box-shadow"}:         cssBoxShadowValue,
+	{root: "ring", property: "box-shadow"}:                 cssBoxShadowValue,
+	{root: "inset-ring", property: "box-shadow"}:           cssBoxShadowValue,
+	{root: "ring-offset", property: "box-shadow"}:          cssBoxShadowValue,
+	{root: "drop-shadow", property: "filter"}:              cssFilterValue,
+	{root: "scale", property: "scale"}:                     cssScaleZValue,
+	{root: "bg-conic", property: "background-image"}:       cssConicGradientValue,
+	{root: "bg-linear", property: "background-image"}:      cssLinearGradientValue,
+	{root: "bg-radial", property: "background-image"}:      cssRadialGradientValue,
+	{root: "mask-x-from", property: "mask-image"}:          cssMaskImageValue,
+	{root: "mask-x-to", property: "mask-image"}:            cssMaskImageValue,
+	{root: "mask-y-from", property: "mask-image"}:          cssMaskImageValue,
+	{root: "mask-y-to", property: "mask-image"}:            cssMaskImageValue,
+	{root: "mask-t-from", property: "mask-image"}:          cssMaskImageValue,
+	{root: "mask-t-to", property: "mask-image"}:            cssMaskImageValue,
+	{root: "mask-r-from", property: "mask-image"}:          cssMaskImageValue,
+	{root: "mask-r-to", property: "mask-image"}:            cssMaskImageValue,
+	{root: "mask-b-from", property: "mask-image"}:          cssMaskImageValue,
+	{root: "mask-b-to", property: "mask-image"}:            cssMaskImageValue,
+	{root: "mask-l-from", property: "mask-image"}:          cssMaskImageValue,
+	{root: "mask-l-to", property: "mask-image"}:            cssMaskImageValue,
+	{root: "mask-linear-from", property: "mask-image"}:     cssMaskImageValue,
+	{root: "mask-linear-to", property: "mask-image"}:       cssMaskImageValue,
+	{root: "mask-radial-from", property: "mask-image"}:     cssMaskImageValue,
+	{root: "mask-radial-to", property: "mask-image"}:       cssMaskImageValue,
+	{root: "mask-conic-from", property: "mask-image"}:      cssMaskImageValue,
+	{root: "mask-conic-to", property: "mask-image"}:        cssMaskImageValue,
+	{root: "mask-x-from", property: "mask-composite"}:      cssMaskCompositeValue,
+	{root: "mask-x-to", property: "mask-composite"}:        cssMaskCompositeValue,
+	{root: "mask-y-from", property: "mask-composite"}:      cssMaskCompositeValue,
+	{root: "mask-y-to", property: "mask-composite"}:        cssMaskCompositeValue,
+	{root: "mask-t-from", property: "mask-composite"}:      cssMaskCompositeValue,
+	{root: "mask-t-to", property: "mask-composite"}:        cssMaskCompositeValue,
+	{root: "mask-r-from", property: "mask-composite"}:      cssMaskCompositeValue,
+	{root: "mask-r-to", property: "mask-composite"}:        cssMaskCompositeValue,
+	{root: "mask-b-from", property: "mask-composite"}:      cssMaskCompositeValue,
+	{root: "mask-b-to", property: "mask-composite"}:        cssMaskCompositeValue,
+	{root: "mask-l-from", property: "mask-composite"}:      cssMaskCompositeValue,
+	{root: "mask-l-to", property: "mask-composite"}:        cssMaskCompositeValue,
+	{root: "mask-linear-from", property: "mask-composite"}: cssMaskCompositeValue,
+	{root: "mask-linear-to", property: "mask-composite"}:   cssMaskCompositeValue,
+	{root: "mask-radial-from", property: "mask-composite"}: cssMaskCompositeValue,
+	{root: "mask-radial-to", property: "mask-composite"}:   cssMaskCompositeValue,
+	{root: "mask-conic-from", property: "mask-composite"}:  cssMaskCompositeValue,
+	{root: "mask-conic-to", property: "mask-composite"}:    cssMaskCompositeValue,
+}
+
+// composedAggregate is one root's use of one shared property.
+type composedAggregate struct {
+	root     string
+	property string
+}
+
+// The shared constants these gap roots write, read from the shipped 4.3.3 source.
+const (
+	cssBoxShadowValue      = "var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow)"
+	cssConicGradientValue  = "conic-gradient(var(--tw-gradient-stops))"
+	cssLinearGradientValue = "linear-gradient(var(--tw-gradient-stops))"
+	cssRadialGradientValue = "radial-gradient(var(--tw-gradient-stops))"
+	cssMaskCompositeValue  = "intersect"
+)

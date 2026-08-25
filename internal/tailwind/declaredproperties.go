@@ -240,21 +240,6 @@ func appendVisibleProperty(properties []string, property string) []string {
 func ComposesFor(root string) (composes bool, ok bool) {
 	stripped := strings.TrimPrefix(root, "-")
 
-	// A gap root's emitter cannot see the value, so it cannot be asked this.
-	//
-	// This guard is redundant and is kept deliberately. Measured by removing it: every gap root is
-	// declined anyway, because a gap root is in neither value-independent map, so `emitRootWithValue`
-	// returns nil for both emissions and the empty check below refuses it. Two independent reasons
-	// reach the same decline.
-	//
-	// It stays because the two reasons are not equally durable. The empty check declines a gap root
-	// as a side effect of where its emitter lives; this states the actual reason, which is that the
-	// question is unanswerable from a branch that carries no value. If a gap root were ever reachable
-	// through one of those maps, the side effect would stop firing and this would not.
-	if _, isGapRoot := gapEmitters[stripped]; isGapRoot {
-		return false, false
-	}
-
 	first := visibleDeclarationText(emitRootWithValue(stripped, composesProbeFirst))
 	second := visibleDeclarationText(emitRootWithValue(stripped, composesProbeSecond))
 	if first == "" && second == "" {
@@ -278,6 +263,14 @@ const (
 // collects property names, where the value is noise. Composition is the one consumer that reads the
 // value back, so it needs two emissions that actually differ.
 func emitRootWithValue(root string, value string) []*Node {
+	// A gap root branches on the value's shape, so it is asked through a branch carrying that value
+	// rather than through a resolved value. The branch says an ordinary length was written, which is
+	// the arm these roots take for the values a conflict comparison is about: `shadow-sm` against
+	// `shadow-lg`, not `shadow-red-500`, which is a different arm and a different question.
+	if _, isGapRoot := gapEmitters[root]; isGapRoot {
+		return EmitGapRoot(root, UtilityBranch{HasValue: true, DataType: DataTypeLength, Value: value})
+	}
+
 	resolved := ResolvedUtilityValue{Value: value}
 	if utility, known := FrameworkFunctionalUtilities[root]; known {
 		return utility.Emit(root, resolved)

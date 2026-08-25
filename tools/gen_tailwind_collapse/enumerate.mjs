@@ -1049,7 +1049,6 @@ process.stdout.write(
             variantOrder,
             unreachableRoots: unreachableRoots.sort(),
             rootSelectorShapes,
-            composingRoots: composingRoots.sort(),
             rootColorProperties: rootValueProperties,
             classProperties,
             colorNames: Array.from(colorNames).sort(),

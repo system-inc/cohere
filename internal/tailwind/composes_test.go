@@ -16,7 +16,7 @@ func TestComposesForAgreesWithTheGeneratedTable(t *testing.T) {
 	var agreed, disagreed, unanswerable int
 	var disagreements []string
 
-	for root := range ComposingRoots {
+	for root := range composingRootsTheGeneratorFound {
 		composes, ok := ComposesFor(root)
 		if !ok {
 			unanswerable++
@@ -32,7 +32,7 @@ func TestComposesForAgreesWithTheGeneratedTable(t *testing.T) {
 
 	sort.Strings(disagreements)
 	t.Logf("composing roots: %d in the table, %d answered, %d agreed, %d disagreed, %d unanswerable",
-		len(ComposingRoots), agreed+disagreed, agreed, disagreed, unanswerable)
+		len(composingRootsTheGeneratorFound), agreed+disagreed, agreed, disagreed, unanswerable)
 
 	if disagreed != 0 {
 		t.Errorf("%d roots the table calls composing are computed as conflicting: %s",
@@ -56,7 +56,7 @@ func TestComposesForRefusesRootsTheTableOmits(t *testing.T) {
 	var wrong []string
 
 	for root := range FrameworkMultiDeclarationUtilities {
-		if ComposingRoots[root] || composingRootsTheGeneratorNeverReached[root] {
+		if composingRootsTheGeneratorFound[root] || composingRootsTheGeneratorNeverReached[root] {
 			continue
 		}
 		composes, ok := ComposesFor(root)
@@ -72,7 +72,7 @@ func TestComposesForRefusesRootsTheTableOmits(t *testing.T) {
 		}
 	}
 	for root := range FrameworkFunctionalUtilities {
-		if ComposingRoots[root] || composingRootsTheGeneratorNeverReached[root] {
+		if composingRootsTheGeneratorFound[root] || composingRootsTheGeneratorNeverReached[root] {
 			continue
 		}
 		composes, ok := ComposesFor(root)
@@ -100,42 +100,61 @@ func TestComposesForRefusesRootsTheTableOmits(t *testing.T) {
 	}
 }
 
-// The gap wave cannot answer composition, and this pins that rather than leaving it as a silence.
+// The value-partitioned roots answer composition too, and their non-composing siblings are the
+// control that says the answer is not a constant yes.
 //
-// `UtilityBranch` carries the value's shape and never the value, so two emissions of a gap root are
-// identical whether it composes or not. Measured while writing this: 27 of 27 composing gap roots
-// compare identical and so do 25 of 30 non-composing ones. `ComposesFor` therefore declines them,
-// and this fails if it ever starts answering, since an answer from that path would be an artifact.
-func TestComposesForDeclinesGapRoots(t *testing.T) {
-	var declined, answered int
-	var answeredNames []string
+// This slice takes a `UtilityBranch` rather than a resolved value, and the branch carries a `Value`
+// so two emissions of one root can differ. A first version of that rewrite keyed each family's
+// shared constant on the property name alone and was wrong on two roots, both caught here rather
+// than by reading: `bg` writes a gradient name into `background-image` for a named non-colour value,
+// and `filter` writes the chain only when the class is the bare `filter`. Keying on the root's use
+// of the property fixed both.
+func TestComposesForAnswersGapRootsAndTheirControls(t *testing.T) {
+	var composingAnswered, composingAgreed int
+	var controlAnswered, controlWrong int
+	var wrong []string
 
 	for root := range gapEmitters {
-		if _, ok := ComposesFor(root); ok {
-			answered++
-			if len(answeredNames) < 10 {
-				answeredNames = append(answeredNames, root)
+		composes, ok := ComposesFor(root)
+		if !ok {
+			continue
+		}
+		if composingRootsTheGeneratorFound[root] {
+			composingAnswered++
+			if composes {
+				composingAgreed++
 			}
 			continue
 		}
-		declined++
+		controlAnswered++
+		if composes {
+			controlWrong++
+			if len(wrong) < 20 {
+				wrong = append(wrong, root)
+			}
+		}
 	}
 
-	t.Logf("gap roots: %d declined, %d answered", declined, answered)
+	sort.Strings(wrong)
+	t.Logf("gap roots: %d composing answered and %d agreed, %d controls answered and %d wrongly composing",
+		composingAnswered, composingAgreed, controlAnswered, controlWrong)
 
-	if answered != 0 {
-		t.Errorf("%d gap roots were answered, but their emitter cannot see a value: %s",
-			answered, strings.Join(answeredNames, ", "))
+	if composingAnswered != composingAgreed {
+		t.Errorf("%d of %d composing gap roots computed as conflicting",
+			composingAnswered-composingAgreed, composingAnswered)
 	}
-	if declined == 0 {
-		t.Fatal("no gap root was seen, so this test measured nothing")
+	if controlWrong != 0 {
+		t.Errorf("%d non-composing gap roots computed as composing: %s", controlWrong, strings.Join(wrong, ", "))
+	}
+	if composingAnswered == 0 || controlAnswered == 0 {
+		t.Fatal("one side of the comparison was empty, so this test measured nothing")
 	}
 }
 
 // Roots the computation calls composing and the generated table omits, because the generator's probe
 // values never reached them.
 //
-// Absence from `ComposingRoots` means one of two things and they are not the same: the generator
+// Absence from the generator's table means one of two things and they are not the same: the generator
 // measured the root and found it conflicting, or the generator never measured it. The table cannot
 // tell them apart, and this map is where that difference is written down.
 //
@@ -172,7 +191,7 @@ var composingRootsTheGeneratorNeverReached = map[string]bool{
 //
 // Two assertions. Every entry must be a root the computation actually calls composing, so an entry
 // cannot sit here excusing a root the computation agrees is conflicting. And every entry must be
-// absent from `ComposingRoots`, so an entry cannot shadow a root the table already answers.
+// absent from the generator's table, so an entry cannot shadow a root the table already answers.
 //
 // A previous slice of this port shipped an exemption map that read as careful and was hiding 47
 // comparisons, 7 of which disagreed. Keeping this one honest means asserting its shape rather than
@@ -190,8 +209,158 @@ func TestTheUnreachedMapHoldsOnlyMeasuredFindings(t *testing.T) {
 		if !composes {
 			t.Errorf("%s is exempted but computes as conflicting, which the control test would pass anyway", root)
 		}
-		if ComposingRoots[root] {
+		if composingRootsTheGeneratorFound[root] {
 			t.Errorf("%s is exempted but the table already carries it, so the exemption is dead", root)
 		}
+	}
+}
+
+// The 82 rows the generated `ComposingRoots` held, captured here when it was deleted.
+//
+// The table was produced by compiling two values of each root through the real Tailwind engine and
+// comparing declaration text. `ComposesFor` performs the same comparison against the ported handle
+// bodies, so keeping the generator's answers as a fixture means the two remain independent
+// measurements of one fact rather than one fact read twice.
+//
+// This is a test fixture and not a table the rule reads. It never grows: a root added upstream is
+// answered by the emitters, and the only thing this pins is that the port did not lose an answer the
+// generator had. `4f23e9f` and `7a72125` both found generated tables carrying one repository's own
+// `@utility` blocks as though they were Tailwind's, which is what a live table costs and a frozen
+// fixture does not.
+var composingRootsTheGeneratorFound = map[string]bool{
+	"-backdrop-hue-rotate": true,
+	"-bg-conic":            true,
+	"-hue-rotate":          true,
+	"-mask-conic":          true,
+	"-mask-linear":         true,
+	"-rotate-x":            true,
+	"-rotate-y":            true,
+	"-rotate-z":            true,
+	"-scale":               true,
+	"-scale-x":             true,
+	"-scale-y":             true,
+	"-scale-z":             true,
+	"-skew":                true,
+	"-skew-x":              true,
+	"-skew-y":              true,
+	"-translate":           true,
+	"-translate-x":         true,
+	"-translate-y":         true,
+	"-translate-z":         true,
+	"backdrop-blur":        true,
+	"backdrop-brightness":  true,
+	"backdrop-contrast":    true,
+	"backdrop-grayscale":   true,
+	"backdrop-hue-rotate":  true,
+	"backdrop-invert":      true,
+	"backdrop-opacity":     true,
+	"backdrop-saturate":    true,
+	"backdrop-sepia":       true,
+	"bg-conic":             true,
+	"blur":                 true,
+	"border-spacing":       true,
+	"border-spacing-x":     true,
+	"border-spacing-y":     true,
+	"brightness":           true,
+	"contrast":             true,
+	"drop-shadow":          true,
+	"grayscale":            true,
+	"hue-rotate":           true,
+	"inset-ring":           true,
+	"inset-shadow":         true,
+	"invert":               true,
+	"mask-b-from":          true,
+	"mask-b-to":            true,
+	"mask-conic":           true,
+	"mask-conic-from":      true,
+	"mask-conic-to":        true,
+	"mask-l-from":          true,
+	"mask-l-to":            true,
+	"mask-linear":          true,
+	"mask-linear-from":     true,
+	"mask-linear-to":       true,
+	"mask-r-from":          true,
+	"mask-r-to":            true,
+	"mask-radial-from":     true,
+	"mask-radial-to":       true,
+	"mask-t-from":          true,
+	"mask-t-to":            true,
+	"mask-x-from":          true,
+	"mask-x-to":            true,
+	"mask-y-from":          true,
+	"mask-y-to":            true,
+	"ring":                 true,
+	"rotate-x":             true,
+	"rotate-y":             true,
+	"rotate-z":             true,
+	"saturate":             true,
+	"scale":                true,
+	"scale-x":              true,
+	"scale-y":              true,
+	"scale-z":              true,
+	"scrollbar-thumb":      true,
+	"scrollbar-track":      true,
+	"sepia":                true,
+	"shadow":               true,
+	"shadow-":              true,
+	"skew":                 true,
+	"skew-x":               true,
+	"skew-y":               true,
+	"translate":            true,
+	"translate-x":          true,
+	"translate-y":          true,
+	"translate-z":          true,
+}
+
+// Asking a gap root for a value must not change what the next caller sees.
+//
+// `EmitGapRoot` rewrites declaration values when the branch carries one, and every other caller in
+// the package reads property names off the sentinel. If the rewrite mutated the emitter's nodes
+// rather than copying them, a composition query would leave a real value behind for whoever asked
+// next, and every reading in the package is downstream of that.
+//
+// Measured rather than assumed: mutating `withResolvedValue` to rewrite in place instead of copying
+// leaves this test passing, because every emitter here allocates its nodes per call and none returns
+// a package-level slice. So the copy is defensive today and this test does not currently catch its
+// removal, which is recorded rather than dressed up as a caught mutation.
+//
+// Both stay. The copy is what makes the rewrite correct against an emitter that caches, and this is
+// what would notice if one started to; the alternative is a defect that surfaces as a wrong reading
+// somewhere else in the package, with nothing pointing back here.
+func TestAskingForAValueLeavesTheSentinelIntact(t *testing.T) {
+	var checked int
+	for root := range gapEmitters {
+		branch := UtilityBranch{HasValue: true, DataType: DataTypeLength}
+
+		before := EmitGapRoot(root, branch)
+		if len(before) == 0 {
+			continue
+		}
+		beforeValues := make([]string, 0, len(before))
+		for _, node := range before {
+			beforeValues = append(beforeValues, node.Value)
+		}
+
+		valued := branch
+		valued.Value = "zzsomeoneelsesvalue"
+		EmitGapRoot(root, valued)
+
+		after := EmitGapRoot(root, branch)
+		if len(after) != len(before) {
+			t.Errorf("%s emitted %d declarations before a valued call and %d after", root, len(before), len(after))
+			continue
+		}
+		for index, node := range after {
+			if node.Value != beforeValues[index] {
+				t.Errorf("%s declaration %d carried %q before a valued call and %q after",
+					root, index, beforeValues[index], node.Value)
+			}
+		}
+		checked++
+	}
+
+	t.Logf("gap roots re-read after a valued call: %d", checked)
+	if checked == 0 {
+		t.Fatal("no root was checked, so this test measured nothing")
 	}
 }

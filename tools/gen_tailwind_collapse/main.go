@@ -86,7 +86,6 @@ type enumeration struct {
 	// its consumer drift without either one failing, so they are removed here as well as in
 	// enumerate.mjs.
 	RootSelectorShapes []rootSelectorShape `json:"rootSelectorShapes"`
-	ComposingRoots     []string            `json:"composingRoots"`
 	UnreachableRoots   []string            `json:"unreachableRoots"`
 	PropertyOrder      []string            `json:"propertyOrder"`
 	SortOverrides      []string            `json:"sortOverrides"`
@@ -560,20 +559,13 @@ var RootSelectorShapes = map[string]string{
 
 	fmt.Fprintf(&buffer, `}
 
-// ComposingRoots are roots whose utilities layer rather than overwrite each other.
+// ComposingRoots used to be printed here and is not any more.
 //
-// shadow-lg and ring-1 both declare box-shadow and do not conflict: every shadow and every ring
-// emits the same var() chain and each contributes through its own custom property. px-4 and px-8
-// declare different values under one property and genuinely collide.
-//
-// Detected by asking whether two different values of a root produce identical declaration text.
-var ComposingRoots = map[string]bool{
-`)
-	for _, root := range result.ComposingRoots {
-		fmt.Fprintf(&buffer, "\t%q: true,\n", root)
-	}
-
-	fmt.Fprintf(&buffer, `}
+// It answered whether two utilities of one root layer or overwrite. internal/tailwind's ComposesFor
+// computes that from the ported handle bodies, running the same two-value comparison this generator
+// ran against the real engine. Measured before the deletion: 81 of its 82 rows answered and all 81
+// agreed. The generator's answers are kept as a fixture in composes_test.go so the computation stays
+// checked against an independent measurement.
 
 // KnownRoots and KnownStatics used to be printed here and are not any more.
 //

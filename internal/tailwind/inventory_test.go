@@ -26,21 +26,12 @@ import "testing"
 //
 // A reading is a sorted set of property positions and a count. `getPropertySort` reads
 // `node.property` and increments a counter, and never reads a value. That single fact is what made
-// this port tractable, deleting roughly 85% of `utilities.ts`, and it is also the reason these four
+// this port tractable, deleting roughly 85% of `utilities.ts`, and it is also the reason these two
 // tables cannot be derived from what the port carries.
 //
 //	baseDescriptors          78   the reading partitions on the value's resolved type, and no
 //	                              registration shape carries both halves: `border-[3px]` is a width
 //	                              and `border-red-500` is a colour.
-//	ComposingRoots           82   whether two values of a root layer or overwrite. `ComposesFor` now
-//	                              computes this for the 54 roots the two value-independent emitter
-//	                              slices answer, agreeing 54 of 54 with 0 false positives across 146
-//	                              controls, so the rule reads the computation first. The table stays
-//	                              for the 28 it cannot answer: a gap root's emitter takes a branch
-//	                              shape and never a value, so two emissions agree whatever the root
-//	                              does. Measured: 27 of 27 composing gap roots compare identical and
-//	                              so do 25 of 30 non-composing ones, which is a measurement of
-//	                              nothing. Shrinking it further needs the branch to carry a value.
 //	CollapseFamilies         45   which pairs canonicalize into a third root. All 45 are CSS
 //	                              shorthand relationships between declared properties, so deriving
 //	                              it means carrying a shorthand table of equal size, one layer
@@ -49,6 +40,12 @@ import "testing"
 // `RootDeclaredProperties` and its three companions were here until #mz0m6k8, carried for exactly the
 // reason the paragraph below rejected. The emitting half is now ported, so the answer is computed by
 // `DeclaredPropertiesFor` and the four tables, 1,183 entries and 62 KB, are deleted.
+//
+// `ComposingRoots` went the same way in #gb4bkgc, and its reason had read as the strongest of the
+// four. A reading cannot answer whether two values of a root layer or overwrite, which is true and
+// was never the question: the emitters can, once they stop flattening the constant each layering
+// family writes to its shared property. 81 of its 82 rows answered and all 81 agreed before it was
+// deleted, and the 82nd was not a utility. Its answers are kept as a fixture in composes_test.go.
 //
 // # Why not port the emitting half and delete the rest
 //
@@ -75,7 +72,6 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	}
 	ours := map[string]int{
 		"baseDescriptors":  len(baseDescriptors),
-		"ComposingRoots":   len(ComposingRoots),
 		"CollapseFamilies": len(CollapseFamilies),
 	}
 
@@ -94,7 +90,7 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	// The count of tables, not their contents. A fifth table of ours appearing without an entry in
 	// the doc comment above is the thing this catches: the inventory going stale is how a table ends
 	// up carried for no stated reason, which is what this package started with.
-	if len(ours) != 3 {
+	if len(ours) != 2 {
 		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 3, so "+
 			"one has been added or removed without its reason being written down", len(ours))
 	}
@@ -113,7 +109,7 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	inPackage := []string{
 		"PropertyOrder", "SortOverrideProperties", "FrameworkVariantRegistrations",
 		"FrameworkStaticDeclarations", "FrameworkFunctionalUtilities", "FrameworkMultiDeclaration",
-		"baseDescriptors", "ComposingRoots", "CollapseFamilies",
+		"baseDescriptors", "CollapseFamilies",
 	}
 	accounted := make(map[string]bool, len(upstream)+len(ours))
 	for name := range upstream {

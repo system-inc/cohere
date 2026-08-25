@@ -188,25 +188,23 @@ func resolveClassFactsIn(className string, designSystem DesignSystemResult) (cla
 
 // composesForRoot answers whether a root's utilities layer rather than overwrite.
 //
-// Computed from the ported handle bodies where they can answer, which is the two value-independent
-// emitter slices, and read from the generated table where they cannot. `ComposesFor` declines the 57
-// value-partitioned roots because their emitter takes a branch shape and never a value, so two
-// emissions agree whatever the root does, and an answer from that path would be an artifact rather
-// than a measurement.
+// Computed from the ported handle bodies across all three emitter slices. `ComposesFor` emits the
+// root twice with two different values and compares the declarations an author can see, which is
+// upstream's own definition rather than a proxy for it: a family that layers writes its value into
+// its own `--tw-*` variable and a constant into the property they share, so two of its utilities
+// produce identical visible text and stack.
 //
-// The computation is upstream's own definition rather than a proxy: emit the root twice with two
-// different values and compare the declarations an author can see. Measured against the table it
-// replaces, class for class: 54 of 54 answerable roots agree, 0 disagree, and 146 roots the table
-// omits are computed as conflicting with 0 false positives.
+// Measured against the generated table this replaced, class for class: 81 of 82 rows answered and
+// all 81 agreed, with 0 disagreements. 171 roots the table omits are computed as conflicting with 0
+// false positives. The one row not answered was `shadow-`, which is not a utility at all: it is one
+// of the eight trailing-dash repository tokens `4f23e9f` found sitting in tables headed with a
+// Tailwind version, and `DeclaredPropertiesFor` declines it before this is ever consulted.
 //
-// The table therefore shrinks to the roots the computation declines rather than being deleted. That
-// is less than #gb4bkgc asked for and it is where the measurement landed; `internal/tailwind`'s
-// `ComposesFor` carries the reason in full.
+// Returns false for a root no emitter answers, which is the same decline the property computation
+// makes for it, so the two stay consistent about which roots exist.
 func composesForRoot(root string) bool {
-	if composes, answered := tailwindengine.ComposesFor(root); answered {
-		return composes
-	}
-	return tailwindengine.ComposingRoots[root]
+	composes, _ := tailwindengine.ComposesFor(root)
+	return composes
 }
 
 // valueResolutionIn asks this repository's theme what a class's value resolved through.
