@@ -156,6 +156,27 @@ comparison, and that is a real defect we shipped.
 directly. That is what puts a default inversion or a serde alias under test, and those are the two
 lines most likely to have no upstream counterpart.
 
+## If you score a rule in two directions, pin both
+
+A rule measured against a corpus usually gets two numbers: how often it fires where it should, and
+how often it fires where it should not. **Pinning one exactly and asserting only `> 0` on the other
+is not two instruments. It is one instrument and a formality.**
+
+The asymmetry runs one way, which is why it survives review. A change that trades true positives away
+for false-positive removals moves the pinned number in the direction that reads as success, while the
+loose side stays green because it is still non-zero.
+
+Measured, on `preserve-manual-memoization`: freezing component parameters in the aliasing graph took
+the clean-fixture rate from 31 of 70 to 19, a 39% improvement against the number that rule was being
+judged on. The golden count went from 15 of 33 to 9 in the same run. Six programs upstream reports on
+had gone silent underneath a result that looked like progress, and the author had the 19 and was
+composing the commit message before checking the other side.
+
+So: assert both counts exactly, and make each failure message say which direction means what. "This
+went down, so either the rule improved and you lower it deliberately, or it stopped reporting things
+upstream reports on" is the sentence that does the work. A ceiling cannot distinguish a fix from a
+rule that went quiet.
+
 ## Prove the fixtures can see: the mutation sweep
 
     tools/sweep.sh <file> <package> "<python expression rewriting the string `source`>" [TestName]
