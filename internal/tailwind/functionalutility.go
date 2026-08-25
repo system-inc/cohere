@@ -123,6 +123,27 @@ type FunctionalUtilityArm struct {
 	// per-arm rather than per-root: the same class resolves or does not depending on which arm
 	// claimed its value.
 	RefusesModifier bool
+	// InferTypes is the ordered type list this arm infers a bare value against, when it infers at
+	// all rather than reading the theme.
+	//
+	// `maskStopUtility`'s position arm is the shape: it runs `inferDataType(value, ['number',
+	// 'percentage'])` and returns nothing when neither matches, then treats the two differently. A
+	// number goes through the spacing multiplier and a percentage passes through once its digits are
+	// a positive integer, so `mask-x-from-1.5` resolves, `mask-x-from-3.7` does not, and
+	// `mask-x-from-50%` resolves while `mask-x-from-nonsense` does not.
+	//
+	// An arm that infers never reads the theme for its value: upstream's block is a switch with a
+	// `default: return`, so a value that infers as nothing ends the utility rather than falling
+	// through to the next arm.
+	//
+	// Empty for an arm that reads the theme instead, which is every colour arm and every width arm.
+	InferTypes []DataType
+	// PercentagePassesThrough lets an inferred percentage resolve as written.
+	//
+	// Only meaningful beside `InferTypes`, and separate from the bare handler because the two cases
+	// of that switch disagree about what a valid value is: the number case accepts a spacing
+	// multiplier and the percentage case accepts any positive integer followed by `%`.
+	PercentagePassesThrough bool
 }
 
 // ResolvedUtilityValue is what the pipeline produces for one candidate.
@@ -297,6 +318,13 @@ func resolveArm(candidate *ParsedCandidate, arm *FunctionalUtilityArm, theme *Th
 		return resolveArmColor(candidate, arm, theme)
 	}
 
+	// An inferring arm never reads the theme for its value: upstream's block is a switch with a
+	// `default: return`, so a value that infers as nothing ends the utility rather than falling
+	// through to whatever comes next.
+	if len(arm.InferTypes) > 0 {
+		return resolveArmByInferredType(candidate, arm, theme)
+	}
+
 	if value, found := theme.Resolve(candidate.Value.Value, true, arm.ThemeKeys, 0); found {
 		return value, true
 	}
@@ -310,6 +338,49 @@ func resolveArm(candidate *ParsedCandidate, arm *FunctionalUtilityArm, theme *Th
 		}
 	}
 	return "", false
+}
+
+// resolveArmByInferredType is an arm that dispatches on the value's inferred type.
+//
+// Upstream's `maskStopUtility` position block, read at utilities.ts:3285. The type list is the arm's
+// own and the two arms of the switch accept different values, which is why the percentage case is a
+// field rather than another `BareValueKind`: a bare kind is one predicate and this is two.
+//
+// A percentage is valid when the digits before the `%` are a positive integer, so `50%` resolves and
+// `12.5%` does not. A number goes through the arm's bare handler, which for this family is the
+// spacing multiplier, so `1.5` resolves and `3.7` does not.
+func resolveArmByInferredType(candidate *ParsedCandidate, arm *FunctionalUtilityArm, theme *Theme) (string, bool) {
+	inferred := InferDataType(candidate.Value.Value, arm.InferTypes)
+
+	switch inferred {
+	case DataTypePercentage:
+		if !arm.PercentagePassesThrough {
+			return "", false
+		}
+		if !isPositiveInteger(strings.TrimSuffix(candidate.Value.Value, "%")) {
+			return "", false
+		}
+		return candidate.Value.Value, true
+
+	case "":
+		return "", false
+	}
+
+	// Upstream reads `--spacing` before applying the multiplier and returns nothing when the theme
+	// declares none, so a theme without it refuses the class rather than resolving it.
+	if len(arm.ThemeKeys) > 0 {
+		if _, found := theme.Resolve("", false, arm.ThemeKeys, 0); !found {
+			return "", false
+		}
+	}
+	if arm.BareValue == BareValueNone {
+		return "", false
+	}
+	handler := bareValueHandler(arm.BareValue, arm.BareValueSuffix)
+	if handler == nil {
+		return "", false
+	}
+	return handler(candidate.Value)
 }
 
 // resolveArmColor is upstream's `resolveThemeColor`, which is not `theme.resolve` with a flag.
