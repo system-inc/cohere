@@ -222,6 +222,34 @@ for (const entry of designSystem.getClassList?.() ?? []) {
     if (asWritten?.kind === 'functional' && asWritten.root) knownRoots.add(asWritten.root);
 }
 
+/*
+ * The registry's own functional roots, which the class list cannot advertise.
+ *
+ * `getClassList()` enumerates *classes*, so a functional root that advertises none is invisible to
+ * it however the names are probed. Fourteen are in that state: `filter`, `backdrop-filter`,
+ * `bg-size`, `bg-position`, `mask-position`, `font-features`, `flex-grow`, `flex-shrink`,
+ * `max-w-screen`, `-col`, `-row`, `-hue-rotate` and `-backdrop-hue-rotate`. Measured, a `-4` probe
+ * and a `-[var(--x)]` probe each add zero of them, so this is not a gap a better suffix closes.
+ *
+ * `KnownRoots` is what `HasUtility` answers from, and `HasUtility` is what `findRoots` consults at
+ * every split, so a root missing here is not merely absent from a table: the parser cannot see it at
+ * all and resolves the class to a shorter root that *is* present. `flex-grow-1` read as root `flex`
+ * with value `grow-1`, `bg-size-cover` as `bg`, `max-w-screen-sm` as `max-w`, and `filter-none` did
+ * not parse at all because `filter` was unknown and no shorter prefix exists. The engine reads all
+ * four as their own roots.
+ *
+ * That is a wrong root rather than a missing one, and the readings happened to agree, which is why
+ * nothing downstream looked anomalous. `KnownStatics` is deliberately not extended the same way:
+ * `utilities.keys('static')` is the same enumeration for statics, but a static root that advertises
+ * no class has no reading to carry, and `max-w-screen` is registered both ways and already reaches
+ * the static table through the class list above.
+ */
+for (const root of designSystem.utilities?.keys?.('functional') ?? []) {
+    if (typeof root !== 'string') continue;
+    knownRoots.add(root);
+    functionalRoots.add(root);
+}
+
 const orderingByRoot = [];
 const orderingByStatic = [];
 const orderingByClass = [];

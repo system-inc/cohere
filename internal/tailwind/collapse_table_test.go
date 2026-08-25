@@ -110,8 +110,27 @@ func TestTableEntriesAreWellFormed(t *testing.T) {
 		if entry.First == entry.Second {
 			t.Errorf("%+v pairs a root with itself", entry)
 		}
-		if entry.Output == entry.First || entry.Output == entry.Second {
-			t.Errorf("%+v collapses into one of its own inputs, which is a rewrite rather than a merge", entry)
+		// The output may equal one of its inputs, and `max-w + max-w-screen => max-w` is the case
+		// that proves it rather than an entry to be filtered out.
+		//
+		// This assertion previously rejected that shape as "a rewrite rather than a merge", which was
+		// right about the hazard and wrong about the test for it. The hazard is a class that
+		// canonicalizes on its own, so its rewrite appears in the output whether or not the other
+		// class contributed; the generator already excludes those two ways, by `rewritesAlone` before
+		// the pair is probed and by requiring both inputs to be load-bearing after.
+		//
+		// Root equality is a different question, and the roots here are genuinely nested rather than
+		// disjoint: `max-w-screen` is a registered root that also reads as `max-w` plus the value
+		// `screen`. Measured on the engine, `max-w-sm max-w-screen-sm` canonicalizes to `max-w-96`,
+		// which parses to root `max-w`, and neither input rewrites alone. So the merge is real, the
+		// output root is one of the inputs, and rejecting it would delete a family the engine has.
+		//
+		// The entry only became visible when the registry enumeration landed: `max-w-screen`
+		// advertises no class, so the class-list route never saw it and the pair was never probed.
+		// What remains guarded is the shape that would actually be meaningless, an output equal to
+		// both inputs at once, which cannot happen while First and Second differ.
+		if entry.Output == entry.First && entry.Output == entry.Second {
+			t.Errorf("%+v collapses into both of its inputs, which names no merge at all", entry)
 		}
 
 		key := entry.First + " " + entry.Second
