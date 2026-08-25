@@ -500,10 +500,20 @@ func (r *reactivity) stableTypeName(id IdentifierId) string {
 // the mutation gap, and inventing a bare-name match for `use` would report every function named
 // `use` in the tree as a reactive source.
 func (r *reactivity) isHookCallee(id IdentifierId) bool {
-	if int(id) >= len(r.function.Identifiers) {
+	return IsHookCallee(r.function, id)
+}
+
+// IsHookCallee reports whether a called value resolves to a React hook.
+//
+// Lifted from `reactivity.isHookCallee` when `pruneNonEscapingScopes` needed the same question: a
+// value passed as an argument to a hook escapes, because React may retain it. Two copies of this
+// predicate would drift, and the verdict recorded below is the kind that only stays true while its
+// callers are enumerated -- so it lives in one place with the caller list attached.
+func IsHookCallee(function *Function, id IdentifierId) bool {
+	if function == nil || int(id) >= len(function.Identifiers) {
 		return false
 	}
-	identifier := r.function.Identifiers[id]
+	identifier := function.Identifiers[id]
 	if identifier == nil {
 		return false
 	}
@@ -526,6 +536,10 @@ func (r *reactivity) isHookCallee(id IdentifierId) bool {
 	// caller passing an identifier that names a local binding — a hook stored in a variable, which
 	// lowering would give a real `Name` — makes the name branch reachable again and this deletion
 	// has to be re-argued rather than assumed to still hold.
+	//
+	// Re-checked when this was lifted for `pruneNonEscapingScopes`: that pass also asks about a
+	// CALLEE place, so the verdict still holds. It would not hold for a caller asking about an
+	// arbitrary value.
 	return identifier.Node != nil && ast.IsIdentifier(identifier.Node) && isHookName(identifier.Node.Text())
 }
 
