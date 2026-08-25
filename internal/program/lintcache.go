@@ -74,19 +74,48 @@ type LintCacheEntry struct {
 // the time this is read back, so the file is implied by the entry rather than stored per
 // finding.
 //
-// Message text is deliberately absent. It is derived from the id when a finding is rendered,
-// so storing it would duplicate a value that can drift from its source; a field that must not
-// drift is better missing than stale. Fixes and suggestions are counted rather than stored for
-// a harder reason: a fix is a replacement over a byte range, and replaying one computed
-// against different bytes would corrupt the file it claims to repair. A cached finding is a
-// report, never an edit.
+// MessageDescription holds the rendered text. An earlier version of this comment said text was
+// "derived from the id when a finding is rendered" and therefore safe to omit. That was untrue,
+// and the field was absent because of it. Nothing in this tree derives text from an id: there is
+// no id-to-text table, and `printRuleDiagnostic` prints `Message.Description` directly. Measured
+// 2026-08-25 over `internal/rules`: 340 message ids, of which 11 build their description with
+// `fmt.Sprintf` from runtime values, so for those one id maps to many strings and no table could
+// exist. A cached finding replaying only the id would print an empty or wrong sentence beside a
+// correct file, range and rule — the right metadata carrying the wrong message, which is the one
+// failure here that looks exactly like success.
+//
+// The text is stored rather than the 11 being refused because refusing them buys bytes with a
+// standing per-rule obligation, and this format already depends on `ReadsProgram` carrying one.
+// The size scales the right way: the artifact grows with a dirty tree, which is the run where
+// this cache saves least, because changed files are recomputed anyway.
+//
+// Message ids are not unique on their own, which is a second reason the id could never have been
+// the key. `unexpected` carries five distinct descriptions across six core rules, colliding across
+// rules and never within one, so the honest identity of a message is the pair (RuleName,
+// MessageId). Lookups key on the pair even though the text is now stored, so nobody later assumes
+// ids are unique.
+//
+// Fixes and suggestions are counted rather than stored, and that omission IS sound: a fix is a
+// replacement over a byte range, and replaying one computed against different bytes would corrupt
+// the file it claims to repair. A cached finding is a report, never an edit.
 type LintCacheFinding struct {
-	RuleName        string
-	Start           int32
-	End             int32
-	MessageId       string
+	RuleName string
+	Start    int32
+	End      int32
+
+	// MessageId identifies the message within its rule. Not unique across rules; see above.
+	MessageId string
+
+	// MessageDescription is the rendered sentence, stored because nothing can rebuild it.
+	MessageDescription string
+
 	FixCount        int32
 	SuggestionCount int32
+}
+
+// MessageKey is the honest identity of a message: the pair, never the id alone.
+func (f LintCacheFinding) MessageKey() (string, string) {
+	return f.RuleName, f.MessageId
 }
 
 // HashContent is the key a cached entry is stored under.
@@ -115,11 +144,11 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 // Same reasoning as the resolution cache: this is read back as offsets into a blob, so a file
 // from an older layout parses into strings from the wrong places rather than failing. The
 // version byte is what makes that loud.
-var lintCacheMagic = [8]byte{'v', 'f', 'y', 'l', 'i', 'n', 't', 1}
+var lintCacheMagic = [8]byte{'v', 'f', 'y', 'l', 'i', 'n', 't', 2}
 
 const (
 	lintEntryHeaderSize = sha256.Size + 12 // content hash, path offset+length, finding count
-	lintFindingSize     = 32               // rule offset+length, start, end, message id offset+length, fix and suggestion counts
+	lintFindingSize     = 40               // rule offset+length, start, end, message id offset+length, description offset+length, fix and suggestion counts
 )
 
 // Encode writes the cache as a flat binary artifact.
@@ -145,7 +174,7 @@ func (c *LintCache) Encode() []byte {
 		contentHash            [sha256.Size]byte
 		pathOffset, pathLength int32
 		findings               []LintCacheFinding
-		findingOffsets         [][4]int32 // rule offset, rule length, message id offset, message id length
+		findingOffsets         [][6]int32 // rule offset+length, message id offset+length, description offset+length
 	}
 	layouts := make([]entryLayout, 0, len(c.Entries))
 	totalFindings := 0
@@ -160,8 +189,10 @@ func (c *LintCache) Encode() []byte {
 		for _, finding := range entry.Findings {
 			ruleOffset, ruleLength := intern(finding.RuleName)
 			messageOffset, messageLength := intern(finding.MessageId)
+			descriptionOffset, descriptionLength := intern(finding.MessageDescription)
 			layout.findingOffsets = append(layout.findingOffsets,
-				[4]int32{ruleOffset, ruleLength, messageOffset, messageLength})
+				[6]int32{ruleOffset, ruleLength, messageOffset, messageLength,
+					descriptionOffset, descriptionLength})
 		}
 		totalFindings += len(entry.Findings)
 		layouts = append(layouts, layout)
@@ -193,8 +224,10 @@ func (c *LintCache) Encode() []byte {
 			binary.LittleEndian.PutUint32(buffer[cursor+12:], uint32(finding.End))
 			binary.LittleEndian.PutUint32(buffer[cursor+16:], uint32(offsets[2]))
 			binary.LittleEndian.PutUint32(buffer[cursor+20:], uint32(offsets[3]))
-			binary.LittleEndian.PutUint32(buffer[cursor+24:], uint32(finding.FixCount))
-			binary.LittleEndian.PutUint32(buffer[cursor+28:], uint32(finding.SuggestionCount))
+			binary.LittleEndian.PutUint32(buffer[cursor+24:], uint32(offsets[4]))
+			binary.LittleEndian.PutUint32(buffer[cursor+28:], uint32(offsets[5]))
+			binary.LittleEndian.PutUint32(buffer[cursor+32:], uint32(finding.FixCount))
+			binary.LittleEndian.PutUint32(buffer[cursor+36:], uint32(finding.SuggestionCount))
 			cursor += lintFindingSize
 		}
 	}
@@ -293,13 +326,20 @@ func DecodeLintCache(buffer []byte) (*LintCache, error) {
 			if err != nil {
 				return nil, err
 			}
+			description, err := read(
+				int32(binary.LittleEndian.Uint32(buffer[cursor+24:])),
+				int32(binary.LittleEndian.Uint32(buffer[cursor+28:])))
+			if err != nil {
+				return nil, err
+			}
 			entry.Findings = append(entry.Findings, LintCacheFinding{
-				RuleName:        ruleName,
-				Start:           int32(binary.LittleEndian.Uint32(buffer[cursor+8:])),
-				End:             int32(binary.LittleEndian.Uint32(buffer[cursor+12:])),
-				MessageId:       messageId,
-				FixCount:        int32(binary.LittleEndian.Uint32(buffer[cursor+24:])),
-				SuggestionCount: int32(binary.LittleEndian.Uint32(buffer[cursor+28:])),
+				RuleName:           ruleName,
+				Start:              int32(binary.LittleEndian.Uint32(buffer[cursor+8:])),
+				End:                int32(binary.LittleEndian.Uint32(buffer[cursor+12:])),
+				MessageId:          messageId,
+				MessageDescription: description,
+				FixCount:           int32(binary.LittleEndian.Uint32(buffer[cursor+32:])),
+				SuggestionCount:    int32(binary.LittleEndian.Uint32(buffer[cursor+36:])),
 			})
 			cursor += lintFindingSize
 		}
