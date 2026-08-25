@@ -490,9 +490,11 @@ type dependencyTree struct {
 // insertion order with no sort (bundle 46967) and raises `CompilerError.invariant('Conflicting
 // access types')` when two entries disagree about a property, where oxc silently keeps the first.
 //
-// React is the truth, so there is no sort. The divergence is unobservable here for a measured
-// reason rather than an assumed one: `hoistable` is always empty in this tree, so there is nothing
-// to order and nothing to conflict. It becomes real if optional chains are ever reconstructed.
+// React is the truth, so there is no sort. The divergence WAS unobservable because `hoistable` was
+// always empty, and that is no longer the state: `CollectHoistablePropertyLoads` is built and
+// supplies real entries. Measured on `useMemo-alias-property-load-dep.ts`, the tree seeds three
+// roots, one carrying a property and marked non-null. So ordering and conflicts are now reachable
+// and this note is a live caveat rather than a dormant one.
 func newDependencyTree(hoistable map[IdentifierId]*hoistableNode) *dependencyTree {
 	if hoistable == nil {
 		hoistable = map[IdentifierId]*hoistableNode{}
@@ -512,8 +514,23 @@ func newDependencyTree(hoistable map[IdentifierId]*hoistableNode) *dependencyTre
 // to bare `props`. That is not an approximation of upstream -- it is exactly what React does when
 // handed an empty hoistable set (bundle 47019, the `else { break; }` arm), and it is the SAFE
 // direction: the scope is reported as depending on all of `props` rather than on `props.a.b`, so it
-// invalidates more often than strictly necessary and never less. Recovering the deeper paths is
-// what `DependencyGapNullPropagation` would buy.
+// invalidates more often than strictly necessary and never less.
+//
+// # The heading above is now only half the story, and the remaining half is measured
+//
+// The hoistable set is no longer empty, so this loop DOES descend where the analysis proved an
+// object non-null. Deep paths reach the tree: probed on `useMemo-alias-property-load-dep.ts`, the
+// collector accepts `propB.x.y` and `propA.x` alongside the bare roots.
+//
+// They are then discarded, and not here. `collectMinimalInSubtree` emits a node the moment it is
+// marked a dependency and does not walk its children, which is upstream's own shape. The bare root
+// is marked, so the deep paths under it are pruned as redundant -- correctly, given the root is
+// there. **The open question is why a bare access is recorded at all**, which is a question about
+// what `handleInstruction` visits rather than about this tree.
+//
+// Measured on the corpus, this is not an edge case: 171 dependencies carry a path and 1,435 do not.
+// `preserve-manual-memoization` cannot enable its third firing condition until it is answered; see
+// the gate at the pipeline in `preserve_manual_memoization.go`.
 func (t *dependencyTree) addDependency(dep ReactiveScopeDependency) {
 	root, ok := t.roots[dep.Identifier]
 	if !ok {
