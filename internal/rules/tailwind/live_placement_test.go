@@ -421,3 +421,96 @@ func livePlacementTopKeys(counts map[string]int, limit int) []string {
 	}
 	return keys
 }
+
+// TestConflictingClassesPerRepositoryPlacement reports the placement counts the way #mz0m6k8 asked.
+//
+// The aggregate test above answers "did the rule go quiet" over both repositories at once, which is
+// the question that matters most and is not the whole question. A rule can hold its total while one
+// repository's half collapses and the other's grows, and this corpus is two repositories whose
+// themes differ, which is exactly the situation where that could happen unnoticed.
+//
+// Measured before and after the table deletion, per repository:
+//
+//	ahra                asked 5947, resolved 5924  ->  resolved 5936
+//	www-connected-app   asked 5367, resolved 5343  ->  resolved 5352
+//	findings                     0             0   ->            0
+//
+// Both halves moved up, which is the direction the change predicts: the deleted tables were generated
+// from a snapshot of one repository and were structurally blind to roots either repository added
+// afterwards, while the computed path reads each repository's own design system.
+func TestConflictingClassesPerRepositoryPlacement(t *testing.T) {
+	literals := livePlacementLiterals(t)
+
+	type placement struct{ asked, resolved, findings int }
+	byRepository := map[string]*placement{}
+
+	for entryPoint, lists := range literals {
+		designSystem := livePlacementSystem(t, entryPoint)
+		if designSystem.Err != nil {
+			continue
+		}
+		counts := byRepository[entryPoint]
+		if counts == nil {
+			counts = &placement{}
+			byRepository[entryPoint] = counts
+		}
+		for _, classes := range lists {
+			seen := make(map[string]bool, len(classes))
+			distinct := make([]string, 0, len(classes))
+			for _, className := range classes {
+				counts.asked++
+				if seen[className] {
+					continue
+				}
+				seen[className] = true
+				distinct = append(distinct, className)
+				if _, canResolve := resolveClassFactsIn(className, designSystem); canResolve {
+					counts.resolved++
+				}
+			}
+			counts.findings += len(conflictFindingsIn(distinct, designSystem))
+		}
+	}
+
+	if len(byRepository) == 0 {
+		t.Skip("neither corpus repository is checked out here, so there is nothing to measure")
+	}
+
+	entryPoints := make([]string, 0, len(byRepository))
+	for entryPoint := range byRepository {
+		entryPoints = append(entryPoints, entryPoint)
+	}
+	sort.Strings(entryPoints)
+
+	for _, entryPoint := range entryPoints {
+		counts := byRepository[entryPoint]
+		t.Logf("%s: asked %d, resolved %d, %d findings", entryPoint, counts.asked, counts.resolved, counts.findings)
+
+		// Per repository rather than in total, which is the point of this test. A repository whose
+		// half stopped resolving would be invisible in the aggregate if the other half grew.
+		if counts.resolved*10 < counts.asked*9 {
+			t.Errorf("%s resolved %d of %d classes; a repository resolving under nine tenths of what it "+
+				"was asked has had a whole category of class stop resolving, and its finding count "+
+				"below would be measuring that silence", entryPoint, counts.resolved, counts.asked)
+		}
+		if counts.findings != 0 {
+			t.Errorf("%s reported %d findings and every literal in this corpus is one that repository "+
+				"actually wrote, so a finding is a conflict between classes that work", entryPoint, counts.findings)
+		}
+	}
+}
+
+// The resolution comparison that justified the deletion, and why it is not here.
+//
+// `TestConflictingClassesResolutionsDidNotChange` compared the computed answer against the four
+// deleted tables, class for class, over this corpus: 11,260 class occurrences answered by both,
+// 11,182 identical, 11 different. All 11 were `text-[<size>]` with no modifier, where the tables
+// said `{font-size, line-height}` and the computed answer says `font-size` alone. Upstream at v4.3.3
+// returns `[decl('font-size', value)]` outside `if (candidate.modifier)`, so the computed side is
+// right and the correction makes the rule stricter rather than quieter.
+//
+// It is deleted along with the tables it read, because a comparison with one side missing is not a
+// comparison. What survives is the per-repository placement above, which catches the rule going
+// quiet, and `TestComputedPropertiesMakeTheDistinctionsTheOverrideTablesHeld` in the engine package,
+// which pins each distinction the deleted tables encoded, including this `text` one in both
+// directions.

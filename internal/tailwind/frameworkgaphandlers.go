@@ -88,6 +88,18 @@ type UtilityBranch struct {
 	// with one, and PropertySort skips the first and counts the second. `text` uses it differently
 	// again: a modifier turns a font size into a font size plus a line height.
 	HasModifier bool
+	// ResolvedNamespace is the theme namespace a named value resolved through, when one that is not
+	// a colour decides an arm.
+	//
+	// `ResolvedAsColor` covers the colour namespaces, which is the split most of these roots make.
+	// One root splits on a namespace that is not a colour: `font` consults `--font` before
+	// `--font-weight`, so `font-mono` emits `font-family` and `font-medium` emits `font-weight`,
+	// and both are named values that infer as nothing. That is the branch `ClassDeclaredProperties`
+	// recorded as three per-class overrides.
+	//
+	// An input for the same reason `ResolvedAsColor` is: which keys are in `--font` is this
+	// repository's `@theme`, not Tailwind's.
+	ResolvedNamespace string
 }
 
 // UtilityBranchFor builds a branch from a parsed candidate and the root's own type list.
@@ -96,8 +108,8 @@ type UtilityBranch struct {
 // else is read off the candidate the same way upstream's handle body reads it: the presence of a
 // value, its kind, and the type inferred against the root's list in the root's own order, which
 // InferDataType already implements and which the descriptor rows already carry per root.
-func UtilityBranchFor(candidate *ParsedCandidate, typeList []DataType, resolvedAsColor bool) UtilityBranch {
-	branch := UtilityBranch{ResolvedAsColor: resolvedAsColor}
+func UtilityBranchFor(candidate *ParsedCandidate, typeList []DataType, resolvedAsColor bool, resolvedNamespace string) UtilityBranch {
+	branch := UtilityBranch{ResolvedAsColor: resolvedAsColor, ResolvedNamespace: resolvedNamespace}
 	if candidate == nil {
 		return branch
 	}
@@ -442,8 +454,24 @@ var gapEmitters = map[string]GapEmitter{
 			}
 			return declarations("--tw-font-weight", "font-weight")
 		}
-		if branch.ResolvedAsColor {
-			return nil
+		// `--font` is consulted before `--font-weight`, and its arm resolves the family together
+		// with two settings values from the same theme entry. So `font-mono` declares three
+		// properties and `font-medium` declares one, from one root and two named values that both
+		// infer as nothing.
+		if branch.ResolvedNamespace == "--font" {
+			// The two settings declarations carry `options['--font-feature-settings']`, which is
+			// undefined unless the theme entry defined it alongside the family. Upstream emits them
+			// regardless and an undefined value makes the declaration absent, which PropertySort
+			// skips and a conflict comparison must not see. Measured on ahra: neither `--font-mono`
+			// nor `--font-sans` carries either option, so both declarations are absent there.
+			//
+			// Emitted rather than elided so the shape matches the source, with the presence of the
+			// value carrying the difference the way it does for the shadow family's alpha.
+			return []*Node{
+				Declaration("font-family", gapEmitterValue),
+				absentValued("font-feature-settings"),
+				absentValued("font-variation-settings"),
+			}
 		}
 		return declarations("--tw-font-weight", "font-weight")
 	},

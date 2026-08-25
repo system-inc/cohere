@@ -275,120 +275,79 @@ func TestEveryGapRootHasAnEmitter(t *testing.T) {
 	t.Logf("emitters: %d roots in the slice, %d in gapEmitters", len(gapRoots), len(gapEmitters))
 }
 
-// TestGapRootPropertyNamesAgreeWithTheTable is the second check, and it is expected to disagree.
+// TestGapRootPropertyNamesAreDistinctPerArm replaces a comparison whose other side is gone.
 //
-// `RootDeclaredProperties` stores which CSS properties a root declares, and for these roots it
-// stores ONE list where the emitter produces several: `border` declares a width shape and a colour
-// shape, and the table has a single row. So the emitter and the table are two different claims and
-// the interesting result is where they part.
+// This compared the emitters against `RootDeclaredProperties` and expected to disagree: the table
+// stored one property list per root while these roots declare different properties per value, and 31
+// of 57 differed. #mz0m6k8 deleted that table precisely because the emitter is the correct side, so
+// the comparison has nothing left to compare against.
 //
-// The disagreement is asserted rather than tolerated. `object` is the case the milestone named: the
-// table stores `[object-fit]` for the whole root while `object-center` declares `object-position`,
-// and `ClassDeclaredProperties` patches thirteen classes on exactly that problem while leaving
-// `object-cover` and `object-fill` correct only because their reading happens to match. The emitter
-// is the correct side in every such case, because it reproduces the handle body per value where the
-// table stores one answer per root.
-func TestGapRootPropertyNamesAgreeWithTheTable(t *testing.T) {
-	// A branch per root that reproduces the arm the table's own row was measured on. For most roots
-	// that is a named value the theme did not answer as a colour, which is the width or size arm.
-	probe := UtilityBranch{HasValue: true}
-
-	var agreed, absent int
-	var disagreements []string
+// What it was really asserting was that the arms are distinct, and that is asserted directly here.
+// A root whose arms returned the same property list would have made the old comparison AGREE, which
+// is the direction that reads as success, so this is the check that carried the weight.
+func TestGapRootPropertyNamesAreDistinctPerArm(t *testing.T) {
+	// The roots that branch colour against not-colour. Each must declare different properties on the
+	// two arms, or a width and a colour of the same root would read as conflicting.
+	var distinct, identical int
 	for _, root := range gapRoots {
-		declared, found := RootDeclaredProperties[root]
-		if !found {
-			absent++
+		ordinary := PropertySort(EmitGapRoot(root, UtilityBranch{HasValue: true}))
+		colour := PropertySort(EmitGapRoot(root, UtilityBranch{HasValue: true, ResolvedAsColor: true}))
+		if len(ordinary.Order) == 0 && len(colour.Order) == 0 {
 			continue
 		}
-		emitted := EmitGapRoot(root, probe)
-		if len(emitted) == 0 {
-			// A root whose named arm emits nothing, such as `mask` or `bg-radial`. The table's row
-			// for it was measured on a different arm, so there is nothing to compare here.
-			absent++
+		if readingsEqual(
+			Reading{Order: ordinary.Order, Count: ordinary.Count},
+			Reading{Order: colour.Order, Count: colour.Count},
+		) {
+			identical++
 			continue
 		}
-
-		emittedNames := make(map[string]bool, len(emitted))
-		for _, node := range emitted {
-			emittedNames[node.Property] = true
-		}
-		matches := len(emittedNames) == len(declared)
-		for _, property := range declared {
-			if !emittedNames[property] {
-				matches = false
-			}
-		}
-		if matches {
-			agreed++
-			continue
-		}
-		disagreements = append(disagreements, root+": the table stores "+joinStrings(declared)+
-			", the ported handle declares "+describeDeclarations(emitted))
+		distinct++
 	}
 
-	sort.Strings(disagreements)
-	t.Logf("property names: %d roots agreed with RootDeclaredProperties, %d disagreed, %d had no comparable row",
-		agreed, len(disagreements), absent)
-	for _, disagreement := range disagreements {
-		t.Logf("expected disagreement, the emitter is the correct side: %s", disagreement)
-	}
+	t.Logf("arms: %d gap roots read differently for a colour than for their ordinary value, %d read the same",
+		distinct, identical)
 
-	// The disagreement is the point. If it reaches zero, either the table has been fixed, in which
-	// case delete this assertion, or this test has stopped comparing anything.
-	if len(disagreements) == 0 {
-		t.Error("no root disagreed with RootDeclaredProperties; that table stores one property list per root " +
-			"while these roots declare different properties per value, so at least the border family must differ. " +
-			"A zero here means this test stopped measuring rather than that the table became right")
+	// Named rather than asserted loosely. The border family alone is eleven roots that must split,
+	// and a zero here means every root now returns one answer for both values, which is the flattening
+	// the deleted override tables existed to work around.
+	if distinct == 0 {
+		t.Error("no gap root distinguishes a colour value from its ordinary one, so every branch has " +
+			"been flattened and a width would conflict with a colour on the same root")
 	}
 }
 
-// TestObjectRootDisagreesWithItsTableRow is the specific case the milestone named.
+// TestObjectRootAndItsStaticsDeclareDifferentProperties is what the table defect looked like once
+// the table was gone.
 //
-// `object` is not in this slice, and it is checked here because it is the clearest instance of the
-// defect the slice's own comparison has to expect. `RootDeclaredProperties` stores `[object-fit]`
-// for the whole root, and the single-declaration emitter declares `object-position`, because
-// `object-cover` is a fit and `object-center` is a position and the table holds one answer.
+// `RootDeclaredProperties` stored `[object-fit]` for root `object`, and the functional registration
+// declares `object-position`: `object-cover` is a static declaring a fit and `object-center` is the
+// functional root declaring a position. One row could hold only one of those, so
+// `ClassDeclaredProperties` patched nine `object-*` classes back while `object-cover` and
+// `object-fill` were correct only because they happened to read the row.
 //
-// `ClassDeclaredProperties` is a thirteen-entry patch on that problem and is incomplete by
-// construction: `object-center` has an override, `object-cover` and `object-fill` do not and are
-// right only because the value they happen to carry reads the same way.
-//
-// Asserted as a disagreement rather than fixed here, because fixing it is a different change with
-// its own measurement. What this pins is that the emitter is the side that reproduces the handle.
-func TestObjectRootDisagreesWithItsTableRow(t *testing.T) {
-	declared, found := RootDeclaredProperties["object"]
-	if !found {
-		t.Fatal("object has no RootDeclaredProperties row, so the disagreement this test pins cannot be observed")
-	}
+// Both tables are deleted. This asserts the two registrations still answer separately, which is what
+// makes the patch unnecessary rather than merely absent.
+func TestObjectRootAndItsStaticsDeclareDifferentProperties(t *testing.T) {
 	utility, known := FrameworkFunctionalUtilities["object"]
 	if !known {
 		t.Fatal("object is not in FrameworkFunctionalUtilities")
 	}
-
 	emitted := utility.Emit("object", ResolvedUtilityValue{Value: "zzsentinel"})
-	if len(emitted) != 1 {
-		t.Fatalf("object emitted %s; its registration is a single declaration", describeDeclarations(emitted))
+	if len(emitted) != 1 || emitted[0].Property != "object-position" {
+		t.Errorf("the functional root object emits %s; it declares object-position, and reading "+
+			"object-fit here is the defect the deleted table had", describeDeclarations(emitted))
 	}
 
-	if len(declared) == 1 && declared[0] == emitted[0].Property {
-		t.Errorf("object's table row and its emitter now agree on %q. Either the table was corrected, in which "+
-			"case delete this test, or the emitter was changed to match the table, which would be the wrong "+
-			"side: object-cover declares object-fit and object-center declares object-position, and one row "+
-			"cannot hold both", emitted[0].Property)
-	}
-	t.Logf("object: the table stores %s, the emitter declares %q. The emitter is correct: the root declares "+
-		"object-fit for a fit value and object-position for a position one, and the table holds one list per root",
-		joinStrings(declared), emitted[0].Property)
-
-	// The incompleteness of the patch, named rather than described. If `object-cover` gains an
-	// override the patch is no longer relying on an accident and this can be revisited.
-	if _, patched := ClassDeclaredProperties["object-center"]; !patched {
-		t.Error("object-center has no ClassDeclaredProperties override; it was the entry that made the patch " +
-			"visible, and without it this test is describing a patch that no longer exists")
-	}
-	if _, patched := ClassDeclaredProperties["object-cover"]; patched {
-		t.Log("object-cover now has an override too, so the patch is no longer incomplete in the way this test records")
+	for _, className := range []string{"object-cover", "object-fill", "object-contain"} {
+		declarations, isStatic := FrameworkStaticDeclarations[className]
+		if !isStatic {
+			t.Errorf("%s is not in FrameworkStaticDeclarations; it is a staticUtility declaring object-fit", className)
+			continue
+		}
+		if len(declarations) != 1 || declarations[0].Property != "object-fit" {
+			t.Errorf("%s declares %v; upstream registers it as a static object-fit", className, declarations)
+		}
 	}
 }
 

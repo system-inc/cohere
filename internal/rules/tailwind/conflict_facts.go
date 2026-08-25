@@ -9,7 +9,7 @@
 // # What moved
 //
 // The class is now dissected by `ParseCandidate` against the live design system rather than by a
-// prefix walk over `RootDeclaredProperties`. That fixes the same defect
+// prefix walk over the framework's root table. That fixes the same defect
 // `enforce-canonical-classes` had: the walk re-derived where a root ends, and which roots exist is a
 // question about this repository's `@utility` blocks as much as about the framework.
 //
@@ -20,28 +20,29 @@
 // every one of them a class the framework tables can only answer because the generator was run
 // against a repository that declared it.
 //
-// # What did not move, and why a reading is not a substitute
+// # What moved next, and why a reading was never the substitute
 //
-// The framework's own utilities stay on `RootDeclaredProperties` and its four companions. That is
-// not reluctance; it is that nothing in shipped Go can produce the answer. `px-4` is not an
-// `@utility` block, so the evaluator declines it — measured: `evaluatorHasRoot=false`,
-// `compiledProps=[]`. Compiling it needs the framework's own utility handlers, which is
-// `utilities.ts`, 6,827 lines, and porting it was rejected twice on this project already.
+// The framework's own utilities were on `RootDeclaredProperties` and three companions until
+// #mz0m6k8, and the reason given here was that nothing in shipped Go could produce the answer:
+// compiling `px-4` needs the framework's utility handlers, which is `utilities.ts`, 6,827 lines,
+// and porting it had been rejected twice.
 //
-// The tempting shortcut is `Table.Lookup`, which is per-repository, already built, and returns
-// `Order` — indices into `PropertyOrder`, invertible to property names. It gets the right answer on
-// 1,355 of the corpus's 1,530 resolvable classes, including the two cases the conflict tables carry
-// special entries for: `font-medium` reads `font-weight` and `font-mono` reads `font-family`, which
-// is exactly what `ClassDeclaredProperties` exists to record.
+// That is no longer true. The handle bodies are ported across three files in the engine package,
+// and `DeclaredPropertiesFor` runs them, so a class's declared properties are computed the way the
+// engine computes them. The four tables, 1,183 entries and 62 KB, are deleted.
 //
-// It is still the wrong source, and the 75 it gets wrong say why:
+// The shortcut this comment warned against is still the wrong one, and naming it is still worth the
+// space because it is the obvious move for anyone reading the emitters for the first time.
+// `Table.Lookup` returns `Order`, indices into `PropertyOrder`, invertible to property names. It got
+// 1,355 of the corpus's 1,530 resolvable classes right and 75 wrong. The port does not use it, and
+// the 75 say why:
 //
 //   - **The two table families answer deliberately different questions.**
 //     `OrderingPropertiesByRoot`'s own comment states it: the ordering tables keep `--tw-*` custom
-//     properties because they are what separates `shadow-lg` from `ring-1` in the sort, and the
-//     conflict tables strip them because two classes both setting `--tw-border-style` are not in
-//     conflict about anything an author sees. Stripping them here recovers `[box-shadow]` for both,
-//     which is right, and leaves `outline-none` and `ring-neutral-800` with nothing at all.
+//     properties because they are what separates `shadow-lg` from `ring-1` in the sort, and a
+//     conflict answer strips them because two classes both setting `--tw-border-style` are not in
+//     conflict about anything an author sees. Stripping them from a reading recovers `[box-shadow]`
+//     for both, which is right, and leaves `outline-none` and `ring-neutral-800` with nothing at all.
 //   - **A `--tw-sort` override replaces the reading entirely.** `divide-y` reads `divide-y-width`,
 //     which is not a CSS property and is not what the class declares; the class emits
 //     `border-top-width`, `border-top-style` and their bottom pair. `PropertySort`'s own comment
@@ -49,17 +50,31 @@
 //   - **A reading is a sorted set of positions, not a declaration list.** `backdrop-blur-sm`
 //     declares `-webkit-backdrop-filter` and `backdrop-filter`; only one has a position.
 //
-// So a class's sort position and a class's declared properties are two different facts that happen
-// to coincide most of the time, and a rule built on the coincidence is wrong in the direction that
-// invents conflicts between classes that compose. `no-conflicting-classes`'s own doc comment says a
-// port that got this wrong "would report the first and be wrong on correct code, which is how a rule
-// gets disabled."
+// Every one of those is a fact the declaration list has and the reading has thrown away, which is
+// why `DeclaredPropertiesFor` asks the emitters for the list and never touches a reading.
+//
+// # What the deletion fixed rather than preserved
+//
+// A generated table knows the repository it was generated from. Measured: 29 of ahra's roots and 27
+// of www-connected-app's were absent from `RootDeclaredProperties`, and 8 of ahra's own `@utility`
+// blocks were captured INTO `StaticDeclaredProperties` as though they were Tailwind's. Computing the
+// framework half and compiling the repository half puts each answer with the source that owns it.
+//
+// One answer changed, and it is a correction. `RootDeclaredProperties` stored
+// `{font-size, line-height}` for root `text`; upstream emits the line height only when a modifier is
+// written, so `text-[10px]` declares one property and `text-[10px]/6` declares two. 11 corpus
+// occurrences moved, and the rule got stricter rather than quieter: a class claiming `line-height`
+// it does not set is a class that fails to conflict with `leading-6` when it should.
 //
 // # The honest state of the boundary
 //
-// Five of this rule's seven tables remain framework data consulted through a repository-aware split.
-// `ColorNames` is the one that is genuinely per-repository and still generated, and it is a real gap
-// rather than a settled seam: a repository that defines its own palette has different color names,
+// Two of this rule's tables remain, counted rather than estimated. `ComposingRoots` decides whether
+// two values of a root layer or overwrite, which a declaration list cannot see because it carries no
+// values; it is task #mz0m6k8's sibling P4 and is deliberately untouched here so the two changes do
+// not race in one file.
+//
+// `ColorNames` is the other, and it is genuinely per-repository and still generated, which makes it a
+// real gap rather than a settled seam: a repository that defines its own palette has different color names,
 // and this rule reads Tailwind's. It is narrowed rather than closed here, since the theme is asked
 // first so a repository's own colors are recognised, and what remains is the framework's default
 // palette as a fallback for a repository that did not override it.
@@ -125,55 +140,90 @@ func resolveClassFactsIn(className string, designSystem DesignSystemResult) (cla
 		return facts, true
 	}
 
-	// The framework's half. Still the generated tables, for the reason in the file comment: nothing
-	// in shipped Go compiles a framework utility, so there is no live source to prefer.
+	// The framework's half, computed rather than looked up.
 	//
-	// The class is dissected by the live parser rather than by a prefix walk, so which root the
-	// tables are consulted FOR is a repository-aware answer even though the tables are not.
-	root, readsFunctionally := functionalRootIn(className, designSystem.System)
-
-	// A static's properties are keyed on its whole name rather than on a root, so it is answered
-	// before the root lookup and only when the parser did not read the class functionally. The order
-	// matters on the names that are both: `flex` is the static `display: flex` AND the root of
-	// `flex-4`, and taking the static entry for `flex-4` would give it `display`.
-	if !readsFunctionally {
-		properties, isStatic := tailwindengine.StaticDeclaredProperties[base]
-		if !isStatic {
-			return classFacts{}, false
-		}
-		return classFacts{
-			ClassName:     className,
-			Variants:      variants,
-			SelectorShape: selectorShapeOf(base),
-			Properties:    properties,
-			Composes:      tailwindengine.ComposingRoots[base],
-		}, true
-	}
-
-	properties := tailwindengine.RootDeclaredProperties[root]
-
-	// A root's entry is the common case, and two kinds of class take a different reading. A color
-	// value, handled per root because the color scale is large and uniform. And a handful of named
-	// values whose properties simply differ: `font-medium` declares `font-weight` while `font-mono`
-	// declares `font-family`, and both parse as root `font`. Taking the root's reading for those
-	// reported `font-medium font-mono` as a conflict on correct code.
-	if classProperties, hasClassReading := tailwindengine.ClassDeclaredProperties[base]; hasClassReading {
-		properties = classProperties
-	} else if colorProperties, hasColorReading := tailwindengine.RootColorProperties[root]; hasColorReading &&
-		valueIsColorIn(base, root, designSystem.System) {
-		properties = colorProperties
-	}
-	if len(properties) == 0 {
+	// This was four generated tables until #mz0m6k8: a static list, a root list, thirteen per-class
+	// overrides and fifteen colour arms. `DeclaredPropertiesFor` runs the ported handle bodies
+	// instead, so the answer follows from the value the way the engine's does and the three override
+	// tables have nothing left to patch. The measurement that justified deleting them ran while both
+	// sides existed: 13 of 13 class overrides and 15 of 15 colour arms reproduced, and 839 of 839
+	// statics, with 8 declines that were this repository's own `@utility` blocks captured into a
+	// framework table.
+	//
+	// What this fixes rather than preserves is the blindness the tables had to a repository's own
+	// roots. A generated table knows the repository it was generated from, and 29 of ahra's roots
+	// and 27 of www-connected-app's were absent from it.
+	parsed := tailwindengine.ParseCandidate(className, designSystem.System)
+	if len(parsed) == 0 {
 		return classFacts{}, false
+	}
+	// The first reading, matching every other consumer of the parser in this package. See
+	// `gate.go:227` for the measurement that choice rests on.
+	candidate := parsed[0]
+
+	properties, canCompute := tailwindengine.DeclaredPropertiesFor(
+		&candidate,
+		valueResolutionIn(base, &candidate, designSystem.System),
+	)
+	if !canCompute {
+		return classFacts{}, false
+	}
+
+	// The name the shape and the composition flag are keyed on. A static is keyed on its whole name
+	// and a functional class on its root, which is the same split the deleted tables made: `flex` is
+	// the static `display: flex` AND the root of `flex-4`, and one key cannot serve both.
+	shapeKey := base
+	if candidate.Kind == tailwindengine.ParsedCandidateKindFunctional {
+		shapeKey = candidate.Root
 	}
 
 	return classFacts{
 		ClassName:     className,
 		Variants:      variants,
-		SelectorShape: selectorShapeOf(root),
+		SelectorShape: selectorShapeOf(shapeKey),
 		Properties:    properties,
-		Composes:      tailwindengine.ComposingRoots[root],
+		Composes:      tailwindengine.ComposingRoots[shapeKey],
 	}, true
+}
+
+// valueResolutionIn asks this repository's theme what a class's value resolved through.
+//
+// The emitters need this and deliberately do not compute it: which keys are in `--color` or `--font`
+// is a fact about the repository's `@theme`, and answering it inside the engine's framework tables
+// would put one repository's tokens in a file describing Tailwind. So the question is asked here,
+// where a live design system is in hand.
+//
+// Two namespaces are consulted because two decide an arm. The colour namespaces separate
+// `border-red-500` from `border-4`, which is most of these roots. `--font` separates `font-mono` from
+// `font-medium`, which is neither a colour nor an inferable type, and is what the three
+// `ClassDeclaredProperties` font overrides recorded.
+//
+// Flattening either half is loud rather than silent, which was measured: forcing `IsColor` to false
+// makes every colour class report its root's width properties, and the corpus goes from 0 findings to
+// 206 across both repositories.
+func valueResolutionIn(
+	base string,
+	candidate *tailwindengine.ParsedCandidate,
+	system *tailwindengine.LoadedDesignSystem,
+) tailwindengine.ValueResolution {
+	if candidate.Kind != tailwindengine.ParsedCandidateKindFunctional {
+		return tailwindengine.ValueResolution{}
+	}
+
+	resolution := tailwindengine.ValueResolution{
+		IsColor: valueIsColorIn(base, candidate.Root, system),
+	}
+
+	// `--font` is consulted only for the root that branches on it. Asking for every root would make
+	// a value that happens to name a font key change an unrelated root's answer, which is the shape
+	// of defect the bare-value precedence in `descriptor.go` exists to prevent.
+	if candidate.Root == "font" && candidate.Value != nil &&
+		candidate.Value.Kind == tailwindengine.ParsedValueKindNamed && system != nil {
+		if _, isFontKey := system.Theme().Get([]string{"--font-" + candidate.Value.Value}); isFontKey {
+			resolution.Namespace = "--font"
+		}
+	}
+	return resolution
 }
 
 // repositoryClassFacts answers for a class the repository's own `@utility` blocks declare.
@@ -245,7 +295,7 @@ func repositoryClassFacts(
 
 // functionalRootIn returns the root a class reads as, when the design system reads it functionally.
 //
-// This replaces `functionalRootOf`'s longest-prefix walk over `RootDeclaredProperties`. The walk's
+// This replaces `functionalRootOf`'s longest-prefix walk over the deleted root table. The walk's
 // own comment records why longest-wins was needed — `border-l-4` has root `border-l` rather than
 // `border`, and the shorter match gives it `border-width` instead of `border-left-width`, which
 // changes what it conflicts with — and the parser answers the same question without re-deriving it.

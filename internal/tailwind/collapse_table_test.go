@@ -1,6 +1,7 @@
 package tailwind
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -180,14 +181,10 @@ func tableContains(want CollapseFamily) bool {
 // each other, because a table where `flex` and `block` disagree about their property cannot report
 // the conflict between them however correct each entry looks alone.
 func TestDeclaredPropertiesCoverBothReadings(t *testing.T) {
-	if len(StaticDeclaredProperties) == 0 || len(RootDeclaredProperties) == 0 {
-		t.Fatal("a property table is empty, so every assertion below passes for the wrong reason")
-	}
-
 	// Names that are genuinely both. Their static reading is what `no-conflicting-classes` needs.
 	bothReadings := []string{"flex", "block"}
 	for _, name := range bothReadings {
-		staticProperties, hasStatic := StaticDeclaredProperties[name]
+		staticProperties, hasStatic := declaredPropertiesOfStatic(name)
 		if !hasStatic {
 			t.Errorf("%q is missing from the static table. It is both a static utility and a "+
 				"functional root, and a generator that classifies rather than records loses whichever "+
@@ -199,7 +196,7 @@ func TestDeclaredPropertiesCoverBothReadings(t *testing.T) {
 		}
 
 		// The functional reading should also be present, and should NOT be display.
-		if functionalProperties, hasFunctional := RootDeclaredProperties[name]; hasFunctional {
+		if functionalProperties, hasFunctional := declaredPropertiesOfRoot(name); hasFunctional {
 			if containsProperty(functionalProperties, "display") {
 				t.Errorf("%q as a functional root declares display, which means the static reading "+
 					"overwrote the functional one rather than both being recorded", name)
@@ -210,9 +207,9 @@ func TestDeclaredPropertiesCoverBothReadings(t *testing.T) {
 	// Every display utility must agree, or a conflict between two of them cannot be detected.
 	displayUtilities := []string{"flex", "block", "hidden", "grid", "inline"}
 	for _, name := range displayUtilities {
-		properties, isPresent := StaticDeclaredProperties[name]
+		properties, isPresent := declaredPropertiesOfStatic(name)
 		if !isPresent {
-			t.Errorf("%q is missing from the static table, so a conflict involving it is invisible", name)
+			t.Errorf("%q has no computed static reading, so a conflict involving it is invisible", name)
 			continue
 		}
 		if !containsProperty(properties, "display") {
@@ -222,10 +219,10 @@ func TestDeclaredPropertiesCoverBothReadings(t *testing.T) {
 	}
 
 	// The property-name-not-value distinction, which inverts two answers if it is lost.
-	width, hasWidth := RootDeclaredProperties["w"]
-	height, hasHeight := RootDeclaredProperties["h"]
+	width, hasWidth := declaredPropertiesOfRoot("w")
+	height, hasHeight := declaredPropertiesOfRoot("h")
 	if !hasWidth || !hasHeight {
-		t.Fatal("w or h is missing from the root table")
+		t.Fatal("w or h has no computed reading")
 	}
 	if containsProperty(width, "height") || containsProperty(height, "width") {
 		t.Error("w and h share a property, so `w-8 h-8` would be reported as a conflict when it is a " +
@@ -233,10 +230,10 @@ func TestDeclaredPropertiesCoverBothReadings(t *testing.T) {
 	}
 
 	// And the shorthand distinction upstream deliberately does not normalise.
-	padding, hasPadding := RootDeclaredProperties["p"]
-	paddingInline, hasPaddingInline := RootDeclaredProperties["px"]
+	padding, hasPadding := declaredPropertiesOfRoot("p")
+	paddingInline, hasPaddingInline := declaredPropertiesOfRoot("px")
 	if !hasPadding || !hasPaddingInline {
-		t.Fatal("p or px is missing from the root table")
+		t.Fatal("p or px has no computed reading")
 	}
 	for _, property := range padding {
 		if containsProperty(paddingInline, property) {
@@ -245,6 +242,72 @@ func TestDeclaredPropertiesCoverBothReadings(t *testing.T) {
 				"property names even though they visually overlap.", property)
 		}
 	}
+}
+
+// declaredPropertiesOfStatic is the computed answer for a static utility.
+//
+// These tests asserted invariants about `StaticDeclaredProperties` and its three companions, which
+// #mz0m6k8 deleted in favour of computing the answer from the ported handle bodies. The invariants
+// did not go away with the tables, so they are asserted against the computed source instead: an
+// answer that is now derived rather than stored still has to be the right answer.
+func declaredPropertiesOfStatic(className string) ([]string, bool) {
+	return DeclaredPropertiesFor(&ParsedCandidate{Kind: ParsedCandidateKindStatic, Root: className}, ValueResolution{})
+}
+
+// declaredPropertiesOfRoot is the computed answer for a functional root on its ordinary arm.
+//
+// The probe value is a named one that resolves through nothing, which is the arm the deleted root
+// table recorded. A root that branches on a colour or a theme namespace is asked for that arm
+// explicitly where a test needs it.
+func declaredPropertiesOfRoot(root string) ([]string, bool) {
+	return DeclaredPropertiesFor(&ParsedCandidate{
+		Kind:  ParsedCandidateKindFunctional,
+		Root:  root,
+		Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "zzprobe"},
+	}, ValueResolution{})
+}
+
+// computedPropertyTables is every class and root answer the emitters produce, for the sweeps below.
+//
+// The two tests that follow swept the deleted tables looking for a property name that is not a CSS
+// property. That guard is still worth having and is now stronger: it sweeps what the emitters
+// actually produce rather than what a generator once wrote down, so a bad property name introduced
+// in a handle body is caught rather than only one baked into a table.
+//
+// Built from the emitter registries so the population is every root the port answers, and from
+// `FrameworkStaticDeclarations` for the static half.
+func computedPropertyTables() map[string][]string {
+	entries := map[string][]string{}
+	for className := range FrameworkStaticDeclarations {
+		if properties, resolved := declaredPropertiesOfStatic(className); resolved {
+			entries[className] = properties
+		}
+	}
+	roots := map[string]bool{}
+	for root := range FrameworkFunctionalUtilities {
+		roots[root] = true
+	}
+	for root := range FrameworkMultiDeclarationUtilities {
+		roots[root] = true
+	}
+	for root := range gapEmitters {
+		roots[root] = true
+	}
+	for root := range roots {
+		if properties, resolved := declaredPropertiesOfRoot(root); resolved {
+			entries[root] = properties
+		}
+		// The colour arm too, since it declares property names the ordinary arm does not.
+		colored, resolved := DeclaredPropertiesFor(&ParsedCandidate{
+			Kind:  ParsedCandidateKindFunctional,
+			Root:  root,
+			Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "red-500"},
+		}, ValueResolution{IsColor: true})
+		if resolved {
+			entries[root+" (colour arm)"] = colored
+		}
+	}
+	return entries
 }
 
 func containsProperty(properties []string, want string) bool {
@@ -273,8 +336,7 @@ func TestPropertiesExcludeAtRuleDescriptors(t *testing.T) {
 		name    string
 		entries map[string][]string
 	}{
-		{name: "root", entries: RootDeclaredProperties},
-		{name: "static", entries: StaticDeclaredProperties},
+		{name: "computed", entries: computedPropertyTables()},
 	} {
 		for utility, properties := range table.entries {
 			for _, descriptor := range descriptors {
@@ -288,10 +350,10 @@ func TestPropertiesExcludeAtRuleDescriptors(t *testing.T) {
 	}
 
 	// The specific pair that exposed it.
-	left, hasLeft := RootDeclaredProperties["border-l"]
-	right, hasRight := RootDeclaredProperties["border-r"]
+	left, hasLeft := declaredPropertiesOfRoot("border-l")
+	right, hasRight := declaredPropertiesOfRoot("border-r")
 	if !hasLeft || !hasRight {
-		t.Fatal("border-l or border-r is missing from the root table")
+		t.Fatal("border-l or border-r has no computed reading")
 	}
 	for _, property := range left {
 		if containsProperty(right, property) {
@@ -335,9 +397,7 @@ func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
 		name    string
 		entries map[string][]string
 	}{
-		{name: "root", entries: RootDeclaredProperties},
-		{name: "static", entries: StaticDeclaredProperties},
-		{name: "color", entries: RootColorProperties},
+		{name: "computed", entries: computedPropertyTables()},
 	} {
 		if len(table.entries) == 0 {
 			t.Fatalf("the %s table is empty, so this assertion passes for the wrong reason", table.name)
@@ -357,7 +417,7 @@ func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
 
 	// Multi-rule component classes are skipped entirely rather than merged, so they must be absent.
 	for _, componentClass := range []string{"markdown-content", "prose", "typing-dots"} {
-		if properties, isPresent := StaticDeclaredProperties[componentClass]; isPresent {
+		if properties, isPresent := declaredPropertiesOfStatic(componentClass); isPresent {
 			t.Errorf("%q is a component class emitting several rules targeting descendants, so its "+
 				"declarations belong to children rather than to the element. It should be absent, not "+
 				"recorded as %v.", componentClass, properties)
@@ -365,7 +425,7 @@ func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
 	}
 
 	// A class that declares only custom properties records nothing rather than recording itself.
-	if properties, isPresent := StaticDeclaredProperties["slide-in-from-end"]; isPresent {
+	if properties, isPresent := declaredPropertiesOfStatic("slide-in-from-end"); isPresent {
 		t.Errorf("slide-in-from-end declares only a custom property and should be absent, got %v", properties)
 	}
 }
@@ -380,48 +440,78 @@ func TestPropertyExtractionRejectsSelectorsAndKeyframes(t *testing.T) {
 // Colors are the same shape at a different scale, handled per root because the palette is large and
 // uniform: `border` is width plus style with a number and `border-color` with a color.
 func TestValueDependentReadingsAreRecorded(t *testing.T) {
-	if len(ClassDeclaredProperties) == 0 {
-		t.Fatal("the per-class table is empty, so every assertion below passes for the wrong reason")
-	}
-
-	// The named-value exceptions.
-	for className, wantProperty := range map[string]string{
-		"font-mono":     "font-family",
-		"font-sans":     "font-family",
-		"object-cover":  "object-fit",
-		"object-top":    "object-position",
-		"object-center": "object-position",
+	// The named-value distinctions, computed rather than excepted.
+	//
+	// `ClassDeclaredProperties` held these as thirteen per-class overrides because a root-keyed table
+	// has one answer per root and these classes needed a second. The emitter branches on the value, so
+	// the distinction falls out of running the handle body and there is nothing left to override.
+	// TestOverrideTablesCollapseIntoTheEmitter measured that collapse at 13 of 13 before the table was
+	// deleted; this asserts the distinction itself survives, which is the thing the table existed for.
+	for _, expectation := range []struct {
+		className    string
+		resolution   ValueResolution
+		wantProperty string
+	}{
+		// `font` splits on the theme namespace: `--font` gives a family, `--font-weight` a weight.
+		{className: "font-mono", resolution: ValueResolution{Namespace: "--font"}, wantProperty: "font-family"},
+		{className: "font-sans", resolution: ValueResolution{Namespace: "--font"}, wantProperty: "font-family"},
+		{className: "font-medium", resolution: ValueResolution{}, wantProperty: "font-weight"},
 	} {
-		properties := ClassDeclaredProperties[className]
-		if len(properties) == 0 {
-			// `object-cover` takes the root's reading, so absence here is correct for it.
-			if className == "object-cover" {
-				continue
-			}
-			t.Errorf("%q is missing from the per-class table, so it would take its root's reading and "+
-				"be reported as conflicting with classes it shares no property with", className)
+		root, value, _ := strings.Cut(expectation.className, "-")
+		properties, resolved := DeclaredPropertiesFor(&ParsedCandidate{
+			Kind:  ParsedCandidateKindFunctional,
+			Root:  root,
+			Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: value},
+		}, expectation.resolution)
+		if !resolved {
+			t.Errorf("%q computes no properties, so it would be skipped rather than compared", expectation.className)
 			continue
 		}
-		if !containsProperty(properties, wantProperty) {
-			t.Errorf("%q declares %v, want %q", className, properties, wantProperty)
+		if !containsProperty(properties, expectation.wantProperty) {
+			t.Errorf("%q computes %v, want %q. Without this distinction `font-medium font-mono` reads as "+
+				"a conflict on correct code, which is what the deleted overrides existed to prevent",
+				expectation.className, properties, expectation.wantProperty)
 		}
 	}
 
-	// The exceptions must not swallow the whole color scale: that produced 8,428 entries and a
-	// 10,000-line file before colors were excluded, for a distinction the color reading makes.
-	if len(ClassDeclaredProperties) > 200 {
-		t.Errorf("the per-class table holds %d entries, which means the color scale is being recorded "+
-			"class by class rather than once per root", len(ClassDeclaredProperties))
+	// `object` is the case the override table could not express and the emitter can.
+	//
+	// The functional root declares `object-position`; `object-cover` and `object-fill` are separate
+	// static utilities declaring `object-fit`. `RootDeclaredProperties` stored `[object-fit]` for the
+	// whole root, and `ClassDeclaredProperties` patched nine `object-*` classes back to
+	// `object-position` while `object-cover` was correct only because it read the root's row. Asking
+	// the two registrations separately gives both answers with no override at all.
+	if properties, resolved := declaredPropertiesOfRoot("object"); !resolved {
+		t.Error("root `object` computes nothing")
+	} else if !containsProperty(properties, "object-position") {
+		t.Errorf("root `object` computes %v, want object-position. The functional registration is a "+
+			"position; the fits are separate statics", properties)
+	}
+	if properties, resolved := declaredPropertiesOfStatic("object-cover"); !resolved {
+		t.Error("static `object-cover` computes nothing")
+	} else if !containsProperty(properties, "object-fit") {
+		t.Errorf("static `object-cover` computes %v, want object-fit", properties)
 	}
 
-	// And the root readings that matter must still disagree, or the exceptions are pointless.
-	fontRoot := RootDeclaredProperties["font"]
-	if len(fontRoot) == 0 {
-		t.Fatal("root `font` is missing from the table")
+	// And the two arms of one root must still disagree, or the distinction is not being made.
+	//
+	// `border` is width plus style with a number and a colour with a colour. This is the shape every
+	// one of the 57 gap roots has and the reason a root-keyed table needed fifteen colour arms beside
+	// it.
+	width, hasWidth := declaredPropertiesOfRoot("border")
+	colour, hasColour := DeclaredPropertiesFor(&ParsedCandidate{
+		Kind:  ParsedCandidateKindFunctional,
+		Root:  "border",
+		Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "red-500"},
+	}, ValueResolution{IsColor: true})
+	if !hasWidth || !hasColour {
+		t.Fatal("root `border` computes nothing on one of its two arms")
 	}
-	if containsProperty(fontRoot, "font-family") && containsProperty(fontRoot, "font-weight") {
-		t.Error("root `font` claims both font-family and font-weight, which means a probe merged two " +
-			"readings rather than recording one and excepting the other")
+	for _, property := range width {
+		if containsProperty(colour, property) {
+			t.Errorf("border's width arm and colour arm share %q, which means one answer is being "+
+				"returned for both values rather than the branch being taken", property)
+		}
 	}
 }
 
@@ -452,9 +542,9 @@ func TestValueDependentReadingsAreRecorded(t *testing.T) {
 func TestCollapseFamiliesAreCssShorthandRelationships(t *testing.T) {
 	withProperties := 0
 	for _, family := range CollapseFamilies {
-		first := RootDeclaredProperties[family.First]
-		second := RootDeclaredProperties[family.Second]
-		output := RootDeclaredProperties[family.Output]
+		first, _ := declaredPropertiesOfRoot(strings.TrimPrefix(family.First, "-"))
+		second, _ := declaredPropertiesOfRoot(strings.TrimPrefix(family.Second, "-"))
+		output, _ := declaredPropertiesOfRoot(strings.TrimPrefix(family.Output, "-"))
 		if len(first) == 0 || len(second) == 0 || len(output) == 0 {
 			t.Errorf("%s + %s => %s: one of the three declares no properties, so this family is not a "+
 				"shorthand relationship and the reasoning in this test does not cover it",

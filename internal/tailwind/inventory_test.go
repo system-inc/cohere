@@ -32,12 +32,6 @@ import "testing"
 //	baseDescriptors          78   the reading partitions on the value's resolved type, and no
 //	                              registration shape carries both halves: `border-[3px]` is a width
 //	                              and `border-red-500` is a colour.
-//	RootDeclaredProperties  308   which properties a root declares. A reading is lossy past a
-//	                              `--tw-sort` override: `space-x-4` reads `[132]`, which is
-//	                              `row-gap`, while the root declares the two margin-inline
-//	                              properties. Measured: 251 of 308 invert correctly, 42 cannot in
-//	                              principle, and `-webkit-backdrop-filter` is not in PropertyOrder
-//	                              at all so no reading can carry it.
 //	ComposingRoots           82   whether two values of a root layer or overwrite. A reading cannot
 //	                              see values, so both answers look identical. Measured with a
 //	                              control: 79 of 79 composing roots and 4 of 4 non-composing roots
@@ -48,7 +42,11 @@ import "testing"
 //	                              it means carrying a shorthand table of equal size, one layer
 //	                              further from the question.
 //
-// # Why not port the emitting half and delete all four
+// `RootDeclaredProperties` and its three companions were here until #mz0m6k8, carried for exactly the
+// reason the paragraph below rejected. The emitting half is now ported, so the answer is computed by
+// `DeclaredPropertiesFor` and the four tables, 1,183 entries and 62 KB, are deleted.
+//
+// # Why not port the emitting half and delete the rest
 //
 // Measured rather than assumed. `utilities.ts` holds 582 `decl()` call sites and 374 of them compute
 // their value, which means porting `color-mix`, `withAlpha`, `calc` and the 729-reference `--tw-*`
@@ -72,10 +70,9 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 		"FrameworkMultiDeclaration":     len(FrameworkMultiDeclarationUtilities),
 	}
 	ours := map[string]int{
-		"baseDescriptors":        len(baseDescriptors),
-		"RootDeclaredProperties": len(RootDeclaredProperties),
-		"ComposingRoots":         len(ComposingRoots),
-		"CollapseFamilies":       len(CollapseFamilies),
+		"baseDescriptors":  len(baseDescriptors),
+		"ComposingRoots":   len(ComposingRoots),
+		"CollapseFamilies": len(CollapseFamilies),
 	}
 
 	for name, count := range upstream {
@@ -93,8 +90,8 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	// The count of tables, not their contents. A fifth table of ours appearing without an entry in
 	// the doc comment above is the thing this catches: the inventory going stale is how a table ends
 	// up carried for no stated reason, which is what this package started with.
-	if len(ours) != 4 {
-		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 4, so "+
+	if len(ours) != 3 {
+		t.Errorf("the inventory lists %d tables of our own; the doc comment above accounts for 3, so "+
 			"one has been added or removed without its reason being written down", len(ours))
 	}
 
@@ -112,7 +109,7 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(t *testing.T) {
 	inPackage := []string{
 		"PropertyOrder", "SortOverrideProperties", "FrameworkVariantRegistrations",
 		"FrameworkStaticDeclarations", "FrameworkFunctionalUtilities", "FrameworkMultiDeclaration",
-		"baseDescriptors", "RootDeclaredProperties", "ComposingRoots", "CollapseFamilies",
+		"baseDescriptors", "ComposingRoots", "CollapseFamilies",
 	}
 	accounted := make(map[string]bool, len(upstream)+len(ours))
 	for name := range upstream {
