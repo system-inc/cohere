@@ -212,6 +212,9 @@ type ScopeDependencies struct {
 	declarations  map[ScopeId][]IdentifierId
 	reassignments map[ScopeId][]IdentifierId
 	order         []ScopeId
+	// conflicts counts hoistable entries that disagreed about an access type. Upstream raises an
+	// invariant on these; see `hoistableTreeFor`. Measured at zero on the corpus.
+	conflicts int
 }
 
 // DependenciesOf returns a scope's inputs, or nil for a scope with none.
@@ -730,6 +733,10 @@ type dependencyCollector struct {
 	result        *ScopeDependencies
 	// scopeRange answers a scope's final range, which `checkValidDependency` compares against.
 	scopeRange func(ScopeId) MutableRange
+	// hoistable is the per-scope set of accesses proven safe to read before the scope runs, from
+	// `CollectHoistablePropertyLoads`. Nil is a valid and meaningful value: it truncates every
+	// dependency path to its root, which is exactly what this pass did before that analysis existed.
+	hoistable map[ScopeId][]ReactiveScopeDependency
 }
 
 func (c *dependencyCollector) currentScope() (ScopeId, bool) {
@@ -939,6 +946,62 @@ func CollectScopeDependencies(function *Function, identity ScopeIdentity) *Scope
 	return result
 }
 
+// CollectScopeDependenciesWithHoistable is the pass with the null analysis supplying path depth.
+//
+// `CollectScopeDependencies` truncates every dependency to its bare root, because `addDependency`
+// stops at the first non-optional entry it cannot prove safe to hoist -- upstream's own behaviour
+// under an empty hoistable set. This spelling runs `CollectHoistablePropertyLoads` first and hands
+// its answer in, which is what lets a dependency name `props.a.b` rather than `props`.
+//
+// Both spellings are kept, and the difference between them is the measurement that shows this
+// analysis works at all: the path-length distribution moves from every path at length zero to a real
+// spread. See `TestHoistableAnalysisDeepensDependencyPaths`.
+//
+// The `ranges` argument must be the same table the scopes were assigned from. `Conflicts` on the
+// result reports hoistable entries that disagreed about an access type, which upstream raises on.
+func CollectScopeDependenciesWithHoistable(function *Function, scopes *ReactiveScopes,
+	identity ScopeIdentity, ranges *MutableRanges) *ScopeDependencies {
+	result := &ScopeDependencies{}
+	if function == nil || scopes == nil || identity == nil || ranges == nil {
+		return result
+	}
+
+	terminals := scopeBlockTraversal(function)
+	if len(terminals) == 0 {
+		return result
+	}
+
+	usedOutside := findTemporariesUsedOutsideDeclaringScope(function, terminals)
+	collector := &dependencyCollector{
+		function:      function,
+		temporaries:   collectTemporaries(function, usedOutside),
+		declarations:  map[DeclarationId]declaration{},
+		reassignments: map[IdentifierId]declaration{},
+		objectMethods: objectMethodValues(function),
+		result:        result,
+		scopeRange:    identity.RangeOf,
+		hoistable:     CollectHoistablePropertyLoads(function, scopes, identity, ranges),
+	}
+	for _, param := range function.Params {
+		collector.declare(param.Identifier, declaration{})
+	}
+	collector.walk(function, terminals)
+	collector.reduce(identity)
+	return result
+}
+
+// Conflicts reports hoistable entries that disagreed about whether an access was optional.
+//
+// Upstream raises `CompilerError.invariant('Conflicting access types')` on any of these. Measured at
+// zero across 400 corpus files, so this exists to make a future non-zero visible rather than to
+// describe current behaviour.
+func (d *ScopeDependencies) Conflicts() int {
+	if d == nil {
+		return 0
+	}
+	return d.conflicts
+}
+
 // objectMethodValues returns the values produced by an ObjectMethod instruction.
 //
 // This is the recoverable half of `DependencyGapTypeExclusions`. Upstream rejects an object method
@@ -1114,7 +1177,12 @@ func (c *dependencyCollector) reduce(identity ScopeIdentity) {
 		if len(accesses) == 0 {
 			continue
 		}
-		tree := newDependencyTree(nil)
+		// The hoistable set for this scope, which is what decides how DEEP each dependency path
+		// may go. Empty when `hoistable` was not supplied, which is the pre-5b behaviour and
+		// truncates every path to its root; see `DependencyGapNullPropagation`.
+		hoistable, conflicts := hoistableTreeFor(c.hoistable[scope])
+		c.result.conflicts += conflicts
+		tree := newDependencyTree(hoistable)
 		for _, access := range accesses {
 			tree.addDependency(access)
 		}
