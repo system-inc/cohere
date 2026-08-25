@@ -1,58 +1,39 @@
 package prettier
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
 
-// newTestEngine builds an engine, skipping when the fork's bundles are not on this machine.
+// newTestEngine builds an engine, and no longer skips when a fork is absent.
 //
-// Skipping rather than failing because the bundle path is still a local checkout until the build
-// step vendors them. A skip says "not measured here"; a pass would say "measured and fine", and the
-// difference is the whole reason this package exists.
+// This function used to stat a directory and skip the whole file when it was missing, because the
+// bundles were build output of a checkout that only existed on one machine. That skip is gone, and
+// the reason it is gone is the point of the vendoring: the bundles are embedded, so there is no
+// machine where they can be absent, and a failure here is a real failure rather than a missing
+// dependency.
 //
-// But a skip is only truthful to a reader who reads it, and the reader that matters is a CI summary
-// that prints `ok  internal/prettier` and swallows the line. On any machine without the fork, every
-// test in this file skips and the package reports as passing over an engine that cannot load a
-// single bundle -- which is the exact shape the coverage line exists to prevent, a run that checked
-// nothing looking like a run that found nothing, sitting inside our own suite.
-//
-// So the skip names the count and the consequence rather than the path alone. It cannot make `go
-// test` print red, and it should not: the honest state today is genuinely "not measured here".
-//
-// Be precise about how little that buys, because the first version of this comment overclaimed it.
-// This message reaches a `-v` reader and nobody else. A plain run prints `ok internal/prettier` and
-// exit 0 with no trace of it, which is what CI sees:
+// Worth keeping the record of why that skip was dangerous, because the same shape will be proposed
+// again for something else. A skip is truthful only to a reader who reads it, and the reader that
+// mattered was a CI summary printing `ok internal/prettier` and swallowing the line. Every assertion
+// in this file skipped, and the package reported as passing over an engine that could not load a
+// single bundle:
 //
 //	VERIFY_PRETTIER_FORK=/nonexistent go test ./internal/prettier/
 //	ok  github.com/system-inc/verify/internal/prettier  0.208s   exit=0
 //
-// And that is not a property of `t.Skipf` that some other mechanism dodges. Measured: a `TestMain`
-// writing the same warning straight to `os.Stderr` is swallowed too. `go test` suppresses a passing
-// package's output regardless of where it came from, so the only thing that changes a plain run is
-// the package not passing.
-//
-// Which means the skip message is a courtesy to a human reading verbose output, not a guard. The
-// guard is vendoring: when the bundles are embedded, absence becomes a hard failure and the run goes
-// red on its own. Do not reach for a build tag or a sentinel failing test to force red before then,
-// because "not measured here" is the true state on a machine without the fork, and printing it as a
-// defect is the same lie pointed the other way.
+// The message that skip carried reached a `-v` reader and nobody else, and that was not a property
+// of `t.Skipf` that some other mechanism dodges. Measured both directions: a `TestMain` writing the
+// same warning straight to `os.Stderr` is swallowed in a passing package, and shown in a failing
+// one. `go test` suppresses a passing package's output regardless of source, so the only thing that
+// changes a plain run is the package not passing -- which forecloses every message-shaped fix and
+// left vendoring as the only real one.
 func newTestEngine(t *testing.T) *Engine {
 	t.Helper()
-	directory := BundleDirectory()
-	if _, err := os.Stat(directory); err != nil {
-		t.Skipf(
-			"NOT MEASURED: the Prettier engine was never built, so every formatter assertion in this "+
-				"package is unverified on this machine. All %d bundles are absent from %s. "+
-				"This package reporting `ok` means nothing was checked, not that it passed. "+
-				"Set %s to a built fork, or wait for the bundles to be vendored.",
-			len(BundleFiles), directory, ForkPathVariable,
-		)
-	}
+	t.Setenv(ForkPathVariable, "")
 	engine, err := New(DefaultOptions())
 	if err != nil {
-		t.Fatalf("building the engine: %v", err)
+		t.Fatalf("building the engine from the embedded bundles: %v", err)
 	}
 	return engine
 }

@@ -2,8 +2,6 @@ package prettier
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -24,42 +22,27 @@ import (
  * Prettier handles, including the four our own fork customizes.
  */
 
-// ForkPathVariable overrides where the Prettier fork is read from.
+// ForkPathVariable selects loading from a fork checkout instead of the embedded bundles.
 //
-// It lives here rather than in the package that first defined it, and that relocation is the fix
-// rather than a tidy-up. The fork was reachable by two independent paths -- this engine's own
-// constant, and the release guard's environment lookup -- and neither consulted the other. The
-// defect was not that either path was wrong. It was that they existed separately, so overriding one
-// left the other pinned: a CI runner that set this variable got a release guard reporting green over
-// an engine still reading a home directory on one laptop. Measured, not reasoned: with the variable
-// pointed at a nonexistent path, `New` returned a working engine.
+// The meaning changed when the bundles were vendored, and the old meaning is worth stating because
+// anything set in a CI config still carries it. It used to answer "where is the fork", back when
+// disk was the only mode and the alternative was a hardcoded home directory. It now answers "load
+// from disk rather than from this binary", and the default is no longer a path at all -- it is the
+// embedded copy, which needs no fork present.
+//
+// Being set is the entire mode switch, evaluated in one place (Bundles), so there is no second
+// condition to keep in agreement with this one. That matters here more than it usually would: the
+// fork was previously reachable by two independent paths, this engine's own constant and the release
+// guard's environment lookup, and neither consulted the other. Overriding one left the other pinned,
+// so a CI runner that set this variable got a release guard reporting green over an engine still
+// reading a home directory on one laptop. Measured rather than reasoned: with the variable pointed
+// at a nonexistent path, `New` returned a working engine.
 //
 // So the engine that loads the bundles owns the name, and every other consumer resolves through it.
 // `prettier` imports nothing internal, which is what makes it the safe home; `release` already
 // depends on it, so the reference points down rather than sideways. Anyone adding a third consumer
 // of the fork should find one place here rather than guess which of two to copy.
 const ForkPathVariable = "VERIFY_PRETTIER_FORK"
-
-// DefaultForkPath is where the fork lives on the machine this was built on.
-//
-// A default rather than a requirement: the common case is Kirk's laptop, and making everyone set a
-// variable to reproduce the common case is friction that buys nothing. The variable exists for every
-// other machine.
-const DefaultForkPath = "/Users/kirkouimet/Projects/system/prettier"
-
-// BundleDirectory returns where the fork's build output is read from.
-//
-// This is the seam the build step replaces. Today it resolves a local checkout; the vendoring step
-// will generate the bundles into the package and embed them, the same way typescript-go generates
-// and embeds its lib files rather than committing them. Keeping every path decision behind this
-// function means that change is one function body rather than a rewrite.
-func BundleDirectory() string {
-	forkPath := strings.TrimSpace(os.Getenv(ForkPathVariable))
-	if forkPath == "" {
-		forkPath = DefaultForkPath
-	}
-	return filepath.Join(forkPath, "dist", "prettier")
-}
 
 // BundleFiles are the Prettier bundles the engine evaluates, in dependency order.
 //
@@ -82,18 +65,23 @@ var BundleFiles = []string{
 
 // loadBundles returns each bundle's source, in evaluation order.
 //
-// A missing bundle is a hard error rather than a skipped language. An engine that quietly loaded
-// seven of eight would format the eighth's files by falling through to no parser at all, and the
-// failure would look like a file type nobody formats rather than a broken build.
+// The ordering is this function's job and Bundles' map cannot carry it: standalone.js has to be
+// evaluated before the plugins that register against it, and a map has no order. So Bundles decides
+// where the bytes come from and this decides what order they are fed to the interpreter, which are
+// genuinely different questions.
+//
+// A missing bundle is a hard error rather than a skipped language, and Bundles has already enforced
+// that -- an engine that quietly loaded seven of eight would format the eighth's files by falling
+// through to no parser at all, and the failure would look like a file type nobody formats rather
+// than a broken build.
 func loadBundles() ([]namedSource, error) {
-	directory := BundleDirectory()
+	bundles, err := Bundles()
+	if err != nil {
+		return nil, err
+	}
 	sources := make([]namedSource, 0, len(BundleFiles))
 	for _, name := range BundleFiles {
-		text, err := os.ReadFile(filepath.Join(directory, name))
-		if err != nil {
-			return nil, fmt.Errorf("reading prettier bundle %s: %w", name, err)
-		}
-		sources = append(sources, namedSource{name: name, text: string(text)})
+		sources = append(sources, namedSource{name: name, text: string(bundles.Files[name])})
 	}
 	return sources, nil
 }

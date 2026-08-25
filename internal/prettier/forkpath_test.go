@@ -1,8 +1,6 @@
 package prettier
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -41,23 +39,73 @@ func TestOverrideReachesTheLoader(t *testing.T) {
 // for the wrong reason if the engine is simply always broken.
 //
 // A loader that failed unconditionally would satisfy the regression above while being useless. This
-// pins the default: with no variable set, the directory is the built-on machine's path, unchanged.
+// pins the default, and what the default is has changed: with no variable set the bundles come from
+// the binary, not from any path. That is the property the whole vendoring unit exists to produce, so
+// asserting Origin is asserting the point rather than an implementation detail.
 func TestOverrideIsTheOnlyKnobThatMoves(t *testing.T) {
 	t.Setenv(ForkPathVariable, "")
 
-	want := filepath.Join(DefaultForkPath, "dist", "prettier")
-	if got := BundleDirectory(); got != want {
-		t.Fatalf("with no override the directory is %q, want %q", got, want)
+	bundles, err := Bundles()
+	if err != nil {
+		t.Fatalf("with no override the embedded bundles failed to load: %v", err)
+	}
+	if bundles.Origin != Embedded {
+		t.Fatalf("with no override the origin is %q, want %q", bundles.Origin, Embedded)
+	}
+	if bundles.Path != "" {
+		t.Fatalf("embedded bundles carry path %q, want empty so a forgotten branch cannot use it", bundles.Path)
+	}
+}
+
+// TestEmbeddedBundlesNeedNoFork is the property the vendoring bought, stated as a test.
+//
+// Before this, every formatter assertion in the package skipped on a machine without the fork, and
+// the package printed `ok` while measuring nothing. This asserts the opposite condition directly:
+// point the override at a path that does not exist, unset it, and the engine still builds. If this
+// fails, the binary is depending on a checkout again and the skip would come back with it.
+func TestEmbeddedBundlesNeedNoFork(t *testing.T) {
+	t.Setenv(ForkPathVariable, "")
+
+	if _, err := New(DefaultOptions()); err != nil {
+		t.Fatalf("building an engine from the embedded bundles: %v", err)
+	}
+}
+
+// TestEmbedMatchesBundleFiles holds the go:embed directive and BundleFiles together.
+//
+// They are two lists of the same eight names and nothing in the language ties them. The directive
+// names paths explicitly rather than globbing the directory, which makes a missing file a compile
+// error, but it cannot catch the other direction: a name added to BundleFiles and not to the
+// directive compiles fine and fails when someone formats that language. This is the guard for that,
+// and it is why the loader checks a map it was just handed.
+func TestEmbedMatchesBundleFiles(t *testing.T) {
+	t.Setenv(ForkPathVariable, "")
+
+	bundles, err := Bundles()
+	if err != nil {
+		t.Fatalf("loading the embedded bundles: %v", err)
+	}
+	if len(bundles.Files) != len(BundleFiles) {
+		t.Fatalf("the embed carries %d bundles, BundleFiles names %d", len(bundles.Files), len(BundleFiles))
+	}
+	for _, name := range BundleFiles {
+		if len(bundles.Files[name]) == 0 {
+			t.Errorf("%s is absent or empty in the embed", name)
+		}
 	}
 }
 
 // TestReleaseResolvesThroughTheEngine is the guard against the two paths reappearing.
 //
-// `release` declares its own exported names for the variable and the default, which is the shape the
-// defect had. They are now aliases of these rather than copies, and a copy would be invisible: both
-// spellings would be the same string today and could drift apart in any later edit, with the drift
-// producing exactly the original defect again. Comparing the values catches a redeclaration that
-// starts equal, which is the only kind anyone would actually write.
+// `release` declares its own exported name for the variable, which is the shape the defect had. It
+// is an alias of this one rather than a copy, and a copy would be invisible: both spellings would be
+// the same string today and could drift apart in any later edit, with the drift producing exactly
+// the original defect again.
+//
+// The default path is no longer shared, and that is deliberate rather than a regression. The engine
+// has no path-shaped default any more, so `release` declaring its own is two different questions
+// rather than one value with two homes. Only that file still asks the path-shaped one, and only
+// until its guard is reshaped to vouch for embedded bytes.
 //
 // It lives here rather than in `release` because `prettier` imports nothing internal, so this
 // direction is the one that cannot create a cycle.
@@ -65,8 +113,4 @@ func TestReleaseResolvesThroughTheEngine(t *testing.T) {
 	if ForkPathVariable != "VERIFY_PRETTIER_FORK" {
 		t.Fatalf("the variable is %q; release's exported alias and any CI that sets it both assume the old spelling", ForkPathVariable)
 	}
-	if _, err := os.Stat(DefaultForkPath); err == nil {
-		return
-	}
-	t.Logf("the default fork path is absent on this machine, which is fine: %s", DefaultForkPath)
 }

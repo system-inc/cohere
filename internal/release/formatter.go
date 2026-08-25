@@ -13,19 +13,29 @@ import (
 
 // FormatterForkPathVariable overrides where the Prettier fork is read from.
 //
-// The default is a path on one machine, which is the whole problem this file exists to bound. A CI
-// runner or a second developer needs to say where their checkout is, and saying it explicitly is
-// better than a search that might find the wrong one.
-//
 // It is the engine's own name rather than a copy of it, for the same reason FormatterBundleNames is
 // the engine's own list. This guard vouches for the bundles the engine loads, so it has to read the
 // variable the engine reads: a second declaration of the same string would let the two drift, and
 // the drift would be silent in the worst direction -- a guard reporting green about a directory
 // nothing loads from. That was the defect this replaced, measured rather than supposed.
+//
+// The variable's meaning has since changed under this file. It used to mean "where is the fork";
+// since the bundles were vendored it means "load from disk rather than from the binary", and the
+// engine's default is the embedded copy rather than any path. This guard has not been reshaped for
+// that yet, so it still resolves a fork checkout and still checks it the way it always did.
 const FormatterForkPathVariable = prettier.ForkPathVariable
 
-// DefaultFormatterForkPath is where the fork lives on the machine it was built on.
-const DefaultFormatterForkPath = prettier.DefaultForkPath
+// DefaultFormatterForkPath is where the fork lives on the machine this was built on.
+//
+// It is declared here rather than read from `prettier` because the engine no longer has a default
+// path to share: its default is the embedded bundles, and a path-shaped default would be the wrong
+// answer to the wrong question. So this is deliberately release-local rather than the second
+// declaration this file spent a commit removing -- there is no longer one value with two homes,
+// there are two different questions, and only this file still asks the path-shaped one.
+//
+// It goes away when this guard is reshaped to vouch for embedded bytes, which is the other half of
+// the vendoring unit and is tracked on #t55yd27.
+const DefaultFormatterForkPath = "/Users/kirkouimet/Projects/system/prettier"
 
 // FormatterBundleNames are the JavaScript bundles a release must provide.
 //
