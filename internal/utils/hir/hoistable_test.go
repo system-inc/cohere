@@ -480,8 +480,29 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// so five of the seven additional dependencies are not ones upstream infers. That is a real cost
 	// and it is recorded rather than buried; it is smaller than two recovered true dependencies and
 	// a corrected invariant.
-	if deep != 237 || flat != 2205 {
-		t.Errorf("got %d deep and %d flat dependencies, want 237 and 2205; a SMALL move here is "+
+	//
+	// # Both counts moved again when `isDeferredDependency` landed, and this gain in `deep` is NOT
+	// over-approximation
+	//
+	// Transcribing upstream's `isDeferredDependency` -- skip an instruction whose lvalue is in the
+	// temporaries sidemap, because the instruction reading that temporary records the full path at
+	// its site of use -- took `deep` from 237 to 386 and `flat` from 2,205 to 2,136.
+	//
+	// The heading above says a gain in `deep` is the over-approximating direction unless something
+	// says otherwise, and the oracle cannot: it moved not at all (72 matched of 87, ours 158). So
+	// the evidence is a direct diff of the two dependency sets over this same corpus instead, which
+	// is a stronger answer than the oracle's 87 scored slots could give here.
+	//
+	// Measured, every dependency in both sets: 71 bare roots removed, 147 specific paths added,
+	// every added path an extension of a root that was removed, and every removed root replaced by
+	// at least one path. Nothing was dropped and no new root appeared. `AccordionItem.tsx` is the
+	// shape: bare `properties` in two scopes became `properties.icon` and `properties.title`.
+	//
+	// That is the opposite of over-approximation -- a scope that invalidated on all of `properties`
+	// now invalidates on the one field it reads -- and it is why the total rises while the answer
+	// gets narrower. One bare root that swallowed N deep paths becomes N paths.
+	if deep != 386 || flat != 2136 {
+		t.Errorf("got %d deep and %d flat dependencies, want 386 and 2136; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

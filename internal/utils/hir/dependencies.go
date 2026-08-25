@@ -461,9 +461,11 @@ func (n *dependencyNode) makeOrMergeProperty(property string, access propertyAcc
 
 // hoistableNode is one value in the tree of accesses proven safe to hoist out of a scope.
 //
-// Always empty in this tree: the analysis that populates it is `DependencyGapNullPropagation`. Kept
-// as a real type rather than elided because its ABSENCE is what makes `addDependency` truncate, and
-// a reader tracing why paths are short should find the mechanism rather than a missing parameter.
+// This was empty when the type was written, and the comment saying so outlived the fact by several
+// changes. `CollectHoistablePropertyLoads` in `hoistable.go` populates it, called from
+// `CollectScopeDependenciesWithHoistable`, so a path descends here wherever that analysis proved
+// the object non-null. `CollectScopeDependencies` -- the spelling that passes nil -- is the one
+// that still sees an empty set, and truncates every path to its root as a result.
 type hoistableNode struct {
 	properties map[string]*hoistableNode
 	// nonNull is upstream's `HoistableAccessType::NonNull`, meaning this access is known not to
@@ -504,33 +506,33 @@ func newDependencyTree(hoistable map[IdentifierId]*hoistableNode) *dependencyTre
 
 // addDependency records one access path, truncating it where the path stops being safe to hoist.
 //
-// # Why every path truncates to its root in this tree, and why that is upstream's own answer
+// # How a path truncates, and why truncation is the safe direction
 //
 // The loop walks the access path and the hoistable tree together. An entry survives only if the
 // hoistable cursor says the object is already known non-null, or the entry itself is optional; a
 // non-optional entry under an unknown object hits `break` and the path stops there.
 //
-// With an empty hoistable set the cursor is nil at every step, so a path like `props.a.b` truncates
-// to bare `props`. That is not an approximation of upstream -- it is exactly what React does when
-// handed an empty hoistable set (bundle 47019, the `else { break; }` arm), and it is the SAFE
-// direction: the scope is reported as depending on all of `props` rather than on `props.a.b`, so it
-// invalidates more often than strictly necessary and never less.
+// Under an empty hoistable set the cursor is nil at every step, so `props.a.b` truncates to bare
+// `props`. That is not an approximation of upstream -- it is exactly what React does when handed an
+// empty hoistable set (bundle 47019, the `else { break; }` arm), and it is the SAFE direction: the
+// scope is reported as depending on all of `props` rather than on `props.a.b`, so it invalidates
+// more often than strictly necessary and never less. `CollectScopeDependencies` is the spelling
+// that still sees that; `CollectScopeDependenciesWithHoistable` supplies a real set and descends.
 //
-// # The heading above is now only half the story, and the remaining half is measured
+// # The open question this comment used to pose is answered, and it was not about this tree
 //
-// The hoistable set is no longer empty, so this loop DOES descend where the analysis proved an
-// object non-null. Deep paths reach the tree: probed on `useMemo-alias-property-load-dep.ts`, the
-// collector accepts `propB.x.y` and `propA.x` alongside the bare roots.
+// The question was why a BARE access is recorded alongside the deep path, given the tree then emits
+// the root and prunes the deep path under it as redundant -- upstream's own shape in
+// `collectMinimalInSubtree`, and correct given the root is there.
 //
-// They are then discarded, and not here. `collectMinimalInSubtree` emits a node the moment it is
-// marked a dependency and does not walk its children, which is upstream's own shape. The bare root
-// is marked, so the deep paths under it are pruned as redundant -- correctly, given the root is
-// there. **The open question is why a bare access is recorded at all**, which is a question about
-// what `handleInstruction` visits rather than about this tree.
+// The root should not have been there. `t = propA` records `t -> propA` in the temporaries sidemap,
+// and the instruction reading `t` resolves through that sidemap and records the FULL path. Visiting
+// the intermediate instruction's operands as well recorded the prefix a second time, as a bare root.
+// Upstream skips such an instruction entirely; see `isDeferredDependency`, now transcribed.
 //
-// Measured on the corpus, this is not an edge case: 171 dependencies carry a path and 1,435 do not.
-// `preserve-manual-memoization` cannot enable its third firing condition until it is answered; see
-// the gate at the pipeline in `preserve_manual_memoization.go`.
+// Measured on the corpus, that duplicate submission was the whole gap: 71 bare roots were replaced
+// by 147 specific paths, every added path an extension of a removed root and every removed root
+// replaced. The path distribution moved from 237 deep / 2,205 flat to 386 / 2,136.
 func (t *dependencyTree) addDependency(dep ReactiveScopeDependency) {
 	root, ok := t.roots[dep.Identifier]
 	if !ok {
@@ -1256,9 +1258,17 @@ func (c *dependencyCollector) walk(function *Function, terminals map[BlockId]sco
 // The per-kind arms are upstream's and the order within each matters: a store visits its VALUE
 // before declaring its lvalue, so `x = x + 1` reads the old `x` as a dependency rather than seeing
 // its own definition.
+//
+// The DECLARATION is recorded before the deferral check, and before the visit, because a deferred
+// instruction still defines its lvalue -- `checkValidDependency` compares against that order, so
+// skipping the declare would make every later read of the temporary look undeclared.
 func (c *dependencyCollector) handleInstruction(instruction *Instruction) {
 	decl := declaration{order: instruction.Order, scopeStack: c.copyScopeStack()}
 	c.declare(instruction.LValue.Identifier, decl)
+
+	if c.isDeferredDependency(instruction) {
+		return
+	}
 
 	switch value := instruction.Value.(type) {
 	case *PropertyLoad:
@@ -1304,6 +1314,33 @@ func (c *dependencyCollector) handleInstruction(instruction *Instruction) {
 			}
 		})
 	}
+}
+
+// isDeferredDependency reports whether this instruction's accesses are recorded at the site of USE
+// rather than here, upstream's `isDeferredDependency`.
+//
+// # Why an instruction that produces a dependency is skipped entirely
+//
+// An instruction whose lvalue is in the temporaries sidemap is not a value in its own right, it is
+// one link in an access path that some later instruction will read whole. `t = propA` records
+// `t -> propA`, and the instruction that reads `t` resolves through the sidemap and records the
+// FULL path. Visiting the operands here as well would record the prefix a second time, as a bare
+// root with an empty path.
+//
+// That double-recording is what truncated every path in this tree. `addDependency` submits both
+// `propA` and `propA.x`, and `collectMinimalInSubtree` then emits the root and prunes the deep path
+// under it as redundant -- correct pruning given the root is there, and the root should not have
+// been there. Skipping the deferred instruction is upstream's answer to the open question this
+// file's `addDependency` comment used to pose: the bare access is recorded because nothing was
+// stopping it.
+//
+// Upstream also defers instructions consumed by an optional chain, via `processedInstrsInOptional`.
+// That set is empty here -- see `DependencyGapOptionalChains` -- so only the temporaries half is
+// expressible, which is the safe direction: an instruction upstream would also have deferred is
+// visited, never the reverse.
+func (c *dependencyCollector) isDeferredDependency(instruction *Instruction) bool {
+	_, deferred := c.temporaries[instruction.LValue.Identifier]
+	return deferred
 }
 
 func (c *dependencyCollector) copyScopeStack() []ScopeId {
