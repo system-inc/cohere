@@ -673,3 +673,62 @@ func TestGateCandidatesSeparatesWhatMustNotMerge(t *testing.T) {
 
 	t.Logf("confirmed %d pairs that must not share a bucket do not", len(mustDiffer))
 }
+
+// TestArbitraryTypehintIsSplitFromTheValue pins the coupling the descriptor table depends on.
+//
+// `bg-[color:var(--x)]` carries an author-written type annotation. The engine trusts that
+// annotation instead of inferring, which matters because `InferDataType` declines `var(...)`
+// outright: without the annotation reaching the table, every annotated class falls to the axis
+// fallback and reads as something else. The descriptor lookup reads `Value.DataType` and expects
+// `Value.Value` to hold the value alone.
+//
+// So the split is a contract between two components rather than an internal detail, and it has the
+// failure shape this slice keeps meeting: a parse that looks correct and a reading that is wrong.
+// A port that left `color:` on the front of the value, or dropped the annotation instead of
+// carrying it, would still produce a plausible candidate and would silently change the reading.
+//
+// The corpus test covers these cases too, as two rows among five thousand. This one names the
+// contract, so a regression reports what broke rather than a diff someone has to interpret.
+func TestArbitraryTypehintIsSplitFromTheValue(t *testing.T) {
+	corpus := loadCandidateCorpus(t)
+	designSystem := newFixtureDesignSystem(corpus)
+
+	cases := []struct {
+		className string
+		dataType  string
+		value     string
+	}{
+		// Both spellings of the same annotation must land identically, because the `(…)` shorthand
+		// is rewritten into the bracketed form during parsing.
+		{"bg-[color:var(--my-color)]", "color", "var(--my-color)"},
+		{"bg-(color:--my-var)", "color", "var(--my-var)"},
+		// An unannotated arbitrary value must carry no type, so the table infers rather than
+		// trusting an annotation that was never written.
+		{"bg-[#0088cc]", "", "#0088cc"},
+	}
+
+	for _, testCase := range cases {
+		readings := ParseCandidate(testCase.className, designSystem)
+		if len(readings) == 0 {
+			t.Errorf("%s produced no readings", testCase.className)
+			continue
+		}
+
+		value := readings[0].Value
+		if value == nil {
+			t.Errorf("%s: the first reading carries no value", testCase.className)
+			continue
+		}
+		if value.Kind != ParsedValueKindArbitrary {
+			t.Errorf("%s: the first reading's value is %s, want arbitrary", testCase.className, value.Kind)
+			continue
+		}
+		if value.DataType != testCase.dataType {
+			t.Errorf("%s: DataType is %q, want %q", testCase.className, value.DataType, testCase.dataType)
+		}
+		// The annotation must be gone from the value, not merely also present in DataType.
+		if value.Value != testCase.value {
+			t.Errorf("%s: Value is %q, want %q", testCase.className, value.Value, testCase.value)
+		}
+	}
+}
