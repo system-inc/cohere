@@ -42,20 +42,27 @@ const { designSystem, tailwindVersion, entryPoint } = await loadDesignSystem(
 const roots = [
     'align',
     'animate',
+    'bg-position',
+    'bg-size',
     'col',
     'col-end',
     'col-start',
     'columns',
     'contain',
     'cursor',
+    'delay',
     'font-features',
     'grow',
     'list',
     'list-image',
+    'mask-position',
     'mask-radial-at',
+    'mask-size',
     'object',
+    'opacity',
     'order',
     'origin',
+    'outline-offset',
     'perspective',
     'perspective-origin',
     'row',
@@ -65,6 +72,7 @@ const roots = [
     'tab',
     'will-change',
     'z',
+    'zoom',
 ];
 
 /*
@@ -75,7 +83,17 @@ const roots = [
  * advertises no arbitrary ones at all, so a run over registry classes alone would never exercise the
  * arbitrary branch or the rejections.
  */
-const probeSuffixes = ['', '-4', '-0', '-1', '-auto', '-none', '-[3px]', '-[var(--a)]', '-1/2', '/50'];
+/*
+ * The probe suffixes, and why the fractional ones are here.
+ *
+ * The registry advertises theme-backed and static values, so a run over registry classes alone never
+ * reaches the arbitrary branch, never reaches a rejection, and never separates one bare-value
+ * predicate from another. `-2.5` and `-1.3` are the pair that does the last of those: `isPositiveInteger`
+ * rejects both, `isValidOpacityValue` accepts `2.5` and rejects `1.3`. Without them, swapping
+ * opacity's predicate for the integer one changed no answer in the whole fixture and the mutation
+ * survived, which is how the gap was found.
+ */
+const probeSuffixes = ['', '-4', '-0', '-1', '-auto', '-none', '-[3px]', '-[var(--a)]', '-1/2', '/50', '-2.5', '-1.3'];
 
 const registryByRoot = new Map();
 for (const entry of designSystem.getClassList?.() ?? []) {

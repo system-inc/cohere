@@ -645,6 +645,16 @@ func isValidSpacingMultiplier(value string) bool {
 	return isMultipleOf(value, 0.25)
 }
 
+// isValidOpacityValue is upstream's `isValidOpacityValue`: the same predicate as the spacing
+// multiplier, against the same divisor.
+//
+// Identical to isValidSpacingMultiplier today, and kept separate rather than aliased because they
+// answer different questions and upstream has changed one without the other before. Folding them
+// would make a future divergence a silent behaviour change here rather than a compile error.
+func isValidOpacityValue(value string) bool {
+	return isMultipleOf(value, 0.25)
+}
+
 // isMultipleOf is upstream's `isMultipleOf`, the shared body of `isValidSpacingMultiplier` and
 // `isValidOpacityValue`.
 //

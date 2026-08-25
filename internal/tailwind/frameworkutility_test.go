@@ -123,11 +123,21 @@ func TestFrameworkFunctionalUtilitiesMatchTheEngine(t *testing.T) {
 // TestFrameworkFunctionalUtilitiesCoverTheUnprobableRoots is why this wave matters beyond its size.
 //
 // `gen_tailwind_collapse` reports eight roots it cannot reach with any probe value, so they are in
-// KnownRoots and absent from every property table. Three of them are wave-1 roots and are answered
-// here: `align`, `font-features` and `mask-radial-at`. Asserted by name, because the point is which
-// roots stopped being unanswerable.
+// KnownRoots and absent from every property table. Seven of the eight are answered by this table.
+// Asserted by name, because the point is which roots stopped being unanswerable rather than how many.
+//
+// The four this wave adds are the reason `RequiresValue` exists: `bg-size`, `bg-position`,
+// `mask-size` and `mask-position` all spell their handler as `handle(value) { if (!value) return }`,
+// which is why no probe value reached them and why they were invisible to a generator that only asks
+// what a root reads.
 func TestFrameworkFunctionalUtilitiesCoverTheUnprobableRoots(t *testing.T) {
-	for _, root := range []string{"align", "font-features", "mask-radial-at"} {
+	// Seven of the eight. `mask-radial` is the exception and stays uncovered: it emits four
+	// declarations behind `--tw-*` custom properties, so it belongs to wave 2b rather than here, and
+	// naming it in this list would claim coverage this table does not have.
+	for _, root := range []string{
+		"align", "font-features", "mask-radial-at",
+		"bg-size", "bg-position", "mask-size", "mask-position",
+	} {
 		utility, known := FrameworkFunctionalUtilities[root]
 		if !known {
 			t.Errorf("%s is one of the roots no probe value reaches and it is not in the table", root)
@@ -221,4 +231,63 @@ func TestFrameworkStaticValuesDeclareTheirRootsProperty(t *testing.T) {
 		t.Errorf("%d static values now declare a property their root does not; the property lookup in Reading is load-bearing in this wave and needs a mutation covering it", diverging)
 	}
 	t.Logf("%d roots declare staticValues, %d diverging properties", withStatics, diverging)
+}
+
+// TestFrameworkBareValueSuffixIsUnobservableInAReading records why a mutation of it survives.
+//
+// `delay-150` resolves to `150ms` and `delay-1` resolves to `1ms`, and both read `[352]#1`. The
+// reading is a property position and a declaration count, and `getPropertySort` never reads a value,
+// so removing the suffix entirely changes no reading anywhere and the wave-1 comparison passes.
+//
+// That makes the suffix real code with no coverage from the fixture, which is the shape that quietly
+// rots. So it is asserted directly on the resolved value rather than through a reading, and the three
+// suffixes upstream uses are named: `ms` for delay, `px` for outline-offset, `%` for zoom and opacity.
+//
+// The value matters even though the reading does not: it is what an arbitrary-value data-type
+// inference would read downstream, and it is what the engine emits.
+func TestFrameworkBareValueSuffixIsUnobservableInAReading(t *testing.T) {
+	theme := NewTheme()
+	cases := []struct {
+		root     string
+		bare     string
+		expected string
+	}{
+		{"delay", "150", "150ms"},
+		{"outline-offset", "2", "2px"},
+		{"zoom", "50", "50%"},
+		{"opacity", "25", "25%"},
+	}
+
+	for _, testCase := range cases {
+		utility, known := FrameworkFunctionalUtilities[testCase.root]
+		if !known {
+			t.Errorf("%s is not in the table", testCase.root)
+			continue
+		}
+		candidate := ParsedCandidate{
+			Kind:  ParsedCandidateKindFunctional,
+			Root:  testCase.root,
+			Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: testCase.bare},
+		}
+		resolved, produced := ResolveFunctionalUtilityValue(&candidate, utility.Description(), theme, false)
+		if !produced {
+			t.Errorf("%s-%s resolved to nothing", testCase.root, testCase.bare)
+			continue
+		}
+		if resolved.Value != testCase.expected {
+			t.Errorf("%s-%s resolved to %q, the engine resolves it to %q", testCase.root, testCase.bare, resolved.Value, testCase.expected)
+		}
+	}
+
+	// The reading is deliberately shown to be blind to all of it, so the next reader does not add a
+	// reading-based assertion here and believe it covers the suffix.
+	utility := FrameworkFunctionalUtilities["delay"]
+	long := ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: "delay", Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "150"}}
+	short := ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: "delay", Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "1"}}
+	longReading, _ := utility.Reading(&long, theme, false)
+	shortReading, _ := utility.Reading(&short, theme, false)
+	if !readingsEqual(longReading, shortReading) {
+		t.Errorf("delay-150 and delay-1 read differently (%v#%d and %v#%d); if that is now true, a reading-based test can cover the suffix",
+			longReading.Order, longReading.Count, shortReading.Order, shortReading.Count)
+	}
 }
