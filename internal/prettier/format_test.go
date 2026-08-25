@@ -19,9 +19,25 @@ import (
 // nothing looking like a run that found nothing, sitting inside our own suite.
 //
 // So the skip names the count and the consequence rather than the path alone. It cannot make `go
-// test` print red, and it should not: the honest state today is genuinely "not measured here". What
-// it can do is make the reason unmissable to anyone who does look, and say what would end it. That
-// ends when the bundles are vendored into the package and this becomes a hard failure.
+// test` print red, and it should not: the honest state today is genuinely "not measured here".
+//
+// Be precise about how little that buys, because the first version of this comment overclaimed it.
+// This message reaches a `-v` reader and nobody else. A plain run prints `ok internal/prettier` and
+// exit 0 with no trace of it, which is what CI sees:
+//
+//	VERIFY_PRETTIER_FORK=/nonexistent go test ./internal/prettier/
+//	ok  github.com/system-inc/verify/internal/prettier  0.208s   exit=0
+//
+// And that is not a property of `t.Skipf` that some other mechanism dodges. Measured: a `TestMain`
+// writing the same warning straight to `os.Stderr` is swallowed too. `go test` suppresses a passing
+// package's output regardless of where it came from, so the only thing that changes a plain run is
+// the package not passing.
+//
+// Which means the skip message is a courtesy to a human reading verbose output, not a guard. The
+// guard is vendoring: when the bundles are embedded, absence becomes a hard failure and the run goes
+// red on its own. Do not reach for a build tag or a sentinel failing test to force red before then,
+// because "not measured here" is the true state on a machine without the fork, and printing it as a
+// defect is the same lie pointed the other way.
 func newTestEngine(t *testing.T) *Engine {
 	t.Helper()
 	directory := BundleDirectory()
