@@ -125,26 +125,9 @@ func Build(options Options) (Result, error) {
 
 	// Resolved once, before any target is built, so a stale or missing fork fails the release
 	// immediately rather than after six cross-compilations.
-	//
-	// Resolved whatever EmbedFormatter says, because the bundles are embedded by a `go:embed`
-	// directive with no build tag on it: every binary carries them, and a binary built with the
-	// flag off still formats. Gating the stamp on the flag produced a binary that formatted a file
-	// and reported no formatter at all, which was measured rather than supposed -- `--format` on an
-	// unstamped build rewrote `const   x:number=1` to `const x: number = 1;` while `--version`
-	// printed zero formatter lines. The stamp describes the bytes that ship, so it has to follow
-	// the bytes rather than an option about them.
-	//
-	// The flag still decides whether a fork is required. With it on, a fork that is absent, unbuilt
-	// or stale fails the release. With it off, an unavailable fork leaves the stamp empty, which
-	// reports honestly as "this binary cannot name its formatter" rather than blocking a build for
-	// a fork the release was not asking for.
-	formatter := FormatterSource{}
-	formatter, err = ResolveFormatterSource()
+	formatter, err := resolveFormatterStamp(options.EmbedFormatter, ResolveFormatterSource)
 	if err != nil {
-		if options.EmbedFormatter {
-			return Result{}, err
-		}
-		formatter = FormatterSource{}
+		return Result{}, err
 	}
 
 	result := Result{}
@@ -164,6 +147,35 @@ func Build(options Options) (Result, error) {
 	result.Packages = append(result.Packages, dispatcher)
 
 	return result, nil
+}
+
+// resolveFormatterStamp decides what a build stamps about its formatter.
+//
+// It is a named function taking the resolve as a parameter, rather than four lines inside `Build`,
+// because the decision is the thing that was wrong and a decision buried in a cross-compiling
+// function cannot be tested. The defect it now pins shipped for an hour: the resolve sat inside
+// `if requireFork`, a binary built with the flag off formatted a file and reported no formatter at
+// all, and every line of that `--version` was true. A guard asserting `ResolveFormatterSource`
+// works passed the whole time, because that function was never broken -- the caller was.
+//
+// The stamp is resolved whatever `requireFork` says, because the bundles are embedded by a
+// `go:embed` directive with no build tag: every binary carries them and every binary can format.
+// The stamp describes the bytes that ship, so it follows the bytes rather than an option about
+// them.
+//
+// `requireFork` decides only what an unavailable fork means. With it set, a fork that is absent,
+// unbuilt or stale fails the release. Without it, the stamp is left empty, which reports honestly
+// that this binary cannot name its formatter rather than blocking a build for a fork the release
+// was not asking for.
+func resolveFormatterStamp(requireFork bool, resolve func() (FormatterSource, error)) (FormatterSource, error) {
+	formatter, err := resolve()
+	if err != nil {
+		if requireFork {
+			return FormatterSource{}, err
+		}
+		return FormatterSource{}, nil
+	}
+	return formatter, nil
 }
 
 // buildPlatformPackage cross-compiles one target and writes its package around the binary.

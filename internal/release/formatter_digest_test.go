@@ -1,6 +1,7 @@
 package release
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -110,22 +111,49 @@ func TestDigestRefusesAMissingBundle(t *testing.T) {
 
 // TestStampFollowsTheBytesNotTheFlag pins the defect that the stamp is about what shipped.
 //
-// The bundles are embedded unconditionally, so a binary built with EmbedFormatter off still formats.
-// A stamp gated on the flag produced exactly that binary: it rewrote a file and reported no
-// formatter at all, so a bug report from it could not name which Prettier did the rewriting.
+// The bundles are embedded unconditionally, so a binary built without requiring a fork still
+// formats. A stamp gated on that flag produced exactly that binary: it rewrote a file and reported
+// no formatter, so a bug report from it could not name which Prettier did the rewriting.
 //
-// This asserts the resolve happens regardless of the flag, which is the half a reader would
-// otherwise have to infer from the absence of an `if`.
+// This drives resolveFormatterStamp with a stub rather than calling ResolveFormatterSource, because
+// the first version of this test did the latter and passed with the defect reintroduced. That
+// function was never broken. The defect was in whether the resolve is reached at all, so a test
+// that never exercises the gate cannot see it, however true its assertions are.
 func TestStampFollowsTheBytesNotTheFlag(t *testing.T) {
-	source, err := ResolveFormatterSource()
-	if err != nil {
-		t.Skipf("NOT MEASURED: the Prettier fork is unavailable, so the stamp is unverified here: %v", err)
+	stamped := FormatterSource{Commit: "abc123", Digest: "def456"}
+	resolve := func() (FormatterSource, error) { return stamped, nil }
+
+	for _, requireFork := range []bool{true, false} {
+		formatter, err := resolveFormatterStamp(requireFork, resolve)
+		if err != nil {
+			t.Fatalf("requireFork=%v: %v", requireFork, err)
+		}
+		if formatter.Commit != stamped.Commit || formatter.Digest != stamped.Digest {
+			t.Fatalf(
+				"requireFork=%v dropped the stamp: got commit %q digest %q, want %q and %q",
+				requireFork, formatter.Commit, formatter.Digest, stamped.Commit, stamped.Digest,
+			)
+		}
+	}
+}
+
+// TestStampRequiresAForkOnlyWhenAsked holds the other half of the same decision: what an
+// unavailable fork means. Required, it fails the release. Not required, it leaves an empty stamp,
+// which says plainly that the binary cannot name its formatter.
+func TestStampRequiresAForkOnlyWhenAsked(t *testing.T) {
+	resolve := func() (FormatterSource, error) {
+		return FormatterSource{}, errors.New("no fork here")
 	}
 
-	if source.Commit == "" {
-		t.Fatal("a resolved fork produced no commit, so a binary built from it would report no formatter")
+	if _, err := resolveFormatterStamp(true, resolve); err == nil {
+		t.Fatal("a required fork that could not be resolved did not fail the release")
 	}
-	if source.Digest == "" {
-		t.Fatal("a resolved fork produced no digest, so a binary built from it could not name its bytes")
+
+	formatter, err := resolveFormatterStamp(false, resolve)
+	if err != nil {
+		t.Fatalf("an unrequired fork that could not be resolved failed the release: %v", err)
+	}
+	if formatter.Commit != "" || formatter.Digest != "" {
+		t.Fatalf("an unresolvable fork produced a stamp: %+v", formatter)
 	}
 }
