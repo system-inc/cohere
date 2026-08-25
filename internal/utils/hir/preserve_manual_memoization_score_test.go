@@ -168,7 +168,15 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// So both directions are pinned, and a change moving either one has to say which it moved and
 	// why. Silence is not the right answer on ANY of these 33: each is a program where upstream
 	// reports a lost memoization.
-	const knownTruePositives = 15
+	// Raised from 15 by turning on the third firing condition, which had been gated since it was
+	// written. The gate's own unblock instruction was "turn this on when the hoistable analysis
+	// lands", and it did: `CollectHoistablePropertyLoads` populates the tree, the collector descends
+	// into nested functions and into callbacks it can assume are invoked, and 595 dependencies carry
+	// a path against 2,092 that do not -- where the gate was written, 171 did against 1,435.
+	//
+	// The four recovered are the fixtures whose golden says the inferred dependency did not match
+	// the written one, which is the only condition that can report them.
+	const knownTruePositives = 19
 	if fired != knownTruePositives {
 		t.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
 			"should be raised deliberately, and if it went DOWN the rule stopped reporting programs "+
@@ -278,7 +286,17 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	// so it was counted as clean while both compilers agree it is a violation. It was not firing
 	// under the current gate, so 27 is unchanged; ungated it was one of the false positives and is
 	// no longer counted as one.
-	const knownFalsePositives = 27
+	// Raised from 27 by the same change, and the cost is exactly one fixture:
+	// `useCallback-alias-property-load-dep.ts`. Traced to a scope boundary rather than to the
+	// comparison -- `const x = propB.x.y` is declared inside our scope 1, so `checkValidDependency`
+	// rejects `x` on the rule this tree shares with upstream verbatim
+	// (`decl.order < scopeRange.Start`), while upstream's scope begins after that declaration and
+	// names `x` in its compiled output. That belongs to the scope work.
+	//
+	// Four true positives for one false positive is the first net-positive reading this trade has
+	// ever had. It was plus six for thirteen when the ungating task was re-measured, and every step
+	// between is recorded on that task.
+	const knownFalsePositives = 28
 	if fired != knownFalsePositives {
 		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
 			"number should be lowered deliberately, and if it went UP something regressed",
@@ -361,7 +379,7 @@ func pipelineFindings(function *Function, checker *shimchecker.Checker) []Preser
 	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 	PruneNonReactiveDependencies(tree, function, dependencies)
 
-	return ValidatePreservedManualMemoizationWithDependencies(tree, function, scopes, nil)
+	return ValidatePreservedManualMemoizationWithDependencies(tree, function, scopes, dependencies)
 }
 
 // upstreamReportsInLogs reports whether a fixture's expectation carries this rule's message in its

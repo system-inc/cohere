@@ -368,27 +368,26 @@ func AnalyzePreservedManualMemoization(function *Function,
 	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 	PruneNonReactiveDependencies(tree, function, dependencies)
 
-	// Nil, deliberately, and this is the one place the third firing condition is turned off.
+	// The third firing condition, on. This gate was closed and the reason it was closed is gone.
 	//
-	// The comparison itself is built and tested. Its INPUT is not ready: `CollectScopeDependencies`
-	// truncates a path to its root wherever the hoistable set is empty, and the hoistable analysis
-	// is `DependencyGapNullPropagation`, declined. Measured on the corpus, 171 dependencies carry a
-	// path and 1,435 do not, so 89% of what the comparison would see is shallower than what the
-	// developer wrote.
+	// It read: "the comparison itself is built and tested. Its INPUT is not ready:
+	// `CollectScopeDependencies` truncates a path to its root wherever the hoistable set is empty,
+	// and the hoistable analysis is `DependencyGapNullPropagation`, declined." That analysis landed.
+	// `CollectHoistablePropertyLoads` populates the tree, the collector descends into nested
+	// functions and into callbacks it can assume are invoked, and 595 dependencies now carry a path
+	// against 2,092 that do not -- where the gate was written, 171 did against 1,435.
 	//
-	// A shorter inferred path than source is `CompareDependencyPathDifference`, which the comparison
-	// reports correctly. So passing `dependencies` here turns a systematic inference gap into a
-	// systematic stream of findings. Measured, against `useMemo-alias-property-load-dep.ts` and its
-	// nine siblings:
+	// Its own instruction was "turn this on when the hoistable analysis lands, and expect the
+	// ungated numbers to be the ones that move." Both happened. The numbers it recorded --
+	// golden 15 to 25 for clean 27 to 37 -- are stale by a dozen commits; measured now, the trade
+	// is golden 15 to 19 for one additional false positive.
 	//
-	//	ungated                              golden 15 -> 25   clean 27 -> 37
-	//	skip an inferred dep with no path    golden 15 -> 17   clean 27 -> 31
-	//	skip when the two are incomparable   golden 15 -> 20   clean 27 -> 34
-	//
-	// Every variant costs more false positives than it gains true positives, so none of them is an
-	// improvement and the gate is not a tuning problem. Turn this on when the hoistable analysis
-	// lands, and expect the ungated numbers to be the ones that move.
-	return ValidatePreservedManualMemoizationWithDependencies(tree, function, scopes, nil)
+	// That one is `useCallback-alias-property-load-dep.ts`, traced to a scope boundary rather than
+	// to this comparison: `const x = propB.x.y` is declared inside our scope 1, so
+	// `checkValidDependency` rejects `x` on the rule this tree shares with upstream verbatim
+	// (`decl.order < scopeRange.Start`), while upstream's scope begins after that declaration and
+	// names `x`. It belongs to the scope work rather than here.
+	return ValidatePreservedManualMemoizationWithDependencies(tree, function, scopes, dependencies)
 }
 
 // ForEachFunctionLike calls visit for every outermost function-like node under root.
