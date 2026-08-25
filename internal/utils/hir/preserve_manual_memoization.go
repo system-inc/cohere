@@ -26,6 +26,11 @@
 // identifiers carry one.
 package hir
 
+import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
+)
+
 // PreserveManualMemoizationFinding is one disagreement between source and output.
 type PreserveManualMemoizationFinding struct {
 	// Identifier is the value whose memoization was lost.
@@ -235,4 +240,64 @@ func (v *manualMemoValidator) walkTerminal(statement *ReactiveTerminalStatement)
 		v.walk(shape.Block)
 		v.walk(shape.Handler)
 	}
+}
+
+// AnalyzePreservedManualMemoization runs the reactive-scope pipeline over one function and validates.
+//
+// Exported so the rule surface does not have to know the pass order. That order is upstream's and is
+// load-bearing rather than incidental: the validation reads which scopes survived, which were pruned
+// and which absorbed others in a merge, and each of those facts is written by a different pass. A
+// caller running them in a different order gets a validation against a half-built world, which
+// reports plausibly and is wrong.
+//
+// Expects `Lower` and `Construct` to have run already, since a caller that has a `*Function` has
+// done both by definition.
+func AnalyzePreservedManualMemoization(function *Function,
+	typeChecker *shimchecker.Checker) []PreserveManualMemoizationFinding {
+	if function == nil {
+		return nil
+	}
+	InferReactive(function, typeChecker)
+	DropManualMemoization(function)
+
+	ranges := InferMutableRanges(function)
+	set := FindDisjointMutableValuesWithRanges(function, ranges)
+	scopes := AssignReactiveScopesWithSets(function, ranges, set)
+	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
+	identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
+	BuildReactiveScopeTerminals(function, scopes, identity)
+	dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
+
+	tree, _ := BuildReactiveFunction(function)
+	if tree == nil {
+		return nil
+	}
+
+	MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, typeChecker)
+	PruneNonEscapingScopes(tree, function, dependencies, typeChecker)
+	PruneUnusedScopes(tree, dependencies)
+	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
+	PruneNonReactiveDependencies(tree, function, dependencies)
+
+	return ValidatePreservedManualMemoization(tree, function, scopes)
+}
+
+// ForEachFunctionLike calls visit for every outermost function-like node under root.
+//
+// Exported for the rule surface. Outermost only, which is the same denominator every measurement in
+// this package uses: a nested function is reached through `Function.Functions` rather than by
+// walking into it, because an IdentifierId names one value in this function and a different value in
+// a nested one.
+func ForEachFunctionLike(root *ast.Node, visit func(*ast.Node)) {
+	if root == nil {
+		return
+	}
+	root.ForEachChild(func(node *ast.Node) bool {
+		if ast.IsFunctionLike(node) {
+			visit(node)
+			return false
+		}
+		ForEachFunctionLike(node, visit)
+		return false
+	})
 }
