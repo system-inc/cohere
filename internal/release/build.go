@@ -246,6 +246,7 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 	// report a commit for one, because a reader would take that as the Prettier it formats with.
 	if formatter.Commit != "" {
 		stamps = append(stamps, "-X", packagePath+".formatterCommit="+formatter.Commit)
+		stamps = append(stamps, "-X", packagePath+".formatterDigest="+formatter.Digest)
 	}
 
 	linkerFlags := strings.Join(stamps, " ")

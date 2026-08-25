@@ -1,6 +1,8 @@
 package release
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -81,6 +83,14 @@ type FormatterSource struct {
 
 	// Commit is the fork's HEAD at the time the bundles were read.
 	Commit string
+
+	// Digest is a sha256 over the bundle bytes, keyed by name, in BundleFiles order.
+	//
+	// Commit says which fork revision the bundles were built from; Digest says which bytes those
+	// were. They answer different questions and a vendored copy needs both: the commit can be
+	// correct while the bytes on disk are a stale build of it, and after vendoring nothing in a
+	// `git pull` of the fork updates our copy.
+	Digest string
 }
 
 // ResolveFormatterSource finds the built fork and refuses anything it cannot vouch for.
@@ -115,7 +125,39 @@ func ResolveFormatterSource() (FormatterSource, error) {
 		return FormatterSource{}, err
 	}
 
-	return FormatterSource{Directory: bundleDirectory, Commit: commit}, nil
+	digest, err := digestBundles(bundleDirectory)
+	if err != nil {
+		return FormatterSource{}, err
+	}
+
+	return FormatterSource{Directory: bundleDirectory, Commit: commit, Digest: digest}, nil
+}
+
+// digestBundles hashes the bundles a build is about to embed, in BundleFiles order.
+//
+// It hashes the names alongside the bytes. Hashing bytes alone would give the same digest to a set
+// where two bundles were swapped, and a swapped pair is exactly the kind of vendoring mistake that
+// produces a binary which loads and formats wrongly rather than one that fails.
+//
+// It reads FormatterBundleNames, which is the engine's own BundleFiles, so the digest covers the set
+// the engine loads rather than whatever happens to sit in the directory. That is the half `go:embed`
+// cannot check: the compiler refuses a named file that is absent, and says nothing about a file
+// present but unnamed. A stray bundle on disk changes nothing here, which is correct -- it is not
+// loaded, so it is not part of what this binary formats with.
+func digestBundles(bundleDirectory string) (string, error) {
+	hash := sha256.New()
+
+	for _, name := range FormatterBundleNames {
+		content, err := os.ReadFile(filepath.Join(bundleDirectory, name))
+		if err != nil {
+			return "", fmt.Errorf("reading the Prettier bundle %s for its digest: %w", name, err)
+		}
+
+		fmt.Fprintf(hash, "%s\x00%d\x00", name, len(content))
+		hash.Write(content)
+	}
+
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 // readForkCommit reads the fork's HEAD.
