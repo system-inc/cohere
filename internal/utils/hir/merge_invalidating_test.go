@@ -2,6 +2,11 @@ package hir
 
 import (
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/ruletest"
 )
 
 // TestFindLastUsageRecordsTheHighestOrder is the property the merge condition reads.
@@ -278,4 +283,245 @@ func TestFindLastUsageCorpus(t *testing.T) {
 
 	t.Logf("functions=%d placeVisits=%d missing=%d outOfOrder=%d",
 		functions, declarationsSeen, missing, outOfOrder)
+}
+
+// TestScopeIsEligibleForMergingTreatsNoDependenciesAsEligible pins the special case.
+//
+// Upstream's comment: a scope with no dependencies can never change, so there is nothing for a
+// later scope to compare and nothing lost by fusing. Every other scope is eligible only if it
+// declares an always-invalidating value, because otherwise keeping them separate lets the later
+// scope skip work.
+//
+// Both directions are asserted with a nil checker, which forces `IsAlwaysInvalidatingType` to
+// answer false: that isolates the no-dependencies arm from the type arm, so a test passing here
+// cannot be passing because the type lookup happened to say yes.
+func TestScopeIsEligibleForMergingTreatsNoDependenciesAsEligible(t *testing.T) {
+	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
+	if function == nil {
+		t.Fatal("the source did not lower")
+	}
+
+	empty := &ScopeDependencies{}
+	if !ScopeIsEligibleForMerging(function, 1, empty, nil) {
+		t.Error("a scope with no dependencies must be eligible; its output can never change")
+	}
+
+	withDependency := &ScopeDependencies{
+		dependencies: map[ScopeId][]ReactiveScopeDependency{
+			1: {{Identifier: 0}},
+		},
+	}
+	if ScopeIsEligibleForMerging(function, 1, withDependency, nil) {
+		t.Error("a scope with dependencies and no always-invalidating declaration must not be " +
+			"eligible; keeping it separate lets a later scope compare and skip")
+	}
+
+	if ScopeIsEligibleForMerging(function, 1, nil, nil) {
+		t.Error("a nil dependency table answered eligible")
+	}
+}
+
+// TestCanMergeScopesDeclinesReassignments covers the arm the corpus cannot exercise.
+//
+// Only 2 of 1,576 corpus scopes carry a reassignment, so corpus coverage says almost nothing about
+// this branch. It gets its own fixture for that reason rather than being trusted to the sweep.
+func TestCanMergeScopesDeclinesReassignments(t *testing.T) {
+	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
+	if function == nil {
+		t.Fatal("the source did not lower")
+	}
+
+	// Identical dependencies, which would otherwise merge on condition two.
+	shared := []ReactiveScopeDependency{{Identifier: 3}}
+	table := &ScopeDependencies{
+		dependencies: map[ScopeId][]ReactiveScopeDependency{1: shared, 2: shared},
+	}
+	if !CanMergeScopes(function, 1, 2, table, nil, nil) {
+		t.Fatal("two scopes with identical dependencies and no reassignments must merge; the rest " +
+			"of this test assumes that baseline")
+	}
+
+	for _, testCase := range []struct {
+		name          string
+		reassignments map[ScopeId][]IdentifierId
+	}{
+		{name: "current reassigns", reassignments: map[ScopeId][]IdentifierId{1: {5}}},
+		{name: "next reassigns", reassignments: map[ScopeId][]IdentifierId{2: {5}}},
+		{name: "both reassign", reassignments: map[ScopeId][]IdentifierId{1: {5}, 2: {6}}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			withReassignment := &ScopeDependencies{
+				dependencies:  map[ScopeId][]ReactiveScopeDependency{1: shared, 2: shared},
+				reassignments: testCase.reassignments,
+			}
+			if CanMergeScopes(function, 1, 2, withReassignment, nil, nil) {
+				t.Error("a scope carrying a reassignment must decline; its output depends on " +
+					"control flow rather than on its dependencies alone")
+			}
+		})
+	}
+}
+
+// TestCanMergeScopesRequiresRootedInvalidatingFlow covers the third arm's two guards.
+//
+// Upstream requires both that the flowing dependency be rooted (`path.length === 0`) and that its
+// type be always-invalidating. Dropping either turns "these always change together" into "these
+// happen to be connected", which merges scopes that do not invalidate together -- and the resulting
+// program recomputes more than it should while every fixture still passes.
+func TestCanMergeScopesRequiresRootedInvalidatingFlow(t *testing.T) {
+	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
+	if function == nil {
+		t.Fatal("the source did not lower")
+	}
+
+	// A pathed dependency, with a nil checker so the type arm cannot rescue it either. The point is
+	// that the path check must reject before the type check is even consulted.
+	pathed := &ScopeDependencies{
+		dependencies: map[ScopeId][]ReactiveScopeDependency{
+			1: {{Identifier: 7}},
+			2: {{Identifier: 9, Path: []DependencyPathEntry{{Property: "a"}}}},
+		},
+		declarations: map[ScopeId][]IdentifierId{1: {9}},
+	}
+	if CanMergeScopes(function, 1, 2, pathed, nil, nil) {
+		t.Error("a dependency read through a property path must decline; a property off an " +
+			"invalidating value is not itself guaranteed to change")
+	}
+
+	// Rooted, flowing from the earlier scope, and not always-invalidating.
+	//
+	// The later scope depends on TWO values where the earlier declares both, so the synthetic
+	// declarations set does not equal the dependency set and condition two cannot fire -- which is
+	// what leaves condition three as the only path and makes the type check the deciding factor.
+	// An earlier spelling used one dependency matching one declaration exactly, and condition two
+	// returned true before the type was ever consulted: the case asserted nothing about types.
+	rooted := &ScopeDependencies{
+		dependencies: map[ScopeId][]ReactiveScopeDependency{
+			1: {{Identifier: 7}},
+			2: {{Identifier: 9}},
+		},
+		declarations: map[ScopeId][]IdentifierId{1: {9, 11}},
+	}
+	if CanMergeScopes(function, 1, 2, rooted, nil, nil) {
+		t.Error("a rooted dependency whose type is not always-invalidating must decline; the " +
+			"earlier scope's output may not change when its input does")
+	}
+
+	// The declarations-equal arm, which does not consult the type at all.
+	declarationsMatch := &ScopeDependencies{
+		dependencies: map[ScopeId][]ReactiveScopeDependency{
+			1: {{Identifier: 7}},
+			2: {{Identifier: 9, Reactive: true}},
+		},
+		declarations: map[ScopeId][]IdentifierId{1: {9}},
+	}
+	if !CanMergeScopes(function, 1, 2, declarationsMatch, nil, nil) {
+		t.Error("when the earlier scope's declarations are exactly the later scope's dependencies, " +
+			"the scopes merge without consulting types")
+	}
+}
+
+// TestCanMergeScopesGuardsAreIndependentlyLoadBearing isolates each arm of condition three.
+//
+// A mutation sweep found the rooted-path check and the flow check both survivable: each fixture
+// that was supposed to isolate one of them was ALSO rejected by a later guard, so deleting the
+// guard under test changed no answer. A test that only ever sees a rejection cannot tell which
+// guard did the rejecting.
+//
+// Each case here is therefore built to pass every guard except the one it targets, with a real
+// checker so the type arm genuinely answers true rather than falling through on a nil.
+func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
+	withInvalidatingScopes(t, func(function *Function, checker *shimchecker.Checker,
+		invalidating IdentifierId) {
+		// The baseline: rooted, always-invalidating, flowing from the earlier scope's declarations,
+		// and the two dependency sets deliberately unequal so conditions one and two cannot fire.
+		// This must merge, or every rejection below proves nothing.
+		baseline := &ScopeDependencies{
+			dependencies: map[ScopeId][]ReactiveScopeDependency{
+				1: {{Identifier: invalidating}, {Identifier: invalidating + 1}},
+				2: {{Identifier: invalidating}},
+			},
+			declarations: map[ScopeId][]IdentifierId{1: {invalidating}},
+		}
+		if !CanMergeScopes(function, 1, 2, baseline, nil, checker) {
+			t.Fatal("the baseline did not merge, so every case below is rejected for the wrong " +
+				"reason and this test asserts nothing about individual guards")
+		}
+
+		// Targets the rooted check only: identical to the baseline but for the path.
+		pathed := &ScopeDependencies{
+			dependencies: map[ScopeId][]ReactiveScopeDependency{
+				1: {{Identifier: invalidating}, {Identifier: invalidating + 1}},
+				2: {{Identifier: invalidating, Path: []DependencyPathEntry{{Property: "a"}}}},
+			},
+			declarations: map[ScopeId][]IdentifierId{1: {invalidating}},
+		}
+		if CanMergeScopes(function, 1, 2, pathed, nil, checker) {
+			t.Error("a pathed dependency merged; a property read off an invalidating value is not " +
+				"itself guaranteed to change, so the rooted check must reject it")
+		}
+
+		// Targets the flow check only: rooted and invalidating, but declared by nobody.
+		unflowed := &ScopeDependencies{
+			dependencies: map[ScopeId][]ReactiveScopeDependency{
+				1: {{Identifier: invalidating}, {Identifier: invalidating + 1}},
+				2: {{Identifier: invalidating}},
+			},
+			declarations: map[ScopeId][]IdentifierId{1: {invalidating + 2}},
+		}
+		if CanMergeScopes(function, 1, 2, unflowed, nil, checker) {
+			t.Error("a dependency the earlier scope does not declare merged; without the flow " +
+				"check this is two unrelated scopes that happen to read invalidating values")
+		}
+	})
+}
+
+// withInvalidatingScopes hands the callback a lowered function plus an identifier whose type the
+// checker reports as always-invalidating.
+//
+// The identifier is found rather than assumed: a hardcoded id would silently stop being an array
+// the day lowering changes, and the test would keep passing while asserting nothing.
+func withInvalidatingScopes(t *testing.T, visit func(*Function, *shimchecker.Checker, IdentifierId)) {
+	t.Helper()
+
+	ran := false
+	probe := rule.Rule{
+		Name:             "merge-guards-harness",
+		NeedsTypeChecker: true,
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			return rule.Listeners{
+				ast.KindSourceFile: func(node *ast.Node) {
+					if ctx.TypeChecker == nil {
+						t.Fatal("the typed harness handed this probe a nil checker, so the type " +
+							"arm would answer false and the baseline could never merge")
+					}
+					forEachFunctionLike(node, func(functionNode *ast.Node) {
+						function := Lower(functionNode, ctx.TypeChecker)
+						if function == nil {
+							return
+						}
+						Construct(function)
+						for _, identifier := range function.Identifiers {
+							if identifier == nil {
+								continue
+							}
+							if IsAlwaysInvalidatingType(function, identifier.Id, ctx.TypeChecker) {
+								ran = true
+								visit(function, ctx.TypeChecker, identifier.Id)
+								return
+							}
+						}
+					})
+				},
+			}
+		},
+	}
+	ruletest.RunTypedFiles(t, probe, map[string]string{
+		"/merge.ts": `function f(a) { const first = [a]; const second = [first]; return second; }`,
+	}, "/merge.ts")
+
+	if !ran {
+		t.Fatal("no always-invalidating identifier was found in the fixture, so the callback " +
+			"never ran and this test asserted nothing")
+	}
 }

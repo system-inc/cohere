@@ -27,6 +27,10 @@
 // that pass wrote was the renamer.
 package hir
 
+import (
+	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
+)
+
 // LastUsage records the last instruction at which each declaration is read.
 //
 // Upstream's `FindLastUsageVisitor`. Keyed by `DeclarationId` rather than `IdentifierId`, which is
@@ -133,4 +137,130 @@ func AreLValuesLastUsedByScope(scopeEnd EvaluationOrder, lvalues []DeclarationId
 		}
 	}
 	return true
+}
+
+// ScopeIsEligibleForMerging reports whether a scope may be fused with the ones after it.
+//
+// Upstream's `scopeIsEligibleForMerging`, and its comment is the whole reasoning: merging is only
+// safe when the scope's output is guaranteed to change whenever its input changes. When the output
+// may not change, keeping the scopes separate lets the later one compare its input and skip the
+// update -- so merging there would make the program recompute more, not less.
+//
+// A scope with no dependencies is the special case and it is eligible: its output can never change,
+// so there is nothing for a later scope to compare against and nothing lost by fusing.
+//
+// Otherwise the scope is eligible only if it declares a value of an always-invalidating type. Those
+// are the values whose identity is fresh on every evaluation, so their scope really does invalidate
+// whenever its inputs do.
+func ScopeIsEligibleForMerging(function *Function, scope ScopeId, dependencies *ScopeDependencies,
+	typeChecker *shimchecker.Checker) bool {
+	if dependencies == nil {
+		return false
+	}
+	if len(dependencies.DependenciesOf(scope)) == 0 {
+		return true
+	}
+	for _, declaration := range dependencies.DeclarationsOf(scope) {
+		if IsAlwaysInvalidatingType(function, declaration, typeChecker) {
+			return true
+		}
+	}
+	return false
+}
+
+// CanMergeScopes reports whether two adjacent scopes always invalidate together.
+//
+// Upstream's `canMergeScopes`, three conditions in order.
+//
+// # One: neither scope reassigns
+//
+// A reassignment makes a scope's output depend on control flow rather than on its dependencies
+// alone, so two such scopes cannot be shown to invalidate together. Worth knowing before trusting
+// corpus coverage here: only 2 of 1,576 corpus scopes carry a reassignment, so this arm is real but
+// rare and needs its own fixture rather than the corpus to exercise it.
+//
+// # Two: identical dependencies
+//
+// Two scopes reading exactly the same inputs recompute under exactly the same conditions, so one
+// scope does the work of both.
+//
+// # Three: the earlier scope's outputs are the later scope's inputs
+//
+// The arm with the judgment in it, and upstream's comment explains why it is not simply "the values
+// flow from one to the other". A scope's output is not guaranteed to change when its input changes:
+// `foo(x)` returning `x < 10` is unchanged as `x` goes from 0 to 1. Fusing on flow alone would make
+// the later scope recompute whenever the earlier one's inputs moved, even when its own actual input
+// did not.
+//
+// So the flow must additionally be through values whose type guarantees a fresh identity every
+// evaluation, which is what `IsAlwaysInvalidatingType` answers. Upstream also requires those
+// dependencies be rooted -- `path.length === 0` -- because a property read off an invalidating
+// value is not itself guaranteed to change.
+func CanMergeScopes(function *Function, current, next ScopeId, dependencies *ScopeDependencies,
+	temporaries map[DeclarationId]DeclarationId, typeChecker *shimchecker.Checker) bool {
+	if dependencies == nil {
+		return false
+	}
+	if len(dependencies.ReassignmentsOf(current)) != 0 ||
+		len(dependencies.ReassignmentsOf(next)) != 0 {
+		return false
+	}
+
+	nextDependencies := dependencies.DependenciesOf(next)
+	if AreEqualDependencies(dependencies.DependenciesOf(current), nextDependencies) {
+		return true
+	}
+
+	// The earlier scope's declarations, read as if they were a dependency set, so the comparison
+	// against the later scope's inputs is the same one condition two performs. Upstream builds the
+	// same synthetic set inline, with `reactive: true` and an empty path.
+	asDependencies := make([]ReactiveScopeDependency, 0, len(dependencies.DeclarationsOf(current)))
+	for _, declaration := range dependencies.DeclarationsOf(current) {
+		asDependencies = append(asDependencies, ReactiveScopeDependency{
+			Identifier: declaration,
+			Reactive:   true,
+		})
+	}
+	if AreEqualDependencies(asDependencies, nextDependencies) {
+		return true
+	}
+
+	if len(nextDependencies) == 0 {
+		return false
+	}
+	for _, dependency := range nextDependencies {
+		if len(dependency.Path) != 0 {
+			return false
+		}
+		if !IsAlwaysInvalidatingType(function, dependency.Identifier, typeChecker) {
+			return false
+		}
+		if !declaredByOrAliasedFrom(function, dependency.Identifier,
+			dependencies.DeclarationsOf(current), temporaries) {
+			return false
+		}
+	}
+	return true
+}
+
+// declaredByOrAliasedFrom reports whether a dependency comes from one of the given declarations.
+//
+// Either directly, or through the temporaries map the driver threads along -- upstream resolves a
+// `StoreLocal` chain so that a value copied into a temporary is still recognised as the earlier
+// scope's output. Without that indirection an ordinary `const b = a` between two scopes would hide
+// the flow and silently prevent a merge upstream performs.
+func declaredByOrAliasedFrom(function *Function, dependency IdentifierId,
+	declarations []IdentifierId, temporaries map[DeclarationId]DeclarationId) bool {
+	target := declarationOf(function, dependency)
+	aliased, hasAlias := temporaries[target]
+	for _, declaration := range declarations {
+		candidate := declarationOf(function, declaration)
+		if candidate == target {
+			return true
+		}
+		if hasAlias && candidate == aliased {
+			return true
+		}
+	}
+	return false
 }
