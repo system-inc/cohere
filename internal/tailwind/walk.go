@@ -104,11 +104,32 @@ type Sort struct {
 // contributes to Order. Count keeps incrementing regardless. A `--tw-sort` whose value is unknown
 // does not latch, and falls through to be looked up as a property name in its own right.
 //
+// # The input is the pre-variant body, and is not mutated
+//
 // The declaration list passed here is the utility's body before it is wrapped in its `.selector`
 // rule and before any variant is applied, matching upstream's call site. Variants never change a
-// candidate's reading.
+// candidate's reading: verified by recompiling every variant-carrying candidate in Tailwind's class
+// list with its variants stripped and confirming the reading is identical, which the fixture
+// generator asserts during generation. The distinction is observable rather than academic, because
+// a duplicating variant such as `not-hover:` emits twice the declarations it reads.
+//
+// nodes is copied rather than used as the queue's own backing array, so a caller passing a subslice
+// of a larger tree does not have the nodes after it overwritten as the queue grows.
 func PropertySort(nodes []*Node) Sort {
+	sort, _ := propertySort(nodes)
+	return sort
+}
+
+// propertySort is PropertySort plus the sequence of declaration properties it visited, in visit
+// order.
+//
+// The sequence exists so that a test can assert the traversal order against the engine's, on the
+// real function rather than on a reimplementation of it. Order is a sorted set and Count is a total,
+// so both are insensitive to visit order on most input; without observing the sequence directly, a
+// depth-first PropertySort passes every assertion that can be made about its return value.
+func propertySort(nodes []*Node) (Sort, []string) {
 	sort := Sort{}
+	var visited []string
 
 	// seen keeps Order deduplicated while positions are collected out of ascending order; upstream
 	// uses a Set and sorts at the end.
@@ -131,6 +152,7 @@ func PropertySort(nodes []*Node) Sort {
 			}
 
 			sort.Count++
+			visited = append(visited, node.Property)
 
 			if seenTwSort {
 				continue
@@ -162,5 +184,5 @@ func PropertySort(nodes []*Node) Sort {
 	}
 
 	slices.Sort(sort.Order)
-	return sort
+	return sort, visited
 }

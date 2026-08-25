@@ -227,11 +227,12 @@ for (const name of [...extraClassNames, ...classNames]) {
                  */
                 node: readNode,
                 /*
-                 * emittedNode is the post-variant tree the engine actually returns. Recorded so the
-                 * variant-invariance of the reading is visible in the fixture rather than only
-                 * asserted during generation.
+                 * emittedNode is the post-variant tree the engine actually returns, recorded only
+                 * where it can differ from the tree the reading was taken from. For a candidate with
+                 * no variants the two are the same object and storing it twice would double the
+                 * fixture for no added claim.
                  */
-                emittedNode,
+                emittedNode: candidate.variants && candidate.variants.length > 0 ? emittedNode : null,
                 hasVariants: Boolean(candidate.variants && candidate.variants.length > 0),
                 /*
                  * The reading the engine itself took, from the same call that produced the tree.

@@ -179,7 +179,7 @@ func TestPropertySortIsBreadthFirst(t *testing.T) {
 
 	for _, testCase := range corpus.TraversalCases {
 		node := testCase.Node.toNode(t)
-		got := propertySortVisitOrder(seedFor(node))
+		_, got := propertySort(seedFor(node))
 
 		if !equalStrings(got, testCase.BreadthFirst) {
 			t.Errorf("%s: visit order = %v, engine's queue visits %v", testCase.ClassName, got, testCase.BreadthFirst)
@@ -388,6 +388,40 @@ func TestVariantsDoNotChangeTheReading(t *testing.T) {
 	t.Logf("%d variant-carrying cases, %d of which emit a different declaration count than their reading counts", withVariants, whereEmittedDiffers)
 }
 
+// TestPropertySortDoesNotMutateItsInput pins that the traversal leaves the caller's slice alone.
+//
+// The queue is seeded with a copy. Seeding it with the slice itself passes every other test in this
+// file and is still wrong: the queue grows by append, so once it outgrows the caller's backing array
+// it detaches, but until then it writes children over whatever followed the caller's slice in that
+// array. That is a use-after-free-shaped bug in Go's clothing, and it only shows up when the caller
+// passes a subslice of something larger, which is exactly what the CSS parser will do.
+func TestPropertySortDoesNotMutateItsInput(t *testing.T) {
+	// A backing array larger than the slice handed to PropertySort, so an append that fails to copy
+	// writes into the tail rather than reallocating.
+	backing := make([]*Node, 0, 16)
+	backing = append(backing,
+		StyleRule(".a", Declaration("display", "flex"), Declaration("color", "red")),
+	)
+	tail := []*Node{Declaration("margin", "0"), Declaration("padding", "0")}
+	backing = append(backing, tail...)
+
+	seed := backing[:1]
+
+	before := make([]*Node, len(backing))
+	copy(before, backing)
+
+	PropertySort(seed)
+
+	for index := range backing {
+		if backing[index] != before[index] {
+			t.Fatalf("PropertySort overwrote the caller's backing array at index %d; it must seed its queue with a copy", index)
+		}
+	}
+	if len(seed) != 1 {
+		t.Errorf("seed length = %d, want 1", len(seed))
+	}
+}
+
 // seedFor recovers the declaration list the engine seeded getPropertySort with.
 //
 // The fixture stores that list already wrapped in the candidate's `.selector` rule, because that is
@@ -397,31 +431,6 @@ func seedFor(node *Node) []*Node {
 		return node.Nodes
 	}
 	return []*Node{node}
-}
-
-// propertySortVisitOrder records the properties PropertySort visits, in the order it visits them.
-//
-// It reimplements PropertySort's queue rather than instrumenting it, which would normally be the
-// wrong shape for a test. Here it is the point: the assertion is that the port's traversal and the
-// engine's traversal agree, and the fixture holds the engine's. If this diverges from PropertySort
-// the corpus test above fails, so the two are pinned against each other.
-func propertySortVisitOrder(nodes []*Node) []string {
-	var visited []string
-	queue := make([]*Node, len(nodes))
-	copy(queue, nodes)
-
-	for head := 0; head < len(queue); head++ {
-		node := queue[head]
-		switch node.Kind {
-		case KindDeclaration:
-			if node.ValuePresent {
-				visited = append(visited, node.Property)
-			}
-		case KindRule, KindAtRule:
-			queue = append(queue, node.Nodes...)
-		}
-	}
-	return visited
 }
 
 func treeHasKind(node *Node, kind NodeKind) bool {
