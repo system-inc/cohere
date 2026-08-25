@@ -76,6 +76,8 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	}
 
 	scored, matched, missed, unmatchable, flowExcluded := 0, 0, 0, 0, 0
+	upstreamTotal, oursTotal := 0, 0
+	overProducing, underProducing, exactCount := 0, 0, 0
 	for _, fixture := range fixtures {
 		if !strings.Contains(fixture.Source, "validatePreserveExistingMemoizationGuarantees") {
 			continue
@@ -96,6 +98,17 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 		if !ok {
 			continue
 		}
+		upstreamTotal += len(expected)
+		oursTotal += len(ours)
+		switch {
+		case len(ours) > len(expected):
+			overProducing++
+		case len(ours) < len(expected):
+			underProducing++
+		default:
+			exactCount++
+		}
+
 		have := map[string]bool{}
 		for _, one := range ours {
 			have[one] = true
@@ -152,8 +165,38 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
 	}
+	// # The second half of the score, and the oracle was blind to it until now
+	//
+	// Everything above measures whether an upstream dependency has a match on our side. Nothing
+	// measured the reverse: a dependency we produce that upstream does not. Those cost nothing in
+	// the matched count and are the dominant error.
+	//
+	// Measured: we produce 151 dependencies where upstream produces 115, on the same fixtures. 25
+	// fixtures over-produce, 6 under-produce, 17 agree exactly. Every session before this one
+	// treated the shortfall as missing depth and built toward producing MORE, which is the wrong
+	// direction for two thirds of the disagreements.
+	//
+	// This matters for the rule rather than only for tidiness. A dependency we infer and upstream
+	// does not widens the scope that holds it, and a wider scope is one still open when
+	// `preserve-manual-memoization` checks it. Ten fixtures both over-produce here and false-positive
+	// in the rule's own score, which is what makes this the same defect seen from two ends rather
+	// than a second lane.
+	const knownUpstreamTotal = 115
+	const knownOursTotal = 151
+	if upstreamTotal != knownUpstreamTotal {
+		t.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
+			"every count below is against a different population", upstreamTotal, knownUpstreamTotal)
+	}
+	if oursTotal != knownOursTotal {
+		t.Errorf("we produce %d dependencies against upstream's %d, want %d; DOWN toward %d is the "+
+			"improvement here and up is a regression, which is the opposite of the matched count "+
+			"above", oursTotal, upstreamTotal, knownOursTotal, knownUpstreamTotal)
+	}
+
 	t.Logf("golden cache slots: %d scored, %d matched, %d missed, %d unmatchable; "+
 		"%d flow fixtures excluded", scored, matched, missed, unmatchable, flowExcluded)
+	t.Logf("dependency counts: upstream %d, ours %d (%d over-producing, %d under, %d exact)",
+		upstreamTotal, oursTotal, overProducing, underProducing, exactCount)
 }
 
 // inferredDependencyStrings renders every scope dependency the way source would spell it.
