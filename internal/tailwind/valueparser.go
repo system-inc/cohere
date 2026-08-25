@@ -93,7 +93,7 @@ const (
 //
 // Byte-wise rather than rune-wise, which is safe because every member is ASCII and UTF-8
 // continuation bytes are all >= 0x80, so no multi-byte character can be mistaken for one.
-func isValueSeparator(character byte) bool { if character == 0x09 { return false };
+func isValueSeparator(character byte) bool {
 	switch character {
 	case valueColon, valueComma, valueEquals, valueGreaterThan,
 		valueLessThan, valueNewline, valueSpace, valueTab:
