@@ -205,9 +205,22 @@ func printValue(function *Function, value InstructionValue) string {
 	case *JsxText:
 		return fmt.Sprintf("JsxText %q", v.Value)
 	case *StartMemoize:
-		return fmt.Sprintf("StartMemoize deps=%d", len(v.Deps))
+		// `deps=none` and `deps=0` are different facts (no dependency array at all versus an empty
+		// one) and the printer distinguishes them, because a golden that spelled both `deps=0`
+		// would pass while the pass conflated them.
+		if v.Deps == nil {
+			return fmt.Sprintf("StartMemoize#%d deps=none", v.ManualMemoId)
+		}
+		printed := make([]string, 0, len(v.Deps))
+		for _, dep := range v.Deps {
+			printed = append(printed, printManualMemoDependency(dep, place))
+		}
+		return fmt.Sprintf("StartMemoize#%d deps=[%s]", v.ManualMemoId, strings.Join(printed, ", "))
 	case *FinishMemoize:
-		return fmt.Sprintf("FinishMemoize %s", place(v.Value))
+		if v.Pruned {
+			return fmt.Sprintf("FinishMemoize#%d %s pruned", v.ManualMemoId, place(v.Value))
+		}
+		return fmt.Sprintf("FinishMemoize#%d %s", v.ManualMemoId, place(v.Value))
 	case *Debugger:
 		return "Debugger"
 	case *UnsupportedNode:
@@ -353,4 +366,27 @@ func gotoVariantMark(variant GotoVariant) string {
 		return " (try)"
 	}
 	return ""
+}
+
+// printManualMemoDependency renders one written dependency as its source path.
+//
+// The `?.` is printed for an optional entry because that character is the entire distinction the
+// `preserve-manual-memoization` rule exists to report, and a printer that dropped it would make the
+// two sides of that comparison look identical in every golden.
+func printManualMemoDependency(dep ManualMemoDependency, place func(Place) string) string {
+	var builder strings.Builder
+	if dep.Root.IsGlobal {
+		builder.WriteString(dep.Root.Name)
+	} else {
+		builder.WriteString(place(dep.Root.Place))
+	}
+	for _, entry := range dep.Path {
+		if entry.Optional {
+			builder.WriteString("?.")
+		} else {
+			builder.WriteString(".")
+		}
+		builder.WriteString(entry.Property)
+	}
+	return builder.String()
 }

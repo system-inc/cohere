@@ -145,7 +145,11 @@ func EachPlacePointer(value InstructionValue, visit func(place *Place, role Plac
 		// No places.
 	case *StartMemoize:
 		for index := range v.Deps {
-			visit(&v.Deps[index], PlaceRoleUse)
+			// See the matching note in `visitor.go`: a global root has no place to rewrite.
+			if v.Deps[index].Root.IsGlobal {
+				continue
+			}
+			visit(&v.Deps[index].Root.Place, PlaceRoleUse)
 		}
 	case *FinishMemoize:
 		visit(&v.Value, PlaceRoleUse)

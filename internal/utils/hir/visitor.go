@@ -174,7 +174,14 @@ func EachPlace(value InstructionValue, visit func(place Place, role PlaceRole)) 
 		// No places.
 	case *StartMemoize:
 		for _, dep := range v.Deps {
-			visit(dep, PlaceRoleUse)
+			// A global-rooted dependency carries a NAME rather than a place, so it holds a zero
+			// `Place` that names no identifier. Visiting it would hand every operand consumer an
+			// identifier id of zero, which single-assignment renaming would then treat as a real
+			// binding.
+			if dep.Root.IsGlobal {
+				continue
+			}
+			visit(dep.Root.Place, PlaceRoleUse)
 		}
 	case *FinishMemoize:
 		visit(v.Value, PlaceRoleUse)

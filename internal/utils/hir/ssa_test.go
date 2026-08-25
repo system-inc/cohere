@@ -299,7 +299,12 @@ func TestMutatingVisitorCoversEveryValue(t *testing.T) {
 		&JsxExpression{Props: []JsxAttribute{{Value: place(1)}}, Children: []Place{place(2)}},
 		&JsxFragment{Children: []Place{place(1)}},
 		&JsxText{},
-		&StartMemoize{Deps: []Place{place(1)}},
+		// Both root kinds, because the walkers SKIP a global root (it carries a name, not a
+		// place) and a case listing only local roots would let a walker that skipped both pass.
+		&StartMemoize{Deps: []ManualMemoDependency{
+			{Root: ManualMemoRoot{Place: place(1)}, Path: []DependencyPathEntry{{Property: "a"}}},
+			{Root: ManualMemoRoot{IsGlobal: true, Name: "g"}},
+		}},
 		&FinishMemoize{Value: place(1)},
 		&Debugger{},
 		&UnsupportedNode{},

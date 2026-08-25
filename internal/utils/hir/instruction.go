@@ -373,14 +373,67 @@ type JsxText struct{ Value string }
 // Inserted by a later pass and read by a later pass. Nothing in lowering produces them and no
 // generic pass must interpret them; they cost one variant each.
 
+// ManualMemoDependency is one entry a developer WROTE in a `useMemo`/`useCallback` dependency
+// array: an access path, not a value.
+//
+// This is upstream's `ManualMemoDependency` and it is deliberately the same shape as
+// `ReactiveScopeDependency` in `dependencies.go`, because the entire purpose of these markers is
+// for the two to be COMPARED. `preserve-manual-memoization` reports when what the developer wrote
+// and what the compiler inferred disagree, so a difference in spelling between the two sides would
+// become a false report at every call site.
+//
+// `Root` is the base of the path. A dependency array entry can be rooted at a local binding
+// (`props` in `[props.items]`) or at a global, and the two are not interchangeable: a global has no
+// identifier in this function to compare against, so it is carried by name.
+//
+// The path reuses `DependencyPathEntry` rather than declaring a second spelling of the same idea.
+// That reuse is load-bearing rather than tidy: `DependencyPathEntry.Optional` is compared by
+// `equalPaths`, so `props.a` and `props?.a` are different dependencies on BOTH sides of the
+// comparison. Collapsing them on this side only would make a one-character source difference
+// invisible to the rule whose whole job is to see it.
+type ManualMemoDependency struct {
+	Root ManualMemoRoot
+	Path []DependencyPathEntry
+}
+
+// ManualMemoRoot is the base of a manual dependency path: a local binding, or a global by name.
+//
+// Exactly one field is meaningful, selected by `IsGlobal`. A struct rather than an interface
+// because this is carried inside an instruction value and every pass that walks operands must be
+// able to see the `Place` without a type switch.
+type ManualMemoRoot struct {
+	// IsGlobal selects which of the two fields below is meaningful.
+	IsGlobal bool
+	// Place is the local binding the path is rooted at, meaningful when IsGlobal is false.
+	Place Place
+	// Name is the global's name, meaningful when IsGlobal is true.
+	Name string
+}
+
 // StartMemoize marks the beginning of a manually memoized region.
+//
+// `Deps` is nil when the call had NO dependency array at all, which is a different fact from an
+// empty array and is why the field is a nil-able slice rather than a length. `useMemo(fn)` with no
+// second argument recomputes every render and is not a memoization claim; `useMemo(fn, [])` claims
+// the value never changes. A rule comparing declared against inferred dependencies must not read
+// the first as the second.
 type StartMemoize struct {
-	// Deps are the declared dependencies, nil when the dependency array was absent.
-	Deps []Place
+	// ManualMemoId pairs this marker with its `FinishMemoize`.
+	//
+	// Necessary rather than decorative: memo calls nest (a `useMemo` whose callback body contains
+	// another), so the markers do not form a simple stack in instruction order once the callbacks
+	// are inlined, and a consumer matching by proximity would pair the wrong two.
+	ManualMemoId int
+	// Deps are the dependencies the developer WROTE, nil when the dependency array was absent.
+	Deps []ManualMemoDependency
 }
 
 // FinishMemoize marks the end of a manually memoized region.
 type FinishMemoize struct {
+	// ManualMemoId pairs this marker with its `StartMemoize`.
+	ManualMemoId int
+	// Value is the memoized declaration: the call's result for `useMemo`, the callback itself for
+	// `useCallback`. Upstream names this field `decl`.
 	Value Place
 	// Pruned records that the memoization was discarded.
 	Pruned bool
