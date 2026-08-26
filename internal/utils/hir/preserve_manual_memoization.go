@@ -423,6 +423,11 @@ func AnalyzePreservedManualMemoization(function *Function,
 	InferReactive(function, typeChecker)
 	DropManualMemoization(function)
 
+	if InlineImmediatelyInvokedFunctionExpressions(function) > 0 {
+		MergeConsecutiveBlocks(function)
+		Construct(function)
+	}
+
 	ranges := InferMutableRanges(function)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)

@@ -132,8 +132,9 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 			copied := &Instruction{
 				Order:  source.Order,
 				LValue: source.LValue,
-				Value:  source.Value,
+				Value:  copyInstructionValue(source.Value),
 				Node:   source.Node,
+				Range:  source.Range,
 			}
 			copied.LValue.Identifier = remap.Identifiers[source.LValue.Identifier]
 			EachInstructionPlacePointer(copied, func(place *Place, role PlaceRole) {
@@ -145,7 +146,7 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 			remap.Instructions[instructionId] = parent.AddInstruction(target, copied)
 		}
 
-		target.Terminal = shallowCopyTerminal(block.Terminal)
+		target.Terminal = copyTerminal(block.Terminal)
 		EachTerminalPlacePointer(target.Terminal, func(place *Place, role PlaceRole) {
 			if mapped, ok := remap.Identifiers[place.Identifier]; ok {
 				place.Identifier = mapped
@@ -194,33 +195,146 @@ func remapNestedFunctionIds(value InstructionValue, functionRemap map[FunctionId
 	}
 }
 
-// shallowCopyTerminal returns a terminal holding the same field values as its argument, in fresh
-// storage.
+// copyTerminal returns a terminal holding the same field values as its argument, in storage the
+// argument does not share.
 //
 // The copy exists because remapping rewrites through pointers. `EachTerminalPlacePointer` and
 // `EachBlockReferencePointer` both hand out pointers into the terminal they are given, and the
 // caller writes through them; handing them the nested function's own terminal would rename the
-// nested body rather than the copy. Copying is shallow on purpose: the fields a terminal holds are
-// places, block ids and evaluation orders, all values, so one level is the whole structure.
+// nested body rather than the copy.
 //
-// It is written by reflection rather than as one arm per terminal because the arms would say
-// nothing. A hand-written `case *If: return &If{...}` restates the struct definition, and the
-// restatement is what rots: a field added to a terminal is silently dropped by a copier that
-// predates it, and nothing fails until a rule reads the field through an inlined body. Reflection
-// copies whatever is there.
-func shallowCopyTerminal(terminal Terminal) Terminal {
+// # Why one level is not enough, which is the correction
+//
+// This was written as a one-level copy on the reasoning that a terminal's fields are "places, block
+// ids and evaluation orders, all values". Two are not. `Switch.Cases` is a `[]SwitchCase`, and a
+// struct copy duplicates the slice HEADER while both headers keep pointing at one backing array --
+// so a rewrite through a copied case writes into the original. Each `SwitchCase.Test` is a `*Place`,
+// and a copied pointer is the same place.
+//
+// The measured symptom was in the sibling instruction path, which had the same shallow shape: after
+// a copy, ten of nineteen places in the nested body had been renamed to the parent's ids, and
+// printing the nested function panicked on an identifier past the end of its table. Nothing in the
+// remap's own mutation sweep saw it, because that sweep asserted only over block REFERENCES and
+// this damage is to places.
+//
+// So the copy follows pointers and slices to the bottom. `deepCopyValue` is the one implementation
+// and both terminals and instruction values go through it.
+func copyTerminal(terminal Terminal) Terminal {
 	if terminal == nil {
 		return nil
 	}
-	value := reflect.ValueOf(terminal)
-	if value.Kind() != reflect.Pointer || value.IsNil() {
-		return terminal
-	}
-	copied := reflect.New(value.Elem().Type())
-	copied.Elem().Set(value.Elem())
-	clone, ok := copied.Interface().(Terminal)
+	clone, ok := deepCopyAny(terminal).(Terminal)
 	if !ok {
 		return terminal
 	}
 	return clone
 }
+
+// copyInstructionValue returns an instruction value sharing no mutable storage with its argument.
+//
+// Same reason as `copyTerminal`, and the same measurement: `EachInstructionPlacePointer` hands out
+// pointers into the value, so a copied instruction that still holds the original's `*CallExpression`
+// has its operands renamed in the nested function rather than in the copy.
+func copyInstructionValue(value InstructionValue) InstructionValue {
+	if value == nil {
+		return nil
+	}
+	clone, ok := deepCopyAny(value).(InstructionValue)
+	if !ok {
+		return value
+	}
+	return clone
+}
+
+// deepCopyAny duplicates a value and everything reachable from it through pointers, slices, maps
+// and interfaces.
+//
+// Written by reflection rather than as one arm per type because the arms would say nothing. A
+// hand-written `case *If: return &If{...}` restates the struct definition, and the restatement is
+// what rots: a field added to a terminal is silently dropped by a copier that predates it, and
+// nothing fails until a rule reads the field through an inlined body. The failure this replaced was
+// exactly that shape one level down -- a `[]SwitchCase` the copier's own comment claimed could not
+// exist.
+//
+// `*ast.Node` and the checker types reachable from it are deliberately NOT followed: they are the
+// syntax tree, shared by every consumer in the process and never rewritten by a remap. Following
+// them would copy the program. The stop condition is therefore structural rather than a type list:
+// a pointer to a struct declared outside this package is kept as-is.
+func deepCopyAny(value any) any {
+	if value == nil {
+		return nil
+	}
+	source := reflect.ValueOf(value)
+	return deepCopyValue(source).Interface()
+}
+
+func deepCopyValue(source reflect.Value) reflect.Value {
+	switch source.Kind() {
+	case reflect.Pointer:
+		if source.IsNil() {
+			return source
+		}
+		// The syntax tree and anything else this package does not declare is shared, not copied.
+		// A remap never writes through those, and copying them would duplicate the program.
+		if source.Type().Elem().PkgPath() != hirPackagePath {
+			return source
+		}
+		copied := reflect.New(source.Type().Elem())
+		copied.Elem().Set(deepCopyValue(source.Elem()))
+		return copied
+	case reflect.Interface:
+		if source.IsNil() {
+			return source
+		}
+		copied := reflect.New(source.Type()).Elem()
+		copied.Set(deepCopyValue(source.Elem()))
+		return copied
+	case reflect.Slice:
+		if source.IsNil() {
+			return source
+		}
+		copied := reflect.MakeSlice(source.Type(), source.Len(), source.Len())
+		for index := 0; index < source.Len(); index++ {
+			copied.Index(index).Set(deepCopyValue(source.Index(index)))
+		}
+		return copied
+	case reflect.Map:
+		if source.IsNil() {
+			return source
+		}
+		copied := reflect.MakeMapWithSize(source.Type(), source.Len())
+		iterator := source.MapRange()
+		for iterator.Next() {
+			copied.SetMapIndex(deepCopyValue(iterator.Key()),
+				deepCopyValue(iterator.Value()))
+		}
+		return copied
+	case reflect.Struct:
+		copied := reflect.New(source.Type()).Elem()
+		copied.Set(source)
+		if source.Type().PkgPath() != hirPackagePath {
+			// A struct from another package is copied whole and not descended into, for the same
+			// reason its pointers are not followed.
+			return copied
+		}
+		for index := 0; index < source.NumField(); index++ {
+			field := copied.Field(index)
+			if !field.CanSet() {
+				// Unexported. The struct copy above already carried its bits across, which is the
+				// most a copier outside the declaring type can do, and nothing a remap rewrites is
+				// unexported.
+				continue
+			}
+			field.Set(deepCopyValue(source.Field(index)))
+		}
+		return copied
+	default:
+		return source
+	}
+}
+
+// hirPackagePath is this package, used to decide what deepCopyValue descends into.
+//
+// Taken from a declared type rather than written as a string so a package move cannot silently turn
+// the copy shallow again.
+var hirPackagePath = reflect.TypeOf(Place{}).PkgPath()

@@ -525,6 +525,11 @@ func pipelineFindings(function *Function, checker *shimchecker.Checker) []Preser
 	OutlineFunctions(function)
 	InferReactive(function, checker)
 	DropManualMemoization(function)
+
+	if InlineImmediatelyInvokedFunctionExpressions(function) > 0 {
+		MergeConsecutiveBlocks(function)
+		Construct(function)
+	}
 	// Upstream sweeps at `Pipeline.ts:230`, after the memo rewrite at 168 and long before the
 	// dependency analysis at 428, so the instructions that built a written dependency array are gone
 	// before anything reads them. See `dead_code_elimination.go`.
