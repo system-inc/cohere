@@ -1,6 +1,7 @@
 package react
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -9,123 +10,119 @@ import (
 
 // stringRefsFile is where the fixtures pretend to live.
 //
-// A `.tsx` name rather than `.ts`, and that is load-bearing rather than cosmetic. This rule gates
-// on the file being a JSX file, reproducing oxc's `should_run` on `source_type().is_jsx()`, so the
-// same fixture under a `.ts` name is silent by design. `TestNoStringRefsNeedsAJsxFile` below pins
-// that, because a revert of the gate would otherwise leave every clean case passing vacuously.
+// A `.tsx` name because the corpus is JSX and needs a parser that reads it. It is NOT load-bearing
+// the way the previous port's was: this rule has no file gate, and `TestNoStringRefsHasNoFileGate`
+// pins that by running the same source under four extensions.
 const stringRefsFile = "/repository/source/StringRefs.tsx"
 
-// The corpus is oxc's, copied rather than rewritten.
+// The corpus is `eslint-plugin-react`'s own, extracted rather than retyped.
 //
-// Every case below is verbatim from `oxc/crates/oxc_linter/src/rules/react/no_string_refs.rs`:
-// 6 pass and 10 fail. The extractor reported 14 diagnostics against those 10 inputs, so one finding
-// per input would have been wrong here. The four inputs that report twice each carry a `this.refs`
-// read and a string ref in the same component, and the mapping below was recovered by aligning each
-// snapshot diagnostic against the source line it underlines rather than by walking the two lists in
-// order. That mattered: upstream lists one input twice, byte for byte, and an in-order walk
-// silently gave both of its diagnostics to the first copy and none to the input after it.
+// `/tmp/lint-sources/eslint-plugin-react/tests/lib/rules/no-string-refs.js` holds 4 valid and 7
+// invalid cases carrying 10 diagnostics between them. Every string below was pulled out of that
+// file by loading it with a stubbed `RuleTester` and serializing the captured object, then compared
+// byte against byte back into the source with a script rather than by eye.
 //
-// The strings were decoded from the extractor's dump and then checked byte against byte into the
-// Rust source before any Go was written. Two of them came back wrong: the dump double-escaped the
-// `\"` inside `ref=\"hello\"`, so the decoded fixture held a literal backslash and would have
-// tested a different attribute value than upstream does. Reading them would not have caught it.
+// Two columns encode what upstream expresses as test configuration:
+//
+//	noTemplateLiterals   the case's `options[0].noTemplateLiterals`
+//	checkThisRefs        upstream's `settings.react.version` resolved through the version gate,
+//	                     `< 18.3.0`. Three of the eleven cases exist only to vary this: upstream's
+//	                     fourth valid case and its first invalid case are byte-identical and differ
+//	                     only in carrying `18.3.0` against `18.2.0`, and its last invalid case is
+//	                     its sixth with the version raised so one of the two findings disappears.
+//	                     Absent means `999.999.999`, so false.
+//
+// That pair is the whole reason this rule grew a `checkThisRefs` option. Without it the corpus
+// cannot be expressed: two of its cases are the same bytes with opposite verdicts.
 func TestNoStringRefsFires(t *testing.T) {
 	cases := []struct {
 		name               string
 		sourceText         string
 		noTemplateLiterals bool
+		checkThisRefs      bool
 		findings           []string
 	}{
-		{"this.refs inside componentDidMount", "\n              var Hello = createReactClass({\n                componentDidMount: function() {\n                  var component = this.refs.hello;\n                },\n                render: function() {\n                  return <div>Hello {this.props.name}</div>;\n                }\n              });\n            ", false, []string{"thisRefsDeprecated"}},
-		{"a double-quoted string ref", "\n              var Hello = createReactClass({\n                render: function() {\n                  return <div ref=\"hello\">Hello {this.props.name}</div>;\n                }\n              });\n            ", false, []string{"stringInRefDeprecated"}},
-		{"a single-quoted string ref in a container", "\n              var Hello = createReactClass({\n                render: function() {\n                  return <div ref={'hello'}>Hello {this.props.name}</div>;\n                }\n              });\n            ", false, []string{"stringInRefDeprecated"}},
-		{"this.refs and a string ref in one component", "\n              var Hello = createReactClass({\n                componentDidMount: function() {\n                  var component = this.refs.hello;\n                },\n                render: function() {\n                  return <div ref=\"hello\">Hello {this.props.name}</div>;\n                }\n              });\n            ", false, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
-		{"this.refs and a template ref under the option", "\n              var Hello = createReactClass({\n                componentDidMount: function() {\n                var component = this.refs.hello;\n                },\n                render: function() {\n                  return <div ref={`hello`}>Hello {this.props.name}</div>;\n                }\n              });\n            ", true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
-		{"this.refs and an interpolated template ref under the option", "\n              var Hello = createReactClass({\n                componentDidMount: function() {\n                var component = this.refs.hello;\n                },\n                render: function() {\n                  return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n                }\n              });\n            ", true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
-		{"an interpolated template ref alone under the option", "\n              var Hello = createReactClass({\n                render: function() {\n                  return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n                }\n              });\n            ", true, []string{"stringInRefDeprecated"}},
-		{"this.refs in an ES6 class component", "\n              class Hello extends React.Component {\n                componentDidMount() {\n                  var component = this.refs.hello;\n                }\n              }\n            ", false, []string{"thisRefsDeprecated"}},
-		{"this.refs in an ES6 class component, listed twice upstream", "\n              class Hello extends React.Component {\n                componentDidMount() {\n                  var component = this.refs.hello;\n                }\n              }\n            ", false, []string{"thisRefsDeprecated"}},
-		{"this.refs and a template ref in a PureComponent", "\n              class Hello extends React.PureComponent {\n                componentDidMount() {\n                  var component = this.refs.hello;\n                }\n                render() {\n                  return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n                }\n              }\n            ", true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
+		{"upstream invalid 0", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"thisRefsDeprecated"}},
+		{"upstream invalid 1", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref=\"hello\">Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"stringInRefDeprecated"}},
+		{"upstream invalid 2", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={'hello'}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"stringInRefDeprecated"}},
+		{"upstream invalid 3", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref=\"hello\">Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
+		{"upstream invalid 4", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", true, true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
+		{"upstream invalid 5", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", true, true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
+		{"upstream invalid 6", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", true, false, []string{"stringInRefDeprecated"}},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := ruletest.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
-				NoStringRefsOptions{NoTemplateLiterals: testCase.noTemplateLiterals})
+				NoStringRefsOptions{
+					NoTemplateLiterals: testCase.noTemplateLiterals,
+					CheckThisRefs:      testCase.checkThisRefs,
+				})
 			ruletest.ExpectFindings(t, result, testCase.findings...)
 		})
 	}
 }
 
-// The clean cases are the whole discrimination, and each declines for a different reason.
+// The clean cases, and each declines for a different reason.
 //
-// The first, fifth and sixth read `this.refs` from somewhere no component encloses: a plain
-// function, and a plain function that merely sits beside a component rather than inside one. Those
-// three are why the rule asks about the enclosing component instead of matching `this.refs` on
-// sight. The second passes a callback, which is the repair this rule is asking for. The third and
-// fourth write template refs with the option off, which is the option's entire subject.
+// The first passes a ref callback, which is the repair this rule asks for. The second and third
+// write template refs with the option off, which is that option's entire subject. The fourth is the
+// version gate: byte-identical to the first firing case and clean only because upstream's
+// `18.3.0` setting turns the `this.refs` half off.
 func TestNoStringRefsStaysSilent(t *testing.T) {
 	cases := []struct {
 		name               string
 		sourceText         string
 		noTemplateLiterals bool
+		checkThisRefs      bool
 	}{
-		{"this.refs in a plain function, which is no component", "\n                    var Hello = function() {\n                      return this.refs;\n                    };\n                  ", false},
-		{"a ref callback beside a this.hello read", "\n                    var Hello = React.createReactClass({\n                      componentDidMount: function() {\n                        var component = this.hello;\n                      },\n                      render: function() {\n                        return <div ref={c => this.hello = c}>Hello {this.props.name}</div>;\n                      }\n                    });\n                  ", false},
-		{"a template ref with the option off", "\n                    var Hello = createReactClass({\n                      render: function() {\n                        return <div ref={`hello`}>Hello {this.props.name}</div>;\n                      }\n                    });\n                  ", false},
-		{"a template ref with interpolation and the option off", "\n                    var Hello = createReactClass({\n                      render: function() {\n                        return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n                      }\n                    });\n                  ", false},
-		{"this.refs outside the createReactClass beside it", "\n                    var Hello = function() {\n                      return this.refs;\n                    };\n                    createReactClass({\n                      render: function() {\n                        let x;\n                      }\n                    });\n                  ", false},
-		{"this.refs outside the class component beside it", "\n                    var Hello = function() {\n                      return this.refs;\n                    };\n                    class Other extends React.Component {\n                      render() {\n                        let x;\n                      }\n                    };\n                  ", false},
+		{"upstream valid 0", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.hello;\n          },\n          render: function() {\n            return <div ref={c => this.hello = c}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
+		{"upstream valid 1", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={`hello`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
+		{"upstream valid 2", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
+		{"upstream valid 3", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoStringRefs, stringRefsFile,
-				testCase.sourceText, NoStringRefsOptions{NoTemplateLiterals: testCase.noTemplateLiterals}))
+				testCase.sourceText, NoStringRefsOptions{
+					NoTemplateLiterals: testCase.noTemplateLiterals,
+					CheckThisRefs:      testCase.checkThisRefs,
+				}))
 		})
 	}
 }
 
 // Cases upstream does not ship, each covering a discrimination its corpus leaves untested.
 //
-// Every shape here was run against the release oxlint binary before being written down, so these
-// assert measured upstream behavior rather than my reading of the Rust. Three of them were found by
-// mutation: the rule survived a mutant that compared the attribute name case-insensitively, and one
-// that accepted any object rather than `this`, because no upstream fixture writes either shape.
+// Every shape here was run against the installed `eslint-plugin-react` build, version 7.37.5,
+// through the ESLint Linter API before being written down, so these assert measured upstream
+// behavior rather than a reading of the JavaScript. The reading was wrong about five of them.
 func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 	fires := []struct {
 		name       string
 		sourceText string
 		findings   []string
 	}{
-		// oxc resolves a computed member through `static_property_name`, which answers for a string
-		// literal, so the bracketed spelling is the same judgment as the dotted one. Confirmed
-		// reporting on the release binary.
-		{
-			"a computed refs read written with a string",
-			"class Hello extends React.Component {\n  m() { return this[\"refs\"].hello; }\n}\n",
-			[]string{"thisRefsDeprecated"},
-		},
-		// The same resolution accepts a single-quasi template, which is what `quasis.len() == 1`
-		// means upstream and what a NoSubstitutionTemplateLiteral is here. Confirmed reporting.
-		{
-			"a computed refs read written with a bare template",
-			"class Hello extends React.Component {\n  m() { return this[`refs`].hello; }\n}\n",
-			[]string{"thisRefsDeprecated"},
-		},
 		// A ref attribute needs no enclosing component, unlike the other half of this rule. This is
 		// the asymmetry the rule doc describes, and upstream writes every ref fixture inside a
-		// component so nothing in the imported corpus pins it. Confirmed reporting.
+		// component so nothing in the imported corpus pins it. Measured reporting.
 		{
 			"a string ref outside any component",
 			"const a = <div ref=\"hello\" />;\n",
 			[]string{"stringInRefDeprecated"},
 		},
 		// A double-quoted string inside the container, which upstream only ever writes
-		// single-quoted. Confirmed reporting.
+		// single-quoted. Measured reporting.
 		{
 			"a double-quoted string ref inside a container",
 			"const a = <div ref={\"hello\"} />;\n",
+			[]string{"stringInRefDeprecated"},
+		},
+		// A member-expression element name is still an element with a ref attribute. Measured.
+		{
+			"a string ref on a namespaced component",
+			"const a = <Foo.Bar ref=\"hello\" />;\n",
 			[]string{"stringInRefDeprecated"},
 		},
 	}
@@ -142,39 +139,20 @@ func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 		name       string
 		sourceText string
 	}{
-		// Found by mutation. A rule matching the attribute name case-insensitively survived the
-		// entire imported corpus, because upstream never writes the attribute any other way. JSX
-		// attribute names are case-sensitive and `REF` is a different attribute; confirmed silent
-		// on the release binary.
+		// JSX attribute names are case-sensitive and `REF` is a different attribute. Measured
+		// silent. A rule comparing case-insensitively survives the entire imported corpus, because
+		// upstream never writes the attribute any other way.
 		{
 			"a ref attribute in the wrong case",
 			"const a = <div REF=\"hello\" />;\n",
 		},
-		// Found by mutation. A rule dropping the `this` check survived everything, since upstream
-		// has no fixture reading `refs` off anything else. Confirmed silent.
-		{
-			"a refs read off something that is not this",
-			"class Hello extends React.Component {\n  m() { return that.refs.hello; }\n}\n",
-		},
-		// The same shape one level in: a nested object whose property happens to be named `refs`.
-		{
-			"a refs property on a plain object",
-			"class Hello extends React.Component {\n  m() { return this.props.refs.hello; }\n}\n",
-		},
-		// An interpolated computed key cannot be resolved without evaluating it, so upstream's
-		// `quasis.len() == 1` declines it. Confirmed silent on the release binary, which is the
-		// pair to the bare-template case above.
-		{
-			"a computed refs read with interpolation",
-			"class Hello extends React.Component {\n  m() { return this[`refs${x}`].hello; }\n}\n",
-		},
-		// A bare attribute has no value at all, and both upstreams require one before looking.
+		// A bare attribute has no value at all, and `containsStringLiteral` opens with `!!node.value`.
 		{
 			"a ref attribute with no value",
 			"const a = <div ref />;\n",
 		},
-		// A ref holding something that is not a string is the ordinary modern spelling once it is a
-		// variable, and a number is neither shape this rule refuses.
+		// A numeric Literal is a Literal whose value is not a string, so it falls out of
+		// `typeof node.value.value === 'string'` rather than out of a kind check. Measured silent.
 		{
 			"a ref holding a number",
 			"const a = <div ref={123} />;\n",
@@ -183,16 +161,27 @@ func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 			"a ref holding an identifier",
 			"const a = <div ref={hello} />;\n",
 		},
-		// A namespaced attribute name is not a plain identifier, which is the shape oxc destructures
-		// and returns early on. Confirmed silent.
+		// A knowable string that is not a Literal. Upstream does not evaluate, so this is silent
+		// even though its value is obvious. Measured.
+		{
+			"a ref holding a concatenation of two strings",
+			"const a = <div ref={\"a\" + \"b\"} />;\n",
+		},
+		// A namespaced attribute name is a JSXNamespacedName whose `.name` is an object rather than
+		// a string, so the comparison against `'ref'` fails on type. Measured silent.
 		{
 			"a namespaced ref attribute",
 			"const a = <svg xlink:ref=\"hello\" />;\n",
 		},
-		// An attribute whose name merely contains `ref`.
+		// An attribute whose name merely starts with `ref`.
 		{
 			"an attribute whose name only starts with ref",
 			"const a = <div refs=\"hello\" />;\n",
+		},
+		// A spread supplying the ref is not a JSXAttribute and is never visited. Measured silent.
+		{
+			"a ref supplied through a spread",
+			"const a = <div {...{ ref: \"hello\" }} />;\n",
 		},
 	}
 
@@ -203,41 +192,362 @@ func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 	}
 }
 
-// The file gate is the one discrimination no upstream fixture can reach, because oxc's tester only
-// ever names the fixture `.tsx`.
+// How `this.refs` is spelled, which upstream's corpus writes exactly one way.
 //
-// Without it this rule reports `this.refs` inside every plain TypeScript file holding a class that
-// extends `React.Component`, which is a real shape in this codebase and not a contrived one. The
-// gate reproduces oxc's `should_run` on `source_type().is_jsx()`, and it was measured against the
-// release oxlint binary rather than inferred from the call: the same four-line class written to
-// `probe.ts` and to `probe.tsx` and linted in one invocation reported on the `.tsx` copy only.
-func TestNoStringRefsNeedsAJsxFile(t *testing.T) {
-	// Deliberately the `this.refs` half rather than the attribute half. A `.ts` file cannot hold a
-	// JSX attribute at all, so gating on a ref attribute would pass whether or not the gate exists.
+// The corpus writes `this.refs.hello` inside `createReactClass` and nothing else, so every
+// discrimination in `isRefsUsage` beyond that one shape is untested upstream. Each case here was
+// measured on the installed build with `settings.react.version` set to `18.2.0`, which is what
+// `checkThisRefs: true` reproduces.
+//
+// The computed group is the reason this test exists. `node.property.name` is undefined for a
+// computed key unless that key is an identifier, and `computed` is never checked, so the four
+// spellings split in a way no reading of the rule name would predict. The previous port of this
+// rule had them exactly inverted.
+func TestNoStringRefsSpellingsOfTheRefsRead(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+		findings   []string
+	}{
+		{
+			"the dotted spelling",
+			"class H extends React.Component { m() { return this.refs.x; } }\n",
+			[]string{"thisRefsDeprecated"},
+		},
+		{
+			"a bare refs read with nothing taken off it",
+			"class H extends React.Component { m() { return this.refs; } }\n",
+			[]string{"thisRefsDeprecated"},
+		},
+		// A string-literal key has no `.name`, so upstream is silent. Measured.
+		{
+			"a computed read written with a string",
+			"class H extends React.Component { m() { return this[\"refs\"].x; } }\n",
+			nil,
+		},
+		// A template key likewise. Measured.
+		{
+			"a computed read written with a bare template",
+			"class H extends React.Component { m() { return this[`refs`].x; } }\n",
+			nil,
+		},
+		// An IDENTIFIER key does have `.name`, and it is `refs`, and `computed` is never checked.
+		// So an unrelated variable named `refs` is read as the registry and reports. Measured on
+		// the installed build. This is an upstream defect, reproduced rather than corrected.
+		{
+			"a computed read whose key is a variable named refs",
+			"class H extends React.Component { m() { return this[refs].x; } }\n",
+			[]string{"thisRefsDeprecated"},
+		},
+		// Parentheses are transparent in ESTree, which has no node for them. Measured reporting;
+		// the previous port was silent here.
+		{
+			"a parenthesized this",
+			"class H extends React.Component { m() { return (this).refs.x; } }\n",
+			[]string{"thisRefsDeprecated"},
+		},
+		// The object must be `this` specifically. Measured silent.
+		{
+			"a refs read off something that is not this",
+			"class H extends React.Component { m() { return that.refs.x; } }\n",
+			nil,
+		},
+		// The same shape one level in: a nested object whose property happens to be named `refs`.
+		{
+			"a refs property on a plain object",
+			"class H extends React.Component { m() { return this.props.refs.x; } }\n",
+			nil,
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
+				NoStringRefsOptions{CheckThisRefs: true})
+			if len(testCase.findings) == 0 {
+				ruletest.ExpectClean(t, result)
+				return
+			}
+			ruletest.ExpectFindings(t, result, testCase.findings...)
+		})
+	}
+}
+
+// Which enclosing component counts, which is a SCOPE walk and not a parent-chain walk.
+//
+// This is the group that the previous port got wrong in two directions, and neither was visible
+// from the imported corpus, which writes exactly one nesting shape. `getParentES6Component` stops
+// at the first class scope rather than continuing upward, and `getParentES5Component` walks
+// function scopes asking whether each one's block sits inside a factory call.
+//
+// Every case measured on the installed build at `settings.react.version` of `18.2.0`.
+func TestNoStringRefsEnclosingComponentIsAScopeWalk(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+		reports    bool
+	}{
+		// The ES6 walk stops at `Inner`, which is not a component, and returns null rather than
+		// continuing up to `H`. Measured silent. A parent-chain walk reports here, which is the
+		// false positive the previous port shipped.
+		{
+			"a plain class nested inside a component hides it",
+			"class H extends React.Component { m() { class Inner { k() { return this.refs.x; } } } }\n",
+			false,
+		},
+		// The mirror image: the first class scope IS the component, so the plain class above it
+		// does not matter. Measured reporting.
+		{
+			"a component nested inside a plain class still counts",
+			"class Outer { m() { class H extends React.Component { k() { return this.refs.x; } } } }\n",
+			true,
+		},
+		// An arrow opens no class scope, so the walk passes through it to the component.
+		{
+			"an arrow function inside a component method",
+			"class H extends React.Component { m() { const f = () => this.refs.x; } }\n",
+			true,
+		},
+		{
+			"a static method",
+			"class H extends React.Component { static m() { return this.refs.x; } }\n",
+			true,
+		},
+		{
+			"a class field initializer",
+			"class H extends React.Component { f = this.refs.x; }\n",
+			true,
+		},
+		{
+			"a class expression assigned to a variable",
+			"var H = class extends React.Component { m() { return this.refs.x; } };\n",
+			true,
+		},
+		// The ES5 walk reads `scope.block.parent.parent` at each scope. With no function between
+		// the read and the module there is no such scope, so this is silent even though the read
+		// sits lexically inside the factory call. Measured.
+		{
+			"an ES5 property value with no function around it",
+			"var H = createReactClass({ m: this.refs.x });\n",
+			false,
+		},
+		// A function nested arbitrarily deep inside the factory argument still answers, because the
+		// ES5 walk continues upward rather than stopping at the first scope.
+		{
+			"an ES5 factory with a nested plain object holding the function",
+			"var H = createReactClass({ m: function() { var o = { k: function() { return this.refs.x; } }; } });\n",
+			true,
+		},
+		// The four cases below were found by mutation: deleting `KindArrowFunction` and deleting
+		// `KindMethodDeclaration` from `opensFunctionScope` both survived every fixture above,
+		// because upstream's corpus writes the factory property exactly one way, as a function
+		// expression. eslint-scope opens a scope for each of these, so each reaches the factory
+		// test and each reports. All four measured on the installed build before being written.
+		{
+			"an ES5 factory property written as an arrow",
+			"var H = createReactClass({ m: () => this.refs.x });\n",
+			true,
+		},
+		{
+			"an ES5 factory property written as a shorthand method",
+			"var H = createReactClass({ m() { return this.refs.x; } });\n",
+			true,
+		},
+		{
+			"an ES5 factory property written as a getter",
+			"var H = createReactClass({ get m() { return this.refs.x; } });\n",
+			true,
+		},
+		// An arrow nested inside the function property. The arrow's own hops land on nothing, and
+		// the walk continues to the function above it, which is what makes this a case about the
+		// loop continuing rather than about the arrow.
+		{
+			"an arrow nested inside an ES5 factory property",
+			"var H = createReactClass({ m: function() { return (() => this.refs.x)(); } });\n",
+			true,
+		},
+		// The factory name is the default `createClass` pragma and nothing wider. The shelf's
+		// `IsEs5ComponentCall` accepts the two below and would report on both. Measured silent.
+		{
+			"the React.createClass factory spelling",
+			"var H = React.createClass({ m: function() { return this.refs.x; } });\n",
+			false,
+		},
+		{
+			"the bare createClass factory spelling",
+			"var H = createClass({ m: function() { return this.refs.x; } });\n",
+			false,
+		},
+		// The namespaced form of the pragma does count. Measured reporting.
+		{
+			"the React.createReactClass factory spelling",
+			"var H = React.createReactClass({ m: function() { return this.refs.x; } });\n",
+			true,
+		},
+		// Parentheses on the callee are transparent in ESTree. Measured reporting.
+		{
+			"a parenthesized factory callee",
+			"var H = (createReactClass)({ m: function() { return this.refs.x; } });\n",
+			true,
+		},
+		// The ES6 base names are `Component` and `PureComponent`, bare or namespaced.
+		{
+			"a bare Component base",
+			"class H extends Component { m() { return this.refs.x; } }\n",
+			true,
+		},
+		{
+			"a PureComponent base",
+			"class H extends React.PureComponent { m() { return this.refs.x; } }\n",
+			true,
+		},
+		{
+			"an unrelated base class",
+			"class H extends React.Foo { m() { return this.refs.x; } }\n",
+			false,
+		},
+		{
+			"a class with no heritage at all",
+			"class H { m() { return this.refs.x; } }\n",
+			false,
+		},
+		// Upstream's first valid case in spirit: no component of any kind encloses the read.
+		{
+			"a plain function, which is no component",
+			"var Hello = function() { return this.refs; };\n",
+			false,
+		},
+		// A component sitting beside the read rather than around it.
+		{
+			"a read outside the component beside it",
+			"var Hello = function() { return this.refs; };\n" +
+				"class Other extends React.Component { render() { let x; } }\n",
+			false,
+		},
+		// Upstream's `isExplicitComponent` reads an `@extends` JSDoc tag through doctrine, behind
+		// the `componentDetection` option most configurations leave off. Measured silent on the
+		// installed build rather than assumed, and not implemented here. Recorded so the absence
+		// reads as measured rather than as forgotten.
+		{
+			"a JSDoc extends tag naming React.Component",
+			"/** @extends React.Component */ class H extends Foo { m() { return this.refs.x; } }\n",
+			false,
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
+				NoStringRefsOptions{CheckThisRefs: true})
+			if testCase.reports {
+				ruletest.ExpectFindings(t, result, "thisRefsDeprecated")
+				return
+			}
+			ruletest.ExpectClean(t, result)
+		})
+	}
+}
+
+// Upstream has no file gate, and the previous port of this rule had one.
+//
+// oxc declares `should_run` on `source_type().is_jsx()`; `eslint-plugin-react` declares nothing of
+// the kind, and the same class reports identically under `probe.jsx`, `probe.js`, `probe.cjs` and
+// `probe.mjs` on the installed build. Reproducing oxc's gate costs every finding in every `.ts`
+// file, which is most of this tree.
+//
+// The `this.refs` half rather than the attribute half, deliberately: a `.ts` file cannot hold a JSX
+// attribute at all, so gating on a ref attribute would pass whether or not a gate exists.
+func TestNoStringRefsHasNoFileGate(t *testing.T) {
 	sourceText := "class Hello extends React.Component {\n" +
 		"  componentDidMount() {\n" +
 		"    var component = this.refs.hello;\n" +
 		"  }\n" +
 		"}\n"
 
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoStringRefs, "/repository/source/Hello.tsx", sourceText),
-		"thisRefsDeprecated")
-	ruletest.ExpectClean(t, ruletest.Run(t, NoStringRefs, "/repository/source/Hello.ts", sourceText))
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoStringRefs, "/repository/source/Hello.jsx", sourceText),
-		"thisRefsDeprecated")
-	ruletest.ExpectClean(t, ruletest.Run(t, NoStringRefs, "/repository/source/Hello.js", sourceText))
+	for _, fileName := range []string{
+		"/repository/source/Hello.tsx",
+		"/repository/source/Hello.ts",
+		"/repository/source/Hello.jsx",
+		"/repository/source/Hello.js",
+	} {
+		t.Run(fileName, func(t *testing.T) {
+			ruletest.ExpectFindings(t,
+				ruletest.RunWithOptions(t, NoStringRefs, fileName, sourceText,
+					NoStringRefsOptions{CheckThisRefs: true}),
+				"thisRefsDeprecated")
+		})
+	}
+}
+
+// The option decoder, routed through the rule's own exported entry point.
+//
+// Building the options struct directly leaves the decoder untested, and the decoder is where the
+// one non-upstream key lives. `checkThisRefs` has to be distinguishable as absent, so a struct
+// literal cannot exercise the branch that decides what absence means.
+func TestDecodeNoStringRefsOptions(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want NoStringRefsOptions
+	}{
+		{"empty input is upstream's unconfigured answer", "", NoStringRefsOptions{}},
+		{"an empty object is the same", "{}", NoStringRefsOptions{}},
+		{"the template option alone", `{"noTemplateLiterals":true}`,
+			NoStringRefsOptions{NoTemplateLiterals: true}},
+		{"the refs half turned on", `{"checkThisRefs":true}`,
+			NoStringRefsOptions{CheckThisRefs: true}},
+		{"an explicit false is still off", `{"checkThisRefs":false}`, NoStringRefsOptions{}},
+		{"both keys together", `{"noTemplateLiterals":true,"checkThisRefs":true}`,
+			NoStringRefsOptions{NoTemplateLiterals: true, CheckThisRefs: true}},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			decoded, err := DecodeNoStringRefsOptions([]byte(testCase.raw))
+			if err != nil {
+				t.Fatalf("decoding %q: %v", testCase.raw, err)
+			}
+			got, ok := decoded.(NoStringRefsOptions)
+			if !ok {
+				t.Fatalf("decoded %q to %T", testCase.raw, decoded)
+			}
+			if got != testCase.want {
+				t.Errorf("decoded %q to %+v, want %+v", testCase.raw, got, testCase.want)
+			}
+		})
+	}
+
+	if _, err := DecodeNoStringRefsOptions([]byte("not json")); err == nil {
+		t.Error("decoding malformed input returned no error")
+	}
+}
+
+// A rule handed nil options must reach the same answer as one handed an empty object.
+//
+// The brief's measured failure here is a rule reporting registrations while finding nothing,
+// because a bare `"error"` in the config hands the rule nil and every fixture reached it through
+// the decoder. This bypasses the decoder entirely, which is the only way to see that.
+func TestNoStringRefsWithNilOptions(t *testing.T) {
+	// The template half is off, so a template ref is clean.
+	ruletest.ExpectClean(t, ruletest.Run(t, NoStringRefs, stringRefsFile,
+		"const a = <div ref={`hello`} />;\n"))
+	// The refs half is off, so a component's `this.refs` is clean.
+	ruletest.ExpectClean(t, ruletest.Run(t, NoStringRefs, stringRefsFile,
+		"class H extends React.Component { m() { return this.refs.x; } }\n"))
+	// The attribute half is on regardless, so a string ref still reports. Without this the two
+	// assertions above would pass on a rule that registered no listeners at all.
+	ruletest.ExpectFindings(t, ruletest.Run(t, NoStringRefs, stringRefsFile,
+		"const a = <div ref=\"hello\" />;\n"), "stringInRefDeprecated")
 }
 
 // Where each finding points, which no message-id assertion can see.
 //
-// Both spans are upstream's and both are surprising in a different direction. The `this.refs`
-// finding underlines nine characters, so it points at the `refs` read and not at `this.refs.hello`,
-// which is what the snapshot's nine-character underline under a longer expression records. The
-// attribute finding underlines the whole `ref="hello"`, which is `attr.span` rather than the name
-// span that `no-children-prop` in this same package reports, so the two rules here disagree about
-// where a JSX attribute finding belongs and that disagreement is upstream's rather than ours.
+// Both spans are the node upstream hands to `report`, and both were read off the installed build
+// rather than inferred. The `this.refs` finding underlines the member expression and stops there,
+// so `this.refs.hello` reports against `this.refs` and the outer access is left alone. The
+// attribute finding underlines the whole `ref="hello"` rather than the name span that
+// `no-children-prop` in this same package reports, so the two rules here disagree about where a JSX
+// attribute finding belongs and that disagreement is upstream's rather than ours.
 func TestNoStringRefsPointsAtTheRightNode(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -254,10 +564,12 @@ func TestNoStringRefsPointsAtTheRightNode(t *testing.T) {
 			"class Hello extends React.Component {\n  m() { return this.refs; }\n}\n",
 			[]string{"this.refs"},
 		},
+		// The parenthesis is inside the reported range upstream, measured, because ESTree's member
+		// expression starts at the open paren.
 		{
-			"a computed refs read",
-			"class Hello extends React.Component {\n  m() { return this[\"refs\"].hello; }\n}\n",
-			[]string{"this[\"refs\"]"},
+			"a parenthesized this, parenthesis included",
+			"class Hello extends React.Component {\n  m() { return (this).refs.hello; }\n}\n",
+			[]string{"(this).refs"},
 		},
 		{
 			"the whole attribute, not its name",
@@ -281,7 +593,8 @@ func TestNoStringRefsPointsAtTheRightNode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoStringRefs, stringRefsFile, testCase.sourceText)
+			result := ruletest.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
+				NoStringRefsOptions{CheckThisRefs: true})
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
 			}
@@ -295,12 +608,13 @@ func TestNoStringRefsPointsAtTheRightNode(t *testing.T) {
 	}
 }
 
-// The rendered text of both messages, asserted by equality rather than by containment.
+// The two messages, asserted by equality rather than by containment.
 //
 // A `strings.Contains` check on a message that interpolates nothing still passes when the message
-// is wrong in a way that only adds text, so equality is what is asserted. The two descriptions also
-// have to stay distinguishable from each other, since this rule's whole structure rests on the two
-// judgments being separately named.
+// is wrong in a way that only adds text, so the ids are asserted against literals typed here rather
+// than against the rule's own constants, which would move together under mutation. The two
+// descriptions also have to stay distinguishable, since this rule's whole structure rests on the
+// two judgments being separately named.
 func TestNoStringRefsMessagesReadCorrectly(t *testing.T) {
 	if messageThisRefsDeprecated.Id != "thisRefsDeprecated" {
 		t.Errorf("this.refs message id is %q", messageThisRefsDeprecated.Id)
@@ -320,5 +634,24 @@ func TestNoStringRefsMessagesReadCorrectly(t *testing.T) {
 		if len(message) < 60 || !strings.Contains(message, "React 19") {
 			t.Errorf("description does not explain the removal: %q", message)
 		}
+	}
+}
+
+// The wire type accepts exactly upstream's key set plus the one this port adds.
+//
+// `meta.schema` declares `additionalProperties: false`, which ESLint enforces by refusing the whole
+// configuration by name; there is no error channel for that here, so an unknown key is ignored
+// rather than refused. Asserted so the difference is recorded rather than assumed.
+func TestNoStringRefsIgnoresUnknownOptionKeys(t *testing.T) {
+	decoded, err := DecodeNoStringRefsOptions([]byte(`{"bogus":true,"noTemplateLiterals":true}`))
+	if err != nil {
+		t.Fatalf("decoding: %v", err)
+	}
+	if got := decoded.(NoStringRefsOptions); got != (NoStringRefsOptions{NoTemplateLiterals: true}) {
+		t.Errorf("decoded to %+v", got)
+	}
+	// A control, so the assertion above cannot pass by the decoder ignoring everything.
+	if _, err := json.Marshal(NoStringRefsOptions{}); err != nil {
+		t.Fatalf("marshalling: %v", err)
 	}
 }

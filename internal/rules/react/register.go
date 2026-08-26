@@ -48,7 +48,6 @@ func init() {
 		rule.Registration{Rule: NoFindDOMNode},
 		rule.Registration{Rule: NoIsMounted},
 		rule.Registration{Rule: NoRenderReturnValue},
-		rule.Registration{Rule: NoStringRefs, Decode: rule.DecodeOptionsInto[NoStringRefsOptions]()},
 		rule.Registration{Rule: NoThisInSfc},
 		rule.Registration{Rule: NoUnsafe, Decode: rule.DecodeOptionsInto[NoUnsafeOptions]()},
 		rule.Registration{Rule: NoWillUpdateSetState, Decode: rule.DecodeOptionsInto[NoWillUpdateSetStateOptions]()},
