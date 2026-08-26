@@ -1447,6 +1447,19 @@ func nestedFunctionHeldBy(function *Function, id IdentifierId) *Function {
 			switch value := instruction.Value.(type) {
 			case *FunctionExpression:
 				held[instruction.LValue.Identifier] = value.Function
+			case *LoadGlobal:
+				// An outlined function. `OutlineFunctions` rewrote a capture-free
+				// `FunctionExpression` into this load and recorded where the body went, so the
+				// callee is still readable and this pass still sees what it does to its parameter.
+				//
+				// Without this arm the two passes silently disagree: outlining runs first, the
+				// resolver finds nothing, and a callback that mutates what it is called over stops
+				// widening the receiver's range. Measured on
+				// `error.validate-object-values-mutation`, where that cost two goldens once both
+				// passes were present.
+				if outlinedId, ok := function.Outlined[instruction.LValue.Identifier]; ok {
+					held[instruction.LValue.Identifier] = outlinedId
+				}
 			case *StoreLocal:
 				if id, ok := held[value.Value.Identifier]; ok {
 					held[value.LValue.Identifier] = id
