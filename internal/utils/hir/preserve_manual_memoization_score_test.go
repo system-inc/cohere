@@ -402,6 +402,10 @@ func findingsForSource(t *testing.T, source string) ([]PreserveManualMemoization
 func pipelineFindings(function *Function, checker *shimchecker.Checker) []PreserveManualMemoizationFinding {
 	InferReactive(function, checker)
 	DropManualMemoization(function)
+	// Upstream sweeps at `Pipeline.ts:230`, after the memo rewrite at 168 and long before the
+	// dependency analysis at 428, so the instructions that built a written dependency array are gone
+	// before anything reads them. See `dead_code_elimination.go`.
+	EliminateDeadCode(function)
 
 	ranges := InferMutableRanges(function)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)

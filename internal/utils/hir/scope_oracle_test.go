@@ -84,6 +84,7 @@ type scopeStageCounts struct {
 func countScopeStages(function *Function, checker *shimchecker.Checker) scopeStageCounts {
 	InferReactive(function, checker)
 	DropManualMemoization(function)
+	EliminateDeadCode(function)
 
 	ranges := InferMutableRanges(function)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)

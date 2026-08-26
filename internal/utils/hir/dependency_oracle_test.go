@@ -307,7 +307,21 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// dependencies are upstream's; five are not. Recorded rather than buried: the trade was taken
 	// because it also recovered a broken invariant, 2,345 of 3,357 scopes covering none of their own
 	// members before the fix and 0 after.
-	const knownOursTotal = 158
+	// Lowered from 158 to 120, against upstream's 116, by running dead-code elimination where
+	// upstream runs it. This is the direction this number's own message calls the improvement, and
+	// it is the largest move it has made: over-producing fixtures fall from 27 to 12 and exact
+	// agreement rises from 16 to 20, with `matched` unmoved at 77 -- so 38 rows left and not one of
+	// them was a dependency upstream names.
+	//
+	// What they were: the loads that built each memo call's written dependency array. Upstream
+	// sweeps them at `Pipeline.ts:230`, between the memo rewrite at 168 and the dependency analysis
+	// at 428, so its collector never sees them. This tree kept them because
+	// `drop_manual_memoization.go` leaves them deliberately -- matching upstream's pass -- and the
+	// elimination upstream relies on afterwards did not exist here.
+	//
+	// The 16 fixtures now under-producing are logged rather than pinned, and `matched` is what
+	// guards that direction: a row lost from a golden guard would show there, and none did.
+	const knownOursTotal = 120
 	if upstreamTotal != knownUpstreamTotal {
 		t.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
 			"every count below is against a different population", upstreamTotal, knownUpstreamTotal)
@@ -346,6 +360,7 @@ func inferredDependencyStrings(t *testing.T, source string) ([]string, bool) {
 						Construct(function)
 						InferReactive(function, ctx.TypeChecker)
 						DropManualMemoization(function)
+						EliminateDeadCode(function)
 						ranges := InferMutableRanges(function)
 						disjoint := FindDisjointMutableValuesWithRanges(function, ranges)
 						scopes := AssignReactiveScopesWithSets(function, ranges, disjoint)
