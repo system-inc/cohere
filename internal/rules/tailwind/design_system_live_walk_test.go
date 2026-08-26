@@ -58,6 +58,7 @@ func liveWalkRules() []rule.Rule {
 		EnforceConsistentClassOrder,
 		EnforceConsistentVariantOrder,
 		EnforceConsistentImportantPosition,
+		EnforceConsistentVariableSyntax,
 		EnforceCanonicalClasses,
 		NoConcatenatedClasses,
 		NoConflictingClasses,

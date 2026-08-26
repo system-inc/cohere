@@ -30,6 +30,10 @@ func init() {
 			Decode: rule.DecodeOptionsInto[EnforceConsistentImportantPositionOptions](),
 		},
 		rule.Registration{
+			Rule:   EnforceConsistentVariableSyntax,
+			Decode: rule.DecodeOptionsInto[EnforceConsistentVariableSyntaxOptions](),
+		},
+		rule.Registration{
 			Rule:   EnforceCanonicalClasses,
 			Decode: rule.DecodeOptionsInto[EnforceCanonicalClassesOptions](),
 		},
