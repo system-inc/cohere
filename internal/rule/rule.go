@@ -195,9 +195,14 @@ type Rule struct {
 	//
 	// # How much the skip is still worth, as a dated measurement rather than a standing claim
 	//
-	// **2026-08-25: 44 of 216 registered rules declare this.** So the acquisition is skipped on a
-	// file only when none of those 44 applies to it, which is a real saving and is nothing like the
-	// blanket one this comment used to describe.
+	// **2026-08-25: 44 of 216 registered rules declare this, roughly a fifth.** So the acquisition
+	// is skipped on a file only when none of that fifth applies to it, which is a real saving and is
+	// nothing like the blanket one this comment used to describe.
+	//
+	// The share is what the claim rests on rather than either count, and
+	// `TestCheckerDeclarationShareStillSupportsTheConclusion` asserts it as a band for that reason.
+	// A porting wave moves the total on every commit without touching what this paragraph concludes;
+	// a shift in the ratio is what would make it false.
 	//
 	// It previously read "every file in the current catalog: of 112 rule files exactly one reads the
 	// checker, and it is the tsgolint adapter, which registers no rules yet." That was true when it

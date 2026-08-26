@@ -337,3 +337,86 @@ func TestEveryDeclinedRuleIsRealAndUnported(t *testing.T) {
 		}
 	}
 }
+
+// TestInventoryCountersMatchItsOwnRules keeps the summary counters honest without asking a porter
+// to maintain them.
+//
+// `rule-inventory.json` opens with `total`, `byNamespace`, `bySeverity` and `byEnabledBy`. Nothing
+// reads any of them: the parity comparison unmarshals `rules[].rule` and ignores the rest. So they
+// are documentation that sits at the top of the file a reader opens first, which is the position
+// most likely to be believed and least likely to be checked.
+//
+// They were also four hand-edits per port, and the shape of the mistake is quiet. A porter who
+// appends an entry and forgets `total` leaves a file whose header disagrees with its body, and no
+// test says so. During a porting wave that is a near certainty rather than a risk.
+//
+// So this derives them and compares. The fix on failure is to correct the counters, never to relax
+// this: a counter that is allowed to be wrong is worse than one that is absent, because absence is
+// visible and wrongness reads as measurement.
+func TestInventoryCountersMatchItsOwnRules(t *testing.T) {
+	path := inventoryPath()
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("cannot read %s: %v", path, err)
+	}
+
+	var document struct {
+		Total       int            `json:"total"`
+		ByNamespace map[string]int `json:"byNamespace"`
+		BySeverity  map[string]int `json:"bySeverity"`
+		ByEnabledBy map[string]int `json:"byEnabledBy"`
+		Rules       []struct {
+			Rule      string `json:"rule"`
+			Severity  string `json:"severity"`
+			EnabledBy string `json:"enabledBy"`
+		} `json:"rules"`
+	}
+	if err := json.Unmarshal(contents, &document); err != nil {
+		t.Fatalf("cannot parse %s: %v", path, err)
+	}
+	if len(document.Rules) == 0 {
+		t.Fatalf("%s parsed to zero rules, so this would pass by having nothing to compare", path)
+	}
+
+	// A bare name is a core rule, and the inventory files those under "(core)" rather than under a
+	// namespace. Read out of the file rather than assumed: the first version of this guard wrote
+	// "eslint" and the guard itself reported the disagreement, which is the behaviour it exists for.
+	namespaceOf := func(rule string) string {
+		if index := strings.Index(rule, "/"); index >= 0 {
+			return rule[:index]
+		}
+		return "(core)"
+	}
+
+	wantNamespace := map[string]int{}
+	wantSeverity := map[string]int{}
+	wantEnabledBy := map[string]int{}
+	for _, entry := range document.Rules {
+		wantNamespace[namespaceOf(entry.Rule)]++
+		if entry.Severity != "" {
+			wantSeverity[entry.Severity]++
+		}
+		if entry.EnabledBy != "" {
+			wantEnabledBy[entry.EnabledBy]++
+		}
+	}
+
+	if document.Total != len(document.Rules) {
+		t.Errorf("the inventory says total %d and carries %d rules", document.Total, len(document.Rules))
+	}
+	compare := func(label string, want map[string]int, got map[string]int) {
+		for key, count := range want {
+			if got[key] != count {
+				t.Errorf("%s[%q] says %d, the rules array holds %d", label, key, got[key], count)
+			}
+		}
+		for key, count := range got {
+			if _, present := want[key]; !present {
+				t.Errorf("%s[%q] says %d, and no rule in the array has that value", label, key, count)
+			}
+		}
+	}
+	compare("byNamespace", wantNamespace, document.ByNamespace)
+	compare("bySeverity", wantSeverity, document.BySeverity)
+	compare("byEnabledBy", wantEnabledBy, document.ByEnabledBy)
+}
