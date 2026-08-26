@@ -10,6 +10,9 @@ package hir
 // out of it.
 
 import (
+	"os"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -490,5 +493,74 @@ func TestInlineIsIdempotent(t *testing.T) {
 	}
 	if len(function.Blocks) != blocks {
 		t.Errorf("a second run changed the block count from %d to %d", blocks, len(function.Blocks))
+	}
+}
+
+// TestMemoInclusiveInliningIsNotUsedWhereScopesAreComputed pins the precondition on the
+// memo-inclusive entry point.
+//
+// # Why this is a grep and not a behavioural assertion
+//
+// The hazard is not that the splice is wrong. It is that it is right for a caller that never asks
+// for a reactive scope and wrong for one that does: measured over the vendored corpus, inserting
+// this splice into the scope oracle's pipeline moves `under` from 0 fixtures / 0 scopes to 7 / 7,
+// and an under-produced scope drops a memoization a developer wrote. The same run improves `exact`
+// 16 to 23 and `over` 32 to 18, which is what makes it dangerous: it looks like a win from every
+// angle except the one that matters.
+//
+// No assertion inside this package can catch that, because the damage appears in a caller this
+// package does not own. What can be caught is the shape of the mistake -- a new caller of the
+// memo-inclusive entry point -- so the test is a census of its call sites. When one appears, this
+// fails and whoever added it reads the precondition at the entry point's own comment and either
+// confirms their caller computes no scope or turns the dependency comparison on first.
+//
+// The alternative, a comment alone, was what the guarded entry point already had. It did not stop
+// this same measurement from being needed twice.
+func TestMemoInclusiveInliningIsNotUsedWhereScopesAreComputed(t *testing.T) {
+	// The call sites that are known and reviewed. `cache.go` is `ForFunctionWithoutManualMemoization`,
+	// which runs Lower, Construct, the erasure, and this, then hands the graph to
+	// `set-state-in-effect` -- a rule that reads no scope, no mutable range, and no dependency.
+	knownCallSites := map[string]bool{
+		"../../utils/hir/cache.go": true,
+		"cache.go":                 true,
+	}
+
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("reading the package directory: %v", err)
+	}
+
+	found := []string{}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") {
+			continue
+		}
+		// The definition itself and this test both name it; neither is a call site.
+		if name == "inline_iife.go" || name == "inline_iife_test.go" {
+			continue
+		}
+		body, readErr := os.ReadFile(name)
+		if readErr != nil {
+			t.Fatalf("reading %s: %v", name, readErr)
+		}
+		text := string(body)
+		if strings.Contains(text, "InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks") ||
+			strings.Contains(text, "inlineInvokedFunctions(function, true)") {
+			if !knownCallSites[name] {
+				found = append(found, name)
+			}
+		}
+	}
+
+	if len(found) != 0 {
+		sort.Strings(found)
+		t.Fatalf("new caller(s) of the memo-inclusive inlining: %v.\n"+
+			"That entry point must not be used where reactive scopes are computed from the result: "+
+			"measured over the vendored corpus it moves the scope oracle's `under` from 0 fixtures / "+
+			"0 scopes to 7 / 7, which drops memoizations developers wrote. Read the precondition at "+
+			"InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks, confirm the new "+
+			"caller reaches no scope, and add it to knownCallSites here. If it does reach a scope, "+
+			"the dependency comparison has to be turned on first.", found)
 	}
 }

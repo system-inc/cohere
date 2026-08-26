@@ -101,6 +101,23 @@ func InlineImmediatelyInvokedFunctionExpressions(function *Function) int {
 // to the call site. Upstream has no such split because it has no such gate; when the dependency
 // comparison is turned on and `memoizedResults` is deleted, these two entry points collapse back
 // into one and this comment goes with them.
+//
+// # The precondition on using this, which is not optional
+//
+// A caller of this entry point must not compute reactive scopes from the result. Measured over the
+// vendored corpus by running the scope oracle's own pipeline with this splice inserted: `under`
+// goes from 0 fixtures / 0 scopes to 7 / 7, and the oracle fails loudly on exactly that, because an
+// under-produced scope drops a memoization a developer wrote. That is a behaviour change rather
+// than a performance one, and it outranks the improvements that come with it -- `exact` rises 16 to
+// 23 and `over` falls 32 to 18 in the same run, which is what a single-number oracle would have
+// reported as a clean win.
+//
+// The one production caller today, `ForFunctionWithoutManualMemoization`, is safe because it never
+// reaches a scope: it runs `Lower`, `Construct`, the erasure, and this, and hands the graph to
+// `set-state-in-effect`, which reads no scope, no mutable range, and no dependency. That is a fact
+// about the caller and not a property of this function, which is why it is written here rather than
+// assumed there. A second caller that wants the erased form AND a scope population needs the
+// dependency comparison turned on first, since that is what carries those seven back.
 func InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function *Function) int {
 	return inlineInvokedFunctions(function, true)
 }
