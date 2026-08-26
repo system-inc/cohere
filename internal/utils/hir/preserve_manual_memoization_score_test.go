@@ -226,7 +226,13 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// `todo-repro` prefix, and `error.useMemo-aliased-var.ts` says in its own header "This is
 	// technically a false positive, but source is already breaking `exhaustive-deps`". Two real
 	// detections for two upstream calls a mistake.
-	const knownTruePositives = 25
+	//
+	// 27 once a ref's stability is decided the way upstream decides it, in `reactive.go`. The two
+	// that close are `error.ref-like-name-not-a-ref.js` and `error.ref-like-name-not-Ref.js`, and
+	// they are a matched pair with two clean fixtures that differ only in the variable's name.
+	// False positives are unmoved at 11, `under` holds at 0 fixtures / 0 scopes, and the dependency
+	// oracle is byte-identical at 74 matched with ours 119.
+	const knownTruePositives = 27
 	if fired != knownTruePositives {
 		t.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
 			"should be raised deliberately, and if it went DOWN the rule stopped reporting programs "+

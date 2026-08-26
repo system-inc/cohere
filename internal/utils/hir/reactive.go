@@ -135,6 +135,8 @@
 package hir
 
 import (
+	"regexp"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 )
@@ -192,6 +194,9 @@ func InferReactive(function *Function, typeChecker *shimchecker.Checker) {
 		typeChecker: typeChecker,
 		reactive:    map[IdentifierId]bool{},
 		stable:      map[IdentifierId]bool{},
+		// Collected once here rather than asked per value: the fixpoint calls `isStableType` many
+		// times over the same identifiers.
+		useRefResults: useRefResultValues(function),
 	}
 	state.run()
 }
@@ -208,6 +213,10 @@ type reactivity struct {
 	// stable holds values React guarantees do not change identity between renders, so that they are
 	// exempted from being marked even when they come out of a reactive hook call.
 	stable map[IdentifierId]bool
+
+	// useRefResults holds every value that came from a direct `useRef` call in this function,
+	// including the bindings and loads it flows into. See `isStableType`.
+	useRefResults map[IdentifierId]bool
 
 	// hookResults maps a call's result to the hook's name, for the positional exemption below.
 	//
@@ -512,10 +521,132 @@ func (r *reactivity) recordStable(instruction *Instruction) {
 func (r *reactivity) isStableType(id IdentifierId) bool {
 	name := r.stableTypeName(id)
 	switch name {
-	case "Dispatch", "ActionDispatch", "RefObject", "TransitionStartFunction":
+	case "Dispatch", "ActionDispatch", "TransitionStartFunction":
 		return true
+	case "RefObject":
+		// A ref is stable only when it came from a `useRef` call in THIS function.
+		//
+		// Upstream does not ask a type here at all. Its `isUseRefType` reads
+		// `id.type.shapeId === 'BuiltInUseRefId'` (`HIR.ts:1822`), and that shape is assigned by
+		// its own global signature table, where `useRef` is declared with `returnType: {kind:
+		// 'Object', shapeId: BuiltInUseRefId}` (`Globals.ts:689`). So upstream's question is which
+		// values came out of a `useRef` call, and its answer does not cross a function boundary.
+		//
+		// The TypeScript checker's answer does cross it, and that is the divergence. The two
+		// `ref-like-name-not-a-ref` fixtures exist for exactly this case and are named for it:
+		// `useCustomRef()` returns `useRef(...)`, so the checker types the result `RefObject` while
+		// upstream still says it is not a ref. Marking it stable there suppresses the hook-call
+		// reactivity above, the dependency is then pruned as non-reactive, and the rule stays
+		// silent where upstream reports.
+		return r.useRefResults[id] || isRefLikeName(r.identifierName(id))
 	}
 	return false
+}
+
+// useRefResultValues names every value produced by a direct `useRef` call.
+//
+// Upstream asks `isUseRefType`, which is `id.type.kind === 'Object' && id.type.shapeId ===
+// 'BuiltInUseRefId'` (`HIR.ts:1822`). That shape is not TypeScript's type: it is assigned by
+// upstream's own global signature table, where `useRef` is declared with `returnType: {kind:
+// 'Object', shapeId: BuiltInUseRefId}` (`Globals.ts:689`). So the question is which values came out
+// of a `useRef` call, and a call site is visible here even though a type is not.
+//
+// Deliberately only the DIRECT call. Upstream propagates the shape through assignments and returns
+// with its own inference, and the two `ref-like-name-not-a-ref` fixtures turn on the fact that it
+// does NOT carry it across a user function boundary: `useCustomRef()` returns `useRef(...)` and
+// upstream still says the result is not a ref. Following aliases further than upstream does would
+// re-break those two fixtures in the other direction.
+func useRefResultValues(function *Function) map[IdentifierId]bool {
+	refs := map[IdentifierId]bool{}
+	if function == nil {
+		return refs
+	}
+	for _, block := range function.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			instruction := function.Instructions[instructionId]
+			if instruction == nil {
+				continue
+			}
+			call, ok := instruction.Value.(*CallExpression)
+			if !ok {
+				continue
+			}
+			if calleeName(function, instruction, call.Callee) == "useRef" {
+				refs[instruction.LValue.Identifier] = true
+			}
+		}
+	}
+	// A ref reaches its `.current` read through the store into the named binding and the load back
+	// out, so the direct call's lvalue alone is never the identifier a dependency names.
+	for {
+		grew := false
+		for _, block := range function.Blocks {
+			if block == nil {
+				continue
+			}
+			for _, instructionId := range block.Instructions {
+				instruction := function.Instructions[instructionId]
+				if instruction == nil {
+					continue
+				}
+				var from, into IdentifierId
+				switch value := instruction.Value.(type) {
+				case *StoreLocal:
+					from, into = value.Value.Identifier, value.LValue.Identifier
+				case *LoadLocal:
+					from, into = value.Place.Identifier, instruction.LValue.Identifier
+				default:
+					continue
+				}
+				if refs[from] && !refs[into] {
+					refs[into] = true
+					grew = true
+				}
+			}
+		}
+		if !grew {
+			return refs
+		}
+	}
+}
+
+// refLikeName is upstream's `RefLikeNameRE`, `/^(?:[a-zA-Z$_][a-zA-Z$_0-9]*)Ref$|^ref$/`
+// (`InferTypes.ts:783`).
+var refLikeName = regexp.MustCompile(`^(?:[a-zA-Z$_][a-zA-Z$_0-9]*)Ref$|^ref$`)
+
+// isRefLikeName reports whether a binding's name makes it a ref by upstream's naming rule.
+//
+// Upstream assigns the ref shape from the NAME as well as from a `useRef` call, behind
+// `enableTreatRefLikeIdentifiersAsRefs` -- which is `z.boolean().default(true)`
+// (`Environment.ts:469`), so it is on for every fixture including the ones carrying no pragma.
+// `isRefLikeName` reads `RefLikeNameRE.test(t.objectName)` alongside a `current` property
+// (`InferTypes.ts:785`).
+//
+// This is the discriminator across four fixtures that are otherwise the same program:
+//
+//	customRef   in `ref-like-name-in-useCallback`      matches, so it IS a ref and upstream is silent
+//	notaref     in `error.ref-like-name-not-a-ref`     no match, so upstream reports
+//	Ref         in `error.ref-like-name-not-Ref`       no match, the pattern needs a prefix before
+//	                                                   `Ref` and bare `ref` is lowercase only
+//
+// The two error fixtures are named for the two ways to fail this pattern.
+func isRefLikeName(name string) bool {
+	return name != "" && refLikeName.MatchString(name)
+}
+
+// identifierName returns a value's source name, empty for a temporary.
+func (r *reactivity) identifierName(id IdentifierId) string {
+	if int(id) >= len(r.function.Identifiers) {
+		return ""
+	}
+	identifier := r.function.Identifiers[id]
+	if identifier == nil {
+		return ""
+	}
+	return identifier.Name
 }
 
 // stableTypeName returns a value's type alias name, falling back to its type symbol name.
