@@ -197,3 +197,32 @@ func TestImportRequirePathAliasRootDoesNotShadowASubdirectory(t *testing.T) {
 		t.Fatalf("expected the longer root to win, got: %s", description)
 	}
 }
+
+// TestImportRequirePathAliasFixesTheSpecifier pins what the fixer writes.
+//
+// The replacement covers the literal's whole token range, quotes included, so the fix has to supply
+// its own. The quote character is read off the source rather than hardcoded: this codebase writes
+// single quotes and Prettier would restore them either way, but a fixer that silently changed a byte
+// nobody asked about is a fixer people stop trusting.
+func TestImportRequirePathAliasFixesTheSpecifier(t *testing.T) {
+	ruletest.ExpectFixedSource(t,
+		ruletest.RunWithOptions(t, ImportRequirePathAlias, aliasImporter,
+			"import { Thing } from '../../foundation/Thing';\n", pathAliasOptions),
+		"import { Thing } from '@project/source/foundation/Thing';\n")
+
+	// A double-quoted specifier keeps its quotes.
+	ruletest.ExpectFixedSource(t,
+		ruletest.RunWithOptions(t, ImportRequirePathAlias, aliasImporter,
+			"import { Thing } from \"../../foundation/Thing\";\n", pathAliasOptions),
+		"import { Thing } from \"@project/source/foundation/Thing\";\n")
+
+	// The root alias, which is the spelling that matched nothing before the directory fix.
+	rootOptions := ImportRequirePathAliasOptions{
+		RepositoryRoot: "/repository",
+		Aliases:        []PathAlias{{Directory: ".", Alias: "@project"}},
+	}
+	ruletest.ExpectFixedSource(t,
+		ruletest.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
+			"import { Helper } from '../../shared/Helper';\n", rootOptions),
+		"import { Helper } from '@project/app/shared/Helper';\n")
+}

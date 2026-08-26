@@ -137,16 +137,21 @@ var ImportRequirePathAlias = rule.Rule{
 				return
 			}
 
+			specifierRange := rule.TokenRange(ctx.SourceFile, specifierNode)
+			specifierText := ctx.SourceFile.Text()[specifierRange.Pos():specifierRange.End()]
+			fix := ctx.ReplaceNode(specifierNode, quotedLike(specifierText, suggestion))
+
 			for _, root := range strictRoots {
 				if directoryContains(root, importingRelative) {
-					ctx.ReportNode(specifierNode, messageUseAliasInStrictRoot(importPath, root, suggestion))
+					ctx.ReportNodeWithFixes(specifierNode,
+						messageUseAliasInStrictRoot(importPath, root, suggestion), fix)
 					return
 				}
 			}
 
 			levels := strings.Count(importPath, "../")
 			if levels >= 2 {
-				ctx.ReportNode(specifierNode, messageUseAlias(importPath, levels, suggestion))
+				ctx.ReportNodeWithFixes(specifierNode, messageUseAlias(importPath, levels, suggestion), fix)
 			}
 		}
 
@@ -193,6 +198,24 @@ func aliasForPath(aliases []PathAlias, repositoryPath string) (string, bool) {
 		return alias.Alias + "/" + rest, true
 	}
 	return "", false
+}
+
+// quotedLike wraps a replacement specifier in the quote character the original used.
+//
+// `ReplaceNode` takes the literal's whole token range, quotes included, so the replacement has to
+// supply its own. Reading the quote off the source rather than hardcoding one keeps the fix from
+// rewriting a file's quote style as a side effect: this codebase writes single quotes and Prettier
+// would put them back either way, but a fixer that silently changed a byte nobody asked about is a
+// fixer people stop trusting.
+//
+// Falls back to a single quote when the source text is too short to have quotes at all, which
+// cannot happen for a parsed string literal and is handled rather than assumed away.
+func quotedLike(originalText string, replacement string) string {
+	quote := byte('\'')
+	if len(originalText) > 0 && (originalText[0] == '"' || originalText[0] == '\'' || originalText[0] == '`') {
+		quote = originalText[0]
+	}
+	return string(quote) + replacement + string(quote)
 }
 
 // normalizeConfiguredDirectory is a configured directory as the matcher wants it: no leading `./`,
