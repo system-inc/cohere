@@ -245,7 +245,17 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// `[propA.x, x]`: the written `x` was resolving to `propB.x.y` while the inferred side kept
 	// `x`, so the two could never match. False positives hold at 11, `under` at 0 fixtures / 0
 	// scopes, and both other oracles are byte-identical.
-	const knownTruePositives = 29
+	//
+	// 28 with the local zero-argument callee resolution in `effects.go`, and the one that leaves is
+	// `error.false-positive-useMemo-dropped-infer-always-invalidating.ts`, whose own header says
+	// what it is: "This is technically a false positive as the useMemo in source was effectively a
+	// no-op". Upstream reports it and calls the report a mistake, which is the same reasoning
+	// already recorded above for the two `todo` fixtures.
+	//
+	// Taken because the trade is measured and one-sided everywhere else: false positives 11 to 8
+	// with three real fixtures closing and none added, dependency `matched` 74 to 75 -- a golden row
+	// GAINED on the strongest oracle -- and `under` held at 0 fixtures / 0 scopes.
+	const knownTruePositives = 28
 	if fired != knownTruePositives {
 		t.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
 			"should be raised deliberately, and if it went DOWN the rule stopped reporting programs "+
@@ -445,7 +455,13 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	// Goldens hold at 25 and `under` holds at 5 fixtures / 7 scopes. The other oracles move and each
 	// carries its reasoning: dependency 74 matched held with ours 116 to 119, scope survived 109 to
 	// 110 with exact 28 held, memo blocks 20 all-empty to 22.
-	const knownFalsePositives = 11
+	//
+	// Lowered to 8 by the local zero-argument callee resolution in `effects.go`. The three that
+	// close are `hoisting-setstate-captured-indirectly-jsx.js`,
+	// `useCallback-nonescaping-invoked-callback-escaping-return.ts` and
+	// `repro-missing-memoization-lack-of-phi-types.js`, named by logging the fixture per false
+	// positive and diffing. None is added.
+	const knownFalsePositives = 8
 	if fired != knownFalsePositives {
 		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
 			"number should be lowered deliberately, and if it went UP something regressed",

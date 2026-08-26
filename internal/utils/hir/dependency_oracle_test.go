@@ -252,7 +252,11 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// Taken because a silent id collision drops declarations wherever a binding's store lands inside
 	// a scope, which is the mechanism recorded on `#z8n858s`: whichever value claims a declaration
 	// first wins it, and the real binding is dropped with the losing scope stack.
-	const knownMatched = 74
+	//
+	// Raised to 75 by the local zero-argument callee resolution in `effects.go`. A floor going UP is
+	// the improvement this number names, and it is the first time it has moved up since the
+	// declaration-id fix lowered it.
+	const knownMatched = 75
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
@@ -377,7 +381,13 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// fixtures to 19. So 119 is the honest number for a tree that splits like upstream and does not
 	// inline like it, and it falls back toward 116 when the nested-callback gap on `#ef406xa`
 	// closes.
-	const knownOursTotal = 119
+	//
+	// 120 with the local zero-argument callee resolution in `effects.go`. Up is the regression
+	// direction for this number and `matched` is the check on it: it rises 74 to 75 in the same
+	// change, so the added row is one upstream also produces rather than an invented one. A scope
+	// that stops swallowing a binding names that binding as a dependency instead of holding it as a
+	// member.
+	const knownOursTotal = 120
 	if upstreamTotal != knownUpstreamTotal {
 		t.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
 			"every count below is against a different population", upstreamTotal, knownUpstreamTotal)

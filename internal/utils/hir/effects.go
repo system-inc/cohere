@@ -990,6 +990,34 @@ func effectsForCall(
 	name := calleeName(function, instruction, callee)
 	signature, known := lookupSignature(function, instruction, name)
 	if !known {
+		// A zero-argument call of a locally-declared function whose body does not mutate what it
+		// closed over.
+		//
+		// Upstream never reaches its unknown-callee default here. Its `Apply` arm resolves a callee
+		// that is a single locally-declared `FunctionExpression` to that function's own inferred
+		// effects and substitutes the arguments for the parameters
+		// (`InferMutationAliasingEffects.ts:1016`, "We're calling a locally declared function, we
+		// already know it's effects!"). The full resolution is a bottom-up effects pass plus a
+		// substitution engine, recorded as `EffectGapInterproceduralParameters` and `#qgzpt6a`.
+		//
+		// With no arguments the substitution is empty, so the answer reduces to the callback's own
+		// effects, and this asks only the half that matters for range widening: does it mutate a
+		// capture. When it does not, the conservative
+		// `MutateTransitiveConditionally` on the callee is dropped and nothing the callback closed
+		// over has its range widened across the call.
+		//
+		// Measured on `useMemo-alias-property-load-dep.ts` against its `useCallback` twin, which
+		// differ by one instruction: `useMemo` lowers to a call of the callback and `useCallback` to
+		// a load. Without this the call widened every captured load from `[n,n+1)` to `[n,14)`, so
+		// scope 1 spanned `[2,11)` and swallowed the `const x = propB.x.y` the developer wrote,
+		// while upstream's compiled output keeps that binding outside the scope in both twins.
+		if len(args) == 0 && mutatesCallee {
+			if nested := nestedFunctionHeldBy(function, callee.Identifier); nested != nil &&
+				!mutatesOwnCapture(nested) {
+				out := effectsForUnknownCall(receiver, callee, args, lvalue, false)
+				return append(out, argumentMutationsFromCallbacks(function, receiver, args)...)
+			}
+		}
 		out := effectsForUnknownCall(receiver, callee, args, lvalue, mutatesCallee)
 		return append(out, argumentMutationsFromCallbacks(function, receiver, args)...)
 	}
@@ -1496,6 +1524,54 @@ func nestedFunctionHeldBy(function *Function, id IdentifierId) *Function {
 // follows, so this resolves those transitively rather than requiring the mutation to name the
 // parameter directly: `value => { value.updated = true }` lowers to a load of the parameter and a
 // store through the loaded temporary.
+// mutatesOwnCapture reports whether a nested function mutates a value it closed over.
+//
+// The capture half of `mutatesOwnParameter`, and the same shape: walk the function's own effects and
+// ask whether any mutation lands on something reachable from its `Context`. A function that only
+// READS its captures cannot invalidate them by being called, so calling it does not widen their
+// ranges.
+func mutatesOwnCapture(nested *Function) bool {
+	if nested == nil || len(nested.Context) == 0 {
+		return false
+	}
+	effects := InferAliasingEffects(nested)
+	if effects == nil || effects.Len() == 0 {
+		return false
+	}
+
+	reaches := map[IdentifierId]bool{}
+	for _, context := range nested.Context {
+		reaches[context.Identifier] = true
+	}
+	var mutated []IdentifierId
+	for _, block := range nested.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			for _, effect := range effects.Get(instructionId) {
+				switch effect.Kind {
+				case AliasingEffectAssign, AliasingEffectAlias, AliasingEffectCreateFrom,
+					AliasingEffectCapture, AliasingEffectMaybeAlias:
+					if reaches[effect.From.Identifier] {
+						reaches[effect.Into.Identifier] = true
+					}
+				case AliasingEffectMutate, AliasingEffectMutateConditionally,
+					AliasingEffectMutateTransitive,
+					AliasingEffectMutateTransitiveConditionally:
+					mutated = append(mutated, effect.Into.Identifier)
+				}
+			}
+		}
+	}
+	for _, id := range mutated {
+		if reaches[id] {
+			return true
+		}
+	}
+	return false
+}
+
 func mutatesOwnParameter(nested *Function) bool {
 	if nested == nil || len(nested.Params) == 0 {
 		return false

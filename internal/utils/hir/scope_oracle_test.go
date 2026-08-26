@@ -384,7 +384,11 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	//
 	// Over-production is the performance direction and `under` is the correctness one, which is the
 	// ranking this file's own header states. Taken on that ranking.
-	const knownSurvivedExact = 17
+	//
+	// 16 with the local zero-argument callee resolution in `effects.go`. One fixture moves from
+	// exact to over-production, which is the performance direction, and `under` holds at 0 fixtures
+	// / 0 scopes. The board carries it: false positives 11 to 8 and dependency `matched` 74 to 75.
+	const knownSurvivedExact = 16
 	if survivedExact < knownSurvivedExact {
 		t.Errorf("exact per-fixture agreement = %d of %d, want at least %d; fewer fixtures now "+
 			"match upstream's scope count exactly, which a stable total would hide", survivedExact,
@@ -416,7 +420,13 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// scopes upstream fuses on the way in stay separate here. Restoring the inline is measured and
 	// rejected on `#8ga37gt` -- it drives `under` from 5 fixtures to 19 -- so the over-production
 	// stands until that lands in some other form.
-	const knownSurvivedTotal = 145
+	//
+	// 146 with the local zero-argument callee resolution in `effects.go`, and it is the same one
+	// scope as the `exact` move above: a call that no longer widens what its callback captured
+	// leaves a binding outside the scope instead of inside it, so the scope splits where it used to
+	// swallow. Over-production, the performance direction, with `under` held at 0 fixtures / 0
+	// scopes.
+	const knownSurvivedTotal = 146
 	if survivedTotal > knownSurvivedTotal {
 		t.Errorf("surviving scopes = %d against upstream's %d, want at most %d; we produce more "+
 			"scopes than before, so something split a scope upstream keeps whole or stopped a "+
