@@ -291,6 +291,46 @@ func TestForwardPropagationIntersectsRatherThanUnions(t *testing.T) {
 	}
 }
 
+// A scope beginning inside a branch is not seeded with that branch's own facts.
+//
+// The intersection above covers the join: after an `if`, a fact true on one arm alone is gone. This
+// covers the other half, which the intersection cannot reach. A scope whose first block sits INSIDE
+// the arm is asking a block where the fact is still true, and upstream's keying -- which this tree
+// reproduces exactly -- hands it that block's set.
+//
+// The two are not the same question. Nothing about the join is wrong; the scope simply begins
+// somewhere the branch's facts still hold, and a fact true only under an `if` then licenses the
+// dependency walk to descend past a property that may never have been loaded.
+//
+// Measured on `error.useMemo-infer-less-specific-conditional-access` with the memo callback inlined:
+// `propB.x` is hoistable in the conditional arm alone, the scope for the object returned from that
+// arm begins there, and the walk inferred `propB.x.y` where upstream infers bare `propB`. Upstream's
+// own scope for that value begins after the branch closes, where the fact is not available.
+func TestAScopeInsideABranchIsNotSeededFromIt(t *testing.T) {
+	function, scopes, identity, ranges, _ := hoistableFor(t, `
+		function Component(props) {
+			if (props.flag) {
+				return {value: props.deep.inner};
+			}
+			return null;
+		}
+	`)
+	seeds := CollectHoistablePropertyLoads(function, scopes, identity, ranges)
+	for scope, paths := range seeds {
+		for _, path := range paths {
+			if len(path.Path) == 0 {
+				continue
+			}
+			// `deep` is dereferenced only under the `if`. A scope seeded from inside that arm would
+			// carry it, and the walk would then descend to `inner`.
+			if path.Path[0].Property == "deep" {
+				t.Errorf("scope %d was seeded with `deep`, which is only dereferenced inside the "+
+					"branch the scope begins in", scope)
+			}
+		}
+	}
+}
+
 // TestHoistableHandlesNilInputs pins that the pass declines rather than panicking.
 func TestHoistableHandlesNilInputs(t *testing.T) {
 	if got := analyseHoistableLoads(nil, nil, nil, nil); got != nil {
@@ -663,8 +703,21 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// which is what a value that stops being treated as stable should produce: it becomes reactive,
 	// survives `PruneNonReactiveDependencies`, and is named at its root. `deep` is the number this
 	// test's rule is about and it does not move.
-	if deep != 615 || flat != 2379 {
-		t.Errorf("got %d deep and %d flat dependencies, want 615 and 2379; a SMALL move here is "+
+	// # And again when a scope inside a branch stopped being seeded from that branch
+	//
+	// 615 deep to 576, 2,379 flat to 2,414. Thirty-nine paths become shallow, and this is the only
+	// entry here where `deep` FALLS. That is the conservative direction the rule above asks for: a
+	// property proven non-null only under an `if` no longer licenses the walk to descend past it
+	// when the scope asking began inside that same `if`.
+	//
+	// Endorsed by the board rather than by the count. With the memo callback inlined,
+	// `error.useMemo-infer-less-specific-conditional-access` goes from silent to reporting -- the
+	// fixture exists precisely because upstream infers bare `propB` there -- and the golden trade
+	// improves from three fixtures for two false positives to two for one. `under` holds at 0
+	// fixtures / 0 scopes, which is the number that would have moved had this made dependencies too
+	// shallow to preserve a memoization.
+	if deep != 576 || flat != 2414 {
+		t.Errorf("got %d deep and %d flat dependencies, want 576 and 2414; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

@@ -788,6 +788,14 @@ func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 	if analysis == nil {
 		return nil
 	}
+	// Which blocks run on every path through the function. A scope beginning inside a branch is
+	// seeded from the entry instead of from its own block; see below.
+	always := blocksAlwaysReached(function)
+	entry := BlockId(0)
+	if len(function.Blocks) > 0 && function.Blocks[0] != nil {
+		entry = function.Blocks[0].Id
+	}
+
 	result := map[ScopeId][]ReactiveScopeDependency{}
 	for _, block := range function.Blocks {
 		if block == nil {
@@ -797,7 +805,28 @@ func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 		if !ok {
 			continue
 		}
-		result[scope.Scope] = analysis.hoistableAt(scope.Block)
+		// Upstream reads the block the scope begins in, and so does this: `keyByScopeId` sets
+		// `source.get(block.terminal.block)`. The keying is faithful and is not what differs.
+		//
+		// What differs is where a scope BEGINS. A scope whose first block sits inside a branch is
+		// handed that branch's facts, and a fact true only under an `if` then licenses the
+		// dependency walk to descend past a property that may never have been loaded.
+		//
+		// Measured on `error.useMemo-infer-less-specific-conditional-access` with the memo callback
+		// inlined: `propB.x` is hoistable in the conditional arm alone, the scope for the object
+		// returned from that arm begins there, and the seed carried `propB.x` -- so the walk
+		// inferred `propB.x.y` where upstream infers bare `propB` and reports the disagreement the
+		// fixture exists to test. Upstream's own scope for that value begins after the branch
+		// closes, where the fact is not available.
+		//
+		// This is the same hazard `hoistableFromNestedFunction` gates with `blocksAlwaysReached`,
+		// which runs only while the callback is still nested. Once it is inlined nothing plays that
+		// part, so the rule is applied here as well and covers both shapes.
+		source := scope.Block
+		if !always[source] {
+			source = entry
+		}
+		result[scope.Scope] = analysis.hoistableAt(source)
 	}
 	return result
 }
