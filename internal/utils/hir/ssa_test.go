@@ -13,6 +13,9 @@
 package hir
 
 import (
+	"os"
+	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -447,4 +450,46 @@ func TestConstructionIsIdempotent(t *testing.T) {
 			"from %d to %d", firstStale, secondStale)
 	}
 	t.Logf("stable across two runs: %d phis, %d naming an undefined operand", firstPhis, firstStale)
+}
+
+// Construction is not re-run after the inline, because upstream runs it once and after both.
+//
+// `Pipeline.ts` orders these deliberately: `dropManualMemoization` at 169,
+// `inlineImmediatelyInvokedFunctionExpressions` at 173, `mergeConsecutiveBlocks` at 180, and
+// `enterSSA` at 188. Single static assignment sees the spliced graph and versions it once. Nothing
+// upstream constructs twice.
+//
+// A second run is not merely redundant here, it is destructive. `CopyNestedBodyInto` carries the
+// nested function's phis across with their operands and blocks remapped, and those are exactly the
+// phis a rebuild cannot re-derive: both arms of a logical define one temporary, which is versioned
+// per block rather than merged, so the join has nothing to merge. Measured on
+// `useMemo(() => p.a.b ?? [], [p.a?.b])`, the splice produces a correct phi at the join and a second
+// construction destroys it, leaving a join with no phi.
+//
+// A grep rather than a behavioural assertion, for the same reason as the memo-inclusive census: the
+// hazard is a caller adding the re-run back, and no assertion inside this package can see a pipeline
+// assembled elsewhere.
+var constructAfterInline = regexp.MustCompile(
+	`(?s)Inline[A-Za-z]*InvokedFunctionExpressions[A-Za-z]*\(function\)[^}]*?Construct\(function\)`)
+
+func TestConstructionIsNotReRunAfterTheInline(t *testing.T) {
+	paths, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range paths {
+		source, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// This file names the pattern in prose.
+		if filepath.Base(path) == "ssa_test.go" {
+			continue
+		}
+		if constructAfterInline.Match(source) {
+			t.Errorf("%s re-runs Construct after the inline; upstream runs single static "+
+				"assignment once, AFTER the splice, and a second run destroys the phis the copy "+
+				"carried", path)
+		}
+	}
 }

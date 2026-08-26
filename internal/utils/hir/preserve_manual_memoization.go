@@ -446,7 +446,6 @@ func AnalyzePreservedManualMemoization(function *Function,
 
 	if InlineImmediatelyInvokedFunctionExpressions(function) > 0 {
 		MergeConsecutiveBlocks(function)
-		Construct(function)
 	}
 
 	ranges := InferMutableRanges(function)
