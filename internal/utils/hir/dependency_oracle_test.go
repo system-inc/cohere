@@ -232,7 +232,27 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// optional route upstream uses to keep the depth -- `collectOptionalChainSidemap`, keyed by
 	// optional block -- is the gap already recorded at `maybeNonNullInInstruction`. The floor
 	// returns to 78 when that lands.
-	const knownMatched = 77
+	//
+	// Lowered to 74 by the declaration-id fix in `lower.go`. Named bindings were minted from their
+	// own counter while temporaries took `identifierId + 1`, so the two spaces overlapped and
+	// binding number n shared a declaration with the temporary at index n-1. Upstream has one space
+	// -- `makeTemporaryIdentifier` and `HIRBuilder`'s named path both write
+	// `declarationId: makeDeclarationId(id)` -- and cannot collide.
+	//
+	// The three rows lost are all a bare root: `handleLogout` in
+	// `hoisting-setstate-captured-indirectly-jsx.js`, and `object` in the two
+	// `preserve-memo-deps-conditional-property-chain` fixtures. All three were produced BY the
+	// collision. Traced on the second: `object` is read inside the next `useMemo`'s callback, which
+	// this tree keeps nested where upstream lowers it inline, so the outer collector never sees the
+	// read at all. Before the fix `object` shared a declaration with a temporary declared outside
+	// the scope, and that borrowed declaration is what let it through -- a wrong mechanism reaching
+	// a right answer. Upstream's golden does carry `$[2] !== object`, so the dependency is real and
+	// the route to it is the nested-callback gap, not this counter.
+	//
+	// Taken because a silent id collision drops declarations wherever a binding's store lands inside
+	// a scope, which is the mechanism recorded on `#z8n858s`: whichever value claims a declaration
+	// first wins it, and the real binding is dropped with the losing scope stack.
+	const knownMatched = 74
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
@@ -328,7 +348,12 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	//
 	// `matched` holds at 77 and the scope oracle improves -- `exact` 25 to 26 with `under` unmoved
 	// -- so the row is a dependency the program has rather than an invented one.
-	const knownOursTotal = 121
+	//
+	// Lowered to 114 by the declaration-id fix above, in the direction this number calls the
+	// improvement: 121 against upstream's 116 becomes 114, over-producing fixtures fall from 13 to
+	// 12 and under-producing rises from 16 to 17, with `exact` unmoved at 19. Seven rows left and
+	// three of them were golden, which is the cost recorded at `knownMatched`.
+	const knownOursTotal = 114
 	if upstreamTotal != knownUpstreamTotal {
 		t.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
 			"every count below is against a different population", upstreamTotal, knownUpstreamTotal)

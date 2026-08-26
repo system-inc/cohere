@@ -291,7 +291,19 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// 25 when the oracle was written, then 26, now 30: a hook's parameters became frozen, so a
 	// conditional mutation stopped widening ranges through them and values stopped joining scopes
 	// upstream leaves them out of.
-	const knownSurvivedExact = 30
+	//
+	// Lowered to 28 by the declaration-id fix in `lower.go`, and the two fixtures that left are the
+	// two the fix was aimed at: `useMemo-in-other-reactive-block` and
+	// `useCallback-in-other-reactive-block` both go from `survived=2` to `survived=3` against
+	// upstream's 2. The scope holding `const x = []` and its later `arrayPush` was being pruned for
+	// declaring nothing, because `x`'s declaration had been claimed by an unrelated temporary before
+	// the store ever ran. It now survives, which is the direction that matters -- a pruned scope
+	// there drops a memoization the developer wrote -- and it lands one scope wide of upstream, in
+	// the over direction rather than the under one.
+	//
+	// A third fixture moved the other way in the same change: `ref-like-name-in-effect` falls from
+	// `survived=3` to 2 against upstream's 1. Over-production, closer.
+	const knownSurvivedExact = 28
 	if survivedExact < knownSurvivedExact {
 		t.Errorf("exact per-fixture agreement = %d of %d, want at least %d; fewer fixtures now "+
 			"match upstream's scope count exactly, which a stable total would hide", survivedExact,
@@ -300,7 +312,15 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 
 	// `ours` last, as a ceiling. Down toward 97 is the improvement.
 	// 114 to 108 with frozen parameters. Down toward upstream's 97 is the improvement.
-	const knownSurvivedTotal = 108
+	//
+	// Raised to 109 by the declaration-id fix in `lower.go`, which is this ceiling's own message
+	// firing correctly: a prune pass that used to fire stopped. It stopped because it was firing on
+	// a scope whose declaration had been stolen by an id collision, and the two scopes it recovers
+	// are the two named at `knownSurvivedExact`. A third fixture loses one in the same change, so
+	// the net is plus one. Taken because the recovered scopes are ones upstream keeps and this
+	// number's direction cannot distinguish a scope wrongly kept from one rightly restored, which
+	// is what `knownSurvivedExact` and `knownSurvivedUnder` are for.
+	const knownSurvivedTotal = 109
 	if survivedTotal > knownSurvivedTotal {
 		t.Errorf("surviving scopes = %d against upstream's %d, want at most %d; we produce more "+
 			"scopes than before, so something split a scope upstream keeps whole or stopped a "+

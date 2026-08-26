@@ -609,8 +609,23 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// 569 deep to 567, 2,141 flat to 2,129. Both fall, and `deep` falling is the safe direction by
 	// the rule above. A callback that destructures its parameter now widens the value it is called
 	// over, so a few scopes that used to name a value deep inside a wider one name it at the root.
-	if deep != 567 || flat != 2129 {
-		t.Errorf("got %d deep and %d flat dependencies, want 567 and 2129; a SMALL move here is "+
+	// # And again when named bindings stopped colliding with temporaries
+	//
+	// 567 deep to 625, 2,129 flat to 2,023. The largest move this number has made, and it is not a
+	// mutation of this analysis at all: `lower.go` minted named declarations from their own counter
+	// while temporaries took `identifierId + 1`, so binding n shared a declaration with the
+	// temporary at index n-1. Values that were being read as one binding are now read as two, and a
+	// path that collapsed to a shared root resolves to its own depth instead. 106 flat entries
+	// become 58 deep ones, which is 48 fewer dependencies overall -- the duplicates the collision
+	// was manufacturing.
+	//
+	// `deep` rising is the over-approximating direction by the rule above and no oracle claims the
+	// gain: dependency matched falls 77 to 74 in the same change, for three rows that were
+	// themselves produced by the collision. What carries this is the scope oracle, where the two
+	// fixtures the fix was aimed at recover a pruned scope. The trade is named at `knownMatched` in
+	// `dependency_oracle_test.go` and at `knownSurvivedExact` in `scope_oracle_test.go`.
+	if deep != 625 || flat != 2023 {
+		t.Errorf("got %d deep and %d flat dependencies, want 625 and 2023; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

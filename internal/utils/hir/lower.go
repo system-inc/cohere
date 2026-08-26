@@ -231,8 +231,6 @@ type builder struct {
 	// scoping bugs come from. `go vet` does not flag a written-and-unread struct field, so this
 	// comment is the only thing that stops the next reader deleting it as dead.
 	handlers []BlockId
-
-	nextDeclaration DeclarationId
 }
 
 // jumpTarget is one enclosing construct a break or continue can name.
@@ -305,18 +303,28 @@ func (b *builder) newTemporary(node *ast.Node) Place {
 	return Place{Identifier: identifier.Id, Range: rangeOf(node)}
 }
 
-// declarationOf returns the binding a symbol names, minting one on first sight.
+// declarationOf returns the binding a symbol names, or zero on first sight.
+//
+// Zero tells `NewIdentifier` to derive the declaration from the identifier id, which is upstream's
+// rule for every value it mints: `makeTemporaryIdentifier` and `HIRBuilder`'s named-binding path
+// both write `declarationId: makeDeclarationId(id)`. One space, one source, so a temporary and a
+// binding can never be handed the same number.
+//
+// A separate counter lived here and collided with that space. Named bindings counted 1, 2, 3 while
+// temporaries took `identifierId + 1`, so binding number n shared a declaration with the temporary
+// at index n-1 -- four collisions in the first fourteen values of a five-line fixture. The damage
+// was silent and downstream: `dependencyCollector.declare` is first-writer-wins, matching upstream,
+// so whichever value reached a declaration first claimed it and the real binding was dropped with
+// the losing scope stack. A binding whose store sat inside a scope then registered no declaration
+// for it, and `PruneUnusedScopes` removed the scope for declaring nothing.
 func (b *builder) declarationOf(symbol *ast.Symbol) DeclarationId {
 	if symbol == nil {
-		b.nextDeclaration++
-		return b.nextDeclaration
+		return 0
 	}
 	if declaration, ok := b.declarations[symbol]; ok {
 		return declaration
 	}
-	b.nextDeclaration++
-	b.declarations[symbol] = b.nextDeclaration
-	return b.nextDeclaration
+	return 0
 }
 
 // lowerNestedFunction lowers a function nested in this one and pairs up what it captured.
@@ -454,6 +462,11 @@ func (b *builder) bind(name string, symbol *ast.Symbol, node *ast.Node) Place {
 	declaration := b.declarationOf(symbol)
 	identifier := b.function.NewIdentifier(name, node, declaration)
 	if symbol != nil {
+		// The first value a symbol takes names the binding for every value after it, which is what
+		// makes `let x = 1; x = 2` one declaration across two identifiers.
+		if declaration == 0 {
+			b.declarations[symbol] = identifier.Declaration
+		}
 		b.identifiers[symbol] = identifier.Id
 	}
 	return Place{Identifier: identifier.Id, Range: rangeOf(node)}
