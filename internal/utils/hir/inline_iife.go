@@ -116,7 +116,7 @@ func InlineImmediatelyInvokedFunctionExpressions(function *Function) int {
 // reaches a scope: it runs `Lower`, `Construct`, the erasure, and this, and hands the graph to
 // `set-state-in-effect`, which reads no scope, no mutable range, and no dependency. That is a fact
 // about the caller and not a property of this function, which is why it is written here rather than
-// assumed there. A second caller that wants the erased form AND a scope population needs the
+// assumed there. A second caller that wants the erased form and a scope population needs the
 // dependency comparison turned on first, since that is what carries those seven back.
 func InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function *Function) int {
 	return inlineInvokedFunctions(function, true)
