@@ -703,3 +703,40 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(t *testing.T) {
 		t.Errorf("reading the ref field's current gave %d findings, want 1 — the rule has gone blind to refs on props", len(readingResult.Diagnostics))
 	}
 }
+
+// A hook spelled through the React namespace admits its function to compilation.
+//
+// The gate asks whether a function creates JSX or calls a hook, and it read only `LoadGlobal`, so a
+// bare `useRef` admitted and `React.useRef` did not. A file that imports React as a default and
+// spells every hook that way was never compiled at all, and this rule reported nothing in it.
+//
+// Found on a real file rather than by a fixture. `useKingdomLive.tsx` reads a ref during render,
+// ESLint reported it, and this rule was silent: every hook call in that file is namespaced. The
+// sibling gate in `unsupported_syntax.go` already accepted both spellings, which is what made this
+// a gap rather than a decision.
+//
+// A namespaced call lowers to a `MethodCall` whose property is a `Primitive` string rather than to a
+// `PropertyLoad`, which is why matching on the property load did not work either and is worth
+// pinning: the shape is not the one a reader predicts.
+func TestRefsAdmitsNamespacedHookCalls(t *testing.T) {
+	namespaced := runRefsFixture(t, refsFixture{
+		Source: "import * as ReactNamespace from 'react';\n" +
+			"export function useOther() {\n" +
+			"  const reference = ReactNamespace.useRef<number | null>(null);\n" +
+			"  if(reference.current === null) { reference.current = 1; }\n" +
+			"  return reference.current;\n" +
+			"}\n",
+	})
+	ruletest.ExpectFindings(t, namespaced, "refValueAccess")
+
+	// The control that gives it meaning: a namespaced call to something that is not a hook must not
+	// admit the function, or the gate stops gating.
+	notAHook := runRefsFixture(t, refsFixture{
+		Source: "import * as Other from 'react';\n" +
+			"export function helper() {\n" +
+			"  const value = Other.somethingElse<number | null>(null);\n" +
+			"  return value;\n" +
+			"}\n",
+	})
+	ruletest.ExpectClean(t, notAHook)
+}

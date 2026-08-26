@@ -264,10 +264,46 @@ func refsCreatesJsxOrCallsHook(function *hir.Function) bool {
 				if refsIsHookName(value.Name) {
 					return true
 				}
+
+			// `React.useRef(...)` is the same call written through the namespace, and it lowers to
+			// a `MethodCall` whose property is a primitive string rather than to a global of its
+			// own. Admitting only `LoadGlobal` meant a file that imports React as a default and
+			// spells every hook `React.useHook` was never compiled at all, so nothing in it was
+			// checked by this rule.
+			//
+			// Found on a real file rather than by a fixture: `useKingdomLive.tsx` reads a ref
+			// during render, ESLint reported it, and this rule was silent because every hook call
+			// in that file is spelled through the namespace. `unsupported_syntax.go`'s
+			// `isCompilerHookCallee` already accepts both spellings, which is what makes this a gap
+			// rather than a decision.
+			case *hir.MethodCall:
+				if refsIsHookName(refsPrimitiveStringAt(function, value.Property)) {
+					return true
+				}
 			}
 		}
 	}
 	return false
+}
+
+// refsPrimitiveStringAt returns the string a place holds, when it holds a primitive string.
+//
+// A namespaced call lowers its property to a `Primitive` rather than keeping it as syntax, so
+// `React.useRef` arrives as a `MethodCall` whose `Property` place is defined by `Primitive{useRef}`.
+// Empty for anything else, which reads as "not a hook name" at the one call site.
+func refsPrimitiveStringAt(function *hir.Function, place hir.Place) string {
+	for _, instruction := range function.Instructions {
+		if instruction == nil || instruction.LValue.Identifier != place.Identifier {
+			continue
+		}
+		if primitive, isPrimitive := instruction.Value.(*hir.Primitive); isPrimitive {
+			if text, isText := primitive.Value.(string); isText {
+				return text
+			}
+		}
+		return ""
+	}
+	return ""
 }
 
 // refsIsHookName reports whether a name is a hook by React's own syntactic test.
