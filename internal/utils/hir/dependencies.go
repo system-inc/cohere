@@ -159,8 +159,41 @@ const (
 	// The consequence for THIS pass is bounded and was measured rather than assumed.
 	// `collectOptionalChainSidemap` initialises all three of its outputs empty and only ever ADDS on
 	// encountering an `Optional` terminal, so with none it returns three empty collections -- which
-	// is a state every consumption site here already tolerates. The effect is that the 166 optional
-	// loads are skipped, not mis-collected. That is an honest subset rather than a silent zero.
+	// is a state every consumption site here already tolerates.
+	//
+	// # The 166 loads are not skipped, and that is the half this record was missing
+	//
+	// The sentence above used to end "the 166 optional loads are skipped, not mis-collected". They
+	// are not skipped. `PropertyLoad.Optional` is set at lowering and this pass reads it, so an
+	// optional access produces a dependency CARRYING the marker -- which is the opposite of what
+	// upstream produces from the same source.
+	//
+	// Upstream passes a literal `false` at both of its collection sites,
+	// `PropagateScopeDependenciesHIR.ts:301` and `:696`, so a dependency it collects from a
+	// `PropertyLoad` is never optional. The optional paths in its output come from
+	// `collectOptionalChainSidemap` instead, and the guard codegen prints is re-added from the
+	// source expression. Its WRITTEN side does keep the marker (`DropManualMemoization.ts:78`), so
+	// the asymmetry is deliberate: written optional, inferred not.
+	//
+	// `CompareManualMemoDependencies` compares the flag strictly -- "if the inferred path is
+	// optional, then the source path must have been optional too"
+	// (`ValidatePreservedManualMemoization.ts:181`) -- so carrying it here makes a path that agrees
+	// name for name and depth for depth fail against the array the developer wrote.
+	//
+	// Measured, by passing `false` at both sites here to match upstream:
+	//
+	//	closes   useMemo-conditional-access-alloc, useMemo-conditional-access-noAlloc
+	//	breaks   optional-member-expression-single, optional-member-expression-as-memo-dep,
+	//	         and both of their propagate-scope-deps-hir-fork copies
+	//	board    goldens 28 to 27, false positives 8 to 10
+	//
+	// The two groups differ in what the developer wrote. The pair that closes writes `[propB.x.y]`,
+	// non-optional, so the marker is pure noise. The four that break write `[arg?.items]`, optional
+	// on both sides, and they match today only because both sides are wrong in the same direction.
+	//
+	// So the flag is standing in for the pass this gap names, and it cannot be removed before the
+	// pass exists. That is the whole cost of the gap, and it is three false positives rather than an
+	// honest subset.
 	DependencyGapOptionalChains DependencyGap = iota
 
 	// DependencyGapNullPropagation is upstream's hoistable-property analysis, not performed here.
