@@ -98,9 +98,9 @@ func InlineImmediatelyInvokedFunctionExpressions(function *Function) int {
 // changes findings not at all, 0 against 0 over Kirk's tree with identical node counts.
 //
 // So the exclusion is a property of one caller's needs and not of the transformation, and it moves
-// to the call site. Upstream has no such split because it has no such gate; when the dependency
-// comparison is turned on and `memoizedResults` is deleted, these two entry points collapse back
-// into one and this comment goes with them.
+// to the call site. Upstream has no such split because it has no such gate, and these two entry
+// points collapse back into one when the gate goes. What that takes is below, and it is more than
+// deleting `memoizedResults`.
 //
 // # The precondition on using this, which is not optional
 //
@@ -116,8 +116,30 @@ func InlineImmediatelyInvokedFunctionExpressions(function *Function) int {
 // reaches a scope: it runs `Lower`, `Construct`, the erasure, and this, and hands the graph to
 // `set-state-in-effect`, which reads no scope, no mutable range, and no dependency. That is a fact
 // about the caller and not a property of this function, which is why it is written here rather than
-// assumed there. A second caller that wants the erased form and a scope population needs the
-// dependency comparison turned on first, since that is what carries those seven back.
+// assumed there.
+//
+// # What the seven actually need, since the obvious answer is wrong
+//
+// The first guess was that these seven are the same population as the nine goldens
+// `memoizedResults` protects, seen from the other side, so that turning the dependency comparison
+// on would carry both. That was checked by naming both sets rather than reasoning about them, and
+// it is false: the sets are disjoint, and disjoint by construction. The seven are clean fixtures
+// with no `## Error` section at all, and a clean fixture cannot be a golden, so they cannot
+// overlap.
+//
+// They share a cause without sharing members, which is why the guess was tempting. Both are the
+// scope fusion this splice removes, read from opposite sides: the nine fire today because fusion
+// makes a memo look broken, so removing the fusion silences them; the seven are clean fixtures
+// where removing the fusion leaves fewer scopes than upstream. A dependency comparison does not
+// create a scope, so turning it on should recover the nine and do nothing at all for the seven.
+//
+// What the seven look like they need is the optional-chain lowering: four of the six distinct
+// names are optional or conditional property chains
+// (`optional-member-expression-as-memo-dep`, `preserve-memo-deps-conditional-property-chain` and
+// its less-precise variant, `useMemo-conditional-access-own-scope`).
+//
+// So the gate goes when both land, not when either does, and the way to know is to re-run the
+// oracle with this splice inserted and read `under` directly rather than believing this comment.
 func InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function *Function) int {
 	return inlineInvokedFunctions(function, true)
 }

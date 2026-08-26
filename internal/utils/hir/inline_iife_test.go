@@ -11,6 +11,7 @@ package hir
 
 import (
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -516,6 +517,8 @@ func TestInlineIsIdempotent(t *testing.T) {
 //
 // The alternative, a comment alone, was what the guarded entry point already had. It did not stop
 // this same measurement from being needed twice.
+var memoInclusiveCall = regexp.MustCompile(`inlineInvokedFunctions\([^,)]*,\s*true\s*\)`)
+
 func TestMemoInclusiveInliningIsNotUsedWhereScopesAreComputed(t *testing.T) {
 	// The call sites that are known and reviewed. `cache.go` is `ForFunctionWithoutManualMemoization`,
 	// which runs Lower, Construct, the erasure, and this, then hands the graph to
@@ -545,8 +548,13 @@ func TestMemoInclusiveInliningIsNotUsedWhereScopesAreComputed(t *testing.T) {
 			t.Fatalf("reading %s: %v", name, readErr)
 		}
 		text := string(body)
+		// The exported entry point by name, and the unexported one asked for the memo-inclusive
+		// behaviour under any argument spelling. The second pattern is a regexp rather than a
+		// literal because the first version of this test matched only
+		// `inlineInvokedFunctions(function, true)` and a caller writing `(f, true)` walked past it
+		// -- found by adding exactly that caller and watching the test stay green.
 		if strings.Contains(text, "InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks") ||
-			strings.Contains(text, "inlineInvokedFunctions(function, true)") {
+			memoInclusiveCall.MatchString(text) {
 			if !knownCallSites[name] {
 				found = append(found, name)
 			}
@@ -561,6 +569,6 @@ func TestMemoInclusiveInliningIsNotUsedWhereScopesAreComputed(t *testing.T) {
 			"0 scopes to 7 / 7, which drops memoizations developers wrote. Read the precondition at "+
 			"InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks, confirm the new "+
 			"caller reaches no scope, and add it to knownCallSites here. If it does reach a scope, "+
-			"the dependency comparison has to be turned on first.", found)
+			"re-run the oracle with the splice inserted and check `under` is back at 0 first.", found)
 	}
 }
