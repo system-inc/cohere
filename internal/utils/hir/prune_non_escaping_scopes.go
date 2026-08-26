@@ -106,7 +106,8 @@ func pruneNonEscapingScopesWith(tree *ReactiveFunction, function *Function,
 	dependencies *ScopeDependencies, collector memoizationCollector,
 	memoized map[DeclarationId]bool, scopes *ReactiveScopes) PruneNonEscapingScopesResult {
 	prunedScopes := map[ScopeId]bool{}
-	pruned := prunePassOverScopes(tree, function, dependencies, memoized, prunedScopes)
+	pruned := prunePassOverScopes(tree, function, dependencies, memoized, prunedScopes,
+		collector.resolve)
 	markers := prunePassOverMemoMarkers(tree, function, scopes, prunedScopes)
 
 	return PruneNonEscapingScopesResult{
@@ -432,7 +433,7 @@ func (c *memoizationCollector) eachOperand(value ReactiveValue, visit func(Place
 // and the second is why `PropagateEarlyReturns` is still open rather than declined.
 func prunePassOverScopes(tree *ReactiveFunction, function *Function,
 	dependencies *ScopeDependencies, memoized map[DeclarationId]bool,
-	prunedScopes map[ScopeId]bool) int {
+	prunedScopes map[ScopeId]bool, resolve func(DeclarationId) DeclarationId) int {
 	pruned := 0
 	TransformReactiveFunction(tree, ReactiveTransformer{
 		Scope: func(scope *ReactiveScopeBlock, traverse func()) ReactiveTransformed {
@@ -445,13 +446,26 @@ func prunePassOverScopes(tree *ReactiveFunction, function *Function,
 			if len(declarations) == 0 && len(reassignments) == 0 {
 				return KeepStatement()
 			}
+			// Resolved through the same `LoadLocal` indirection the collector applied when it
+			// recorded these declarations, or the lookup asks for an identity the graph never used.
+			//
+			// Upstream reads `decl.identifier.declarationId` with no indirection because its
+			// declarations already carry the resolved identifier: `scope.declarations` stores the
+			// `Identifier` object itself, and its `LoadLocal` handling rewrites that object rather
+			// than keeping a side table. This tree keeps the side table, so the resolution has to
+			// be re-applied at every consumer.
+			//
+			// Measured on `error.validate-object-values-mutation` with a widened range: the
+			// collector records the `values` binding under declaration 1 and this looked it up
+			// under declaration 3, so a memoized value read as unmemoized and the scope holding it
+			// was pruned.
 			for _, declared := range declarations {
-				if memoized[declarationOf(function, declared)] {
+				if memoized[resolve(declarationOf(function, declared))] {
 					return KeepStatement()
 				}
 			}
 			for _, reassigned := range reassignments {
-				if memoized[declarationOf(function, reassigned)] {
+				if memoized[resolve(declarationOf(function, reassigned))] {
 					return KeepStatement()
 				}
 			}
