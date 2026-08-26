@@ -56,6 +56,7 @@ const liveWalkRepository = "/Users/kirkouimet/Projects/ahra"
 func liveWalkRules() []rule.Rule {
 	return []rule.Rule{
 		EnforceConsistentClassOrder,
+		EnforceConsistentVariantOrder,
 		EnforceCanonicalClasses,
 		NoConcatenatedClasses,
 		NoConflictingClasses,

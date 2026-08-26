@@ -22,6 +22,10 @@ func init() {
 			Decode: rule.DecodeOptionsInto[EnforceConsistentClassOrderOptions](),
 		},
 		rule.Registration{
+			Rule:   EnforceConsistentVariantOrder,
+			Decode: rule.DecodeOptionsInto[EnforceConsistentVariantOrderOptions](),
+		},
+		rule.Registration{
 			Rule:   EnforceCanonicalClasses,
 			Decode: rule.DecodeOptionsInto[EnforceCanonicalClassesOptions](),
 		},
