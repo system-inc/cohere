@@ -1194,7 +1194,7 @@ func CollectScopeDependenciesWithHoistable(function *Function, scopes *ReactiveS
 		objectMethods: objectMethodValues(function),
 		result:        result,
 		scopeRange:    identity.RangeOf,
-		hoistable:     CollectHoistablePropertyLoads(function, scopes, identity, ranges),
+		hoistable:     CollectHoistablePropertyLoads(function, scopes, identity, ranges, nil),
 	}
 	for _, param := range function.Params {
 		collector.declare(param.Identifier, declaration{})

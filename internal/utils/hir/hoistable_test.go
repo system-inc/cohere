@@ -25,7 +25,7 @@ func hoistableFor(t *testing.T, source string) (*Function, *ReactiveScopes, Scop
 	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 	identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
 	BuildReactiveScopeTerminals(function, scopes, identity)
-	return function, scopes, identity, ranges, analyseHoistableLoads(function, scopes, identity, ranges)
+	return function, scopes, identity, ranges, analyseHoistableLoads(function, scopes, identity, ranges, nil)
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ func TestAScopeInsideABranchIsNotSeededFromIt(t *testing.T) {
 			return null;
 		}
 	`)
-	seeds := CollectHoistablePropertyLoads(function, scopes, identity, ranges)
+	seeds := CollectHoistablePropertyLoads(function, scopes, identity, ranges, nil)
 	for scope, paths := range seeds {
 		for _, path := range paths {
 			if len(path.Path) == 0 {
@@ -333,10 +333,10 @@ func TestAScopeInsideABranchIsNotSeededFromIt(t *testing.T) {
 
 // TestHoistableHandlesNilInputs pins that the pass declines rather than panicking.
 func TestHoistableHandlesNilInputs(t *testing.T) {
-	if got := analyseHoistableLoads(nil, nil, nil, nil); got != nil {
+	if got := analyseHoistableLoads(nil, nil, nil, nil, nil); got != nil {
 		t.Error("a nil function produced an analysis")
 	}
-	if got := CollectHoistablePropertyLoads(nil, nil, nil, nil); got != nil {
+	if got := CollectHoistablePropertyLoads(nil, nil, nil, nil, nil); got != nil {
 		t.Error("a nil function produced hoistable loads")
 	}
 	if got := CollectScopeDependenciesWithHoistable(nil, nil, nil, nil); got.Len() != 0 {
@@ -423,7 +423,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 							BuildReactiveScopeTerminals(function, scopes, identity)
 
 							if analysis := analyseHoistableLoads(function, scopes, identity,
-								ranges); analysis != nil {
+								ranges, nil); analysis != nil {
 								if !analysis.Converged() {
 									notConverged++
 								}

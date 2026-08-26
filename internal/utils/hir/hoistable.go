@@ -341,7 +341,8 @@ func (h *HoistableAnalysis) hoistableAt(block BlockId) []ReactiveScopeDependency
 // `props.a.b` executed without throwing, then `props.a` was not nullish at that point, so `props.a`
 // is hoistable to anywhere that dominates it.
 func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges *MutableRanges,
-	identity ScopeIdentity, scopes *ReactiveScopes, registry *pathRegistry) map[BlockId]map[int]bool {
+	identity ScopeIdentity, scopes *ReactiveScopes, registry *pathRegistry,
+	hoistableFromOptionals map[BlockId]ReactiveScopeDependency) map[BlockId]map[int]bool {
 	known := map[int]bool{}
 	invoked := CollectAssumedInvokedFunctions(function)
 
@@ -385,6 +386,22 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 			assumed[index] = true
 		}
 
+		// A base the optional-chain traversal proved reachable at this block. Upstream seeds the
+		// same set at `CollectHoistablePropertyLoads.ts:416`: for `a?.b.c`, the `.c` rides an outer
+		// chain that already tested `a`, so `a?.b` is non-null wherever that block runs and the
+		// further loads are safe to read unconditionally.
+		//
+		// Without it the analysis truncates exactly the paths those fixtures turn on, which is
+		// measurable: wiring the optional lowering and collector WITHOUT this seed takes goldens
+		// from 28 to 21, and every one of the seven lost is an optional-chain fixture.
+		if base, ok := hoistableFromOptionals[block.Id]; ok {
+			node := registry.identifierNode(base.Identifier, base.Reactive)
+			for _, entry := range base.Path {
+				node = registry.propertyNode(node, entry)
+			}
+			assumed[node] = true
+		}
+
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
 			if instruction == nil {
@@ -400,7 +417,7 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 				// function: a read inside a callback that may never run is not safe to hoist out of
 				// it, and hoisting it would move a load to somewhere it can throw.
 				for _, path := range invokedNonNullPaths(function, expression, invoked,
-					ranges, identity, scopes, instruction.Order) {
+					ranges, identity, scopes, instruction.Order, hoistableFromOptionals) {
 					assumed[registry.pathIndex(path)] = true
 				}
 				continue
@@ -783,8 +800,10 @@ func sameNodeSet(a, b map[int]bool) bool {
 // first, exactly as `CollectScopeDependencies` does. The result is keyed by SCOPE, taking each
 // scope's set from the block its terminal names as the body -- upstream's `keyByScopeId`.
 func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
-	identity ScopeIdentity, ranges *MutableRanges) map[ScopeId][]ReactiveScopeDependency {
-	analysis := analyseHoistableLoads(function, scopes, identity, ranges)
+	identity ScopeIdentity, ranges *MutableRanges,
+	hoistableFromOptionals map[BlockId]ReactiveScopeDependency,
+) map[ScopeId][]ReactiveScopeDependency {
+	analysis := analyseHoistableLoads(function, scopes, identity, ranges, hoistableFromOptionals)
 	if analysis == nil {
 		return nil
 	}
@@ -833,7 +852,8 @@ func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 
 // analyseHoistableLoads runs the whole analysis, returning the per-block answer.
 func analyseHoistableLoads(function *Function, scopes *ReactiveScopes,
-	identity ScopeIdentity, ranges *MutableRanges) *HoistableAnalysis {
+	identity ScopeIdentity, ranges *MutableRanges,
+	hoistableFromOptionals map[BlockId]ReactiveScopeDependency) *HoistableAnalysis {
 	if function == nil || scopes == nil || identity == nil || ranges == nil {
 		return nil
 	}
@@ -842,7 +862,8 @@ func analyseHoistableLoads(function *Function, scopes *ReactiveScopes,
 	usedOutside := findTemporariesUsedOutsideDeclaringScope(function, terminals)
 	temporaries := collectTemporaries(function, usedOutside)
 
-	seeded := collectNonNullsInBlocks(function, temporaries, ranges, identity, scopes, registry)
+	seeded := collectNonNullsInBlocks(function, temporaries, ranges, identity, scopes, registry,
+		hoistableFromOptionals)
 	working, converged, iterations := propagateNonNull(function, seeded, registry)
 	return &HoistableAnalysis{
 		blocks:     working,
@@ -909,8 +930,8 @@ func hoistableTreeFor(paths []ReactiveScopeDependency) (map[IdentifierId]*hoista
 // a zip. A path rooted anywhere else is inner-local and is dropped rather than guessed at.
 func invokedNonNullPaths(parent *Function, expression *FunctionExpression,
 	invoked AssumedInvokedFunctions, ranges *MutableRanges,
-	identity ScopeIdentity, scopes *ReactiveScopes,
-	order EvaluationOrder) []ReactiveScopeDependency {
+	identity ScopeIdentity, scopes *ReactiveScopes, order EvaluationOrder,
+	hoistableFromOptionals map[BlockId]ReactiveScopeDependency) []ReactiveScopeDependency {
 	if !invoked[expression.Function] || int(expression.Function) >= len(parent.Functions) {
 		return nil
 	}
@@ -958,7 +979,11 @@ func invokedNonNullPaths(parent *Function, expression *FunctionExpression,
 	// `useMemo-infer-less-specific-conditional-access.ts`, whose callback reads it only under an
 	// `if` and where upstream infers bare `propB`. The two lower to nearly identical outer
 	// functions, so the caller cannot tell them apart -- only the callback's own control flow can.
-	nestedAnalysis := analyseHoistableLoads(nested, scopes, identity, ranges)
+	// The same sidemap is passed through, matching upstream's `collectHoistablePropertyLoadsInInnerFn`
+	// (`CollectHoistablePropertyLoads.ts:131`), which hands the inner function the caller's
+	// `hoistableFromOptionals` unchanged. A nested function numbers its blocks from its own space, so
+	// an outer entry simply does not match and the map is inert there rather than wrong.
+	nestedAnalysis := analyseHoistableLoads(nested, scopes, identity, ranges, hoistableFromOptionals)
 	if nestedAnalysis == nil || len(nested.Blocks) == 0 || nested.Blocks[0] == nil {
 		return nil
 	}
