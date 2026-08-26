@@ -276,11 +276,43 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 // goldens from 15 to 6 while the clean fixtures improved, and every one of the nine losses was a
 // fixture where a memo callback had been spliced.
 //
-// The honest reading is that those nine were right answers reached by a wrong route. Restoring them
-// by inlining less is not a fix for that, and this does not claim to be one -- it holds them at the
-// number they were at while the false-positive side gets the improvement it should. Delete this
-// guard when the dependency comparison is turned on, and expect these nine to come back on the
-// condition upstream actually reports them under.
+// # That reading was measured and is wrong, in three ways
+//
+// The paragraph above concluded those were "right answers reached by a wrong route" and instructed a
+// reader to delete this guard once the dependency comparison was turned on. All three parts of that
+// have since been measured against the corpus and none survives.
+//
+// FIRST, the comparison is already on. `AnalyzePreservedManualMemoization` and the score test both
+// pass real dependencies; only `ValidatePreservedManualMemoization` at :79 still passes nil, and its
+// callers are five unit tests. So the trigger the instruction names has already happened and the
+// guard is still needed.
+//
+// SECOND, the count is six rather than nine. Lifting the guard on the current tree takes goldens from
+// 28 of 28 scoreable to 22, and buys two false positives, 8 to 6. The nine was measured before the
+// declaration-id fix in `7a48d68` and several passes since.
+//
+// THIRD, and this is the part that matters: the six are not one mechanism and neither of the two
+// traced is "the same answer under a different condition".
+//
+//	useMemo-infer-less-specific-conditional-access
+//	  guarded we infer `propA.a` AND bare `propB`, and bare `propB` against the written
+//	  `propB.x.y` is exactly upstream's disagreement. Lifting the guard loses `propB` entirely,
+//	  so the comparison has nothing left to disagree about. The dependency is destroyed, not
+//	  relocated.
+//
+//	validate-object-values-mutation
+//	  the dependencies are IDENTICAL either way, `props.object` and `values`. Inlining creates
+//	  two more scopes -- assigned goes 2 to 4 -- and `PruneNonEscapingScopes` removes two of
+//	  them, taking the scope that carried the finding with it. Upstream's expectation for this
+//	  fixture is "Found 2 errors" and guarded we produce exactly those two, so the guarded answer
+//	  is the answer key rather than a lucky one.
+//
+// So lifting this guard has to answer two unrelated questions -- why a dependency is destroyed by
+// inlining, and why a scope upstream keeps becomes non-escaping once the body is spliced. Both are
+// upstream of anything the dependency comparison can reach.
+//
+// The guard stays until those are answered. Five of the eight remaining false positives are behind
+// it, which makes this the largest single item on that board and not a detail.
 //
 // A programmer-written IIFE is untouched by any of this: nothing marks it, so it is not in this set.
 func memoizedResults(function *Function) map[IdentifierId]bool {
