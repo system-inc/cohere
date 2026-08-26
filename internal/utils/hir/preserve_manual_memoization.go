@@ -97,6 +97,7 @@ func ValidatePreservedManualMemoizationWithDependencies(tree *ReactiveFunction, 
 		scopes:           scopes,
 		liveScopes:       map[ScopeId]bool{},
 		prunedScopes:     map[ScopeId]bool{},
+		walkedScopes:     map[ScopeId]bool{},
 		openMemoBlocks:   map[int]bool{},
 		dependencies:     dependencies,
 		sourceDeps:       map[int][]ManualMemoDependency{},
@@ -113,6 +114,12 @@ type manualMemoValidator struct {
 	liveScopes map[ScopeId]bool
 	// prunedScopes are scopes the walk has passed that were pruned.
 	prunedScopes map[ScopeId]bool
+	// walkedScopes are scopes the walk entered at all, whether they survived or were pruned.
+	//
+	// Distinct from the other two rather than derivable from them: a scope absent from both is
+	// either one the walk has not reached yet or one that is not in the tree at all, and only this
+	// separates those.
+	walkedScopes map[ScopeId]bool
 	// openMemoBlocks are the `ManualMemoId`s of memo blocks opened and not yet closed.
 	//
 	// A set keyed by id rather than a boolean, because `ManualMemoId` exists precisely to make
@@ -145,6 +152,7 @@ func (v *manualMemoValidator) walk(block ReactiveBlock) {
 			v.visitInstruction(shape.Instruction)
 
 		case *ReactiveScopeBlock:
+			v.walkedScopes[shape.Scope] = true
 			v.walk(shape.Instructions)
 			// A pruned scope is recorded and NOT compared, which is upstream's split into two
 			// methods: `visitScope` runs `validateInferredDep` over the scope's dependencies,
@@ -289,6 +297,29 @@ func (v *manualMemoValidator) check(identifier IdentifierId, order EvaluationOrd
 		return
 	}
 	if kind == PreserveManualMemoizationDependencyMutable && v.prunedScopes[scope] {
+		return
+	}
+	// # A scope the walk never entered is one this condition cannot judge
+	//
+	// Upstream asks the same three-part question -- scoped, not survived, not pruned -- but every
+	// scope it asks about lives in the reactive tree it is walking, so "scoped but absent from the
+	// tree" is not a state it can encounter and its behaviour there is unspecified rather than
+	// matched.
+	//
+	// It is the dominant state here. Measured across the clean corpus, of 55 checks that get past
+	// the scopeless return: 35 are on a scope the walk never entered, 20 on a live one, and zero on
+	// a pruned one. Without this the rule reads every one of those 35 as "neither survived nor
+	// pruned, so it may be modified later" and reports.
+	//
+	// `prune-nonescaping-useMemo.ts` is the shape. After `be5b49c` sweeps its body it keeps exactly
+	// what upstream keeps -- the two markers, the callback, the call -- and upstream compiles it to
+	// `function useFoo(x) {}` with no cache slots at all. Its own header calls reporting here
+	// "technically a false positive". `x` still carries a scope in our table, from the call inside
+	// the callback, and that scope has no block in the tree.
+	//
+	// Measured: false positives 31 to 25, golden unchanged at 25, and all three oracles byte
+	// identical -- `matched` 77, `ours` 120, `under` 5 fixtures / 7 scopes.
+	if kind == PreserveManualMemoizationDependencyMutable && !v.walkedScopes[scope] {
 		return
 	}
 	v.findings = append(v.findings, PreserveManualMemoizationFinding{

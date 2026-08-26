@@ -339,7 +339,24 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	// Six true positives for three false positives, with `under` in the scope oracle unmoved at
 	// 5 fixtures / 7 scopes and the corpus depth distribution moving 595 to 574 rather than
 	// collapsing the way every truncation attempt on this cluster did.
-	const knownFalsePositives = 31
+	// Lowered from 31 by exempting a dependency whose scope the walk never entered. See the note at
+	// `check`: 35 of 55 checks corpus-wide are on such a scope, and upstream cannot reach that state
+	// because every scope it asks about is in the tree it walks.
+	//
+	// The six, and they are one shape:
+	//
+	//	prune-nonescaping-useMemo.ts
+	//	prune-nonescaping-useMemo-mult-returns.ts
+	//	prune-nonescaping-useMemo-mult-returns-primitive.ts
+	//	maybe-invalid-useMemo-no-memoblock-sideeffect.ts
+	//	optional-member-expression-inverted-optionals-parallel-paths.js
+	//	propagate-scope-deps-hir-fork/optional-member-expression-inverted-optionals-parallel-paths.js
+	//
+	// The first four are the zero-cache-slot group: upstream emits no `_c(` at all for them, having
+	// deleted the bodies, and `prune-nonescaping-useMemo.ts` calls reporting here "technically a
+	// false positive" in its own header. Nothing newly fires, and golden holds at 25 with all three
+	// oracles byte identical.
+	const knownFalsePositives = 25
 	if fired != knownFalsePositives {
 		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
 			"number should be lowered deliberately, and if it went UP something regressed",
