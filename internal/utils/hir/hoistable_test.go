@@ -597,8 +597,15 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// which is what a capture edge that did not exist before should produce: `Object.values(o)` now
 	// records that the result holds the object's own values, so a scope naming the result names the
 	// object once more often, and no path gets longer or shorter.
-	if deep != 563 || flat != 2135 {
-		t.Errorf("got %d deep and %d flat dependencies, want 563 and 2135; a SMALL move here is "+
+	// # And again when a callback's mutation began widening the receiver's range
+	//
+	// 563 deep to 569, 2,135 flat to 2,141. Six more of each, and the clause above applies: both
+	// oracles that carry an upstream reference are byte-identical across this change -- scope
+	// survived 108 with exact 30 and under held at 5 fixtures / 7 scopes, dependency 77 matched
+	// against 121 produced. A wider scope names more values, and more of those values sit deep
+	// enough inside it to carry a path.
+	if deep != 569 || flat != 2141 {
+		t.Errorf("got %d deep and %d flat dependencies, want 569 and 2141; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

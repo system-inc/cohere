@@ -163,7 +163,21 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// oracle exists for. And the change it records fires both
 	// `error.invalid-useCallback-captures-reassigned-context` fixtures, which is the third
 	// condition reaching programs it could not reach before rather than fewer.
-	const knownBlocksWithCarrying = 67
+	// # Lowered again when a callback's mutation began widening the receiver's range
+	//
+	// 67 to 66, and the block that stops carrying is named rather than assumed: logging the fixture
+	// per carrying block and diffing the two configurations gives exactly
+	// `error.validate-object-values-mutation`, with nothing gained.
+	//
+	// Upstream carries zero scopes inside that memo block. Read at the same stage, its output is
+	// two scopes -- `SCOPE 1 decls=[52]` and `SCOPE 3 decls=[65]` -- with the memo markers sitting
+	// INSIDE scope 1 rather than wrapping a scope of their own, so there is no scope between them
+	// to carry anything. Our widening produces that same shape.
+	//
+	// So this is the third lowering for the reason the paragraph above already records twice: the
+	// direction of `blocksWithCarrying` is not always the direction of correctness. Unlike the
+	// earlier two, this one is checked against upstream's own output rather than argued from ours.
+	const knownBlocksWithCarrying = 66
 	const knownBlocksAllEmpty = 20
 	if blocksWithCarrying < knownBlocksWithCarrying {
 		t.Errorf("blocks with a dependency-carrying interior scope = %d, want at least %d; the "+

@@ -979,12 +979,13 @@ func effectsForCall(
 	name := calleeName(function, instruction, callee)
 	signature, known := lookupSignature(function, instruction, name)
 	if !known {
-		return effectsForUnknownCall(receiver, callee, args, lvalue, mutatesCallee)
+		out := effectsForUnknownCall(receiver, callee, args, lvalue, mutatesCallee)
+		return append(out, argumentMutationsFromCallbacks(function, receiver, args)...)
 	}
 
 	if len(signature.Aliasing) > 0 {
 		if applied, ok := effectsFromAliasingSignature(signature, receiver, args, lvalue); ok {
-			return applied
+			return append(applied, argumentMutationsFromCallbacks(function, receiver, args)...)
 		}
 		// Upstream returns nil from `computeEffectsForSignature` when the arity does not fit and
 		// then falls through to the legacy path (`:1087`). Reproduced rather than raising.
@@ -1037,7 +1038,7 @@ func effectsForCall(
 			}
 		}
 	}
-	return out
+	return append(out, argumentMutationsFromCallbacks(function, receiver, args)...)
 }
 
 // visitSignatureOperand is upstream's `visit` closure inside compute_effects_for_legacy_signature.
@@ -1364,4 +1365,151 @@ func effectsFromAliasingSignature(signature effectSignature, receiver Place, arg
 		out = append(out, flow(effect.Kind, from, into))
 	}
 	return out, true
+}
+
+// argumentMutationsFromCallbacks lifts a callback's mutation of its own parameter to the call site.
+//
+// Upstream's `Apply` arm at `InferMutationAliasingEffects.ts:1016` resolves a callee to a single
+// locally-declared `FunctionExpression` whose effects are already inferred, builds a signature from
+// it, and substitutes the arguments for the parameters. Its own comment: "We're calling a locally
+// declared function, we already know it's effects! We just have to substitute in the args for the
+// params".
+//
+// # This is the ONE consequence of that machinery, not the machinery
+//
+// The full port is a bottom-up effects pass plus a 194-line substitution engine, recorded as
+// `EffectGapInterproceduralParameters` and `#qgzpt6a`. What this does instead is answer one question
+// the whole corpus turns on: does an argument that IS a callback mutate the parameter it is handed?
+//
+// `values.map(value => { value.updated = true; })` is the shape. Upstream emits `Mutate` on a
+// temporary standing for the mapped element; this emits it on the receiver-adjacent argument the
+// callback was passed with, which is the same claim in this graph -- the callback's parameter is not
+// a place the caller holds, so the mutation is attributed to the value the callback is invoked over.
+//
+// A narrower answer than upstream's, and narrow in the measured direction: it fires only when the
+// callback's own inferred effects contain a mutation reaching a parameter, so a callback that merely
+// reads its argument adds nothing.
+//
+// Returns nil when nothing qualifies, which is the common case and costs one map lookup per call.
+func argumentMutationsFromCallbacks(function *Function, receiver Place,
+	args []Argument) []AliasingEffect {
+	if function == nil || len(args) == 0 || len(function.Functions) == 0 {
+		return nil
+	}
+	var out []AliasingEffect
+	for _, argument := range args {
+		if argument.Spread {
+			continue
+		}
+		nested := nestedFunctionHeldBy(function, argument.Place.Identifier)
+		if nested == nil {
+			continue
+		}
+		if !mutatesOwnParameter(nested) {
+			continue
+		}
+		// A temporary standing for the element, created FROM the receiver and mutated.
+		//
+		// Upstream's shape exactly, read off its own effect list for `values.map(cb)`:
+		//
+		//	CreateFrom from=<receiver> into=<temp>
+		//	Mutate     into=<temp>
+		//
+		// Mutating the receiver directly was tried first and cost a golden. The difference is not
+		// bookkeeping: `createFrom` is one edge the mutation walk crosses backwards, so the receiver
+		// is reached transitively rather than named, and a value merely aliased by the receiver is
+		// not swept in. One step less coarse is the whole distance between the two results.
+		element := function.NewIdentifier("", nil, 0)
+		temporary := Place{Identifier: element.Id, Reactive: receiver.Reactive}
+		out = append(out,
+			flow(AliasingEffectCreateFrom, receiver, temporary),
+			mutate(AliasingEffectMutateTransitive, temporary))
+	}
+	return out
+}
+
+// nestedFunctionHeldBy resolves a value to the nested function it holds, if it holds one.
+//
+// Follows the same stores and loads `collectInvokedCandidates` does, and for the same reason: a
+// callback is usually passed as a temporary that a `FunctionExpression` was assigned into rather
+// than as the expression itself.
+func nestedFunctionHeldBy(function *Function, id IdentifierId) *Function {
+	held := map[IdentifierId]FunctionId{}
+	for _, block := range function.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			instruction := function.Instructions[instructionId]
+			if instruction == nil {
+				continue
+			}
+			switch value := instruction.Value.(type) {
+			case *FunctionExpression:
+				held[instruction.LValue.Identifier] = value.Function
+			case *StoreLocal:
+				if id, ok := held[value.Value.Identifier]; ok {
+					held[value.LValue.Identifier] = id
+				}
+			case *LoadLocal:
+				if id, ok := held[value.Place.Identifier]; ok {
+					held[instruction.LValue.Identifier] = id
+				}
+			}
+		}
+	}
+	index, ok := held[id]
+	if !ok || int(index) >= len(function.Functions) {
+		return nil
+	}
+	return function.Functions[index]
+}
+
+// mutatesOwnParameter reports whether a function's inferred effects mutate one of its parameters.
+//
+// The walk is the callback's own effect table, which `InferAliasingEffects` already computes per
+// function. A mutation reaches a parameter through the same assign and alias edges the ranges pass
+// follows, so this resolves those transitively rather than requiring the mutation to name the
+// parameter directly: `value => { value.updated = true }` lowers to a load of the parameter and a
+// store through the loaded temporary.
+func mutatesOwnParameter(nested *Function) bool {
+	if nested == nil || len(nested.Params) == 0 {
+		return false
+	}
+	effects := InferAliasingEffects(nested)
+	if effects == nil || effects.Len() == 0 {
+		return false
+	}
+
+	// Values reachable from a parameter by assignment or aliasing, seeded with the parameters.
+	reaches := map[IdentifierId]bool{}
+	for _, param := range nested.Params {
+		reaches[param.Identifier] = true
+	}
+	var mutated []IdentifierId
+	for _, block := range nested.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			for _, effect := range effects.Get(instructionId) {
+				switch effect.Kind {
+				case AliasingEffectAssign, AliasingEffectAlias, AliasingEffectCreateFrom:
+					if reaches[effect.From.Identifier] {
+						reaches[effect.Into.Identifier] = true
+					}
+				case AliasingEffectMutate, AliasingEffectMutateTransitive,
+					AliasingEffectMutateConditionally,
+					AliasingEffectMutateTransitiveConditionally:
+					mutated = append(mutated, effect.Into.Identifier)
+				}
+			}
+		}
+	}
+	for _, id := range mutated {
+		if reaches[id] {
+			return true
+		}
+	}
+	return false
 }
