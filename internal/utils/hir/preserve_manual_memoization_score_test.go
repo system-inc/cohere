@@ -415,7 +415,18 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	// Goldens hold at 25 and all three oracles are byte-identical: scope survived 108 with exact 30
 	// and under-production at 5 fixtures / 7 scopes, dependency 77 matched against 121 produced,
 	// memo blocks 101 with 65 carrying.
-	const knownFalsePositives = 13
+	//
+	// Lowered to 11 by the frozen-capture rule in `ranges.go`. The two that stop firing are
+	// `useMemo-constant-prop.ts` and `todo-ensure-constant-prop-decls-get-removed.ts`, named the
+	// same way, by logging the fixture per false positive and diffing. Both memoize over a constant,
+	// so upstream emits a `memo_cache_sentinel` rather than a dependency comparison, and both were
+	// the rule validating against a scope that had fused with its neighbour across a closure
+	// capture.
+	//
+	// Goldens hold at 25 and `under` holds at 5 fixtures / 7 scopes. The other oracles move and each
+	// carries its reasoning: dependency 74 matched held with ours 116 to 119, scope survived 109 to
+	// 110 with exact 28 held, memo blocks 20 all-empty to 22.
+	const knownFalsePositives = 11
 	if fired != knownFalsePositives {
 		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
 			"number should be lowered deliberately, and if it went UP something regressed",

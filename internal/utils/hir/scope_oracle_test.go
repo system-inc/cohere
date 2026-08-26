@@ -320,7 +320,16 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// the net is plus one. Taken because the recovered scopes are ones upstream keeps and this
 	// number's direction cannot distinguish a scope wrongly kept from one rightly restored, which
 	// is what `knownSurvivedExact` and `knownSurvivedUnder` are for.
-	const knownSurvivedTotal = 109
+	//
+	// Raised to 110 by the frozen-capture rule in `ranges.go`, and it is the same one scope this
+	// number's own message describes: a value that stopped being captured no longer fuses with its
+	// neighbour, so `useMemo-constant-prop` splits from 2 surviving scopes to 3 against upstream's
+	// 1. That is the only fixture that moves on this oracle.
+	//
+	// Over-production, which is the performance direction rather than the correctness one: `under`
+	// holds at 5 fixtures / 7 scopes and `exact` at 28. The board is what carries it -- false
+	// positives fall 13 to 11, and `useMemo-constant-prop` is one of the two that close.
+	const knownSurvivedTotal = 110
 	if survivedTotal > knownSurvivedTotal {
 		t.Errorf("surviving scopes = %d against upstream's %d, want at most %d; we produce more "+
 			"scopes than before, so something split a scope upstream keeps whole or stopped a "+

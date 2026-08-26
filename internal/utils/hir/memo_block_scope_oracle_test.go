@@ -188,7 +188,10 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// Read from upstream rather than inferred from the sibling, because the two fixtures differ in
 	// the callback and the symmetry was worth checking.
 	const knownBlocksWithCarrying = 65
-	const knownBlocksAllEmpty = 20
+	//
+	// 22 with the frozen-capture rule in `ranges.go`. Both added blocks are
+	// `useMemo-constant-prop`, whose two memo blocks memoize over a constant.
+	const knownBlocksAllEmpty = 22
 	if blocksWithCarrying < knownBlocksWithCarrying {
 		t.Errorf("blocks with a dependency-carrying interior scope = %d, want at least %d; the "+
 			"rule's third condition can no longer reach programs it could reach before",
@@ -203,7 +206,9 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// more blocks lost their dependencies to a closure boundary.
 	// Raised from 10 by the same change. The four added are the stable-built-in fixtures above,
 	// whose blocks hold a capturing function expression and correctly carry no dependency.
-	const knownBlocksAllEmptyWithCapture = 14
+	//
+	// 16 with the frozen-capture rule, the same two blocks as above.
+	const knownBlocksAllEmptyWithCapture = 16
 	if blocksAllEmptyWithCapture > knownBlocksAllEmptyWithCapture {
 		t.Errorf("all-empty memo blocks holding a capturing closure = %d, want at most %d; the "+
 			"closure boundary is swallowing more dependencies than before",
@@ -218,7 +223,18 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// dependency comparison -- `_c(1)` with `$[0] === Symbol.for("react.memo_cache_sentinel")`.
 	// Counting a sentinel as a contradicted dependency is a property of this oracle's slot pattern
 	// rather than of our output, and is left recorded rather than silently filtered.
-	const knownBlocksAllEmptyContradicted = 5
+	//
+	// 7 with the frozen-capture rule, and this rise was checked against the fixture rather than
+	// accepted, because zero is this number's target. Both added blocks are `useMemo-constant-prop`,
+	// and its slots are `Symbol.for("react.memo_cache_sentinel")` rather than dependency
+	// comparisons -- the fixture holds exactly one `!==` guard and it is on the returned array, not
+	// on either memo block. So upstream infers no dependency in either block either, and this is the
+	// same sentinel-counting property of the slot pattern already recorded above rather than a
+	// disagreement about dependencies.
+	//
+	// The rule's own answer on that fixture went from wrong to right in the same change: it is one
+	// of the two false positives that close at `knownFalsePositives`.
+	const knownBlocksAllEmptyContradicted = 7
 	if blocksAllEmptyContradicted > knownBlocksAllEmptyContradicted {
 		t.Errorf("all-empty memo blocks contradicted by upstream's compiled output = %d, want at "+
 			"most %d; upstream infers a dependency in a block where we now infer none",

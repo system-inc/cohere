@@ -571,9 +571,32 @@ func TestMergePreservesScopeWidthAndMembership(t *testing.T) {
 		t.Errorf("the empty cell filled: %d multi-member scopes of width one before and %d after",
 			manyNarrowBefore, manyNarrowAfter)
 	}
-	if oneNarrowAfter != oneNarrowBefore {
-		t.Errorf("the narrow single-value scopes moved from %d to %d; this pass should not be "+
-			"touching that population at all", oneNarrowBefore, oneNarrowAfter)
+	// A ceiling rather than an equality, and the change from equality is recorded rather than
+	// loosened silently.
+	//
+	// The equality held for as long as no narrow single-value scope overlapped anything, which was a
+	// property of the corpus shape rather than of this pass. Upstream has no width guard at all --
+	// `MergeOverlappingReactiveScopesHIR.ts` never consults a scope's width -- and `collectScopeInfo`
+	// registers any scope whose start differs from its end, so a width-one scope is eligible to be
+	// unioned exactly like any other.
+	//
+	// The frozen-capture rule in `ranges.go` changed the shape: values that used to be swallowed by a
+	// wide hull now form their own narrow scopes, and 8 of them sit inside a hull that still exists,
+	// so they merge back into it. Traced on all eight before this was relaxed: every one merges into
+	// a scope that CONTAINS it, and the containing scope is byte-identical before and after. On
+	// `pos=5163` scope 3 is `[15,382)` in both, holding 135 members before and 73 after -- the
+	// frozen values left it, formed their own scopes, and rejoined. Nothing is grouped that was not
+	// grouped before.
+	//
+	// The final grouping moves in the safe direction, which is what makes this a relaxation rather
+	// than a retreat: `[40,44)` with 3 members becomes `[42,44)` with 1, and the corpus gains 92
+	// groups. Narrower scopes with fewer members invalidate less, and `under` in the scope oracle
+	// holds at 5 fixtures / 7 scopes across the change.
+	//
+	// The empty-cell assertion above is the one that catches over-merging, and it is untouched.
+	if oneNarrowAfter > oneNarrowBefore {
+		t.Errorf("the narrow single-value scopes GREW from %d to %d; merging cannot create a "+
+			"scope, so this population can only shrink", oneNarrowBefore, oneNarrowAfter)
 	}
 	if manyWideBefore == 0 {
 		t.Fatal("no wide multi-member scopes exist, so the table above measured nothing")
@@ -687,10 +710,26 @@ func TestMergeIsUnaffectedBySkippingFunctionOperands(t *testing.T) {
 		t.Fatal("no function-expression operands exist on this corpus, so the zero below is about " +
 			"the probe rather than about the gate")
 	}
-	if withGate != withoutGate {
+	// The gap's size, recorded as this assertion's own message asked once it stopped being zero.
+	//
+	// It was empty at 88 either way for as long as no function-expression operand named a value in a
+	// scope that could overlap. The frozen-capture rule in `ranges.go` un-fuses scopes, and exactly
+	// one of the newly separate ones is reachable through a function-expression operand, so the
+	// upper-bound probe now removes one union: 80 without the gate, 79 with it.
+	//
+	// One is the UPPER bound rather than the real size. The probe skips every use-operand of every
+	// `FunctionExpression`, which is strictly more than upstream's gate, since upstream skips only
+	// the primitive ones. So the true divergence is at most one union and may still be zero.
+	//
+	// The direction is unchanged and is the one already stated on `MergeGapPrimitiveOperandSkip`:
+	// not skipping visits operands upstream skips, and visiting an operand can only ever ADD a
+	// union, so this errs toward merging more than upstream rather than less.
+	const knownGateDivergence = 1
+	if withoutGate-withGate != knownGateDivergence {
 		t.Errorf("skipping every function-expression operand changed the union count from %d to "+
-			"%d, so MergeGapPrimitiveOperandSkip is no longer empty and its size should be "+
-			"recorded rather than the zero", withoutGate, withGate)
+			"%d, a divergence of %d where %d was measured; MergeGapPrimitiveOperandSkip changed "+
+			"size and the new one should be recorded", withoutGate, withGate,
+			withoutGate-withGate, knownGateDivergence)
 	}
 	if typed != 0 {
 		t.Log("identifiers now carry types, so the real Primitive gate can be asked and " +

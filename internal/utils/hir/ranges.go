@@ -893,20 +893,30 @@ type aliasingState struct {
 	// Absent rather than false is deliberate. A value the walk never reached has no entry, and the
 	// gate treats that as mutable, which is the pre-existing behaviour of this pass and the
 	// conservative direction for widening.
-	immutable map[IdentifierId]bool
+	immutable map[IdentifierId]EffectValueKind
 }
 
 func newAliasingState() *aliasingState {
 	return &aliasingState{
 		nodes:     map[IdentifierId]*aliasingNode{},
-		immutable: map[IdentifierId]bool{},
+		immutable: map[IdentifierId]EffectValueKind{},
 	}
 }
 
 // markImmutable records that a value is not Mutable or Context, so a conditional mutation of it
 // widens nothing.
-func (s *aliasingState) markImmutable(id IdentifierId) {
-	s.immutable[id] = true
+func (s *aliasingState) markImmutable(id IdentifierId, kind EffectValueKind) {
+	s.immutable[id] = kind
+}
+
+// notMutable reports whether a value is neither Mutable nor Context.
+//
+// The question `state.mutate` asks: its conditional arm mutates for `Mutable` and `Context` and
+// returns `none` for everything else (`InferMutationAliasingEffects.ts:1489`). Absent means mutable,
+// which is the conservative direction for widening and the pre-existing behaviour of this pass.
+func (s *aliasingState) notMutable(id IdentifierId) bool {
+	_, present := s.immutable[id]
+	return present
 }
 
 // deriveImmutable gives Into the same mutability as From.
@@ -915,8 +925,8 @@ func (s *aliasingState) markImmutable(id IdentifierId) {
 // initializes the target with it, rewriting the effect into a plain `Create` of that kind when the
 // source is Primitive, Global or Frozen. This is that propagation, in the one bit this pass reads.
 func (s *aliasingState) deriveImmutable(from IdentifierId, into IdentifierId) {
-	if s.immutable[from] {
-		s.immutable[into] = true
+	if kind, present := s.immutable[from]; present {
+		s.immutable[into] = kind
 		return
 	}
 	delete(s.immutable, into)
@@ -1255,7 +1265,7 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 	for _, param := range function.Params {
 		state.create(param, aliasingNodeObject)
 		if parametersAreFrozen {
-			state.markImmutable(param.Identifier)
+			state.markImmutable(param.Identifier, EffectValueFrozen)
 		}
 	}
 	for _, contextValue := range function.Context {
@@ -1310,7 +1320,7 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 				case effect.Kind == AliasingEffectCreate:
 					state.create(effect.Into, aliasingNodeObject)
 					if effect.Value != EffectValueMutable {
-						state.markImmutable(effect.Into.Identifier)
+						state.markImmutable(effect.Into.Identifier, effect.Value)
 					} else {
 						delete(state.immutable, effect.Into.Identifier)
 					}
@@ -1349,6 +1359,30 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					index++
 
 				case effect.Kind == AliasingEffectCapture:
+					// Upstream switches on the SOURCE's kind here and only two of its four arms
+					// reach `state.capture` (`InferMutationAliasingEffects.ts:894-942`):
+					//
+					//	Frozen, MaybeFrozen   re-applied as `ImmutableCapture`
+					//	Global, Primitive     pruned, the arm breaks with no effect pushed
+					//	Context               re-applied as `MaybeAlias`
+					//	default (Mutable)     pushed, and widens
+					//
+					// `ImmutableCapture` is already a no-op for range widening in this pass, and a
+					// pruned effect never reaches it either, so both of the arms this tree can
+					// express come out the same way: do not widen. `Global` and `Context` have no
+					// `EffectValueKind` here, so the switch is over the two that do.
+					//
+					// The kind is what this needs and one bit is not enough for it. `notMutable`
+					// answers "not Mutable or Context", which is exactly right for the two
+					// conditional-mutation readers below and wrong here: it would fold `Primitive`
+					// and `Frozen` together with everything else the walk marked, and measured that
+					// way it merges eight narrow single-value scopes that
+					// `TestMergePreservesScopeWidthAndMembership` says this pass must never touch.
+					if kind, present := state.immutable[effect.From.Identifier]; present &&
+						(kind == EffectValueFrozen || kind == EffectValuePrimitive) {
+						index++
+						break
+					}
 					state.capture(index, effect.From, effect.Into)
 					index++
 
@@ -1358,7 +1392,7 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					if effect.Kind == AliasingEffectMutateTransitiveConditionally {
 						kind = mutationKindConditional
 					}
-					if kind == mutationKindConditional && state.immutable[effect.Into.Identifier] {
+					if kind == mutationKindConditional && state.notMutable(effect.Into.Identifier) {
 						// Upstream's `state.mutate` returns `none` for a conditional mutation of
 						// anything that is not Mutable or Context, and `applyEffect` then does not
 						// push the effect at all. The index still advances: a dropped effect must
@@ -1386,7 +1420,7 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					index++
 
 				case effect.Kind == AliasingEffectMutateConditionally:
-					if state.immutable[effect.Into.Identifier] {
+					if state.notMutable(effect.Into.Identifier) {
 						index++
 						break
 					}

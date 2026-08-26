@@ -281,7 +281,12 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 	// 86 with the two frozen-propagation edges. Falling is the improvement this bound names, and it
 	// falls because a frozen value stops widening a scope across a call, so fewer scopes reach a
 	// break that has to be spelled out. `unmatchedGotos` holds at 60 and `doubleEmitted` at 22.
-	const knownNonImplicitScopeBreaks = 86
+	//
+	// 85 with the frozen-capture rule in `ranges.go`. Falling is the improvement this bound names,
+	// and it falls for the same reason as the move to 86: a value that stops widening leaves fewer
+	// scopes reaching a break that has to be spelled out. `unmatchedGotos` holds at 60,
+	// `doubleEmitted` at 22, and unattributed loss at 5.
+	const knownNonImplicitScopeBreaks = 85
 	if nonImplicitScopeBreaks > knownNonImplicitScopeBreaks {
 		t.Errorf("%d break(s) to a scope fallthrough were not implicit, up from the measured %d; "+
 			"upstream raises an invariant here, so this is a control-flow stack the walk built "+

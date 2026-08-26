@@ -83,7 +83,10 @@ func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
 	// longer widens its range across a conditional mutation, so more method calls reach this pass
 	// with their two sides in different scopes and more get aligned. The pass changing what it
 	// touches is the second cause this comment names, and it is this one.
-	const knownChanged = 363
+	//
+	// 365 with the frozen-capture rule in `ranges.go`, for the same reason as the move to 363: a
+	// narrower range leaves more method calls with their two sides in different scopes.
+	const knownChanged = 365
 	if changed != knownChanged {
 		t.Errorf("the pass changed %d of %d functions, want %d", changed, functions, knownChanged)
 	}

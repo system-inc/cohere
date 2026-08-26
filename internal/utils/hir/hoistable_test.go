@@ -636,8 +636,15 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// captured read lowers to and through every property read off it. A frozen value does not widen
 	// its range across a conditional mutation, so scopes stop swallowing the loads that feed them
 	// and a path that was deep inside a widened scope is read at its root instead.
-	if deep != 588 || flat != 2203 {
-		t.Errorf("got %d deep and %d flat dependencies, want 588 and 2203; a SMALL move here is "+
+	// # And again when a frozen value stopped being captured by a closure
+	//
+	// 588 deep to 610, 2,203 flat to 2,346. `deep` rising is the over-approximating direction by the
+	// rule above, and the oracle that says otherwise is the board rather than a scope count: false
+	// positives fall 13 to 11 with `under` held at 5 fixtures / 7 scopes. A frozen capture no longer
+	// widens its source's range, so scopes that were fusing across a closure stay separate and a
+	// value read inside one is read at depth rather than at the root of a merged scope.
+	if deep != 610 || flat != 2346 {
+		t.Errorf("got %d deep and %d flat dependencies, want 610 and 2346; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

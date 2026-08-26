@@ -863,7 +863,24 @@ export function f() {
 	// The count is what separates the faithful walk from one that ignores the index. It is asserted
 	// exactly rather than as a bound, because a bound would be satisfied by a walk that widened
 	// nothing at all.
-	const wantWidened = 10
+	//
+	// Ten until the frozen-capture rule in `ranges.go`, eight after it, and the two that leave are
+	// not values this test is about. Traced before the count was changed:
+	//
+	//	id 19  the `LoadGlobal` temporary holding `deep`, created frozen
+	//	id 21  the result of `deep(holder)`
+	//
+	// Both named values still widen to exactly `[0,9)`: `inner` and `holder` are byte-identical
+	// before and after. What stopped is the `Capture` from the frozen global into `holder`, which
+	// upstream also prunes -- its `Capture` arm maps a `Global` source to a null `sourceType` that
+	// matches none of its three branches (`InferMutationAliasingEffects.ts:901`), and a `Frozen`
+	// source to `ImmutableCapture`. This tree types a `LoadGlobal` as `EffectValueFrozen`, so it
+	// takes the second route to the same answer.
+	//
+	// Widening a global was never meaningful, and the sequence-index guard this test exists for is
+	// untouched: without it the count rises by two from whatever the baseline is, which is still
+	// what the assertion below catches.
+	const wantWidened = 8
 	if got := widened.Len(); got != wantWidened {
 		t.Errorf("the widening reached %d values, want %d. More than %d means the walk followed an "+
 			"edge created after the mutation it is propagating, which is the sequence-index guard "+

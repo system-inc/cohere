@@ -365,7 +365,19 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// id collision fixed in `7a48d68` was inflating the count; with that gone the same two edges
 	// land on the number. The earlier reading was correct about the measurement and wrong about the
 	// cause.
-	const knownOursTotal = 116
+	//
+	// And to 119 by the frozen-capture rule in `ranges.go`, which moves AWAY from upstream's 116.
+	// Taken because the board says otherwise: false positives fall 13 to 11, and the two that close
+	// are `useMemo-constant-prop` and `todo-ensure-constant-prop-decls-get-removed`, the fixture
+	// family whose scopes stop fusing. `matched` holds at 74, so no golden row was lost.
+	//
+	// The three added rows are the cost of splitting scopes this tree was previously merging by
+	// accident. Upstream splits them too and then has three fewer because it inlines the memo
+	// callback; that inline is measured and rejected on `#8ga37gt`, where it drives `under` from 5
+	// fixtures to 19. So 119 is the honest number for a tree that splits like upstream and does not
+	// inline like it, and it falls back toward 116 when the nested-callback gap on `#ef406xa`
+	// closes.
+	const knownOursTotal = 119
 	if upstreamTotal != knownUpstreamTotal {
 		t.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
 			"every count below is against a different population", upstreamTotal, knownUpstreamTotal)
