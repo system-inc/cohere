@@ -195,7 +195,7 @@ type Rule struct {
 	//
 	// # How much the skip is still worth, as a dated measurement rather than a standing claim
 	//
-	// **2026-08-25: 44 of 215 registered rules declare this.** So the acquisition is skipped on a
+	// **2026-08-25: 44 of 216 registered rules declare this.** So the acquisition is skipped on a
 	// file only when none of those 44 applies to it, which is a real saving and is nothing like the
 	// blanket one this comment used to describe.
 	//

@@ -34,6 +34,10 @@ func init() {
 			Decode: rule.DecodeOptionsInto[EnforceConsistentVariableSyntaxOptions](),
 		},
 		rule.Registration{
+			Rule:   EnforceShorthandClasses,
+			Decode: rule.DecodeOptionsInto[EnforceShorthandClassesOptions](),
+		},
+		rule.Registration{
 			Rule:   EnforceCanonicalClasses,
 			Decode: rule.DecodeOptionsInto[EnforceCanonicalClassesOptions](),
 		},

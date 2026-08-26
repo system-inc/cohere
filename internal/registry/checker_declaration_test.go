@@ -16,7 +16,7 @@ import (
 // query, so acquiring it serialized every file against every other. Nothing paid for that at the
 // time, because zero of the 93 rules then registered read the checker.
 //
-// **That is no longer the shape of the catalog. 2026-08-25: 44 of 215 registered rules declare it**,
+// **That is no longer the shape of the catalog. 2026-08-25: 44 of 216 registered rules declare it**,
 // so the lock is acquired on any file one of those 44 applies to. The saving is still real and it is
 // conditional now rather than total. Dated because a rule count in a comment decays silently: this
 // sentence said "zero" for as long as it took someone to notice, and nothing failed in between.
@@ -209,7 +209,7 @@ func fileReadsTypeChecker(parsed *ast.File) bool {
 // whether the conditional checker lock is a blanket saving or a conditional one. Both were wrong for
 // an unknown stretch, in the direction that tells a reader the lock costs nothing:
 // `rule.go` said one of 112 and `checker_declaration_test.go` said zero of 93, while the real figure
-// had reached 44 of 215.
+// had reached 44 of 216.
 //
 // Nothing failed in between, which is the whole problem. A dated comment is honest about being a
 // measurement and still says nothing when it expires, so this asserts the figure instead.
@@ -219,7 +219,7 @@ func fileReadsTypeChecker(parsed *ast.File) bool {
 // three together -- which is the review the comments needed and did not get.
 func TestCheckerDeclarationCountIsCurrent(t *testing.T) {
 	const (
-		wantRegistered   = 215
+		wantRegistered   = 216
 		wantNeedsChecker = 44
 	)
 
