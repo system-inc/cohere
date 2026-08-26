@@ -530,10 +530,29 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 	case *StoreLocal:
 		// A value block's result arrives through a store. Upstream tracks these so that optional
 		// chains, which lower through value blocks there, stay reachable as dependency roots.
-		if source, ok := sidemap.deps[value.Value.Identifier]; ok {
+		//
+		// Only into an UNNAMED target. Upstream's condition is `aliased != null &&
+		// lvalue.name?.kind !== 'named'` (`DropManualMemoization.ts:116`), so a store into a named
+		// binding ends the chain rather than continuing it: the binding is the root a developer can
+		// write, and resolving through it would name something they did not.
+		//
+		// Measured on `useCallback-alias-property-load-dep.ts`, where `const x = propB.x.y` is
+		// written as `[propA.x, x]`. Without the guard the written `x` resolved to `propB.x.y`
+		// while the inferred side kept `x`, so the two never matched and the rule fired on a
+		// fixture upstream compiles cleanly.
+		if source, ok := sidemap.deps[value.Value.Identifier]; ok && !isNamedBinding(function, value.LValue.Identifier) {
 			sidemap.deps[value.LValue.Identifier] = source
 		}
 	}
+}
+
+// isNamedBinding reports whether a value is a named source binding rather than a temporary.
+func isNamedBinding(function *Function, id IdentifierId) bool {
+	if function == nil || int(id) >= len(function.Identifiers) {
+		return false
+	}
+	identifier := function.Identifiers[id]
+	return identifier != nil && identifier.Name != ""
 }
 
 // propagateManualMemoDependency carries a path through a load, or starts one at a named binding.

@@ -238,7 +238,14 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// `useRef` results and is named `ref`. False positives hold at 11, `under` at 0 fixtures / 0
 	// scopes, and the dependency oracle is byte-identical at 74 matched with ours 119. Memo blocks
 	// improve: 20 all-empty to 17 and 7 contradicted to 5.
-	const knownTruePositives = 28
+	//
+	// 29 once an alias into a named binding stops resolving through, in
+	// `drop_manual_memoization.go`. The one that closes is
+	// `useCallback-alias-property-load-dep.ts`, where `const x = propB.x.y` is written as
+	// `[propA.x, x]`: the written `x` was resolving to `propB.x.y` while the inferred side kept
+	// `x`, so the two could never match. False positives hold at 11, `under` at 0 fixtures / 0
+	// scopes, and both other oracles are byte-identical.
+	const knownTruePositives = 29
 	if fired != knownTruePositives {
 		t.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
 			"should be raised deliberately, and if it went DOWN the rule stopped reporting programs "+
