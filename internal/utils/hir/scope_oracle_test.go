@@ -119,7 +119,70 @@ func countScopeStages(function *Function, checker *shimchecker.Checker) scopeSta
 		},
 	})
 	counts.survived = len(surviving)
+
+	// Upstream compiles the memo callback's body INTO this function, so its guard count includes
+	// those scopes and ours has to as well.
+	//
+	// `DropManualMemoization` rewrites `useMemo(fn, deps)` into `fn()`, a zero-argument call of the
+	// callback (`DropManualMemoization.ts:410`, and `drop_manual_memoization.go:228` here), and
+	// `inlineImmediatelyInvokedFunctionExpressions` folds that IIFE into the caller at
+	// `Pipeline.ts:173`. This tree does not run that inline -- restoring it is measured and rejected
+	// on `#8ga37gt`, where it drives `under` from 5 fixtures to 19 -- so the callback's scopes stay
+	// in a nested `Function` that this walk would otherwise never reach.
+	//
+	// Measured on `useMemo-inner-decl.ts`: upstream emits two guards and no arrow function survives
+	// in its output at all, its `useMemo` import going unused. Our two scopes for the same program
+	// are one in `useFoo` and one in the callback. Counting only the outer function compares one
+	// function against two and reports a scope missing that is not.
+	//
+	// Restricted to the inlinable IIFEs rather than descending into every nested function, and the
+	// difference is large: unrestricted descent also reaches `under` zero but reports `survived` 174
+	// and `exact` 8, with `object-values` reading 12 scopes against upstream's 2. Those callbacks are
+	// real functions upstream never inlines, and their scopes genuinely are not in the compiled
+	// output being counted.
+	for _, id := range inlinedMemoCallbacks(function) {
+		nested := function.Functions[id]
+		if nested == nil {
+			continue
+		}
+		inner := countScopeStages(nested, checker)
+		counts.assigned += inner.assigned
+		counts.survived += inner.survived
+	}
 	return counts
+}
+
+// inlinedMemoCallbacks names the nested functions upstream folds into this one.
+//
+// The shape `DropManualMemoization` leaves behind: a `CallExpression` with no arguments whose callee
+// holds a `FunctionExpression`. That is exactly what
+// `inlineImmediatelyInvokedFunctionExpressions` matches upstream, so it is the same population.
+func inlinedMemoCallbacks(function *Function) []FunctionId {
+	held := map[IdentifierId]FunctionId{}
+	var inlined []FunctionId
+	for _, block := range function.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			instruction := function.Instructions[instructionId]
+			if instruction == nil {
+				continue
+			}
+			switch value := instruction.Value.(type) {
+			case *FunctionExpression:
+				held[instruction.LValue.Identifier] = value.Function
+			case *CallExpression:
+				if len(value.Args) != 0 {
+					continue
+				}
+				if id, ok := held[value.Callee.Identifier]; ok {
+					inlined = append(inlined, id)
+				}
+			}
+		}
+	}
+	return inlined
 }
 
 // TestScopeStructureAgainstUpstreamGuards scores our surviving scopes against upstream's.
@@ -275,8 +338,18 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// `under` first. It is the correctness direction and it outranks the other two whenever they
 	// disagree -- which they already have: at the survived stage the total improved and per-fixture
 	// agreement doubled while `under` got WORSE than at the assigned stage.
-	const knownSurvivedUnder = 5
-	const knownSurvivedUnderScopes = 7
+	//
+	// Zero once the memo callbacks are counted. All five under-producing fixtures were the same
+	// bookkeeping error rather than a missing scope: their scopes sit in the callback, which
+	// upstream inlines and this walk was not descending into. Four of the five now land on
+	// upstream's count exactly -- `useMemo-dep-array-literal-access` and `useMemo-inner-decl` at 2,
+	// both `preserve-memo-deps-conditional-property-chain` fixtures at 5 -- and
+	// `useMemo-conditional-access-alloc` is the one that overshoots, by one.
+	//
+	// Held at zero rather than left at 5. This is the number that outranks the others, so the floor
+	// it reached is the floor it keeps.
+	const knownSurvivedUnder = 0
+	const knownSurvivedUnderScopes = 0
 	if survivedUnder > knownSurvivedUnder || survivedUnderScopes > knownSurvivedUnderScopes {
 		t.Errorf("under-production = %d fixtures / %d scopes, want at most %d / %d; we now produce "+
 			"FEWER scopes than upstream somewhere new, which drops a memoization the developer "+
@@ -303,7 +376,15 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	//
 	// A third fixture moved the other way in the same change: `ref-like-name-in-effect` falls from
 	// `survived=3` to 2 against upstream's 1. Over-production, closer.
-	const knownSurvivedExact = 28
+	//
+	// 17 once the memo callbacks are counted, and this is the cost of `under` reaching zero. Eleven
+	// fixtures move from exact to over-production, because a callback's scopes are now counted where
+	// before they were invisible, and this tree splits scopes upstream fuses when it inlines. The
+	// distribution is 17 exact, 18 over by one, 11 over by two, 2 over by four, and nothing under.
+	//
+	// Over-production is the performance direction and `under` is the correctness one, which is the
+	// ranking this file's own header states. Taken on that ranking.
+	const knownSurvivedExact = 17
 	if survivedExact < knownSurvivedExact {
 		t.Errorf("exact per-fixture agreement = %d of %d, want at least %d; fewer fixtures now "+
 			"match upstream's scope count exactly, which a stable total would hide", survivedExact,
@@ -329,7 +410,13 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// Over-production, which is the performance direction rather than the correctness one: `under`
 	// holds at 5 fixtures / 7 scopes and `exact` at 28. The board is what carries it -- false
 	// positives fall 13 to 11, and `useMemo-constant-prop` is one of the two that close.
-	const knownSurvivedTotal = 110
+	//
+	// 145 once the memo callbacks are counted, against upstream's 97. The gap is real over-production
+	// and its cause is named rather than absorbed: this tree does not inline the memo callback, so
+	// scopes upstream fuses on the way in stay separate here. Restoring the inline is measured and
+	// rejected on `#8ga37gt` -- it drives `under` from 5 fixtures to 19 -- so the over-production
+	// stands until that lands in some other form.
+	const knownSurvivedTotal = 145
 	if survivedTotal > knownSurvivedTotal {
 		t.Errorf("surviving scopes = %d against upstream's %d, want at most %d; we produce more "+
 			"scopes than before, so something split a scope upstream keeps whole or stopped a "+
