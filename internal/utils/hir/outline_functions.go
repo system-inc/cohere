@@ -16,7 +16,10 @@
 // faithful port. The scopes were never supposed to exist.
 package hir
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+)
 
 // OutlineFunctions replaces capture-free function expressions with a load of an outlined function.
 //
@@ -86,6 +89,36 @@ func OutlineFunctions(function *Function) int {
 //
 // Upstream spells these `_temp`, `_temp2` and so on. The numbering here is by `FunctionId` rather
 // than by a counter, which is stable across runs and unique within one function.
+// outlinedFunctionByName inverts `outlinedFunctionName`, resolving a `LoadGlobal` back to the
+// function it names.
+//
+// The `Outlined` map is keyed by the identifier the `LoadGlobal` was written into, and that key does
+// not survive a second `Construct`: inlining an immediately invoked function expression re-runs SSA,
+// every identifier is renumbered, and the map still holds the pre-inline keys. Measured on
+// `error.validate-object-values-mutation`, where the callback resolver found nothing after the
+// inline and `values.map` stopped widening its receiver's range, dropping the golden.
+//
+// The name is the durable half. It is synthesized from the function id and nothing rewrites it, so
+// reading it back is the same answer the map was built to give and it is renumber-proof.
+func outlinedFunctionByName(function *Function, name string) (FunctionId, bool) {
+	if function == nil || name == "" || !strings.HasPrefix(name, "_temp") {
+		return 0, false
+	}
+	suffix := strings.TrimPrefix(name, "_temp")
+	if suffix == "" {
+		return 0, len(function.Functions) > 0
+	}
+	parsed, err := strconv.Atoi(suffix)
+	if err != nil || parsed < 1 {
+		return 0, false
+	}
+	id := FunctionId(parsed - 1)
+	if int(id) >= len(function.Functions) {
+		return 0, false
+	}
+	return id, true
+}
+
 func outlinedFunctionName(id FunctionId) string {
 	if id == 0 {
 		return "_temp"

@@ -1498,6 +1498,11 @@ func nestedFunctionHeldBy(function *Function, id IdentifierId) *Function {
 				// passes were present.
 				if outlinedId, ok := function.Outlined[instruction.LValue.Identifier]; ok {
 					held[instruction.LValue.Identifier] = outlinedId
+				} else if outlinedId, ok := outlinedFunctionByName(function, value.Name); ok {
+					// The map is keyed by an identifier that a second `Construct` renumbers, which
+					// inlining an immediately invoked function expression forces. The name is the
+					// half that survives; see `outlinedFunctionByName`.
+					held[instruction.LValue.Identifier] = outlinedId
 				}
 			case *StoreLocal:
 				if id, ok := held[value.Value.Identifier]; ok {
