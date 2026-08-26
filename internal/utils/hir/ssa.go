@@ -111,6 +111,26 @@ func Construct(function *Function) {
 	// forgot would otherwise get a wrong answer with no symptom.
 	Finalize(function)
 
+	// Phis from a previous run are dropped, because this pass APPENDS them and cannot reconcile
+	// what it did not mint.
+	//
+	// A caller that restructures the graph and runs construction again is the case: inlining an
+	// immediately invoked function expression does exactly that. The phis left behind name
+	// identifiers from before the renumbering, so they define a value nothing produces, join no
+	// class in the disjoint partition, and take no scope. Measured over the corpus, a second run
+	// takes phis 1,548 to 3,096 -- every one duplicated -- and phis naming an undefined operand
+	// 221 to 1,730.
+	//
+	// Same intent as recomputing reverse postorder above: re-establish the invariant rather than
+	// trust it. Braun's algorithm derives every phi it needs from the graph, so nothing is lost by
+	// discarding the previous answer, and `EliminateRedundantPhis` below then sees only phis this
+	// run placed.
+	for _, block := range function.Blocks {
+		if block != nil {
+			block.Phis = nil
+		}
+	}
+
 	builder := &ssaBuilder{
 		function:      function,
 		states:        map[BlockId]*ssaState{},
