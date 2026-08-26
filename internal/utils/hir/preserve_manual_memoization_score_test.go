@@ -200,7 +200,18 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// 25. The `dependencies.go` block gate in the same commit reads flat on its own and drops this
 	// to 20 when removed from the combined state, so it is latent rather than inert -- it only pays
 	// once the hoistable set stops over-approximating.
-	const knownTruePositives = 25
+	// Lowered from 25 to 24 by the parameter exemption recorded at `knownFalsePositives`, and the
+	// cost is one fixture, named because lowering this number is otherwise a retreat:
+	// `error.useMemo-aliased-var.ts`.
+	//
+	//	const aliasedX = x; const aliasedProp = x.y.z;
+	//	useMemo(() => [x, x.y.z], [aliasedX, aliasedProp])
+	//
+	// Its own header reads "This is technically a false positive, but source is already breaking
+	// `exhaustive-deps` lint rule (and can be considered invalid)" -- upstream reports it while
+	// saying it should not have to, the same category as the `todo-repro` fixtures elsewhere in this
+	// corpus. Ten false positives for that one.
+	const knownTruePositives = 24
 	if fired != knownTruePositives {
 		t.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
 			"should be raised deliberately, and if it went DOWN the rule stopped reporting programs "+
@@ -356,7 +367,25 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	// deleted the bodies, and `prune-nonescaping-useMemo.ts` calls reporting here "technically a
 	// false positive" in its own header. Nothing newly fires, and golden holds at 25 with all three
 	// oracles byte identical.
-	const knownFalsePositives = 25
+	// Lowered from 25 by exempting a component or hook parameter from the dependency condition. See
+	// the note at `check`: the parameter's scope is inherited from the callback that captured it,
+	// and upstream's own comment calls this an edge case of mutable range inference.
+	//
+	// The ten, which are the dependency-condition cluster this rule has carried all along:
+	//
+	//	memoize-primitive-function-calls.js
+	//	optional-member-expression-single-with-unconditional.js
+	//	propagate-scope-deps-hir-fork/optional-member-expression-single-with-unconditional.js
+	//	repro-maybe-invalid-useMemo-read-maybeRef.ts
+	//	repro-preserve-memoization-inner-destructured-value-mistaken-as-dependency.js
+	//	useMemo-in-other-reactive-block.ts
+	//	useMemo-infer-fewer-deps.ts
+	//	useMemo-infer-more-specific.ts
+	//	useMemo-infer-nonallocating.ts
+	//	useMemo-inner-decl.ts
+	//
+	// Nothing newly fires; every oracle and every structural invariant is unchanged.
+	const knownFalsePositives = 15
 	if fired != knownFalsePositives {
 		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
 			"number should be lowered deliberately, and if it went UP something regressed",

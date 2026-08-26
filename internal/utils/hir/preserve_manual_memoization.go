@@ -322,6 +322,48 @@ func (v *manualMemoValidator) check(identifier IdentifierId, order EvaluationOrd
 	if kind == PreserveManualMemoizationDependencyMutable && !v.walkedScopes[scope] {
 		return
 	}
+	// # A component or hook parameter's scope is one it inherited, not one it earned
+	//
+	// `useMemo(() => [x.y.z], [x])` inside `useHook(x)` puts `x` and the callback in one class: the
+	// invocation widens the callback's range across the memo call, and the capture widens `x` with
+	// it. Measured, `x` takes range {2,7} and a scope spanning the whole memo block. Upstream's
+	// compiled guard for that fixture is `$[0] !== x.y.z`, so its scope depends on the path and `x`
+	// itself carries no scope at all.
+	//
+	// The condition above then reports, because a scope the memo marker sits inside is not yet
+	// classified when this runs -- a scope is recorded only after the walk leaves it, which is
+	// upstream's order too (`ValidatePreservedManualMemoization.ts:412`). Upstream reaches the same
+	// intermediate state and stays silent, since its dependency has no scope to ask about.
+	//
+	// This is the escape upstream's own comment describes: "due to current limitations of mutable
+	// range inference, there are edge cases in which we infer known-immutable values (e.g. props or
+	// hook params) to have a mutable range and scope" (`CollectHoistablePropertyLoads.ts:105`). It
+	// builds `knownImmutableIdentifiers` for exactly this, and consumes it only inside that file --
+	// as did this tree, so the fact was known and never reached the place the rule reads.
+	//
+	// # Why here rather than in the partition or in scope assignment
+	//
+	// Both were built and measured, and both score identically to this. Filtering at scope
+	// construction breaks `TestScopeMatchesTheDisjointSetPartition`, which requires every class to
+	// map to a scope with the same members. Filtering at the partition satisfies that and then
+	// breaks two more: the hoistable corpus distribution rises 574 deep to 692, which that test
+	// calls the over-approximating direction, and the reactive tree loses instructions in five
+	// functions and emits twenty-two blocks twice. The parameter's membership is load-bearing for
+	// the tree even though it is wrong for this rule, so the exemption belongs where the rule reads
+	// rather than where the scopes are made.
+	//
+	// Measured: false positives 25 to 15, ten fixtures, none newly firing, every oracle unchanged --
+	// `matched` 77, `ours` 120, `under` 5 fixtures / 7 scopes -- and every structural invariant
+	// intact.
+	//
+	// A mutation dropping the `kind` gate SURVIVES: the value condition checks a memoized value
+	// rather than a written dependency, and no corpus fixture memoizes a bare parameter, so it never
+	// asks about one. Kept narrow because the two conditions ask different questions and an
+	// exemption argued from the dependency side should not silently answer the other.
+	if kind == PreserveManualMemoizationDependencyMutable &&
+		isKnownImmutableParameter(v.function, identifier) {
+		return
+	}
 	v.findings = append(v.findings, PreserveManualMemoizationFinding{
 		Identifier: identifier,
 		Scope:      scope,
