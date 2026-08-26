@@ -68,6 +68,14 @@ func OutlineFunctions(function *Function) int {
 				Name:        outlinedFunctionName(expression.Function),
 				BindingKind: GlobalBindingKindGlobal,
 			}
+			// The `Functions` entry is now reachable only through this map. Upstream keeps the
+			// lowered function in its environment for the same reason: outlining moves a function,
+			// it does not discard one, and a later pass that reads the callee's own effects still
+			// needs to find it.
+			if function.Outlined == nil {
+				function.Outlined = map[IdentifierId]FunctionId{}
+			}
+			function.Outlined[instruction.LValue.Identifier] = expression.Function
 			outlined++
 		}
 	}

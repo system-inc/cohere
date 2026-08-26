@@ -263,6 +263,17 @@ type Function struct {
 	// Functions are the nested functions lowered within this one. Indexed by FunctionId.
 	Functions []*Function
 
+	// Outlined maps a value holding an outlined function to the function it names.
+	//
+	// `OutlineFunctions` replaces a capture-free `FunctionExpression` with a `LoadGlobal`, which
+	// leaves the entry in `Functions` reachable only through this map. A pass that needs the
+	// callee's own body -- `argumentMutationsFromCallbacks` is the one today -- looks here rather
+	// than parsing the synthetic name, because `Name` is documented as diagnostics-only and a user
+	// function called `_temp` would otherwise resolve to the wrong body.
+	//
+	// Nil until something is outlined, which is the common case.
+	Outlined map[IdentifierId]FunctionId
+
 	// IsAsync and IsGenerator carry the modifiers, which change what `await` and `yield` mean and
 	// are consulted by validators that do not want to walk back to the AST for them.
 	IsAsync     bool
