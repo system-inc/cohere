@@ -683,7 +683,9 @@ func (c *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) 
 		c.visitFallthrough(fallthroughId, into)
 
 	case *Logical:
-		c.emitValueTerminal(terminal.Fallthrough, terminal.Order, into, &scheduleIds)
+		if !c.emitLogicalValue(terminal, into, &scheduleIds) {
+			c.emitValueTerminal(terminal.Fallthrough, terminal.Order, into, &scheduleIds)
+		}
 
 	case *Ternary:
 		c.emitValueTerminal(terminal.Fallthrough, terminal.Order, into, &scheduleIds)
@@ -809,6 +811,109 @@ func (c *reactiveContext) emitGoto(terminal *Goto, into *ReactiveBlock) {
 // and records the gap, because reconstructing the expression needs the value-block extraction that
 // `extractValueBlockResult` performs and that extraction depends on phi elimination this tree
 // performs differently. See `ReactiveFunctionGapValueExpressions`.
+// emitLogicalValue builds `a && b` as one instruction holding a nested value.
+//
+// This is the expression form `ReactiveFunctionGapValueExpressions` describes. Upstream's
+// `extractValueBlockResult` reads a value block's trailing `StoreLocal` and prunes it, which the gap
+// says it can do "because value blocks there carry no phis by construction". Measured across the
+// corpus here: 3,641 value blocks, 0 with phis, and 0 of the 1,570 value-terminal arms with phis. The
+// property upstream relies on holds in this tree too, so the extraction is available.
+//
+// Why it matters beyond fidelity: the value the whole expression produces becomes ONE identifier that
+// a scope can declare. Left as a branch, the result is a phi in the join and the dependency collector
+// records no declaration, so a scope whose only member sits inside the expression declares nothing and
+// `PruneUnusedScopes` removes it. Measured on
+// `error.invalid-optional-member-expression-as-memo-dep-non-optional-in-body`, where that is why the
+// rule stays silent and upstream reports.
+//
+// Returns false when the shape is not the expected `Branch` in a value block, which sends the caller
+// back to the statement form rather than guessing.
+func (c *reactiveContext) emitLogicalValue(terminal *Logical, into *ReactiveBlock,
+	ids *[]int) bool {
+	test := c.block(terminal.Test)
+	if test == nil || c.emitted[test.Id] {
+		return false
+	}
+	branch, isBranch := test.Terminal.(*Branch)
+	if !isBranch {
+		return false
+	}
+	// One arm computes the right operand and the other short-circuits to the join. Measured over
+	// the corpus: of 371 logical terminals, the value-kind arm is the consequent 136 times and the
+	// alternate 235 times, and the other arm is always an ordinary block carrying the join's phi.
+	// So the operand is the arm whose block kind is `value`, never the one with a phi.
+	right := c.valueArm(branch.Consequent)
+	if right == 0 {
+		right = c.valueArm(branch.Alternate)
+	}
+	if right == 0 {
+		return false
+	}
+
+	// The test block's own instructions run before the branch, so they are the left operand. Its
+	// trailing `LoadLocal` is the branch's own test value, which the statement this builds already
+	// names as its lvalue -- keeping it would count the same value twice.
+	left := c.valueOfWithoutResult(test.Id)
+	if left == nil {
+		return false
+	}
+	rightValue := c.valueOf(right)
+	if rightValue == nil {
+		return false
+	}
+
+	blockId, _ := c.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, ids)
+	result := branch.Test
+	into2 := &ReactiveInstruction{
+		Order:  terminal.Order,
+		LValue: &result,
+		Value: &ReactiveLogicalValue{
+			Operator: terminal.Operator,
+			Left:     left,
+			Right:    rightValue,
+		},
+	}
+	*into = append(*into, &ReactiveInstructionStatement{Instruction: into2})
+	c.unscheduleAll(*ids)
+	c.visitFallthrough(blockId, into)
+	return true
+}
+
+// valueArm returns the block id when it is a value block with no phi, and zero otherwise.
+//
+// The operand of a logical is the arm that computes a value; the other arm short-circuits to the
+// join and carries its phi. Asking for the kind rather than assuming a side is what keeps this
+// correct for both `&&` and `||`.
+// valueOfWithoutResult is `valueOf` with the trailing instruction dropped.
+//
+// Upstream's `extractValueBlockResult` prunes a value block's final `StoreLocal` "since we represent
+// value blocks as compound values in ReactiveFunction (no phis)". The same applies to the trailing
+// load a lowered logical leaves: the enclosing statement names that value as its own lvalue, so
+// emitting it inside the operand as well counts one instruction more than entered the graph.
+//
+// Returns nil when the block holds only that one instruction, which leaves nothing for the operand.
+func (c *reactiveContext) valueOfWithoutResult(block BlockId) ReactiveValue {
+	basic := c.block(block)
+	if basic == nil || len(basic.Instructions) < 2 {
+		return nil
+	}
+	trimmed := *basic
+	trimmed.Instructions = basic.Instructions[:len(basic.Instructions)-1]
+	saved := c.blockIndex[block]
+	c.blockIndex[block] = &trimmed
+	value := c.valueOf(block)
+	c.blockIndex[block] = saved
+	return value
+}
+
+func (c *reactiveContext) valueArm(id BlockId) BlockId {
+	block := c.block(id)
+	if block == nil || block.Kind != BlockKindValue || len(block.Phis) > 0 || c.emitted[id] {
+		return 0
+	}
+	return id
+}
+
 func (c *reactiveContext) emitValueTerminal(fallthrough_ BlockId, order EvaluationOrder,
 	into *ReactiveBlock, ids *[]int) {
 	blockId, _ := c.scheduleFallthrough(fallthrough_, controlFlowIf, ids)

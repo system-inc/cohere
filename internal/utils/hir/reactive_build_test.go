@@ -22,12 +22,17 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 		// terminal. It decides which assertion applies, because the value-expression gap is declared
 		// and losing instructions there is the DOCUMENTED behaviour rather than a regression.
 		hasValueTerminal bool
+		// conserves marks a value terminal whose expression form IS built, so its instructions
+		// survive into the tree. `emitLogicalValue` builds `ReactiveLogicalValue`; the ternary and
+		// sequence forms are not built yet and keep the gap's inequality assertion.
+		conserves bool
 		source           string
 	}{
 		{name: "branch with join", source: `function f(a) { if (a) { return 1; } return 2; }`},
 		{name: "loop with back edge", source: `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`},
 		{name: "ternary", hasValueTerminal: true, source: `function f(a) { const x = a ? 1 : 2; return x; }`},
-		{name: "logical", hasValueTerminal: true, source: `function f(a) { const x = a && a.b; return x; }`},
+		{name: "logical", hasValueTerminal: true, conserves: true,
+			source: `function f(a) { const x = a && a.b; return x; }`},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			function, _ := rangesFor(t, testCase.source)
@@ -77,7 +82,7 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 					"target that is not on the control-flow stack", result.UnmatchedGotos)
 			}
 
-			if testCase.hasValueTerminal {
+			if testCase.hasValueTerminal && !testCase.conserves {
 				// The declared gap. Asserted as an INEQUALITY so that closing it is a visible
 				// event: reconstructing the composite values makes this fail, which is the signal
 				// to delete this arm rather than a regression.
@@ -169,7 +174,17 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 
 	// The load-bearing assertion. Attribution measured 353 losing functions WITH a value terminal
 	// and 0 without, which is what makes the gap a single declared cause rather than a scattered
-	// defect. A function losing instructions with no value terminal is a real bug, and it is the
+	// defect.
+	//
+	// 353 to 224 when `emitLogicalValue` began building `a && b` as one instruction holding a
+	// `ReactiveLogicalValue`. The gap's own text says the extraction needs value blocks that carry
+	// no phis, "which upstream can do because value blocks there carry no phis by construction",
+	// and implies this tree's do. Measured: 3,641 value blocks corpus-wide, 0 with a phi, and 0 of
+	// the 1,570 value-terminal arms with one. The property holds here too, so the logical form is
+	// buildable and is built. The remaining 224 are ternary and sequence, whose forms are not.
+	//
+	// Every other conservation number held exactly across that change: `doubleEmitted` 22,
+	// `unmatchedGotos` 60, `nonImplicitScopeBreaks` 85, `lostWithout` 5. A function losing instructions with no value terminal is a real bug, and it is the
 	// exact shape that was already found once here: the first spelling of `valueOf` returned only a
 	// block's last instruction, which cost 27 functions holding a `ForOf` whose `Test` and `Init`
 	// are read through it.
