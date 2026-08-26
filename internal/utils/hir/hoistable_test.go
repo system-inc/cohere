@@ -604,8 +604,13 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// survived 108 with exact 30 and under held at 5 fixtures / 7 scopes, dependency 77 matched
 	// against 121 produced. A wider scope names more values, and more of those values sit deep
 	// enough inside it to carry a path.
-	if deep != 569 || flat != 2141 {
-		t.Errorf("got %d deep and %d flat dependencies, want 569 and 2141; a SMALL move here is "+
+	// # And again when a destructured callback parameter began counting as mutated
+	//
+	// 569 deep to 567, 2,141 flat to 2,129. Both fall, and `deep` falling is the safe direction by
+	// the rule above. A callback that destructures its parameter now widens the value it is called
+	// over, so a few scopes that used to name a value deep inside a wider one name it at the root.
+	if deep != 567 || flat != 2129 {
+		t.Errorf("got %d deep and %d flat dependencies, want 567 and 2129; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

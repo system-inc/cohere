@@ -1492,9 +1492,34 @@ func mutatesOwnParameter(nested *Function) bool {
 			continue
 		}
 		for _, instructionId := range block.Instructions {
+			// A destructuring pattern binds places the effect list never names: its only effect is
+			// a `Capture` into the instruction's own lvalue, while the bindings the body reads are
+			// the pattern's places. `([, value]) => ...` reaches its parameter through one of those
+			// and through nothing else.
+			if instruction := nested.Instructions[instructionId]; instruction != nil {
+				if destructure, ok := instruction.Value.(*Destructure); ok &&
+					reaches[destructure.Value.Identifier] {
+					eachPatternPlace(destructure.LValue, func(place Place, role PlaceRole) {
+						reaches[place.Identifier] = true
+					})
+				}
+			}
 			for _, effect := range effects.Get(instructionId) {
 				switch effect.Kind {
-				case AliasingEffectAssign, AliasingEffectAlias, AliasingEffectCreateFrom:
+				case AliasingEffectAssign, AliasingEffectAlias, AliasingEffectCreateFrom,
+					AliasingEffectCapture:
+					// `Capture` is followed here where the range-widening walk follows it only for a
+					// transitive mutation, and the difference is the question being asked. There the
+					// question is "does mutating this container mutate what it holds", and the
+					// answer is no. Here it is "is this value part of the parameter", and a value
+					// captured out of a parameter is.
+					//
+					// Destructuring is why: `([, value]) => { value.updated = true }` lowers to a
+					// `Destructure` whose only effect is `Capture` from the parameter, so a walk
+					// that skipped capture edges saw a callback that never touched its parameter.
+					// Measured on `error.validate-object-entries-mutation` against its sibling
+					// `error.validate-object-values-mutation`, which binds the parameter directly
+					// and was already reached.
 					if reaches[effect.From.Identifier] {
 						reaches[effect.Into.Identifier] = true
 					}

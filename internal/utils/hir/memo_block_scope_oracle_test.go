@@ -177,7 +177,17 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// So this is the third lowering for the reason the paragraph above already records twice: the
 	// direction of `blocksWithCarrying` is not always the direction of correctness. Unlike the
 	// earlier two, this one is checked against upstream's own output rather than argued from ours.
-	const knownBlocksWithCarrying = 66
+	// # Lowered once more, and the block is the sibling of the last one
+	//
+	// 66 to 65 on exactly `error.validate-object-entries-mutation`, named the same way and with
+	// nothing gained. It differs from `error.validate-object-values-mutation` only in destructuring
+	// its callback parameter, and upstream's output for it has the same shape: two scopes,
+	// `SCOPE 1 decls=[54]` and `SCOPE 3 decls=[69]`, with the memo markers inside scope 1 rather
+	// than wrapping one, so there is no scope between them to carry anything.
+	//
+	// Read from upstream rather than inferred from the sibling, because the two fixtures differ in
+	// the callback and the symmetry was worth checking.
+	const knownBlocksWithCarrying = 65
 	const knownBlocksAllEmpty = 20
 	if blocksWithCarrying < knownBlocksWithCarrying {
 		t.Errorf("blocks with a dependency-carrying interior scope = %d, want at least %d; the "+
