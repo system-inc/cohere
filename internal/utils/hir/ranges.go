@@ -1374,11 +1374,21 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					//
 					// The kind is what this needs and one bit is not enough for it. `notMutable`
 					// answers "not Mutable or Context", which is exactly right for the two
-					// conditional-mutation readers below and wrong here: it would fold `Primitive`
-					// and `Frozen` together with everything else the walk marked, and measured that
-					// way it merges eight narrow single-value scopes that
-					// `TestMergePreservesScopeWidthAndMembership` says this pass must never touch.
+					// conditional-mutation readers below and wrong here, because it cannot tell a
+					// `Context` source -- which upstream downgrades rather than prunes -- from a
+					// frozen one.
+					//
+					// The DESTINATION half is the second condition, and upstream states it in the
+					// same comment: "If the destination is not mutable, or the source value has
+					// copy-on-write semantics, then we can prune the effect". `destinationType` is
+					// null for `Frozen`, `Global` and `Primitive`, and a mutable source into a null
+					// destination matches none of the three branches, so it is pruned.
 					if kind, present := state.immutable[effect.From.Identifier]; present &&
+						(kind == EffectValueFrozen || kind == EffectValuePrimitive) {
+						index++
+						break
+					}
+					if kind, present := state.immutable[effect.Into.Identifier]; present &&
 						(kind == EffectValueFrozen || kind == EffectValuePrimitive) {
 						index++
 						break

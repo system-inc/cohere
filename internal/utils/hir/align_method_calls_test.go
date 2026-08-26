@@ -86,7 +86,13 @@ func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
 	//
 	// 365 with the frozen-capture rule in `ranges.go`, for the same reason as the move to 363: a
 	// narrower range leaves more method calls with their two sides in different scopes.
-	const knownChanged = 365
+	//
+	// 368 with the destination half of the frozen-capture rule. A capture into a frozen or primitive
+	// destination stops widening, so more method calls reach this pass with their two sides in
+	// different scopes. Every upstream-referenced number is unmoved by that change: the scope
+	// oracle's per-fixture dump is byte-identical across all 48 scored fixtures, and the board and
+	// the other two oracles do not move either.
+	const knownChanged = 368
 	if changed != knownChanged {
 		t.Errorf("the pass changed %d of %d functions, want %d", changed, functions, knownChanged)
 	}

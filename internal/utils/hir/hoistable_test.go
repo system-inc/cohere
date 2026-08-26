@@ -643,8 +643,22 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// positives fall 13 to 11 with `under` held at 5 fixtures / 7 scopes. A frozen capture no longer
 	// widens its source's range, so scopes that were fusing across a closure stay separate and a
 	// value read inside one is read at depth rather than at the root of a merged scope.
-	if deep != 610 || flat != 2346 {
-		t.Errorf("got %d deep and %d flat dependencies, want 610 and 2346; a SMALL move here is "+
+	// # And again when the frozen-capture rule gained its destination half
+	//
+	// 610 deep to 615, 2,346 flat to 2,376. `deep` rising is the over-approximating direction and no
+	// oracle endorses it, which is why the move is small and the reason is fidelity rather than a
+	// gain: upstream prunes a capture whose DESTINATION is not mutable, in the same arm and the same
+	// comment as the source half -- "If the destination is not mutable, or the source value has
+	// copy-on-write semantics, then we can prune the effect".
+	//
+	// Measured rather than assumed harmless. The branch fires 9,036 times across the 400-file corpus
+	// and moves no goal number: board 25 goldens and 11 false positives, `under` 5 fixtures / 7
+	// scopes, and all three oracles unchanged. The scope oracle's per-fixture dump is byte-identical
+	// across all 48 scored fixtures, so this does not move the tree away from upstream anywhere
+	// upstream can be observed. It buys nothing today and removes a divergence that would matter as
+	// soon as a fixture exercises it.
+	if deep != 615 || flat != 2376 {
+		t.Errorf("got %d deep and %d flat dependencies, want 615 and 2376; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}
