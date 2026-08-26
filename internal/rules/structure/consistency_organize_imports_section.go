@@ -145,9 +145,12 @@ func classifyDeclarations(
 		isTypeOnly := isTypeOnlyImport(declaration)
 		localNames := localBindingNames(declaration)
 
-		preserved := preservedCommentsFor(sourceFile, fileComments, declaration, sectionStart, descriptionBlock)
+		preserved := preservedCommentsFor(sourceFile, sourceText, fileComments, declaration, sectionStart, descriptionBlock)
 
 		importText := sourceText[tokenStart(sourceFile, declaration):declaration.End()]
+		if trailing, hasTrailing := trailingCommentFor(sourceText, fileComments, declaration); hasTrailing {
+			importText += " " + trailing
+		}
 		fullText := importText
 		if len(preserved) > 0 {
 			fullText = strings.Join(preserved, "\n") + "\n" + importText
@@ -162,6 +165,41 @@ func classifyDeclarations(
 	return classified
 }
 
+// trailingCommentFor returns a comment written on the same line as an import, after it.
+//
+// # Why this is not left to preservedCommentsFor
+//
+// A trailing comment is, syntactically, the leading trivia of whatever comes next. So a section
+// that only ever collects leading comments moves `import zebra from 'zebra'; // note about zebra`
+// to sit above whichever import sorts next, and the note ends up describing a module it was never
+// about. Measured against the original on exactly that input: the comment came back above the
+// React import.
+//
+// That is one of three defects the original's fixer carries, and it is the reason this rule
+// declined to ship a fixer at all. Attaching the comment to the import it trails removes it, which
+// is what lets the fixer exist.
+//
+// A comment counts as trailing when it starts after the import ends and no newline separates them.
+// The newline test is the whole predicate: a comment on the next line is a leading comment of the
+// next statement and belongs to it, which is the case this must not steal.
+func trailingCommentFor(sourceText string, fileComments []comments.Comment,
+	declaration *ast.Node) (string, bool) {
+	for _, comment := range fileComments {
+		if comment.Range.Pos() < declaration.End() {
+			continue
+		}
+		between := sourceText[declaration.End():comment.Range.Pos()]
+		if strings.ContainsAny(between, "\n\r") {
+			continue
+		}
+		if strings.TrimSpace(between) != "" {
+			continue
+		}
+		return comment.Text, true
+	}
+	return "", false
+}
+
 // preservedCommentsFor collects the comments that render above one import.
 //
 // Three kinds are dropped rather than preserved, because the rendering regenerates them: a group
@@ -169,6 +207,7 @@ func classifyDeclarations(
 // import travels with it.
 func preservedCommentsFor(
 	sourceFile *ast.SourceFile,
+	sourceText string,
 	fileComments []comments.Comment,
 	declaration *ast.Node,
 	sectionStart int,
@@ -180,6 +219,13 @@ func preservedCommentsFor(
 
 	for _, comment := range fileComments {
 		if comment.Range.Pos() < triviaStart || comment.Range.End() > declarationStart {
+			continue
+		}
+		// A comment on the same line as whatever precedes it trails that statement rather than
+		// leading this one, and `trailingCommentFor` has already attached it there. Without this
+		// the comment renders twice: once beside the import it describes and once above the import
+		// that happens to sort next.
+		if trailsPrecedingLine(sourceText, comment.Range.Pos()) {
 			continue
 		}
 		// A comment above the section start is preamble: a license header, a file banner. It stays
@@ -200,6 +246,24 @@ func preservedCommentsFor(
 		preserved = append(preserved, comment.Text)
 	}
 	return preserved
+}
+
+// trailsPrecedingLine reports whether a comment begins on a line that already holds code.
+//
+// Walking backwards to the line start and asking whether anything non-blank precedes it is the
+// whole test, and it is the difference between a comment that describes the statement it sits
+// beside and one that introduces the statement below.
+func trailsPrecedingLine(sourceText string, commentStart int) bool {
+	for cursor := commentStart - 1; cursor >= 0; cursor-- {
+		character := sourceText[cursor]
+		if character == '\n' || character == '\r' {
+			return false
+		}
+		if character != ' ' && character != '\t' {
+			return true
+		}
+	}
+	return false
 }
 
 // interleavedStatements collects the non-import statements written between the first and last
@@ -267,11 +331,37 @@ func interleavedStatements(
 }
 
 // extendPastNewline swallows one trailing newline after the section, matching the original.
+//
+// A comment trailing the last statement is swallowed first, because the rendering now carries it
+// with the import it trails. Leaving it outside the span would put it in both places at once: the
+// rendered section would hold a copy and the source would keep the original, so the fix would
+// duplicate the comment. The verdict is unaffected, since the comparison uses the same span on both
+// sides.
 func extendPastNewline(sourceText string, offset int) int {
+	offset = skipTrailingComment(sourceText, offset)
 	if offset < len(sourceText) && sourceText[offset] == '\n' {
 		return offset + 1
 	}
 	return offset
+}
+
+// skipTrailingComment advances past a comment written on the same line as what precedes it.
+//
+// Only a line comment: a block comment can carry a newline of its own, and swallowing one would
+// pull an unrelated following line into the section. The same-line test is what makes this a
+// trailing comment rather than the leading comment of whatever comes next.
+func skipTrailingComment(sourceText string, offset int) int {
+	cursor := offset
+	for cursor < len(sourceText) && (sourceText[cursor] == ' ' || sourceText[cursor] == '\t') {
+		cursor++
+	}
+	if cursor+1 >= len(sourceText) || sourceText[cursor] != '/' || sourceText[cursor+1] != '/' {
+		return offset
+	}
+	for cursor < len(sourceText) && sourceText[cursor] != '\n' && sourceText[cursor] != '\r' {
+		cursor++
+	}
+	return cursor
 }
 
 // renderSection builds the canonical text the real section is compared against.
@@ -334,6 +424,60 @@ func renderSection(
 		rendered += "\n" + strings.Join(interleaved, "\n\n") + "\n"
 	}
 	return rendered
+}
+
+// suppressionPrecedesSection reports whether a lint suppression sits above the section boundary.
+//
+// A suppression comment silences the line directly beneath it, so its meaning is positional. A
+// comment above the first import is outside the compared section by design (only a `Dependencies`
+// header moves the boundary earlier), which means the fix rewrites everything below it and leaves
+// the comment where it was. For an ordinary comment that is correct and is what keeps a license
+// header in place. For a suppression it is not: the line it was silencing has moved, and the
+// comment now silences a group header instead.
+//
+// Upstream deletes that comment outright, which is worse, and is the first of the three defects
+// that kept this rule from shipping a fixer. Preserving it displaced is safer than deleting it and
+// still not right, so these files are reported without a fix and a reader moves the comment onto
+// the import it belongs to.
+//
+// Measured on Kirk's tree: no file carries the shape, so this costs nothing today. It exists
+// because a suppression that stops suppressing is the one failure here that hides.
+func suppressionPrecedesSection(sourceText string, fileComments []comments.Comment, sectionStart int) bool {
+	for _, comment := range fileComments {
+		if comment.Range.End() > sectionStart {
+			continue
+		}
+		inner := strings.TrimLeft(commentInnerText(comment), " \t")
+		if strings.HasPrefix(inner, "eslint-disable") || strings.HasPrefix(inner, "cohere-disable") ||
+			strings.HasPrefix(inner, "verify-disable") {
+			return true
+		}
+	}
+	return false
+}
+
+// canRenderSafely reports whether the rendered section can be written back over the source.
+//
+// # Why a rendering that is correct to compare is not always correct to apply
+//
+// `renderSection` describes the canonical form, and for the verdict that is all it has to do: a
+// file whose section differs from the canonical form is reported, and how the difference would be
+// repaired never enters the question. A fixer asks a second thing of the same string, which is that
+// writing it back preserves what the file meant.
+//
+// One shape fails that. A statement written between two imports runs before the imports below it,
+// and the rendering appends it after every one of them, so applying the text would move code across
+// an evaluation boundary. That is upstream's third fixer defect, reproduced here deliberately
+// because the verdict has to match, and it is the one thing that cannot simply be corrected: the
+// canonical form has no place to put a statement mid-section, since the imports around it are being
+// reordered relative to each other.
+//
+// So the fixer declines these files rather than guessing. The finding still reports and a reader
+// still moves the statement, which is the same outcome the rule had before it could fix anything at
+// all. Measured on Kirk's tree: zero files carry the shape, so the decline costs nothing today and
+// exists for the file somebody writes next.
+func canRenderSafely(interleaved []string) bool {
+	return len(interleaved) == 0
 }
 
 // sortGroup orders one group's imports by module specifier, with react first inside Frameworks.

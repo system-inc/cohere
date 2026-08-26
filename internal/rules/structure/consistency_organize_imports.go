@@ -2,6 +2,7 @@ package structure
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/utils/comments"
 )
@@ -142,5 +143,23 @@ func checkImportOrganization(ctx rule.Context, sourceFile *ast.Node) {
 		return
 	}
 
-	ctx.ReportNode(importDeclarations[0], messageImportsNotOrganized)
+	/*
+	 * The fix is the rendering the comparison just used, written back over the span it was compared
+	 * against. Nothing is recomputed: a fix derived from a second rendering could disagree with the
+	 * verdict that produced it, and a rule that reports one thing and writes another is worse than
+	 * one that only reports.
+	 *
+	 * `canRenderSafely` is what makes this shippable. Two of the original fixer's three defects are
+	 * repaired at the rendering (a trailing comment now travels with the import it trails, and a
+	 * comment above the section is outside the replaced span to begin with), and the third cannot
+	 * be: a statement written between two imports has no correct home in a section whose imports are
+	 * being reordered. Those files are reported without a fix.
+	 */
+	if !canRenderSafely(interleaved) || suppressionPrecedesSection(sourceText, fileComments, sectionStart) {
+		ctx.ReportNode(importDeclarations[0], messageImportsNotOrganized)
+		return
+	}
+
+	ctx.ReportNodeWithFixes(importDeclarations[0], messageImportsNotOrganized,
+		rule.ReplaceRange(core.NewTextRange(sectionStart, sectionEnd), expected))
 }

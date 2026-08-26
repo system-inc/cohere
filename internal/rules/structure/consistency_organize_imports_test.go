@@ -199,3 +199,77 @@ func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
 		})
 	}
 }
+
+// TestConsistencyOrganizeImportsFixesTheSection pins what the fixer writes.
+//
+// # Why this rule ships a fixer now, having declined one
+//
+// The original's fixer carries three defects, each measured on the real rule and each invisible
+// until applied: a disable comment above the first import is deleted, a trailing comment migrates
+// to a different import, and a statement between two imports is moved below both. This port declined
+// to carry them, which left every reported file to be reordered by hand.
+//
+// All three are addressed rather than reproduced. Two are repaired: a trailing comment now travels
+// with the import it trails, and the section span was extended to cover it so the fix cannot leave a
+// duplicate behind. The third cannot be repaired, because a statement written mid-section has no
+// correct home once the imports around it are reordered, so those files are reported without a fix.
+// A suppression above the section boundary is declined for the same reason: preserving it displaced
+// is safer than deleting it and still not right.
+//
+// Each case below was run against the original for comparison, and the divergences are the point.
+func TestConsistencyOrganizeImportsFixesTheSection(t *testing.T) {
+	// The ordinary case, which is every one of the 109 files this landed for.
+	ruletest.ExpectFixedSource(t,
+		ruletest.Run(t, ConsistencyOrganizeImports, "Component.tsx",
+			"import alpha from 'alpha';\nimport React from 'react';\n"),
+		"// Dependencies - Frameworks\nimport React from 'react';\n\n// Dependencies - Third-party\nimport alpha from 'alpha';\n")
+
+	/*
+	 * A trailing comment stays on the import it trails. The original moves it above whichever
+	 * import sorts next, because a trailing comment is syntactically the leading trivia of the
+	 * following statement, so the note ends up describing a module it was never about.
+	 */
+	ruletest.ExpectFixedSource(t,
+		ruletest.Run(t, ConsistencyOrganizeImports, "Component.tsx",
+			"import zebra from 'zebra'; // note about zebra\nimport React from 'react';\n"),
+		"// Dependencies - Frameworks\nimport React from 'react';\n\n// Dependencies - Third-party\nimport zebra from 'zebra'; // note about zebra\n")
+
+	// A comment above a non-first import travels with it and keeps suppressing what it suppressed.
+	ruletest.ExpectFixedSource(t,
+		ruletest.Run(t, ConsistencyOrganizeImports, "Component.tsx",
+			"import React from 'react';\n// eslint-disable-next-line no-explicit-any\nimport alpha from 'alpha';\n"),
+		"// Dependencies - Frameworks\nimport React from 'react';\n\n// Dependencies - Third-party\n// eslint-disable-next-line no-explicit-any\nimport alpha from 'alpha';\n")
+}
+
+// TestConsistencyOrganizeImportsDeclinesToFixWhatItCannotMove pins the two refusals.
+//
+// Both still report. The finding is unchanged and a reader reorders the section by hand, which is
+// what the rule did for every file before it could fix anything. What changed is only that the
+// fixer says nothing rather than guessing.
+func TestConsistencyOrganizeImportsDeclinesToFixWhatItCannotMove(t *testing.T) {
+	/*
+	 * A statement between two imports runs before the imports below it. The rendering appends it
+	 * after every one of them, which would move code across an evaluation boundary, and there is no
+	 * correct alternative: the canonical form has no place to put a statement mid-section when the
+	 * imports around it are being reordered.
+	 */
+	interleaved := ruletest.Run(t, ConsistencyOrganizeImports, "Component.tsx",
+		"import alpha from 'alpha';\nconsole.info('between');\nimport React from 'react';\n")
+	ruletest.ExpectFindings(t, interleaved, "importsNotOrganized")
+	if len(interleaved.Diagnostics) > 0 && len(interleaved.Diagnostics[0].Fixes) > 0 {
+		t.Error("a file with an interleaved statement must not be fixed")
+	}
+
+	/*
+	 * A suppression above the first import sits outside the compared section, so a fix would rewrite
+	 * everything beneath it and leave it silencing a group header instead of the import it was
+	 * written for. The original deletes it outright, which is worse and is the defect this refusal
+	 * exists to avoid inheriting.
+	 */
+	suppressed := ruletest.Run(t, ConsistencyOrganizeImports, "Component.tsx",
+		"// eslint-disable-next-line no-explicit-any\nimport alpha from 'alpha';\nimport React from 'react';\n")
+	ruletest.ExpectFindings(t, suppressed, "importsNotOrganized")
+	if len(suppressed.Diagnostics) > 0 && len(suppressed.Diagnostics[0].Fixes) > 0 {
+		t.Error("a file whose suppression precedes the section must not be fixed")
+	}
+}
