@@ -26,6 +26,10 @@ func init() {
 			Decode: rule.DecodeOptionsInto[EnforceConsistentVariantOrderOptions](),
 		},
 		rule.Registration{
+			Rule:   EnforceConsistentImportantPosition,
+			Decode: rule.DecodeOptionsInto[EnforceConsistentImportantPositionOptions](),
+		},
+		rule.Registration{
 			Rule:   EnforceCanonicalClasses,
 			Decode: rule.DecodeOptionsInto[EnforceCanonicalClassesOptions](),
 		},

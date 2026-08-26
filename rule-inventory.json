@@ -1,10 +1,10 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 215,
+  "total": 216,
   "byNamespace": {
     "(core)": 67,
-    "better-tailwindcss": 9,
+    "better-tailwindcss": 10,
     "nextjs": 22,
     "nexus": 20,
     "react": 34,
@@ -12,11 +12,11 @@
     "typescript": 31
   },
   "bySeverity": {
-    "error": 174,
+    "error": 175,
     "warn": 41
   },
   "byEnabledBy": {
-    "rulesBlock": 175,
+    "rulesBlock": 176,
     "pluginDefault": 40
   },
   "rules": [
@@ -42,6 +42,15 @@
     },
     {
       "rule": "better-tailwindcss/enforce-consistent-variant-order",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/enforce-consistent-important-position",
       "sources": [
         "eslint"
       ],
