@@ -572,3 +572,86 @@ func TestMemoInclusiveInliningIsNotUsedWhereScopesAreComputed(t *testing.T) {
 			"re-run the oracle with the splice inserted and check `under` is back at 0 first.", found)
 	}
 }
+
+// A multi-exit body's stores must name the value each `return` produces, not `Function.Returns`.
+//
+// A `Return` terminal names `Function.Returns`, the one identifier every `return` in a function
+// stores into. Nothing ever defines that identifier -- the stores target it -- so
+// `CopyNestedBodyInto` has no remap entry for it and a copied terminal still names the nested
+// function's version. Reading the terminal directly then produces a reassignment whose rvalue no
+// instruction in the caller defines.
+//
+// The failure is quiet, which is why it is pinned here rather than left to the corpus. The store
+// itself survives dead-code elimination, because a reassignment is unconditionally live, so the
+// graph stays well formed and every structural assertion keeps passing. What disappears is whatever
+// the return value was built from: nothing references it, and the sweep takes it.
+//
+// Measured on `error.useMemo-infer-less-specific-conditional-access` with the memo callback inlined:
+// the store read identifier 30, defined nowhere, while the `ObjectExpression` the callback returns
+// sat directly above it and was pruned along with the two `PropertyLoad`s feeding it. Upstream keeps
+// all three at its own `DeadCodeElimination` stage.
+func TestInlineStoresTheValueEachReturnProduces(t *testing.T) {
+	const source = `
+	declare function mutate(v: unknown): void;
+	function Component(properties: {flag: boolean; a: {b: number}}) {
+		const built = (() => {
+			const x = {};
+			if (properties.flag) {
+				mutate(x);
+				return {value: properties.a.b};
+			}
+		})();
+		return [built];
+	}
+`
+	function, inlined := inlinedFixture(t, source, false)
+	if function == nil || inlined != 1 {
+		t.Fatalf("the fixture spliced %d calls, want 1", inlined)
+	}
+
+	// Every identifier an instruction defines. A store whose rvalue is outside this set names a
+	// value the caller never produces.
+	defined := map[IdentifierId]bool{}
+	for _, block := range function.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			if instruction := function.Instructions[instructionId]; instruction != nil {
+				defined[instruction.LValue.Identifier] = true
+			}
+		}
+	}
+
+	stores, resolved := 0, 0
+	for _, block := range function.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			instruction := function.Instructions[instructionId]
+			if instruction == nil {
+				continue
+			}
+			store, isStore := instruction.Value.(*StoreLocal)
+			if !isStore || store.Kind != InstructionKindReassign {
+				continue
+			}
+			stores++
+			if defined[store.Value.Identifier] {
+				resolved++
+			}
+		}
+	}
+	if stores != 2 {
+		t.Errorf("found %d return stores, want 2 -- the fixture has two exits", stores)
+	}
+	// One arm returns an expression and one falls off the end. The first must name the value it
+	// built; the second returns undefined and keeps the terminal's own place, which is
+	// `Function.Returns` and is defined by nothing. Emitting an explicit `undefined` there was
+	// measured and made the golden trade worse, so the asymmetry is deliberate -- see
+	// `returnedPlace`.
+	if resolved != 1 {
+		t.Errorf("%d of %d return stores name a defined value, want 1", resolved, stores)
+	}
+}

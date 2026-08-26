@@ -416,6 +416,44 @@ func spliceInlinedCall(function *Function, block *BasicBlock, index int,
 // Only blocks the copy produced are touched. The remap's values are that set; walking the parent's
 // blocks instead would rewrite returns the caller wrote itself, which end the caller rather than
 // the inlined body.
+// returnedPlace is the value a copied `Return` actually yields.
+//
+// A `Return` terminal names `Function.Returns`, the single identifier every `return` in a function
+// stores into. That identifier is never an lvalue -- nothing defines it, the stores target it -- so
+// `CopyNestedBodyInto` has no remap entry for it and the copied terminal still names the nested
+// function's version. Storing it produces a reassignment whose rvalue no instruction defines.
+//
+// Measured on `error.useMemo-infer-less-specific-conditional-access` with the memo callback inlined:
+// the store read identifier 30, which is defined nowhere, while the `ObjectExpression` the callback
+// actually returns sat directly above it. The store survives dead-code elimination because a
+// reassignment is unconditionally live, so nothing referenced the object and the sweep pruned it
+// along with the two `PropertyLoad`s feeding it. Upstream keeps all three at its own
+// `DeadCodeElimination` stage.
+//
+// The block's last instruction is the value: a `return expr` lowers to the expression followed by a
+// load into `Returns`, so the load is what the terminal means.
+//
+// When there is no such load the function returns undefined -- an implicit fall-through off the end
+// of a body, or a bare `return;` -- and the terminal's own place is kept.
+//
+// That place names `Function.Returns` and so is still a value nothing defines, which is the same
+// phantom this exists to remove. Emitting an explicit `undefined` there instead was built and
+// measured: with the memo callback inlined it took the golden trade from three fixtures back to six,
+// so the phantom is load-bearing for a valueless arm in a way the emitted primitive is not. Left as
+// it is deliberately, and the next reader who sees the asymmetry should re-measure rather than
+// tidy it.
+func returnedPlace(function *Function, block *BasicBlock, terminal *Return) Place {
+	if len(block.Instructions) > 0 {
+		last := function.Instructions[block.Instructions[len(block.Instructions)-1]]
+		if last != nil {
+			if load, isLoad := last.Value.(*LoadLocal); isLoad && load.Place.Identifier != 0 {
+				return load.Place
+			}
+		}
+	}
+	return terminal.Value
+}
+
 func rewriteCopiedReturns(function *Function, remap *InlineRemap, continuation BlockId,
 	result Place, node *ast.Node, direct bool) {
 	for _, blockId := range remap.Blocks {
@@ -427,10 +465,11 @@ func rewriteCopiedReturns(function *Function, remap *InlineRemap, continuation B
 		if !isReturn {
 			continue
 		}
+		returned := returnedPlace(function, block, terminal)
 		if direct {
 			function.AddInstruction(block, &Instruction{
 				LValue: result,
-				Value:  &LoadLocal{Place: terminal.Value},
+				Value:  &LoadLocal{Place: returned},
 				Node:   node,
 			})
 		} else {
@@ -438,7 +477,7 @@ func rewriteCopiedReturns(function *Function, remap *InlineRemap, continuation B
 				LValue: Place{Identifier: function.NewIdentifier("", nil, 0).Id},
 				Value: &StoreLocal{
 					LValue: result,
-					Value:  terminal.Value,
+					Value:  returned,
 					Kind:   InstructionKindReassign,
 				},
 				Node: node,
