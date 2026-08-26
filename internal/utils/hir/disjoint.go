@@ -102,8 +102,34 @@
 // methods rather than hooks and module globals. So the lookup returns the same TRUE the naive flip
 // does, at every site that matters.
 //
-// Recorded because both readings are natural and both are wrong: the gap really does need the
-// lattice, not a signature lookup, and the FALSE above stays the conservative answer until it lands.
+// Recorded because both readings are natural and both are wrong. A third was measured afterwards and
+// corrects the conclusion those two produced.
+//
+// # It is a name list, not a lattice
+//
+// Every `Primitive` equation in `InferTypes.ts` is syntactic -- `Primitive`, `UnaryExpression`,
+// `BinaryExpression`, `PrefixUpdate`, `ComputedDelete` -- and none of them is a call. A call's
+// result unifies with the callee's return type (`InferTypes.ts:282`), which is `Primitive` only for
+// globals whose table entry says so. There are 26 such entries in `HIR/Globals.ts`, and they are
+// enumerable: `Boolean`, `Number`, `String`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`,
+// `isArray`, the four URI functions, six `Math` methods, six `console` methods, `useEffect` and
+// `useImperativeHandle`.
+//
+// So no lattice is required, and the note this comment carried until now was wrong to imply one.
+// Transcribing the list and answering `!primitiveReturningGlobals[calleeName]` was measured: it
+// resolves correctly, 11 hits across the clean corpus with `log` and `useEffect` answering
+// primitive, and it still costs false positives 8 to 10 and scope exact 16 to 11.
+//
+// The reason is the 39 remaining sites, all `useMemo` calls that `DropManualMemoization` has
+// rewritten into a call of the callback. Their callee is an unnamed temporary, so the answer is
+// correctly "allocates", and allocating there is what upstream does NOT do -- because upstream has
+// already inlined the callback and has no residual call at all.
+//
+// That makes this arm and the missing inline one change rather than two. Measured together, with
+// `InlineImmediatelyInvokedFunctionExpressions` wired and this arm answering true: scope
+// under-production goes 6 fixtures / 6 scopes to 3 / 3, the best the inline has measured, with
+// goldens 28 to 27 and false positives 8 to 9. Still not landable, and no longer blocked on a
+// lattice that was never needed.
 //
 // # enableForest is off, and that is upstream's default rather than a simplification
 //
