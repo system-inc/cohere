@@ -420,13 +420,32 @@ const (
 	// requires `extractValueBlockResult`, which reads a value block's trailing `StoreLocal` and
 	// prunes it, and which upstream can do because value blocks there carry no phis by construction.
 	//
-	// This emits the fallthrough and leaves the arms as ordinary statements, which is structurally
-	// honest -- the control flow is all present and correctly nested -- but does not produce the
-	// expression forms. The consequence is measurable rather than hypothetical: `ReactiveLogicalValue`
+	// This emits the fallthrough and does not produce the expression forms. `ReactiveLogicalValue`
 	// and friends are declared and never constructed by this pass, which is the one place this file
 	// knowingly creates the shape it warns about. They are declared anyway because they are the
 	// OUTPUT type a downstream consumer switches on, and an absent variant would be a hole that
 	// consumer discovers rather than one this file names.
+	//
+	// # The arms are DROPPED, not kept as statements
+	//
+	// This sentence used to read "leaves the arms as ordinary statements, which is structurally
+	// honest -- the control flow is all present and correctly nested". The first clause was wrong
+	// and the second followed from it. `emitValueTerminal` schedules the fallthrough and visits only
+	// that; `terminal.Test` is never read, so a value terminal's arms are not traversed by anything.
+	//
+	// Measured on `error.invalid-optional-member-expression-as-memo-dep-non-optional-in-body`, whose
+	// `props.items.edges.nodes ?? []` lowers to a `Logical` whose test block holds the whole property
+	// chain: two of eight blocks never reach the tree. The scope built around them is therefore
+	// empty, `PruneUnusedScopes` removes it as unused, and `preserve-manual-memoization` records a
+	// pruned scope rather than comparing its dependencies -- so a golden upstream reports cannot
+	// fire. Corpus-wide the pass loses instructions in 353 of 677 functions for this reason.
+	//
+	// Emitting each arm inline before the fallthrough fixes that fixture and takes corpus
+	// `DoubleEmitted` from 22 to 1,091, because an arm is reachable from the fallthrough path as
+	// well. The real fix is to schedule each arm with a break target the way `If` and `Switch`
+	// already do, which is a redesign of `emitValueTerminal` rather than a few lines.
+	//
+	// Corrected here because a gap that overstates what it preserves hides the defect it describes.
 	ReactiveFunctionGapValueExpressions
 )
 
