@@ -441,6 +441,48 @@ type effectSignature struct {
 	HasRest bool
 	// Result is the kind the call produces.
 	Result EffectValueKind
+	// Aliasing is upstream's second signature form, preferred over the scalar fields above.
+	//
+	// `InferMutationAliasingEffects.ts:1070` reads `signature.aliasing` when present and only falls
+	// back to `computeEffectsForLegacySignature` otherwise. The scalar form cannot express where a
+	// captured operand goes: it says "this argument is captured" and leaves the destination to a
+	// reconciliation step, which aliases into the lvalue. The aliasing form names both ends.
+	//
+	// Measured on `Object.values(object)`: the scalar path emits an immutable capture of the
+	// receiver, upstream emits `Capture from @object into @returns`, and only the second carries a
+	// later mutation of the result back to the argument.
+	//
+	// Nil means this entry has no aliasing form and takes the scalar path, which is every entry that
+	// has not been transcribed yet rather than a claim that upstream lacks one.
+	Aliasing []aliasingSignatureEffect
+}
+
+// aliasingOperand names one end of an aliasing-signature effect.
+//
+// Upstream uses `IdentifierId` placeholders bound through a substitution map. The placeholders it
+// actually needs for the static table are the receiver, the positional params and the return value,
+// so this is that closed set rather than an id space.
+type aliasingOperand uint8
+
+const (
+	// aliasingReceiver is upstream's `@receiver`: the object a method is called on.
+	aliasingReceiver aliasingOperand = iota
+	// aliasingReturns is upstream's `@returns`: the call's own result.
+	aliasingReturns
+	// aliasingParam0 is the first positional argument. Later positions are `aliasingParam0 + n`,
+	// which keeps the set contiguous for the bounds check at the substitution site.
+	aliasingParam0
+)
+
+// aliasingSignatureEffect is one entry of an aliasing signature's effect list.
+//
+// `From` is meaningless for `AliasingEffectCreate`, which upstream spells with no source, and
+// `Value` is meaningful only for it -- the same asymmetry `AliasingEffect` already carries.
+type aliasingSignatureEffect struct {
+	Kind  AliasingEffectKind
+	From  aliasingOperand
+	Into  aliasingOperand
+	Value EffectValueKind
 }
 
 // effectSignatures is the transcribed subset of upstream's global signature table.
@@ -523,6 +565,13 @@ var effectQualifiedMethods = map[string]effectSignature{
 	// Effect.Read on the positional param, per `Globals.ts:88-96`.
 	"Object.keys": {
 		Receiver: EffectRead, Positional: []Effect{EffectRead}, Result: EffectValueMutable,
+		// `Globals.ts:147-178`, and note this one is `ImmutableCapture` where `values` and
+		// `entries` are `Capture`: keys are fresh strings, so nothing of the object flows into the
+		// result and a later mutation of the array must not reach back.
+		Aliasing: []aliasingSignatureEffect{
+			{Kind: AliasingEffectCreate, Into: aliasingReturns, Value: EffectValueMutable},
+			{Kind: AliasingEffectImmutableCapture, From: aliasingParam0, Into: aliasingReturns},
+		},
 	},
 	// Effect.CAPTURE, `Globals.ts:177-183`, and not Read. The first spelling of this entry inferred
 	// it from `keys` on the reasoning that the two are siblings returning an array, and that is
@@ -535,11 +584,25 @@ var effectQualifiedMethods = map[string]effectSignature{
 	// coincides with one. The false-positive score did not move either way.
 	"Object.values": {
 		Receiver: EffectRead, Positional: []Effect{EffectCapture}, Result: EffectValueMutable,
+		// `Globals.ts:185`, with upstream's own comment: "Object values are captured into the
+		// return". The scalar form above says the argument is captured and leaves the destination
+		// to a reconciliation step; this names it, which is what carries a later mutation of the
+		// result back to the object.
+		Aliasing: []aliasingSignatureEffect{
+			{Kind: AliasingEffectCreate, Into: aliasingReturns, Value: EffectValueMutable},
+			{Kind: AliasingEffectCapture, From: aliasingParam0, Into: aliasingReturns},
+		},
 	},
 	// Effect.Capture, `Globals.ts:115-123`: the returned array holds the receiver's own values, so
 	// the result may alias them. Capture rather than Read for exactly that reason.
 	"Object.entries": {
 		Receiver: EffectRead, Positional: []Effect{EffectCapture}, Result: EffectValueMutable,
+		// `Globals.ts:116-147`, the same pair as `values`: the returned array holds the object's
+		// own values, so they are captured into the return rather than merely read.
+		Aliasing: []aliasingSignatureEffect{
+			{Kind: AliasingEffectCreate, Into: aliasingReturns, Value: EffectValueMutable},
+			{Kind: AliasingEffectCapture, From: aliasingParam0, Into: aliasingReturns},
+		},
 	},
 	// Effect.ConditionallyMutate, `Globals.ts:98-113`. Upstream is deliberately WEAKER here than for
 	// the other three: `fromEntries` walks an iterable, and advancing an iterator can mutate it.
@@ -919,6 +982,14 @@ func effectsForCall(
 		return effectsForUnknownCall(receiver, callee, args, lvalue, mutatesCallee)
 	}
 
+	if len(signature.Aliasing) > 0 {
+		if applied, ok := effectsFromAliasingSignature(signature, receiver, args, lvalue); ok {
+			return applied
+		}
+		// Upstream returns nil from `computeEffectsForSignature` when the arity does not fit and
+		// then falls through to the legacy path (`:1087`). Reproduced rather than raising.
+	}
+
 	out := []AliasingEffect{create(lvalue, signature.Result)}
 
 	// Upstream aliases the receiver into the result unless the receiver's own effect is Capture,
@@ -1217,4 +1288,80 @@ func ProjectEffects(effects []AliasingEffect, ranges *MutableRanges, order Evalu
 		}
 	}
 	return out
+}
+
+// effectsFromAliasingSignature applies an aliasing signature by substituting its operands.
+//
+// Upstream's `computeEffectsForSignature` (`InferMutationAliasingEffects.ts:2563`), reduced to what
+// the static table needs. Upstream builds a substitution map from placeholder id to place and then
+// rewrites each effect through it; the placeholders in the transcribed entries are only the
+// receiver, the positional params and the return value, so this substitutes directly.
+//
+// Returns false when the call does not fit the signature's arity, which is upstream's `return null`
+// at `:2580`. The caller then takes the legacy path, which is upstream's own fallback rather than a
+// softening of it.
+//
+// # What is NOT ported, and why it costs nothing here
+//
+// Upstream also handles a rest parameter, spread arguments, signature temporaries, and a dynamic
+// context array for signatures built from function expressions. None of the transcribed entries uses
+// any of them: they are static two-effect signatures over a receiver, one argument and a result. An
+// entry that needs those must extend this rather than be added silently, which the arity check
+// enforces by declining any call whose argument count the signature does not name.
+func effectsFromAliasingSignature(signature effectSignature, receiver Place, args []Argument,
+	lvalue Place) ([]AliasingEffect, bool) {
+	positional := 0
+	for _, effect := range signature.Aliasing {
+		for _, operand := range [2]aliasingOperand{effect.From, effect.Into} {
+			if operand >= aliasingParam0 {
+				if index := int(operand-aliasingParam0) + 1; index > positional {
+					positional = index
+				}
+			}
+		}
+	}
+	if positional > len(args) {
+		return nil, false
+	}
+	for index := 0; index < positional; index++ {
+		if args[index].Spread {
+			// A spread makes the positional binding meaningless: the argument at that position is
+			// not one place. Upstream routes spreads to the rest param, which no transcribed entry
+			// has, so declining is the same answer.
+			return nil, false
+		}
+	}
+
+	resolve := func(operand aliasingOperand) (Place, bool) {
+		switch {
+		case operand == aliasingReceiver:
+			return receiver, true
+		case operand == aliasingReturns:
+			return lvalue, true
+		default:
+			index := int(operand - aliasingParam0)
+			if index >= len(args) {
+				return Place{}, false
+			}
+			return args[index].Place, true
+		}
+	}
+
+	out := make([]AliasingEffect, 0, len(signature.Aliasing))
+	for _, effect := range signature.Aliasing {
+		into, ok := resolve(effect.Into)
+		if !ok {
+			return nil, false
+		}
+		if effect.Kind == AliasingEffectCreate {
+			out = append(out, create(into, effect.Value))
+			continue
+		}
+		from, ok := resolve(effect.From)
+		if !ok {
+			return nil, false
+		}
+		out = append(out, flow(effect.Kind, from, into))
+	}
+	return out, true
 }

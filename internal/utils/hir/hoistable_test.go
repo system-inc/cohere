@@ -591,8 +591,14 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// `deep` FALLING is the safe direction by this test's own rule -- a gain in depth is the
 	// over-approximating one -- and the scope oracle agrees rather than merely not objecting:
 	// surviving scopes 114 to 108 against upstream's 97, and exact per-fixture agreement 26 to 30.
-	if deep != 563 || flat != 2134 {
-		t.Errorf("got %d deep and %d flat dependencies, want 563 and 2134; a SMALL move here is "+
+	// # And again when three `Object.*` entries gained their aliasing signatures
+	//
+	// 563 deep unchanged, 2,134 flat to 2,135. One more bare dependency and no change in depth,
+	// which is what a capture edge that did not exist before should produce: `Object.values(o)` now
+	// records that the result holds the object's own values, so a scope naming the result names the
+	// object once more often, and no path gets longer or shorter.
+	if deep != 563 || flat != 2135 {
+		t.Errorf("got %d deep and %d flat dependencies, want 563 and 2135; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}
