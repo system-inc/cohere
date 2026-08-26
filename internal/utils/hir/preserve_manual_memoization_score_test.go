@@ -232,7 +232,13 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// they are a matched pair with two clean fixtures that differ only in the variable's name.
 	// False positives are unmoved at 11, `under` holds at 0 fixtures / 0 scopes, and the dependency
 	// oracle is byte-identical at 74 matched with ours 119.
-	const knownTruePositives = 27
+	//
+	// 28 once a ref's STABILITY is seeded only by a hook call, separately from its shape. The one
+	// that closes is `error.preserve-use-memo-ref-missing-reactive.ts`, whose `ref` is a phi of two
+	// `useRef` results and is named `ref`. False positives hold at 11, `under` at 0 fixtures / 0
+	// scopes, and the dependency oracle is byte-identical at 74 matched with ours 119. Memo blocks
+	// improve: 20 all-empty to 17 and 7 contradicted to 5.
+	const knownTruePositives = 28
 	if fired != knownTruePositives {
 		t.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
 			"should be raised deliberately, and if it went DOWN the rule stopped reporting programs "+

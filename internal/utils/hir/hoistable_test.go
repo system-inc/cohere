@@ -657,8 +657,14 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// across all 48 scored fixtures, so this does not move the tree away from upstream anywhere
 	// upstream can be observed. It buys nothing today and removes a divergence that would matter as
 	// soon as a fixture exercises it.
-	if deep != 615 || flat != 2376 {
-		t.Errorf("got %d deep and %d flat dependencies, want 615 and 2376; a SMALL move here is "+
+	// # And again when a ref's stability stopped being read off its name
+	//
+	// 615 deep unchanged, 2,376 flat to 2,379. Three more bare dependencies and no change in depth,
+	// which is what a value that stops being treated as stable should produce: it becomes reactive,
+	// survives `PruneNonReactiveDependencies`, and is named at its root. `deep` is the number this
+	// test's rule is about and it does not move.
+	if deep != 615 || flat != 2379 {
+		t.Errorf("got %d deep and %d flat dependencies, want 615 and 2379; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

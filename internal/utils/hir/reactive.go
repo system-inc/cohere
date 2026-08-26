@@ -135,8 +135,6 @@
 package hir
 
 import (
-	"regexp"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 )
@@ -538,7 +536,24 @@ func (r *reactivity) isStableType(id IdentifierId) bool {
 		// upstream still says it is not a ref. Marking it stable there suppresses the hook-call
 		// reactivity above, the dependency is then pruned as non-reactive, and the rule stays
 		// silent where upstream reports.
-		return r.useRefResults[id] || isRefLikeName(r.identifierName(id))
+		// The CALL only, not the name.
+		//
+		// Upstream keeps two questions apart that both read `BuiltInUseRefId`, and this arm answers
+		// the second one. `isUseRefType` asks whether a value has a ref's SHAPE, and a ref-like name
+		// is one of the two ways to acquire it (`InferTypes.ts:536`). Stability is a different
+		// question, answered by `StableSidemap`, whose only seed is a known hook call:
+		// `evaluatesToStableTypeOrContainer` switches on `getHookKind(env, callee.identifier)` and
+		// returns false for anything that is not one (`HIR.ts:1928`). A name never seeds it.
+		//
+		// The distinction is load-bearing on
+		// `error.preserve-use-memo-ref-missing-reactive.ts`. `const ref = cond ? ref1 : ref2` is a
+		// phi of two `useRef` results, and the binding is named `ref`, which matches upstream's
+		// `^ref$`. Upstream's side map never populates a phi -- its comment says why, "ternaries and
+		// other value blocks can produce reactive identifiers typed as these"
+		// (`InferReactivePlaces.ts:283`) -- so the value is reactive, its dependency survives
+		// `PruneNonReactiveDependencies`, and the rule reports. Answering the name here marked it
+		// stable, and the dependency was pruned before the comparison saw it.
+		return r.useRefResults[id]
 	}
 	return false
 }
@@ -613,41 +628,6 @@ func useRefResultValues(function *Function) map[IdentifierId]bool {
 	}
 }
 
-// refLikeName is upstream's `RefLikeNameRE`, `/^(?:[a-zA-Z$_][a-zA-Z$_0-9]*)Ref$|^ref$/`
-// (`InferTypes.ts:783`).
-var refLikeName = regexp.MustCompile(`^(?:[a-zA-Z$_][a-zA-Z$_0-9]*)Ref$|^ref$`)
-
-// isRefLikeName reports whether a binding's name makes it a ref by upstream's naming rule.
-//
-// Upstream assigns the ref shape from the NAME as well as from a `useRef` call, behind
-// `enableTreatRefLikeIdentifiersAsRefs` -- which is `z.boolean().default(true)`
-// (`Environment.ts:469`), so it is on for every fixture including the ones carrying no pragma.
-// `isRefLikeName` reads `RefLikeNameRE.test(t.objectName)` alongside a `current` property
-// (`InferTypes.ts:785`).
-//
-// This is the discriminator across four fixtures that are otherwise the same program:
-//
-//	customRef   in `ref-like-name-in-useCallback`      matches, so it IS a ref and upstream is silent
-//	notaref     in `error.ref-like-name-not-a-ref`     no match, so upstream reports
-//	Ref         in `error.ref-like-name-not-Ref`       no match, the pattern needs a prefix before
-//	                                                   `Ref` and bare `ref` is lowercase only
-//
-// The two error fixtures are named for the two ways to fail this pattern.
-func isRefLikeName(name string) bool {
-	return name != "" && refLikeName.MatchString(name)
-}
-
-// identifierName returns a value's source name, empty for a temporary.
-func (r *reactivity) identifierName(id IdentifierId) string {
-	if int(id) >= len(r.function.Identifiers) {
-		return ""
-	}
-	identifier := r.function.Identifiers[id]
-	if identifier == nil {
-		return ""
-	}
-	return identifier.Name
-}
 
 // stableTypeName returns a value's type alias name, falling back to its type symbol name.
 //
