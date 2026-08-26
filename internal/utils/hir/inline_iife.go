@@ -76,13 +76,49 @@ import "github.com/microsoft/TypeScript/tsc/shim/ast"
 // Returns the number of call sites spliced, so a caller can skip the graph rebuild when nothing
 // changed and a test can assert the pass did something rather than passing vacuously.
 func InlineImmediatelyInvokedFunctionExpressions(function *Function) int {
+	return inlineInvokedFunctions(function, false)
+}
+
+// InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks is the same pass with the memo
+// exclusion lifted, which is what upstream actually does.
+//
+// # Why the choice is the caller's rather than the pass's
+//
+// `memoizedResults` declines to inline a callback `DropManualMemoization` marked, and the comment
+// at its definition gives the reason in full: with `preserve-manual-memoization`'s dependency
+// comparison off, nine of its fixtures fire on the other two conditions because of the very scope
+// fusion inlining removes, and inlining them moves that rule's goldens from 15 to 6. That is a real
+// cost and the guard is right to hold it.
+//
+// It is right for that rule. `set-state-in-effect` has the opposite need and pays none of that
+// cost: it never reads a scope, never compares a dependency, and never sees a golden. What it needs
+// is exactly what upstream does -- `useMemo(fn, deps)` becomes `fn()` becomes the closure itself,
+// so a setter inside that closure is reachable. With the guard on, the one shape its divergence is
+// about is the one shape the pass refuses, measured: wiring the guarded pass into its lowering
+// changes findings not at all, 0 against 0 over Kirk's tree with identical node counts.
+//
+// So the exclusion is a property of one caller's needs and not of the transformation, and it moves
+// to the call site. Upstream has no such split because it has no such gate; when the dependency
+// comparison is turned on and `memoizedResults` is deleted, these two entry points collapse back
+// into one and this comment goes with them.
+func InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function *Function) int {
+	return inlineInvokedFunctions(function, true)
+}
+
+// inlineInvokedFunctions is the pass itself. `includeMemoCallbacks` lifts the `memoizedResults`
+// exclusion; see the exported wrapper above for why that is the caller's decision.
+func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 	if function == nil {
 		return 0
 	}
 
 	// The values that `DropManualMemoization` marked as the result of a memo call. See
-	// `memoizedResults` for why they are excluded.
-	memoized := memoizedResults(function)
+	// `memoizedResults` for why they are excluded, and the wrapper above for why a caller may ask
+	// for them anyway.
+	memoized := map[IdentifierId]bool{}
+	if !includeMemoCallbacks {
+		memoized = memoizedResults(function)
+	}
 
 	inlined := 0
 	// The callee temporaries of the calls that were spliced. Their defining

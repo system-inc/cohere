@@ -505,41 +505,71 @@ func TestSetStateInEffectSeesThroughManualMemoization(t *testing.T) {
 	}
 }
 
-// TestSetStateInEffectDeclinesMemoizationItDoesNotReach records where the erasure stops.
+// TestSetStateInEffectReachesThroughAMemoizedCallbackThatReturnsAFunction closes the last
+// divergence from React in this rule.
 //
-// # The useMemo-returns-a-function case is a known divergence, not an oversight
+// # What this was, and what closed it
 //
-// `const bump = useMemo(() => () => setState(1), [])` is reported by React and is silent here, and
-// the reason is one pass further down upstream's pipeline. The erasure rewrites `useMemo(fn, deps)`
-// to `fn()`, which leaves a call whose result is the inner closure; upstream then runs
-// `InlineImmediatelyInvokedFunctionExpressions` immediately afterwards, which replaces that call
-// with the closure itself and is what puts a `FunctionExpression` where the validator can see it.
-// This tree has no such pass -- `invoked_functions.go` is the analysis of the same name's family,
-// not the rewrite -- so setter-ness has to flow through a call's return value, which neither
-// upstream's validator nor this rule tracks.
+// `const bump = useMemo(() => () => setState(1), [])` called from an effect is reported by React
+// 7.1.1 and was silent here through three separate versions of this comment, which is worth saying
+// because each one was true when written.
 //
-// Porting that pass is the fix and it is a real one, not a line. It is left undone deliberately
-// rather than approximated here, because a hand-rolled "follow the return value" would diverge from
-// upstream in the other direction on every non-memo call. Recorded as a failing-shape fixture so
-// the divergence is a fact in the suite rather than a surprise, and so the day the inlining pass
-// lands this test is what tells its author the gap closed.
+// The erasure rewrites `useMemo(fn, deps)` to `fn()`, leaving a call whose result is the inner
+// closure, and setter-ness would have to flow through a call's return value -- which neither
+// upstream's validator nor this rule tracks. Upstream never faces that because
+// `InlineImmediatelyInvokedFunctionExpressions` runs one line later and replaces the call with the
+// closure itself. That pass landed here at `f9eba3f`.
 //
-// The propagation is also not general, which bounds what the erasure claims. A closure passed
-// through an ordinary function or a custom hook stays silent in both implementations, measured on
-// both: only `useMemo` and `useCallback` are erased, because only those two are what
-// `dropManualMemoization` recognises.
-func TestSetStateInEffectDeclinesMemoizationItDoesNotReach(t *testing.T) {
-	// useMemo returning a function. React reports; this does not, pending the inlining pass.
-	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useEffect, useMemo, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useMemo(() => () => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"))
+// Landing it was not enough, and the measurement is the interesting part. Wiring the pass in as
+// published changed nothing: 0 findings against 0 over Kirk's tree, identical node counts, this
+// fixture still silent. The cause is `memoizedResults`, a deliberate exclusion in that file that
+// declines to inline any callback `DropManualMemoization` marked -- and an inline `useMemo`
+// callback is exactly what gets marked, so the one shape this test is about was the one shape the
+// pass refused.
+//
+// The exclusion is right for the caller it was written for. `preserve-manual-memoization` runs with
+// its dependency comparison off, and with it off, nine of its fixtures fire on the other two
+// conditions because of the scope fusion inlining removes; inlining memo callbacks moves its
+// goldens from 15 to 6. That cost is real and this rule does not get to impose it.
+//
+// It also does not have to. This rule reads no scope, compares no dependency, and has no golden, so
+// it pays none of that cost and needs precisely what upstream does. The exclusion moved to the call
+// site: `InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks` lifts it, the guarded
+// entry point is unchanged for the other caller, and the full `hir` suite is green either way.
+//
+// Verified against React 7.1.1 on the same input rather than assumed: both report, at the same line
+// and the same column.
+func TestSetStateInEffectReachesThroughAMemoizedCallbackThatReturnsAFunction(t *testing.T) {
+	const setStateInEffect = "setStateInEffect"
 
+	// The case itself. Was the failing-shape fixture; now asserts the fix.
+	ruletest.ExpectFindings(t, runSetStateInEffect(t, "import {useEffect, useMemo, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useMemo(() => () => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"), setStateInEffect)
+
+	// A `useMemo` returning a value rather than a function has no setter to reach, and inlining its
+	// callback must not invent one. This is the case that would break first if the splice ever
+	// spliced something it should not.
+	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useEffect, useMemo, useState} from \"./react\";\n\nfunction Component() {\n  const [state] = useState(0);\n  const doubled = useMemo(() => state * 2, [state]);\n  useEffect(() => {\n    console.info(doubled);\n  }, [doubled]);\n  return doubled;\n}\n"))
+
+	// A programmer-written IIFE, which nothing marks and which the pass has always inlined. Silent
+	// because there is no setter in it, not because it was declined.
+	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state] = useState(0);\n  const value = (function() {\n    return 1;\n  })();\n  useEffect(() => {\n    console.info(value);\n  }, [value]);\n  return state + value;\n}\n"))
+}
+
+// TestSetStateInEffectDeclinesMemoizationItDoesNotReach records where the erasure still stops.
+//
+// The propagation is not general, which bounds what the erasure claims. A closure passed through an
+// ordinary function or a custom hook stays silent in both implementations, measured on both: only
+// `useMemo` and `useCallback` are erased, because only those two are what `dropManualMemoization`
+// recognises.
+func TestSetStateInEffectDeclinesMemoizationItDoesNotReach(t *testing.T) {
 	// A closure through an ordinary function. Silent in both, so the erasure is not "any call".
 	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useEffect, useState} from \"./react\";\n\nfunction identity<T>(callback: T): T {\n  return callback;\n}\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = identity(() => {\n    setState(1);\n  });\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"))
 
 	// A closure through a custom hook. Silent in both, for the same reason.
 	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useEffect, useState} from \"./react\";\n\nfunction useWrap<T>(callback: T): T {\n  return callback;\n}\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useWrap(() => {\n    setState(1);\n  });\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"))
 
-	// A useCallback closing over no setter, beside the firing cases above: the erasure does not
-	// make every memoized callback suspect.
+	// A useCallback closing over no setter: the erasure does not make every memoized callback
+	// suspect.
 	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useCallback, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state] = useState(0);\n  const log = useCallback(() => {\n    console.info(\"x\");\n  }, []);\n  useEffect(() => {\n    log();\n  }, [log]);\n  return state;\n}\n"))
 }
 

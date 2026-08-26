@@ -157,9 +157,11 @@ var messageSetStateInEffect = rule.Message{
 //     was populated in the ENCLOSING function, so only setters that crossed the boundary from
 //     outside are known. This is a real hole rather than an exemption, and it is reproduced.
 //   - **A `useCallback` or `useMemo` wrapper is invisible to both sides**, because upstream deletes
-//     it before this validator runs and this rule now reads a graph prepared the same way. See
+//     it before this validator runs and this rule now reads a graph prepared the same way: the
+//     erasure, then the inlining pass that follows it one line later upstream. See
 //     `hir.ForFunctionWithoutManualMemoization`; the fixtures are
-//     `TestSetStateInEffectSeesThroughManualMemoization`.
+//     `TestSetStateInEffectSeesThroughManualMemoization` and
+//     `TestSetStateInEffectReachesThroughAMemoizedCallbackThatReturnsAFunction`.
 //   - **A setter reached through a callback is silent, by the same mechanism running the other
 //     way.** `setTimeout(setS, 10)` and `subscribe(() => setS(1))` are both clean, which is the
 //     rule's actual purpose: the setter is not called during the effect body.
@@ -170,16 +172,6 @@ var messageSetStateInEffect = rule.Message{
 //     behave identically, and a setter passed as the SECOND argument is silent.
 //
 // # Where this diverges, and why
-//
-// A `useMemo` whose callback returns a function is reported upstream and is silent here.
-// `dropManualMemoization` turns `useMemo(fn, deps)` into `fn()`, and upstream's
-// `InlineImmediatelyInvokedFunctionExpressions` then replaces that call with the closure itself;
-// this tree has no such pass, so setter-ness would have to flow through a call's return value,
-// which neither upstream's validator nor this rule tracks. Porting the inlining pass is the fix and
-// it is left undone rather than approximated, since a hand-rolled return-value follow would diverge
-// in the other direction on every non-memo call. Pinned as a failing-shape fixture in
-// `TestSetStateInEffectDeclinesMemoizationItDoesNotReach`, which is what will announce the gap has
-// closed the day that pass lands.
 //
 // Upstream distinguishes an import of `useEffect` from React from a same-named local declaration or
 // an import from an unrelated module, and is silent on the latter two. That distinction lives in

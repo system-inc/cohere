@@ -82,7 +82,8 @@ func ForFunction(ctx rule.Context, node *ast.Node) *Function {
 	})
 }
 
-// ForFunctionWithoutManualMemoization is ForFunction with `useMemo` and `useCallback` erased.
+// ForFunctionWithoutManualMemoization is ForFunction with `useMemo` and `useCallback` erased and
+// the resulting immediately-invoked calls inlined, which is the graph upstream's validators read.
 //
 // # Why this is a second cache entry rather than a step inside the first
 //
@@ -113,6 +114,10 @@ func ForFunction(ctx rule.Context, node *ast.Node) *Function {
 // statistics that disagree in opposite directions by ten milliseconds is what "no difference" looks
 // like. The gate is why: 12,986 of 13,171 functions skip the second lowering entirely, so only the
 // 185 that actually memoize pay for one.
+//
+// The inlining pass added alongside the erasure is free for the same reason: it only runs on the
+// functions the gate already admitted. Ten interleaved runs each, before and after wiring it in:
+// mean 2.038s against 2.059s, minimum 1.970s against 1.980s.
 //
 // An earlier version of this comment claimed 570ms, and that number was measured wrong in a way
 // worth recording because the trap is easy to fall into twice. It came from runs under `--timing`,
@@ -159,6 +164,16 @@ func ForFunctionWithoutManualMemoization(ctx rule.Context, node *ast.Node) *Func
 		}
 		Construct(lowered)
 		DropManualMemoization(lowered)
+		// Upstream runs the inlining pass one line after the erasure, and the two together are
+		// what make a memoized callback reachable: the erasure turns `useMemo(fn, deps)` into
+		// `fn()`, and this turns `fn()` into the closure itself. The memo-inclusive entry point is
+		// deliberate and its own comment says why the other caller wants the guard this one lifts.
+		//
+		// `Construct` again because the splice copies a body that arrives carrying its own phis,
+		// and only when something was actually spliced, which is most files never.
+		if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(lowered) > 0 {
+			Construct(lowered)
+		}
 		return lowered
 	})
 }
