@@ -146,6 +146,7 @@ func lowerNested(node *ast.Node, typeChecker *checker.Checker, enclosing *builde
 		declarations: map[*ast.Symbol]DeclarationId{},
 		identifiers:  map[*ast.Symbol]IdentifierId{},
 		captured:     map[*ast.Symbol]IdentifierId{},
+		contextual:   findContextIdentifiers(node, typeChecker),
 	}
 
 	entry := function.NewBlock(BlockKindBlock)
@@ -212,6 +213,11 @@ type builder struct {
 	// captured binding are the same value here, which is what makes single-assignment form over a
 	// nested function meaningful.
 	captured map[*ast.Symbol]IdentifierId
+
+	// contextual is the set of bindings this function shares with the closures inside it, decided
+	// syntactically before lowering. See `context_identifiers.go` for why the question cannot be
+	// asked while lowering and what it costs to answer it late.
+	contextual contextIdentifiers
 
 	// jumps is the stack of enclosing constructs a break or continue can target.
 	jumps []jumpTarget

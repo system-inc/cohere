@@ -211,7 +211,22 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 	// `exhaustive-deps` lint rule (and can be considered invalid)" -- upstream reports it while
 	// saying it should not have to, the same category as the `todo-repro` fixtures elsewhere in this
 	// corpus. Ten false positives for that one.
-	const knownTruePositives = 24
+	// Raised from 24 by defining a context binding once in SSA rather than versioning every write.
+	// Both fixtures this rule's scope conditions were missing now fire:
+	//
+	//	new-mutability/error.invalid-useCallback-captures-reassigned-context.js
+	//	preserve-memo-validation/error.invalid-useCallback-captures-reassigned-context.ts
+	//
+	// See the note at `defineIn` in `ssa.go`. Upstream's two writes to such a binding name one
+	// identifier, which is what puts the declaration and the reassignment in one disjoint class so
+	// the scope spans the memo block between them.
+	//
+	// Costs two fixtures, both of which upstream itself flags:
+	// `error.todo-repro-unmemoized-callback-captured-in-context-variable.tsx` carries the
+	// `todo-repro` prefix, and `error.useMemo-aliased-var.ts` says in its own header "This is
+	// technically a false positive, but source is already breaking `exhaustive-deps`". Two real
+	// detections for two upstream calls a mistake.
+	const knownTruePositives = 25
 	if fired != knownTruePositives {
 		t.Errorf("true positives = %d, want %d; if this went UP the rule improved and this number "+
 			"should be raised deliberately, and if it went DOWN the rule stopped reporting programs "+

@@ -153,7 +153,17 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// So this count moving down is not a regression here, and the direction of `blocksWithCarrying`
 	// is not always the direction of correctness. The ceiling on `blocksAllEmptyWithCapture` below
 	// is what still guards the defect this oracle was built for.
-	const knownBlocksWithCarrying = 69
+	// Lowered from 69 to 67 by defining a context binding once in SSA rather than versioning every
+	// write (see `defineIn` in `ssa.go`). Two blocks lose an interior carrying scope because the
+	// declaration and the reassignment now share one class rather than forming two, so what was two
+	// scopes carrying dependencies is one.
+	//
+	// The paragraph above is the reason this is not read as a regression: `blocksAllEmpty` holds at
+	// 20 and `blocksAllEmptyWithCapture` at 14, which are the counts that guard the defect this
+	// oracle exists for. And the change it records fires both
+	// `error.invalid-useCallback-captures-reassigned-context` fixtures, which is the third
+	// condition reaching programs it could not reach before rather than fewer.
+	const knownBlocksWithCarrying = 67
 	const knownBlocksAllEmpty = 20
 	if blocksWithCarrying < knownBlocksWithCarrying {
 		t.Errorf("blocks with a dependency-carrying interior scope = %d, want at least %d; the "+

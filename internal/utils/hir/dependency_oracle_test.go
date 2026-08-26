@@ -321,7 +321,14 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	//
 	// The 16 fixtures now under-producing are logged rather than pinned, and `matched` is what
 	// guards that direction: a row lost from a golden guard would show there, and none did.
-	const knownOursTotal = 120
+	// Raised from 120 to 121 by the SSA context change recorded at `knownTruePositives` in the
+	// score test. One row, on a fixture whose subject is exactly a reassigned context variable:
+	// sharing one identifier across the declaration and the reassignment puts both in one class,
+	// and the class names one more dependency than two separate classes did.
+	//
+	// `matched` holds at 77 and the scope oracle improves -- `exact` 25 to 26 with `under` unmoved
+	// -- so the row is a dependency the program has rather than an invented one.
+	const knownOursTotal = 121
 	if upstreamTotal != knownUpstreamTotal {
 		t.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
 			"every count below is against a different population", upstreamTotal, knownUpstreamTotal)

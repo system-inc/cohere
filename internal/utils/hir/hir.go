@@ -215,6 +215,11 @@ func HasBlock(block BlockId) bool { return block != InvalidBlock }
 // It owns its tables rather than sharing an arena, which is the main structural divergence from
 // upstream. See the package comment.
 type Function struct {
+	// ContextDeclarations are bindings this function declares, reassigns, and shares with a closure
+	// inside it -- upstream's second `FindContextIdentifiers` rule. Recorded during lowering, and
+	// read by SSA, which defines such a binding once rather than versioning every write.
+	ContextDeclarations map[DeclarationId]bool
+
 	// Node is the syntactic function this was lowered from. Retained so a pass can reach the type
 	// checker, and so a diagnostic can point at source without the IR carrying its own copy of
 	// every span.

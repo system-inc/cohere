@@ -116,6 +116,7 @@ func Construct(function *Function) {
 		states:        map[BlockId]*ssaState{},
 		unsealedPreds: map[BlockId]int{},
 		unknown:       map[DeclarationId]bool{},
+		contextual:    function.ContextDeclarations,
 	}
 	builder.run()
 
@@ -181,6 +182,10 @@ type ssaBuilder struct {
 	// in this function to merge, so a phi over them would be an invention.
 	unknown map[DeclarationId]bool
 
+	// contextual holds bindings a nested function captures, which are defined once and never
+	// redefined. See `defineIn` for why, and for what versioning them instead costs.
+	contextual map[DeclarationId]bool
+
 	// visited records blocks already processed, so sealing only fills phis for a block whose body
 	// has actually been walked.
 	visited map[BlockId]bool
@@ -215,9 +220,14 @@ func (b *ssaBuilder) run() {
 					b.useIn(block.Id, place)
 				}
 			})
+			// Only a context store reuses its binding's definition. The guard keys on the
+			// declaration, and a `FunctionExpression` assigned to the same declaration would
+			// otherwise reuse the identifier too -- measured as a duplicate definition of a
+			// function value on `let n = 1; const g = () => n; n = 2`.
+			_, isContextStore := instruction.Value.(*StoreContext)
 			EachInstructionPlacePointer(instruction, func(place *Place, role PlaceRole) {
 				if role == PlaceRoleDefine {
-					b.defineIn(block.Id, place)
+					b.defineInMaybeContext(block.Id, place, isContextStore)
 				}
 			})
 		}
@@ -258,8 +268,54 @@ func newSSAState() *ssaState {
 }
 
 // defineIn mints a fresh value for a definition and records it as the block's current answer.
+//
+// # A context binding is defined once and never redefined
+//
+// Upstream refuses every rename after the first for a binding it has marked as context:
+//
+//	// Do not redefine context references.
+//	if (this.#context.has(oldId)) {
+//	  return this.getPlace(oldPlace);
+//	}
+//
+// `SSA/EnterSSA.ts:124`. That is what makes a later write reach the value a closure already
+// captured. For `let x = []; useCallback(() => [x], [x]); x = makeArray();` the reassignment's
+// `Mutate` lands on the identifier the callback captured, so the range widens across the memo
+// marker and the rule can see that the dependency may be mutated later.
+//
+// Versioning that write instead mints a value at the reassignment's own order, and a mutation on a
+// value whose range starts there widens nothing -- measured as `{20, 21}` against a memo block
+// spanning 6 to 15, which is why the effect and the lowering were both faithful and the finding
+// still did not fire.
 func (b *ssaBuilder) defineIn(blockId BlockId, place *Place) {
+	b.defineInMaybeContext(blockId, place, false)
+}
+
+// defineInMaybeContext is `defineIn`, told whether this definition is a context store.
+func (b *ssaBuilder) defineInMaybeContext(blockId BlockId, place *Place, contextStore bool) {
 	binding := b.function.Identifiers[place.Identifier].Declaration
+	// # A context binding is defined once and every later write reuses that definition
+	//
+	// Upstream's two writes to a reassigned-and-captured binding name the SAME identifier --
+	// measured on the pinned build, `StoreContext@2 lvalueId=2 kind=Let` and
+	// `StoreContext@17 lvalueId=2 kind=Reassign`. Lowering resolves both through one Babel binding
+	// and nothing renumbers it afterwards.
+	//
+	// That shared identity is what puts the declaration and the reassignment in one disjoint class,
+	// so the scope's hull spans both and covers the memo block between them. Versioning them
+	// instead gives the reassignment a range starting at its own order, which widens nothing --
+	// measured as `{20, 21}` against a memo block spanning 6 to 15.
+	//
+	// Gated on the instruction being a context store. The set is keyed by declaration, and a
+	// `FunctionExpression` assigned to the same declaration would otherwise reuse the identifier
+	// too, which is a real duplicate definition -- measured on
+	// `let n = 1; const g = () => n; n = 2`.
+	if contextStore && b.contextual[binding] {
+		if existing, defined := b.states[blockId].defs[binding]; defined {
+			place.Identifier = existing
+			return
+		}
+	}
 	renamed := b.mint(place.Identifier)
 	b.states[blockId].defs[binding] = renamed
 	place.Identifier = renamed

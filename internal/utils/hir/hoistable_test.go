@@ -574,8 +574,14 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	//
 	// The dependency oracle falls by exactly one row and it is named at `knownMatched`: the same
 	// fixture that gains a false positive, for the optional-chain reason recorded there.
-	if deep != 574 || flat != 2097 {
-		t.Errorf("got %d deep and %d flat dependencies, want 574 and 2097; a SMALL move here is "+
+	// # And again when a context binding stopped being versioned
+	//
+	// 574 deep unchanged, 2,097 flat to 2,101. Four more flat dependencies and no change in depth,
+	// which is what one identifier serving several writes should produce: the same accesses resolve
+	// to one value instead of several, so a scope names the binding once more often and no path
+	// gets shorter or longer.
+	if deep != 574 || flat != 2101 {
+		t.Errorf("got %d deep and %d flat dependencies, want 574 and 2101; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

@@ -104,10 +104,30 @@ func VerifySSA(function *Function) []SSAViolation {
 		}
 		for position, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
+			// # A context binding is written many times, and upstream's invariant never sees it
+			//
+			// `AssertConsistentIdentifiers.ts:43` asserts "Expected lvalues to be assigned exactly
+			// once" against `instr.lvalue.identifier` -- the instruction's own temporary. A
+			// `StoreContext` writes its binding through a different field, `value.lvalue.place`,
+			// which is never added to that set. So upstream's context binding, written at its
+			// declaration and again at every reassignment, does not trip its own check.
+			//
+			// Measured on the pinned build: both writes name `lvalueId=2`, one `kind=Let` and one
+			// `kind=Reassign`, and the invariant passes.
+			//
+			// This walk records every `PlaceRoleDefine`, which includes a store's inner lvalue, so
+			// the same binding reads as defined twice. Narrowed to match upstream's subject rather
+			// than widened generally: an ordinary `StoreLocal` still reports, and only the place a
+			// context store writes through is exempt.
+			_, isContextStore := instruction.Value.(*StoreContext)
 			EachInstructionPlace(instruction, func(place Place, role PlaceRole) {
-				if role == PlaceRoleDefine {
-					recordDefinition(place.Identifier, block.Id, position)
+				if role != PlaceRoleDefine {
+					return
 				}
+				if isContextStore && place.Identifier != instruction.LValue.Identifier {
+					return
+				}
+				recordDefinition(place.Identifier, block.Id, position)
 			})
 		}
 		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {

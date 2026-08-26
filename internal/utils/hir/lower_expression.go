@@ -394,6 +394,25 @@ func (b *builder) lowerAssignmentTarget(target *ast.Node, value Place, kind Inst
 		if symbol != nil {
 			if _, known := b.identifiers[symbol]; known {
 				place := b.bind(target.Text(), symbol, target)
+				// A binding this function declared is still a CONTEXT binding when a closure inside
+				// it reads the value and something reassigns it, which is upstream's second rule at
+				// `FindContextIdentifiers.ts:108`. The write is in the outer function either way, so
+				// the writer's position cannot decide it -- see `context_identifiers.go`.
+				//
+				// It matters because the two lower to different effects: `StoreContext` emits a
+				// `Mutate` on the binding, widening its mutable range past the memo call that
+				// captured it, and without that widening the scope closes before the marker and the
+				// rule stays silent where upstream reports a dependency that may be mutated later.
+				if b.contextual[symbol] {
+					if b.function.ContextDeclarations == nil {
+						b.function.ContextDeclarations = map[DeclarationId]bool{}
+					}
+					if identifier := b.function.Identifiers[place.Identifier]; identifier != nil {
+						b.function.ContextDeclarations[identifier.Declaration] = true
+					}
+					b.emit(&StoreContext{LValue: place, Value: value, Kind: kind}, target)
+					return value
+				}
 				b.emit(&StoreLocal{LValue: place, Value: value, Kind: kind}, target)
 				return value
 			}
