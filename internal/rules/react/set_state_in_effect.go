@@ -156,6 +156,10 @@ var messageSetStateInEffect = rule.Message{
 //     is a nested `FunctionExpression` whose body those blocks do not contain. The map it consults
 //     was populated in the ENCLOSING function, so only setters that crossed the boundary from
 //     outside are known. This is a real hole rather than an exemption, and it is reproduced.
+//   - **A `useCallback` or `useMemo` wrapper is invisible to both sides**, because upstream deletes
+//     it before this validator runs and this rule now reads a graph prepared the same way. See
+//     `hir.ForFunctionWithoutManualMemoization`; the fixtures are
+//     `TestSetStateInEffectSeesThroughManualMemoization`.
 //   - **A setter reached through a callback is silent, by the same mechanism running the other
 //     way.** `setTimeout(setS, 10)` and `subscribe(() => setS(1))` are both clean, which is the
 //     rule's actual purpose: the setter is not called during the effect body.
@@ -166,6 +170,16 @@ var messageSetStateInEffect = rule.Message{
 //     behave identically, and a setter passed as the SECOND argument is silent.
 //
 // # Where this diverges, and why
+//
+// A `useMemo` whose callback returns a function is reported upstream and is silent here.
+// `dropManualMemoization` turns `useMemo(fn, deps)` into `fn()`, and upstream's
+// `InlineImmediatelyInvokedFunctionExpressions` then replaces that call with the closure itself;
+// this tree has no such pass, so setter-ness would have to flow through a call's return value,
+// which neither upstream's validator nor this rule tracks. Porting the inlining pass is the fix and
+// it is left undone rather than approximated, since a hand-rolled return-value follow would diverge
+// in the other direction on every non-memo call. Pinned as a failing-shape fixture in
+// `TestSetStateInEffectDeclinesMemoizationItDoesNotReach`, which is what will announce the gap has
+// closed the day that pass lands.
 //
 // Upstream distinguishes an import of `useEffect` from React from a same-named local declaration or
 // an import from an unrelated module, and is silent on the latter two. That distinction lives in
@@ -184,6 +198,18 @@ var messageSetStateInEffect = rule.Message{
 //
 // Run over Kirk's tree with `--no-fix --lint --timing`: 20 findings over 3,407 files, and every one
 // was read rather than counted. It does not explode.
+//
+// That figure predates both the manual-memoization erasure and the ref work that landed beside it.
+// Re-measured after the erasure: 2 findings over 3,482 files, both `useCallback`-wrapped async
+// fetches called from an effect, both confirmed against React 7.1.1. One of the two is reported by
+// React as well; the other is not, and the difference is the ref exemption rather than this change.
+//
+// The cost figure below is also from that first run and has moved since, in the rule's favour: the
+// same tree now attributes about 40ms to this rule, and `refs` is the expensive one at roughly
+// 1.5s. The per-rule numbers in this paragraph came from a `--timing` run, which times every
+// listener call and is slower than a real one, so they compare rules to each other and are not the
+// tool's speed. What has not changed is the reason they are what they are, which is why the
+// paragraph stays.
 //
 // **It costs 888ms, which is 10% of all rule time and the most expensive rule in the run.** That is
 // stated plainly rather than buried, but it is a property of the approach rather than of this rule:
@@ -232,10 +258,11 @@ var SetStateInEffect = rule.Rule{
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
-					// Shared with the other rules that lower this same function; see hir.ForFunction.
-					// Construct runs inside the cached computation, because it mutates in place and is
-					// not idempotent.
-					lowered := hir.ForFunction(ctx, functionNode)
+					// Manual memoization is erased first, because upstream validates a graph
+					// where `useMemo` and `useCallback` are already gone; see
+					// hir.ForFunctionWithoutManualMemoization for why that is a separate cache
+					// entry rather than a step in the shared one.
+					lowered := hir.ForFunctionWithoutManualMemoization(ctx, functionNode)
 					if lowered == nil {
 						return
 					}

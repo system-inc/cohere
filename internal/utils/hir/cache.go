@@ -3,6 +3,7 @@ package hir
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
@@ -79,6 +80,115 @@ func ForFunction(ctx rule.Context, node *ast.Node) *Function {
 		Construct(lowered)
 		return lowered
 	})
+}
+
+// ForFunctionWithoutManualMemoization is ForFunction with `useMemo` and `useCallback` erased.
+//
+// # Why this is a second cache entry rather than a step inside the first
+//
+// Upstream erases manual memoization at `Pipeline.ts:169`, before any validator runs, so a rule
+// ported from one of those validators is only faithful if its input has been through the same
+// erasure. `set-state-in-effect` is one: `const f = useCallback(() => setS(1), []); useEffect(() =>
+// f())` is reported by React 7.1.1 and was silent here, because the wrapper broke the alias chain
+// the rule follows. The rewrite `useCallback(fn, deps)` -> `LoadLocal fn` restores it with no
+// change to the rule.
+//
+// Putting the pass in `ForFunction` was tried first and is wrong, which the suite caught rather
+// than review: three other rules read that same cached graph and need the memo call intact.
+// `set-state-in-render` distinguishes a setter called inside a `useMemo` callback from one called
+// during render, and with the call erased the first shape becomes the second, so two fixtures
+// reported twice. `refs` misnamed a finding on `error.maybe-mutable-ref-not-preserved`, and
+// `immutability` failed too. The pass mutates in place, so sharing it silently changes what every
+// later rule sees — the same hazard the Construct note above describes, in a form no verifier
+// catches.
+//
+// So the erasure is one rule family's view of the graph, not the representation's, and it gets its
+// own entry under its own key.
+//
+// # What the second lowering costs, measured twice because the first measurement was wrong
+//
+// Ungated, it costs about 100ms of a 2.1s lint phase. Gated by `mentionsManualMemoization` below it
+// costs nothing measurable: over Kirk's tree, twenty-five interleaved runs of each binary, median
+// 2.160s with the erasure against 2.170s without it, and the minimum is 1.950s against 1.960s. Two
+// statistics that disagree in opposite directions by ten milliseconds is what "no difference" looks
+// like. The gate is why: 12,986 of 13,171 functions skip the second lowering entirely, so only the
+// 185 that actually memoize pay for one.
+//
+// An earlier version of this comment claimed 570ms, and that number was measured wrong in a way
+// worth recording because the trap is easy to fall into twice. It came from runs under `--timing`,
+// which wraps every listener call in a `time.Now` pair; `cmd/verify/timing.go` says so on the line
+// that prints the total, in as many words -- compare rules to each other, never these totals to a
+// normal run. It also came from three samples against a machine whose run-to-run spread is larger
+// than the effect being measured. The honest procedure is what produced the numbers above:
+// interleave the binaries so drift hits both, take twenty-plus samples, and read the median and the
+// minimum rather than the mean, since a single descheduled run moves a mean and cannot move a
+// minimum.
+//
+// A future `ForFunction` could keep the memo call and record the rewrite alongside it, letting both
+// families read one graph and removing even the gated cost. That is a change to the representation
+// and wants its own commit, its own measurement, and the six rules re-run against it. It is not
+// worth doing for the time: it is worth doing only if a third rule family ever wants the erased
+// form, at which point the gate stops being enough.
+//
+// Running the pass after Construct rather than before it, as upstream's line order has it, is safe
+// for the reason the pass's own header gives: it creates and deletes no instruction, block, or
+// terminal, so the control-flow graph is bit-identical and single-assignment form is undisturbed.
+// Only one instruction value per memo call changes, toward fewer operands.
+// `AnalyzePreservedManualMemoization` already sequences it post-Construct for the same reason.
+func ForFunctionWithoutManualMemoization(ctx rule.Context, node *ast.Node) *Function {
+	if node == nil || ctx.TypeChecker == nil {
+		return nil
+	}
+	// A function with no memo call anywhere in its text lowers to a graph the erasure cannot
+	// change, so it shares the entry every other rule already paid for. This is the whole
+	// optimisation and it is worth stating why it is safe rather than merely fast:
+	// `DropManualMemoization` only ever rewrites a `CallExpression` or `MethodCall` whose callee
+	// resolves to one of the two names, so a function whose source contains neither name has
+	// nothing for it to find. The check is over the function's own span including its nested
+	// functions, which is the same subtree the lowering covers.
+	//
+	// The numbers this buys are in the header above rather than repeated here, so there is one
+	// place to correct when they go stale.
+	if !mentionsManualMemoization(node) {
+		return ForFunction(ctx, node)
+	}
+	return rule.Cached(ctx.FileCache, cacheKeyFor(node)+":no-manual-memo", func() *Function {
+		lowered := Lower(node, ctx.TypeChecker)
+		if lowered == nil {
+			return nil
+		}
+		Construct(lowered)
+		DropManualMemoization(lowered)
+		return lowered
+	})
+}
+
+// mentionsManualMemoization reports whether this function's source text names either memo hook.
+//
+// Deliberately textual rather than a walk over the syntax tree. What it must never do is answer
+// "no" for a function the erasure would have changed, and a substring search over the span cannot:
+// every spelling that reaches `DropManualMemoization` -- a bare `useCallback`, a `React.useMemo`
+// member access, a renamed import whose call site still reads `useMemo` -- contains one of the two
+// literal names somewhere in the span. Answering "yes" for a function that merely mentions the name
+// in a comment or a string costs one extra lowering and nothing else, which is the direction that
+// is allowed to be wrong.
+//
+// The one spelling this does not catch is an import renamed to something else entirely
+// (`import {useCallback as memo}` called as `memo(...)`), and that is already outside what the pass
+// recognises: its sidemap keys on the name at the call site, matching upstream's syntactic
+// recognition, so a call spelled `memo(...)` is not erased by either implementation.
+func mentionsManualMemoization(node *ast.Node) bool {
+	sourceFile := ast.GetSourceFileOfNode(node)
+	if sourceFile == nil {
+		return true
+	}
+	text := sourceFile.Text()
+	start, end := node.Pos(), node.End()
+	if start < 0 || end > len(text) || start >= end {
+		return true
+	}
+	span := text[start:end]
+	return strings.Contains(span, "useCallback") || strings.Contains(span, "useMemo")
 }
 
 // cacheKeyFor names one function node within one file.

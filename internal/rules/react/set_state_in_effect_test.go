@@ -54,7 +54,7 @@ import (
 // file rather than approximated, because the whole rule rests on `Dispatch` being an ALIAS and
 // `RefObject` being an INTERFACE. A stub that made either the other kind would test the opposite of
 // what ships.
-const reactStub = "export type SetStateAction<S> = S | ((prevState: S) => S);\nexport type Dispatch<A> = (value: A) => void;\nexport type Destructor = () => void;\nexport type EffectCallback = () => void | Destructor;\nexport type DependencyList = readonly unknown[];\nexport interface RefObject<T> { current: T }\nexport declare function useState<S>(initialState: S | (() => S)): [S, Dispatch<SetStateAction<S>>];\nexport declare function useEffect(effect: EffectCallback, deps?: DependencyList): void;\nexport declare function useLayoutEffect(effect: EffectCallback, deps?: DependencyList): void;\nexport declare function useInsertionEffect(effect: EffectCallback, deps?: DependencyList): void;\nexport declare function useEffectEvent<T extends Function>(callback: T): T;\nexport declare function useRef<T>(initialValue: T): RefObject<T>;\nexport type ActionDispatch<A extends unknown[]> = (...args: A) => void;\nexport declare function useReducer<S, A>(r: (s: S, a: A) => S, i: S): [S, ActionDispatch<[A]>];\n"
+const reactStub = "export type SetStateAction<S> = S | ((prevState: S) => S);\nexport type Dispatch<A> = (value: A) => void;\nexport type Destructor = () => void;\nexport type EffectCallback = () => void | Destructor;\nexport type DependencyList = readonly unknown[];\nexport interface RefObject<T> { current: T }\nexport declare function useState<S>(initialState: S | (() => S)): [S, Dispatch<SetStateAction<S>>];\nexport declare function useEffect(effect: EffectCallback, deps?: DependencyList): void;\nexport declare function useLayoutEffect(effect: EffectCallback, deps?: DependencyList): void;\nexport declare function useInsertionEffect(effect: EffectCallback, deps?: DependencyList): void;\nexport declare function useEffectEvent<T extends Function>(callback: T): T;\nexport declare function useRef<T>(initialValue: T): RefObject<T>;\nexport declare function useCallback<T extends Function>(callback: T, deps: DependencyList): T;\nexport declare function useMemo<T>(factory: () => T, deps: DependencyList): T;\nexport type ActionDispatch<A extends unknown[]> = (...args: A) => void;\nexport declare function useReducer<S, A>(r: (s: S, a: A) => S, i: S): [S, ActionDispatch<[A]>];\n"
 
 // otherModuleStub declares hooks that are NOT React's, for the custom-hook-name cases.
 const otherModuleStub = "export declare function useMyEffect2(cb: () => void): void;\nexport declare function useEffective(cb: () => void): void;\n"
@@ -443,4 +443,142 @@ func TestSetStateInEffectDescendsIntoNestedFunctions(t *testing.T) {
 // cost the gate exists to avoid. Measured against React: silent.
 func TestSetStateInEffectDeclinesACallbackClosingOverNoSetter(t *testing.T) {
 	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useEffect} from \"./react\";\nfunction Component({onTick}: {onTick: () => void}) {\n  useEffect(() => {\n    onTick();\n  });\n  return null;\n}\n"))
+}
+
+// TestSetStateInEffectSeesThroughManualMemoization pins the `useCallback` / `useMemo` erasure.
+//
+// # What was missing, and how the gap was found
+//
+// This was found by differential run rather than by reading: `s l --linter both` over Kirk's tree
+// had React reporting one finding this rule did not. Reduced, the difference was one wrapper:
+//
+//	const bump = useCallback(() => setState(1), []);  // React reports, this was silent
+//	const bump = () => setState(1);                   // both report
+//	useEffect(() => { bump(); });
+//
+// Both spellings were run through React 7.1.1 via the ESLint Linter API, not inferred. The
+// mechanism is upstream's pipeline rather than its validator: `dropManualMemoization`
+// (`Pipeline.ts:169`) rewrites `useCallback(fn, deps)` to a plain load of `fn` and
+// `useMemo(fn, deps)` to `fn()`, and `validateNoSetStateInEffects` runs at line 50131 of the same
+// bundle, long after. So upstream's validator never sees a memo call at all, and this rule --
+// transcribed faithfully from that validator -- was faithful to a function whose input had not
+// been prepared the same way.
+//
+// The fix is entirely in the input: `hir.ForFunctionWithoutManualMemoization` runs the erasure
+// before this rule reads the graph. The rule itself is unchanged, because it already carries
+// setter-ness across `LoadLocal`, which is exactly what the `useCallback` rewrite produces.
+//
+// # Why the async cases are here
+//
+// The site that exposed this is a mount fetch whose setters all run after an `await`, so the
+// obvious reading is that the await boundary is what upstream is tracking. It is not: `asyncAfterAwait`
+// and `asyncBeforeAwait` below differ only in where the setter sits relative to the first await,
+// React reports both, and so does this. The await is not consulted by either implementation. That
+// is recorded because it is the wrong conclusion a reader is most likely to draw from the site,
+// and because it is the one that would send someone rewriting application code to no effect.
+func TestSetStateInEffectSeesThroughManualMemoization(t *testing.T) {
+	const setStateInEffect = "setStateInEffect"
+
+	cases := []setStateInEffectCase{
+		// The reduced form of the gap. React 7.1.1 reports at the `bump()` call site.
+		{
+			name:   "useCallbackWrappingASetter",
+			source: "import {useCallback, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useCallback(() => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n",
+		},
+		// Every setter after the first await, which is the shape the real site has. React reports.
+		{
+			name:   "asyncAfterAwait",
+			source: "import {useCallback, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const load = useCallback(async () => {\n    const value = await Promise.resolve(1);\n    setState(value);\n  }, []);\n  useEffect(() => {\n    void load();\n  }, [load]);\n  return state;\n}\n",
+		},
+		// The same with a setter before the await. Reports too, which is what shows the await is
+		// not the discriminator either implementation uses.
+		{
+			name:   "asyncBeforeAwait",
+			source: "import {useCallback, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const load = useCallback(async () => {\n    setState(0);\n    const value = await Promise.resolve(1);\n    setState(value);\n  }, []);\n  useEffect(() => {\n    void load();\n  }, [load]);\n  return state;\n}\n",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ruletest.ExpectFindings(t, runSetStateInEffect(t, testCase.source), setStateInEffect)
+		})
+	}
+}
+
+// TestSetStateInEffectDeclinesMemoizationItDoesNotReach records where the erasure stops.
+//
+// # The useMemo-returns-a-function case is a known divergence, not an oversight
+//
+// `const bump = useMemo(() => () => setState(1), [])` is reported by React and is silent here, and
+// the reason is one pass further down upstream's pipeline. The erasure rewrites `useMemo(fn, deps)`
+// to `fn()`, which leaves a call whose result is the inner closure; upstream then runs
+// `InlineImmediatelyInvokedFunctionExpressions` immediately afterwards, which replaces that call
+// with the closure itself and is what puts a `FunctionExpression` where the validator can see it.
+// This tree has no such pass -- `invoked_functions.go` is the analysis of the same name's family,
+// not the rewrite -- so setter-ness has to flow through a call's return value, which neither
+// upstream's validator nor this rule tracks.
+//
+// Porting that pass is the fix and it is a real one, not a line. It is left undone deliberately
+// rather than approximated here, because a hand-rolled "follow the return value" would diverge from
+// upstream in the other direction on every non-memo call. Recorded as a failing-shape fixture so
+// the divergence is a fact in the suite rather than a surprise, and so the day the inlining pass
+// lands this test is what tells its author the gap closed.
+//
+// The propagation is also not general, which bounds what the erasure claims. A closure passed
+// through an ordinary function or a custom hook stays silent in both implementations, measured on
+// both: only `useMemo` and `useCallback` are erased, because only those two are what
+// `dropManualMemoization` recognises.
+func TestSetStateInEffectDeclinesMemoizationItDoesNotReach(t *testing.T) {
+	// useMemo returning a function. React reports; this does not, pending the inlining pass.
+	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useEffect, useMemo, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useMemo(() => () => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"))
+
+	// A closure through an ordinary function. Silent in both, so the erasure is not "any call".
+	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useEffect, useState} from \"./react\";\n\nfunction identity<T>(callback: T): T {\n  return callback;\n}\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = identity(() => {\n    setState(1);\n  });\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"))
+
+	// A closure through a custom hook. Silent in both, for the same reason.
+	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useEffect, useState} from \"./react\";\n\nfunction useWrap<T>(callback: T): T {\n  return callback;\n}\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useWrap(() => {\n    setState(1);\n  });\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"))
+
+	// A useCallback closing over no setter, beside the firing cases above: the erasure does not
+	// make every memoized callback suspect.
+	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useCallback, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state] = useState(0);\n  const log = useCallback(() => {\n    console.info(\"x\");\n  }, []);\n  useEffect(() => {\n    log();\n  }, [log]);\n  return state;\n}\n"))
+}
+
+// TestSetStateInEffectGatesTheSecondLoweringWithoutLosingFindings pins the fast path.
+//
+// `ForFunctionWithoutManualMemoization` skips its own lowering when the function's text names
+// neither memo hook, which is what makes the erasure free: 12,986 of 13,171 functions in Kirk's
+// tree take that path. The risk it introduces is one-directional and silent -- a function the gate
+// wrongly calls memo-free is lowered from the shared cache, so the erasure never runs and the
+// finding disappears with no error anywhere, which is the failure a fixture has to catch because
+// nothing else can.
+//
+// Each case here reports, and each would go silent if the gate stopped seeing its spelling.
+func TestSetStateInEffectGatesTheSecondLoweringWithoutLosingFindings(t *testing.T) {
+	const setStateInEffect = "setStateInEffect"
+
+	// The namespace spelling: the span names `useCallback` only through a member access, and the
+	// pass recognises it through its `react` sidemap rather than a bare identifier.
+	ruletest.ExpectFindings(t, runSetStateInEffect(t, "import * as React from \"./react\";\n\nfunction Component() {\n  const [state, setState] = React.useState(0);\n  const bump = React.useCallback(() => {\n    setState(1);\n  }, []);\n  React.useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"), setStateInEffect)
+
+	// The control: no memo call at all, so this takes the gate's fast path and must still report
+	// through the shared lowering. Without this, a gate that returned `nil` on its fast path would
+	// look correct from the case above alone.
+	ruletest.ExpectFindings(t, runSetStateInEffect(t, "import {useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = () => {\n    setState(1);\n  };\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"), setStateInEffect)
+}
+
+// TestSetStateInEffectRenamedMemoImportIsAKnownDivergence records a gap the gate does not cause.
+//
+// `import {useCallback as useCached}` called as `useCached(...)` is reported by React 7.1.1 and is
+// silent here, measured on both. It is recorded beside the gate fixtures because that is where a
+// reader will look for it and wrongly blame the fast path: the gate is innocent, and the proof is
+// that the ungated binary is silent on this input too.
+//
+// The cause is upstream's `Environment.getGlobalDeclaration`, which keys on `binding.imported` --
+// the name a binding was declared as -- while this tree's lowering leaves `LoadGlobal.BindingKind`
+// at `Global` for every global and never populates `Imported`, documented at
+// `internal/utils/hir/lower.go:58`. So the memo sidemap can only recognise a call spelled with the
+// hook's own name. It is the same missing binding-kind information the rule's own header names as
+// its other divergence, reached from the opposite direction, and it closes when that closes.
+func TestSetStateInEffectRenamedMemoImportIsAKnownDivergence(t *testing.T) {
+	ruletest.ExpectClean(t, runSetStateInEffect(t, "import {useCallback as useCached, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useCached(() => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"))
 }
