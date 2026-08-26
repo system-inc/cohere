@@ -86,6 +86,25 @@
 //
 // Measured: 1,974 method calls and their call siblings across the corpus reach this arm.
 //
+// # Two shortcuts to that lattice were measured and neither works
+//
+// The type upstream reads here is not TypeScript's. A call's result type comes from unifying the
+// callee's own function type (`InferTypes.ts:276`), so it is `Primitive` only when the callee is a
+// known global whose signature says so. That made two cheaper routes look plausible, in the way
+// `isUseRefType` turned out to be a call-site fact rather than a type fact. Both were tried:
+//
+//	answer TRUE for every call            false positives 8 to 10, scope exact 16 to 11
+//	ask `effectSignature.Result` first    identical, 10 and 11
+//
+// The second is identical to the first because the table cannot discriminate. Instrumented over the
+// clean corpus, `lookupSignature` answers `known=false` for almost every callee that reaches this
+// arm -- 39 `useMemo`, 6 `useState`, 5 `useRef`, 5 `log` -- because the table holds array and Map
+// methods rather than hooks and module globals. So the lookup returns the same TRUE the naive flip
+// does, at every site that matters.
+//
+// Recorded because both readings are natural and both are wrong: the gap really does need the
+// lattice, not a signature lookup, and the FALSE above stays the conservative answer until it lands.
+//
 // # enableForest is off, and that is upstream's default rather than a simplification
 //
 // React's phi branch has an `else if (fn.env.config.enableForest)` arm unioning each phi with each
