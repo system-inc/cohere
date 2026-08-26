@@ -288,7 +288,10 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 
 	// `exact` second. Per-fixture agreement is the finer signal, because two totals can net out: a
 	// change making twenty fixtures worse and twenty better leaves `survivedTotal` untouched.
-	const knownSurvivedExact = 25
+	// 25 when the oracle was written, then 26, now 30: a hook's parameters became frozen, so a
+	// conditional mutation stopped widening ranges through them and values stopped joining scopes
+	// upstream leaves them out of.
+	const knownSurvivedExact = 30
 	if survivedExact < knownSurvivedExact {
 		t.Errorf("exact per-fixture agreement = %d of %d, want at least %d; fewer fixtures now "+
 			"match upstream's scope count exactly, which a stable total would hide", survivedExact,
@@ -296,7 +299,8 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	}
 
 	// `ours` last, as a ceiling. Down toward 97 is the improvement.
-	const knownSurvivedTotal = 114
+	// 114 to 108 with frozen parameters. Down toward upstream's 97 is the improvement.
+	const knownSurvivedTotal = 108
 	if survivedTotal > knownSurvivedTotal {
 		t.Errorf("surviving scopes = %d against upstream's %d, want at most %d; we produce more "+
 			"scopes than before, so something split a scope upstream keeps whole or stopped a "+

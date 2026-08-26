@@ -881,10 +881,45 @@ func insertBackEdge(into map[IdentifierId]int, order *[]IdentifierId, from Ident
 // is strictly weaker than upstream.
 type aliasingState struct {
 	nodes map[IdentifierId]*aliasingNode
+
+	// immutable is upstream's abstract value kind, reduced to the one bit the mutation gate needs.
+	//
+	// `InferMutationAliasingEffects` carries a five-point lattice -- Mutable, Context, Primitive,
+	// Frozen, MaybeFrozen, Global -- because it uses the distinctions to phrase diagnostics. The
+	// only consumer here is `state.mutate` at `InferMutationAliasingEffects.ts:1489`, whose
+	// conditional arm mutates for `Mutable` and `Context` and returns `none` for everything else.
+	// So one bit is the whole answer: present means "not Mutable or Context", absent means mutable.
+	//
+	// Absent rather than false is deliberate. A value the walk never reached has no entry, and the
+	// gate treats that as mutable, which is the pre-existing behaviour of this pass and the
+	// conservative direction for widening.
+	immutable map[IdentifierId]bool
 }
 
 func newAliasingState() *aliasingState {
-	return &aliasingState{nodes: map[IdentifierId]*aliasingNode{}}
+	return &aliasingState{
+		nodes:     map[IdentifierId]*aliasingNode{},
+		immutable: map[IdentifierId]bool{},
+	}
+}
+
+// markImmutable records that a value is not Mutable or Context, so a conditional mutation of it
+// widens nothing.
+func (s *aliasingState) markImmutable(id IdentifierId) {
+	s.immutable[id] = true
+}
+
+// deriveImmutable gives Into the same mutability as From.
+//
+// Upstream's `CreateFrom` at `InferMutationAliasingEffects.ts:731` reads the source's kind and
+// initializes the target with it, rewriting the effect into a plain `Create` of that kind when the
+// source is Primitive, Global or Frozen. This is that propagation, in the one bit this pass reads.
+func (s *aliasingState) deriveImmutable(from IdentifierId, into IdentifierId) {
+	if s.immutable[from] {
+		s.immutable[into] = true
+		return
+	}
+	delete(s.immutable, into)
 }
 
 // create makes a node, replacing any existing one.
@@ -1206,8 +1241,22 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 	// walking any block, and the `assign`/`capture`/`maybeAlias` builders DROP an edge whose
 	// endpoints do not both exist, so an edge touching a parameter would be silently discarded
 	// without these.
+	// Upstream picks the parameter kind once, at `InferMutationAliasingEffects.ts:123`: a component
+	// or hook gets `ValueKind.Frozen` with reason `ReactiveFunctionArgument`, and only a nested
+	// function expression gets `Mutable`. React owns the arguments it passes a component or hook,
+	// so nothing the body does may mutate them; a callback's parameters carry no such promise.
+	//
+	// This is what keeps a prop read out of the scope its consumer creates. Without it, a
+	// `PropertyLoad` off a parameter is mutable, a later call conditionally mutates it, its range
+	// widens to reach that call, and the load joins a scope upstream leaves it out of. Measured on
+	// `useMemo-inner-decl.ts`, where upstream's three loads are one instruction wide and ours
+	// reached the call.
+	parametersAreFrozen := function.Kind == FunctionKindComponent || function.Kind == FunctionKindHook
 	for _, param := range function.Params {
 		state.create(param, aliasingNodeObject)
+		if parametersAreFrozen {
+			state.markImmutable(param.Identifier)
+		}
 	}
 	for _, contextValue := range function.Context {
 		state.create(contextValue, aliasingNodeObject)
@@ -1260,9 +1309,15 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 				switch {
 				case effect.Kind == AliasingEffectCreate:
 					state.create(effect.Into, aliasingNodeObject)
+					if effect.Value != EffectValueMutable {
+						state.markImmutable(effect.Into.Identifier)
+					} else {
+						delete(state.immutable, effect.Into.Identifier)
+					}
 
 				case effect.Kind == AliasingEffectCreateFrom:
 					state.createFrom(index, effect.From, effect.Into)
+					state.deriveImmutable(effect.From.Identifier, effect.Into.Identifier)
 					index++
 
 				case effect.Kind == AliasingEffectAssign:
@@ -1291,6 +1346,14 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					if effect.Kind == AliasingEffectMutateTransitiveConditionally {
 						kind = mutationKindConditional
 					}
+					if kind == mutationKindConditional && state.immutable[effect.Into.Identifier] {
+						// Upstream's `state.mutate` returns `none` for a conditional mutation of
+						// anything that is not Mutable or Context, and `applyEffect` then does not
+						// push the effect at all. The index still advances: a dropped effect must
+						// not shift the numbering the walk assigns to the ones that remain.
+						index++
+						break
+					}
 					mutations = append(mutations, pendingMutation{
 						index:      index,
 						end:        instruction.Order + 1,
@@ -1311,6 +1374,10 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					index++
 
 				case effect.Kind == AliasingEffectMutateConditionally:
+					if state.immutable[effect.Into.Identifier] {
+						index++
+						break
+					}
 					mutations = append(mutations, pendingMutation{
 						index:      index,
 						end:        instruction.Order + 1,

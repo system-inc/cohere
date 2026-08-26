@@ -580,8 +580,19 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// which is what one identifier serving several writes should produce: the same accesses resolve
 	// to one value instead of several, so a scope names the binding once more often and no path
 	// gets shorter or longer.
-	if deep != 574 || flat != 2101 {
-		t.Errorf("got %d deep and %d flat dependencies, want 574 and 2101; a SMALL move here is "+
+	// # And again when a hook's parameters became frozen
+	//
+	// 574 deep to 563, 2,101 flat to 2,134. Eleven fewer paths and 33 more bare dependencies, for a
+	// net of 22 more overall. Both halves follow from the same cause: a conditional mutation no
+	// longer widens a frozen value's range, so values that used to be swept into a neighbouring
+	// scope now stand alone. More scopes name a dependency, and fewer of those dependencies sit
+	// deep enough inside a widened range to carry a path.
+	//
+	// `deep` FALLING is the safe direction by this test's own rule -- a gain in depth is the
+	// over-approximating one -- and the scope oracle agrees rather than merely not objecting:
+	// surviving scopes 114 to 108 against upstream's 97, and exact per-fixture agreement 26 to 30.
+	if deep != 563 || flat != 2134 {
+		t.Errorf("got %d deep and %d flat dependencies, want 563 and 2134; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}
