@@ -318,6 +318,68 @@ var statedDivergences = map[string]StatedDivergence{
 		Boundary: "TestGlobalsGateIsSharedWithUnsupportedSyntax",
 		Reason:   "`useFoo` is hook-named but calls no hook, and verify's compilation gate requires a hook call in the body; probed with controls showing the same write reports from a function that does call one",
 	},
+
+	// Three `preserve-manual-memoization` goldens that upstream's own fixture headers call
+	// mistakes. Staying silent on them is the correct answer rather than a missed finding, so
+	// scoring them as targets makes the rule's number describe the corpus rather than the rule.
+	//
+	// Quoted from the fixtures rather than characterised:
+	//
+	//	todo-useCallback-captures-invalidating-value
+	//	  "False positive: We currently bail out on this because we don't understand
+	//	   that `() => [x]` gets pruned because `x` always invalidates."
+	//
+	//	false-positive-useMemo-dropped-infer-always-invalidating
+	//	  "This is technically a false positive as the useMemo in source was
+	//	   effectively a no-op"
+	//
+	//	todo-repro-unmemoized-callback-captured-in-context-variable
+	//	  carries upstream's `todo-repro` prefix, its marker for a known-wrong reproduction
+	//
+	// This is a different kind of entry from the pragma three above, and the difference is worth
+	// stating. Those describe a compiler verify does not implement. These describe a verdict
+	// upstream itself disowns, so reproducing them would mean copying a bug -- which is the one
+	// case where matching the answer key is the wrong goal.
+	//
+	// `error.useMemo-aliased-var.ts` is deliberately NOT here. Its header says "This is technically
+	// a false positive, but source is already breaking `exhaustive-deps`", which is upstream
+	// describing an input it considers invalid rather than a verdict it considers wrong, and verify
+	// fires on it today. The distinction is the second clause: a fixture upstream calls a mistake
+	// outright is excluded, one it blames on the input is not.
+	"preserve-memo-validation/error.todo-useCallback-captures-invalidating-value.ts": {
+		Fixture:  "preserve-memo-validation/error.todo-useCallback-captures-invalidating-value.ts",
+		Boundary: "TestPreserveManualMemoizationAgainstGoldens",
+		Reason:   "upstream's own header calls this a false positive: it bails out because it does not understand that `() => [x]` gets pruned when `x` always invalidates",
+	},
+	"preserve-memo-validation/error.false-positive-useMemo-dropped-infer-always-invalidating.ts": {
+		Fixture:  "preserve-memo-validation/error.false-positive-useMemo-dropped-infer-always-invalidating.ts",
+		Boundary: "TestPreserveManualMemoizationAgainstGoldens",
+		Reason:   "upstream's own header calls this a false positive: the `useMemo` in source was effectively a no-op",
+	},
+	"error.todo-repro-unmemoized-callback-captured-in-context-variable.tsx": {
+		Fixture:  "error.todo-repro-unmemoized-callback-captured-in-context-variable.tsx",
+		Boundary: "TestPreserveManualMemoizationAgainstGoldens",
+		Reason:   "carries upstream's `todo-repro` prefix, its marker for a reproduction it knows to be wrong",
+	},
+}
+
+// divergenceRuleIsShipped reports whether any rule a fixture is attributed to is registered.
+//
+// The gate on answering a stated divergence early. See its call site for why the two cases differ.
+func divergenceRuleIsShipped(rules []string) bool {
+	// No attribution means there is no unshipped rule to defer to, so the divergence is answered
+	// here as it always was. This is the shape `TestStatedDivergenceCategoryCanHoldAnEntry` uses,
+	// and it is also the honest answer: deferring would send a fixture nobody owns to a verdict
+	// about rule registration.
+	if len(rules) == 0 {
+		return true
+	}
+	for _, ruleName := range rules {
+		if _, found := ShippedRules[ruleName]; found {
+			return true
+		}
+	}
+	return false
 }
 
 // StatedDivergenceNames returns the fixtures recorded as deliberate divergences, keyed by name.
@@ -364,7 +426,16 @@ func Classify(fixture Fixture, result Result, err error) FixtureVerdict {
 		return verdict
 	}
 
-	if divergence, found := statedDivergences[fixture.Name]; found {
+	// A stated divergence outranks everything below it EXCEPT the question of whether verify ships a
+	// rule that could have been asked at all. Claiming "we deliberately differ" about a fixture no
+	// registered rule reaches would be the score taking credit for a judgment nothing acts on, which
+	// is the same error `VerdictNoRuleShipped`'s comment warns about from the other side.
+	//
+	// So the check is split. Divergences for shipped rules are answered here, before attribution;
+	// divergences for unshipped ones are answered after the shipped test below, and until the rule
+	// registers they land in `no-rule-shipped` with everything else that rule owns.
+	if divergence, found := statedDivergences[fixture.Name]; found &&
+		divergenceRuleIsShipped(rules) {
 		verdict.Verdict = VerdictStatedDivergence
 		verdict.Reason = divergence.Reason + " (held by " + divergence.Boundary + ")"
 		return verdict
@@ -390,6 +461,12 @@ func Classify(fixture Fixture, result Result, err error) FixtureVerdict {
 	if len(shipped) == 0 {
 		verdict.Verdict = VerdictNoRuleShipped
 		verdict.Reason = "verify ships no rule for " + strings.Join(rules, ", ")
+		return verdict
+	}
+
+	if divergence, found := statedDivergences[fixture.Name]; found {
+		verdict.Verdict = VerdictStatedDivergence
+		verdict.Reason = divergence.Reason + " (held by " + divergence.Boundary + ")"
 		return verdict
 	}
 

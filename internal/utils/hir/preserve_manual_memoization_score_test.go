@@ -103,13 +103,24 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 			"message string is wrong, and a zero score below would be meaningless")
 	}
 
-	fired, silent, unsupported := 0, 0, 0
+	fired, silent, unsupported, disowned := 0, 0, 0, 0
+	divergences := reactconformance.StatedDivergenceNames()
 	for _, fixture := range mine {
 		// The Flow-declaration exclusion documented above. This is checked BEFORE lowering rather
 		// than after, because these fixtures do lower -- into the wrong thing -- and so the `!ok`
 		// decline below cannot see them.
 		if fixture.RequiresFlow() {
 			unsupported++
+			continue
+		}
+		// Fixtures upstream's own headers call mistakes. Staying silent on one is the right answer,
+		// so counting it as a target would make this number describe the corpus rather than the
+		// rule. The three are enumerated in `statedDivergences` with the header text quoted, and
+		// `TestPreserveManualMemoizationAgainstGoldens` is named there as the boundary that holds
+		// them -- which is this test, so an entry that stops being true fails here.
+		if divergence, disowns := divergences[fixture.Name]; disowns &&
+			divergence.Boundary == "TestPreserveManualMemoizationAgainstGoldens" {
+			disowned++
 			continue
 		}
 		findings, ok := findingsForSource(t, fixture.Source)
@@ -124,8 +135,25 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 		}
 	}
 
-	t.Logf("fixtures=%d fired=%d silent=%d unsupported=%d (of unsupported, %d are Flow declarations)",
-		len(mine), fired, silent, unsupported, flowOnly)
+	// The denominator, spelled out rather than left to be reconstructed. `fixtures` is every golden
+	// carrying this rule's message; `scoreable` is what remains once the two populations that
+	// cannot be scored are removed, and it is the number the pass count should be read against.
+	// Printing only `fixtures=33 fired=28` reads as five failures, and three of those five are the
+	// rule being right.
+	scoreable := len(mine) - unsupported - disowned
+	t.Logf("fixtures=%d scoreable=%d fired=%d silent=%d "+
+		"(excluded: %d Flow, %d disowned upstream)",
+		len(mine), scoreable, fired, silent, unsupported, disowned)
+
+	// Pinned to the exact population, for the same reason as the Flow count below: an exclusion
+	// that silently widens is how a denominator rots. A fourth entry naming this boundary, or one
+	// of these three being rewritten upstream, has to be re-justified rather than inherited.
+	const knownDisownedFixtures = 3
+	if disowned != knownDisownedFixtures {
+		t.Errorf("fixtures upstream disowns = %d, want %d; the exclusions in `statedDivergences` "+
+			"naming this test as their boundary have changed and the judgment has to be re-made",
+			disowned, knownDisownedFixtures)
+	}
 
 	// The exclusion is pinned to the exact population it was measured against. If the corpus is
 	// re-vendored and a THIRD Flow fixture appears -- or one of these two is rewritten in the
