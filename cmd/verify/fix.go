@@ -172,7 +172,22 @@ func proposalsForText(
 		return nil, fmt.Errorf("re-parsing %s produced nothing", fileName)
 	}
 
+	/*
+	 * Options are resolved here, not left nil, and the omission was a real defect rather than a
+	 * simplification.
+	 *
+	 * A rule handed nil options falls back to whatever it does unconfigured, and for several rules
+	 * that is to decline entirely: `import-require-path-alias` reads its alias map from options, so
+	 * with nil it proposes nothing. That made every pass after the first blind to it. The visible
+	 * symptom was a file needing two separate `--fix` invocations to settle, because the first pass
+	 * applied one fix and the second pass could no longer see the other one to apply it.
+	 *
+	 * It hid because the first pass reuses the proposals the lint phase already collected, which do
+	 * have options. Only passes two and later go through here, and only a file with two overlapping
+	 * fixes ever needs a second pass at all.
+	 */
 	applicable := rules
+	ruleOptions := map[string]any{}
 	if graph.LintConfig != nil {
 		resolution := graph.LintConfig.Resolve(fileName)
 		if resolution.Ignored {
@@ -180,11 +195,45 @@ func proposalsForText(
 		}
 		applicable = applicable[:0:0]
 		for _, subject := range rules {
-			if resolution.Enabled(subject.Name) {
-				applicable = append(applicable, subject)
+			if !resolution.Enabled(subject.Name) {
+				continue
 			}
+			decoded, decodeError := graph.RuleOptions.Decode(subject.Name, resolution.RawOptionsFor(subject.Name))
+			if decodeError != nil {
+				return nil, fmt.Errorf("decoding options for %s on %s: %w", subject.Name, fileName, decodeError)
+			}
+			ruleOptions[subject.Name] = decoded
+			applicable = append(applicable, subject)
 		}
 	}
+
+	/*
+	 * A rule that needs the type checker cannot run here, and running it anyway crashed the whole
+	 * command.
+	 *
+	 * This pass re-lints text that has just been rewritten, which by definition is not the text the
+	 * program was built from, so no checker in the graph describes it: `ctx.TypeChecker` is nil and
+	 * a rule declaring `NeedsTypeChecker` dereferences it on its first question.
+	 * `react/no-danger-with-children` is the one that found it, at `resolvedDeclaration`.
+	 *
+	 * It stayed hidden because reaching this code takes two things at once: a fix that lands, and a
+	 * second pass to verify it. Every fixable rule in the tree happened to be syntactic, so until a
+	 * fixer landed on a file that also carries a checker-needing rule, the pass simply never ran
+	 * with one in the list.
+	 *
+	 * Skipping is the honest answer rather than a workaround. A type-aware rule has nothing true to
+	 * say about text no program contains, so its verdict here would be a guess whichever way it
+	 * came out. The cost is bounded and worth naming: a fix that introduces a type-aware violation
+	 * is not caught by the pass that applied it, and is caught by the next real lint run.
+	 */
+	withoutTypeChecker := applicable[:0:0]
+	for _, subject := range applicable {
+		if subject.NeedsTypeChecker {
+			continue
+		}
+		withoutTypeChecker = append(withoutTypeChecker, subject)
+	}
+	applicable = withoutTypeChecker
 
 	var diagnostics []rule.Diagnostic
 	for _, subject := range applicable {
@@ -201,7 +250,7 @@ func proposalsForText(
 			},
 		}
 
-		listeners := currentRule.Run(context, nil)
+		listeners := currentRule.Run(context, ruleOptions[currentRule.Name])
 		if len(listeners) == 0 {
 			continue
 		}
