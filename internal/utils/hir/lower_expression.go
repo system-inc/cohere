@@ -317,15 +317,29 @@ func (b *builder) lowerLogicalExpression(node *ast.Node) Place {
 		Fallthrough: fallthroughBlock.Id,
 	}, testBlock)
 
-	left := b.lowerExpressionToPlace(expression.Left)
-	b.emitTo(result, &LoadLocal{Place: left}, expression.Left)
+	// The arms write DISTINCT identifiers under the result's declaration, so construction sees two
+	// definitions of one binding and merges them. See `newTemporaryUnder`.
+	shared := b.function.Identifiers[result.Identifier].Declaration
 
+	left := b.lowerExpressionToPlace(expression.Left)
+
+	// Both arms get a value block, including the short-circuiting one.
+	//
+	// Sending that path straight to the fallthrough leaves it with no write, so the join has one
+	// incoming value and no phi is minted. Measured before this: `a && b` merged only because its
+	// short circuit fell through writeless while the other arm wrote, and `a || b` and `a ?? b`
+	// never merged at all, since they swap the arms and hand the fallthrough to the branch.
+	//
+	// Upstream gives both a block: on `const x = a ?? []` its graph is a `branch` value block plus
+	// two `goto` value blocks feeding a join carrying one phi. This reproduces that for every
+	// operator.
+	shortCircuitBlock := b.reserve(BlockKindValue)
 	rightBlock := b.reserve(BlockKindValue)
-	consequent, alternate := rightBlock, fallthroughBlock
+	consequent, alternate := rightBlock, shortCircuitBlock
 	if expression.OperatorToken.Kind == ast.KindBarBarToken ||
 		expression.OperatorToken.Kind == ast.KindQuestionQuestionToken {
 		// `a || b` and `a ?? b` evaluate the right operand when the test is falsy or nullish.
-		consequent, alternate = fallthroughBlock, rightBlock
+		consequent, alternate = shortCircuitBlock, rightBlock
 	}
 	b.terminateWith(&Branch{
 		Test:        left,
@@ -334,9 +348,15 @@ func (b *builder) lowerLogicalExpression(node *ast.Node) Place {
 		Fallthrough: fallthroughBlock.Id,
 	})
 
+	b.enter(shortCircuitBlock)
+	b.emitTo(b.newTemporaryUnder(expression.Left, shared), &LoadLocal{Place: left},
+		expression.Left)
+	b.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
+
 	b.enter(rightBlock)
 	right := b.lowerExpressionToPlace(expression.Right)
-	b.emitTo(result, &LoadLocal{Place: right}, expression.Right)
+	b.emitTo(b.newTemporaryUnder(expression.Right, shared), &LoadLocal{Place: right},
+		expression.Right)
 	b.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
 
 	b.enter(fallthroughBlock)

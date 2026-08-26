@@ -303,6 +303,21 @@ func (b *builder) newTemporary(node *ast.Node) Place {
 	return Place{Identifier: identifier.Id, Range: rangeOf(node)}
 }
 
+// newTemporaryUnder mints a value sharing an existing value's DECLARATION.
+//
+// Construction merges two writes only when they name one binding, keyed on the declaration rather
+// than the identifier (`ssa.go:316`). Two arms of a logical each writing a fresh temporary give a
+// join unrelated declarations and nothing to merge; both writing the SAME identifier give it one
+// definition and nothing to version. Distinct identifiers under one declaration are what make them
+// versions of one thing.
+//
+// Upstream gets this structurally: its `LogicalExpression` case stores into a single `place` in both
+// arms and construction versions that one binding.
+func (b *builder) newTemporaryUnder(node *ast.Node, shared DeclarationId) Place {
+	identifier := b.function.NewIdentifier("", node, shared)
+	return Place{Identifier: identifier.Id, Range: rangeOf(node)}
+}
+
 // declarationOf returns the binding a symbol names, or zero on first sight.
 //
 // Zero tells `NewIdentifier` to derive the declaration from the identifier id, which is upstream's

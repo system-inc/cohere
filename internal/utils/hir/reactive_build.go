@@ -684,21 +684,21 @@ func (c *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) 
 
 	case *Logical:
 		if !c.emitLogicalValue(terminal, into, &scheduleIds) {
-			c.emitValueTerminal(terminal.Fallthrough, terminal.Order, into, &scheduleIds)
+			c.emitValueTerminal(terminal.Fallthrough, terminal.Order, into, &scheduleIds, terminal.Test)
 		}
 
 	case *Ternary:
-		c.emitValueTerminal(terminal.Fallthrough, terminal.Order, into, &scheduleIds)
+		c.emitValueTerminal(terminal.Fallthrough, terminal.Order, into, &scheduleIds, terminal.Test)
 
 	case *Optional:
 		// Never constructed in this tree; see ReactiveFunctionGapUnbuiltTerminals. Handled because
 		// it shares upstream's arm with ternary and logical, so leaving it out would be a silent
 		// hole the day the lowering starts emitting one.
-		c.emitValueTerminal(terminal.Fallthrough, terminal.Order, into, &scheduleIds)
+		c.emitValueTerminal(terminal.Fallthrough, terminal.Order, into, &scheduleIds, terminal.Test)
 
 	case *Sequence:
 		// Never constructed in this tree; see ReactiveFunctionGapUnbuiltTerminals.
-		c.emitValueTerminal(terminal.Fallthrough, terminal.Order, into, &scheduleIds)
+		c.emitValueTerminal(terminal.Fallthrough, terminal.Order, into, &scheduleIds, terminal.Block)
 
 	case *MaybeThrow:
 		// Upstream's comment: "ReactiveFunction does not explicitly model maybe-throw semantics, so
@@ -915,8 +915,22 @@ func (c *reactiveContext) valueArm(id BlockId) BlockId {
 }
 
 func (c *reactiveContext) emitValueTerminal(fallthrough_ BlockId, order EvaluationOrder,
-	into *ReactiveBlock, ids *[]int) {
+	into *ReactiveBlock, ids *[]int, test BlockId) {
 	blockId, _ := c.scheduleFallthrough(fallthrough_, controlFlowIf, ids)
+	// The test block, walked while the fallthrough is SCHEDULED.
+	//
+	// That block ends in a `Branch`, which already nests both arms under a `ReactiveIf` and
+	// schedules nothing of its own precisely because this terminal owns the fallthrough. So the
+	// whole construct arrives as ONE statement, and a jump out of an arm becomes a break to the
+	// fallthrough rather than a walk that emits it twice.
+	//
+	// Without this the arms are never traversed: `terminal.Test` was not read, so a value terminal's
+	// blocks reached the tree through nothing and their instructions were lost. Measured over the
+	// corpus as `lostWithValueTerminal`, and now visible per fixture because the lowering gives the
+	// short-circuiting arm a block of its own rather than letting it fall through writeless.
+	if test != 0 && test != fallthrough_ && !c.emitted[test] {
+		*into = append(*into, c.traverse(test)...)
+	}
 	c.unscheduleAll(*ids)
 	c.visitFallthrough(blockId, into)
 }

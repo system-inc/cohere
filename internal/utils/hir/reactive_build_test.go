@@ -30,7 +30,13 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 	}{
 		{name: "branch with join", source: `function f(a) { if (a) { return 1; } return 2; }`},
 		{name: "loop with back edge", source: `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`},
-		{name: "ternary", hasValueTerminal: true, source: `function f(a) { const x = a ? 1 : 2; return x; }`},
+		// Both value terminals conserve now that `emitValueTerminal` traverses the test block: it
+		// ends in a `Branch`, which nests both arms under a `ReactiveIf` and schedules nothing of
+		// its own, so the construct arrives as one statement and nothing is dropped. The expression
+		// FORMS are still not built, which is what `ReactiveFunctionGapValueExpressions` remains
+		// about.
+		{name: "ternary", hasValueTerminal: true, conserves: true,
+			source: `function f(a) { const x = a ? 1 : 2; return x; }`},
 		{name: "logical", hasValueTerminal: true, conserves: true,
 			source: `function f(a) { const x = a && a.b; return x; }`},
 	} {
