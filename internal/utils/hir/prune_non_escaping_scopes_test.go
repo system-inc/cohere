@@ -251,7 +251,13 @@ func TestPruneNonEscapingScopesIsDeterministic(t *testing.T) {
 		t.Fatal("the first run pruned or memoized nothing, so comparing runs proves nothing")
 	}
 	for index := 1; index < runs; index++ {
-		if results[index] != results[0] {
+		// Compared field by field rather than with `!=`: the result carries a `PrunedScopes` map,
+		// which makes the struct non-comparable, and the accumulator above only ever fills the four
+		// counters. Those are what "reproducible" means here.
+		if results[index].Pruned != results[0].Pruned ||
+			results[index].EscapingRoots != results[0].EscapingRoots ||
+			results[index].Memoized != results[0].Memoized ||
+			results[index].Declarations != results[0].Declarations {
 			t.Errorf("run %d returned %+v and run 0 returned %+v; the pass is not reproducible",
 				index, results[index], results[0])
 		}
@@ -427,4 +433,58 @@ func markerCounts(function *Function, checker *shimchecker.Checker) (pruned, rea
 		},
 	})
 	return result.MarkersPruned, reached
+}
+
+// The pass reports which scopes it replaced, because replacing leaves no trace in the tree.
+//
+// A scope that stops escaping is replaced by its own instructions rather than marked, so once this
+// pass has run, nothing in the reactive tree records that the scope existed. That is upstream's
+// structure too -- and upstream's validator still knows, because it reads a `prunedScopes` set the
+// pass wrote rather than inferring it from the tree.
+//
+// Without the set a consumer asking "did this scope survive, or was it pruned" reaches a fourth
+// state upstream cannot produce: scoped, and absent from the tree entirely. Measured on
+// `error.repro-preserve-memoization-inner-destructured-value-mistaken-as-dependency-mutated-dep`,
+// where the scope holding a memo block's declared dependency is replaced here and
+// `preserve-manual-memoization` then declines to judge it, staying silent where upstream reports.
+func TestPruneNonEscapingScopesReportsWhatItReplaced(t *testing.T) {
+	replaced, stillPresent := 0, 0
+	forEachCorpusFunctionWithChecker(t, 100, func(function *Function, checker *shimchecker.Checker) {
+		InferReactive(function, checker)
+		tree, dependencies := prunableTree(t, function, checker)
+		if tree == nil {
+			return
+		}
+		result := PruneNonEscapingScopes(tree, function, dependencies, checker)
+		if len(result.PrunedScopes) != result.Pruned {
+			t.Errorf("reported %d pruned scopes and replaced %d; the set and the count must agree",
+				len(result.PrunedScopes), result.Pruned)
+		}
+		replaced += result.Pruned
+
+		// Every reported scope must be gone from the tree. One still present was marked rather than
+		// replaced, which belongs to a different pass.
+		var walk func(block ReactiveBlock)
+		walk = func(block ReactiveBlock) {
+			for _, statement := range block {
+				switch shape := statement.(type) {
+				case *ReactiveScopeBlock:
+					if result.PrunedScopes[shape.Scope] {
+						stillPresent++
+					}
+					walk(shape.Instructions)
+				case *ReactiveTerminalStatement:
+					eachNestedBlock(shape.Terminal, walk)
+				}
+			}
+		}
+		walk(tree.Body)
+	})
+	if replaced == 0 {
+		t.Fatal("the corpus pruned nothing, so this proves nothing about the reported set")
+	}
+	if stillPresent != 0 {
+		t.Errorf("%d scope(s) reported as replaced are still in the tree", stillPresent)
+	}
+	t.Logf("replaced %d scopes, all absent from their trees", replaced)
 }

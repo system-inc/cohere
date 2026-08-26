@@ -41,6 +41,18 @@ type PruneNonEscapingScopesResult struct {
 	// Zero unless the caller supplied scopes, since the marker pass needs to ask which scope an
 	// identifier belongs to and this IR keeps that in a side table rather than on the identifier.
 	MarkersPruned int
+	// PrunedScopes is which scopes were replaced by their own instructions.
+	//
+	// The block is REPLACED rather than marked, so after this pass nothing in the tree records that
+	// the scope existed. Upstream keeps the same structural result and its validator still knows,
+	// because it reads a `prunedScopes` set the pass wrote. Returning the set is how a consumer here
+	// can ask the same question.
+	//
+	// Measured on `error.repro-preserve-memoization-inner-destructured-value-mistaken-as-dependency-mutated-dep`:
+	// scope 1 holds the `x` a memo block names as a dependency, this pass replaces its block, and the
+	// rule then finds a scope that is neither live nor pruned nor walked and declines to judge it --
+	// where upstream reports.
+	PrunedScopes map[ScopeId]bool
 }
 
 // PruneNonEscapingScopes drops scopes whose values are not held by anything.
@@ -111,6 +123,7 @@ func pruneNonEscapingScopesWith(tree *ReactiveFunction, function *Function,
 	markers := prunePassOverMemoMarkers(tree, function, scopes, prunedScopes)
 
 	return PruneNonEscapingScopesResult{
+		PrunedScopes:  prunedScopes,
 		Pruned:        pruned,
 		Declarations:  collector.graph.Len(),
 		EscapingRoots: collector.graph.EscapingCount(),

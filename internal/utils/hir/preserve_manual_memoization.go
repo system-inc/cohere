@@ -89,6 +89,23 @@ func ValidatePreservedManualMemoization(tree *ReactiveFunction, function *Functi
 // caller had before this existed.
 func ValidatePreservedManualMemoizationWithDependencies(tree *ReactiveFunction, function *Function,
 	scopes *ReactiveScopes, dependencies *ScopeDependencies) []PreserveManualMemoizationFinding {
+	return ValidatePreservedManualMemoizationWithPruned(tree, function, scopes, dependencies, nil)
+}
+
+// ValidatePreservedManualMemoizationWithPruned is the same validation, told which scopes the prune
+// chain replaced rather than marked.
+//
+// `PruneNonEscapingScopes` replaces a scope block with its own instructions, so after it runs nothing
+// in the tree records that the scope existed. The walk therefore sees neither a live scope block nor
+// a pruned one, and the `DependencyMutable` condition -- which asks exactly "scoped, not survived,
+// not pruned" -- reaches a fourth state upstream cannot: scoped, and absent.
+//
+// Upstream reads a `prunedScopes` set its own pass wrote, so it answers the three-part question with
+// three states. Passing the set here does the same. A caller with nothing to pass keeps the previous
+// behaviour, which is what the exported wrapper above preserves.
+func ValidatePreservedManualMemoizationWithPruned(tree *ReactiveFunction, function *Function,
+	scopes *ReactiveScopes, dependencies *ScopeDependencies,
+	prunedByChain map[ScopeId]bool) []PreserveManualMemoizationFinding {
 	if tree == nil || function == nil {
 		return nil
 	}
@@ -98,6 +115,7 @@ func ValidatePreservedManualMemoizationWithDependencies(tree *ReactiveFunction, 
 		liveScopes:       map[ScopeId]bool{},
 		prunedScopes:     map[ScopeId]bool{},
 		walkedScopes:     map[ScopeId]bool{},
+		prunedByChain:    prunedByChain,
 		openMemoBlocks:   map[int]bool{},
 		dependencies:     dependencies,
 		sourceDeps:       map[int][]ManualMemoDependency{},
@@ -114,6 +132,8 @@ type manualMemoValidator struct {
 	liveScopes map[ScopeId]bool
 	// prunedScopes are scopes the walk has passed that were pruned.
 	prunedScopes map[ScopeId]bool
+	// prunedByChain are scopes the prune chain REPLACED, which leaves no block for the walk to see.
+	prunedByChain map[ScopeId]bool
 	// walkedScopes are scopes the walk entered at all, whether they survived or were pruned.
 	//
 	// Distinct from the other two rather than derivable from them: a scope absent from both is
@@ -319,7 +339,8 @@ func (v *manualMemoValidator) check(identifier IdentifierId, order EvaluationOrd
 	//
 	// Measured: false positives 31 to 25, golden unchanged at 25, and all three oracles byte
 	// identical -- `matched` 77, `ours` 120, `under` 5 fixtures / 7 scopes.
-	if kind == PreserveManualMemoizationDependencyMutable && !v.walkedScopes[scope] {
+	if kind == PreserveManualMemoizationDependencyMutable && !v.walkedScopes[scope] &&
+		!v.prunedByChain[scope] {
 		return
 	}
 	// # A component or hook parameter's scope is one it inherited, not one it earned
@@ -442,7 +463,7 @@ func AnalyzePreservedManualMemoization(function *Function,
 	}
 
 	MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, typeChecker)
-	PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, typeChecker)
+	nonEscaping := PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, typeChecker)
 	PruneUnusedScopes(tree, dependencies)
 	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 	PruneNonReactiveDependencies(tree, function, dependencies)
@@ -466,7 +487,8 @@ func AnalyzePreservedManualMemoization(function *Function,
 	// `checkValidDependency` rejects `x` on the rule this tree shares with upstream verbatim
 	// (`decl.order < scopeRange.Start`), while upstream's scope begins after that declaration and
 	// names `x`. It belongs to the scope work rather than here.
-	return ValidatePreservedManualMemoizationWithDependencies(tree, function, scopes, dependencies)
+	return ValidatePreservedManualMemoizationWithPruned(tree, function, scopes, dependencies,
+		nonEscaping.PrunedScopes)
 }
 
 // ForEachFunctionLike calls visit for every outermost function-like node under root.

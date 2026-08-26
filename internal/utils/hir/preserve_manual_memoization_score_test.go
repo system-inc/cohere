@@ -577,12 +577,13 @@ func pipelineFindings(function *Function, checker *shimchecker.Checker) []Preser
 	}
 
 	MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, checker)
-	PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, checker)
+	nonEscaping := PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, checker)
 	PruneUnusedScopes(tree, dependencies)
 	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 	PruneNonReactiveDependencies(tree, function, dependencies)
 
-	return ValidatePreservedManualMemoizationWithDependencies(tree, function, scopes, dependencies)
+	return ValidatePreservedManualMemoizationWithPruned(tree, function, scopes, dependencies,
+		nonEscaping.PrunedScopes)
 }
 
 // upstreamReportsInLogs reports whether a fixture's expectation carries this rule's message in its
