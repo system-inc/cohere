@@ -419,6 +419,7 @@ func AnalyzePreservedManualMemoization(function *Function,
 	if function == nil {
 		return nil
 	}
+	OutlineFunctions(function)
 	InferReactive(function, typeChecker)
 	DropManualMemoization(function)
 

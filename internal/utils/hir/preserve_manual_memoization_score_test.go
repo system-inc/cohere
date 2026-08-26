@@ -400,7 +400,22 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	//	useMemo-inner-decl.ts
 	//
 	// Nothing newly fires; every oracle and every structural invariant is unchanged.
-	const knownFalsePositives = 15
+	// # Lowered to 13 when capture-free function expressions began being outlined
+	//
+	// A `FunctionExpression` closing over nothing is the same function on every render, so upstream
+	// lifts it to a module-level declaration before scopes are assigned and it never gets a reactive
+	// scope. `repro-object-fromEntries-entries.expect.md` shows both of its callbacks compiled to
+	// `_temp` and `_temp2` at module scope.
+	//
+	// The two that stop firing are `allow-global-mutation-in-effect-indirect-usecallback.ts` and
+	// `array-pattern-spread-creates-array.ts`, named by logging the fixture per false positive and
+	// diffing rather than inferred from the fixture that motivated the pass. Both were the rule
+	// validating a memoization against a scope that should never have existed.
+	//
+	// Goldens hold at 25 and all three oracles are byte-identical: scope survived 108 with exact 30
+	// and under-production at 5 fixtures / 7 scopes, dependency 77 matched against 121 produced,
+	// memo blocks 101 with 65 carrying.
+	const knownFalsePositives = 13
 	if fired != knownFalsePositives {
 		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
 			"number should be lowered deliberately, and if it went UP something regressed",
@@ -461,6 +476,7 @@ func findingsForSource(t *testing.T, source string) ([]PreserveManualMemoization
 // The order is upstream's pipeline order, and it is load-bearing: the rule reads `Pruned` and
 // `Merged`, both of which are written by passes that must have run.
 func pipelineFindings(function *Function, checker *shimchecker.Checker) []PreserveManualMemoizationFinding {
+	OutlineFunctions(function)
 	InferReactive(function, checker)
 	DropManualMemoization(function)
 	// Upstream sweeps at `Pipeline.ts:230`, after the memo rewrite at 168 and long before the
