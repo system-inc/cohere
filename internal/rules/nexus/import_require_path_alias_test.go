@@ -117,3 +117,83 @@ func TestImportRequirePathAliasSuggestsTheAliasedPath(t *testing.T) {
 		t.Fatalf("expected the aliased suggestion, got: %s", description)
 	}
 }
+
+// TestImportRequirePathAliasAcceptsTheRepositoryRoot pins the spelling a tsconfig uses.
+//
+// # This was a silent defect in both implementations
+//
+// A tsconfig maps the repository root as `"@project/*": ["../../*"]`, so a reader configuring this
+// rule writes `{Directory: ".", Alias: "@project"}` -- the only spelling that reads like what it
+// means. The matcher compares against repository-relative paths like `app/Foo.ts`, which equal
+// neither `.` nor anything starting with `./`, so that entry matched nothing at all. Every deep
+// relative import under the root went unreported, and a tree with 238 of them read clean.
+//
+// Found by counting `../../` imports by hand and getting 230 where the rule reported 0, not by any
+// test: a suite whose fixtures all name real subdirectories cannot see this, because the bug is in
+// the one directory nobody writes as a subdirectory.
+func TestImportRequirePathAliasAcceptsTheRepositoryRoot(t *testing.T) {
+	rootOptions := ImportRequirePathAliasOptions{
+		RepositoryRoot: "/repository",
+		Aliases: []PathAlias{
+			{Directory: "libraries/base", Alias: "@base"},
+			{Directory: ".", Alias: "@project"},
+		},
+	}
+
+	result := ruletest.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
+		"import { Helper } from '../../shared/Helper';\n", rootOptions)
+	ruletest.ExpectFindings(t, result, "useAlias")
+
+	description := result.Diagnostics[0].Message.Description
+	if !strings.Contains(description, "@project/app/shared/Helper") {
+		t.Fatalf("expected the root-aliased suggestion, got: %s", description)
+	}
+}
+
+// TestImportRequirePathAliasNormalizesConfiguredDirectories accepts the spellings a reader may write.
+//
+// `./app` and `app/` name the same directory as `app`, and a reader has no reason to expect them to
+// differ. Normalising once at configuration read is also what keeps the alias matcher and the
+// strict-root matcher from drifting, since both now ask the same function.
+func TestImportRequirePathAliasNormalizesConfiguredDirectories(t *testing.T) {
+	for _, spelling := range []string{"app", "./app", "app/"} {
+		t.Run(spelling, func(t *testing.T) {
+			options := ImportRequirePathAliasOptions{
+				RepositoryRoot: "/repository",
+				Aliases:        []PathAlias{{Directory: spelling, Alias: "@app"}},
+			}
+			result := ruletest.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
+				"import { Helper } from '../../shared/Helper';\n", options)
+			ruletest.ExpectFindings(t, result, "useAlias")
+
+			description := result.Diagnostics[0].Message.Description
+			if !strings.Contains(description, "@app/shared/Helper") {
+				t.Fatalf("expected the normalised suggestion, got: %s", description)
+			}
+		})
+	}
+}
+
+// TestImportRequirePathAliasRootDoesNotShadowASubdirectory pins the sort.
+//
+// The root contains everything, so an unsorted matcher that reached it first would alias every path
+// as `@project` and no path as `@base`. Aliases are ordered longest-directory-first and the root
+// normalises to the empty string, which is the shortest, so it is consulted last by construction.
+func TestImportRequirePathAliasRootDoesNotShadowASubdirectory(t *testing.T) {
+	rootOptions := ImportRequirePathAliasOptions{
+		RepositoryRoot: "/repository",
+		Aliases: []PathAlias{
+			{Directory: ".", Alias: "@project"},
+			{Directory: "libraries/base", Alias: "@base"},
+		},
+	}
+
+	result := ruletest.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
+		"import { Thing } from '../../../libraries/base/source/Thing';\n", rootOptions)
+	ruletest.ExpectFindings(t, result, "useAlias")
+
+	description := result.Diagnostics[0].Message.Description
+	if !strings.Contains(description, "@base/source/Thing") {
+		t.Fatalf("expected the longer root to win, got: %s", description)
+	}
+}

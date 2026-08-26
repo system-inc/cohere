@@ -92,10 +92,21 @@ var ImportRequirePathAlias = rule.Rule{
 		}
 
 		// Longest directory first, so a nested root is not shadowed by its parent.
-		aliases := append([]PathAlias(nil), settings.Aliases...)
+		aliases := make([]PathAlias, 0, len(settings.Aliases))
+		for _, alias := range settings.Aliases {
+			aliases = append(aliases, PathAlias{
+				Directory: normalizeConfiguredDirectory(alias.Directory),
+				Alias:     alias.Alias,
+			})
+		}
 		sort.SliceStable(aliases, func(first int, second int) bool {
 			return len(aliases[first].Directory) > len(aliases[second].Directory)
 		})
+
+		strictRoots := make([]string, 0, len(settings.StrictRoots))
+		for _, root := range settings.StrictRoots {
+			strictRoots = append(strictRoots, normalizeConfiguredDirectory(root))
+		}
 
 		repositoryRoot := strings.TrimSuffix(normalizedPathText(settings.RepositoryRoot), "/")
 		importingFile := imports.NormalizedFileName(ctx.SourceFile)
@@ -126,8 +137,8 @@ var ImportRequirePathAlias = rule.Rule{
 				return
 			}
 
-			for _, root := range settings.StrictRoots {
-				if importingRelative == root || strings.HasPrefix(importingRelative, root+"/") {
+			for _, root := range strictRoots {
+				if directoryContains(root, importingRelative) {
 					ctx.ReportNode(specifierNode, messageUseAliasInStrictRoot(importPath, root, suggestion))
 					return
 				}
@@ -169,14 +180,58 @@ var ImportRequirePathAlias = rule.Rule{
 // aliasForPath returns the aliased spelling of a repository-relative path.
 func aliasForPath(aliases []PathAlias, repositoryPath string) (string, bool) {
 	for _, alias := range aliases {
-		if repositoryPath == alias.Directory {
+		if !directoryContains(alias.Directory, repositoryPath) {
+			continue
+		}
+		rest := repositoryPath
+		if alias.Directory != "" {
+			rest = strings.TrimPrefix(strings.TrimPrefix(repositoryPath, alias.Directory), "/")
+		}
+		if rest == "" {
 			return alias.Alias, true
 		}
-		if strings.HasPrefix(repositoryPath, alias.Directory+"/") {
-			return alias.Alias + "/" + strings.TrimPrefix(repositoryPath, alias.Directory+"/"), true
-		}
+		return alias.Alias + "/" + rest, true
 	}
 	return "", false
+}
+
+// normalizeConfiguredDirectory is a configured directory as the matcher wants it: no leading `./`,
+// no trailing slash, and the repository root as the empty string.
+//
+// The root is the case this exists for, and it was a silent defect in both implementations. A
+// tsconfig spells the root `"@project/*": ["../../*"]`, so a reader configuring this rule writes
+// `{ directory: ".", alias: "@project" }` -- the only spelling that reads like what it means. The
+// matcher compares against repository-relative paths like `app/Foo.tsx`, which equal neither `.` nor
+// anything starting with `./`, so that entry matched nothing at all. Every deep relative import
+// under the root went unreported and the tree read clean.
+//
+// Measured on Kirk's tree: 127 findings before, 365 after, and the 238 that appeared are exactly
+// the `app/` and `modules/` imports a hand count had already found. Normalising here rather than at
+// each comparison also means the alias matcher and the strict-root matcher cannot drift, and it
+// accepts `./app` and `app/` for the same directory, which a reader has no reason to expect to
+// differ.
+func normalizeConfiguredDirectory(directory string) string {
+	trimmed := directory
+	for strings.HasPrefix(trimmed, "./") {
+		trimmed = trimmed[len("./"):]
+	}
+	trimmed = strings.TrimRight(trimmed, "/")
+	if trimmed == "." {
+		return ""
+	}
+	return trimmed
+}
+
+// directoryContains reports whether a repository-relative path sits inside a normalised directory.
+//
+// The empty string is the repository root and contains everything, which is what makes a root alias
+// work. Every other directory matches on a `/` boundary rather than as a bare prefix, so
+// `libraries/structure` does not swallow `libraries/structure-tools`.
+func directoryContains(directory string, repositoryPath string) bool {
+	if directory == "" {
+		return true
+	}
+	return repositoryPath == directory || strings.HasPrefix(repositoryPath, directory+"/")
 }
 
 // repositoryRelative expresses an absolute path relative to the repository root, reporting whether

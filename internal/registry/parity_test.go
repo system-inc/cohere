@@ -269,12 +269,13 @@ func namespacesOf(remaining []string) []namespaceCount {
 // A reason is required. An entry here says "we looked", and an entry with no reason says only that
 // somebody wanted the test to pass.
 var rulesOutsideTheInventory = map[string]string{
-	// Registered in the nexus plugin map at NexusLintConfiguration.ts:31 and enabled in no rules
-	// block, which that file's own comment names as inert: the plugin knows the name and nothing
-	// turns it on. Confirmed by a whole-tree search returning exactly one occurrence, the plugin
-	// map line. So the rule is real, its judgment is real, and it has never run anywhere. Porting
-	// it was correct and enabling it is a decision for Kirk rather than a parity question.
-	"import-require-path-alias": "in the nexus plugin map, enabled in no config, so it has never run",
+	// Registered in the nexus plugin map at NexusLintConfiguration.ts:31 and, until it was turned on
+	// in ahra, enabled in no rules block anywhere: the plugin knew the name and nothing turned it on.
+	// It is enabled now, in both engines, and it stays outside the inventory for a different reason
+	// than it started with. The inventory records what the two tools being replaced enforced at the
+	// moment it was captured, and at that moment this rule enforced nothing. A rule enabled after
+	// the capture is not a parity gap; it is a rule the gate never had.
+	"import-require-path-alias": "not enforced by either tool when the inventory was captured, and enabled after it",
 
 	// A house rule with no upstream on either side, written from reasoning rather than ported, so
 	// no inventory entry could exist for it. It guards verify's own type-based React rules rather
