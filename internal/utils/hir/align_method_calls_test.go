@@ -78,7 +78,12 @@ func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
 	}
 	// Measured. A move here is the corpus changing or the pass changing what it touches; both are
 	// worth a look rather than an adjustment.
-	const knownChanged = 356
+	//
+	// 363 with the two frozen-propagation edges in `effects.go` and `ranges.go`. A frozen value no
+	// longer widens its range across a conditional mutation, so more method calls reach this pass
+	// with their two sides in different scopes and more get aligned. The pass changing what it
+	// touches is the second cause this comment names, and it is this one.
+	const knownChanged = 363
 	if changed != knownChanged {
 		t.Errorf("the pass changed %d of %d functions, want %d", changed, functions, knownChanged)
 	}

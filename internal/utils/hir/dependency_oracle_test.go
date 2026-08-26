@@ -353,7 +353,19 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// improvement: 121 against upstream's 116 becomes 114, over-producing fixtures fall from 13 to
 	// 12 and under-producing rises from 16 to 17, with `exact` unmoved at 19. Seven rows left and
 	// three of them were golden, which is the cost recorded at `knownMatched`.
-	const knownOursTotal = 114
+	//
+	// And to 116 -- upstream's own count, exactly -- by the two frozen-propagation edges:
+	// `PropertyLoad` emitting `CreateFrom` in `effects.go` and `Assign` carrying mutability in
+	// `ranges.go`. Neither does anything alone; the chain from a hook's frozen parameter breaks at
+	// the `LoadContext` a captured read lowers to unless both are present.
+	//
+	// `matched` holds at 74 while `ours` rises 2, so both added rows are ones upstream also
+	// produces rather than invented ones. Recorded because this pair measured as a REGRESSION on
+	// `8dcfed9`, driving `ours` 121 to 123 away from 116, and was reverted for it. The declaration-
+	// id collision fixed in `7a48d68` was inflating the count; with that gone the same two edges
+	// land on the number. The earlier reading was correct about the measurement and wrong about the
+	// cause.
+	const knownOursTotal = 116
 	if upstreamTotal != knownUpstreamTotal {
 		t.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
 			"every count below is against a different population", upstreamTotal, knownUpstreamTotal)

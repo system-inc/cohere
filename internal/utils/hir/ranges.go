@@ -1325,6 +1325,18 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					if _, exists := state.nodes[effect.Into.Identifier]; !exists {
 						state.create(effect.Into, aliasingNodeObject)
 					}
+					// An assignment carries mutability with it, the same way `CreateFrom` does.
+					// Upstream's `Assign` arm reads `state.kind(effect.from)` and switches on the
+					// result, with `ValueKind.Frozen` its first case
+					// (`InferMutationAliasingEffects.ts:947`), so a frozen value assigned into a
+					// temporary stays frozen.
+					//
+					// This is what carries a hook's frozen parameter through the `LoadContext` a
+					// captured read lowers to. Measured on `useMemo-inner-decl.ts`: `data.a` reads
+					// off a `LoadContext` of the parameter rather than off the parameter itself, so
+					// without this the chain broke at the first hop and every property read came
+					// back mutable. Neither this nor the `PropertyLoad` edge does anything alone.
+					state.deriveImmutable(effect.From.Identifier, effect.Into.Identifier)
 					state.assign(index, effect.From, effect.Into)
 					index++
 

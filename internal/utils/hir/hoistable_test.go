@@ -624,8 +624,20 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// themselves produced by the collision. What carries this is the scope oracle, where the two
 	// fixtures the fix was aimed at recover a pruned scope. The trade is named at `knownMatched` in
 	// `dependency_oracle_test.go` and at `knownSurvivedExact` in `scope_oracle_test.go`.
-	if deep != 625 || flat != 2023 {
-		t.Errorf("got %d deep and %d flat dependencies, want 625 and 2023; a SMALL move here is "+
+	// # And again when a property read off a frozen object stayed frozen
+	//
+	// 625 deep to 588, 2,023 flat to 2,203. `deep` FALLING is the safe direction by the rule above,
+	// and here an oracle says so outright rather than merely not objecting: the dependency count
+	// reaches upstream's exactly, 114 to 116 against 116, with `matched` unmoved at 74. Both added
+	// rows are therefore ones upstream also produces.
+	//
+	// The mechanism is a narrower mutable set. `PropertyLoad` now emits `CreateFrom` and `Assign`
+	// carries mutability, so a hook's frozen parameter stays frozen through the `LoadContext` a
+	// captured read lowers to and through every property read off it. A frozen value does not widen
+	// its range across a conditional mutation, so scopes stop swallowing the loads that feed them
+	// and a path that was deep inside a widened scope is read at its root instead.
+	if deep != 588 || flat != 2203 {
+		t.Errorf("got %d deep and %d flat dependencies, want 588 and 2203; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

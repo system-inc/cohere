@@ -782,8 +782,19 @@ func effectsForInstruction(function *Function, instruction *Instruction) []Alias
 		// Read. Upstream additionally consults the checker to emit ImmutableCapture when the
 		// result type is primitive; that is `EffectGapTypeDirectedShapes` and the conservative
 		// direction is the one taken here.
+		//
+		// `CreateFrom` rather than `Create`, which is upstream's spelling: a property read off a
+		// frozen object is itself frozen. Its `PropertyLoad` arm in the frozen walk is one comment
+		// and a break -- "Properties must be frozen since the original value was frozen"
+		// (`InferMutationAliasingEffects.ts:417`) -- and `CreateFrom` is what carries the kind, by
+		// reading `state.kind(effect.from)` at :739.
+		//
+		// This is what carries a hook's frozen parameters into the values read off them. Measured on
+		// `useMemo-inner-decl.ts`: without it `data.a` is mutable, the `identity(data.a)` call
+		// conditionally mutates it, its range widens across the call, and the three loads join a
+		// scope upstream leaves scopeless.
 		return []AliasingEffect{
-			create(lvalue, EffectValueMutable),
+			flow(AliasingEffectCreateFrom, value.Object, lvalue),
 			flow(AliasingEffectCapture, value.Object, lvalue),
 		}
 
