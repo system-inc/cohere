@@ -421,6 +421,25 @@ var rulesOutsideTheInventory = map[string]string{
 	// counted loop into a for-of.
 	"@typescript-eslint/prefer-for-of": "ported from typescript-eslint, whose stylistic preset carries it; not enforced by either tool when the inventory was captured, and the audit measured 5 violations, none auto-fixable",
 
+	// Ported from typescript-eslint and enabled in both engines by this port. Upstream marks it frozen
+	// and ships it in no preset, so neither tool being replaced had it on and its absence from the
+	// inventory says nothing about the rule. A rule the gate never had rather than a parity gap.
+	//
+	// The audit measured zero violations and this port measures zero, and the reason is NOT that the
+	// tree satisfies the rule. Upstream declares `defaultOptions: ['always']` as a createRule property
+	// rather than as `meta.defaultOptions`, and ESLint 10 reads only the latter, so a rule named as a
+	// bare severity string is handed no mode and does nothing at all. Measured on the installed build,
+	// and EnableRule.ts writes exactly that spelling.
+	//
+	// So the rule is registered, enabled, and deliberately inert, matching the gate being replaced. A
+	// port defaulting to always instead would put 512 findings on this tree, which is what the first
+	// version of this one did before the dry run disagreed with the audit. Giving it a mode is a
+	// one-line config change and a 512-finding decision, and it belongs to Kirk rather than a porter.
+	//
+	// A seeded tree configured with an explicit mode reported on every seeded shape and left the
+	// initialized ones alone, so the rule can see; only the configuration is silent.
+	"@typescript-eslint/init-declarations": "ported from typescript-eslint, which ships it frozen and in no preset; not enforced by either tool when the inventory was captured, and it is inert under a bare severity because upstream's default mode never reaches the rule, so both the audit and this port measure zero",
+
 	// Ported from typescript-eslint and registered, but deliberately NOT enabled: the live config
 	// already turns it off at VerifySettings.json:370 under the `typescript/` spelling, and the port
 	// does not reverse somebody's standing decision. The reason is recorded in full beside its entry
