@@ -1,9 +1,9 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 258,
+  "total": 259,
   "byNamespace": {
-    "(core)": 94,
+    "(core)": 95,
     "better-tailwindcss": 12,
     "nextjs": 22,
     "nexus": 20,
@@ -12,11 +12,11 @@
     "typescript": 38
   },
   "bySeverity": {
-    "error": 216,
+    "error": 217,
     "warn": 42
   },
   "byEnabledBy": {
-    "rulesBlock": 217,
+    "rulesBlock": 218,
     "pluginDefault": 41
   },
   "rules": [
@@ -984,6 +984,15 @@
     },
     {
       "rule": "no-lone-blocks",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-loop-func",
       "sources": [
         "eslint"
       ],
