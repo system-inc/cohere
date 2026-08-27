@@ -390,6 +390,16 @@ var rulesOutsideTheInventory = map[string]string{
 	// entry in the live-wiring guard's exemption map.
 	"@typescript-eslint/no-meaningless-void-operator": "ported and registered but left off, matching an explicit off in the live config; not enforced by either tool when the inventory was captured",
 
+	// Ported from typescript-eslint and enabled in both engines by this port. Unlike the two entries
+	// above it carries no prior decision in the live config to override, so enabling it is the
+	// ordinary path rather than a judgment: the audit measures zero violations in the tree, which
+	// makes it a guardrail against drift rather than a cleanup.
+	//
+	// Outside the inventory for the usual reason. It sits in upstream's `strict` preset rather than
+	// its `recommended` one, so a project on the recommended set never had it, and neither tool
+	// being replaced enforced it when the capture was taken.
+	"@typescript-eslint/no-non-null-asserted-nullish-coalescing": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured",
+
 	// Ported from typescript-eslint, whose strict preset carries it, and enabled in both engines by
 	// this port. It is outside the inventory for the usual reason, that neither tool enforced it when
 	// the capture was taken, but this one has a wrinkle worth recording because the next reader will
