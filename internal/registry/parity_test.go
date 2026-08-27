@@ -1154,6 +1154,15 @@ var rulesOutsideTheInventory = map[string]string{
 		"registered but not enabled because ahra's config names no base/ rules at all, so where it " +
 		"is enforced is a decision nobody has made yet; the gate being replaced never enforced it here",
 
+	// Ported from typescript-eslint and enabled in both engines by this port. Upstream carries it in
+	// its STYLISTIC preset, which neither tool being replaced had on, so its absence from the
+	// inventory says nothing about the rule. A rule the gate never had rather than a parity gap.
+	//
+	// The audit measured zero violations and this port measures zero, so enabling costs no cleanup
+	// and is a guardrail against drift. A seeded tree confirmed the rule can fire, because an audit
+	// pairing a strong recommendation with a zero is the shape that has hidden an inert rule before.
+	"@typescript-eslint/consistent-type-assertions": "ported from typescript-eslint, whose stylistic preset carries it; not enforced by either tool when the inventory was captured, and both the audit and this port measure zero violations",
+
 	// The same shape, and its port is likewise checked against the source repository rather than an
 	// imported corpus. The original rule was driven over all 2,556 TypeScript files of
 	// api-phi-health through the ESLint Linter API, and its net verdict there is zero: eight sites
