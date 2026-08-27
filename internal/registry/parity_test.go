@@ -386,6 +386,22 @@ var rulesOutsideTheInventory = map[string]string{
 	// source.
 	"@typescript-eslint/prefer-literal-enum-member": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured, and the audit measured 2 violations in one test file",
 
+	// Ported from typescript-eslint and enabled in both engines by this port. Upstream carries it in
+	// its STYLISTIC preset, which neither tool being replaced had on, so its absence from the
+	// inventory says nothing about the rule. A rule the gate never had rather than a parity gap.
+	//
+	// The audit measured 55 violations in ahra and this port measures 57, spread over about thirty
+	// files with no single-file cluster of the kind a false-positive class produces. Every site the
+	// audit named by path and line is among them at the same line and column. The two-finding gap is
+	// not explained here: the audit was captured earlier and the tree has moved, and nothing was found
+	// to suggest the difference is the rule.
+	//
+	// They are auto-fixable, and the fixer is upstream's own repair reproduced against its nine
+	// recorded outputs, so the cleanup is a fix run plus a read of the diff rather than 57 hand edits.
+	// A count that size is a decision for Kirk rather than for a porter, and it is named here as well
+	// as in the port's own commit so it cannot land quietly.
+	"@typescript-eslint/non-nullable-type-assertion-style": "ported from typescript-eslint, whose stylistic preset carries it; not enforced by either tool when the inventory was captured, and this port measures 57 violations against the audit's 55, all auto-fixable",
+
 	// Ported from typescript-eslint and registered, but deliberately NOT enabled: the live config
 	// already turns it off at VerifySettings.json:370 under the `typescript/` spelling, and the port
 	// does not reverse somebody's standing decision. The reason is recorded in full beside its entry
