@@ -664,6 +664,20 @@ var rulesOutsideTheInventory = map[string]string{
 	"no-useless-concat": "ported from eslint core, which marks it recommended:false; not enforced " +
 		"by either tool when the inventory was captured, and the audit measured 4 violations, " +
 		"which this port reproduces at the same four positions",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// 16 findings across 9 files, exactly what the audit measured, and the installed eslint reports
+	// the same 16 at the same line and column. The rule is fixable, which makes the interesting
+	// number the second one: only 7 of the 16 carry a repair, and this port declines the same 9
+	// eslint declines, file by file. That agreement is on real code rather than on the corpus, and
+	// it is the number that matters here because a fix is applied unattended and the engine's only
+	// guard is that the result parses, which every one of these declines would have passed.
+	"no-lonely-if": "ported from eslint core, which marks it recommended:false; not enforced by " +
+		"either tool when the inventory was captured, and the audit measured 16 violations, which " +
+		"this port reproduces at the same positions with the same 7 repairs and 9 declines",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
