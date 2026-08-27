@@ -80,11 +80,30 @@ func TestJsxNoUselessFragmentFires(t *testing.T) {
 				// The fixer declined, so replaying whatever it offered must leave the source alone.
 				want = testCase.sourceText
 			}
+			// A case reporting one diagnostic that carries one fix has nothing to deduplicate, so the
+			// shared assertion applies and is used, which is what keeps the fixture-pair guard able
+			// to see that this rule's repair is proven. The local applier below exists only for the
+			// cases this rule reports twice on one node, where the same span arrives from both
+			// messages and replaying it unmerged would double the edit.
+			if testCase.wantFixed != "" && countJsxNoUselessFragmentFixes(result) == 1 {
+				rule_testing.ExpectFixedSource(t, result, want)
+				return
+			}
 			if got := applyJsxNoUselessFragmentFixes(t, result); got != want {
 				t.Errorf("the repair produced %q, want %q", got, want)
 			}
 		})
 	}
+}
+
+// countJsxNoUselessFragmentFixes totals the fixes across every diagnostic, which is how a case that
+// needs no deduplication is told apart from one that does.
+func countJsxNoUselessFragmentFixes(result rule_testing.Result) int {
+	total := 0
+	for _, diagnostic := range result.Diagnostics {
+		total += len(diagnostic.Fixes)
+	}
+	return total
 }
 
 // TestJsxNoUselessFragmentStaysSilent runs upstream's clean cases.
