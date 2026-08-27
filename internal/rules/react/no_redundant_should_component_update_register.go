@@ -1,0 +1,8 @@
+package react
+
+import "github.com/system-inc/verify/internal/rule"
+
+// No decoder. Upstream's `meta.schema` is `[]`, confirmed against the installed build.
+func init() {
+	rule.Register(rule.Registration{Rule: NoRedundantShouldComponentUpdate})
+}
