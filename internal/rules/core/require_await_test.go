@@ -1,0 +1,344 @@
+package core
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/system-inc/verify/internal/rule_testing"
+)
+
+// requireAwaitFile is where the fixtures pretend to live.
+const requireAwaitFile = "/repository/source/RequireAwait.ts"
+
+// requireAwaitCase is one imported corpus row.
+type requireAwaitCase struct {
+	sourceText string
+	// wantNames is the description fragment each finding uses to name the function, in order.
+	// nil means the case is clean. This is half the rendered message and no message-id
+	// assertion can see it.
+	wantNames []string
+	// wantReplacements is what each finding's suggestion writes in place of `async`. Almost
+	// always empty; a semicolon where removing the keyword would let automatic semicolon
+	// insertion join two statements.
+	wantReplacements []string
+}
+
+func runRequireAwait(t *testing.T, testCase requireAwaitCase) rule_testing.Result {
+	t.Helper()
+	return rule_testing.Run(t, RequireAwait, requireAwaitFile, testCase.sourceText)
+}
+
+// The corpus is ESLint's own, extracted mechanically rather than retyped.
+//
+// `tests/lib/rules/require-await.js` was loaded with its RuleTester stubbed so every case came out
+// as data, then replayed against the INSTALLED rule to record what it reports, how each finding
+// names its function, and what each suggestion writes. All 41 reproduced.
+//
+// Every finding this rule produces carries a suggestion and none carries a fix, so there is no
+// `ExpectFixedSource` here: `verifyAndFix` reports no change at all for this rule, because a
+// suggestion is offered to a human rather than applied. Asserting the suggestion's replacement text
+// is the equivalent, and it is done per finding below.
+func requireAwaitFiresCases() []requireAwaitCase {
+	return []requireAwaitCase{
+		{"async function foo() { doSomething() }", []string{"Async function 'foo'"}, []string{""}},
+		{"(async function() { doSomething() })", []string{"Async function"}, []string{""}},
+		{"async () => { doSomething() }", []string{"Async arrow function"}, []string{""}},
+		{"async () => doSomething()", []string{"Async arrow function"}, []string{""}},
+		{"({ async foo() { doSomething() } })", []string{"Async method 'foo'"}, []string{""}},
+		{"class A { async foo() { doSomething() } }", []string{"Async method 'foo'"}, []string{""}},
+		{"(class { async foo() { doSomething() } })", []string{"Async method 'foo'"}, []string{""}},
+		{"(class { async ''() { doSomething() } })", []string{"Async method ''"}, []string{""}},
+		{"async function foo() { async () => { await doSomething() } }", []string{"Async function 'foo'"}, []string{""}},
+		{"async function foo() { await (async () => { doSomething() }) }", []string{"Async arrow function"}, []string{""}},
+		{"const obj = { async: async function foo() { bar(); } }", []string{"Async method 'async'"}, []string{""}},
+		{"async    /* test */ function foo() { doSomething() }", []string{"Async function 'foo'"}, []string{""}},
+		{"class A {\n                a = 0\n                async [b](){ return 0; }\n            }", []string{"Async method"}, []string{";"}},
+		{"class A {\n                a\n                async [b](){ return 0; }\n            }", []string{"Async method"}, []string{""}},
+		{"class A {\n                a = 0\n                async in(){ return 0; }\n            }", []string{"Async method 'in'"}, []string{";"}},
+		{"const obj = {\n                foo,\n                async in(){ return 0; }\n            }", []string{"Async method 'in'"}, []string{""}},
+		{"foo\n                async () => { return 0; }\n            ", []string{"Async arrow function"}, []string{";"}},
+		{"class A {\n                foo() {}\n                async [bar] () { baz; }\n            }", []string{"Async method"}, []string{""}},
+		{"async function run() { using resource = getResource(); }", []string{"Async function 'run'"}, []string{""}},
+	}
+}
+
+func requireAwaitSilentCases() []requireAwaitCase {
+	return []requireAwaitCase{
+		{"async function foo() { await doSomething() }", nil, nil},
+		{"(async function() { await doSomething() })", nil, nil},
+		{"async () => { await doSomething() }", nil, nil},
+		{"async () => await doSomething()", nil, nil},
+		{"({ async foo() { await doSomething() } })", nil, nil},
+		{"class A { async foo() { await doSomething() } }", nil, nil},
+		{"(class { async foo() { await doSomething() } })", nil, nil},
+		{"async function foo() { await (async () => { await doSomething() }) }", nil, nil},
+		{"async function foo() {}", nil, nil},
+		{"async () => {}", nil, nil},
+		{"function foo() { doSomething() }", nil, nil},
+		{"async function foo() { for await (x of xs); }", nil, nil},
+		{"await foo()", nil, nil},
+		{"\n                for await (let num of asyncIterable) {\n                    console.log(num);\n                }\n            ", nil, nil},
+		{"async function* run() { yield * anotherAsyncGenerator() }", nil, nil},
+		{"async function* run() {\n                await new Promise(resolve => setTimeout(resolve, 100));\n                yield 'Hello';\n                console.log('World');\n            }\n            ", nil, nil},
+		{"async function* run() { }", nil, nil},
+		{"const foo = async function *(){}", nil, nil},
+		{"const foo = async function *(){ console.log(\"bar\") }", nil, nil},
+		{"async function* run() { console.log(\"bar\") }", nil, nil},
+		{"await using resource = getResource();", nil, nil},
+		{"async function run() { await using resource = getResource(); }", nil, nil},
+	}
+}
+
+func TestRequireAwaitFires(t *testing.T) {
+	for _, testCase := range requireAwaitFiresCases() {
+		t.Run(testCase.sourceText, func(t *testing.T) {
+			wantIds := make([]string, len(testCase.wantNames))
+			for index := range wantIds {
+				wantIds[index] = "missingAwait"
+			}
+			rule_testing.ExpectFindings(t, runRequireAwait(t, testCase), wantIds...)
+		})
+	}
+}
+
+func TestRequireAwaitStaysSilent(t *testing.T) {
+	for _, testCase := range requireAwaitSilentCases() {
+		t.Run(testCase.sourceText, func(t *testing.T) {
+			rule_testing.ExpectClean(t, runRequireAwait(t, testCase))
+		})
+	}
+}
+
+// How each finding NAMES its function, which the message-id assertions cannot see.
+//
+// Upstream renders nine distinct descriptions from `getFunctionNameWithKind`, and the differences
+// between them are real judgments rather than formatting: a method is named by its property rather
+// than by the function bound to it, an empty string literal name renders as a name rather than as
+// an absent one, and a computed name renders as no name at all.
+func TestRequireAwaitNamesTheFunction(t *testing.T) {
+	for _, testCase := range requireAwaitFiresCases() {
+		t.Run(testCase.sourceText, func(t *testing.T) {
+			result := runRequireAwait(t, testCase)
+			if len(result.Diagnostics) != len(testCase.wantNames) {
+				t.Fatalf("wanted %d findings, got %d", len(testCase.wantNames),
+					len(result.Diagnostics))
+			}
+			for index, wantName := range testCase.wantNames {
+				got := result.Diagnostics[index].Message.Description
+				// Anchored on the sentence opening rather than a bare Contains, so a
+				// description that merely mentioned the name somewhere would not satisfy it.
+				if !strings.HasPrefix(got, wantName+" has no ") {
+					t.Errorf("finding %d rendered\n  %q\nwhich does not open by naming %q",
+						index, got, wantName)
+				}
+			}
+		})
+	}
+}
+
+// What each suggestion WRITES, which is the repair half of this rule.
+//
+// Every finding carries exactly one suggestion and none carries a fix, so a rule that offered its
+// repair as a fix would rewrite source the engine should only have offered to rewrite. Both halves
+// are asserted: the count and kind of repair, and the text it writes.
+//
+// The semicolon rows are the ones to read. Removing `async` can let automatic semicolon insertion
+// join the construct to the line above, and upstream substitutes a semicolon rather than emitting
+// nothing. Three of its own cases exercise it, all measured.
+func TestRequireAwaitSuggestsRemovingAsync(t *testing.T) {
+	semicolons := 0
+	for _, testCase := range requireAwaitFiresCases() {
+		t.Run(testCase.sourceText, func(t *testing.T) {
+			result := runRequireAwait(t, testCase)
+			if len(result.Diagnostics) != len(testCase.wantReplacements) {
+				t.Fatalf("wanted %d findings, got %d", len(testCase.wantReplacements),
+					len(result.Diagnostics))
+			}
+			for index, wantText := range testCase.wantReplacements {
+				diagnostic := result.Diagnostics[index]
+				if len(diagnostic.Fixes) != 0 {
+					t.Errorf("finding %d carried %d fixes; this rule only ever suggests",
+						index, len(diagnostic.Fixes))
+				}
+				if len(diagnostic.Suggestions) != 1 {
+					t.Fatalf("finding %d carried %d suggestions, wanted exactly one",
+						index, len(diagnostic.Suggestions))
+				}
+				fixes := diagnostic.Suggestions[0].Fixes
+				if len(fixes) != 1 {
+					t.Fatalf("finding %d's suggestion carried %d fixes, wanted one", index,
+						len(fixes))
+				}
+				if got := fixes[0].Text; got != wantText {
+					t.Errorf("finding %d's suggestion writes %q, wanted %q", index, got,
+						wantText)
+				}
+			}
+		})
+		for _, text := range testCase.wantReplacements {
+			if text == ";" {
+				semicolons++
+			}
+		}
+	}
+	// The semicolon arm is the one most easily lost, so its coverage is asserted rather than
+	// assumed: a change that stopped emitting it would otherwise leave every row still green
+	// on the empty-string cases alone.
+	if semicolons != 3 {
+		t.Errorf("%d rows exercised the semicolon arm, wanted 3", semicolons)
+	}
+}
+
+// The two halves of the semicolon condition, separated.
+//
+// Written for a surviving mutant: removing the continuation test left all 41 imported rows green,
+// because in every corpus case the two halves agree. They only disagree when the previous member IS
+// a continuable expression and the token after `async` is NOT one that could continue it, which the
+// corpus never writes.
+//
+// `a = 0` followed by `async m()` is that shape. A plain identifier cannot extend `0` into a larger
+// expression, so no semicolon is needed even though the property has an unterminated initializer.
+// Every verdict below was measured against the installed rule before the row was written.
+func TestRequireAwaitSemicolonNeedsBothHalves(t *testing.T) {
+	cases := []struct {
+		sourceText string
+		wantText   string
+	}{
+		// The continuation test alone decides these three: same previous member, different
+		// following token.
+		{"class A {\n a = 0\n async m(){ return 0; }\n}", ""},
+		{"class A {\n a = 0\n async foo(){ return 0; }\n}", ""},
+		{"class A {\n a = 0\n async [b](){ return 0; }\n}", ";"},
+		{"class A {\n a = 0\n async in(){ return 0; }\n}", ";"},
+		{"class A {\n a = 0\n async instanceof(){ return 0; }\n}", ";"},
+		// And the previous-member test alone decides these: same following token, different
+		// predecessor. Without an initializer there is no open expression to continue.
+		{"class A {\n a\n async [b](){ return 0; }\n}", ""},
+		{"class A {\n foo() {}\n async [bar] () { baz; }\n}", ""},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.sourceText, func(t *testing.T) {
+			result := runRequireAwait(t, requireAwaitCase{sourceText: testCase.sourceText})
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+			}
+			suggestions := result.Diagnostics[0].Suggestions
+			if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
+				t.Fatalf("wanted one suggestion carrying one fix, got %d suggestions",
+					len(suggestions))
+			}
+			if got := suggestions[0].Fixes[0].Text; got != testCase.wantText {
+				t.Errorf("suggestion writes %q, wanted %q", got, testCase.wantText)
+			}
+		})
+	}
+}
+
+// A function carrying modifiers BEFORE `async`, which the corpus never writes.
+//
+// Written for a surviving mutant: the loop that finds the `async` keyword skips any modifier that is
+// not `async`, and deleting that skip left all 48 imported rows green. Every corpus case has `async`
+// as its only modifier, so the first modifier IS the right one and a loop that takes the first
+// blindly agrees by accident.
+//
+// Real code does not look like that. `static async`, `public async` and `export async` are ordinary,
+// and there the first modifier is the wrong one: the suggestion would delete `static` and leave the
+// function async, which is both wrong and silent, since the finding still appears and still carries
+// a repair. Upstream was driven over each shape below and removes exactly "async " every time.
+func TestRequireAwaitFindsAsyncPastOtherModifiers(t *testing.T) {
+	cases := []string{
+		"class A { static async foo() { return 1; } }",
+		"class A { public async foo() { return 1; } }",
+		"export async function foo() { return 1; }",
+		"class A { private static async foo() { return 1; } }",
+	}
+	for _, sourceText := range cases {
+		t.Run(sourceText, func(t *testing.T) {
+			result := runRequireAwait(t, requireAwaitCase{sourceText: sourceText})
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+			}
+			suggestions := result.Diagnostics[0].Suggestions
+			if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
+				t.Fatalf("wanted one suggestion carrying one fix")
+			}
+			fix := suggestions[0].Fixes[0]
+			// The span is asserted rather than the resulting text, because a repair that
+			// removed the wrong keyword would still produce compiling source.
+			if removed := sourceText[fix.Range.Pos():fix.Range.End()]; removed != "async " {
+				t.Errorf("suggestion removes %q, wanted %q", removed, "async ")
+			}
+			if fix.Text != "" {
+				t.Errorf("suggestion writes %q, wanted the empty string", fix.Text)
+			}
+		})
+	}
+}
+
+// WHERE each finding is reported, which no message-id assertion can see.
+//
+// This is the arm the imported corpus was blind to. `rule_testing` compares message ids, so all 48
+// rows passed while five of these eleven shapes reported on the wrong column: the span started at
+// the `async` keyword where upstream starts at the property that owns the function. The differential
+// against the installed rule over the ahra tree agreed on every LINE and disagreed on 490 of 767
+// COLUMNS, which is what a line-only comparison reports as perfect agreement.
+//
+// The branch order is the substance. Upstream tests the parent BEFORE the arrow case, so a property
+// holding an arrow reports on the property rather than on the arrow token. Both orderings produce a
+// plausible span and only one matches. Every expectation below was measured against the installed
+// rule.
+func TestRequireAwaitReportsOnTheFunctionHead(t *testing.T) {
+	cases := []struct {
+		sourceText string
+		wantHead   string
+	}{
+		// The parent branch, which wins over both branches below it.
+		{"const o = { run: async function(a) { return 1; } };", "run: async function"},
+		{"class A { foo = async function(a) { return 1; } }", "foo = async function"},
+		{"class A { static foo = async function(a) { return 1; } }", "static foo = async function"},
+		// The same branch with an arrow, where the ordering is load-bearing: an arrow reached
+		// through a property reports on the property, NOT on the arrow token.
+		{"const o = { run: async (a) => { return 1; } };", "run: async "},
+		{"class A { foo = async (a) => { return 1; } }", "foo = async "},
+		// The arrow branch, reached only when no parent claimed the head.
+		{"const f = async (a) => { return 1; };", "=>"},
+		// The plain branch: the function's own start through the end of its name, or through the
+		// opening parenthesis when it has none.
+		{"const o = { async run(a) { return 1; } };", "async run"},
+		{"class A { static async foo(a) { return 1; } }", "static async foo"},
+		{"async function foo(a) { return 1; }", "async function foo"},
+		{"const f = async function(a) { return 1; };", "async function"},
+		{"const f = async function named(a) { return 1; };", "async function named"},
+		// The parent branch requires the function to BE the value, not merely to sit somewhere
+		// inside it. A function nested in an array or a call within the initializer reports on
+		// itself, and an arrow in that position falls through to the arrow branch. Without the
+		// value test these four would take the property's start and every span would be wrong by
+		// the width of the property.
+		{"class A { foo = [async function(a) { return 1; }] }", "async function"},
+		{"class A { foo = bar(async function(a) { return 1; }) }", "async function"},
+		{"const o = { run: [async function(a) { return 1; }] };", "async function"},
+		{"const o = { run: bar(async (a) => { return 1; }) };", "=>"},
+		// An `export` is a wrapper around the declaration rather than part of it, so the span
+		// starts at `async`; a class member modifier IS part of the head and is kept. Both
+		// directions are pinned because skipping every modifier looks just as correct from the
+		// inside and breaks the other half.
+		{"export async function foo(a) { return 1; }", "async function foo"},
+		{"export default async function foo(a) { return 1; }", "async function foo"},
+		{"export default async function(a) { return 1; }", "async function"},
+		{"class A { public async foo(a) { return 1; } }", "public async foo"},
+		{"class A { private static async foo(a) { return 1; } }", "private static async foo"},
+		{"class A { async foo(a) { return 1; } }", "async foo"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.sourceText, func(t *testing.T) {
+			result := runRequireAwait(t, requireAwaitCase{sourceText: testCase.sourceText})
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+			}
+			span := result.Diagnostics[0].Range
+			if got := testCase.sourceText[span.Pos():span.End()]; got != testCase.wantHead {
+				t.Errorf("reported on %q, wanted %q", got, testCase.wantHead)
+			}
+		})
+	}
+}
