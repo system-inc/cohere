@@ -727,6 +727,31 @@ var rulesOutsideTheInventory = map[string]string{
 	// stale rather than a divergence: driven over the same twenty-five files, this rule and the
 	// installed build produce byte-identical finding sets, 49 against 49 with nothing on either side
 	// of the diff, including the one the audit quotes as its example.
+	// Ported from typescript-eslint, whose strict preset carries it, and enabled in both engines by
+	// this port. Outside the inventory for the usual reason: neither tool named it at capture.
+	//
+	// The repair is safe by construction rather than by care, which is worth recording because this
+	// is the shape that lost type information twice in this project. The replacement is built from
+	// the compared expression's OWN SOURCE TEXT plus punctuation, so nothing inside it is
+	// re-rendered and nothing inside it can be lost; the span being replaced holds only the
+	// comparison operator and the boolean literal. Seven rows pin that, including a generic call, a
+	// type assertion, a satisfies expression, a non-null assertion and a comment.
+	//
+	// Two things about our parser that upstream cannot meet. It keeps parentheses where TSESTree
+	// deletes them, and three separate sites needed the unwrap: the literal side, the walk out to a
+	// wrapping negation, and the compared expression itself. Ten of upstream's own reporting cases
+	// failed before all three were handled. And the rule's `noStrictNullCheck` arm is unreachable
+	// through this project's harness, which writes its own tsconfig after the setup hook runs, so it
+	// is pinned by a unit test on the option resolution rather than by a rule fixture.
+	//
+	// The audit recorded 33 violations and this rule finds 35. That is the audit being stale rather
+	// than a divergence: driven over the same twenty files, this rule and the installed build
+	// produce byte-identical finding sets with nothing on either side of the diff.
+	"@typescript-eslint/no-unnecessary-boolean-literal-compare": "ported from typescript-eslint, " +
+		"whose strict preset carries it; not enforced by either tool when the inventory was " +
+		"captured; its strictNullChecks arm is unreachable through the test harness and is pinned " +
+		"by a unit test on the option resolution instead",
+
 	"@typescript-eslint/method-signature-style": "ported from typescript-eslint, which ships it in " +
 		"no preset; not enforced by either tool when the inventory was captured; its overload repair " +
 		"is written as one merged replacement because this engine refuses the overlapping pair " +
@@ -1174,6 +1199,20 @@ var rulesOutsideTheInventory = map[string]string{
 	"no-empty-function": "ported from eslint core, which marks it recommended:false; not enforced " +
 		"by either tool when the inventory was captured, and the audit measured 45 violations it " +
 		"will now require somebody to work through by hand",
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// The audit measured one violation, so this is very nearly a guardrail. It is the second of the
+	// two extension-rule cores: the typescript-eslint rule of the same name fetches this one and
+	// filters on top, so it could not be ported until this existed.
+	//
+	// The repair is a suggestion rather than a fix, matching upstream, because deleting a
+	// constructor changes what the class declares. Its one genuinely delicate part is that removing
+	// a constructor can require leaving a semicolon behind, since a class field written without one
+	// is terminated by automatic semicolon insertion and can run into the member that follows.
+	"no-useless-constructor": "ported from eslint core, which marks it recommended:false; not " +
+		"enforced by either tool when the inventory was captured, and the audit measured 1 violation",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
