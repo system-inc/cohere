@@ -620,6 +620,27 @@ var rulesOutsideTheInventory = map[string]string{
 	"max-classes-per-file": "ported from eslint core, which marks it recommended:false; not " +
 		"enforced by either tool when the inventory was captured, and the audit measured 18 " +
 		"violations while this port measures 20, each needing a file split by hand",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// THIS IS THE LARGEST CLEANUP IN THIS BATCH BY A WIDE MARGIN and the number belongs in front of
+	// whoever owns the config rather than in a footnote: 366 findings across 157 files, with one
+	// file carrying 21. The audit rated it Yes and predicted 363, so the count is expected rather
+	// than a surprise, and it was cross-checked rather than trusted: the installed eslint reports
+	// 366 over the same 157 files with zero per-file disagreements.
+	//
+	// What the number does not say, and a reader deciding about this rule needs to know: the rule
+	// cannot distinguish an accidental serialization from a deliberate one, and upstream says so by
+	// shipping no fixer and marking itself not recommended. Findings were read rather than counted.
+	// A retry loop awaiting a backoff delay and a pagination loop awaiting the page that carries the
+	// next cursor are both true positives by the rule's definition and both are correct code where
+	// the sequencing is the point. Turning this off in those places is a per-site judgment, which is
+	// the cost the 366 actually represents.
+	"no-await-in-loop": "ported from eslint core, which marks it recommended:false; not enforced " +
+		"by either tool when the inventory was captured, and the audit measured 363 violations " +
+		"while this port measures 366 across 157 files, each needing a per-site judgment",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
