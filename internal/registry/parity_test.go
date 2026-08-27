@@ -1577,12 +1577,20 @@ var rulesOutsideTheInventory = map[string]string{
 	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
 	// never had it, and there is no oxlint config in the tree to have carried it either.
 	//
-	// 58 findings across 42 files, and the installed eslint reports the same 58 at the same line
+	// 59 findings across 43 files, and the installed eslint reports the same 59 at the same line
 	// and column with zero disagreements. The audit predicted 52, so the count is close rather than
 	// exact; the difference is drift since that snapshot rather than a divergence.
 	//
+	// An earlier revision of this comment said 58 and 54, and the correction is worth keeping
+	// rather than quietly overwriting. This rule embeds the operand's own source text in its
+	// message, so a multi-line operand produces a multi-line message whose address and whose rule
+	// tag land on different lines. Two extractions of mine mishandled that in opposite directions,
+	// one dropping the finding and one counting a wrapped continuation as its own, and the errors
+	// cancelled into a number that looked like exact agreement. Split the output into records at
+	// each path-anchored line rather than filtering line by line.
+	//
 	// The second number matters more than the first here, because "auto-fixable" is true of one arm
-	// out of nine. Measured on the tree: 54 of the 58 carry an applicable fix, 4 offer a suggestion
+	// out of nine. Measured on the tree: 55 of the 59 carry an applicable fix, 4 offer a suggestion
 	// instead, and none is bare, which is byte for byte eslint's own split over the same files. A
 	// cleanup run rewrites the double-negation sites and leaves the other four for a human.
 	//
@@ -1594,7 +1602,7 @@ var rulesOutsideTheInventory = map[string]string{
 	// on `(a, b) * 1`, which upstream's corpus does write.
 	"no-implicit-coercion": "ported from eslint core, which marks it recommended:false; not " +
 		"enforced by either tool when the inventory was captured, and the audit measured 52 " +
-		"violations while this port measures 58, of which 54 carry a fix and 4 a suggestion",
+		"violations while this port measures 59, of which 55 carry a fix and 4 a suggestion",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
