@@ -453,6 +453,31 @@ var rulesOutsideTheInventory = map[string]string{
 	// build disagrees on exactly the three cases exercising it. The installed build is the artifact
 	// our gate compares against, so a `disallowedValues` key is accepted by the schema and ignored,
 	// exactly as the installed build ignores it.
+	// Ported from eslint-plugin-react and enabled in both engines by this port. Unlike its four
+	// siblings above, upstream marks this one `recommended: true`, so the usual sentence does not
+	// apply and the reason it sits outside the inventory is different and worth stating.
+	//
+	// It is in eslint-plugin-react's `recommended` preset, but this project does not spread that
+	// preset: the lint configuration spreads the react-hooks, next and better-tailwindcss
+	// recommended rules and then lists its 41 individual `react/` rules by hand, and this was not
+	// among them. So neither tool enforced it when the inventory was captured, despite the upstream
+	// recommendation.
+	//
+	// This is the first rule in this batch that finds real work rather than guarding against drift.
+	// A dry run over the tree reported 18 findings across 5 files, every one a `fill-rule` or
+	// `clip-rule` attribute in an SVG icon, which React does not recognise and silently drops. The
+	// repair was verified on one of those real files rather than only on fixtures: both attributes
+	// on one line were rewritten, the values were untouched, the result parses and re-lints clean.
+	//
+	// Two upstream corpus cases are carried at a different verdict here, and both for the same
+	// missing surface. `settings.react.version` has no equivalent in verify, and those two cases
+	// are clean upstream only because they set it. Which version the plugin assumes with no
+	// settings was measured by bisection rather than read from the source, because reading it gave
+	// the wrong answer: the default constant is 999.999.999, which reads as "every gate passes",
+	// while the no-settings behaviour actually matches 18.0.0. That cost this port a wrong entry,
+	// `precedence`, which one of upstream's own cases then caught.
+	"react/no-unknown-property": "ported from eslint-plugin-react, which marks it recommended:true but which neither tool enforced, because this project lists its react rules individually rather than spreading the recommended preset; a dry run over the tree measured 18 real findings across 5 files, all fill-rule or clip-rule in SVG icons, with the repair verified on one of those files",
+
 	"react/forbid-dom-props": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and it enforces nothing until a forbid list is configured, so the audit's zero and the dry run's zero both reflect an empty list",
 
 	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory
