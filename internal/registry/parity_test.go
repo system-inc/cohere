@@ -327,7 +327,8 @@ var rulesOutsideTheInventory = map[string]string{
 	// measured eighty-four violations, the largest of this batch, so enabling it is a real cleanup
 	// rather than a guardrail. Each is a list whose keys are array positions, which React reuses
 	// across a reorder and which therefore carries element state onto the wrong item.
-	"react/no-array-index-key": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and the audit measured eighty-four violations in ahra",
+	"react/no-array-index-key":            "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and the audit measured eighty-four violations in ahra",
+	"react/no-unstable-nested-components": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and a dry run over the tree measured eighteen findings across seven files, with the installed rule driven over the same seven files reporting the same eighteen at the same lines, and a seeded probe confirming both instruments fire",
 
 	// Ported from eslint-plugin-react and enabled in both engines by this port. Upstream marks it
 	// `recommended: false`, so it is off in the plugin's own recommended config, and there is no
