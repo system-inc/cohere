@@ -1,0 +1,398 @@
+package core
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/ruletest"
+)
+
+// requireAtomicUpdatesCorpusProvenance records where the imported cases came from and how they were
+// checked, because a fixture table is only worth what its provenance is.
+//
+// Source: ESLint's own tests at `tests/lib/rules/require-atomic-updates.js`, extracted by hooking
+// its `RuleTester` and capturing the case objects rather than by parsing the file, so no case was
+// retyped and no escape passed through a shell. 28 clean and 35 reporting cases, 37 findings.
+//
+// Checked twice before being trusted:
+//
+//	every extracted case was replayed against the INSTALLED eslint 10.8.1 through the Linter API,
+//	  and all 63 reproduced their expected verdict with zero mismatches, which is what proves the
+//	  extraction is faithful rather than merely well-formed
+//	every Go literal in the corpus file was parsed back out and compared byte against byte with the
+//	  extracted JSON, which is what catches a cooked escape or a smart quote
+//
+// One case is imported with a stated difference. Upstream's case 26 declares
+// `globals: { process: "readonly" }`, and measured on the installed rule the SAME source with no
+// such declaration is completely silent. See `TestRequireAtomicUpdatesResolutionDivergence`.
+const requireAtomicUpdatesCorpusProvenance = "eslint/tests/lib/rules/require-atomic-updates.js"
+
+// TestRequireAtomicUpdatesStaysSilent runs every clean case upstream ships.
+//
+// These are the false positives upstream already thought about, and each one was added when somebody
+// hit it. They are the half of the corpus that can catch a port being too eager, which is the
+// direction this rule fails in: the flow reasoning is easy to make coarser than upstream's and every
+// reporting case stays green while it happens.
+func TestRequireAtomicUpdatesStaysSilent(t *testing.T) {
+	for _, testCase := range requireAtomicUpdatesCleanCases {
+		result := ruletest.RunTypedWithOptions(
+			t, RequireAtomicUpdates, "clean.ts", testCase.source, testCase.options)
+		if len(result.Diagnostics) != 0 {
+			t.Errorf("reported %v on a clean case\n%s",
+				result.MessageIds(), testCase.source)
+		}
+	}
+}
+
+// TestRequireAtomicUpdatesFires runs every reporting case upstream ships, asserting the message ids
+// in order and their count.
+func TestRequireAtomicUpdatesFires(t *testing.T) {
+	for _, testCase := range requireAtomicUpdatesReportingCases {
+		if requireAtomicUpdatesNeedsDeclaredGlobals(testCase.source) {
+			// One case is decided ABOVE the rule, by whether its identifier resolves at all.
+			// Upstream ships it with `globals: { process: "readonly" }`, and measured on the
+			// installed rule the same source with no such declaration is completely silent. Our
+			// resolution comes from the checker rather than from a globals list, and this fixture
+			// file declares nothing, so the name resolves to nothing here.
+			//
+			// It is recorded rather than deleted or greened, and the behaviour it stands for is
+			// pinned by `TestRequireAtomicUpdatesProcessCaseWithDeclaration`, which supplies the
+			// declaration and gets upstream's two findings.
+			continue
+		}
+		result := ruletest.RunTypedWithOptions(
+			t, RequireAtomicUpdates, "fires.ts", testCase.source, testCase.options)
+		got := result.MessageIds()
+		if len(got) != len(testCase.wantIds) {
+			t.Errorf("reported %v, want %v\n%s", got, testCase.wantIds, testCase.source)
+			continue
+		}
+		for index, want := range testCase.wantIds {
+			if got[index] != want {
+				t.Errorf("finding %d was %q, want %q\n%s",
+					index, got[index], want, testCase.source)
+			}
+		}
+	}
+}
+
+// TestRequireAtomicUpdatesSpan asserts WHERE each finding points, which no message-id fixture can
+// see.
+//
+// Upstream reports on `node.parent`, the whole assignment expression, for both message arms. A port
+// pointing at the left side, at the right side, or at the enclosing statement passes every id
+// fixture in this file while being wrong, and a reader following the finding would be sent to the
+// wrong place. The expectation is the exact source text of the assignment.
+func TestRequireAtomicUpdatesSpan(t *testing.T) {
+	cases := []struct {
+		name   string
+		source string
+		want   []string
+	}{
+		{
+			name:   "compound assignment to an outer variable",
+			source: `let foo; async function x() { foo += await amount; }`,
+			want:   []string{"foo += await amount"},
+		},
+		{
+			name:   "plain assignment reading itself before the suspension",
+			source: `let foo; async function x() { foo = foo + await amount; }`,
+			want:   []string{"foo = foo + await amount"},
+		},
+		{
+			name:   "property store on a const object",
+			source: `const foo = {}; async function x() { foo.bar += await baz }`,
+			want:   []string{"foo.bar += await baz"},
+		},
+		{
+			name:   "computed member in the middle of the chain",
+			source: `const foo = []; async function x() { foo[bar].baz += await result;  }`,
+			want:   []string{"foo[bar].baz += await result"},
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunTyped(t, RequireAtomicUpdates, "span.ts", testCase.source)
+			if len(result.Diagnostics) != len(testCase.want) {
+				t.Fatalf("reported %d findings, want %d: %v",
+					len(result.Diagnostics), len(testCase.want), result.MessageIds())
+			}
+			// The harness writes `strings.TrimSpace(contents)+"\n"`, so the file on disk can be one
+			// byte offset from the literal above. Slicing the source the harness actually wrote is
+			// what keeps this from reading as an off-by-one in the rule.
+			written := result.SourceFile.Text()
+			for index, want := range testCase.want {
+				diagnostic := result.Diagnostics[index]
+				got := written[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if got != want {
+					t.Errorf("finding %d spans %q, want %q", index, got, want)
+				}
+			}
+		})
+	}
+}
+
+// TestRequireAtomicUpdatesMessageText asserts the rendered text, exactly.
+//
+// The description is built with `Sprintf` and carries the binding name and, on the property arm, the
+// assignment target's source text. A mutation that moves only the per-finding text leaves the id and
+// the count fixed, so every other fixture in this file stays green over it. The assertions are
+// equality against a literal typed here rather than against the rule's own message constant, because
+// comparing against the constant moves both sides together under mutation.
+func TestRequireAtomicUpdatesMessageText(t *testing.T) {
+	t.Run("variable arm names the binding", func(t *testing.T) {
+		result := ruletest.RunTyped(t, RequireAtomicUpdates, "text.ts",
+			`let counter; async function x() { counter += await amount; }`)
+		if len(result.Diagnostics) != 1 {
+			t.Fatalf("reported %d findings, want 1", len(result.Diagnostics))
+		}
+		got := result.Diagnostics[0].Message.Description
+		if !strings.HasSuffix(got, " Here the variable is counter.") {
+			t.Errorf("description does not name the binding: %q", got)
+		}
+		if strings.Count(got, "counter") != 1 {
+			t.Errorf("binding name appears %d times, want 1: %q",
+				strings.Count(got, "counter"), got)
+		}
+	})
+
+	t.Run("property arm names the target text and the object", func(t *testing.T) {
+		result := ruletest.RunTyped(t, RequireAtomicUpdates, "text.ts",
+			`const holder = []; async function x() { holder[key].slot += await result; }`)
+		if len(result.Diagnostics) != 1 {
+			t.Fatalf("reported %d findings, want 1", len(result.Diagnostics))
+		}
+		got := result.Diagnostics[0].Message.Description
+		want := " Here the assignment writes holder[key].slot and the object holder was read before the suspension."
+		if !strings.HasSuffix(got, want) {
+			t.Errorf("description tail is wrong\n got %q\nwant suffix %q", got, want)
+		}
+	})
+
+	t.Run("message ids are the two upstream names", func(t *testing.T) {
+		if messageRequireAtomicUpdatesVariable.Id != "nonAtomicUpdate" {
+			t.Errorf("variable arm id is %q", messageRequireAtomicUpdatesVariable.Id)
+		}
+		if messageRequireAtomicUpdatesProperty.Id != "nonAtomicObjectUpdate" {
+			t.Errorf("property arm id is %q", messageRequireAtomicUpdatesProperty.Id)
+		}
+	})
+}
+
+// TestRequireAtomicUpdatesOptionsDecode routes options through the rule's own exported decoder.
+//
+// Building the options struct directly would leave the json tag and the default untested, and those
+// are the two lines with no upstream counterpart. The nil case is the one that has shipped a broken
+// rule in this tree before: a rule configured as a bare severity is handed nil, and a port relying
+// on the zero value arriving by accident cannot tell that from a decoder that never ran.
+func TestRequireAtomicUpdatesOptionsDecode(t *testing.T) {
+	decode := rule.DecodeOptionsInto[RequireAtomicUpdatesOptions]()
+
+	t.Run("allowProperties true suppresses only the property arm", func(t *testing.T) {
+		decoded, err := decode(json.RawMessage(`{"allowProperties": true}`))
+		if err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if decoded.(RequireAtomicUpdatesOptions).AllowProperties != true {
+			t.Fatalf("decoded %#v", decoded)
+		}
+
+		property := `async function a(foo) { if (foo.bar) { foo.bar = await something; } }`
+		result := ruletest.RunTypedWithOptions(t, RequireAtomicUpdates, "opt.ts", property, decoded)
+		if len(result.Diagnostics) != 0 {
+			t.Errorf("property arm still reported under allowProperties: %v", result.MessageIds())
+		}
+
+		variable := `let foo; async function a() { if (foo) { foo = await something; } }`
+		result = ruletest.RunTypedWithOptions(t, RequireAtomicUpdates, "opt.ts", variable, decoded)
+		ruletest.ExpectFindings(t, result, "nonAtomicUpdate")
+	})
+
+	t.Run("allowProperties false keeps both arms", func(t *testing.T) {
+		decoded, err := decode(json.RawMessage(`{"allowProperties": false}`))
+		if err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		property := `async function a(foo) { if (foo.bar) { foo.bar = await something; } }`
+		result := ruletest.RunTypedWithOptions(t, RequireAtomicUpdates, "opt.ts", property, decoded)
+		ruletest.ExpectFindings(t, result, "nonAtomicObjectUpdate")
+	})
+
+	t.Run("nil options bypass the decoder and keep both arms", func(t *testing.T) {
+		// This is the shape a bare `"error"` produces. It reaches the rule without ever passing
+		// through the decoder above, so no fixture routed through `decode` can see it.
+		property := `async function a(foo) { if (foo.bar) { foo.bar = await something; } }`
+		result := ruletest.RunTypedWithOptions(t, RequireAtomicUpdates, "opt.ts", property, nil)
+		ruletest.ExpectFindings(t, result, "nonAtomicObjectUpdate")
+	})
+
+	t.Run("an empty object decodes to the permissive-off default", func(t *testing.T) {
+		decoded, err := decode(json.RawMessage(`{}`))
+		if err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if decoded.(RequireAtomicUpdatesOptions).AllowProperties != false {
+			t.Fatalf("empty object did not default AllowProperties to false: %#v", decoded)
+		}
+	})
+}
+
+// TestRequireAtomicUpdatesSuspensionOrder pins the discrimination the whole rule rests on: which
+// side of the suspension a read sits on.
+//
+// The two inputs differ by nothing except the position of `foo` relative to the await, and they have
+// opposite verdicts upstream. A port that recorded the suspension at the wrong point, or that
+// recorded reads without ordering them against it, gets one of these wrong while the other stays
+// green. Both are upstream cases, kept here as a named pair because the corpus tables cannot say
+// that these two are each other's control.
+func TestRequireAtomicUpdatesSuspensionOrder(t *testing.T) {
+	stale := ruletest.RunTyped(t, RequireAtomicUpdates, "order.ts",
+		`let foo; async function x() { foo = foo + await amount; }`)
+	ruletest.ExpectFindings(t, stale, "nonAtomicUpdate")
+
+	fresh := ruletest.RunTyped(t, RequireAtomicUpdates, "order.ts",
+		`let foo; async function x() { foo = await bar + foo; }`)
+	ruletest.ExpectClean(t, fresh)
+}
+
+// TestRequireAtomicUpdatesEscapeTable pins each row of the escape predicate against the verdict
+// measured on the installed rule.
+//
+// The rows are not interchangeable and the pairs matter more than the rows: each clean case is the
+// control for the reporting case beside it, differing in exactly the property under test. Without
+// the control, a rule that reported on everything would pass the reporting rows.
+func TestRequireAtomicUpdatesEscapeTable(t *testing.T) {
+	cases := []struct {
+		name   string
+		source string
+		want   []string
+	}{
+		{
+			name:   "declared inside and never captured is local",
+			source: `async function x() { let foo; foo += await bar; }`,
+		},
+		{
+			name:   "declared inside but captured by a closure escapes",
+			source: `async function x() { let foo; bar(() => foo); foo += await amount; }`,
+			want:   []string{"nonAtomicUpdate"},
+		},
+		{
+			name: "a closure that does not name the binding is not a capture",
+			// The control for the row above: a nested function exists in both, and only naming the
+			// binding changes the verdict.
+			source: `async function x() { let foo; bar(() => baz += 1); foo += await amount; }`,
+		},
+		{
+			name:   "declared outside the function escapes",
+			source: `let foo; async function x() { foo += await amount; }`,
+			want:   []string{"nonAtomicUpdate"},
+		},
+		{
+			name: "a parameter is local for the variable arm",
+			// Paired with the row below. One parameter, two questions, opposite answers.
+			source: `async function f(foo) { foo = await bar; }`,
+		},
+		{
+			name:   "a parameter escapes for the property arm",
+			source: `async function f(foo) { let b = await get(foo.id); foo.bar = b.bar; }`,
+			want:   []string{"nonAtomicObjectUpdate"},
+		},
+		{
+			name:   "a local object is local for the property arm",
+			source: `async function f() { let foo = {}; let bar = await get(foo.id); foo.prop = bar.prop; }`,
+		},
+		{
+			name: "a non-suspending function is never judged",
+			// The `shouldVerify` gate. Same shape as the reporting rows and no await anywhere.
+			source: `let foo; function x() { foo = foo + amount; }`,
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunTyped(t, RequireAtomicUpdates, "escape.ts", testCase.source)
+			if len(testCase.want) == 0 {
+				ruletest.ExpectClean(t, result)
+				return
+			}
+			ruletest.ExpectFindings(t, result, testCase.want...)
+		})
+	}
+}
+
+// TestRequireAtomicUpdatesResolutionDivergence records the one place this port answers differently
+// from a bare ESLint run, with the measurement rather than an argument.
+//
+// Upstream skips a reference whose `resolved` is null, and ESLint decides "resolved" from its scope
+// analysis plus the configured globals list. Verify asks the checker, which resolves against the
+// program's declarations. Upstream's own case 26 is exactly this: it ships with
+// `globals: { process: "readonly" }`, and measured on the installed eslint 10.8.1 the same source
+// without that declaration is completely silent while with it there are two findings.
+//
+// The divergence is a strict superset in favour of reporting, and it is the direction the rule
+// wants: upstream skips an unresolved name because it cannot tell a global from a typo, not because
+// a global cannot race. A global is the most racy binding in a file.
+//
+// This test pins the behaviour we ship rather than upstream's, deliberately, so a later reader sees
+// which one was chosen. Both halves are asserted: the resolvable binding reports, and a genuinely
+// unresolvable one stays silent, which is the control that proves resolution is what decides it.
+func TestRequireAtomicUpdatesResolutionDivergence(t *testing.T) {
+	t.Run("a resolvable binding is judged", func(t *testing.T) {
+		result := ruletest.RunTyped(t, RequireAtomicUpdates, "divergence.ts",
+			`let holder: any; async function f() { const q = holder.a; try { const r = await run(); holder.b = r; } catch (e) { holder.b = 1; } }`)
+		if len(result.Diagnostics) == 0 {
+			t.Fatal("a resolvable binding was not judged")
+		}
+		for _, diagnostic := range result.Diagnostics {
+			if diagnostic.Message.Id != "nonAtomicObjectUpdate" {
+				t.Errorf("unexpected id %q", diagnostic.Message.Id)
+			}
+		}
+	})
+
+	t.Run("an unresolvable name is skipped", func(t *testing.T) {
+		// The control. Same shape, and nothing declares the binding, so the checker gives no symbol
+		// and the reference is skipped exactly as upstream skips an unresolved one.
+		result := ruletest.RunTyped(t, RequireAtomicUpdates, "divergence.ts",
+			`async function f() { const q = neverDeclaredAnywhere.a; await run(); neverDeclaredAnywhere.b = 1; }`)
+		ruletest.ExpectClean(t, result)
+	})
+}
+
+// requireAtomicUpdatesNeedsDeclaredGlobals names the one imported case whose verdict is decided by a
+// declaration the fixture cannot carry.
+//
+// Matched by content rather than by index, because the corpus file is regenerated from upstream and
+// an index would silently drift onto a different case.
+func requireAtomicUpdatesNeedsDeclaredGlobals(source string) bool {
+	return strings.Contains(source, "process.exitCode")
+}
+
+// TestRequireAtomicUpdatesProcessCaseWithDeclaration is the skipped corpus case, restored.
+//
+// Upstream's case 26 depends entirely on `process` being a declared global: measured on eslint
+// 10.8.1, with `globals: { process: "readonly" }` it reports twice and with the identical source and
+// no declaration it is silent. Supplying the declaration the way this tree actually gets one, through
+// the program's type declarations, reproduces upstream's two findings exactly.
+//
+// This is what makes the divergence a resolution difference rather than a rule difference, and it is
+// the reason the skip above is a stated scope note instead of a defect.
+func TestRequireAtomicUpdatesProcessCaseWithDeclaration(t *testing.T) {
+	source := `declare const process: any;
+declare function run(options: any): Promise<any>;
+async function main() {
+    const opts: any = {};
+    opts.spec = process.stdin;
+    try {
+        const { exit_code } = await run(opts);
+        process.exitCode = exit_code;
+    } catch (e) {
+        process.exitCode = 1;
+    }
+}`
+	result := ruletest.RunTyped(t, RequireAtomicUpdates, "process.ts", source)
+	ruletest.ExpectFindings(t, result, "nonAtomicObjectUpdate", "nonAtomicObjectUpdate")
+}
