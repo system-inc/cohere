@@ -351,6 +351,24 @@ var rulesOutsideTheInventory = map[string]string{
 	// layer. The audit measured zero violations in ahra, which is expected rather than surprising:
 	// the factory it reports on was removed from React itself and now ships as a separate package
 	// nothing in this tree depends on. A guardrail against drift.
+	// Ported from eslint core, which marks it `recommended: false`, so it is off in eslint's own
+	// recommended config. The ahra inventory records it as `"origin": "not configured"` under both
+	// the bare and the `@typescript-eslint` spelling, which is an absence rather than a decision:
+	// nobody turned it off, it was never turned on. A rule the gate never had rather than a parity
+	// gap.
+	//
+	// It is a judgment about any TypeScript rather than about React or the DOM, so it was enabled
+	// on the universal layer. A dry run over the tree measured 690 findings across 278 of 3,516
+	// files, which makes enabling it a real cleanup rather than a guardrail.
+	//
+	// The 690 were checked against the installed rule rather than counted: driving eslint over all
+	// 278 files agreed on every finding, line and column. Two column defects were found that way
+	// and fixed, both invisible to the imported corpus because `rule_testing` compares message ids
+	// rather than spans. A further 400 files where verify reports nothing were driven through
+	// eslint and produced nothing either, with a planted violation confirming both instruments
+	// fire at the same position.
+	"require-await": "ported from eslint core, which marks it recommended:false; the ahra inventory records it as not configured under both spellings, so neither tool enforced it when the inventory was captured, and a dry run measured 690 findings across 278 files, each one matched against the installed rule at the same line and column",
+
 	"react/prefer-es6-class": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and the audit measured zero violations in ahra",
 
 	// Ported from eslint-plugin-react and enabled in both engines by this port. Unlike the
@@ -1540,6 +1558,29 @@ var rulesOutsideTheInventory = map[string]string{
 	// is terminated by automatic semicolon insertion and can run into the member that follows.
 	"no-useless-constructor": "ported from eslint core, which marks it recommended:false; not " +
 		"enforced by either tool when the inventory was captured, and the audit measured 1 violation",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// 58 findings across 42 files, and the installed eslint reports the same 58 at the same line
+	// and column with zero disagreements. The audit predicted 52, so the count is close rather than
+	// exact; the difference is drift since that snapshot rather than a divergence.
+	//
+	// The second number matters more than the first here, because "auto-fixable" is true of one arm
+	// out of nine. Measured on the tree: 54 of the 58 carry an applicable fix, 4 offer a suggestion
+	// instead, and none is bare, which is byte for byte eslint's own split over the same files. A
+	// cleanup run rewrites the double-negation sites and leaves the other four for a human.
+	//
+	// Two defects here were found on the real tree rather than in the corpus, both from the same
+	// parser difference. Our parser keeps parentheses and puts logical and sequence expressions
+	// under the same kind as arithmetic ones, so upstream's `type === "BinaryExpression"` operand
+	// test is wrong in both directions when transcribed literally: without unwrapping it reported
+	// `(index + 1) * 1.0` in modules/tasks, and with unwrapping but no operator test it went silent
+	// on `(a, b) * 1`, which upstream's corpus does write.
+	"no-implicit-coercion": "ported from eslint core, which marks it recommended:false; not " +
+		"enforced by either tool when the inventory was captured, and the audit measured 52 " +
+		"violations while this port measures 58, of which 54 carry a fix and 4 a suggestion",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
