@@ -299,6 +299,17 @@ func namespacesOf(remaining []string) []namespaceCount {
 // A reason is required. An entry here says "we looked", and an entry with no reason says only that
 // somebody wanted the test to pass.
 var rulesOutsideTheInventory = map[string]string{
+	// Ported from eslint-plugin-react and enabled in both engines by this port. Upstream marks it
+	// `recommended: false`, the same shape as the state-in-constructor entry below: it is off in
+	// the plugin's own recommended config, and there is no oxlint config in the tree to have
+	// carried it either. A rule the gate never had rather than a parity gap.
+	//
+	// It is a judgment about how a React component is declared, so it was enabled on the frontend
+	// layer. The audit measured zero violations in ahra, which is expected rather than surprising:
+	// the factory it reports on was removed from React itself and now ships as a separate package
+	// nothing in this tree depends on. A guardrail against drift.
+	"react/prefer-es6-class": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and the audit measured zero violations in ahra",
+
 	// Ported from eslint-plugin-react and enabled in both engines by this port. Unlike the
 	// state-in-constructor entry below, upstream marks THIS one `recommended: true`, so its absence
 	// from the inventory says something about the configuration being replaced rather than about
@@ -521,6 +532,21 @@ var rulesOutsideTheInventory = map[string]string{
 	// this rule's corpus and its behaviour and it is measured rather than inferred.
 	"no-multi-assign": "ported from eslint core, which marks it recommended:false; not enforced by " +
 		"either tool when the inventory was captured, and the audit measured 3 violations",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// The audit measured zero violations, so this is a guardrail against drift rather than a
+	// cleanup, and the audit rated it Yes on exactly that basis.
+	//
+	// It reads the type checker, which upstream does not, and that is the port rather than an
+	// addition. Upstream asks eslint-scope whether the name `Symbol` has any definition in source
+	// and proceeds only when it has none. Four of its six clean cases are shadowing, so a rule
+	// matching the name textually reports all four. `resolvesToAGlobal` asks the same question
+	// through resolution and was probed against all eight upstream cases before being built on.
+	"symbol-description": "ported from eslint core, which marks it recommended:false; not enforced " +
+		"by either tool when the inventory was captured, and the audit measured zero violations",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
