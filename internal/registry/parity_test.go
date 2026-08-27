@@ -363,6 +363,22 @@ var rulesOutsideTheInventory = map[string]string{
 	// records what the two tools enforced when it was captured, and neither enforced this one:
 	// upstream marks it `recommended: false`.
 	//
+	// A dry run over the tree found zero findings across 3,516 files against 117,763 registrations,
+	// and the non-zero registration count is what separates a clean tree from an inert rule. A
+	// seeded probe tree reported five findings on eight candidate style props, declining the
+	// object, the null and the undefined.
+	//
+	// Two things this port had to establish that upstream's corpus does not state. Upstream reads
+	// the FIRST declaration of a name, so a variable declared twice is judged by the one written
+	// first, and a loop over declarations would be wider than the rule. And a shorthand property
+	// resolves through `GetShorthandAssignmentValueSymbol` rather than the plain accessor, which
+	// answers the property's own symbol and made the rule silent on an input upstream reports.
+	"react/style-prop-object": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and a dry run over the tree measured zero findings against 117,763 registrations, with a seeded probe tree confirming the rule fires on five of eight candidate style props",
+
+	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory
+	// records what the two tools enforced when it was captured, and neither enforced this one:
+	// upstream marks it `recommended: false`.
+	//
 	// Like `forbid-elements`, this rule enforces nothing until a forbid list is configured, so the
 	// audit's zero and the dry run's zero both reflect an empty list rather than a clean tree. A
 	// seeded probe tree with a configured list reported three findings on five candidate
