@@ -14,12 +14,33 @@ import (
 
 // noEmptyFunctionAllowKinds is upstream's `ALLOW_OPTIONS`, in its order.
 //
-// Fifteen values, and four of them describe TypeScript rather than JavaScript. That is worth
+// Fourteen values, and four of them describe TypeScript rather than JavaScript. That is worth
 // stating because the typescript-eslint EXTENSION of this rule exists and reads as though it adds
 // them: measured against eslint 10.8.1, core already handles a private constructor, a protected
 // constructor, a constructor taking parameter properties, a decorated method and an override
 // method. The extension's only real difference is SPELLING, `private-constructors` against
 // `privateConstructors`, and core refuses the kebab form at config load.
+//
+// # That claim is now measured across the whole extension corpus rather than probed
+//
+// `@typescript-eslint/no-empty-function` is not ported here, and this is why. Driving upstream's
+// core and upstream's extension over identical inputs on the installed 8.67.0 build, across the
+// extension's own corpus of nine passing and seven failing cases: ZERO behavioural differences on
+// every case where both configurations load. The only two divergent rows are the ones spelling an
+// allow value in kebab, which eslint core rejects at config load rather than answering differently.
+//
+// `decoratedFunctions` and `overrideMethods` are spelled identically in both, and a parameter
+// property is exempt in both UNCONDITIONALLY rather than behind an allow value, which is the part
+// most likely to be misread from the extension's source.
+//
+// This rule was then run against that same extension corpus with the two kebab spellings translated
+// and reproduced it exactly, nine of nine passing and seven of seven failing.
+//
+// So porting the extension would register a second NAME rather than a second check. A rule package
+// may not import another rule package, so a wrapper would need this file's body lifted into
+// `internal/utilities`, and `rule-inventory.json` carries no entry for this rule under either
+// spelling, so nothing in the differential asks for the name. The audit lists the extension as an
+// unported line item, which reads as work outstanding; it is not.
 var noEmptyFunctionAllowKinds = []string{
 	"functions",
 	"arrowFunctions",

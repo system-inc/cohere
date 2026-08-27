@@ -60,6 +60,37 @@ var messageNoUselessConstructorRemove = rule.Message{
 // constructor is still useless and upstream reports it. On a subclass it widens the visibility the
 // parent declared, which is a real effect. Both directions are pinned by fixtures.
 //
+// # The typescript-eslint extension of this rule adds nothing, and that is measured
+//
+// `@typescript-eslint/no-useless-constructor` exists upstream and is not ported here. It is a
+// wrapper over this same core rule that lays three filters over the member listener: skip a
+// protected constructor, skip a private one, skip a public one when the class extends, and skip any
+// constructor carrying a parameter property or a decorated parameter.
+//
+// Those are the four judgments the section above already makes, so the extension narrows nothing
+// that this rule has not already narrowed. Established by running upstream's core and upstream's
+// extension over identical inputs on the installed 8.67.0 build, three ways:
+//
+//	upstream's own 41-case corpus FOR THE EXTENSION   identical verdicts on all 41
+//	13 shapes written for this comparison            identical on all 13
+//	11 adversarial shapes, aimed one per filter       identical on all 11
+//
+// Sixty-five inputs, no divergence. This rule was then run against that same extension corpus and
+// reproduced it exactly, 32 of 32 passing and 9 of 9 failing.
+//
+// So porting the extension would register a second NAME rather than a second check, and the name is
+// not free: a rule package may not import another rule package, so a wrapper would need this file's
+// body lifted into `internal/utilities` the way `no-dupe-class-members` was at `27c5ff0`. That is
+// 427 lines and sixteen helpers moved for no behavioural change.
+//
+// Nothing asks for the name either. `TestParityAgainstInventory` walks REGISTERED rules and asks
+// whether each appears in `rule-inventory.json`, not the reverse, and that file carries no entry for
+// this rule under either spelling, so a missing `@typescript-eslint/` registration costs nothing in
+// the differential. Checked with a control against a rule that does have an entry.
+//
+// This note exists because the audit lists the extension as an unported line item, which reads as
+// work outstanding. It is not, and re-deriving that has cost more than one reader a cycle.
+//
 // # A suggestion, not a fix
 //
 // Upstream sets `hasSuggestions` and no `fixable`. Deleting a constructor is a change to what the
