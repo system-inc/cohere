@@ -1293,6 +1293,15 @@ var rulesOutsideTheInventory = map[string]string{
 	"@typescript-eslint/prefer-find": "ported from typescript-eslint, whose stylistic preset carries it; not enforced by either tool when the inventory was captured",
 
 	// Ported from typescript-eslint and enabled in both engines by this port. No prior decision in
+	// the config to override, confirmed against the linter's own orphaned-key report rather than by
+	// grep alone. Outside the inventory for the usual reason, that neither tool enforced it when the
+	// capture was taken.
+	//
+	// Worth naming the cost: the audit measures 85 sites and the rule ships no fixer, so every one
+	// is a human judgment.
+	"@typescript-eslint/strict-void-return": "ported from typescript-eslint; not enforced by either tool when the inventory was captured",
+
+	// Ported from typescript-eslint and enabled in both engines by this port. No prior decision in
 	// the config to override: neither spelling of the key appears there, confirmed against the
 	// linter's own orphaned-key report rather than by grep alone. Outside the inventory for the
 	// usual reason, that neither tool enforced it when the capture was taken.
