@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/utilities/comments"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/imports"
 )
 
 // NoDeprecated flags a React API that React itself has deprecated.
@@ -483,22 +484,9 @@ func deprecatedModuleAlias(node *ast.Node) (string, bool) {
 // `specifier.imported.name`. `import { createClass as cc }` reports as `React.createClass`, and the
 // span is the whole specifier including the alias. Measured; the corpus writes no alias.
 func forEachNamedImportSpecifier(node *ast.Node, visit func(specifier *ast.Node, importedName string)) {
-	declaration := node.AsImportDeclaration()
-	if declaration == nil || declaration.ImportClause == nil {
-		return
-	}
-	clause := declaration.ImportClause.AsImportClause()
-	if clause == nil || clause.NamedBindings == nil {
-		return
-	}
-	if clause.NamedBindings.Kind != ast.KindNamedImports {
-		return
-	}
-	elements := clause.NamedBindings.AsNamedImports().Elements
-	if elements == nil {
-		return
-	}
-	for _, element := range elements.Nodes {
+	// Named is empty for a default-only or namespace-only import, which is how upstream's
+	// `'imported' in s` filter reads here: both shapes are silent.
+	for _, element := range imports.BindingsOf(node).Named {
 		if element.Kind != ast.KindImportSpecifier {
 			continue
 		}
