@@ -335,6 +335,18 @@ var rulesOutsideTheInventory = map[string]string{
 	// happens.
 	"react/iframe-missing-sandbox": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and the audit measured zero violations in ahra, which a dry run over the tree reproduced",
 
+	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory records
+	// what the two tools enforced when it was captured, and neither enforced this one: upstream marks
+	// it `recommended: false`, so it is off in the plugin's own recommended config and nothing turned
+	// it on here, which is why it is outside the inventory rather than a parity gap.
+	//
+	// It is a judgment about React component declarations, so it was enabled on the frontend layer.
+	// The audit measured zero violations in ahra and a dry run over the tree reproduced that zero,
+	// which makes it a guardrail against drift. What it guards is a failure that only appears in the
+	// production build: React strips propTypes off components there, so an expression reading another
+	// component's propTypes is an object in development and undefined in the build users run.
+	"react/forbid-foreign-prop-types": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and the audit measured zero violations in ahra, which a dry run over the tree reproduced",
+
 	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory
 	// records what the two tools enforced when it was captured, and neither enforced this one:
 	// upstream marks it `recommended: false`, so it is off in the plugin's own recommended config,
