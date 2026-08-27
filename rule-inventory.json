@@ -1,9 +1,9 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 239,
+  "total": 250,
   "byNamespace": {
-    "(core)": 78,
+    "(core)": 89,
     "better-tailwindcss": 12,
     "nextjs": 22,
     "nexus": 20,
@@ -12,11 +12,11 @@
     "typescript": 37
   },
   "bySeverity": {
-    "error": 197,
+    "error": 208,
     "warn": 42
   },
   "byEnabledBy": {
-    "rulesBlock": 198,
+    "rulesBlock": 209,
     "pluginDefault": 41
   },
   "rules": [
@@ -184,6 +184,33 @@
     },
     {
       "rule": "no-undef-init",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-throw-literal",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-useless-call",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-alert",
       "sources": [
         "eslint"
       ],
@@ -920,6 +947,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-extend-native",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-iterator",
       "sources": [
         "oxlint"
@@ -927,6 +963,15 @@
       "options": "no",
       "severity": "warn",
       "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "no-lone-blocks",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
     },
     {
       "rule": "no-loss-of-precision",
@@ -989,6 +1034,51 @@
       "sources": [
         "eslint",
         "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-div-regex",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-multi-str",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-octal-escape",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-script-url",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-template-curly-in-string",
+      "sources": [
+        "eslint"
       ],
       "options": "no",
       "severity": "error",
@@ -1261,6 +1351,15 @@
         "oxlint"
       ],
       "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "require-atomic-updates",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
       "severity": "error",
       "enabledBy": "rulesBlock"
     },
