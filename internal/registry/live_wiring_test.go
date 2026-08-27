@@ -47,7 +47,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// off. Turning it on is a config change for whoever owns that block to make.
 		"react/jsx-key": "the live config turns react/jsx-key off deliberately, beside react-in-jsx-scope",
 
-		// The live config already turns this rule off, at VerifySettings.json:362, in the same
+		// The live config already turns this rule off, at the config key `no-useless-rename`, in the same
 		// block as react/jsx-key and react/react-in-jsx-scope. That decision was recorded BEFORE
 		// the rule was ported, which is how this migration is meant to work, and running
 		// EnableRule.ts would have reversed it through the porting process rather than because
@@ -61,8 +61,8 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// auto-fixable, so turning it on later is one config line plus a fix pass.
 		"no-useless-rename": "the live config turns no-useless-rename off deliberately, beside react/jsx-key",
 
-		// The live config already turns this rule off, at VerifySettings.json:370, under the
-		// spelling `typescript/require-array-sort-compare`. Somebody decided against it, and the
+		// The live config already turns this rule off, at the config key `typescript/require-array-sort-compare`, under the
+		// old short spelling. Somebody decided against it, and the
 		// port does not get to reverse that.
 		//
 		// What makes this worth spelling out is that enabling it would have LOOKED like a normal
@@ -78,10 +78,10 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// `react/jsx-key` above. Turning it on is a config change for whoever owns that "off" to
 		// make, and the audit puts the cost at four sites, three of them `results.sort()` over small
 		// number arrays inside test assertions where the default sort is harmless.
-		"@typescript-eslint/require-array-sort-compare": "the live config turns it off deliberately at VerifySettings.json:370, under the typescript/ spelling",
+		"@typescript-eslint/require-array-sort-compare": "the live config turns it off deliberately at the config key `typescript/require-array-sort-compare`, under the typescript/ spelling",
 
 		// The same situation as the entry above, one line earlier in the same block: the live
-		// config turns this off at VerifySettings.json:369 under the `typescript/` spelling, which
+		// config turns this off at the config key `typescript/require-array-sort-compare` under the `typescript/` spelling, which
 		// does not resolve against the `@typescript-eslint/` name registered here. Enabling it was
 		// attempted and reverted rather than kept, because the two rules sit in the same
 		// hand-maintained list of deliberate disables and treating them differently would be
@@ -90,7 +90,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// The audit measures eleven sites, and unlike its neighbour this rule IS auto-fixable, so
 		// the cleanup is a command plus a review of the diff rather than eleven judgments. That
 		// makes it the cheaper of the two to turn on, and it is still not a porter's call.
-		"@typescript-eslint/no-meaningless-void-operator": "the live config turns it off deliberately at VerifySettings.json:369, under the typescript/ spelling",
+		"@typescript-eslint/no-meaningless-void-operator": "the live config turns it off deliberately at the config key `typescript/no-meaningless-void-operator`, under the typescript/ spelling",
 
 		// Left off for a reason that is not a config decision at all: the rule cannot see its own
 		// subject in this architecture, so enabling it would wire up a rule that is guaranteed to
@@ -134,7 +134,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 
 		// Registered but deliberately not enabled, because the config already carries a standing
 		// decision against this rule and that decision cannot be seen by the resolver.
-		// VerifySettings.json:366 reads `"typescript/restrict-template-expressions": "off"`, written
+		// the config key `typescript/restrict-template-expressions` reads `"typescript/restrict-template-expressions": "off"`, written
 		// under the old short spelling. `settingFor` matches a key exactly, then trims the RULE NAME
 		// off the CONFIG KEY and requires what remains to end in a slash; the old key is SHORTER
 		// than the full name, so the trim is a no-op and the branch never fires. Measured rather
@@ -144,16 +144,16 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// So enabling this would reverse somebody's decision through a spelling difference, with
 		// nothing in the diff to show a decision was reversed. The port is complete and its
 		// eighty six imported cases pass; turning it on is a decision for whoever wrote that line.
-		"@typescript-eslint/restrict-template-expressions": "registered but left off because VerifySettings.json:366 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+		"@typescript-eslint/restrict-template-expressions": "registered but left off because the config key `typescript/restrict-template-expressions` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 
 		// Same shape as the entry above, for the same reason and at a different line.
-		// VerifySettings.json:373 reads `"typescript/no-useless-default-assignment": "off"`, written
+		// the config key `typescript/no-useless-default-assignment` reads `"typescript/no-useless-default-assignment": "off"`, written
 		// under the old short spelling. The config key is 40 characters and the registered name is 48,
 		// so the key is SHORTER than the name, the trim is a no-op, and the branch never fires.
 		// Measured with two controls that do resolve, rather than read off the brief.
-		"@typescript-eslint/no-useless-default-assignment": "registered but left off because VerifySettings.json:373 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+		"@typescript-eslint/no-useless-default-assignment": "registered but left off because the config key `typescript/no-useless-default-assignment` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 
-		// The same shape as the entry above, and the same reason. VerifySettings.json:372 reads
+		// The same shape as the entry above, and the same reason. the config key `typescript/no-useless-default-assignment` reads
 		// `"typescript/no-duplicate-type-constituents": "off"`, written under the old short
 		// spelling, and the resolver cannot match a key that is shorter than the registered name.
 		// Confirmed by the linter itself rather than by argument: a `--lint` run prints
@@ -164,9 +164,9 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// fifteen more TypeScript shapes measured against the installed build. The audit puts the
 		// cleanup at three sites and the rule is auto-fixable, so turning it on is cheap; it is
 		// still a decision for whoever wrote that off rather than for a porter.
-		"@typescript-eslint/no-duplicate-type-constituents": "registered but left off because VerifySettings.json:372 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+		"@typescript-eslint/no-duplicate-type-constituents": "registered but left off because the config key `typescript/no-duplicate-type-constituents` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 
-		// The third of this shape, and the reason is the same one. VerifySettings.json:370 reads
+		// The third of this shape, and the reason is the same one. the config key `typescript/no-duplicate-type-constituents` reads
 		// `"typescript/unbound-method": "off"`, written under the old short spelling. The key is 25
 		// characters and the registered name is 34, so the key is SHORTER than the name, the trim is
 		// a no-op, and the resolver's slash-boundary branch never fires.
@@ -186,9 +186,9 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		//
 		// The audit puts the cleanup at eighteen sites and the rule is not auto-fixable, so turning
 		// it on is a real decision and it belongs to whoever wrote that off rather than to a porter.
-		"@typescript-eslint/unbound-method": "registered but left off because VerifySettings.json:370 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+		"@typescript-eslint/unbound-method": "registered but left off because the config key `typescript/unbound-method` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 
-		// The fourth of this shape. VerifySettings.json:367 reads
+		// The fourth of this shape. the config key `typescript/unbound-method` reads
 		// `"typescript/no-base-to-string": "off"`, again under the old short spelling, and again the
 		// key is shorter than the registered name so the resolver's slash-boundary branch cannot
 		// fire. Confirmed by the linter, which prints that the key matches no registered rule.
@@ -203,7 +203,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// The audit measured fifty-three violations and notes that several are deliberate String()
 		// fallbacks in generic serializers that already branch on typeof, so enabling is a judgment
 		// about those sites rather than a cleanup, and it belongs to whoever wrote the off.
-		"@typescript-eslint/no-base-to-string": "registered but left off because VerifySettings.json:367 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+		"@typescript-eslint/no-base-to-string": "registered but left off because the config key `typescript/no-base-to-string` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 	}
 
 	rules := All()
