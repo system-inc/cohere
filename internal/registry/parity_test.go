@@ -1149,6 +1149,17 @@ var rulesOutsideTheInventory = map[string]string{
 		"not enabled because ahra's config names no base/ rules at all, so where it is enforced is " +
 		"a decision nobody has made yet; the gate being replaced never enforced it here",
 
+	// The two nullability parity rules, checked against the real rules driven over the eslint
+	// interface rather than an imported corpus. They share their judgment through
+	// `internal/utilities/ecmascript/decorators` rather than importing each other, which the leaf
+	// guard requires and which the other two parity rules in this family also use.
+	"base/orm-column-nullable-parity": "ported from api-phi-health's own base lint layer; registered but " +
+		"not enabled because ahra's config names no base/ rules at all, so where it is enforced is " +
+		"a decision nobody has made yet; the gate being replaced never enforced it here",
+	"base/serializable-nullable-parity": "ported from api-phi-health's own base lint layer; registered but " +
+		"not enabled because ahra's config names no base/ rules at all, so where it is enforced is " +
+		"a decision nobody has made yet; the gate being replaced never enforced it here",
+
 	// The same shape as the entries above and for the same reason, and its oracle is the sharpest of
 	// them. api-phi-health reports zero for this rule across its 2310 linted files, which is a real
 	// property of that tree rather than a broken instrument: the same run reports 44 findings from
