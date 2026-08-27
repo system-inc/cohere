@@ -24,6 +24,24 @@ const (
 	SeverityError
 )
 
+// String renders a severity the way the config spells it.
+//
+// Without this, fmt prints the underlying int as a control character, because Severity is an
+// iota and SeverityOff is 0. A diagnostic about a config key that rendered its severity as
+// '\x00' would be describing the exact problem it exists to report, illegibly.
+func (s Severity) String() string {
+	switch s {
+	case SeverityOff:
+		return "off"
+	case SeverityWarn:
+		return "warn"
+	case SeverityError:
+		return "error"
+	default:
+		return "unknown"
+	}
+}
+
 // RuleSetting is one rule's severity and its options, if it has any.
 //
 // Options travel with severity rather than in a parallel map, because an override that re-states a
