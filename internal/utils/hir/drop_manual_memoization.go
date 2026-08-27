@@ -176,6 +176,12 @@ type manualMemoSidemap struct {
 	depsLists map[IdentifierId][]Place
 	// deps maps a temporary to the access path it evaluates to, when it is one.
 	deps map[IdentifierId]ManualMemoDependency
+	// optionals is upstream's `findOptionalPlaces`: property values guarded by an Optional
+	// terminal. Structural optional lowering deliberately leaves PropertyLoad.Optional false.
+	optionals map[IdentifierId]bool
+	// optionalJoins are the only phi blocks through which a single resolved optional arm may be
+	// projected. An enclosing ternary or logical join is a distinct expression.
+	optionalJoins map[BlockId]bool
 	// anchors maps a temporary to the instruction that defined it.
 	//
 	// Upstream keeps the whole defining instruction on its `ManualMemoCallee`; only the id is
@@ -190,12 +196,39 @@ type manualMemoSidemap struct {
 func DropManualMemoization(function *Function) ManualMemoization {
 	result := ManualMemoization{}
 	sidemap := manualMemoSidemap{
-		functions:   map[IdentifierId]bool{},
-		manualMemos: map[IdentifierId]ManualMemoKind{},
-		react:       map[IdentifierId]bool{},
-		depsLists:   map[IdentifierId][]Place{},
-		deps:        map[IdentifierId]ManualMemoDependency{},
-		anchors:     map[IdentifierId]InstructionId{},
+		functions:     map[IdentifierId]bool{},
+		manualMemos:   map[IdentifierId]ManualMemoKind{},
+		react:         map[IdentifierId]bool{},
+		depsLists:     map[IdentifierId][]Place{},
+		deps:          map[IdentifierId]ManualMemoDependency{},
+		optionals:     findManualMemoOptionalPlaces(function),
+		optionalJoins: optionalChainJoinBlocks(function),
+		anchors:       map[IdentifierId]InstructionId{},
+	}
+
+	// An optional chain in the dependency ARRAY spans blocks rather than being one `PropertyLoad`.
+	//
+	// `collectManualMemoTemporaries` reads `PropertyLoad.Optional` off the instruction, and the
+	// optional lowering leaves that false by construction: optionality lives on the `Optional`
+	// terminal, which is upstream's shape. So `props?.items` never lands in `sidemap.deps`,
+	// `extractManualMemoArguments` abandons the whole list on its first missing element, and `Deps`
+	// stays nil -- which disables the comparison entirely.
+	//
+	// Measured before this: seven goldens, every one an optional-chain fixture, inferred their
+	// dependencies correctly and reported nothing, because there was no source list to compare them
+	// against. Upstream needs no equivalent, since its `collectMaybeMemoDependencies` reads the
+	// optional form while walking the array before SSA creates join phis.
+	if chains := CollectOptionalChainSidemap(function); chains != nil {
+		recordOptionalChainJoinPhis(function, chains)
+		for id, dependency := range chains.TemporariesReadInOptional {
+			sidemap.deps[id] = ManualMemoDependency{
+				Root: ManualMemoRoot{Place: Place{
+					Identifier: dependency.Identifier,
+					Reactive:   dependency.Reactive,
+				}},
+				Path: dependency.Path,
+			}
+		}
 	}
 
 	// Insertions are QUEUED against the instruction they follow rather than applied during the
@@ -204,6 +237,7 @@ func DropManualMemoization(function *Function) ManualMemoization {
 	var queued []queuedMarkerInsert
 
 	for _, block := range function.Blocks {
+		collectManualMemoPhiDependencies(block, &sidemap)
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
 			kind, calleeLoad := recogniseManualMemoCall(instruction, &sidemap)
@@ -509,16 +543,19 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 		sidemap.depsLists[target] = places
 
 	case *PropertyLoad:
-		// Extending an existing path by one step. `Optional` is READ from the instruction rather
-		// than reconstructed from control flow; this is the central divergence from upstream and
-		// the reason `props?.a` stays distinguishable from `props.a`.
+		// Extending an existing path by one step. New structural chains record optionality on their
+		// terminal, while computed accesses and older call shapes may still carry the instruction
+		// flag. Reading both preserves the source spelling across that transition.
 		object, ok := sidemap.deps[value.Object.Identifier]
 		if !ok {
 			return
 		}
 		path := make([]DependencyPathEntry, 0, len(object.Path)+1)
 		path = append(path, object.Path...)
-		path = append(path, DependencyPathEntry{Property: value.Property, Optional: value.Optional})
+		path = append(path, DependencyPathEntry{
+			Property: value.Property,
+			Optional: value.Optional || sidemap.optionals[target],
+		})
 		sidemap.deps[target] = ManualMemoDependency{Root: object.Root, Path: path}
 
 	case *LoadLocal:
@@ -542,6 +579,102 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 		// fixture upstream compiles cleanly.
 		if source, ok := sidemap.deps[value.Value.Identifier]; ok && !isNamedBinding(function, value.LValue.Identifier) {
 			sidemap.deps[value.LValue.Identifier] = source
+		}
+	}
+}
+
+// findManualMemoOptionalPlaces recovers the guarded value of each optional source link.
+//
+// This is DropManualMemoization.ts's `findOptionalPlaces`, kept separate from
+// CollectOptionalChainSidemap deliberately. The latter answers which chains are safe inferred
+// dependencies and therefore accepts only local/context roots. Source dependency extraction has a
+// different contract: `[GLOBAL?.field]` is a valid written dependency even though a LoadGlobal is
+// not a hoistable inferred root.
+func findManualMemoOptionalPlaces(function *Function) map[IdentifierId]bool {
+	result := map[IdentifierId]bool{}
+	if function == nil {
+		return result
+	}
+	for _, block := range function.Blocks {
+		optional, ok := block.Terminal.(*Optional)
+		if !ok || !optional.Optional {
+			continue
+		}
+		test, found := function.Block(optional.Test)
+		seen := map[BlockId]bool{}
+		for found && test != nil && !seen[test.Id] {
+			seen[test.Id] = true
+			var next BlockId
+			switch terminal := test.Terminal.(type) {
+			case *Branch:
+				if terminal.Fallthrough == optional.Fallthrough {
+					consequent, exists := function.Block(terminal.Consequent)
+					if exists && consequent != nil && len(consequent.Instructions) > 0 {
+						last := function.Instructions[consequent.Instructions[len(consequent.Instructions)-1]]
+						if last != nil {
+							if store, isStore := last.Value.(*StoreLocal); isStore {
+								result[store.Value.Identifier] = true
+							}
+						}
+					}
+					found = false
+					continue
+				}
+				next = terminal.Fallthrough
+			case *Optional:
+				next = terminal.Fallthrough
+			case *Logical:
+				next = terminal.Fallthrough
+			case *Ternary:
+				next = terminal.Fallthrough
+			case *Sequence:
+				next = terminal.Fallthrough
+			case *MaybeThrow:
+				next = terminal.Continuation
+			default:
+				found = false
+				continue
+			}
+			test, found = function.Block(next)
+		}
+	}
+	return result
+}
+
+// collectManualMemoPhiDependencies carries a simple source path across SSA joins.
+//
+// Upstream drops manual memoization before SSA, where StoreLocal writes the value-block result
+// directly. This pipeline runs after construction, so the dependency array names the join phi
+// instead. A single resolved arm is sufficient for an optional join because the other arm is the
+// undefined short circuit; conflicting resolved arms are a real branch and are not collapsed.
+func collectManualMemoPhiDependencies(block *BasicBlock, sidemap *manualMemoSidemap) {
+	if block == nil || sidemap == nil || !sidemap.optionalJoins[block.Id] {
+		return
+	}
+	for _, phi := range block.Phis {
+		if _, known := sidemap.deps[phi.Place.Identifier]; known {
+			continue
+		}
+		var resolved *ManualMemoDependency
+		conflict := false
+		for _, predecessor := range PhiOperandsInOrder(phi) {
+			dependency, ok := sidemap.deps[phi.Operands[predecessor].Identifier]
+			if !ok {
+				continue
+			}
+			if resolved == nil {
+				copy := dependency
+				resolved = &copy
+				continue
+			}
+			if !manualMemoRootsEqual(resolved.Root, dependency.Root) ||
+				!equalPaths(resolved.Path, dependency.Path) {
+				conflict = true
+				break
+			}
+		}
+		if resolved != nil && !conflict {
+			sidemap.deps[phi.Place.Identifier] = *resolved
 		}
 	}
 }

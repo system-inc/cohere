@@ -33,24 +33,22 @@
 //
 // The instrument this package uses is: does the type exist, is it ever constructed, and does the
 // pass run on the IR we have. The third level is trivially satisfied here because this file BUILDS
-// the IR in question. The first two found four gaps, and each was measured rather than assumed:
+// the IR in question. The initial check found four gaps; optional lowering has since closed one:
 //
 //	terminal        declared   constructed   how this pass handles it
-//	Optional             yes             0   shares an arm with ternary/logical
+//	Optional             yes           yes   rebuilds ReactiveOptionalValue
 //	Sequence             yes             0   shares an arm with ternary/logical
 //	MaybeThrow           yes             0   explicitly FLATTENED AWAY upstream
 //	PrunedScope           no             0   shares an arm with scope
 //
-// None is fatal, which is the answer that let this stage proceed. `MaybeThrow` is the interesting
-// one: upstream's comment is that "ReactiveFunction does not explicitly model maybe-throw semantics,
-// so these terminals flatten away", so its absence costs nothing at all rather than costing
-// precision. The other three share arms with terminals this tree DOES construct, so the code paths
-// are exercised; what is missing is only the specific variant reaching them.
+// `Optional` now takes upstream's `visitValueBlockTerminal` route, including recursive rebuilding of
+// nested chains. `MaybeThrow` is the interesting remaining case: upstream says the reactive tree
+// does not model maybe-throw semantics, so these terminals flatten away.
 //
 // `PrunedScope` remains undeclared. This pass would emit one only if it consumed one, and it does
 // not construct any -- see `ReactiveScopeBlock.Pruned`, which exists as a field because the four
 // upstream passes that would set it are downstream of here. Declaring the terminal to satisfy this
-// file would create a third `Optional`: a switchable variant nothing builds.
+// file would create a switchable variant nothing builds.
 //
 // # DIVERGENCE FROM React: labels are emitted for every terminal there and here
 //
@@ -207,12 +205,9 @@ type ReactiveSequenceValue struct {
 	Value        ReactiveValue
 }
 
-// ReactiveOptionalValue is `a?.b`, which the HIR holds as an `Optional` terminal.
-//
-// Never constructed today: `Optional` is one of the four declared-but-unbuilt terminals the input
-// check found, and optionality lives on `PropertyLoad.Optional` in this lowering instead. Declared
-// because this is the OUTPUT type and a consumer switching on `ReactiveValue` should find the
-// variant upstream defines rather than an absence it has to discover. See the package comment.
+// ReactiveOptionalValue is `a?.b`, which the HIR holds as an `Optional` terminal. The nested Value
+// is a sequence containing the chain's test and consequent computations, matching upstream's
+// `visitValueBlockTerminal` reconstruction.
 type ReactiveOptionalValue struct {
 	Order    EvaluationOrder
 	Value    ReactiveValue
@@ -400,52 +395,22 @@ const (
 	// currently a constant rather than a measurement.
 	ReactiveFunctionGapPrunedScopes
 
-	// ReactiveFunctionGapUnbuiltTerminals is the three HIR terminals this pass would consume but never sees.
+	// ReactiveFunctionGapUnbuiltTerminals is the remaining HIR terminals this pass would consume but never sees.
 	//
-	// `Optional`, `Sequence` and `MaybeThrow` are declared in `terminal.go` and constructed zero
-	// times, which the three-level input check found before this file was written. Each shares a
-	// code path with a terminal that IS constructed -- optional and sequence with ternary/logical,
-	// maybe-throw with the flattening arm -- so the arms are exercised and only the specific variant
-	// is absent.
+	// `Sequence` and `MaybeThrow` are declared in `terminal.go` and constructed zero times. Optional
+	// used to belong to this set, but optional lowering now constructs it and this pass rebuilds its
+	// reactive value. The enum name is retained because the category still exists.
 	//
 	// `MaybeThrow` costs nothing even in principle: upstream flattens it away because the tree does
-	// not model maybe-throw semantics at all. The other two cost the expression forms they would
-	// have produced, which is the same gap `DependencyGapOptionalChains` already records.
+	// not model maybe-throw semantics at all. `Sequence` still lacks a live lowering input.
 	ReactiveFunctionGapUnbuiltTerminals
 
-	// ReactiveFunctionGapValueExpressions is the composite-value reconstruction, not performed.
+	// ReactiveFunctionGapValueExpressions is the remaining composite-value reconstruction gap.
 	//
-	// Upstream turns a `Logical`, `Ternary`, `Optional` or `Sequence` terminal into a NESTED VALUE
-	// -- `a && b` becomes one instruction holding a `ReactiveLogicalValue`, not a branch. Doing that
-	// requires `extractValueBlockResult`, which reads a value block's trailing `StoreLocal` and
-	// prunes it, and which upstream can do because value blocks there carry no phis by construction.
-	//
-	// This emits the fallthrough and does not produce the expression forms. `ReactiveLogicalValue`
-	// and friends are declared and never constructed by this pass, which is the one place this file
-	// knowingly creates the shape it warns about. They are declared anyway because they are the
-	// OUTPUT type a downstream consumer switches on, and an absent variant would be a hole that
-	// consumer discovers rather than one this file names.
-	//
-	// # The arms are DROPPED, not kept as statements
-	//
-	// This sentence used to read "leaves the arms as ordinary statements, which is structurally
-	// honest -- the control flow is all present and correctly nested". The first clause was wrong
-	// and the second followed from it. `emitValueTerminal` schedules the fallthrough and visits only
-	// that; `terminal.Test` is never read, so a value terminal's arms are not traversed by anything.
-	//
-	// Measured on `error.invalid-optional-member-expression-as-memo-dep-non-optional-in-body`, whose
-	// `props.items.edges.nodes ?? []` lowers to a `Logical` whose test block holds the whole property
-	// chain: two of eight blocks never reach the tree. The scope built around them is therefore
-	// empty, `PruneUnusedScopes` removes it as unused, and `preserve-manual-memoization` records a
-	// pruned scope rather than comparing its dependencies -- so a golden upstream reports cannot
-	// fire. Corpus-wide the pass loses instructions in 353 of 677 functions for this reason.
-	//
-	// Emitting each arm inline before the fallthrough fixes that fixture and takes corpus
-	// `DoubleEmitted` from 22 to 1,091, because an arm is reachable from the fallthrough path as
-	// well. The real fix is to schedule each arm with a break target the way `If` and `Switch`
-	// already do, which is a redesign of `emitValueTerminal` rather than a few lines.
-	//
-	// Corrected here because a gap that overstates what it preserves hides the defect it describes.
+	// Logical, ternary and optional terminals now become their nested reactive values on the shapes
+	// their lowering produces. The helper deliberately declines an unexpected value-block terminal
+	// and falls back to the statement-preserving path, so labeled or scope-interleaved value blocks
+	// remain outside the reconstructed subset. `Sequence` also remains until lowering constructs it.
 	ReactiveFunctionGapValueExpressions
 )
 

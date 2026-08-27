@@ -198,21 +198,13 @@ func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction
 	}
 	level := MemoizationLevelOfReactiveValue(instruction.Value)
 
-	// A sequence carries instructions inside a value; they are instructions for this purpose and
-	// missing them loses every declaration they make.
-	if sequence, isSequence := instruction.Value.(*ReactiveSequenceValue); isSequence {
-		for _, nested := range sequence.Instructions {
-			c.visitInstruction(nested)
-		}
-	}
-
 	// Places split by role, because an instruction's assignment targets are lvalues and only the
 	// places it reads are dependencies. Collapsing the two inverts every store's edge: the binding
 	// written to would become a dependency of the temporary rather than a value depending on what
 	// was stored into it, and the propagation then walks away from the value it is looking for.
 	var operands []DeclarationId
 	var defines []Place
-	c.eachOperand(instruction.Value, func(place Place, role PlaceRole) {
+	c.eachMemoizationOperand(instruction.Value, func(place Place, role PlaceRole) {
 		if role == PlaceRoleDefine {
 			defines = append(defines, place)
 			return
@@ -414,27 +406,42 @@ func isRestPlaceOfPattern(pattern Pattern, place Place) bool {
 	return false
 }
 
-// eachOperand visits every place a reactive value names, composites included, with its role.
+// eachMemoizationOperand visits every aliased operand of a reactive value, composites included,
+// with its role.
 //
 // The role is carried rather than dropped because this pass reads it: a `PlaceRoleDefine` place is
 // an assignment target and becomes an lvalue, and everything else is a dependency.
-func (c *memoizationCollector) eachOperand(value ReactiveValue, visit func(Place, PlaceRole)) {
+//
+// A sequence's prefix holds real instructions even when the sequence is nested inside a logical,
+// ternary, or optional value. Upstream's `computeMemoizationInputs(SequenceExpression)` visits each
+// prefix instruction while recursively computing the enclosing value's inputs. Visiting sequences
+// only when they are the top-level instruction loses allocations and `LoadLocal` definition edges
+// in nested arms, so an escaping result can look non-escaping and its scope is pruned.
+func (c *memoizationCollector) eachMemoizationOperand(value ReactiveValue, visit func(Place, PlaceRole)) {
 	switch shape := value.(type) {
 	case *ReactiveInstructionValue:
 		if shape.Value != nil {
 			EachPlace(shape.Value, visit)
 		}
 	case *ReactiveLogicalValue:
-		c.eachOperand(shape.Left, visit)
-		c.eachOperand(shape.Right, visit)
+		c.eachMemoizationOperand(shape.Left, visit)
+		c.eachMemoizationOperand(shape.Right, visit)
 	case *ReactiveTernaryValue:
-		c.eachOperand(shape.Test, visit)
-		c.eachOperand(shape.Consequent, visit)
-		c.eachOperand(shape.Alternate, visit)
+		// Keep the test in this port's conservative alias set. Upstream excludes it, but changing
+		// that policy is independent of reaching nested sequence instructions and needs its own
+		// corpus trade-off.
+		c.eachMemoizationOperand(shape.Test, visit)
+		c.eachMemoizationOperand(shape.Consequent, visit)
+		c.eachMemoizationOperand(shape.Alternate, visit)
 	case *ReactiveSequenceValue:
-		c.eachOperand(shape.Value, visit)
+		for _, nested := range shape.Instructions {
+			c.visitInstruction(nested)
+		}
+		// Prefix instructions are graph nodes of their own. Only the sequence's final value aliases
+		// the enclosing expression.
+		c.eachMemoizationOperand(shape.Value, visit)
 	case *ReactiveOptionalValue:
-		c.eachOperand(shape.Value, visit)
+		c.eachMemoizationOperand(shape.Value, visit)
 	}
 }
 

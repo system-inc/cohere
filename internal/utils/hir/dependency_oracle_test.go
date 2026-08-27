@@ -256,7 +256,20 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// Raised to 75 by the local zero-argument callee resolution in `effects.go`. A floor going UP is
 	// the improvement this number names, and it is the first time it has moved up since the
 	// declaration-id fix lowered it.
-	const knownMatched = 75
+	//
+	// Raised to 79 when this oracle began running the same memo-inclusive inline as production and
+	// upstream. Measured against the same tree with only the stale helper restored: 78 matches and
+	// 127 produced become 79 and 126. Three real rows are recovered -- `propB.x.y` in
+	// `useMemo-conditional-access-own-scope`, `temp` in `useMemo-inner-decl`, and `value` in the
+	// inner-destructured-value repro -- while `x.y.z` in `useMemo-infer-more-specific` and `x` in
+	// `useMemo-dep-array-literal-access` are lost. The matcher and golden population are unchanged;
+	// the net one-row gain comes from comparing the IR stage upstream actually collects from.
+	//
+	// Raised again to 81 when `processedInstrsInOptional` became complete. The two recovered rows
+	// are the base and fork copies of `optional-member-expression-inverted-optionals-parallel-paths`:
+	// both now resolve `props.a.b.c.d.e` instead of stopping at `props.a.b`. Their dependency counts
+	// are unchanged, so this is path precision rather than new over-production.
+	const knownMatched = 81
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
@@ -272,7 +285,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	//
 	// So a rise is asserted as loudly as a fall. Raise this deliberately, alongside the floor, when
 	// collection genuinely improves.
-	const knownMatchedCeiling = 78
+	const knownMatchedCeiling = 81
 	if matched > knownMatchedCeiling {
 		t.Errorf("matched %d of %d golden dependencies, UP from %d, which this test treats as "+
 			"suspect rather than good: the usual cause is the pattern above reading upstream's "+
@@ -387,7 +400,19 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// change, so the added row is one upstream also produces rather than an invented one. A scope
 	// that stops swallowing a binding names that binding as a dependency instead of holding it as a
 	// member.
-	const knownOursTotal = 120
+	//
+	// Recalibrated to 126 with the production pipeline alignment above. At that step the collector
+	// produced 127 under the old non-inline helper, so the inline removed one net row and moved this
+	// total toward upstream's 116. The earlier 120 described a different pre-inline IR population;
+	// retaining it would compare two stages rather than detect a collector regression.
+	//
+	// Lowered to 123 by the final effect/range completion: destructuring bindings carry `CreateFrom`,
+	// phi results propagate immutable kinds, and alias effects refine their abstract kinds. The
+	// per-fixture diff removes one row each from
+	// `allow-global-mutation-in-effect-indirect-usecallback`, `useMemo-conditional-access-alloc`, and
+	// `array-pattern-spread-creates-array`; matched does not fall. This is three fewer dependencies
+	// upstream does not name, so the equality is tightened to the improved total.
+	const knownOursTotal = 123
 	if upstreamTotal != knownUpstreamTotal {
 		t.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
 			"every count below is against a different population", upstreamTotal, knownUpstreamTotal)
@@ -424,8 +449,12 @@ func inferredDependencyStrings(t *testing.T, source string) ([]string, bool) {
 							return
 						}
 						Construct(function)
+						OutlineFunctions(function)
 						InferReactive(function, ctx.TypeChecker)
 						DropManualMemoization(function)
+						if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
+							MergeConsecutiveBlocks(function)
+						}
 						EliminateDeadCode(function)
 						ranges := InferMutableRanges(function)
 						disjoint := FindDisjointMutableValuesWithRanges(function, ranges)

@@ -62,18 +62,19 @@ func AlignMethodCallScopes(function *Function, scopes *ReactiveScopes) *Reactive
 
 		// # Two of these three arms are unreachable on this corpus, and that is measured
 		//
-		// Over 677 functions: the property-scoped arm fires 839 times, and the other two fire zero
-		// times. A mutation deleting either of them survives the whole suite, and the reason is the
-		// population rather than a missing fixture.
+		// Over 677 functions and 1,849 method calls: 1,672 calls already have both sides in one scope,
+		// the property-scoped arm fires 177 times, and the other two arms fire zero times. A mutation
+		// deleting either unreachable arm survives the whole suite, and the reason is the population
+		// rather than a missing fixture.
 		//
-		// The cause is that a `MethodCall`'s lvalue is a temporary here. It receives a scope only if
-		// something later mutates it, while the property is a `PropertyLoad` result that routinely
-		// lands in one, so the asymmetry is structural rather than incidental.
+		// Unknown and known-mutable call results allocate, so their lvalue and property are already
+		// joined by the disjoint pass. The remaining asymmetry comes from known primitive-returning
+		// methods such as `includes`, `has`, `join`, and `push`: their lvalue does not allocate, while
+		// the `PropertyLoad` result routinely receives a scope.
 		//
-		// Both arms are kept because they are upstream's and because the asymmetry is a fact about
-		// how this tree lowers rather than about the language. The verdict EXPIRES if a method
-		// call's lvalue ever carries a scope, which `AlignReactiveScopesToBlockScopes` widening a
-		// scope over a call would produce.
+		// Both unreachable arms are kept because they are upstream's and because the current
+		// population is not a proof that the language cannot produce them. The verdict expires when
+		// either arm receives a real input.
 		switch {
 		case lvalueScope != 0 && propertyScope != 0:
 			if lvalueScope != propertyScope {

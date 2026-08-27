@@ -1260,6 +1260,15 @@ func (b *builder) symbolOf(node *ast.Node) *ast.Symbol {
 		return nil
 	}
 	if b.typeChecker != nil {
+		// At the identifier in `{value}`, the generic accessor returns the symbol for the
+		// object's `value` PROPERTY. The lowering is reading the expression side, whose symbol is
+		// the local binding. TypeScript exposes that binding through a dedicated accessor.
+		if parent := node.Parent; parent != nil &&
+			parent.Kind == ast.KindShorthandPropertyAssignment && parent.Name() == node {
+			if symbol := b.typeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
+				return symbol
+			}
+		}
 		if symbol := b.typeChecker.GetSymbolAtLocation(node); symbol != nil {
 			return symbol
 		}

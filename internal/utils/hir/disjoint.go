@@ -68,68 +68,24 @@
 // failing React's test, so applying it would union 13 additional phi groups across 400 files. Should
 // this ever need revisiting, the term is one `||` and the measurement is here.
 //
-// # DIVERGENCE FROM BOTH: mayAllocate's primitive gate is forced FALSE
+// # PARTIAL DIVERGENCE: call-result types are projected from effect signatures
 //
 // Upstream's `mayAllocate` returns `lvalue.identifier.type.kind !== 'Primitive'` for
-// `CallExpression`, `MethodCall` and `TaggedTemplateExpression` -- a call allocates unless its result
-// is known to be a primitive. `Identifier.Type` is nil on every identifier this lowering produces,
-// and there is no primitive predicate anywhere in this package (control: a grep for `Primitive` in
-// `internal/utils/hir` returns 55 hits, so the zero is a real absence rather than a bad pattern).
+// `CallExpression`, `MethodCall` and `TaggedTemplateExpression`. `InferTypes` obtains that result
+// type by unifying the call with the callee's function return type. An unresolved return remains a
+// `Type`, so upstream treats an unknown call as allocating; only a proven primitive is excluded.
 //
-// With no type information the two available answers are opposite errors. Answering TRUE treats
-// every call as allocating, which unions values upstream leaves separate: a false MERGE, and a
-// merge cannot be undone by a consumer. Answering FALSE leaves a call's lvalue out of the operand
-// list unless its range is genuinely wide, which is a missing merge a consumer can still detect
-// through the gap list. The second is the conservative direction and it is what this does, recorded
-// as `DisjointGapPrimitiveCallResult` so a consumer can decline on it rather than inherit it
-// silently. When a type lattice lands, this becomes `!isPrimitive(lvalue)` and the gap closes.
+// This IR does not store that type lattice on identifiers, but its effect registry transcribes the
+// same built-in signatures and records whether each result is primitive or mutable. The call arms
+// therefore use `lookupSignature`: a represented primitive result does not allocate, while a known
+// mutable or unknown result does. This preserves upstream's conservative default and distinguishes
+// the built-ins already modelled here without maintaining a second return-kind table.
 //
-// Measured: 1,974 method calls and their call siblings across the corpus reach this arm.
-//
-// # Two shortcuts to that lattice were measured and neither works
-//
-// The type upstream reads here is not TypeScript's. A call's result type comes from unifying the
-// callee's own function type (`InferTypes.ts:276`), so it is `Primitive` only when the callee is a
-// known global whose signature says so. That made two cheaper routes look plausible, in the way
-// `isUseRefType` turned out to be a call-site fact rather than a type fact. Both were tried:
-//
-//	answer TRUE for every call            false positives 8 to 10, scope exact 16 to 11
-//	ask `effectSignature.Result` first    identical, 10 and 11
-//
-// The second is identical to the first because the table cannot discriminate. Instrumented over the
-// clean corpus, `lookupSignature` answers `known=false` for almost every callee that reaches this
-// arm -- 39 `useMemo`, 6 `useState`, 5 `useRef`, 5 `log` -- because the table holds array and Map
-// methods rather than hooks and module globals. So the lookup returns the same TRUE the naive flip
-// does, at every site that matters.
-//
-// Recorded because both readings are natural and both are wrong. A third was measured afterwards and
-// corrects the conclusion those two produced.
-//
-// # It is a name list, not a lattice
-//
-// Every `Primitive` equation in `InferTypes.ts` is syntactic -- `Primitive`, `UnaryExpression`,
-// `BinaryExpression`, `PrefixUpdate`, `ComputedDelete` -- and none of them is a call. A call's
-// result unifies with the callee's return type (`InferTypes.ts:282`), which is `Primitive` only for
-// globals whose table entry says so. There are 26 such entries in `HIR/Globals.ts`, and they are
-// enumerable: `Boolean`, `Number`, `String`, `parseInt`, `parseFloat`, `isNaN`, `isFinite`,
-// `isArray`, the four URI functions, six `Math` methods, six `console` methods, `useEffect` and
-// `useImperativeHandle`.
-//
-// So no lattice is required, and the note this comment carried until now was wrong to imply one.
-// Transcribing the list and answering `!primitiveReturningGlobals[calleeName]` was measured: it
-// resolves correctly, 11 hits across the clean corpus with `log` and `useEffect` answering
-// primitive, and it still costs false positives 8 to 10 and scope exact 16 to 11.
-//
-// The reason is the 39 remaining sites, all `useMemo` calls that `DropManualMemoization` has
-// rewritten into a call of the callback. Their callee is an unnamed temporary, so the answer is
-// correctly "allocates", and allocating there is what upstream does NOT do -- because upstream has
-// already inlined the callback and has no residual call at all.
-//
-// That makes this arm and the missing inline one change rather than two. Measured together, with
-// `InlineImmediatelyInvokedFunctionExpressions` wired and this arm answering true: scope
-// under-production goes 6 fixtures / 6 scopes to 3 / 3, the best the inline has measured, with
-// goldens 28 to 27 and false positives 8 to 9. Still not landable, and no longer blocked on a
-// lattice that was never needed.
+// The projection is not total. The effect registry is a measured subset of upstream's global
+// shapes, so an omitted primitive signature is treated as allocating. It is also keyed by syntax
+// name rather than receiver shape, so a same-named method on an unrelated object can inherit a
+// built-in's primitive result. `DisjointGapPrimitiveCallResult` exposes those two residual error
+// directions until identifier types or a shape-directed signature lookup lands.
 //
 // # enableForest is off, and that is upstream's default rather than a simplification
 //
@@ -166,7 +122,11 @@
 // that makes a cache non-deterministic. Reading in sorted order removes it.
 package hir
 
-import "sort"
+import (
+	"sort"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+)
 
 // DisjointGap names a union rule this pass cannot apply, for a caller that needs to know.
 //
@@ -176,15 +136,14 @@ import "sort"
 type DisjointGap uint8
 
 const (
-	// DisjointGapPrimitiveCallResult is a call whose result type would have excluded it.
+	// DisjointGapPrimitiveCallResult records that call-result types are projected from the partial,
+	// name-keyed effect signature registry rather than read from an inferred identifier type.
 	//
 	// Upstream's `mayAllocate` treats a call as allocating unless its lvalue's type is `Primitive`.
-	// `Identifier.Type` is nil throughout this tree, so the test is forced to its conservative
-	// answer and calls are never counted as allocating on the strength of the shape alone. The
-	// consequence for a consumer is a MISSING merge rather than a spurious one: two values upstream
-	// would unify through a call's allocated result may appear in separate classes here.
-	//
-	// See the package comment for why false rather than true is the safe direction.
+	// This pass recognizes primitive results present in `lookupSignature` and treats every unknown
+	// result as allocating. Missing primitive signatures can therefore add a spurious merge, while a
+	// name collision with a built-in method can omit a merge upstream's shape lookup would add.
+	// See the package comment for the source of both residual directions.
 	DisjointGapPrimitiveCallResult DisjointGap = iota
 )
 
@@ -446,7 +405,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRang
 			var operands []IdentifierId
 
 			lvalueRange := ranges.Get(instruction.LValue.Identifier)
-			if lvalueRange.End > lvalueRange.Start+1 || mayAllocate(instruction) {
+			if lvalueRange.End > lvalueRange.Start+1 || mayAllocate(function, instruction) {
 				operands = append(operands, instruction.LValue.Identifier)
 			}
 
@@ -465,31 +424,11 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *MutableRang
 				// `LValue` and a `Pattern` field; `Pattern` is the one lowering fills, and
 				// `eachPatternPlace` is the package's own walk over it.
 				//
-				// # The width test below is LIVE code whose input is absent, not a dead branch
+				// # The width test below is live
 				//
-				// A mutation neutralising `placeRange.End > placeRange.Start+1` here SURVIVES, and
-				// the reason is measured rather than argued. Across 200 corpus files: 154
-				// destructures binding 497 places, of which ZERO carry a range wider than one. Four
-				// hand-written shapes that mutate a destructured binding immediately -- object,
-				// multi-binding, array, and one inside a loop -- also produce zero.
-				//
-				// The mechanism, read off the lowered instructions rather than inferred. For
-				// `const {a} = o; a.push(1);` lowering emits the Destructure at order 2 binding `a`
-				// as identifier 13, and then a SEPARATE `LoadLocal` at order 3 as identifier 14.
-				// The mutation widens the load, which gets the range [3,7); the pattern binding
-				// keeps [2,3). Single-assignment form puts a fresh identifier between the binding
-				// and every use of it, so the widening never lands on the bound place itself.
-				//
-				// Upstream has the same test because ITS ranges reach the binding: React runs this
-				// over a graph where `declarationId` grouping and its own alias propagation put the
-				// widened end back on the destructured identifier. Ours does not, today.
-				//
-				// Kept rather than deleted, following the precedent `ranges.go` sets for
-				// `phiOpensBefore` and the `createdFrom` branch: the code is upstream's, it is
-				// correct, and it costs nothing, while deleting it means re-deriving it when the
-				// input arrives. The verdict expires when the widening reaches a destructured
-				// binding -- which is what `RangeGapCreateFromPropagation` closing would do -- and
-				// at that point this becomes killable and a fixture is owed.
+				// Destructure now emits CreateFrom for every ordinary binding. A later mutation
+				// through a LoadLocal therefore reaches the bound place, giving this width test the
+				// same input upstream reads rather than leaving every pattern range one instruction.
 				eachPatternPlace(value.Pattern, func(place Place, role PlaceRole) {
 					if role != PlaceRoleDefine {
 						return
@@ -607,17 +546,19 @@ func declarationOf(function *Function, id IdentifierId) DeclarationId {
 // must not be repeated across renders: re-running `{}` hands back a new object identity and defeats
 // every downstream comparison.
 //
-// The three call arms diverge from upstream and the reason is recorded as
-// `DisjointGapPrimitiveCallResult`. Upstream answers `lvalue.identifier.type.kind !== 'Primitive'`;
-// `Identifier.Type` is nil throughout this tree, so the honest answer is the conservative one and
-// this returns false for them. See the package comment for why false rather than true.
+// The three call arms project upstream's inferred result-kind check through this package's effect
+// signature registry. The remaining incompleteness is recorded as
+// `DisjointGapPrimitiveCallResult`; see the package comment.
 //
 // Written as an explicit type switch with every upstream arm named, including the ones returning
 // false, rather than as a short list of the true cases. Upstream's own switch is exhaustive and
 // ends in `assertExhaustive`, so an unlisted variant there is a build error; the equivalent
 // discipline here is that a reader can diff this switch against the bundle's line by line. The
 // default returns false, which is the safe answer for a variant nobody has classified.
-func mayAllocate(instruction *Instruction) bool {
+func mayAllocate(function *Function, instruction *Instruction) bool {
+	if instruction == nil {
+		return false
+	}
 	switch value := instruction.Value.(type) {
 	case *Destructure:
 		// Upstream: `doesPatternContainSpreadElement(value.lvalue.pattern)`. A spread in a
@@ -633,10 +574,11 @@ func mayAllocate(instruction *Instruction) bool {
 		*UnaryExpression, *BinaryExpression, *PropertyLoad, *StoreGlobal:
 		return false
 
-	// Upstream returns `lvalue.identifier.type.kind !== 'Primitive'` for these three. Forced false;
-	// see DisjointGapPrimitiveCallResult.
+	// Upstream returns `lvalue.identifier.type.kind !== 'Primitive'` for these three. Call result
+	// kinds come from the same signature lookup that drives aliasing effects; an unknown signature
+	// leaves the result non-primitive, which is upstream's conservative default too.
 	case *TaggedTemplateExpression, *CallExpression, *MethodCall:
-		return false
+		return !callResultIsPrimitive(function, instruction)
 
 	// Upstream returns true for all of these: each one constructs a value.
 	case *RegExpLiteral, *PropertyStore, *ComputedStore, *ArrayExpression, *JsxExpression,
@@ -647,6 +589,45 @@ func mayAllocate(instruction *Instruction) bool {
 	default:
 		return false
 	}
+}
+
+// callResultIsPrimitive projects the result kind from the call signature used by effect inference.
+// The lookup is deliberately shared: maintaining a second name table here would let scope
+// allocation disagree with the mutation model for the same callee.
+func callResultIsPrimitive(function *Function, instruction *Instruction) bool {
+	var callee Place
+	switch value := instruction.Value.(type) {
+	case *CallExpression:
+		callee = value.Callee
+	case *MethodCall:
+		callee = value.Property
+	case *TaggedTemplateExpression:
+		callee = value.Tag
+	default:
+		return false
+	}
+	name := calleeName(function, instruction, callee)
+	if name == "" {
+		name = taggedTemplateCalleeSyntaxName(instruction)
+	}
+	signature, known := lookupSignature(function, instruction, name)
+	return known && signature.Result == EffectValuePrimitive
+}
+
+// taggedTemplateCalleeSyntaxName covers the call form `calleeSyntaxName` does not inspect.
+// Lowering stores a global tag in an unnamed temporary, so the syntax is the only surviving name
+// for a direct built-in such as String. Property tags are left unknown: `lookupSignature` cannot
+// validate their receiver shape and treating a property name as a global would be less accurate.
+func taggedTemplateCalleeSyntaxName(instruction *Instruction) string {
+	if instruction == nil || instruction.Node == nil ||
+		instruction.Node.Kind != ast.KindTaggedTemplateExpression {
+		return ""
+	}
+	tag := instruction.Node.AsTaggedTemplateExpression().Tag
+	if tag == nil || tag.Kind != ast.KindIdentifier {
+		return ""
+	}
+	return tag.Text()
 }
 
 // patternContainsSpread reports whether a destructuring pattern binds a rest element.

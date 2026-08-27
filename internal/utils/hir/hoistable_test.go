@@ -291,22 +291,23 @@ func TestForwardPropagationIntersectsRatherThanUnions(t *testing.T) {
 	}
 }
 
-// A scope beginning inside a branch is not seeded with that branch's own facts.
+// A top-level scope beginning inside a branch is seeded with that branch's own facts.
 //
 // The intersection above covers the join: after an `if`, a fact true on one arm alone is gone. This
 // covers the other half, which the intersection cannot reach. A scope whose first block sits INSIDE
 // the arm is asking a block where the fact is still true, and upstream's keying -- which this tree
 // reproduces exactly -- hands it that block's set.
 //
-// The two are not the same question. Nothing about the join is wrong; the scope simply begins
-// somewhere the branch's facts still hold, and a fact true only under an `if` then licenses the
-// dependency walk to descend past a property that may never have been loaded.
+// The old assertion rejected that seed for every branch scope. That fixed the nested allocation in
+// `error.useMemo-infer-less-specific-conditional-access`, but broke the paired top-level case
+// `useMemo-conditional-access-own-scope`, where upstream's guard is exactly `propB.x.y`. The actual
+// distinction is whether another reactive scope dominates the branch scope: only that nested shape
+// falls back to entry facts. `TestBranchLocalHoistableFactsRespectDominatingReactiveScope` pins the
+// pair end to end; this test pins the top-level dataflow answer directly.
 //
-// Measured on `error.useMemo-infer-less-specific-conditional-access` with the memo callback inlined:
-// `propB.x` is hoistable in the conditional arm alone, the scope for the object returned from that
-// arm begins there, and the walk inferred `propB.x.y` where upstream infers bare `propB`. Upstream's
-// own scope for that value begins after the branch closes, where the fact is not available.
-func TestAScopeInsideABranchIsNotSeededFromIt(t *testing.T) {
+// A fact from the untaken arm is still unavailable; that is the intersection invariant above, not
+// a reason to erase facts at a scope that genuinely begins inside the taken arm.
+func TestATopLevelScopeInsideABranchUsesItsFacts(t *testing.T) {
 	function, scopes, identity, ranges, _ := hoistableFor(t, `
 		function Component(props) {
 			if (props.flag) {
@@ -316,18 +317,23 @@ func TestAScopeInsideABranchIsNotSeededFromIt(t *testing.T) {
 		}
 	`)
 	seeds := CollectHoistablePropertyLoads(function, scopes, identity, ranges, nil)
+	found := false
 	for scope, paths := range seeds {
 		for _, path := range paths {
 			if len(path.Path) == 0 {
 				continue
 			}
-			// `deep` is dereferenced only under the `if`. A scope seeded from inside that arm would
-			// carry it, and the walk would then descend to `inner`.
+			// `deep` is dereferenced under the `if`, so the top-level scope beginning in that arm
+			// must carry it and may descend to `inner`.
 			if path.Path[0].Property == "deep" {
-				t.Errorf("scope %d was seeded with `deep`, which is only dereferenced inside the "+
-					"branch the scope begins in", scope)
+				found = true
+				t.Logf("scope %d retains the branch-local `deep` fact", scope)
 			}
 		}
+	}
+	if !found {
+		t.Error("the top-level branch scope lost `deep`, even though its body starts after that " +
+			"dereference in the same branch")
 	}
 }
 
@@ -415,6 +421,13 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 								return
 							}
 							Construct(function)
+							OutlineFunctions(function)
+							InferReactive(function, ctx.TypeChecker)
+							DropManualMemoization(function)
+							if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
+								MergeConsecutiveBlocks(function)
+							}
+							EliminateDeadCode(function)
 							ranges := InferMutableRanges(function)
 							set := FindDisjointMutableValuesWithRanges(function, ranges)
 							scopes := AssignReactiveScopesWithSets(function, ranges, set)
@@ -716,8 +729,29 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// improves from three fixtures for two false positives to two for one. `under` holds at 0
 	// fixtures / 0 scopes, which is the number that would have moved had this made dependencies too
 	// shallow to preserve a memoization.
-	if deep != 576 || flat != 2414 {
-		t.Errorf("got %d deep and %d flat dependencies, want 576 and 2414; a SMALL move here is "+
+	// # Rebased onto the production pipeline and explicit optional CFG
+	//
+	// The old 576 / 2,414 pin ran range and scope inference directly after `Construct`, while the
+	// production path had moved to Outline -> InferReactive -> Drop -> inclusive Inline -> Merge ->
+	// DCE. On the final tree, the old probe reports 622 / 2,778 and the production-aligned probe
+	// reports 626 / 2,731: alignment recovers four deep paths and removes 47 flat dependencies that
+	// do not survive the real prefix.
+	//
+	// The larger movement from the old pin is the explicit optional-chain CFG, its authoritative
+	// sidemap, and signature-aware call allocation. It is accepted against the actual oracles rather
+	// than this distribution alone: golden dependency matches are 81/88 with production down to 123
+	// dependencies against upstream's 116, the scope oracle remains at 0 under-produced fixtures,
+	// and preserve-manual-memoization is 28/28 with 0/69 false positives.
+	// # LoadContext restored to CreateFrom
+	//
+	// Assign made a value loaded from a context box share the box's abstract identity. Upstream uses
+	// CreateFrom: the load copies the box's current kind into a distinct value, so freezing the box
+	// later does not retroactively freeze the earlier load. Restoring that distinction leaves all 626
+	// property paths unchanged and adds 33 root-only dependencies, 2,731 flat to 2,764. The score and
+	// structural oracles hold, so this is the expected conservative movement from the corrected kind
+	// lifetime rather than added path depth.
+	if deep != 626 || flat != 2764 {
+		t.Errorf("got %d deep and %d flat dependencies, want 626 and 2764; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

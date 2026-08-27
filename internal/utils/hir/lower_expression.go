@@ -180,6 +180,9 @@ func (b *builder) lowerIdentifier(node *ast.Node) Place {
 }
 
 func (b *builder) lowerPropertyAccess(node *ast.Node) Place {
+	if isOptionalChainLink(node) {
+		return b.lowerOptionalChain(node, nil)
+	}
 	expression := node.AsPropertyAccessExpression()
 	object := b.lowerExpressionToPlace(expression.Expression)
 	optional := expression.QuestionDotToken != nil

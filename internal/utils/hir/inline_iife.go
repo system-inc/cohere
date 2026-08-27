@@ -82,64 +82,34 @@ func InlineImmediatelyInvokedFunctionExpressions(function *Function) int {
 // InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks is the same pass with the memo
 // exclusion lifted, which is what upstream actually does.
 //
-// # Why the choice is the caller's rather than the pass's
+// # Why there are still two entry points
 //
-// `memoizedResults` declines to inline a callback `DropManualMemoization` marked, and the comment
-// at its definition gives the reason in full: with `preserve-manual-memoization`'s dependency
-// comparison off, nine of its fixtures fire on the other two conditions because of the very scope
-// fusion inlining removes, and inlining them moves that rule's goldens from 15 to 6. That is a real
-// cost and the guard is right to hold it.
+// `DropManualMemoization` rewrites `useMemo(callback, deps)` into a zero-argument call of the
+// callback. The inclusive entry point splices that call just like upstream; production analysis and
+// every structural oracle use it. The guarded entry point remains useful for callers and focused
+// tests that ask specifically about programmer-written IIFEs while retaining memo markers.
 //
-// It is right for that rule. `set-state-in-effect` has the opposite need and pays none of that
-// cost: it never reads a scope, never compares a dependency, and never sees a golden. What it needs
-// is exactly what upstream does -- `useMemo(fn, deps)` becomes `fn()` becomes the closure itself,
-// so a setter inside that closure is reachable. With the guard on, the one shape its divergence is
-// about is the one shape the pass refuses, measured: wiring the guarded pass into its lowering
-// changes findings not at all, 0 against 0 over Kirk's tree with identical node counts.
+// The distinction is explicit rather than inferred from call shape. A rewritten memo callback is
+// structurally an IIFE, so only `StartMemoize`/`FinishMemoize` metadata can tell a caller which kind
+// it is looking at. `memoizedResults` supplies that metadata to the guarded wrapper.
 //
-// So the exclusion is a property of one caller's needs and not of the transformation, and it moves
-// to the call site. Upstream has no such split because it has no such gate, and these two entry
-// points collapse back into one when the gate goes. What that takes is below, and it is more than
-// deleting `memoizedResults`.
+// # The production precondition
 //
-// # The precondition on using this, which is not optional
+// Run this after `DropManualMemoization`, then run `MergeConsecutiveBlocks` when it reports a change.
+// The splice cuts a caller block around the copied body; the merge restores straight-line regions
+// before mutable ranges and reactive scopes read block structure. `AnalyzePreservedManualMemoization`
+// is the canonical ordering.
 //
-// A caller of this entry point must not compute reactive scopes from the result. Measured over the
-// vendored corpus by running the scope oracle's own pipeline with this splice inserted: `under`
-// goes from 0 fixtures / 0 scopes to 7 / 7, and the oracle fails loudly on exactly that, because an
-// under-produced scope drops a memoization a developer wrote. That is a behaviour change rather
-// than a performance one, and it outranks the improvements that come with it -- `exact` rises 16 to
-// 23 and `over` falls 32 to 18 in the same run, which is what a single-number oracle would have
-// reported as a clean win.
+// Earlier versions prohibited scope-producing callers because the optional CFG, marker effects,
+// alias remapping, and immutable-kind propagation needed after the splice were incomplete. That
+// prohibition described a measured failure, but not a property of inlining: after those layers
+// landed, the production-equivalent scope oracle holds at 0 under-produced fixtures / 0 scopes,
+// with 26 of 48 fixtures exact, and preserve-manual-memoization reaches 28/28 goldens and 0/69 false
+// positives. The call-site census in `inline_iife_test.go` keeps new pipelines reviewed against
+// those invariants.
 //
-// The one production caller today, `ForFunctionWithoutManualMemoization`, is safe because it never
-// reaches a scope: it runs `Lower`, `Construct`, the erasure, and this, and hands the graph to
-// `set-state-in-effect`, which reads no scope, no mutable range, and no dependency. That is a fact
-// about the caller and not a property of this function, which is why it is written here rather than
-// assumed there.
-//
-// # What the seven actually need, since the obvious answer is wrong
-//
-// The first guess was that these seven are the same population as the nine goldens
-// `memoizedResults` protects, seen from the other side, so that turning the dependency comparison
-// on would carry both. That was checked by naming both sets rather than reasoning about them, and
-// it is false: the sets are disjoint, and disjoint by construction. The seven are clean fixtures
-// with no `## Error` section at all, and a clean fixture cannot be a golden, so they cannot
-// overlap.
-//
-// They share a cause without sharing members, which is why the guess was tempting. Both are the
-// scope fusion this splice removes, read from opposite sides: the nine fire today because fusion
-// makes a memo look broken, so removing the fusion silences them; the seven are clean fixtures
-// where removing the fusion leaves fewer scopes than upstream. A dependency comparison does not
-// create a scope, so turning it on should recover the nine and do nothing at all for the seven.
-//
-// What the seven look like they need is the optional-chain lowering: four of the six distinct
-// names are optional or conditional property chains
-// (`optional-member-expression-as-memo-dep`, `preserve-memo-deps-conditional-property-chain` and
-// its less-precise variant, `useMemo-conditional-access-own-scope`).
-//
-// So the gate goes when both land, not when either does, and the way to know is to re-run the
-// oracle with this splice inserted and read `under` directly rather than believing this comment.
+// This wrapper deliberately does not perform the merge itself. Some callers need to inspect the
+// splice count, and keeping graph normalization explicit matches upstream's adjacent pass ordering.
 func InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function *Function) int {
 	return inlineInvokedFunctions(function, true)
 }
@@ -169,6 +139,10 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 	// now in the continuation rather than in the block that was cut.
 	queue := make([]*BasicBlock, len(function.Blocks))
 	copy(queue, function.Blocks)
+	// Upstream keeps this map for the whole function. A function expression and its call do not
+	// have to share a block: lowering an argument such as an optional-chain dependency can put CFG
+	// blocks between the definition and the rewritten zero-argument memo call.
+	functions := map[IdentifierId]*FunctionExpression{}
 
 	for position := 0; position < len(queue); position++ {
 		block := queue[position]
@@ -180,9 +154,6 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 		if !isStatementBlockKind(block.Kind) {
 			continue
 		}
-
-		// Function-valued temporaries seen so far in THIS block, and their expressions.
-		functions := map[IdentifierId]*FunctionExpression{}
 
 		for index := 0; index < len(block.Instructions); index++ {
 			instruction := function.Instructions[block.Instructions[index]]
@@ -253,68 +224,14 @@ func inlineInvokedFunctions(function *Function, includeMemoCallbacks bool) int {
 
 // memoizedResults collects the values `DropManualMemoization` recorded as a memo call's result.
 //
-// # A DIVERGENCE from upstream, and it is forced by a gate this tree holds rather than by taste
+// `DropManualMemoization` rewrites a memo callback into the same zero-argument call shape as a
+// programmer-written IIFE. The marker pair is the only remaining evidence that the call came from a
+// memo, and its result identifies the callback the guarded entry point must leave in place.
 //
-// `DropManualMemoization` rewrites `useMemo(callback, deps)` into `result = Call callback()`. That
-// is structurally an IIFE and upstream inlines it: same pass, same pipeline, one line apart. So
-// declining here is not fidelity, and the reason it is right anyway is specific.
-//
-// Upstream has three firing conditions. The third compares the dependencies it inferred against the
-// array the developer wrote, and it is what upstream reports on most of these fixtures -- "The
-// inferred dependency was `x`, but the source dependencies were [aliasedX, aliasedProp]". This tree
-// passes `nil` dependencies into the validator, deliberately: `CollectScopeDependencies` truncates a
-// path wherever the hoistable set is empty and the hoistable analysis is declined, so 89% of what
-// the comparison would see is shallower than what the developer wrote, and turning it on costs more
-// false positives than it gains true ones. `AnalyzePreservedManualMemoization` records the
-// measurement at the gate.
-//
-// With that condition off, some of those fixtures were firing on the OTHER two conditions instead,
-// and they were firing because of the very fusion this pass exists to remove: the memo callback was
-// a closure, range inference could not see through it, ranges widened, scopes fused, and the fused
-// scope read as a lost memo. Inlining the callback removes the fusion and the firing goes with it.
-// Measured on the vendored corpus: inlining memo callbacks along with everything else took the
-// goldens from 15 to 6 while the clean fixtures improved, and every one of the nine losses was a
-// fixture where a memo callback had been spliced.
-//
-// # That reading was measured and is wrong, in three ways
-//
-// The paragraph above concluded those were "right answers reached by a wrong route" and instructed a
-// reader to delete this guard once the dependency comparison was turned on. All three parts of that
-// have since been measured against the corpus and none survives.
-//
-// FIRST, the comparison is already on. `AnalyzePreservedManualMemoization` and the score test both
-// pass real dependencies; only `ValidatePreservedManualMemoization` at :79 still passes nil, and its
-// callers are five unit tests. So the trigger the instruction names has already happened and the
-// guard is still needed.
-//
-// SECOND, the count is six rather than nine. Lifting the guard on the current tree takes goldens from
-// 28 of 28 scoreable to 22, and buys two false positives, 8 to 6. The nine was measured before the
-// declaration-id fix in `7a48d68` and several passes since.
-//
-// THIRD, and this is the part that matters: the six are not one mechanism and neither of the two
-// traced is "the same answer under a different condition".
-//
-//	useMemo-infer-less-specific-conditional-access
-//	  guarded we infer `propA.a` AND bare `propB`, and bare `propB` against the written
-//	  `propB.x.y` is exactly upstream's disagreement. Lifting the guard loses `propB` entirely,
-//	  so the comparison has nothing left to disagree about. The dependency is destroyed, not
-//	  relocated.
-//
-//	validate-object-values-mutation
-//	  the dependencies are IDENTICAL either way, `props.object` and `values`. Inlining creates
-//	  two more scopes -- assigned goes 2 to 4 -- and `PruneNonEscapingScopes` removes two of
-//	  them, taking the scope that carried the finding with it. Upstream's expectation for this
-//	  fixture is "Found 2 errors" and guarded we produce exactly those two, so the guarded answer
-//	  is the answer key rather than a lucky one.
-//
-// So lifting this guard has to answer two unrelated questions -- why a dependency is destroyed by
-// inlining, and why a scope upstream keeps becomes non-escaping once the body is spliced. Both are
-// upstream of anything the dependency comparison can reach.
-//
-// The guard stays until those are answered. Five of the eight remaining false positives are behind
-// it, which makes this the largest single item on that board and not a detail.
-//
-// A programmer-written IIFE is untouched by any of this: nothing marks it, so it is not in this set.
+// Production uses the inclusive wrapper and therefore does not consult this set. Keeping the
+// guarded wrapper is still useful: focused transformation tests can assert that ordinary IIFEs are
+// selected without silently selecting rewritten memos too, and callers that have not erased memo
+// ownership can request that distinction explicitly.
 func memoizedResults(function *Function) map[IdentifierId]bool {
 	results := map[IdentifierId]bool{}
 	for _, instruction := range function.Instructions {

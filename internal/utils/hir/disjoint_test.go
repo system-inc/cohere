@@ -407,7 +407,7 @@ export function plain() {
 			if _, ok := instruction.Value.(*Primitive); !ok {
 				continue
 			}
-			if mayAllocate(instruction) {
+			if mayAllocate(function, instruction) {
 				t.Error("mayAllocate must be false for a Primitive; React returns false for it " +
 					"and a true here would union every constant in the function")
 			}
@@ -416,12 +416,11 @@ export function plain() {
 	}
 }
 
-// TestDisjointMayAllocateMatchesReact pins every arm of the switch against upstream's answers.
+// TestDisjointMayAllocateMatchesReact pins every instruction-kind arm against upstream's answer.
 //
 // The expected values were produced by driving React 7.1.1's own `mayAllocate` with a synthetic
-// instruction per kind, both with a Primitive lvalue type and with an Object one. The three call
-// arms are the only ones where the type changed the answer, which is what makes them the gap this
-// pass records rather than a general uncertainty about the table.
+// instruction per kind. The call cases here have no known signature, corresponding to an unresolved
+// inferred result type; represented primitive and mutable signatures are exercised separately.
 func TestDisjointMayAllocateMatchesReact(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -471,21 +470,66 @@ func TestDisjointMayAllocateMatchesReact(t *testing.T) {
 		{"FunctionExpression", &FunctionExpression{}, true},
 		{"UnsupportedNode", &UnsupportedNode{}, true},
 
-		// DIVERGENCE, recorded as DisjointGapPrimitiveCallResult. React answers
-		// `lvalue.type.kind !== 'Primitive'`, measured true for an Object lvalue and false for a
-		// Primitive one. `Identifier.Type` is nil throughout this tree, so the conservative answer
-		// is taken and these are false. When a type lattice lands, these three expectations move.
-		{"CallExpression", &CallExpression{}, false},
-		{"MethodCall", &MethodCall{}, false},
-		{"TaggedTemplateExpression", &TaggedTemplateExpression{}, false},
+		// With no known primitive signature these take upstream's non-primitive default.
+		{"CallExpression", &CallExpression{}, true},
+		{"MethodCall", &MethodCall{}, true},
+		{"TaggedTemplateExpression", &TaggedTemplateExpression{}, true},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := mayAllocate(&Instruction{Value: test.value}); got != test.want {
+			if got := mayAllocate(nil, &Instruction{Value: test.value}); got != test.want {
 				t.Errorf("mayAllocate(%s) = %v, want %v", test.name, got, test.want)
 			}
 		})
+	}
+}
+
+// TestDisjointCallAllocationUsesTheEffectSignature pins every side of the call-result gate.
+// React scopes a call result unless type inference proves it primitive. The effect signature table
+// is the source of that same result-kind fact in this IR: method, global, and tagged primitive
+// results are excluded, while mutable and unresolved results allocate.
+func TestDisjointCallAllocationUsesTheEffectSignature(t *testing.T) {
+	function, _ := rangesFor(t, `
+export function classify(list: number[]) {
+  const methodPrimitive = list.includes(1);
+  const globalPrimitive = Number(list.length);
+  const tagPrimitive = String`+"`value`"+`;
+  const mutable = list.map(value => value);
+  const unknown = unknownFunction(list);
+  return [methodPrimitive, globalPrimitive, tagPrimitive, mutable, unknown];
+}
+`)
+
+	want := map[string]bool{
+		"includes":        false,
+		"Number":          false,
+		"String":          false,
+		"map":             true,
+		"unknownFunction": true,
+	}
+	seen := map[string]bool{}
+	for _, instruction := range function.Instructions {
+		if instruction == nil {
+			continue
+		}
+		name := calleeSyntaxName(instruction)
+		if name == "" {
+			name = taggedTemplateCalleeSyntaxName(instruction)
+		}
+		expected, relevant := want[name]
+		if !relevant {
+			continue
+		}
+		seen[name] = true
+		if got := mayAllocate(function, instruction); got != expected {
+			t.Errorf("mayAllocate(%s) = %v, want %v", name, got, expected)
+		}
+	}
+	for name := range want {
+		if !seen[name] {
+			t.Errorf("fixture did not lower a %s call", name)
+		}
 	}
 }
 
@@ -500,7 +544,7 @@ func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
 	plain := &Destructure{Pattern: &ObjectPattern{
 		Properties: []ObjectPatternProperty{{Key: "a", Value: &PlacePattern{Place: place}}},
 	}}
-	if mayAllocate(&Instruction{Value: plain}) {
+	if mayAllocate(nil, &Instruction{Value: plain}) {
 		t.Error("a destructure with no rest element does not allocate")
 	}
 
@@ -508,12 +552,12 @@ func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
 		Properties: []ObjectPatternProperty{{Key: "a", Value: &PlacePattern{Place: place}}},
 		Rest:       &place,
 	}}
-	if !mayAllocate(&Instruction{Value: spread}) {
+	if !mayAllocate(nil, &Instruction{Value: spread}) {
 		t.Error("a destructure with a rest element allocates the remainder object")
 	}
 
 	arraySpread := &Destructure{Pattern: &ArrayPattern{Rest: &place}}
-	if !mayAllocate(&Instruction{Value: arraySpread}) {
+	if !mayAllocate(nil, &Instruction{Value: arraySpread}) {
 		t.Error("an array pattern with a rest element allocates too")
 	}
 
@@ -524,7 +568,7 @@ func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
 			Value: &ObjectPattern{Rest: &place},
 		}},
 	}}
-	if !mayAllocate(&Instruction{Value: nested}) {
+	if !mayAllocate(nil, &Instruction{Value: nested}) {
 		t.Error("a rest element nested inside a pattern still allocates")
 	}
 }
@@ -715,21 +759,23 @@ export function loopy(limit: number) {
 //
 // It is NOT always redundant, and the measurement is what pins that. A mutation removing it survived
 // every other test here. Across 200 corpus files the branch is reached by 60 firing phis, and on
-// exactly ONE function of 343 the partition differs -- by a single member, 105 against 104. That is
-// a real distinguishing case rather than an equivalence, and this reproduces its shape minimally:
-// a binding DECLARED without an initializer, assigned separately, then reassigned in a loop. The
+// exactly ONE function of 343 the partition differs by the declaration member. That is a real
+// distinguishing case rather than an equivalence, and this reproduces its shape minimally: a
+// binding DECLARED without an initializer, assigned separately, then reassigned in a loop. The
 // declared value is a member no other path contributes.
 //
-// Both sources below were verified against the mutant rather than assumed: with the declaration
-// operand dropped, the first falls from 24 members to 23 and the second from 11 to 10.
+// Assert that relationship directly rather than pinning the size of the whole partition. Call
+// allocation and alias refinement legitimately add or remove unrelated members; neither may make a
+// phi stop sharing a class with the first value of its declaration.
 func TestDisjointPhiUnionIncludesTheDeclaration(t *testing.T) {
 	tests := []struct {
-		name        string
-		source      string
-		wantMembers int
+		name    string
+		binding string
+		source  string
 	}{
 		{
-			name: "declared without an initializer then reassigned in a for loop",
+			name:    "declared without an initializer then reassigned in a for loop",
+			binding: "acc",
 			source: `
 export function accumulate(limit: number) {
   let acc;
@@ -741,10 +787,10 @@ export function accumulate(limit: number) {
   return acc;
 }
 `,
-			wantMembers: 24,
 		},
 		{
-			name: "declared without an initializer then reassigned in a while loop",
+			name:    "declared without an initializer then reassigned in a while loop",
+			binding: "list",
 			source: `
 export function gather(limit: number) {
   let list;
@@ -758,7 +804,6 @@ export function gather(limit: number) {
   return list;
 }
 `,
-			wantMembers: 11,
 		},
 	}
 
@@ -767,10 +812,68 @@ export function gather(limit: number) {
 			function, ranges := rangesFor(t, test.source)
 			set := FindDisjointMutableValuesWithRanges(function, ranges)
 
-			if got := set.Size(); got != test.wantMembers {
-				t.Errorf("this function unifies %d values, want %d. Dropping the declaration "+
-					"operand from the phi union produces exactly one fewer, because the declared "+
-					"value reaches the class through no other path.", got, test.wantMembers)
+			var declaration IdentifierId
+			var declarationFound bool
+			for _, instruction := range function.Instructions {
+				if instruction == nil {
+					continue
+				}
+				value, ok := instruction.Value.(*DeclareLocal)
+				if !ok {
+					continue
+				}
+				identifier := function.Identifiers[value.LValue.Identifier]
+				if identifier != nil && identifier.Name == test.binding {
+					declaration = value.LValue.Identifier
+					declarationFound = true
+					break
+				}
+			}
+			if !declarationFound {
+				t.Fatalf("no DeclareLocal for %q", test.binding)
+			}
+
+			var phi IdentifierId
+			var phiFound bool
+			var phiBlockFirstOrder EvaluationOrder
+			for _, block := range function.Blocks {
+				if block == nil {
+					continue
+				}
+				for _, candidate := range block.Phis {
+					identifier := function.Identifiers[candidate.Place.Identifier]
+					if identifier != nil && identifier.Name == test.binding {
+						phi = candidate.Place.Identifier
+						phiFound = true
+						phiBlockFirstOrder = blockFirstOrder(function, block)
+						break
+					}
+				}
+				if phiFound {
+					break
+				}
+			}
+			if !phiFound {
+				t.Fatalf("no loop phi for %q", test.binding)
+			}
+			phiRange := ranges.Get(phi)
+			if phiRange.Start+1 == phiRange.End || phiRange.End <= phiBlockFirstOrder {
+				t.Fatalf("phi %d for %q does not reach the declaration-union branch: range=%v "+
+					"blockFirstOrder=%d", phi, test.binding, phiRange, phiBlockFirstOrder)
+			}
+
+			if !set.Has(declaration) {
+				t.Errorf("declared value %d for %q is absent from every class; the firing phi must "+
+					"union the first value of its declaration", declaration, test.binding)
+			}
+			if !set.Has(phi) {
+				t.Errorf("phi %d for %q is absent from every class", phi, test.binding)
+			}
+			if declarationRoot, phiRoot := set.RepresentativeOf(declaration),
+				set.RepresentativeOf(phi); declarationRoot != phiRoot {
+				t.Errorf("declared value %d and phi %d for %q have representatives %d and %d; "+
+					"the phi union must include the declaration", declaration, phi, test.binding,
+					declarationRoot, phiRoot)
 			}
 		})
 	}
@@ -949,9 +1052,9 @@ func TestDisjointHandlesANilFunction(t *testing.T) {
 func TestDisjointGapsAreDeclared(t *testing.T) {
 	gaps := DisjointGaps()
 	if len(gaps) != 1 || gaps[0] != DisjointGapPrimitiveCallResult {
-		t.Fatalf("DisjointGaps() = %v; the only declared gap is the primitive call result. If a "+
-			"type lattice has landed, mayAllocate's three call arms should read it and this list "+
-			"should be empty.", gaps)
+		t.Fatalf("DisjointGaps() = %v; the only declared gap is the partial, name-keyed projection "+
+			"of inferred call-result types. It closes when mayAllocate can read identifier types or "+
+			"a complete shape-directed signature lookup.", gaps)
 	}
 }
 

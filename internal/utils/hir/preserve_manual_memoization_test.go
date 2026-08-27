@@ -43,6 +43,59 @@ func TestValidatePreservedManualMemoizationFiresAndStaysSilent(t *testing.T) {
 	}
 }
 
+// TestConditionalOptionalArgumentPreservesManualMemoization is the end-to-end regression for the
+// final clean-corpus false positive. The optional join is evaluated before the allocating call's
+// singleton scope, so its intermediate `.x` store is not a dependency and the written `.x.y` path
+// remains valid.
+func TestConditionalOptionalArgumentPreservesManualMemoization(t *testing.T) {
+	t.Run("matching dependency", func(t *testing.T) {
+		findings, lowered := findingsForSource(t, `
+			// @validatePreserveExistingMemoizationGuarantees
+			import {useMemo} from 'react';
+			import {identity} from 'shared-runtime';
+			function Component({propA, propB}) {
+				return useMemo(() => ({
+					value: identity(propB?.x.y),
+					other: propA,
+				}), [propA, propB.x.y]);
+			}
+		`)
+		if !lowered {
+			t.Fatal("optional allocation fixture did not lower")
+		}
+		if len(findings) != 0 {
+			t.Fatalf("optional allocation produced %d preserved-memoization findings, want 0: %+v",
+				len(findings), findings)
+		}
+	})
+
+	// The negative assertion above would also pass if memo markers disappeared, every reactive scope
+	// was pruned, or validation stopped walking scope dependencies. Pair it with an upstream error
+	// shape through the same harness and require the scope-exit dependency finding specifically.
+	t.Run("property call control", func(t *testing.T) {
+		findings, lowered := findingsForSource(t, `
+			// @validatePreserveExistingMemoizationGuarantees @validateExhaustiveMemoizationDependencies:false
+			import {useMemo} from 'react';
+			function Component({propA}) {
+				return useMemo(() => propA.x(), [propA.x]);
+			}
+		`)
+		if !lowered {
+			t.Fatal("property-call control did not lower")
+		}
+		if len(findings) != 1 {
+			t.Fatalf("property-call control produced %d findings, want 1: %+v", len(findings), findings)
+		}
+		if findings[0].Kind != PreserveManualMemoizationValueUnmemoized {
+			t.Errorf("property-call control finding is %s, want dependency mismatch", findings[0].Kind)
+		}
+		if findings[0].Order != 0 {
+			t.Errorf("property-call control finding has order %d, want 0 from scope-exit dependency comparison",
+				findings[0].Order)
+		}
+	})
+}
+
 // TestValidatePreservedManualMemoizationAcceptsAMergedScope is why the merge pass was owed.
 //
 // A scope absorbed by a merge survived under its survivor's identity. Reading only the survivor's

@@ -444,9 +444,10 @@ func AnalyzePreservedManualMemoization(function *Function,
 	InferReactive(function, typeChecker)
 	DropManualMemoization(function)
 
-	if InlineImmediatelyInvokedFunctionExpressions(function) > 0 {
+	if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
 		MergeConsecutiveBlocks(function)
 	}
+	EliminateDeadCode(function)
 
 	ranges := InferMutableRanges(function)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)

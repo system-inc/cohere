@@ -419,12 +419,12 @@ func TestInlineDeclinesTheCasesItCannotExpress(t *testing.T) {
 	}
 }
 
-// TestInlineDeclinesADroppedMemoCallback pins the divergence from upstream.
+// TestInlineDeclinesADroppedMemoCallback pins the guarded entry point's narrower selection.
 //
 // `DropManualMemoization` rewrites `useMemo(callback, deps)` into a zero-argument call of the
-// callback, which is structurally an IIFE. Upstream inlines it; this does not, because the
-// dependency-comparison condition that upstream reports those fixtures under is gated off here. See
-// `memoizedResults` for the measurement.
+// callback, which is structurally an IIFE. Production uses the memo-inclusive wrapper and inlines
+// it like upstream. This focused test deliberately uses the guarded wrapper so it can distinguish a
+// programmer-written IIFE from a rewritten memo; see `memoizedResults`.
 //
 // The fixture holds BOTH a real IIFE and a `useMemo`, which is what makes the assertion sharp: a
 // guard that declined everything would also pass a fixture with only the memo in it.
@@ -479,6 +479,65 @@ func TestInlineDeclinesADroppedMemoCallback(t *testing.T) {
 	}
 }
 
+// Optional dependency lowering can put the callback definition before an optional CFG and the
+// rewritten zero-argument memo call after its join. Upstream's candidate table is function-wide,
+// so the intervening block boundary does not stop the callback from being recognised as an IIFE.
+func TestInlineFindsAMemoCallbackAcrossBlocks(t *testing.T) {
+	const source = `
+		function Component(arg: {items?: Array<number>}) {
+			const value = useMemo(() => {
+				const x = [];
+				x.push(arg?.items);
+				return x;
+			}, [arg?.items]);
+			return value;
+		}
+	`
+	function, guarded := inlinedFixture(t, source, true)
+	if function == nil {
+		t.Fatal("the fixture did not lower")
+	}
+	if guarded != 0 {
+		t.Fatalf("the guarded pass spliced %d calls, want 0 for a dropped memo callback", guarded)
+	}
+
+	definitions := map[IdentifierId]BlockId{}
+	calls := map[IdentifierId]BlockId{}
+	for _, block := range function.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instructionId := range block.Instructions {
+			instruction := function.Instructions[instructionId]
+			if instruction == nil {
+				continue
+			}
+			switch value := instruction.Value.(type) {
+			case *FunctionExpression:
+				definitions[instruction.LValue.Identifier] = block.Id
+			case *CallExpression:
+				if len(value.Args) == 0 {
+					calls[value.Callee.Identifier] = block.Id
+				}
+			}
+		}
+	}
+	separated := false
+	for callee, callBlock := range calls {
+		if definitionBlock, found := definitions[callee]; found && definitionBlock != callBlock {
+			separated = true
+		}
+	}
+	if !separated {
+		t.Fatal("the callback definition and rewritten call did not land in different blocks; " +
+			"the fixture no longer exercises function-wide candidate lifetime")
+	}
+
+	if inlined := InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function); inlined != 1 {
+		t.Fatalf("spliced %d callbacks, want 1 across the optional dependency CFG", inlined)
+	}
+}
+
 // TestInlineIsIdempotent pins that a second run finds nothing.
 //
 // A pass that re-splices its own output would copy the body again on every call, and the pipeline
@@ -497,35 +556,35 @@ func TestInlineIsIdempotent(t *testing.T) {
 	}
 }
 
-// TestMemoInclusiveInliningIsNotUsedWhereScopesAreComputed pins the precondition on the
+// TestMemoInclusiveInliningCallSitesAreReviewed pins the production precondition on the
 // memo-inclusive entry point.
 //
 // # Why this is a grep and not a behavioural assertion
 //
-// The hazard is not that the splice is wrong. It is that it is right for a caller that never asks
-// for a reactive scope and wrong for one that does: measured over the vendored corpus, inserting
-// this splice into the scope oracle's pipeline moves `under` from 0 fixtures / 0 scopes to 7 / 7,
-// and an under-produced scope drops a memoization a developer wrote. The same run improves `exact`
-// 16 to 23 and `over` 32 to 18, which is what makes it dangerous: it looks like a win from every
-// angle except the one that matters.
+// The splice is upstream's and is now the production path, including where reactive scopes are
+// computed. It is still ordering-sensitive: a caller must run it after memo erasure, merge the
+// consecutive blocks it creates, and rebuild graph-derived facts before range/scope inference.
 //
-// No assertion inside this package can catch that, because the damage appears in a caller this
-// package does not own. What can be caught is the shape of the mistake -- a new caller of the
-// memo-inclusive entry point -- so the test is a census of its call sites. When one appears, this
-// fails and whoever added it reads the precondition at the entry point's own comment and either
-// confirms their caller computes no scope or turns the dependency comparison on first.
+// The scope and dependency oracles catch behavioural drift in their current callers. What they
+// cannot catch is an unrelated caller introducing a second, incomplete pipeline, so this remains a
+// census: each new call site must be reviewed for the ordering above and, if it computes scopes,
+// measured with scope under-production held at zero.
 //
-// The alternative, a comment alone, was what the guarded entry point already had. It did not stop
-// this same measurement from being needed twice.
+// The known scope-producing callers below are justified by the final production-equivalent
+// measurement: 26/48 scope fixtures exact, 0 fixtures / 0 scopes under, preserve-manual-memoization
+// 28/28 goldens and 0/69 false positives.
 var memoInclusiveCall = regexp.MustCompile(`inlineInvokedFunctions\([^,)]*,\s*true\s*\)`)
 
-func TestMemoInclusiveInliningIsNotUsedWhereScopesAreComputed(t *testing.T) {
-	// The call sites that are known and reviewed. `cache.go` is `ForFunctionWithoutManualMemoization`,
-	// which runs Lower, Construct, the erasure, and this, then hands the graph to
-	// `set-state-in-effect` -- a rule that reads no scope, no mutable range, and no dependency.
+func TestMemoInclusiveInliningCallSitesAreReviewed(t *testing.T) {
+	// The call sites that are known and reviewed. `cache.go` computes no reactive scope. Production
+	// and the three structural probes all use the complete prefix documented above.
 	knownCallSites := map[string]bool{
-		"../../utils/hir/cache.go": true,
-		"cache.go":                 true,
+		"../../utils/hir/cache.go":       true,
+		"cache.go":                       true,
+		"dependency_oracle_test.go":      true,
+		"hoistable_test.go":              true,
+		"preserve_manual_memoization.go": true,
+		"scope_oracle_test.go":           true,
 	}
 
 	entries, err := os.ReadDir(".")
@@ -563,13 +622,12 @@ func TestMemoInclusiveInliningIsNotUsedWhereScopesAreComputed(t *testing.T) {
 
 	if len(found) != 0 {
 		sort.Strings(found)
-		t.Fatalf("new caller(s) of the memo-inclusive inlining: %v.\n"+
-			"That entry point must not be used where reactive scopes are computed from the result: "+
-			"measured over the vendored corpus it moves the scope oracle's `under` from 0 fixtures / "+
-			"0 scopes to 7 / 7, which drops memoizations developers wrote. Read the precondition at "+
-			"InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks, confirm the new "+
-			"caller reaches no scope, and add it to knownCallSites here. If it does reach a scope, "+
-			"re-run the oracle with the splice inserted and check `under` is back at 0 first.", found)
+		t.Fatalf("new unreviewed caller(s) of memo-inclusive inlining: %v.\n"+
+			"Read the production ordering at "+
+			"InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks. Confirm the caller "+
+			"runs memo erasure first and merges changed blocks afterwards; if it computes scopes, "+
+			"re-run the scope oracle and keep under-production at 0 fixtures / 0 scopes before "+
+			"adding it to knownCallSites.", found)
 	}
 }
 

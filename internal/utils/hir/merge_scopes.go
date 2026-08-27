@@ -66,16 +66,15 @@
 // The size of that error is measured at its UPPER BOUND rather than estimated, because the gate's
 // real condition cannot be evaluated here at all. Skipping EVERY use-operand of every
 // `FunctionExpression` -- which is strictly more than the Primitive gate would skip, since the gate
-// skips only the primitive ones -- changes the union count by ZERO: 88 either way. So on this corpus
-// the divergence is not merely bounded, it is empty, and the gate could be closed tomorrow without
-// moving a single number.
+// skips only the primitive ones -- changes the union count from 118 to 115. The real divergence is
+// therefore at most three unions and may still be zero; without types, the probe cannot distinguish
+// primitive captures from the non-primitive captures upstream still visits.
 //
 // A zero from a probe that never fires would be worthless, so the control is recorded beside it:
-// 850 `FunctionExpression` instructions carrying 1,705 use-operands, all of them visited and all of
-// them candidates for the skip. `Identifier.Type` is nil on 0 of 110,858 identifiers, which is why
-// the real gate cannot be asked. Recorded as `MergeGapPrimitiveOperandSkip` so a consumer can
-// decline on it, and it closes for free the day `Identifier.Type` is populated.
-// `TestMergeIsUnaffectedBySkippingFunctionOperands` pins the zero together with its control.
+// 1,701 function-expression use-operands are visited and are candidates for the skip.
+// `Identifier.Type` is nil on all 116,476 identifiers, which is why the real gate cannot be asked.
+// Recorded as `MergeGapPrimitiveOperandSkip` so a consumer can decline on it.
+// `TestMergeFunctionOperandSkipUpperBound` pins the bound together with its control.
 //
 // # DIVERGENCE FROM React: the widening MINIMISES here, and upstream's own guard is why that is safe
 //
@@ -177,8 +176,9 @@ const (
 	//
 	// `Identifier.Type` is nil on every identifier this lowering produces, so there is no primitive
 	// predicate to consult. Not skipping visits operands upstream skips, and a visit can only add a
-	// union, so this errs toward merging MORE than upstream rather than less. Measured on the
-	// corpus: 34 of 88 unions pass through such an operand, which bounds the divergence.
+	// union, so this errs toward merging MORE than upstream rather than less. Skipping every
+	// function-expression operand, a strict superset of upstream's primitive-only skip, removes
+	// three of 118 unions on the measured corpus. The real divergence is therefore at most three.
 	MergeGapPrimitiveOperandSkip MergeGap = iota
 
 	// MergeGapBlockScopeAlignment is `alignReactiveScopesToBlockScopes`, which upstream runs

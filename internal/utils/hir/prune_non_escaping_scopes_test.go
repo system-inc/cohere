@@ -323,6 +323,54 @@ func TestPruneNonEscapingScopesResolvesLoadLocalIndirection(t *testing.T) {
 	t.Logf("escapingRoots=%d loadLocalIndirections=%d", roots, definitionsRecorded)
 }
 
+// A sequence remains a list of real instructions when it is nested inside another reactive value.
+// Optional and nullish-coalescing callbacks produce exactly this shape after IIFE inlining: the
+// allocation and the load that carries it to the join live in a sequence under a logical value.
+// Missing that load leaves the join declaration at MemoizationNever, so an escaping useMemo result
+// is treated as non-escaping and its scope is pruned.
+func TestPruneNonEscapingScopesVisitsASequenceNestedInALogical(t *testing.T) {
+	function := &Function{Identifiers: []*Identifier{
+		{Id: 0, Declaration: 1}, // allocation
+		{Id: 1, Declaration: 2}, // value carried out of the sequence
+		{Id: 2, Declaration: 3}, // logical result
+	}}
+	allocation := Place{Identifier: 0}
+	carried := Place{Identifier: 1}
+	result := Place{Identifier: 2}
+
+	nested := &ReactiveSequenceValue{
+		Instructions: []*ReactiveInstruction{
+			{LValue: &allocation, Value: &ReactiveInstructionValue{Value: &ArrayExpression{}}},
+			{LValue: &carried, Value: &ReactiveInstructionValue{Value: &LoadLocal{Place: allocation}}},
+		},
+		Value: &ReactiveInstructionValue{Value: &LoadLocal{Place: carried}},
+	}
+	logical := &ReactiveInstruction{
+		LValue: &result,
+		Value: &ReactiveLogicalValue{
+			Operator: "??",
+			Left:     &ReactiveInstructionValue{Value: &Primitive{}},
+			Right:    nested,
+		},
+	}
+	collector := memoizationCollector{
+		function:    function,
+		graph:       NewMemoizationGraph(),
+		definitions: map[DeclarationId]DeclarationId{},
+	}
+	collector.visitInstruction(logical)
+
+	if got := collector.definitions[2]; got != 1 {
+		t.Fatalf("nested LoadLocal resolved declaration 2 to %d, want allocation declaration 1; "+
+			"the sequence instructions were not visited through the logical value", got)
+	}
+	collector.graph.MarkEscaping(collector.resolve(2))
+	if memoized := collector.graph.ComputeMemoized(); !memoized[1] {
+		t.Errorf("allocation declaration 1 is not memoized after its carried value escapes: %v",
+			memoized)
+	}
+}
+
 // TestMemoMarkersArePrunedOnlyWhenTheirScopeWas covers the marker pass in both directions.
 //
 // Both directions matter and neither alone is enough. A pass that marks every marker satisfies any

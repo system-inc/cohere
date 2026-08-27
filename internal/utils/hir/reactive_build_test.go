@@ -7,8 +7,8 @@ import (
 // TestBuildReactiveFunctionShapes asserts the tree each control-flow construct converts to.
 //
 // One source per construct, chosen so the four ways a block can leave the graph are each covered
-// once: a branch with a join, a ternary and a logical (both VALUE terminals, which is where this
-// pass has a declared gap), and a loop with a back edge.
+// once: a branch with a join, a ternary and a logical (both value terminals), and a loop with a
+// back edge.
 //
 // The assertion is instruction CONSERVATION rather than a printed shape. A golden string would fail
 // on every cosmetic change to the printer and would not notice the one failure that matters, which
@@ -17,27 +17,19 @@ import (
 // the tree to decide what a scope depends on cannot see an instruction the converter dropped.
 func TestBuildReactiveFunctionShapes(t *testing.T) {
 	for _, testCase := range []struct {
-		name string
-		// hasValueTerminal records whether this source lowers to a Logical/Ternary/Optional/Sequence
-		// terminal. It decides which assertion applies, because the value-expression gap is declared
-		// and losing instructions there is the DOCUMENTED behaviour rather than a regression.
-		hasValueTerminal bool
-		// conserves marks a value terminal whose expression form IS built, so its instructions
-		// survive into the tree. `emitLogicalValue` builds `ReactiveLogicalValue`; the ternary and
-		// sequence forms are not built yet and keep the gap's inequality assertion.
-		conserves bool
-		source           string
+		name           string
+		valueTerminals int
+		// A reconstructed value terminal introduces one reactive instruction for the HIR terminal
+		// itself. Its test and arms remain nested values, so this is one structural instruction
+		// beyond the graph's instruction table rather than a duplicated block.
+		reactiveExtra int
+		source        string
 	}{
 		{name: "branch with join", source: `function f(a) { if (a) { return 1; } return 2; }`},
 		{name: "loop with back edge", source: `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`},
-		// Both value terminals conserve now that `emitValueTerminal` traverses the test block: it
-		// ends in a `Branch`, which nests both arms under a `ReactiveIf` and schedules nothing of
-		// its own, so the construct arrives as one statement and nothing is dropped. The expression
-		// FORMS are still not built, which is what `ReactiveFunctionGapValueExpressions` remains
-		// about.
-		{name: "ternary", hasValueTerminal: true, conserves: true,
+		{name: "ternary", valueTerminals: 1, reactiveExtra: 1,
 			source: `function f(a) { const x = a ? 1 : 2; return x; }`},
-		{name: "logical", hasValueTerminal: true, conserves: true,
+		{name: "logical", valueTerminals: 1, reactiveExtra: 1,
 			source: `function f(a) { const x = a && a.b; return x; }`},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -48,7 +40,7 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 			}
 
 			graphInstructions := 0
-			sawValueTerminal := false
+			valueTerminals := 0
 			for _, block := range function.Blocks {
 				if block == nil {
 					continue
@@ -56,7 +48,7 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 				graphInstructions += len(block.Instructions)
 				switch block.Terminal.(type) {
 				case *Logical, *Ternary, *Optional, *Sequence:
-					sawValueTerminal = true
+					valueTerminals++
 				}
 			}
 			if graphInstructions == 0 {
@@ -67,10 +59,10 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 			// The case's own claim about its lowering is asserted, not assumed. If a change to
 			// lowering stops emitting a ternary as a value terminal, this test would otherwise
 			// quietly start applying the wrong assertion below and still pass.
-			if sawValueTerminal != testCase.hasValueTerminal {
-				t.Fatalf("this case claims hasValueTerminal=%t but its lowering says %t; the "+
+			if valueTerminals != testCase.valueTerminals {
+				t.Fatalf("this case claims valueTerminals=%d but its lowering says %d; the "+
 					"claim decides which assertion applies, so a stale one hides a real change",
-					testCase.hasValueTerminal, sawValueTerminal)
+					testCase.valueTerminals, valueTerminals)
 			}
 
 			tree, result := BuildReactiveFunction(function)
@@ -88,25 +80,238 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 					"target that is not on the control-flow stack", result.UnmatchedGotos)
 			}
 
-			if testCase.hasValueTerminal && !testCase.conserves {
-				// The declared gap. Asserted as an INEQUALITY so that closing it is a visible
-				// event: reconstructing the composite values makes this fail, which is the signal
-				// to delete this arm rather than a regression.
-				if result.Instructions >= graphInstructions {
-					t.Errorf("this case holds a value terminal and lost no instructions "+
-						"(graph=%d tree=%d); if ReactiveFunctionGapValueExpressions has been "+
-						"closed, this arm and that gap should both go",
-						graphInstructions, result.Instructions)
-				}
-				return
-			}
-
-			if result.Instructions != graphInstructions {
-				t.Errorf("instructions were not conserved: %d entered the graph and %d arrived in "+
-					"the tree; a downstream pass cannot see what the converter dropped",
-					graphInstructions, result.Instructions)
+			wantInstructions := graphInstructions + testCase.reactiveExtra
+			if result.Instructions != wantInstructions {
+				t.Errorf("reactive tree holds %d instructions, want %d from %d graph instructions "+
+					"plus %d reconstructed terminal instruction(s)", result.Instructions,
+					wantInstructions, graphInstructions, testCase.reactiveExtra)
 			}
 		})
+	}
+}
+
+func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
+	for _, testCase := range []struct {
+		name   string
+		source string
+		want   int
+	}{
+		{name: "single link", source: `function f(a) { return a?.b; }`, want: 1},
+		{name: "nested links", source: `function f(a) { return a?.b?.c; }`, want: 2},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			function, _ := rangesFor(t, testCase.source)
+			if function == nil {
+				t.Fatal("source did not lower")
+			}
+
+			graphOptionals := 0
+			joinPhis := map[IdentifierId]bool{}
+			for _, block := range function.Blocks {
+				if terminal, ok := block.Terminal.(*Optional); ok {
+					graphOptionals++
+					if join, ok := function.Block(terminal.Fallthrough); ok {
+						for _, phi := range join.Phis {
+							joinPhis[phi.Place.Identifier] = true
+						}
+					}
+				}
+			}
+			if graphOptionals != testCase.want {
+				t.Fatalf("graph holds %d Optional terminals, want %d; the test no longer reaches "+
+					"the reconstruction path", graphOptionals, testCase.want)
+			}
+
+			tree, result := BuildReactiveFunction(function)
+			if tree == nil {
+				t.Fatal("BuildReactiveFunction returned no tree")
+			}
+			if result.DoubleEmitted != 0 {
+				t.Fatalf("reconstructing the chain emitted %d block(s) twice", result.DoubleEmitted)
+			}
+
+			values, statementIfs := 0, 0
+			defined := map[IdentifierId]bool{}
+			VisitReactiveFunction(tree, ReactiveVisitor{
+				Instruction: func(instruction *ReactiveInstruction, traverse func()) {
+					if instruction.LValue != nil {
+						defined[instruction.LValue.Identifier] = true
+					}
+					traverse()
+				},
+				Value: func(_ EvaluationOrder, value ReactiveValue, traverse func()) {
+					if optional, ok := value.(*ReactiveOptionalValue); ok {
+						values++
+						if _, ok := optional.Value.(*ReactiveSequenceValue); !ok {
+							t.Errorf("optional value wraps %T, want the test/consequent sequence", optional.Value)
+						}
+					}
+					traverse()
+				},
+				Terminal: func(statement *ReactiveTerminalStatement, traverse func()) {
+					if _, ok := statement.Terminal.(*ReactiveIf); ok {
+						statementIfs++
+					}
+					traverse()
+				},
+			})
+			if values != testCase.want {
+				t.Errorf("tree holds %d ReactiveOptionalValue nodes, want %d", values, testCase.want)
+			}
+			if statementIfs != 0 {
+				t.Errorf("optional expression became %d statement-level if(s)", statementIfs)
+			}
+			for identifier := range joinPhis {
+				if !defined[identifier] {
+					t.Errorf("optional join phi %d is read after the expression but never defined in the tree",
+						identifier)
+				}
+			}
+		})
+	}
+}
+
+func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
+	for _, testCase := range []struct {
+		name   string
+		source string
+		want   int
+	}{
+		{name: "single conditional", source: `function f(a, b, c) { return a ? b : c; }`, want: 1},
+		{name: "nested conditional", source: `function f(a, b, c, d, e) { return a ? (b ? c : d) : e; }`, want: 2},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			function, _ := rangesFor(t, testCase.source)
+			if function == nil {
+				t.Fatal("source did not lower")
+			}
+
+			graphTernaries := 0
+			joinPhis := map[IdentifierId]bool{}
+			for _, block := range function.Blocks {
+				if terminal, ok := block.Terminal.(*Ternary); ok {
+					graphTernaries++
+					if join, ok := function.Block(terminal.Fallthrough); ok {
+						for _, phi := range join.Phis {
+							joinPhis[phi.Place.Identifier] = true
+						}
+					}
+				}
+			}
+			if graphTernaries != testCase.want {
+				t.Fatalf("graph holds %d Ternary terminals, want %d; the test no longer reaches "+
+					"the reconstruction path", graphTernaries, testCase.want)
+			}
+			tree, result := BuildReactiveFunction(function)
+			if tree == nil {
+				t.Fatal("BuildReactiveFunction returned no tree")
+			}
+			if result.DoubleEmitted != 0 {
+				t.Fatalf("reconstructing the conditional emitted %d block(s) twice", result.DoubleEmitted)
+			}
+
+			values, statementIfs := 0, 0
+			defined := map[IdentifierId]bool{}
+			VisitReactiveFunction(tree, ReactiveVisitor{
+				Instruction: func(instruction *ReactiveInstruction, traverse func()) {
+					if instruction.LValue != nil {
+						defined[instruction.LValue.Identifier] = true
+					}
+					traverse()
+				},
+				Value: func(_ EvaluationOrder, value ReactiveValue, traverse func()) {
+					if conditional, ok := value.(*ReactiveTernaryValue); ok {
+						values++
+						if conditional.Test == nil || conditional.Consequent == nil || conditional.Alternate == nil {
+							t.Error("conditional value does not contain its test and both arms")
+						}
+					}
+					traverse()
+				},
+				Terminal: func(statement *ReactiveTerminalStatement, traverse func()) {
+					if _, ok := statement.Terminal.(*ReactiveIf); ok {
+						statementIfs++
+					}
+					traverse()
+				},
+			})
+			if values != testCase.want {
+				t.Errorf("tree holds %d ReactiveTernaryValue nodes, want %d", values, testCase.want)
+			}
+			if statementIfs != 0 {
+				t.Errorf("conditional expression became %d statement-level if(s)", statementIfs)
+			}
+			for identifier := range joinPhis {
+				if !defined[identifier] {
+					t.Errorf("conditional join phi %d is read after the expression but never defined in the tree",
+						identifier)
+				}
+			}
+		})
+	}
+}
+
+// TestBuildReactiveFunctionLogicalKeepsRightPrefix is the preservation-memoization golden that
+// exposed the wrong logical arm. The `?? []` right block contains both ArrayExpression and a final
+// LoadLocal; rebuilding only the final value drops the allocation, which in turn removes the scope
+// declaration that the validator needs.
+func TestBuildReactiveFunctionLogicalKeepsRightPrefix(t *testing.T) {
+	function, _ := rangesFor(t, `
+		function Component(props) {
+			const data = useMemo(() => {
+				return props.items.edges.nodes ?? [];
+			}, [props.items?.edges?.nodes]);
+			return data;
+		}
+	`)
+	if len(function.Functions) != 1 {
+		t.Fatalf("component holds %d nested functions, want the useMemo callback", len(function.Functions))
+	}
+	callback := function.Functions[0]
+
+	graphArrays, graphLogicals := 0, 0
+	for _, block := range callback.Blocks {
+		if _, ok := block.Terminal.(*Logical); ok {
+			graphLogicals++
+		}
+		for _, instructionId := range block.Instructions {
+			if _, ok := callback.Instructions[instructionId].Value.(*ArrayExpression); ok {
+				graphArrays++
+			}
+		}
+	}
+	if graphArrays != 1 || graphLogicals != 1 {
+		t.Fatalf("callback graph has %d arrays and %d logical terminals, want one of each; the "+
+			"fixture no longer pins the lost-prefix shape", graphArrays, graphLogicals)
+	}
+
+	tree, result := BuildReactiveFunction(callback)
+	if tree == nil {
+		t.Fatal("BuildReactiveFunction returned no callback tree")
+	}
+	if result.DoubleEmitted != 0 {
+		t.Fatalf("reconstructing the logical emitted %d block(s) twice", result.DoubleEmitted)
+	}
+
+	treeArrays, treeLogicals := 0, 0
+	VisitReactiveFunction(tree, ReactiveVisitor{
+		Value: func(_ EvaluationOrder, value ReactiveValue, traverse func()) {
+			switch shape := value.(type) {
+			case *ReactiveLogicalValue:
+				treeLogicals++
+			case *ReactiveInstructionValue:
+				if _, ok := shape.Value.(*ArrayExpression); ok {
+					treeArrays++
+				}
+			}
+			traverse()
+		},
+	})
+	if treeLogicals != graphLogicals {
+		t.Errorf("tree holds %d logical values, want %d", treeLogicals, graphLogicals)
+	}
+	if treeArrays != graphArrays {
+		t.Errorf("tree holds %d array allocations, want all %d from the graph", treeArrays, graphArrays)
 	}
 }
 
@@ -178,19 +383,13 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 			"every count below would be a fact about the harness", converted)
 	}
 
-	// The load-bearing assertion. Attribution measured 353 losing functions WITH a value terminal
-	// and 0 without, which is what makes the gap a single declared cause rather than a scattered
-	// defect.
+	// The initial conversion lost instructions in 353 functions with a value terminal. Rebuilding
+	// logical, ternary and optional terminals through `visitValueBlockTerminal` reduces that to four:
+	// the ordinary lowering shapes now become compound values, including nested expressions, while
+	// a value subtree carrying a phi or an unsupported terminal deliberately takes the conservative
+	// statement fallback. The remaining gap is asserted below rather than hidden in the improvement.
 	//
-	// 353 to 224 when `emitLogicalValue` began building `a && b` as one instruction holding a
-	// `ReactiveLogicalValue`. The gap's own text says the extraction needs value blocks that carry
-	// no phis, "which upstream can do because value blocks there carry no phis by construction",
-	// and implies this tree's do. Measured: 3,641 value blocks corpus-wide, 0 with a phi, and 0 of
-	// the 1,570 value-terminal arms with one. The property holds here too, so the logical form is
-	// buildable and is built. The remaining 224 are ternary and sequence, whose forms are not.
-	//
-	// Every other conservation number held exactly across that change: `doubleEmitted` 22,
-	// `unmatchedGotos` 60, `nonImplicitScopeBreaks` 85, `lostWithout` 5. A function losing instructions with no value terminal is a real bug, and it is the
+	// A function losing instructions with no value terminal is a real bug, and it is the
 	// exact shape that was already found once here: the first spelling of `valueOf` returned only a
 	// block's last instruction, which cost 27 functions holding a `ForOf` whose `Test` and `Init`
 	// are read through it.
@@ -203,13 +402,13 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 	// A ceiling, for the same reason as the two below: this is a known defect with a named cause,
 	// and the test's job is to stop it growing while it waits to be fixed.
 	//
-	// Five with the two frozen-propagation edges in `effects.go` and `ranges.go`. Instrumented
-	// before raising this: the fifth carries exactly one unmatched goto, as do the other four, and
-	// it loses a single instruction (69 to 68). So the attribution above is unchanged and the
-	// population is the same defect one function wider, not a new kind of loss. `unmatchedGotos`
-	// holds at 60 across the change, which is the shape a wider frozen set produces here -- a scope
-	// that no longer widens leaves one more orphaned break target holding an instruction.
-	const knownLostWithoutValueTerminal = 5
+	// This briefly rose to five when frozen propagation split another scope. Structured value
+	// reconstruction brings it back to four while moving the aggregate control-flow counters from
+	// 22 double emissions / 60 unmatched gotos to 21 / 61. One block is no longer emitted twice or
+	// lost with its target; the goto reaching that target is now classified as unmatched instead.
+	// The total anomaly count stays 82, so this is a tighter loss bound around the same break-target
+	// defect rather than evidence that the defect closed.
+	const knownLostWithoutValueTerminal = 4
 	if lostWithout > knownLostWithoutValueTerminal {
 		t.Errorf("%d function(s) lost instructions with NO value terminal, up from the measured "+
 			"%d; the declared gap explains only value terminals, so this is unattributed loss",
@@ -235,9 +434,14 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 	// break to, so a goto that previously found nothing now matches, and the block it lands in is
 	// reached from one more place. The scopes recovered are named at `knownSurvivedExact` in
 	// `scope_oracle_test.go`.
+	//
+	// Structured logical/ternary/optional reconstruction reverses that aggregate trade: 22 to 21
+	// double emissions and 60 to 61 unmatched gotos. Their sum remains 82, and non-implicit scope
+	// breaks remain 85, so the unresolved population did not grow; one failure moved from repeated
+	// traversal to the missing-break-target arm.
 	const (
-		knownDoubleEmitted  = 22
-		knownUnmatchedGotos = 60
+		knownDoubleEmitted  = 21
+		knownUnmatchedGotos = 61
 	)
 	// A note for whoever tightens this: `valueOf`'s own double-emit guard is NOT what these 21
 	// come from. Removing that guard entirely leaves the count at exactly 21, so it never fires on
@@ -259,9 +463,9 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 			"re-openable", doubleEmitted, knownDoubleEmitted, unmatchedGotos, knownUnmatchedGotos)
 	}
 
-	// Held as a floor rather than an equality. The corpus is a live tree and its function count
-	// moves, so pinning the exact 353 would fail on an unrelated edit; what must not happen
-	// silently is the attributed loss going to zero while the gap is still declared.
+	// Held as a floor rather than an equality. The remaining structured-value gap is still declared,
+	// so a zero here means either that the gap closed or the measurement stopped reaching it; both
+	// require updating the declaration and this assertion together.
 	if lostWithValueTerminal == 0 {
 		t.Errorf("no function lost instructions at a value terminal, but " +
 			"ReactiveFunctionGapValueExpressions is still declared; either the gap closed and " +

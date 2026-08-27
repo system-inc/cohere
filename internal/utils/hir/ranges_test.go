@@ -276,6 +276,372 @@ func TestRangesPhiOpensBeforeItsBlockWhenWidened(t *testing.T) {
 	}
 }
 
+// TestPhiNonMutabilityControlsUnknownCallScopes pins the reduced counterpart of upstream's
+// `InferenceState.inferPhi`.
+//
+// A phi does not create a fresh mutable value. It names the union of its operand values, so an
+// unknown call's conditional mutation is discarded when every arm is already frozen or primitive.
+// One mutable arm is the control: it must keep the mutation and pull the phi into the call scope.
+func TestPhiNonMutabilityControlsUnknownCallScopes(t *testing.T) {
+	tests := []struct {
+		name           string
+		source         string
+		wantPhiInScope bool
+	}{
+		{
+			name: "optional frozen and primitive arms",
+			source: `
+				function Component(input: {x?: {y: object}}) {
+					return opaque(input?.x.y);
+				}
+			`,
+		},
+		{
+			name: "optional destructured frozen and primitive arms",
+			source: `
+				function Component({input}: {input: {x?: {y: object}}}) {
+					return opaque(input?.x.y);
+				}
+			`,
+		},
+		{
+			name: "ternary frozen and primitive arms",
+			source: `
+				function Component(input: {flag: boolean, value: object}) {
+					return opaque(input.flag ? input.value : undefined);
+				}
+			`,
+		},
+		{
+			name: "ternary mutable arm",
+			source: `
+				function helper(input: {flag: boolean, value: object}) {
+					return opaque(input.flag ? input.value : undefined);
+				}
+			`,
+			wantPhiInScope: true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			function, ranges := rangesFor(t, testCase.source)
+			call, phi := unknownCallAndArgumentPhi(t, function, "opaque")
+			set := FindDisjointMutableValuesWithRanges(function, ranges)
+			scopes := AssignReactiveScopesWithSets(function, ranges, set)
+			callScope := scopes.ScopeOf(call.LValue.Identifier)
+			if callScope == 0 {
+				t.Fatal("unknown call result received no allocation scope")
+			}
+
+			phiScope := scopes.ScopeOf(phi.Place.Identifier)
+			if got := phiScope == callScope; got != testCase.wantPhiInScope {
+				t.Errorf("phi and call share scope = %v, want %v; phi range=%v call scope=%v",
+					got, testCase.wantPhiInScope, ranges.Get(phi.Place.Identifier),
+					scopes.RangeOf(callScope))
+			}
+			if got := ranges.Contains(phi.Place.Identifier, call.Order); got != testCase.wantPhiInScope {
+				t.Errorf("phi is mutable at call = %v, want %v", got, testCase.wantPhiInScope)
+			}
+
+			if !testCase.wantPhiInScope {
+				callMembers := map[IdentifierId]bool{}
+				for _, member := range scopes.MembersOf(callScope) {
+					callMembers[member] = true
+				}
+				for _, block := range function.Blocks {
+					if block == nil || block.Kind != BlockKindValue {
+						continue
+					}
+					for _, instructionID := range block.Instructions {
+						instruction := function.Instructions[instructionID]
+						if instruction != nil && callMembers[instruction.LValue.Identifier] {
+							t.Errorf("call scope contains value-block instruction %d (%T); upstream starts "+
+								"the scope after the join", instructionID, instruction.Value)
+						}
+					}
+				}
+				if got := scopes.RangeOf(callScope); got.Start != call.Order || got.End != call.Order+1 {
+					t.Errorf("call scope range=%v, want [%d,%d)", got, call.Order, call.Order+1)
+				}
+			}
+		})
+	}
+}
+
+// TestMutatingMethodReceiverSurvivesArgumentControlFlow pins receiver-effect continuity across
+// argument lowering. A method receiver is evaluated before its arguments and retained on the
+// MethodCall after any argument join; Array.push's direct Mutate(receiver) must therefore end the
+// receiver range at call.Order+1 for straight-line, ternary, and optional-chain arguments alike.
+func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
+	tests := []struct {
+		name            string
+		source          string
+		wantArgumentPhi bool
+	}{
+		{
+			name: "direct argument",
+			source: `
+				function helper(arg: {items: object}) {
+					const x: object[] = [];
+					x.push(arg.items);
+					return x;
+				}
+			`,
+		},
+		{
+			name:            "ternary argument",
+			wantArgumentPhi: true,
+			source: `
+				function helper(arg: {items: object}, cond: boolean) {
+					const x: (object | undefined)[] = [];
+					x.push(cond ? arg.items : undefined);
+					return x;
+				}
+			`,
+		},
+		{
+			name:            "optional-chain argument",
+			wantArgumentPhi: true,
+			source: `
+				function helper(arg: {items: object} | null) {
+					const x: (object | undefined)[] = [];
+					x.push(arg?.items);
+					return x;
+				}
+			`,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			function, ranges := rangesFor(t, testCase.source)
+			var call *Instruction
+			var method *MethodCall
+			for _, instruction := range function.Instructions {
+				if instruction == nil {
+					continue
+				}
+				candidate, ok := instruction.Value.(*MethodCall)
+				if !ok || calleeName(function, instruction, candidate.Property) != "push" {
+					continue
+				}
+				call = instruction
+				method = candidate
+				break
+			}
+			if call == nil {
+				t.Fatal("no Array.push MethodCall was lowered")
+			}
+
+			mutations := 0
+			for _, effect := range InferAliasingEffects(function).Get(call.Id) {
+				if effect.Kind == AliasingEffectMutate &&
+					effect.Into.Identifier == method.Receiver.Identifier {
+					mutations++
+				}
+			}
+			if mutations != 1 {
+				t.Fatalf("push effects contain %d direct Mutate(receiver) entries, want exactly 1",
+					mutations)
+			}
+
+			if len(method.Args) != 1 {
+				t.Fatalf("push has %d arguments, want 1", len(method.Args))
+			}
+			argumentIsPhi := false
+			argument := method.Args[0].Place.Identifier
+			for _, block := range function.Blocks {
+				if block == nil {
+					continue
+				}
+				for _, phi := range block.Phis {
+					if phi.Place.Identifier == argument {
+						argumentIsPhi = true
+					}
+				}
+			}
+			if argumentIsPhi != testCase.wantArgumentPhi {
+				t.Errorf("push argument is phi = %v, want %v; the test stopped distinguishing argument CFG",
+					argumentIsPhi, testCase.wantArgumentPhi)
+			}
+
+			var initializer, storedX Place
+			foundStore := false
+			for _, instruction := range function.Instructions {
+				if instruction == nil {
+					continue
+				}
+				store, ok := instruction.Value.(*StoreLocal)
+				if !ok || int(store.LValue.Identifier) >= len(function.Identifiers) {
+					continue
+				}
+				identifier := function.Identifiers[store.LValue.Identifier]
+				if identifier == nil || identifier.Name != "x" {
+					continue
+				}
+				initializer = store.Value
+				storedX = store.LValue
+				foundStore = true
+				break
+			}
+			if !foundStore {
+				t.Fatal("no StoreLocal connected the array initializer to x")
+			}
+			receiverProducerFound := false
+			for _, instruction := range function.Instructions {
+				if instruction == nil || instruction.LValue.Identifier != method.Receiver.Identifier {
+					continue
+				}
+				receiverProducerFound = true
+				load, ok := instruction.Value.(*LoadLocal)
+				if !ok {
+					t.Fatalf("MethodCall receiver %d is produced by %T, want LoadLocal",
+						method.Receiver.Identifier, instruction.Value)
+				}
+				if load.Place.Identifier != storedX.Identifier {
+					t.Fatalf("MethodCall receiver loads %d, want stored x %d",
+						load.Place.Identifier, storedX.Identifier)
+				}
+				break
+			}
+			if !receiverProducerFound {
+				t.Fatalf("no instruction produces MethodCall receiver %d", method.Receiver.Identifier)
+			}
+			initializerIsArray := false
+			for _, instruction := range function.Instructions {
+				if instruction != nil && instruction.LValue.Identifier == initializer.Identifier {
+					_, initializerIsArray = instruction.Value.(*ArrayExpression)
+					break
+				}
+			}
+			if !initializerIsArray {
+				t.Fatalf("x initializer %d is not produced by an ArrayExpression", initializer.Identifier)
+			}
+
+			for _, value := range []struct {
+				name  string
+				place Place
+			}{
+				{name: "array initializer", place: initializer},
+				{name: "stored x", place: storedX},
+				{name: "method receiver", place: method.Receiver},
+			} {
+				got := ranges.Get(value.place.Identifier)
+				if got.Start == 0 || got.Start >= call.Order {
+					t.Errorf("%s range=%v does not begin before call order %d", value.name, got, call.Order)
+				}
+				if got.End != call.Order+1 {
+					t.Errorf("%s range=%v, want end at push call + 1 (%d)", value.name, got, call.Order+1)
+				}
+			}
+		})
+	}
+}
+
+// TestAliasingRefinementMatchesAbstractKinds pins the kind-sensitive edge filtering performed by
+// upstream's `InferenceState.applyEffect` before the range graph sees an effect.
+//
+// Alias is pruned for a frozen/primitive source or destination. MaybeAlias is deliberately
+// asymmetric: a frozen source is pruned, but a primitive source is retained. The latter is a
+// control against simplifying both variants to the same broad "immutable means no edge" rule.
+func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
+	tests := []struct {
+		name        string
+		edge        AliasingEffectKind
+		fromKind    EffectValueKind
+		intoKind    EffectValueKind
+		wantWidened bool
+	}{
+		{name: "alias frozen source", edge: AliasingEffectAlias, fromKind: EffectValueFrozen, intoKind: EffectValueMutable},
+		{name: "alias primitive source", edge: AliasingEffectAlias, fromKind: EffectValuePrimitive, intoKind: EffectValueMutable},
+		{name: "alias frozen destination", edge: AliasingEffectAlias, fromKind: EffectValueMutable, intoKind: EffectValueFrozen},
+		{name: "alias mutable values", edge: AliasingEffectAlias, fromKind: EffectValueMutable, intoKind: EffectValueMutable, wantWidened: true},
+		{name: "maybe-alias frozen source", edge: AliasingEffectMaybeAlias, fromKind: EffectValueFrozen, intoKind: EffectValueMutable},
+		{name: "maybe-alias primitive source", edge: AliasingEffectMaybeAlias, fromKind: EffectValuePrimitive, intoKind: EffectValueMutable, wantWidened: true},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			function := NewFunction(nil, "helper", FunctionKindOther)
+			block := function.NewBlock(BlockKindBlock)
+			function.Entry = block.Id
+			place := func() Place {
+				return Place{Identifier: function.NewIdentifier("", nil, 0).Id}
+			}
+
+			from := place()
+			fromInstruction := &Instruction{LValue: from, Value: &Primitive{Value: 1}}
+			function.AddInstruction(block, fromInstruction)
+			into := place()
+			edgeInstruction := &Instruction{LValue: into, Value: &ObjectExpression{}}
+			function.AddInstruction(block, edgeInstruction)
+			result := place()
+			mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: 0}}
+			function.AddInstruction(block, mutationInstruction)
+			function.Returns = result
+			block.Terminal = &Return{Value: result}
+			Finalize(function)
+
+			effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
+				fromInstruction.Id: {create(from, testCase.fromKind)},
+				edgeInstruction.Id: {
+					create(into, testCase.intoKind),
+					flow(testCase.edge, from, into),
+				},
+				mutationInstruction.Id: {
+					create(result, EffectValuePrimitive),
+					mutate(AliasingEffectMutate, into),
+				},
+			}}
+			ranges := InferMutableRangesWithEffects(function, effects)
+
+			wantEnd := fromInstruction.Order + 1
+			if testCase.wantWidened {
+				wantEnd = mutationInstruction.Order + 1
+			}
+			if got := ranges.Get(from.Identifier); got.End != wantEnd {
+				t.Errorf("source range=%v, want end %d (edge=%s from=%s into=%s)", got,
+					wantEnd, testCase.edge, testCase.fromKind, testCase.intoKind)
+			}
+		})
+	}
+}
+
+func unknownCallAndArgumentPhi(t *testing.T, function *Function,
+	name string) (*Instruction, *Phi) {
+	t.Helper()
+	var call *Instruction
+	var argument IdentifierId
+	for _, instruction := range function.Instructions {
+		if instruction == nil {
+			continue
+		}
+		value, ok := instruction.Value.(*CallExpression)
+		if !ok || calleeName(function, instruction, value.Callee) != name || len(value.Args) != 1 {
+			continue
+		}
+		call = instruction
+		argument = value.Args[0].Place.Identifier
+		break
+	}
+	if call == nil {
+		t.Fatalf("no one-argument call to %s", name)
+	}
+	for _, block := range function.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, phi := range block.Phis {
+			if phi.Place.Identifier == argument {
+				return call, phi
+			}
+		}
+	}
+	t.Fatalf("call argument %d is not a phi", argument)
+	return nil, nil
+}
+
 // TestRangesAreIdempotent pins that a second run produces an equal table.
 //
 // `Construct` is famously NOT idempotent in this package, and a pass built beside it inherits the
@@ -336,20 +702,75 @@ export function f() {
 
 // TestRangeGapsAreNamed pins the declared gaps, so closing one is a visible event.
 //
-// It worked. Stage 2 declared two gaps here, `RangeGapMutationExtension` and
-// `RangeGapAliasPropagation`, and this test failed when Stage 2.5 closed both, which forced the
-// constants and the package comment to be updated together rather than leaving an API that named a
-// gap no longer present. The remaining gap is in the INPUT rather than in this pass: the walk over
-// `createFrom` edges is implemented and correct, and nothing in this tree emits the effect that
-// populates them.
+// It worked. Stage 2 declared mutation-extension and alias-propagation gaps, and this test failed
+// when Stage 2.5 closed both. It failed again when property loads and destructuring began emitting
+// CreateFrom, forcing that input gap out of the API too.
 func TestRangeGapsAreNamed(t *testing.T) {
 	gaps := RangeGaps()
-	if len(gaps) != 2 {
-		t.Fatalf("expected exactly the two declared gaps, got %d", len(gaps))
+	if len(gaps) != 1 {
+		t.Fatalf("expected exactly the one declared gap, got %d", len(gaps))
 	}
-	if gaps[0] != RangeGapCreateFromPropagation || gaps[1] != RangeGapLoopCarriedInversion {
+	if gaps[0] != RangeGapLoopCarriedInversion {
 		t.Errorf("the declared gaps changed; if one was closed, update the package comment and the "+
 			"RangeGap constants together, got %v", gaps)
+	}
+}
+
+// TestCreateFromMutationPropagatesTransitively pins the range path that closed the former
+// CreateFrom gap. A direct mutation of the derived value must reach both its source and a value the
+// source captured; reaching only the source would pass if createdFrom incorrectly preserved the
+// mutation's non-transitive kind.
+func TestCreateFromMutationPropagatesTransitively(t *testing.T) {
+	function := NewFunction(nil, "helper", FunctionKindOther)
+	block := function.NewBlock(BlockKindBlock)
+	function.Entry = block.Id
+	place := func() Place {
+		return Place{Identifier: function.NewIdentifier("", nil, 0).Id}
+	}
+
+	leaf := place()
+	leafInstruction := &Instruction{LValue: leaf, Value: &ObjectExpression{}}
+	function.AddInstruction(block, leafInstruction)
+	source := place()
+	sourceInstruction := &Instruction{LValue: source, Value: &ObjectExpression{}}
+	function.AddInstruction(block, sourceInstruction)
+	derived := place()
+	derivedInstruction := &Instruction{LValue: derived, Value: &PropertyLoad{Object: source, Property: "value"}}
+	function.AddInstruction(block, derivedInstruction)
+	result := place()
+	mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: 0}}
+	function.AddInstruction(block, mutationInstruction)
+	function.Returns = result
+	block.Terminal = &Return{Value: result}
+	Finalize(function)
+
+	effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
+		leafInstruction.Id: {create(leaf, EffectValueMutable)},
+		sourceInstruction.Id: {
+			create(source, EffectValueMutable),
+			flow(AliasingEffectCapture, leaf, source),
+		},
+		derivedInstruction.Id: {flow(AliasingEffectCreateFrom, source, derived)},
+		mutationInstruction.Id: {
+			create(result, EffectValuePrimitive),
+			mutate(AliasingEffectMutate, derived),
+		},
+	}}
+	ranges := InferMutableRangesWithEffects(function, effects)
+
+	wantEnd := mutationInstruction.Order + 1
+	for _, value := range []struct {
+		name  string
+		place Place
+	}{
+		{name: "leaf", place: leaf},
+		{name: "source", place: source},
+		{name: "derived", place: derived},
+	} {
+		if got := ranges.Get(value.place.Identifier); got.End != wantEnd {
+			t.Errorf("%s range=%v, want end %d through transitive CreateFrom propagation", value.name,
+				got, wantEnd)
+		}
 	}
 }
 

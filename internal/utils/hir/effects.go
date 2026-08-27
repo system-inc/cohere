@@ -158,7 +158,11 @@
 // twice over the corpus and compares, so a later addition that does reach for a phi fails loudly.
 package hir
 
-import "github.com/microsoft/TypeScript/tsc/shim/ast"
+import (
+	"strings"
+
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+)
 
 // AliasingEffectKind is what one effect does. These are React's `AliasingEffect` variants.
 //
@@ -739,7 +743,10 @@ func effectsForInstruction(function *Function, instruction *Instruction) []Alias
 		return []AliasingEffect{flow(AliasingEffectAssign, value.Place, lvalue)}
 
 	case *LoadContext:
-		return []AliasingEffect{flow(AliasingEffectAssign, value.Place, lvalue)}
+		// A context binding is a mutable box. Reading it creates a value with the box's current
+		// abstract kind; it does not make the temporary another name for the box itself. This is
+		// upstream's CreateFrom and the distinction matters when the box is frozen after the read.
+		return []AliasingEffect{flow(AliasingEffectCreateFrom, value.Place, lvalue)}
 
 	case *StoreLocal:
 		return []AliasingEffect{
@@ -958,18 +965,110 @@ func effectsForInstruction(function *Function, instruction *Instruction) []Alias
 		}
 		return out
 
+	// --- Manual memoization ---------------------------------------------------------------
+
+	case *StartMemoize:
+		out := []AliasingEffect{create(lvalue, EffectValuePrimitive)}
+		if preserveExistingMemoizationEnabled(function) {
+			for _, dependency := range value.Deps {
+				if !dependency.Root.IsGlobal {
+					out = append(out, mutate(AliasingEffectFreeze, dependency.Root.Place))
+				}
+			}
+		}
+		return out
+
+	case *FinishMemoize:
+		// React's FinishMemoize signature freezes `decl`, the value whose identity the manual memo
+		// promises to preserve. Later conditional mutations (including an unknown method call on
+		// that value) are therefore refined away by the abstract-value state.
+		out := []AliasingEffect{create(lvalue, EffectValuePrimitive)}
+		if preserveExistingMemoizationEnabled(function) {
+			out = append(out, mutate(AliasingEffectFreeze, value.Value))
+		}
+		return out
+
 	// --- Everything else -------------------------------------------------------------------
 
 	case *TypeCastExpression:
 		return []AliasingEffect{flow(AliasingEffectAssign, value.Value, lvalue)}
 
 	case *Destructure:
-		// Destructuring reads the source and binds each target. The individual targets are separate
-		// instructions in this representation, so only the source edge belongs here.
-		return []AliasingEffect{flow(AliasingEffectCapture, value.Value, lvalue)}
+		// Each ordinary binding is a value derived from the destructured source. This is upstream's
+		// `CreateFrom(value -> patternItem)`, and is what lets a component's frozen props state flow
+		// through `function Component({prop})` into `prop`.
+		//
+		// A rest binding is different: object/array spread allocates a fresh container and captures
+		// the source into it. Upstream can prove some object rests non-mutating and create them Frozen;
+		// this reduced effect pass has no such sidemap, so Mutable is the conservative spelling.
+		out := []AliasingEffect{}
+		pattern := value.LValue
+		if pattern == nil {
+			pattern = value.Pattern
+		}
+		eachDestructureBinding(pattern, func(place Place, rest bool) {
+			if rest {
+				out = append(out,
+					create(place, EffectValueMutable),
+					flow(AliasingEffectCapture, value.Value, place),
+				)
+				return
+			}
+			// Upstream emits Create Primitive for primitive-typed bindings. Type-directed shapes are
+			// an explicit gap in this table, and CreateFrom is conservative for a mutable source while
+			// preserving the non-mutable kind needed by the ranges pass for frozen component props.
+			out = append(out, flow(AliasingEffectCreateFrom, value.Value, place))
+		})
+		out = append(out, flow(AliasingEffectAssign, value.Value, lvalue))
+		return out
 	}
 
 	return nil
+}
+
+// eachDestructureBinding walks the binding places of this tree's structured Pattern while retaining
+// the distinction upstream's `eachPatternItem` makes between identifiers and spread items.
+func eachDestructureBinding(pattern Pattern, visit func(place Place, rest bool)) {
+	switch value := pattern.(type) {
+	case *PlacePattern:
+		visit(value.Place, false)
+	case *ObjectPattern:
+		for _, property := range value.Properties {
+			eachDestructureBinding(property.Value, visit)
+		}
+		if value.Rest != nil {
+			visit(*value.Rest, true)
+		}
+	case *ArrayPattern:
+		for _, element := range value.Elements {
+			if element.Value != nil {
+				eachDestructureBinding(element.Value, visit)
+			}
+		}
+		if value.Rest != nil {
+			visit(*value.Rest, true)
+		}
+	}
+}
+
+// preserveExistingMemoizationEnabled answers the environment option that guards marker freezes.
+//
+// React defaults this option to true and fixtures override it on their first line. Function does
+// not retain an Environment, but it retains its syntax node, so the one explicit false spelling is
+// still distinguishable from the default without teaching effect inference about fixture names.
+func preserveExistingMemoizationEnabled(function *Function) bool {
+	if function == nil || function.Node == nil {
+		return true
+	}
+	sourceFile := ast.GetSourceFileOfNode(function.Node)
+	if sourceFile == nil {
+		return true
+	}
+	text := sourceFile.Text()
+	if newline := strings.IndexByte(text, '\n'); newline >= 0 {
+		text = text[:newline]
+	}
+	return !strings.Contains(text, "@enablePreserveExistingMemoizationGuarantees:false")
 }
 
 // effectsForCall is upstream's Apply resolution: consult the signature table, else the default.
@@ -1597,18 +1696,6 @@ func mutatesOwnParameter(nested *Function) bool {
 			continue
 		}
 		for _, instructionId := range block.Instructions {
-			// A destructuring pattern binds places the effect list never names: its only effect is
-			// a `Capture` into the instruction's own lvalue, while the bindings the body reads are
-			// the pattern's places. `([, value]) => ...` reaches its parameter through one of those
-			// and through nothing else.
-			if instruction := nested.Instructions[instructionId]; instruction != nil {
-				if destructure, ok := instruction.Value.(*Destructure); ok &&
-					reaches[destructure.Value.Identifier] {
-					eachPatternPlace(destructure.LValue, func(place Place, role PlaceRole) {
-						reaches[place.Identifier] = true
-					})
-				}
-			}
 			for _, effect := range effects.Get(instructionId) {
 				switch effect.Kind {
 				case AliasingEffectAssign, AliasingEffectAlias, AliasingEffectCreateFrom,
@@ -1619,9 +1706,10 @@ func mutatesOwnParameter(nested *Function) bool {
 					// answer is no. Here it is "is this value part of the parameter", and a value
 					// captured out of a parameter is.
 					//
-					// Destructuring is why: `([, value]) => { value.updated = true }` lowers to a
-					// `Destructure` whose only effect is `Capture` from the parameter, so a walk
-					// that skipped capture edges saw a callback that never touched its parameter.
+					// Destructuring rest is why: `([, ...values]) => { values[0].updated = true }`
+					// lowers to a `Capture` from the parameter into the freshly allocated rest value,
+					// so a walk that skipped capture edges would see a callback that never touched
+					// its parameter.
 					// Measured on `error.validate-object-entries-mutation` against its sibling
 					// `error.validate-object-values-mutation`, which binds the parameter directly
 					// and was already reached.

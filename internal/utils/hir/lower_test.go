@@ -745,6 +745,59 @@ func TestLowerNestedFunction(t *testing.T) {
 	}
 }
 
+// TestLowerShorthandPropertyReadsLocalBinding pins the checker-specific symbol lookup for `{temp}`.
+// TypeScript's generic symbol accessor returns the PROPERTY symbol at the shorthand name; lowering
+// needs the shorthand's VALUE symbol so the read stays connected to the local declaration.
+func TestLowerShorthandPropertyReadsLocalBinding(t *testing.T) {
+	function := lowerTypedFunctions(t, "shorthand.tsx", `
+		export function makeObject() {
+			const temp = compute();
+			return {temp};
+		}
+	`)[0]
+	checkInvariants(t, function)
+
+	var local IdentifierId
+	localFound := false
+	var shorthandValue IdentifierId
+	shorthandFound := false
+	for _, instruction := range function.Instructions {
+		switch value := instruction.Value.(type) {
+		case *StoreLocal:
+			if function.Identifiers[value.LValue.Identifier].Name == "temp" {
+				local = value.LValue.Identifier
+				localFound = true
+			}
+		case *ObjectExpression:
+			for _, property := range value.Properties {
+				if property.Key == "temp" {
+					shorthandValue = property.Value.Identifier
+					shorthandFound = true
+				}
+			}
+		}
+	}
+	if !localFound || !shorthandFound {
+		t.Fatalf("lowering did not produce the local and shorthand property:\n%s", Print(function))
+	}
+
+	for _, instruction := range function.Instructions {
+		if instruction.LValue.Identifier != shorthandValue {
+			continue
+		}
+		load, ok := instruction.Value.(*LoadLocal)
+		if !ok {
+			t.Fatalf("shorthand value lowered as %T, want *LoadLocal:\n%s", instruction.Value, Print(function))
+		}
+		if load.Place.Identifier != local {
+			t.Fatalf("shorthand reads %s, want local %s:\n%s",
+				function.PlaceString(load.Place), function.PlaceString(Place{Identifier: local}), Print(function))
+		}
+		return
+	}
+	t.Fatalf("shorthand value %d has no defining instruction:\n%s", shorthandValue, Print(function))
+}
+
 // TestLowerUnreachableCodeIsDropped pins that this IR removes what controlflow keeps.
 //
 // See ReversePostorder: a value defined only where control never arrives is a value no analysis
@@ -787,24 +840,42 @@ func TestLowerAsyncAndGeneratorModifiers(t *testing.T) {
 	}
 }
 
-// TestLowerOptionalChaining pins that an optional member access records its optionality.
+// TestLowerOptionalChaining pins that optionality is represented as control flow and recovered as
+// one access path. The guarded PropertyLoad itself is ordinary; the Optional terminal is the guard.
 func TestLowerOptionalChaining(t *testing.T) {
-	function := lowerSource(t, `
+	function := lowerTypedFunctions(t, "optional.ts", `
 		function f(input: {a?: {b: number}}) {
 			return input.a?.b;
 		}
-	`)
+	`)[0]
 	checkInvariants(t, function)
 
-	found := false
-	for _, instruction := range function.Instructions {
-		if load, ok := instruction.Value.(*PropertyLoad); ok && load.Optional {
-			found = true
+	foundTerminal := false
+	foundLoad := false
+	for _, block := range function.Blocks {
+		if optional, ok := block.Terminal.(*Optional); ok && optional.Optional {
+			foundTerminal = true
 		}
 	}
-	if !found {
-		t.Errorf("the optional property load did not record its optionality:\n%s", Print(function))
+	for _, instruction := range function.Instructions {
+		if load, ok := instruction.Value.(*PropertyLoad); ok && load.Property == "b" {
+			foundLoad = true
+			if load.Optional {
+				t.Error("the guarded load carries optionality as an instruction flag, want structural control flow")
+			}
+		}
 	}
+	if !foundTerminal || !foundLoad {
+		t.Fatalf("optional access lowered without its terminal or guarded load:\n%s", Print(function))
+	}
+
+	want := []DependencyPathEntry{{Property: "a"}, {Property: "b", Optional: true}}
+	for _, dependency := range CollectOptionalChainSidemap(function).TemporariesReadInOptional {
+		if equalPaths(dependency.Path, want) {
+			return
+		}
+	}
+	t.Errorf("optional sidemap did not reconstruct input.a?.b:\n%s", Print(function))
 }
 
 // TestLowerUnsupportedSyntaxDoesNotFail pins the escape hatch.

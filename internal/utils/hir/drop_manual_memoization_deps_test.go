@@ -81,6 +81,94 @@ func TestUnextractableDependencyAbandonsTheWholeList(t *testing.T) {
 	}
 }
 
+// Upstream's `findOptionalPlaces` derives optionality from Optional terminals before it collects
+// the source dependency list. Optional lowering has the same shape here, so the written path must
+// retain exactly the steps guarded by `?.`, even though the PropertyLoad instructions themselves
+// are non-optional.
+func TestDropManualMemoizationRecoversOptionalPlacesFromControlFlow(t *testing.T) {
+	deps, isNil, result := memoDepsFor(t, `
+		import {useMemo} from 'react';
+		function Component(props) {
+			return useMemo(() => props.items.edges.nodes, [props.items?.edges?.nodes]);
+		}
+	`)
+	if result.Recognised != 1 {
+		t.Fatalf("recognised %d memo calls, want 1", result.Recognised)
+	}
+	if isNil || len(deps) != 1 {
+		t.Fatalf("dependency list is nil=%v with %d entries, want one extracted dependency",
+			isNil, len(deps))
+	}
+	path := deps[0].Path
+	want := []DependencyPathEntry{
+		{Property: "items", Optional: false},
+		{Property: "edges", Optional: true},
+		{Property: "nodes", Optional: true},
+	}
+	if len(path) != len(want) {
+		t.Fatalf("path = %v, want %v", path, want)
+	}
+	for index := range want {
+		if path[index].Property != want[index].Property ||
+			path[index].Optional != want[index].Optional {
+			t.Errorf("path[%d] = %+v, want %+v", index, path[index], want[index])
+		}
+	}
+}
+
+// The inference sidemap intentionally rejects LoadGlobal roots, but source dependency extraction
+// must not: upstream accepts globals in dependency arrays and derives their optionality with a
+// separate terminal walk.
+func TestDropManualMemoizationRecoversOptionalGlobalDependency(t *testing.T) {
+	deps, isNil, result := memoDepsFor(t, `
+		import {useMemo} from 'react';
+		declare const GLOBAL: {field?: {leaf: number}} | undefined;
+		function Component() {
+			return useMemo(() => GLOBAL?.field?.leaf, [GLOBAL?.field?.leaf]);
+		}
+	`)
+	if result.Recognised != 1 {
+		t.Fatalf("recognised %d memo calls, want 1", result.Recognised)
+	}
+	if isNil || len(deps) != 1 {
+		t.Fatalf("dependency list is nil=%v with %d entries, want one extracted dependency",
+			isNil, len(deps))
+	}
+	dependency := deps[0]
+	if !dependency.Root.IsGlobal || dependency.Root.Name != "GLOBAL" {
+		t.Fatalf("root = %+v, want global GLOBAL", dependency.Root)
+	}
+	want := []DependencyPathEntry{
+		{Property: "field", Optional: true},
+		{Property: "leaf", Optional: true},
+	}
+	if !equalPaths(dependency.Path, want) {
+		t.Fatalf("path = %+v, want %+v", dependency.Path, want)
+	}
+}
+
+// A phi with one optional operand is not necessarily the optional chain's own join. Projecting
+// through the enclosing ternary would accept a dependency expression upstream classifies as
+// unextractable and silently compare against only one of its two possible values.
+func TestDropManualMemoizationDoesNotProjectOptionalThroughTernaryPhi(t *testing.T) {
+	deps, isNil, result := memoDepsFor(t, `
+		import {useMemo} from 'react';
+		function Component({condition, value}) {
+			return useMemo(() => value, [condition ? value?.field : value + 1]);
+		}
+	`)
+	if result.Recognised != 1 {
+		t.Fatalf("recognised %d memo calls, want 1", result.Recognised)
+	}
+	if !isNil || len(deps) != 0 {
+		t.Fatalf("dependency list is nil=%v with %d entries, want abandoned unextractable list",
+			isNil, len(deps))
+	}
+	if result.UnextractableDeps != 1 {
+		t.Fatalf("unextractable dependencies = %d, want 1", result.UnextractableDeps)
+	}
+}
+
 // memoDepsFor returns the first memo marker's written dependencies, whether they are nil, and the
 // pass result.
 func memoDepsFor(t *testing.T, source string) ([]ManualMemoDependency, bool, ManualMemoization) {

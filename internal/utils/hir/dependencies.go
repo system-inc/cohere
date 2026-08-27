@@ -49,7 +49,8 @@
 // The lesson generalised into the instrument this package now uses: a writer-check confirms the
 // OUTPUT field belongs to this file and is silent on whether the file's INPUTS exist. Both levels
 // have to be checked, and the second level is "is the type ever CONSTRUCTED", not merely declared.
-// `Optional` is the standing example: it is a declared terminal that nothing in this tree builds.
+// `Optional` used to be the standing example; optional-chain lowering now constructs it and its
+// sidemap is an input to this pass.
 //
 // # DIVERGENCE FROM React: oxc sorts a collection React does not
 //
@@ -60,9 +61,8 @@
 // silently takes first-wins via `or_insert_with`.
 //
 // React is the truth, so no sort is performed here. The divergence is recorded rather than split
-// because it is unobservable in this tree today for a reason that is measured rather than assumed:
-// the hoistable set is empty here (see `DependencyGapOptionalChains`), so there is nothing to sort
-// and nothing to conflict. It becomes real the moment optional chains are reconstructed.
+// because the conflict behavior is already reproduced directly: inputs retain insertion order and
+// `ScopeDependencies.Conflicts` exposes disagreements rather than silently choosing the first.
 //
 // # Termination is a single ordered walk, with no fixpoint anywhere
 //
@@ -72,12 +72,10 @@
 // by `deriveMinimalDependencies`, whose recursion is over a tree whose depth is the longest property
 // path and whose nodes are finite and fixed before the walk begins.
 //
-// This is a deliberately weaker claim than the passes upstream of it needed, and it is the whole
-// reason `propagate_non_null` is NOT in this file. That analysis is a bounded loop of at most 100
-// alternating forward and backward passes over the CFG with a `changed` flag -- a bound, not a
-// proof, and if real code ever reached 100 the answer would be silently truncated. It is a separate
-// pass with a separate termination story and it is not required for what this file computes; see
-// `DependencyGapNullPropagation`. `TestDependencyCollectionIsASinglePass` pins the walk empirically.
+// This is deliberately narrower than the passes that prepare its inputs. Non-null propagation is a
+// separate bounded dataflow pass and optional-chain recovery is a separate structural traversal;
+// both finish before this collector receives their sidemaps. `TestDependencyCollectionIsASinglePass`
+// pins the walk here, not those producers.
 //
 // # The distribution that proves these dependencies are real
 //
@@ -142,77 +140,15 @@ func equalPaths(a, b []DependencyPathEntry) bool {
 type DependencyGap uint8
 
 const (
-	// DependencyGapOptionalChains is upstream's optional-chain reconstruction, not performed here.
+	// DependencyGapOptionalChains is the residual optional-chain surface not yet lowered into the
+	// control-flow shape this pass consumes.
 	//
-	// React's `collectOptionalChainSidemap` recovers "that was one property chain" from the SHAPE of
-	// a lowered control-flow graph: `traverseFunctionOptional` fires only on an `Optional` terminal,
-	// and `matchOptionalTestBlock` then pattern-matches a `Branch` whose consequent block holds
-	// exactly two instructions (a `PropertyLoad` and a matching `StoreLocal`) ending in a
-	// `Goto{Break}`, against an alternate of exactly two (`Primitive`, `StoreLocal`).
-	//
-	// This lowering never produces that shape. Measured on `props?.a?.b` plus `props.fn?.()`: 0
-	// `Optional` terminals, 0 `Branch` terminals, 2 `PropertyLoad` with `Optional` set. Corpus-wide,
-	// 0 `Optional` terminals against 166 optional `PropertyLoad`s out of 4,766. Optionality lives on
-	// the instruction here, not as branching, so this is not a port -- it is a different algorithm,
-	// and choosing it is a design decision rather than a transcription.
-	//
-	// The consequence for THIS pass is bounded and was measured rather than assumed.
-	// `collectOptionalChainSidemap` initialises all three of its outputs empty and only ever ADDS on
-	// encountering an `Optional` terminal, so with none it returns three empty collections -- which
-	// is a state every consumption site here already tolerates.
-	//
-	// # The 166 loads are not skipped, and that is the half this record was missing
-	//
-	// The sentence above used to end "the 166 optional loads are skipped, not mis-collected". They
-	// are not skipped. `PropertyLoad.Optional` is set at lowering and this pass reads it, so an
-	// optional access produces a dependency CARRYING the marker -- which is the opposite of what
-	// upstream produces from the same source.
-	//
-	// Upstream passes a literal `false` at both of its collection sites,
-	// `PropagateScopeDependenciesHIR.ts:301` and `:696`, so a dependency it collects from a
-	// `PropertyLoad` is never optional. The optional paths in its output come from
-	// `collectOptionalChainSidemap` instead, and the guard codegen prints is re-added from the
-	// source expression. Its WRITTEN side does keep the marker (`DropManualMemoization.ts:78`), so
-	// the asymmetry is deliberate: written optional, inferred not.
-	//
-	// `CompareManualMemoDependencies` compares the flag strictly -- "if the inferred path is
-	// optional, then the source path must have been optional too"
-	// (`ValidatePreservedManualMemoization.ts:181`) -- so carrying it here makes a path that agrees
-	// name for name and depth for depth fail against the array the developer wrote.
-	//
-	// Measured, by passing `false` at both sites here to match upstream:
-	//
-	//	closes   useMemo-conditional-access-alloc, useMemo-conditional-access-noAlloc
-	//	breaks   optional-member-expression-single, optional-member-expression-as-memo-dep,
-	//	         and both of their propagate-scope-deps-hir-fork copies
-	//	board    goldens 28 to 27, false positives 8 to 10
-	//
-	// The two groups differ in what the developer wrote. The pair that closes writes `[propB.x.y]`,
-	// non-optional, so the marker is pure noise. The four that break write `[arg?.items]`, optional
-	// on both sides, and they match today only because both sides are wrong in the same direction.
-	//
-	// So the flag is standing in for the pass this gap names, and it cannot be removed before the
-	// pass exists. That is the whole cost of the gap, and it is three false positives rather than an
-	// honest subset.
+	// Dot-property chains are implemented: lowering emits Optional/Branch/value blocks and
+	// `CollectOptionalChainSidemap` reconstructs their paths, processed instructions, test terminals
+	// and hoistable objects. Computed optional links and optional calls still use the older
+	// instruction flags/call lowering, so they do not enter that protocol. A consumer requiring full
+	// optional-chain coverage must still decline on this gap until those two forms join the same CFG.
 	DependencyGapOptionalChains DependencyGap = iota
-
-	// DependencyGapNullPropagation is upstream's hoistable-property analysis, not performed here.
-	//
-	// `collectNonNullsInBlocks` and `propagateNonNull` are a bidirectional dataflow analysis that
-	// decides which property loads may be HOISTED out of a scope: reading `props.a.b` before the
-	// scope runs is safe only if `props.a` is known non-null there, because hoisting an access past
-	// a point where the value might be null moves or invents a crash.
-	//
-	// Omitting it costs PRECISION, not correctness, and the direction of the error is the safe one.
-	// The hoistable set is an input to `ReactiveScopeDependencyTreeHIR`, where it can only PROMOTE
-	// an optional access to an unconditional one. With an empty set every access stays at the
-	// conditional reading, so this pass reports dependencies at least as deep and never claims an
-	// access is safe to hoist when it is not.
-	//
-	// It is also a separate pass because its termination story is genuinely different: a bounded
-	// loop of at most 100 alternating forward and backward passes with a `changed` flag, which is a
-	// BOUND rather than a proof. Everything in this file is a single ordered walk.
-	DependencyGapNullPropagation
 
 	// DependencyGapTypeExclusions is upstream's two type-based dependency filters, not applied.
 	//
@@ -236,7 +172,6 @@ const (
 func DependencyGaps() []DependencyGap {
 	return []DependencyGap{
 		DependencyGapOptionalChains,
-		DependencyGapNullPropagation,
 		DependencyGapTypeExclusions,
 	}
 }
@@ -898,14 +833,28 @@ type declaration struct {
 
 // dependencyCollector is the walk's state, upstream's `DependencyCollectionContext`.
 type dependencyCollector struct {
-	function      *Function
-	temporaries   temporaries
-	scopeStack    []ScopeId
-	dependencies  [][]ReactiveScopeDependency
-	declarations  map[DeclarationId]declaration
-	reassignments map[IdentifierId]declaration
-	objectMethods map[IdentifierId]bool
-	result        *ScopeDependencies
+	function    *Function
+	temporaries temporaries
+
+	// processedOptionalInstructions are the StoreLocal instructions whose values were recovered by
+	// the optional-chain traversal. Visiting their operands here would submit a chain prefix in
+	// addition to the full path submitted at the phi or another site of use. This is the instruction
+	// half of upstream's `processedInstrsInOptional` set.
+	processedOptionalInstructions map[InstructionId]bool
+
+	// processedOptionalTests are the blocks whose `Branch` terminal an optional chain was recovered
+	// from. Upstream gates its terminal operand walk on `isDeferredDependency`, whose set is typed
+	// `Instruction | Terminal` and holds the matched test (`CollectOptionalChainDependencies.ts:411`,
+	// `PropagateScopeDependenciesHIR.ts:833`). Without the gate the test's operand is submitted as a
+	// dependency in its own right, which is a shallower access than the chain it belongs to and wins
+	// the shallowest-node reduction.
+	processedOptionalTests map[BlockId]bool
+	scopeStack             []ScopeId
+	dependencies           [][]ReactiveScopeDependency
+	declarations           map[DeclarationId]declaration
+	reassignments          map[IdentifierId]declaration
+	objectMethods          map[IdentifierId]bool
+	result                 *ScopeDependencies
 	// scopeRange answers a scope's final range, which `checkValidDependency` compares against.
 	scopeRange func(ScopeId) MutableRange
 	// hoistable is the per-scope set of accesses proven safe to read before the scope runs, from
@@ -1135,15 +1084,27 @@ func CollectScopeDependencies(function *Function, identity ScopeIdentity) *Scope
 
 	usedOutside := findTemporariesUsedOutsideDeclaringScope(function, terminals)
 	collected := collectTemporaries(function, usedOutside)
+
+	// The optional chains. `PropagateScopeDependenciesHIR.ts:61` merges the traversal's temporaries
+	// into the collector's map, so a value written inside a chain resolves to the full path with its
+	// optionality recorded per step rather than to a bare root with a plain one.
+	optional := CollectOptionalChainSidemap(function)
+	if optional != nil {
+		for id, dependency := range optional.TemporariesReadInOptional {
+			collected[id] = dependency
+		}
+	}
 	result.temporaries = collected
 	collector := &dependencyCollector{
-		function:      function,
-		temporaries:   collected,
-		declarations:  map[DeclarationId]declaration{},
-		reassignments: map[IdentifierId]declaration{},
-		objectMethods: objectMethodValues(function),
-		result:        result,
-		scopeRange:    identity.RangeOf,
+		function:                      function,
+		temporaries:                   collected,
+		declarations:                  map[DeclarationId]declaration{},
+		reassignments:                 map[IdentifierId]declaration{},
+		objectMethods:                 objectMethodValues(function),
+		result:                        result,
+		scopeRange:                    identity.RangeOf,
+		processedOptionalInstructions: optionalProcessedInstructions(optional),
+		processedOptionalTests:        optionalProcessedTests(optional),
 	}
 
 	// Parameters are declared before any instruction runs, so they are available to every scope.
@@ -1185,16 +1146,30 @@ func CollectScopeDependenciesWithHoistable(function *Function, scopes *ReactiveS
 
 	usedOutside := findTemporariesUsedOutsideDeclaringScope(function, terminals)
 	collected := collectTemporaries(function, usedOutside)
+
+	// The optional chains. `PropagateScopeDependenciesHIR.ts:61` merges the traversal's temporaries
+	// into the collector's map, so a value written inside a chain resolves to the full path with its
+	// optionality recorded per step rather than to a bare root with a plain one.
+	optional := CollectOptionalChainSidemap(function)
+	if optional != nil {
+		for id, dependency := range optional.TemporariesReadInOptional {
+			// Later wins, matching `new Map([...temporaries, ...temporariesReadInOptional])`.
+			// The optional traversal is the authoritative reconstruction for values it consumed.
+			collected[id] = dependency
+		}
+	}
 	result.temporaries = collected
 	collector := &dependencyCollector{
-		function:      function,
-		temporaries:   collected,
-		declarations:  map[DeclarationId]declaration{},
-		reassignments: map[IdentifierId]declaration{},
-		objectMethods: objectMethodValues(function),
-		result:        result,
-		scopeRange:    identity.RangeOf,
-		hoistable:     CollectHoistablePropertyLoads(function, scopes, identity, ranges, nil),
+		function:                      function,
+		temporaries:                   collected,
+		declarations:                  map[DeclarationId]declaration{},
+		reassignments:                 map[IdentifierId]declaration{},
+		objectMethods:                 objectMethodValues(function),
+		result:                        result,
+		scopeRange:                    identity.RangeOf,
+		hoistable:                     CollectHoistablePropertyLoads(function, scopes, identity, ranges, optionalHoistable(optional)),
+		processedOptionalInstructions: optionalProcessedInstructions(optional),
+		processedOptionalTests:        optionalProcessedTests(optional),
 	}
 	for _, param := range function.Params {
 		collector.declare(param.Identifier, declaration{})
@@ -1298,11 +1273,13 @@ func (c *dependencyCollector) walk(function *Function, terminals map[BlockId]sco
 			c.handleInstruction(instruction)
 		}
 
-		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {
-			if role != PlaceRoleDefine {
-				c.visitDependency(c.temporaries.resolve(place))
-			}
-		})
+		if !c.processedOptionalTests[block.Id] {
+			EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {
+				if role != PlaceRoleDefine {
+					c.visitDependency(c.temporaries.resolve(place))
+				}
+			})
+		}
 	}
 
 	// Anything still open at the end is closed in reverse, so a scope whose fallthrough was never
@@ -1443,6 +1420,20 @@ func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Plac
 	nestedTemporaries := temporaries{}
 	collectTemporariesInto(nested, map[DeclarationId]bool{}, nestedTemporaries)
 
+	// The nested function's own optional chains, in the nested function's own key space.
+	//
+	// `IdentifierId` is per-function here, so these entries cannot be lifted into the parent's map
+	// -- see `traverseNested`. They belong beside the nested temporaries they were built from, where
+	// `nestedAccessesByBlock` resolves reads through them and the capture translation below carries
+	// the resulting access out.
+	if nestedOptional := CollectOptionalChainSidemap(nested); nestedOptional != nil {
+		for identifier, dependency := range nestedOptional.TemporariesReadInOptional {
+			// Later wins for the same reason as the outer map: optional-chain reconstruction
+			// carries information a plain PropertyLoad transcription cannot recover.
+			nestedTemporaries[identifier] = dependency
+		}
+	}
+
 	accesses, accessBlocks := nestedAccessesByBlock(nested, nestedTemporaries)
 	// Which of the nested function's blocks run on every path through it. A deep path read only in a
 	// branch still becomes a dependency below -- the value is read there -- but it does not seed the
@@ -1509,6 +1500,12 @@ func nestedAccessesByBlock(function *Function, temps temporaries) ([]ReactiveSco
 	[]BlockId) {
 	var accesses []ReactiveScopeDependency
 	var blocks []BlockId
+	processedOptionalTests := map[BlockId]bool{}
+	processedInstructions := map[InstructionId]bool{}
+	if optional := CollectOptionalChainSidemap(function); optional != nil {
+		processedOptionalTests = optional.ProcessedOptionalTests
+		processedInstructions = nestedOptionalInstructionsToDefer(function, optional)
+	}
 	record := func(block BlockId, dependency ReactiveScopeDependency) {
 		accesses = append(accesses, dependency)
 		blocks = append(blocks, block)
@@ -1523,7 +1520,7 @@ func nestedAccessesByBlock(function *Function, temps temporaries) ([]ReactiveSco
 		}
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
-			if instruction == nil || deferred(instruction) {
+			if instruction == nil || processedInstructions[instruction.Id] || deferred(instruction) {
 				continue
 			}
 			switch value := instruction.Value.(type) {
@@ -1543,6 +1540,11 @@ func nestedAccessesByBlock(function *Function, temps temporaries) ([]ReactiveSco
 				}
 				innerTemporaries := temporaries{}
 				collectTemporariesInto(inner, map[DeclarationId]bool{}, innerTemporaries)
+				if innerOptional := CollectOptionalChainSidemap(inner); innerOptional != nil {
+					for identifier, dependency := range innerOptional.TemporariesReadInOptional {
+						innerTemporaries[identifier] = dependency
+					}
+				}
 				for _, dep := range nestedAccesses(inner, innerTemporaries) {
 					outer, ok := translate[dep.Identifier]
 					if !ok {
@@ -1561,13 +1563,56 @@ func nestedAccessesByBlock(function *Function, temps temporaries) ([]ReactiveSco
 				})
 			}
 		}
-		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {
-			if role != PlaceRoleDefine {
-				record(block.Id, temps.resolve(place))
-			}
-		})
+		if !processedOptionalTests[block.Id] {
+			EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {
+				if role != PlaceRoleDefine {
+					record(block.Id, temps.resolve(place))
+				}
+			})
+		}
 	}
 	return accesses, blocks
+}
+
+// nestedOptionalInstructionsToDefer returns the optional-chain stores whose operand would only
+// contribute a redundant prefix while translating a closure's captures.
+//
+// A consecutive optional link such as the first `?.` in `x?.y?.z` is consumed by the optional
+// traversal: recording its StoreLocal operand as an access would add `x?.y`, which then prunes the
+// real `x?.y?.z` dependency. A non-optional continuation is deliberately different. Upstream's
+// current inference keeps the prefix in `propB?.x.y` and in the known-bug `x.a.b?.c.d?.e` case;
+// those prefixes are what make preserved-memoization validation reject the less-specific inferred
+// dependency. Only an immediate OPTIONAL extension is therefore deferred here.
+func nestedOptionalInstructionsToDefer(function *Function,
+	optional *OptionalChainSidemap) map[InstructionId]bool {
+	result := map[InstructionId]bool{}
+	if function == nil || optional == nil {
+		return result
+	}
+	for instructionID := range optional.ProcessedInstructions {
+		instruction := function.Instructions[instructionID]
+		if instruction == nil {
+			continue
+		}
+		store, ok := instruction.Value.(*StoreLocal)
+		if !ok {
+			continue
+		}
+		prefix, ok := optional.TemporariesReadInOptional[store.LValue.Identifier]
+		if !ok {
+			continue
+		}
+		for _, candidate := range optional.TemporariesReadInOptional {
+			if candidate.Identifier != prefix.Identifier || len(candidate.Path) != len(prefix.Path)+1 ||
+				!candidate.Path[len(prefix.Path)].Optional ||
+				!equalPaths(candidate.Path[:len(prefix.Path)], prefix.Path) {
+				continue
+			}
+			result[instructionID] = true
+			break
+		}
+	}
+	return result
 }
 
 // blocksAlwaysReached returns the blocks of a function that run on every path through it.
@@ -1627,10 +1672,12 @@ func (t temporaries) resolveWithPath(place Place, suffix []DependencyPathEntry) 
 // stopping it.
 //
 // Upstream also defers instructions consumed by an optional chain, via `processedInstrsInOptional`.
-// That set is empty here -- see `DependencyGapOptionalChains` -- so only the temporaries half is
-// expressible, which is the safe direction: an instruction upstream would also have deferred is
-// visited, never the reverse.
+// The optional traversal records those StoreLocal instructions explicitly because their own
+// instruction lvalues are not the stored values keyed in the temporaries sidemap.
 func (c *dependencyCollector) isDeferredDependency(instruction *Instruction) bool {
+	if c.processedOptionalInstructions[instruction.Id] {
+		return true
+	}
 	_, deferred := c.temporaries[instruction.LValue.Identifier]
 	return deferred
 }
@@ -1659,9 +1706,9 @@ func (c *dependencyCollector) reduce(identity ScopeIdentity) {
 		if len(accesses) == 0 {
 			continue
 		}
-		// The hoistable set for this scope, which is what decides how DEEP each dependency path
-		// may go. Empty when `hoistable` was not supplied, which is the pre-5b behaviour and
-		// truncates every path to its root; see `DependencyGapNullPropagation`.
+		// The hoistable set for this scope decides how DEEP each dependency path may go. An explicit
+		// caller can still omit it, in which case the dependency tree conservatively truncates paths
+		// to their roots; the production entry point supplies `CollectHoistablePropertyLoads`.
 		seed := c.hoistable[scope]
 		if extra := c.nestedHoistable[scope]; len(extra) > 0 {
 			seed = appendWithoutOptionalDuplicates(seed, extra)
@@ -1829,4 +1876,30 @@ func prefixesDisagree(path ReactiveScopeDependency, committed map[string]bool) b
 		}
 	}
 	return false
+}
+
+// optionalHoistable is the sidemap's per-block hoistable set, or nil when there was no traversal.
+func optionalHoistable(sidemap *OptionalChainSidemap) map[BlockId]ReactiveScopeDependency {
+	if sidemap == nil {
+		return nil
+	}
+	return sidemap.HoistableObjects
+}
+
+// optionalProcessedInstructions names the instructions whose operands were consumed while
+// reconstructing an optional chain, or nil when no chains were found.
+func optionalProcessedInstructions(sidemap *OptionalChainSidemap) map[InstructionId]bool {
+	if sidemap == nil {
+		return nil
+	}
+	return sidemap.ProcessedInstructions
+}
+
+// optionalProcessedTests names the blocks whose branch terminal an optional chain was recovered
+// from, or nil when no chains were found.
+func optionalProcessedTests(sidemap *OptionalChainSidemap) map[BlockId]bool {
+	if sidemap == nil {
+		return nil
+	}
+	return sidemap.ProcessedOptionalTests
 }

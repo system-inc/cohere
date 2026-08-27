@@ -658,14 +658,14 @@ func TestMergeLeavesBlockScopeAlignmentUnclosed(t *testing.T) {
 	}
 }
 
-// TestMergeIsUnaffectedBySkippingFunctionOperands bounds MergeGapPrimitiveOperandSkip.
+// TestMergeFunctionOperandSkipUpperBound bounds MergeGapPrimitiveOperandSkip.
 //
 // Upstream skips a primitive operand of a function expression or object method, and `Identifier.Type`
 // is nil here so the real gate cannot be asked. This measures the UPPER BOUND instead: skipping
-// every use-operand of every function expression, which is strictly more than the gate would skip,
-// changes nothing. The control is asserted in the same test, because a zero from a probe that never
-// fires is not a measurement.
-func TestMergeIsUnaffectedBySkippingFunctionOperands(t *testing.T) {
+// every use-operand of every function expression, which is strictly more than the gate would skip.
+// The control is asserted in the same test, because a small delta from a probe that barely fires
+// would not be a useful bound.
+func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -713,18 +713,19 @@ func TestMergeIsUnaffectedBySkippingFunctionOperands(t *testing.T) {
 	// The gap's size, recorded as this assertion's own message asked once it stopped being zero.
 	//
 	// It was empty at 88 either way for as long as no function-expression operand named a value in a
-	// scope that could overlap. The frozen-capture rule in `ranges.go` un-fuses scopes, and exactly
-	// one of the newly separate ones is reachable through a function-expression operand, so the
-	// upper-bound probe now removes one union: 80 without the gate, 79 with it.
+	// scope that could overlap. The frozen-capture rule in `ranges.go` first exposed FileCarousel.
+	// Propagating a frozen component parameter through Destructure then exposed InputSelect and
+	// InputText. Each contributes one union, so the upper-bound probe now removes three: 118 without
+	// the gate, 115 with it.
 	//
-	// One is the UPPER bound rather than the real size. The probe skips every use-operand of every
+	// Three is the UPPER bound rather than the real size. The probe skips every use-operand of every
 	// `FunctionExpression`, which is strictly more than upstream's gate, since upstream skips only
-	// the primitive ones. So the true divergence is at most one union and may still be zero.
+	// the primitive ones. So the true divergence is at most three unions and may still be zero.
 	//
 	// The direction is unchanged and is the one already stated on `MergeGapPrimitiveOperandSkip`:
 	// not skipping visits operands upstream skips, and visiting an operand can only ever ADD a
 	// union, so this errs toward merging more than upstream rather than less.
-	const knownGateDivergence = 1
+	const knownGateDivergence = 3
 	if withoutGate-withGate != knownGateDivergence {
 		t.Errorf("skipping every function-expression operand changed the union count from %d to "+
 			"%d, a divergence of %d where %d was measured; MergeGapPrimitiveOperandSkip changed "+

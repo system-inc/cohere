@@ -82,8 +82,12 @@ type scopeStageCounts struct {
 // pipeline twice would introduce every difference between two runs as noise in a comparison whose
 // entire subject is a difference of 46.
 func countScopeStages(function *Function, checker *shimchecker.Checker) scopeStageCounts {
+	OutlineFunctions(function)
 	InferReactive(function, checker)
 	DropManualMemoization(function)
+	if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
+		MergeConsecutiveBlocks(function)
+	}
 	EliminateDeadCode(function)
 
 	ranges := InferMutableRanges(function)
@@ -120,69 +124,7 @@ func countScopeStages(function *Function, checker *shimchecker.Checker) scopeSta
 	})
 	counts.survived = len(surviving)
 
-	// Upstream compiles the memo callback's body INTO this function, so its guard count includes
-	// those scopes and ours has to as well.
-	//
-	// `DropManualMemoization` rewrites `useMemo(fn, deps)` into `fn()`, a zero-argument call of the
-	// callback (`DropManualMemoization.ts:410`, and `drop_manual_memoization.go:228` here), and
-	// `inlineImmediatelyInvokedFunctionExpressions` folds that IIFE into the caller at
-	// `Pipeline.ts:173`. This tree does not run that inline -- restoring it is measured and rejected
-	// on `#8ga37gt`, where it drives `under` from 5 fixtures to 19 -- so the callback's scopes stay
-	// in a nested `Function` that this walk would otherwise never reach.
-	//
-	// Measured on `useMemo-inner-decl.ts`: upstream emits two guards and no arrow function survives
-	// in its output at all, its `useMemo` import going unused. Our two scopes for the same program
-	// are one in `useFoo` and one in the callback. Counting only the outer function compares one
-	// function against two and reports a scope missing that is not.
-	//
-	// Restricted to the inlinable IIFEs rather than descending into every nested function, and the
-	// difference is large: unrestricted descent also reaches `under` zero but reports `survived` 174
-	// and `exact` 8, with `object-values` reading 12 scopes against upstream's 2. Those callbacks are
-	// real functions upstream never inlines, and their scopes genuinely are not in the compiled
-	// output being counted.
-	for _, id := range inlinedMemoCallbacks(function) {
-		nested := function.Functions[id]
-		if nested == nil {
-			continue
-		}
-		inner := countScopeStages(nested, checker)
-		counts.assigned += inner.assigned
-		counts.survived += inner.survived
-	}
 	return counts
-}
-
-// inlinedMemoCallbacks names the nested functions upstream folds into this one.
-//
-// The shape `DropManualMemoization` leaves behind: a `CallExpression` with no arguments whose callee
-// holds a `FunctionExpression`. That is exactly what
-// `inlineImmediatelyInvokedFunctionExpressions` matches upstream, so it is the same population.
-func inlinedMemoCallbacks(function *Function) []FunctionId {
-	held := map[IdentifierId]FunctionId{}
-	var inlined []FunctionId
-	for _, block := range function.Blocks {
-		if block == nil {
-			continue
-		}
-		for _, instructionId := range block.Instructions {
-			instruction := function.Instructions[instructionId]
-			if instruction == nil {
-				continue
-			}
-			switch value := instruction.Value.(type) {
-			case *FunctionExpression:
-				held[instruction.LValue.Identifier] = value.Function
-			case *CallExpression:
-				if len(value.Args) != 0 {
-					continue
-				}
-				if id, ok := held[value.Callee.Identifier]; ok {
-					inlined = append(inlined, id)
-				}
-			}
-		}
-	}
-	return inlined
 }
 
 // TestScopeStructureAgainstUpstreamGuards scores our surviving scopes against upstream's.
@@ -388,7 +330,12 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// 16 with the local zero-argument callee resolution in `effects.go`. One fixture moves from
 	// exact to over-production, which is the performance direction, and `under` holds at 0 fixtures
 	// / 0 scopes. The board carries it: false positives 11 to 8 and dependency `matched` 74 to 75.
-	const knownSurvivedExact = 16
+	//
+	// Tightened to 26 after replacing the recursive callback-counting approximation with the same
+	// memo-inclusive inline and block merge production runs. The aligned population is 26 exact, 22
+	// over and 0 under; the correctness ceiling above therefore remains at zero while the finer
+	// agreement floor becomes ten fixtures stronger.
+	const knownSurvivedExact = 26
 	if survivedExact < knownSurvivedExact {
 		t.Errorf("exact per-fixture agreement = %d of %d, want at least %d; fewer fixtures now "+
 			"match upstream's scope count exactly, which a stable total would hide", survivedExact,
@@ -426,7 +373,11 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// leaves a binding outside the scope instead of inside it, so the scope splits where it used to
 	// swallow. Over-production, the performance direction, with `under` held at 0 fixtures / 0
 	// scopes.
-	const knownSurvivedTotal = 146
+	//
+	// Tightened to 133 by the same pipeline alignment recorded at `knownSurvivedExact`: 152 scopes
+	// are assigned, 133 survive, and none of the 48 fixtures under-produces against upstream. This
+	// is a stricter ceiling than the callback-counting approximation's 146, not a tolerance increase.
+	const knownSurvivedTotal = 133
 	if survivedTotal > knownSurvivedTotal {
 		t.Errorf("surviving scopes = %d against upstream's %d, want at most %d; we produce more "+
 			"scopes than before, so something split a scope upstream keeps whole or stopped a "+

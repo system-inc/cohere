@@ -11,31 +11,20 @@ import (
 
 // TestAlignMethodCallScopesRemovesTheInBetweenState asserts the pass's whole contract.
 //
-// After it runs, a `MethodCall` has either both sides scoped together or neither side scoped. Both
-// directions are checked, because a pass that scoped everything and one that scoped nothing each
-// satisfy an assertion phrased about one of them.
+// After it runs, a `MethodCall` has either both sides scoped together or neither side scoped. The
+// before assertion keeps that result from passing vacuously, and the call count distinguishes a
+// lowering failure from a fixture that simply no longer reaches the in-between state.
 func TestAlignMethodCallScopesRemovesTheInBetweenState(t *testing.T) {
-	// Two shapes, though only one arm turns out to be reachable.
+	// A known primitive-returning method is the live shape after call-result allocation became
+	// faithful. Its result does not allocate, while its PropertyLoad result is scoped, so alignment
+	// must remove the property's scope.
 	//
-	// A first version carried only `console.log(...)` and a mutation deleting the call-scoped arm
-	// survived it. The second shape was added to reach that arm and the mutant survived anyway,
-	// which is the signal that the POPULATION is the reason rather than the fixture. Measured over
-	// the corpus: the property-scoped arm fires 839 times and the other two fire zero times, because
-	// a method call's lvalue is a temporary that only receives a scope if something mutates it.
-	//
-	// Both shapes are kept, because the second one documents what was tried, and the note at the
-	// switch in the pass records the verdict and when it expires.
+	// Unknown and known-mutable calls are no longer suitable controls here: upstream's mayAllocate
+	// rule gives their results a scope, and the disjoint pass joins that result with the property
+	// before this pass runs. The population measurement below records which other arms remain absent.
 	const source = `
-		function draw(styles: Map<number, {color: string}>, features: string[]) {
-			for(const [index, style] of styles) {
-				const feature = features[index];
-				if(!feature) continue;
-				console.log(style.color, feature);
-			}
-		}
-		function build(items: string[]) {
-			const mapped = items.map((one) => ({value: one}));
-			return mapped;
+		function contains(items: string[], selected: string) {
+			return items.includes(selected);
 		}
 	`
 	before, after, calls := methodCallScopeStates(t, source)
@@ -92,7 +81,12 @@ func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
 	// different scopes. Every upstream-referenced number is unmoved by that change: the scope
 	// oracle's per-fixture dump is byte-identical across all 48 scored fixtures, and the board and
 	// the other two oracles do not move either.
-	const knownChanged = 368
+	//
+	// 62 after call-result allocation began following upstream's non-primitive default. Unknown and
+	// known-mutable MethodCalls now allocate a result that the disjoint pass joins with the property,
+	// so they reach this pass already aligned. The remaining 177 property-only calls are known
+	// primitive-returning methods, spread across these 62 functions.
+	const knownChanged = 62
 	if changed != knownChanged {
 		t.Errorf("the pass changed %d of %d functions, want %d", changed, functions, knownChanged)
 	}

@@ -210,21 +210,6 @@ func (r MutableRange) IsValid() bool {
 type RangeGap uint8
 
 const (
-	// RangeGapCreateFromPropagation is a range widened because a mutation reached the value through
-	// a `createFrom` edge.
-	//
-	// The walk that follows those edges is present and correct in `mutate`, so this is a gap in the
-	// INPUT rather than in this pass: `InferAliasingEffects` never emits an
-	// `AliasingEffectCreateFrom`. Measured over 200 corpus files, 0 such effects against a control
-	// of 41,156 graph nodes built in the same walk. The consequence for a consumer is narrow --
-	// upstream emits `CreateFrom` where a value is created carrying another's kind, and a mutation
-	// of the derived value should widen the original transitively. Here it does not.
-	//
-	// The two gaps this list previously held, `RangeGapMutationExtension` and
-	// `RangeGapAliasPropagation`, were both closed by Stage 2.5 and are gone rather than kept as
-	// no-longer-true constants.
-	RangeGapCreateFromPropagation RangeGap = iota
-
 	// RangeGapLoopCarriedInversion is a loop-carried value left unset because its two writes
 	// produced an inverted interval.
 	//
@@ -238,17 +223,18 @@ const (
 	// back-edge store and how far before is exactly what the folded phi hides. A consumer that
 	// needs those values must decline on them rather than read a range this pass invented. See the
 	// lvalue loop for the full reasoning and `TestRangesStayValidAcrossALoopBackEdge` for the pin.
-	RangeGapLoopCarriedInversion
+	RangeGapLoopCarriedInversion RangeGap = iota
 )
 
 // RangeGaps are the widening rules InferMutableRanges does not apply. See RangeGap.
 //
 // Returned as a value rather than documented alone so a test can assert on it, which makes closing
 // a gap a visible event rather than a silent improvement. Stage 2.5 closed two of the three this
-// list once held, which is exactly the event the mechanism exists to make visible: the test naming
-// them failed and had to be rewritten rather than quietly passing.
+// list once held, and CreateFrom propagation closed later when property loads and destructuring
+// began emitting the effect. Those are exactly the events the mechanism exists to make visible:
+// the test naming them failed and had to be rewritten rather than quietly passing.
 func RangeGaps() []RangeGap {
-	return []RangeGap{RangeGapCreateFromPropagation, RangeGapLoopCarriedInversion}
+	return []RangeGap{RangeGapLoopCarriedInversion}
 }
 
 // MutableRanges is the table this pass produces: one range per value.
@@ -882,6 +868,27 @@ func insertBackEdge(into map[IdentifierId]int, order *[]IdentifierId, from Ident
 type aliasingState struct {
 	nodes map[IdentifierId]*aliasingNode
 
+	// identities tracks the identifiers that currently denote the same abstract value.
+	//
+	// Upstream stores a set of InstructionValues for every identifier. An Assign of a mutable
+	// value points the destination at the source's existing set, so a later Freeze through either
+	// name changes the kind observed through every other name. The range graph's alias edges are
+	// not an adequate substitute: Alias and MaybeAlias edges describe possible information flow,
+	// not shared abstract identity, and freezing across them would suppress real mutations.
+	//
+	// This reduced pass needs only the single-value Assign case. Each Create starts a fresh identity;
+	// Assign moves its destination into the source identity while CreateFrom deliberately retains a
+	// distinct identity with a copied kind.
+	identities      map[IdentifierId]uint64
+	identityMembers map[uint64]map[IdentifierId]struct{}
+	nextIdentity    uint64
+
+	// freezeSources are values upstream's abstract value itself points through for freezing. A phi
+	// denotes the union of its operands, and freezing a FunctionExpression recursively freezes its
+	// captures. These are deliberately separate from the range graph's Capture edges: an object can
+	// capture a value without Freeze(object) recursively freezing that value.
+	freezeSources map[IdentifierId][]IdentifierId
+
 	// immutable is upstream's abstract value kind, reduced to the one bit the mutation gate needs.
 	//
 	// `InferMutationAliasingEffects` carries a five-point lattice -- Mutable, Context, Primitive,
@@ -898,8 +905,11 @@ type aliasingState struct {
 
 func newAliasingState() *aliasingState {
 	return &aliasingState{
-		nodes:     map[IdentifierId]*aliasingNode{},
-		immutable: map[IdentifierId]EffectValueKind{},
+		nodes:           map[IdentifierId]*aliasingNode{},
+		identities:      map[IdentifierId]uint64{},
+		identityMembers: map[uint64]map[IdentifierId]struct{}{},
+		freezeSources:   map[IdentifierId][]IdentifierId{},
+		immutable:       map[IdentifierId]EffectValueKind{},
 	}
 }
 
@@ -907,6 +917,42 @@ func newAliasingState() *aliasingState {
 // widens nothing.
 func (s *aliasingState) markImmutable(id IdentifierId, kind EffectValueKind) {
 	s.immutable[id] = kind
+}
+
+// freeze marks an already-known abstract value as frozen.
+//
+// Upstream's InferenceState.freeze starts by looking up kind(place); it changes the instruction
+// values that place currently denotes, but it never creates a value for a place the state has not
+// initialized. This reduced state has no instruction-value sets, so node presence is its
+// initialization predicate. In particular, retaining an immutable bit for an absent node would
+// make a later Assign from that unresolved place frozen retroactively.
+func (s *aliasingState) freeze(id IdentifierId) bool {
+	return s.freezeWithSeen(id, map[IdentifierId]bool{})
+}
+
+func (s *aliasingState) freezeWithSeen(id IdentifierId, seen map[IdentifierId]bool) bool {
+	if seen[id] {
+		return false
+	}
+	seen[id] = true
+	if _, initialized := s.nodes[id]; !initialized {
+		return false
+	}
+	identity, shared := s.identities[id]
+	if !shared {
+		s.markImmutable(id, EffectValueFrozen)
+		for _, source := range s.freezeSources[id] {
+			s.freezeWithSeen(source, seen)
+		}
+		return true
+	}
+	for alias := range s.identityMembers[identity] {
+		s.markImmutable(alias, EffectValueFrozen)
+		for _, source := range s.freezeSources[alias] {
+			s.freezeWithSeen(source, seen)
+		}
+	}
+	return true
 }
 
 // notMutable reports whether a value is neither Mutable nor Context.
@@ -932,6 +978,38 @@ func (s *aliasingState) deriveImmutable(from IdentifierId, into IdentifierId) {
 	delete(s.immutable, into)
 }
 
+// derivePhiImmutable marks a phi non-mutable only when every incoming value is already known
+// non-mutable and every predecessor has been evaluated.
+//
+// Upstream's `InferenceState.inferPhi` does not invent a new abstract value for a phi. It maps the
+// phi to the union of the instruction values named by its operands, so a conditional mutation is
+// later applied to each underlying value. If every value in that union is Primitive or Frozen, the
+// mutation is discarded. This map is a reduced representation of that state, so the equivalent is
+// one non-mutable bit on the phi itself.
+//
+// A backedge or unknown operand leaves the phi mutable. Upstream resolves those through its dataflow
+// fixpoint; this pass is deliberately single-shot, and treating an incomplete union as frozen would
+// be the unsound direction.
+func (s *aliasingState) derivePhiImmutable(phi *Phi, seenBlocks map[BlockId]bool) {
+	if phi == nil || len(phi.Operands) == 0 {
+		return
+	}
+	kind := EffectValuePrimitive
+	for _, predecessor := range PhiOperandsInOrder(phi) {
+		if !seenBlocks[predecessor] {
+			return
+		}
+		operandKind, present := s.immutable[phi.Operands[predecessor].Identifier]
+		if !present {
+			return
+		}
+		if operandKind != EffectValuePrimitive {
+			kind = EffectValueFrozen
+		}
+	}
+	s.markImmutable(phi.Place.Identifier, kind)
+}
+
 // create makes a node, replacing any existing one.
 //
 // Replacement rather than merge is upstream's: `self.nodes.insert(...)` in Rust and
@@ -940,6 +1018,58 @@ func (s *aliasingState) deriveImmutable(from IdentifierId, into IdentifierId) {
 // a different value.
 func (s *aliasingState) create(place Place, value aliasingNodeValue) {
 	s.nodes[place.Identifier] = newAliasingNode(place.Identifier, value)
+	delete(s.immutable, place.Identifier)
+	delete(s.freezeSources, place.Identifier)
+	s.detachIdentity(place.Identifier)
+	s.nextIdentity++
+	s.identities[place.Identifier] = s.nextIdentity
+	s.identityMembers[s.nextIdentity] = map[IdentifierId]struct{}{place.Identifier: {}}
+}
+
+// recordFreezeSources gives a phi or FunctionExpression the values React freezes through when
+// that abstract value is frozen later.
+func (s *aliasingState) recordFreezeSources(into IdentifierId, sources []Place) {
+	if len(sources) == 0 {
+		return
+	}
+	identifiers := make([]IdentifierId, 0, len(sources))
+	for _, source := range sources {
+		identifiers = append(identifiers, source.Identifier)
+	}
+	s.freezeSources[into] = identifiers
+}
+
+// shareIdentity makes into denote the same abstract value as from.
+//
+// It is called only for Assign from a mutable/context source. Alias, Capture and MaybeAlias must
+// not call it: upstream records those as effects without changing the InstructionValues either
+// identifier denotes.
+func (s *aliasingState) shareIdentity(from IdentifierId, into IdentifierId) {
+	if from == into {
+		return
+	}
+	identity, ok := s.identities[from]
+	if !ok {
+		return
+	}
+	s.detachIdentity(into)
+	s.identities[into] = identity
+	s.identityMembers[identity][into] = struct{}{}
+}
+
+// detachIdentity removes one identifier from its previous abstract value without disturbing the
+// aliases that still denote it. A later Create or Assign is a new definition of this identifier.
+func (s *aliasingState) detachIdentity(id IdentifierId) {
+	identity, ok := s.identities[id]
+	if !ok {
+		return
+	}
+	delete(s.identities, id)
+	members := s.identityMembers[identity]
+	delete(members, id)
+	if len(members) == 0 {
+		delete(s.identityMembers, identity)
+	}
 }
 
 // createFrom is the `CreateFrom` effect: Into is a NEW value derived from From.
@@ -1140,24 +1270,9 @@ func (s *aliasingState) mutate(
 		// `createdFrom` always forces TRANSITIVE, whatever the incoming entry said. Mutating a value
 		// derived from another reaches everything that other value transitively holds.
 		//
-		// # This branch is live in the code and its INPUT is absent today, which is a different
-		// # verdict from unreachable and it expires differently
-		//
-		// A mutation sweep flipping the `transitive: true` below to `false` SURVIVES, and the reason
-		// is not that the two are equivalent. `createdFrom` is populated only by `createFrom`, which
-		// is called only for an `AliasingEffectCreateFrom`, and this tree's effect inference never
-		// emits one: measured over 200 corpus files, `createFromEffects` is 0 against a control of
-		// 41,156 graph nodes built in the same walk, and a grep for the constant finds it in the
-		// declaration, the String method and two switch arms with no emission site anywhere, against
-		// 22 occurrences for `AliasingEffectCapture` which is emitted.
-		//
-		// Kept rather than deleted for the reason Stage 2 kept `phiOpensBefore`: the branch is
-		// upstream's, it is correct, and it costs nothing, while deleting it would mean re-deriving
-		// it when the input arrives. Following Stage 2's precedent, the writers are enumerated so the
-		// verdict can expire honestly -- the only way `createdFrom` becomes non-empty is an effect
-		// inference that emits `AliasingEffectCreateFrom`, which upstream does for a value created
-		// with the same kind as another. When that lands, this branch becomes reachable, the
-		// surviving mutant becomes killable, and a fixture is owed.
+		// This path is live: PropertyLoad and ordinary Destructure bindings emit CreateFrom. Forcing
+		// transitive to false loses mutations of values captured inside the source; the focused
+		// CreateFrom test pins that distinction rather than merely checking the source itself widens.
 		for _, alias := range node.createdFromOrder {
 			if node.createdFrom[alias] >= index {
 				continue
@@ -1287,6 +1402,12 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 	for _, block := range function.Blocks {
 		for _, phi := range block.Phis {
 			state.create(phi.Place, aliasingNodePhi)
+			operands := make([]Place, 0, len(phi.Operands))
+			for _, predecessor := range PhiOperandsInOrder(phi) {
+				operands = append(operands, phi.Operands[predecessor])
+			}
+			state.recordFreezeSources(phi.Place.Identifier, operands)
+			state.derivePhiImmutable(phi, seenBlocks)
 			// Deterministic operand order. `Phi.Operands` is a Go map and ranging it directly would
 			// assign indices nondeterministically, which changes which edges a mutation can see and
 			// therefore produces a different range table between runs of the same input.
@@ -1317,8 +1438,19 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 			}
 			for _, effect := range effects.Get(instructionId) {
 				switch {
+				case effect.Kind == AliasingEffectFreeze:
+					// `InferenceState.freeze` changes the abstract kind immediately. Calls later in
+					// evaluation order consult that kind before retaining a conditional mutation, so
+					// this cannot be treated as a graph-only no-op even though Freeze itself does not
+					// widen a range.
+					state.freeze(effect.Into.Identifier)
+
 				case effect.Kind == AliasingEffectCreate:
 					state.create(effect.Into, aliasingNodeObject)
+					if expression, ok := instruction.Value.(*FunctionExpression); ok &&
+						effect.Into.Identifier == instruction.LValue.Identifier {
+						state.recordFreezeSources(effect.Into.Identifier, expression.Captures)
+					}
 					if effect.Value != EffectValueMutable {
 						state.markImmutable(effect.Into.Identifier, effect.Value)
 					} else {
@@ -1335,26 +1467,51 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					if _, exists := state.nodes[effect.Into.Identifier]; !exists {
 						state.create(effect.Into, aliasingNodeObject)
 					}
+					sourceIsMutable := !state.notMutable(effect.From.Identifier)
 					// An assignment carries mutability with it, the same way `CreateFrom` does.
 					// Upstream's `Assign` arm reads `state.kind(effect.from)` and switches on the
 					// result, with `ValueKind.Frozen` its first case
 					// (`InferMutationAliasingEffects.ts:947`), so a frozen value assigned into a
 					// temporary stays frozen.
 					//
-					// This is what carries a hook's frozen parameter through the `LoadContext` a
-					// captured read lowers to. Measured on `useMemo-inner-decl.ts`: `data.a` reads
-					// off a `LoadContext` of the parameter rather than off the parameter itself, so
-					// without this the chain broke at the first hop and every property read came
-					// back mutable. Neither this nor the `PropertyLoad` edge does anything alone.
+					// This also carries kinds through ordinary LoadLocal and StoreLocal values. A
+					// LoadContext uses CreateFrom instead: it reads from a mutable box without making
+					// the loaded temporary another identity for the box.
 					state.deriveImmutable(effect.From.Identifier, effect.Into.Identifier)
+					if sourceIsMutable {
+						state.shareIdentity(effect.From.Identifier, effect.Into.Identifier)
+					}
 					state.assign(index, effect.From, effect.Into)
 					index++
 
 				case effect.Kind == AliasingEffectAlias:
+					// `Alias` and `Capture` share upstream's refinement. A frozen/primitive source
+					// becomes an ImmutableCapture (a range no-op), and a mutable source cannot flow
+					// into a frozen/primitive destination. Keeping either edge would let a later
+					// mutation of the destination widen a value upstream proved non-mutable.
+					if kind, present := state.immutable[effect.From.Identifier]; present &&
+						(kind == EffectValueFrozen || kind == EffectValuePrimitive) {
+						index++
+						break
+					}
+					if kind, present := state.immutable[effect.Into.Identifier]; present &&
+						(kind == EffectValueFrozen || kind == EffectValuePrimitive) {
+						index++
+						break
+					}
 					state.assign(index, effect.From, effect.Into)
 					index++
 
 				case effect.Kind == AliasingEffectMaybeAlias:
+					// MaybeAlias has one intentional asymmetry in upstream's shared refinement:
+					// it survives primitive/global sources and immutable destinations, but a Frozen
+					// (or MaybeFrozen) source is still rewritten to ImmutableCapture. This reduced
+					// lattice has no MaybeFrozen kind, so Frozen is the exact expressible gate.
+					if kind, present := state.immutable[effect.From.Identifier]; present &&
+						kind == EffectValueFrozen {
+						index++
+						break
+					}
 					state.maybeAlias(index, effect.From, effect.Into)
 					index++
 
@@ -1443,7 +1600,7 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					})
 					index++
 
-					// Freeze, ImmutableCapture and Apply are no-ops for range widening, and consume
+					// ImmutableCapture and Apply are no-ops for range widening, and consume
 					// no index. Upstream's `_ => {}` arm, reproduced deliberately rather than by
 					// omission: an effect reaching here must not shift the numbering.
 				}

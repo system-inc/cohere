@@ -814,6 +814,7 @@ func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 	if len(function.Blocks) > 0 && function.Blocks[0] != nil {
 		entry = function.Blocks[0].Id
 	}
+	dominance := computeDominance(function)
 
 	result := map[ScopeId][]ReactiveScopeDependency{}
 	for _, block := range function.Blocks {
@@ -827,9 +828,9 @@ func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 		// Upstream reads the block the scope begins in, and so does this: `keyByScopeId` sets
 		// `source.get(block.terminal.block)`. The keying is faithful and is not what differs.
 		//
-		// What differs is where a scope BEGINS. A scope whose first block sits inside a branch is
-		// handed that branch's facts, and a fact true only under an `if` then licenses the
-		// dependency walk to descend past a property that may never have been loaded.
+		// What differs is where a scope BEGINS. A scope whose first block sits inside a branch can be
+		// handed that branch's facts, and a fact true only under an `if` then licenses the dependency
+		// walk to descend past a property that may never have been loaded.
 		//
 		// Measured on `error.useMemo-infer-less-specific-conditional-access` with the memo callback
 		// inlined: `propB.x` is hoistable in the conditional arm alone, the scope for the object
@@ -838,16 +839,42 @@ func CollectHoistablePropertyLoads(function *Function, scopes *ReactiveScopes,
 		// fixture exists to test. Upstream's own scope for that value begins after the branch
 		// closes, where the fact is not available.
 		//
-		// This is the same hazard `hoistableFromNestedFunction` gates with `blocksAlwaysReached`,
-		// which runs only while the callback is still nested. Once it is inlined nothing plays that
-		// part, so the rule is applied here as well and covers both shapes.
+		// The fallback is restricted to a branch scope DOMINATED BY an earlier reactive scope. That
+		// is the structural residue of the wider scope upstream keeps around the allocation and
+		// mutation in the fixture above. A top-level branch scope is different: in
+		// `useMemo-conditional-access-own-scope`, upstream starts the object scope inside the branch
+		// and its guard is exactly `propB.x.y`, so discarding the branch facts truncates a dependency
+		// upstream keeps. The distinction is not merely whether the source block is conditional; it
+		// is whether another reactive region already encloses the path to it.
 		source := scope.Block
-		if !always[source] {
+		if !always[source] && dominatedByOtherReactiveScope(function, dominance, identity,
+			block.Id, scope.Scope) {
 			source = entry
 		}
 		result[scope.Scope] = analysis.hoistableAt(source)
 	}
 	return result
+}
+
+func dominatedByOtherReactiveScope(function *Function, dominance *dominanceTree,
+	identity ScopeIdentity, targetBlock BlockId, targetScope ScopeId) bool {
+	if function == nil || dominance == nil || identity == nil {
+		return false
+	}
+	targetGroup := identity.GroupOf(targetScope)
+	for _, block := range function.Blocks {
+		if block == nil || block.Id == targetBlock {
+			continue
+		}
+		candidate, ok := block.Terminal.(*Scope)
+		if !ok || identity.GroupOf(candidate.Scope) == targetGroup {
+			continue
+		}
+		if dominance.dominates(block.Id, targetBlock) {
+			return true
+		}
+	}
+	return false
 }
 
 // analyseHoistableLoads runs the whole analysis, returning the per-block answer.

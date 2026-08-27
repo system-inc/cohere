@@ -202,6 +202,60 @@ func TestCopyNestedBodyKeepsCapturesPointingAtTheParent(t *testing.T) {
 	}
 }
 
+// Construction runs before the Go inliner, so a nested body already contains several SSA values
+// for one source binding. IdentifierIds must be renamed into the parent, while DeclarationId
+// equivalence classes must survive the rename for the data-flow passes keyed by declarations.
+func TestCopyNestedBodyPreservesDeclarationEquivalenceClasses(t *testing.T) {
+	parent, nested, captures := loweredParentAndNested(t, branchingParentSource)
+	if parent == nil || nested == nil {
+		t.Fatal("the fixture produced no nested function")
+	}
+
+	classes := map[DeclarationId][]IdentifierId{}
+	for _, identifier := range nested.Identifiers {
+		if identifier != nil && identifier.Declaration != 0 {
+			classes[identifier.Declaration] = append(classes[identifier.Declaration], identifier.Id)
+		}
+	}
+	multiValueClass := false
+	for _, identifiers := range classes {
+		if len(identifiers) > 1 {
+			multiValueClass = true
+			break
+		}
+	}
+	if !multiValueClass {
+		t.Fatal("the nested function has no declaration with multiple SSA values; the fixture no " +
+			"longer exercises declaration equivalence")
+	}
+
+	remap, ok := CopyNestedBodyInto(parent, nested, captures)
+	if !ok {
+		t.Fatal("the copy declined")
+	}
+	parentClass := map[DeclarationId]DeclarationId{}
+	for nestedDeclaration, identifiers := range classes {
+		for _, identifier := range identifiers {
+			mapped, found := remap.Identifiers[identifier]
+			if !found {
+				t.Fatalf("nested identifier %d has no parent mapping", identifier)
+			}
+			mappedIdentifier := parent.Identifiers[mapped]
+			if mappedIdentifier == nil {
+				t.Fatalf("mapped identifier %d is absent from the parent", mapped)
+			}
+			if declaration, seen := parentClass[nestedDeclaration]; seen {
+				if mappedIdentifier.Declaration != declaration {
+					t.Errorf("nested declaration %d split across parent declarations %d and %d",
+						nestedDeclaration, declaration, mappedIdentifier.Declaration)
+				}
+			} else {
+				parentClass[nestedDeclaration] = mappedIdentifier.Declaration
+			}
+		}
+	}
+}
+
 // TestCopyNestedBodyDeclinesOnAContextMismatch pins the refusal.
 func TestCopyNestedBodyDeclinesOnAContextMismatch(t *testing.T) {
 	parent := &Function{}

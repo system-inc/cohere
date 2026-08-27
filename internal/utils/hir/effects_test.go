@@ -144,6 +144,434 @@ func hasEffect(list []string, want string) bool {
 	return false
 }
 
+// TestDestructureEffectsNameEveryBinding pins upstream's `Destructure` signature.
+//
+// Ordinary bindings inherit the source's abstract kind with CreateFrom. Rest bindings allocate a
+// fresh mutable container and Capture the source, while the instruction's own lvalue aliases the
+// source with Assign. The ordinary-binding edge is load-bearing for destructured component props:
+// without it a frozen props object becomes an unknown mutable `prop` before an optional-chain phi.
+func TestDestructureEffectsNameEveryBinding(t *testing.T) {
+	function, table := effectsFor(t, `
+		function Component(source: {a: object, nested: {b: object}, c: object}) {
+			const {a, nested: {b}, ...rest} = source;
+			return [a, b, rest];
+		}
+	`)
+
+	var instruction *Instruction
+	var destructure *Destructure
+	for _, candidate := range function.Instructions {
+		if candidate == nil {
+			continue
+		}
+		if value, ok := candidate.Value.(*Destructure); ok {
+			instruction = candidate
+			destructure = value
+			break
+		}
+	}
+	if instruction == nil {
+		t.Fatal("no Destructure instruction was lowered")
+	}
+
+	effects := table.Get(instruction.Id)
+	has := func(kind AliasingEffectKind, from, into IdentifierId) bool {
+		for _, effect := range effects {
+			if effect.Kind == kind && effect.HasFrom && effect.From.Identifier == from &&
+				effect.Into.Identifier == into {
+				return true
+			}
+		}
+		return false
+	}
+	hasCreate := func(into IdentifierId, kind EffectValueKind) bool {
+		for _, effect := range effects {
+			if effect.Kind == AliasingEffectCreate && effect.Into.Identifier == into &&
+				effect.Value == kind {
+				return true
+			}
+		}
+		return false
+	}
+
+	ordinary, rests := 0, 0
+	eachDestructureBinding(destructure.LValue, func(place Place, rest bool) {
+		if rest {
+			rests++
+			if !hasCreate(place.Identifier, EffectValueMutable) ||
+				!has(AliasingEffectCapture, destructure.Value.Identifier, place.Identifier) {
+				t.Errorf("rest binding %d effects=%v, want Create Mutable and Capture from %d",
+					place.Identifier, effects, destructure.Value.Identifier)
+			}
+			return
+		}
+		ordinary++
+		if !has(AliasingEffectCreateFrom, destructure.Value.Identifier, place.Identifier) {
+			t.Errorf("ordinary binding %d effects=%v, want CreateFrom from %d",
+				place.Identifier, effects, destructure.Value.Identifier)
+		}
+	})
+	if ordinary != 2 || rests != 1 {
+		t.Fatalf("walked %d ordinary and %d rest bindings, want 2 and 1", ordinary, rests)
+	}
+	if !has(AliasingEffectAssign, destructure.Value.Identifier, instruction.LValue.Identifier) {
+		t.Errorf("Destructure instruction effects=%v, want Assign from %d into %d", effects,
+			destructure.Value.Identifier, instruction.LValue.Identifier)
+	}
+}
+
+// TestManualMemoMarkersFreezeTheirOperands pins the marker signatures and their option guard.
+//
+// React emits Freeze(decl) for FinishMemoize only while preservation is enabled. The option
+// defaults on, while a first-line `:false` pragma disables it. The distinction matters because a
+// later unknown call is allowed to conditionally mutate an ordinary value but not a value whose
+// identity a live manual memo has frozen.
+func TestManualMemoMarkersFreezeTheirOperands(t *testing.T) {
+	test := func(source string, wantFreeze bool) {
+		function, _ := effectsFor(t, source)
+		value := function.Params[0]
+		finish := &Instruction{
+			LValue: Place{Identifier: function.NewIdentifier("", nil, 0).Id},
+			Value:  &FinishMemoize{ManualMemoId: 1, Value: value},
+		}
+		start := &Instruction{
+			LValue: Place{Identifier: function.NewIdentifier("", nil, 0).Id},
+			Value: &StartMemoize{ManualMemoId: 1, Deps: []ManualMemoDependency{{
+				Root: ManualMemoRoot{Place: value},
+			}, {
+				Root: ManualMemoRoot{IsGlobal: true, Name: "globalValue"},
+			}}},
+		}
+		freezeCount := 0
+		for _, effect := range append(
+			effectsForInstruction(function, start),
+			effectsForInstruction(function, finish)...,
+		) {
+			if effect.Kind == AliasingEffectFreeze && effect.Into.Identifier == value.Identifier {
+				freezeCount++
+			}
+		}
+		wantCount := 0
+		if wantFreeze {
+			wantCount = 2
+		}
+		if freezeCount != wantCount {
+			t.Fatalf("manual memo Freeze effects = %d, want %d", freezeCount, wantCount)
+		}
+	}
+
+	test(`function f(value: object) { return value; }`, true)
+	test(`// @enablePreserveExistingMemoizationGuarantees:false
+function f(value: object) { return value; }`, false)
+}
+
+// TestMemoFreezeRefinesAnUnknownMethodMutation is the downstream half of marker fidelity.
+//
+// Both controls call the same unknown, zero-argument local-object method and therefore receive the
+// same conservative MutateTransitiveConditionally effect. Only the first object crosses a
+// FinishMemoize marker. React's abstract state makes that object frozen before the call, so ranges
+// must discard the conditional mutation there while retaining it for the otherwise identical
+// unfrozen object. This prevents the fix from becoming a broad zero-argument-method exemption.
+func TestMemoFreezeRefinesAnUnknownMethodMutation(t *testing.T) {
+	build := func(frozen bool) (*Function, Place, *Instruction, *Instruction) {
+		function := NewFunction(nil, "f", FunctionKindOther)
+		block := function.NewBlock(BlockKindBlock)
+		function.Entry = block.Id
+		place := func(name string) Place {
+			return Place{Identifier: function.NewIdentifier(name, nil, 0).Id}
+		}
+		function.Returns = place("")
+
+		callback := place("")
+		function.AddInstruction(block, &Instruction{
+			LValue: callback,
+			Value:  &FunctionExpression{Function: 0},
+		})
+		object := place("object")
+		objectInstruction := &Instruction{
+			LValue: object,
+			Value: &ObjectExpression{Properties: []ObjectProperty{{
+				Key: "callback", Value: callback,
+			}}},
+		}
+		function.AddInstruction(block, objectInstruction)
+		if frozen {
+			function.AddInstruction(block, &Instruction{
+				LValue: place(""),
+				Value:  &FinishMemoize{ManualMemoId: 1, Value: object},
+			})
+		}
+		receiver := place("")
+		function.AddInstruction(block, &Instruction{
+			LValue: receiver,
+			Value:  &LoadLocal{Place: object},
+		})
+		property := place("callback")
+		function.AddInstruction(block, &Instruction{
+			LValue: property,
+			Value:  &Primitive{Value: "callback"},
+		})
+		result := place("")
+		call := &Instruction{
+			LValue: result,
+			Value:  &MethodCall{Receiver: receiver, Property: property},
+		}
+		function.AddInstruction(block, call)
+		block.Terminal = &Return{Value: result}
+		Finalize(function)
+		return function, object, objectInstruction, call
+	}
+
+	checkMutation := func(function *Function, call *Instruction) {
+		table := InferAliasingEffects(function)
+		for _, effect := range table.Get(call.Id) {
+			if effect.Kind == AliasingEffectMutateTransitiveConditionally {
+				return
+			}
+		}
+		t.Fatal("the unknown method control produced no conditional mutation")
+	}
+
+	frozen, frozenObject, frozenDefinition, frozenCall := build(true)
+	unfrozen, unfrozenObject, _, unfrozenCall := build(false)
+	checkMutation(frozen, frozenCall)
+	checkMutation(unfrozen, unfrozenCall)
+
+	frozenRange := InferMutableRanges(frozen).Get(frozenObject.Identifier)
+	unfrozenRange := InferMutableRanges(unfrozen).Get(unfrozenObject.Identifier)
+	if frozenRange.End != frozenDefinition.Order+1 {
+		t.Fatalf("a memo-frozen object widened past its definition: range=%v definition=%d call=%d",
+			frozenRange, frozenDefinition.Order, frozenCall.Order)
+	}
+	if unfrozenRange.End != unfrozenCall.Order+1 {
+		t.Fatalf("the unfrozen unknown method stopped widening its receiver: range=%v call=%d",
+			unfrozenRange, unfrozenCall.Order)
+	}
+}
+
+// TestFreezeFollowsOnlySharedAssignIdentity pins the temporal half of Freeze refinement.
+//
+// React's abstract state makes a mutable Assign destination point at the source's existing
+// InstructionValue. Freezing either name later therefore freezes aliases created before the
+// marker. CreateFrom copies the current kind into a fresh value, while Capture and MaybeAlias are
+// information-flow edges; none of those three share identity under the same ordering.
+func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
+	tests := []struct {
+		name       string
+		relation   AliasingEffectKind
+		wantFrozen bool
+	}{
+		{name: "assign shares identity", relation: AliasingEffectAssign, wantFrozen: true},
+		{name: "create from copies kind", relation: AliasingEffectCreateFrom},
+		{name: "capture does not share identity", relation: AliasingEffectCapture},
+		{name: "maybe alias does not share identity", relation: AliasingEffectMaybeAlias},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			function := NewFunction(nil, "f", FunctionKindOther)
+			block := function.NewBlock(BlockKindBlock)
+			function.Entry = block.Id
+			newPlace := func(name string) Place {
+				return Place{Identifier: function.NewIdentifier(name, nil, 0).Id}
+			}
+			function.Returns = newPlace("")
+
+			source := newPlace("source")
+			sourceInstruction := &Instruction{LValue: source, Value: &ObjectExpression{}}
+			function.AddInstruction(block, sourceInstruction)
+
+			alias := newPlace("alias")
+			aliasInstruction := &Instruction{LValue: alias, Value: &Primitive{}}
+			function.AddInstruction(block, aliasInstruction)
+
+			freezeInstruction := &Instruction{
+				LValue: newPlace(""),
+				Value:  &FinishMemoize{ManualMemoId: 1, Value: source},
+			}
+			function.AddInstruction(block, freezeInstruction)
+
+			callResult := newPlace("")
+			callInstruction := &Instruction{LValue: callResult, Value: &Primitive{}}
+			function.AddInstruction(block, callInstruction)
+			block.Terminal = &Return{Value: callResult}
+			Finalize(function)
+
+			relationEffects := []AliasingEffect{}
+			if testCase.relation == AliasingEffectCapture ||
+				testCase.relation == AliasingEffectMaybeAlias {
+				relationEffects = append(relationEffects, create(alias, EffectValueMutable))
+			}
+			relationEffects = append(relationEffects, flow(testCase.relation, source, alias))
+			effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
+				sourceInstruction.Id: {create(source, EffectValueMutable)},
+				aliasInstruction.Id:  relationEffects,
+				freezeInstruction.Id: effectsForInstruction(function, freezeInstruction),
+				callInstruction.Id: {
+					create(callResult, EffectValueMutable),
+					mutate(AliasingEffectMutateTransitiveConditionally, alias),
+				},
+			}}
+
+			ranges := InferMutableRangesWithEffects(function, effects)
+			gotFrozen := !ranges.Contains(alias.Identifier, callInstruction.Order)
+			if gotFrozen != testCase.wantFrozen {
+				t.Errorf("alias frozen before later conditional mutation = %v, want %v; range=%v call=%d",
+					gotFrozen, testCase.wantFrozen, ranges.Get(alias.Identifier), callInstruction.Order)
+			}
+		})
+	}
+}
+
+// TestFreezeTraversesPhiValuesAndFunctionCaptures covers the two abstract values that denote more
+// than one directly-created value. A phi denotes the union of its operands, and a frozen function
+// recursively freezes its captured context. Neither relationship is an ordinary range Capture.
+func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
+	t.Run("phi operands", func(t *testing.T) {
+		function := NewFunction(nil, "f", FunctionKindOther)
+		entry := function.NewBlock(BlockKindBlock)
+		consequent := function.NewBlock(BlockKindValue)
+		alternate := function.NewBlock(BlockKindValue)
+		join := function.NewBlock(BlockKindBlock)
+		function.Entry = entry.Id
+		newPlace := func(name string) Place {
+			return Place{Identifier: function.NewIdentifier(name, nil, 0).Id}
+		}
+		condition := newPlace("condition")
+		function.Params = []Place{condition}
+		function.Returns = newPlace("")
+		entry.Terminal = &Branch{
+			Test: condition, Consequent: consequent.Id, Alternate: alternate.Id, Fallthrough: join.Id,
+		}
+
+		left := newPlace("left")
+		function.AddInstruction(consequent, &Instruction{LValue: left, Value: &ObjectExpression{}})
+		consequent.Terminal = &Goto{Block: join.Id}
+		right := newPlace("right")
+		function.AddInstruction(alternate, &Instruction{LValue: right, Value: &ObjectExpression{}})
+		alternate.Terminal = &Goto{Block: join.Id}
+
+		selected := newPlace("selected")
+		join.Phis = []*Phi{{
+			Place: selected,
+			Operands: map[BlockId]Place{
+				consequent.Id: left,
+				alternate.Id:  right,
+			},
+		}}
+		marker := &Instruction{
+			LValue: newPlace(""),
+			Value:  &FinishMemoize{ManualMemoId: 1, Value: selected},
+		}
+		function.AddInstruction(join, marker)
+		join.Terminal = &Return{Value: selected}
+		Finalize(function)
+
+		state, _ := buildAliasingGraph(function, InferAliasingEffects(function))
+		for name, place := range map[string]Place{"left": left, "right": right, "phi": selected} {
+			if !state.notMutable(place.Identifier) {
+				t.Errorf("Freeze(phi) left %s mutable", name)
+			}
+		}
+	})
+
+	t.Run("function captures through an alias", func(t *testing.T) {
+		function := NewFunction(nil, "f", FunctionKindOther)
+		block := function.NewBlock(BlockKindBlock)
+		function.Entry = block.Id
+		newPlace := func(name string) Place {
+			return Place{Identifier: function.NewIdentifier(name, nil, 0).Id}
+		}
+		captured := newPlace("captured")
+		function.Params = []Place{captured}
+		function.Returns = newPlace("")
+
+		closure := newPlace("closure")
+		function.AddInstruction(block, &Instruction{
+			LValue: closure,
+			Value:  &FunctionExpression{Function: 0, Captures: []Place{captured}},
+		})
+		alias := newPlace("alias")
+		function.AddInstruction(block, &Instruction{LValue: alias, Value: &LoadLocal{Place: closure}})
+		function.AddInstruction(block, &Instruction{
+			LValue: newPlace(""),
+			Value:  &FinishMemoize{ManualMemoId: 1, Value: alias},
+		})
+		block.Terminal = &Return{Value: alias}
+		Finalize(function)
+
+		state, _ := buildAliasingGraph(function, InferAliasingEffects(function))
+		if !state.notMutable(captured.Identifier) {
+			t.Error("freezing a function alias did not recursively freeze its capture")
+		}
+	})
+}
+
+// TestStartMemoizeFreezeRequiresAnInitializedAbstractValue pins when marker freezing begins.
+//
+// React's InferenceState.freeze changes the abstract values a place already denotes. It does not
+// mint state for an unresolved place and let that state affect a later assignment. The second arm
+// is relevant to this reduced model because an instruction shape the effect pass does not yet
+// initialize can still appear as a marker operand; treating the marker as its allocation site
+// would suppress an otherwise conservative unknown-call mutation.
+func TestStartMemoizeFreezeRequiresAnInitializedAbstractValue(t *testing.T) {
+	build := func(initialized bool) (*Function, *Instruction, *Instruction) {
+		function := NewFunction(nil, "f", FunctionKindOther)
+		block := function.NewBlock(BlockKindBlock)
+		function.Entry = block.Id
+		place := func(name string) Place {
+			return Place{Identifier: function.NewIdentifier(name, nil, 0).Id}
+		}
+		function.Returns = place("")
+
+		root := place("root")
+		if initialized {
+			function.AddInstruction(block, &Instruction{
+				LValue: root,
+				Value:  &ObjectExpression{},
+			})
+		}
+		function.AddInstruction(block, &Instruction{
+			LValue: place(""),
+			Value: &StartMemoize{ManualMemoId: 1, Deps: []ManualMemoDependency{{
+				Root: ManualMemoRoot{Place: root},
+			}}},
+		})
+
+		receiver := place("")
+		load := &Instruction{LValue: receiver, Value: &LoadLocal{Place: root}}
+		function.AddInstruction(block, load)
+		property := place("")
+		function.AddInstruction(block, &Instruction{
+			LValue: property,
+			Value:  &Primitive{Value: "method"},
+		})
+		result := place("")
+		call := &Instruction{
+			LValue: result,
+			Value:  &MethodCall{Receiver: receiver, Property: property},
+		}
+		function.AddInstruction(block, call)
+		block.Terminal = &Return{Value: result}
+		Finalize(function)
+		return function, load, call
+	}
+
+	initialized, initializedLoad, initializedCall := build(true)
+	initializedRange := InferMutableRanges(initialized).Get(initializedLoad.LValue.Identifier)
+	if initializedRange.End != initializedLoad.Order+1 {
+		t.Fatalf("initialized memo dependency was not frozen: range=%v load=%d call=%d",
+			initializedRange, initializedLoad.Order, initializedCall.Order)
+	}
+
+	unresolved, unresolvedLoad, unresolvedCall := build(false)
+	unresolvedRange := InferMutableRanges(unresolved).Get(unresolvedLoad.LValue.Identifier)
+	if unresolvedRange.End != unresolvedCall.Order+1 {
+		t.Fatalf("freeze created state for an unresolved dependency: range=%v load=%d call=%d",
+			unresolvedRange, unresolvedLoad.Order, unresolvedCall.Order)
+	}
+}
+
 // TestPropertyStoreMutatesItsObject is the single most load-bearing fact this pass produces.
 //
 // `o.a = 1` mutates `o`. Everything downstream -- a mutable range's extension, a frozen-value

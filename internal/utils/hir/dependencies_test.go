@@ -126,6 +126,91 @@ func TestDependenciesExcludeValuesTheScopeItselfProduces(t *testing.T) {
 	}
 }
 
+// TestOptionalChainProcessedStoresAreDeferred pins the instruction half of upstream's
+// `processedInstrsInOptional` protocol.
+//
+// Reconstructing `input?.x.y` records both StoreLocal instructions in the optional sidemap. Their
+// operands are prefixes of the reconstructed dependency, so dependency collection must wait for a
+// phi or another site of use to submit the full path.
+func TestOptionalChainProcessedStoresAreDeferred(t *testing.T) {
+	function := lowerTypedFunctions(t, "optional-processed-store.ts", `
+		function Component(input) {
+			return consume(input?.x.y);
+		}
+	`)[0]
+	Construct(function)
+	optional := CollectOptionalChainSidemap(function)
+	collector := dependencyCollector{
+		temporaries:                   temporaries{},
+		processedOptionalInstructions: optionalProcessedInstructions(optional),
+	}
+
+	processedStores := 0
+	for instructionID := range optional.ProcessedInstructions {
+		instruction := function.Instructions[instructionID]
+		if instruction == nil {
+			t.Fatalf("optional traversal recorded missing instruction %d", instructionID)
+		}
+		if _, ok := instruction.Value.(*StoreLocal); !ok {
+			continue
+		}
+		processedStores++
+		if !collector.isDeferredDependency(instruction) {
+			t.Errorf("optional StoreLocal %d was visited again; its operand would submit a chain prefix",
+				instructionID)
+		}
+
+		withoutOptionalSet := dependencyCollector{temporaries: temporaries{}}
+		if withoutOptionalSet.isDeferredDependency(instruction) {
+			t.Errorf("optional StoreLocal %d was also deferred without the processed set; the test is "+
+				"not exercising the optional-chain protocol", instructionID)
+		}
+	}
+	if processedStores == 0 {
+		t.Fatal("optional traversal recorded no StoreLocal instructions")
+	}
+}
+
+// TestOptionalChainProcessedStoreDoesNotLeakPrefix exercises the protocol through the
+// production pipeline. The intermediate store after `.x` must not submit `input?.x`. Once range
+// inference places the optional join before the call's singleton scope, the full chain need not be
+// an outer memo dependency at all; the invariant here is its depth, not its presence.
+func TestOptionalChainProcessedStoreDoesNotLeakPrefix(t *testing.T) {
+	const source = `
+		// @validatePreserveExistingMemoizationGuarantees
+		import {useMemo} from 'react';
+		import {identity} from 'shared-runtime';
+		function Component({other, input}) {
+			return useMemo(() => ({
+				value: identity(input?.x.y),
+				other,
+			}), [other, input.x.y]);
+		}
+	`
+
+	dependencies, ok := inferredDependencyStrings(t, source)
+	if !ok {
+		t.Fatal("source did not lower")
+	}
+	prefix, control := false, false
+	for _, dependency := range dependencies {
+		switch dependency {
+		case "input.x":
+			prefix = true
+		case "other":
+			control = true
+		}
+	}
+	if prefix {
+		t.Errorf("optional dependency paths = %v, intermediate input.x store leaked into the scope",
+			dependencies)
+	}
+	if !control {
+		t.Errorf("optional dependency paths = %v, want the unrelated `other` control dependency",
+			dependencies)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // The path algebra
 // ---------------------------------------------------------------------------
@@ -176,8 +261,8 @@ func TestMergeAccessIsAUnionOnDependencyAndAnIntersectionOnOptionality(t *testin
 // This is the counterfactual that identifies the mechanism rather than merely observing the result.
 // The same access path is added to two trees differing only in whether the hoistable set is
 // populated: with it the path survives at full depth, without it the path truncates to its root.
-// That is what proves the corpus-wide "0 dependencies carry a non-empty path" is
-// `DependencyGapNullPropagation` and not a defect in the tree.
+// This isolates the tree's nil-input fallback from the real production path, where
+// `CollectHoistablePropertyLoads` supplies the non-null facts.
 func TestDependencyTreeTruncatesWithoutAHoistableSet(t *testing.T) {
 	path := []DependencyPathEntry{{Property: "alpha"}, {Property: "beta"}}
 
@@ -403,9 +488,10 @@ func TestScopesCloseAtTheirFallthrough(t *testing.T) {
 // TestDependencyGapsAreDeclared pins the gap list so closing one is a visible event.
 func TestDependencyGapsAreDeclared(t *testing.T) {
 	gaps := DependencyGaps()
-	if len(gaps) != 3 {
-		t.Errorf("expected three declared gaps, got %d; a gap that closed should update this test "+
-			"rather than silently shrinking the list", len(gaps))
+	if len(gaps) != 2 || gaps[0] != DependencyGapOptionalChains ||
+		gaps[1] != DependencyGapTypeExclusions {
+		t.Errorf("DependencyGaps() = %v, want the residual optional-call/computed-access and type "+
+			"gaps; a closed gap must leave this list", gaps)
 	}
 }
 

@@ -78,14 +78,30 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 		Instructions: map[InstructionId]InstructionId{},
 	}
 
-	// Seed: a captured value keeps the parent's identifier.
+	// Seed: a captured value keeps the parent's identifier. Seed the declaration map at the same
+	// time. Construction has already put the nested body in SSA form, so other nested identifiers
+	// may be distinct values of this same source binding; those need fresh parent identifiers but
+	// must remain in the capture's declaration equivalence class.
+	declarations := map[DeclarationId]DeclarationId{}
 	for index, contextValue := range nested.Context {
-		remap.Identifiers[contextValue.Identifier] = captures[index].Identifier
+		capture := captures[index]
+		remap.Identifiers[contextValue.Identifier] = capture.Identifier
+		contextIdentifier := nested.IdentifierOf(contextValue)
+		captureIdentifier := parent.IdentifierOf(capture)
+		if contextIdentifier == nil || captureIdentifier == nil {
+			return nil, false
+		}
+		if mapped, exists := declarations[contextIdentifier.Declaration]; exists &&
+			mapped != captureIdentifier.Declaration {
+			return nil, false
+		}
+		declarations[contextIdentifier.Declaration] = captureIdentifier.Declaration
 	}
 
-	// Identifiers. A declaration id is carried across unchanged when the value is a capture, and
-	// minted fresh otherwise, because a value local to the inlined body is a new binding in the
-	// parent and must not group with anything already there.
+	// Identifiers. Nested declaration ids cannot be copied verbatim because the two functions mint
+	// them independently, but their equivalence classes are semantic: every SSA version of one
+	// source binding must still share one DeclarationId after the copy. Remap each class to one fresh
+	// parent declaration (or to the seeded capture declaration) while keeping IdentifierIds distinct.
 	for id, identifier := range nested.Identifiers {
 		if identifier == nil {
 			continue
@@ -93,7 +109,16 @@ func CopyNestedBodyInto(parent *Function, nested *Function, captures []Place) (*
 		if _, seeded := remap.Identifiers[IdentifierId(id)]; seeded {
 			continue
 		}
-		copied := parent.NewIdentifier(identifier.Name, identifier.Node, 0)
+		declaration, mapped := declarations[identifier.Declaration]
+		var copied *Identifier
+		if !mapped || identifier.Declaration == 0 {
+			copied = parent.NewIdentifier(identifier.Name, identifier.Node, 0)
+			if identifier.Declaration != 0 {
+				declarations[identifier.Declaration] = copied.Declaration
+			}
+		} else {
+			copied = parent.NewIdentifier(identifier.Name, identifier.Node, declaration)
+		}
 		remap.Identifiers[IdentifierId(id)] = copied.Id
 	}
 

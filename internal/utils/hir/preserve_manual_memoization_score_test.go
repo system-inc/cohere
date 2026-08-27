@@ -371,6 +371,13 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 		t.Fatalf("scored %d clean fixtures, want %d; the population this test measures is not the "+
 			"one it believes it is", clean, reactconformance.ExpectedCleanFixtureCount)
 	}
+	// A declined fixture is not a correct silence. In particular, pin this at zero now that the
+	// false-positive count is zero: otherwise a lowering or pipeline regression could move a clean
+	// fixture from `silent` to `unsupported` while leaving the headline score green.
+	if unsupported != 0 {
+		t.Errorf("unsupported clean fixtures = %d, want 0; every clean fixture in the denominator "+
+			"must reach validation before zero false positives is a meaningful result", unsupported)
+	}
 	t.Logf("cleanFixtures=%d silentCorrect=%d falsePositives=%d unsupported=%d (%.0f%% false-positive rate)",
 		clean, silent, fired, unsupported, 100*float64(fired)/float64(clean))
 
@@ -489,7 +496,20 @@ func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
 	// `useCallback-nonescaping-invoked-callback-escaping-return.ts` and
 	// `repro-missing-memoization-lack-of-phi-types.js`, named by logging the fixture per false
 	// positive and diffing. None is added.
-	const knownFalsePositives = 8
+	//
+	// Lowered from 8 to 1 by giving optional chains their upstream control-flow shape and sidemap,
+	// preserving that shape through memo-callback inlining, deferring every instruction consumed by
+	// the optional traversal, and making hoistability respect the branch that proved a path safe.
+	// Goldens rose to and held at 28 while each clean-fixture removal was checked against the same
+	// production pipeline rather than against a fixture-specific comparison exemption.
+	//
+	// Lowered from 1 to 0 by closing the abstract-value chain underneath the last optional fixture.
+	// Destructure now carries a component parameter's Frozen kind into each ordinary binding, a phi
+	// whose inputs are all non-mutable retains that fact, and Alias/MaybeAlias candidates from Frozen
+	// sources refine to range no-ops as upstream's ImmutableCapture does. That leaves the optional
+	// argument outside the allocating call's singleton scope and also prevents later mutations of a
+	// call result from widening a frozen source. The final board is 28/28 goldens and 69/69 clean.
+	const knownFalsePositives = 0
 	if fired != knownFalsePositives {
 		t.Errorf("false positives = %d, want %d; if this went DOWN the rule improved and this "+
 			"number should be lowered deliberately, and if it went UP something regressed",
@@ -550,39 +570,7 @@ func findingsForSource(t *testing.T, source string) ([]PreserveManualMemoization
 // The order is upstream's pipeline order, and it is load-bearing: the rule reads `Pruned` and
 // `Merged`, both of which are written by passes that must have run.
 func pipelineFindings(function *Function, checker *shimchecker.Checker) []PreserveManualMemoizationFinding {
-	OutlineFunctions(function)
-	InferReactive(function, checker)
-	DropManualMemoization(function)
-
-	if InlineImmediatelyInvokedFunctionExpressions(function) > 0 {
-		MergeConsecutiveBlocks(function)
-	}
-	// Upstream sweeps at `Pipeline.ts:230`, after the memo rewrite at 168 and long before the
-	// dependency analysis at 428, so the instructions that built a written dependency array are gone
-	// before anything reads them. See `dead_code_elimination.go`.
-	EliminateDeadCode(function)
-
-	ranges := InferMutableRanges(function)
-	set := FindDisjointMutableValuesWithRanges(function, ranges)
-	scopes := AssignReactiveScopesWithSets(function, ranges, set)
-	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
-	identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
-	BuildReactiveScopeTerminals(function, scopes, identity)
-	dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
-
-	tree, _ := BuildReactiveFunction(function)
-	if tree == nil {
-		return nil
-	}
-
-	MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, checker)
-	nonEscaping := PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, checker)
-	PruneUnusedScopes(tree, dependencies)
-	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
-	PruneNonReactiveDependencies(tree, function, dependencies)
-
-	return ValidatePreservedManualMemoizationWithPruned(tree, function, scopes, dependencies,
-		nonEscaping.PrunedScopes)
+	return AnalyzePreservedManualMemoization(function, checker)
 }
 
 // upstreamReportsInLogs reports whether a fixture's expectation carries this rule's message in its
