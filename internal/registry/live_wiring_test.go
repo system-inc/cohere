@@ -204,6 +204,20 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// fallbacks in generic serializers that already branch on typeof, so enabling is a judgment
 		// about those sites rather than a cleanup, and it belongs to whoever wrote the off.
 		"@typescript-eslint/no-base-to-string": "registered but left off because the config key `typescript/no-base-to-string` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+
+		// A DIFFERENT shape from every entry above it, and the first of its kind in this map.
+		//
+		// The entries above are rules the live config deliberately turned off, where the exemption
+		// records a standing decision. This one is not off; it is unmentioned, because ahra's config
+		// has no `base/` keys at all. `base` is api-phi-health's own lint layer rather than ahra's,
+		// so there is no line anybody wrote for it and nothing to reverse.
+		//
+		// The rule is ported and registered so it exists to be turned on; where it gets enabled is a
+		// question about which trees run base's rules, which is Kirk's to answer rather than a
+		// porter's. Recorded here so that "unmentioned" reads as a pending decision rather than as a
+		// port somebody forgot to wire.
+		"base/no-global-container": "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/no-console":          "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
 	}
 
 	rules := All()

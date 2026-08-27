@@ -169,6 +169,10 @@ func TestRegisteredNamesMatchTheirUpstreamSpelling(t *testing.T) {
 	// tree's own, both of which are correct bare.
 	knownNamespaces := map[string]bool{
 		"@typescript-eslint": true,
+		// `base` is api-phi-health's own lint layer, the same kind of namespace as structure and
+		// nexus below: rules this organization wrote rather than ported from a plugin. It is not an
+		// ESLint plugin prefix, so nothing translates it on the way out.
+		"base":               true,
 		"react":              true,
 		"react-hooks":        true,
 		"@next/next":         true,
@@ -1111,6 +1115,24 @@ var rulesOutsideTheInventory = map[string]string{
 		"registered but left off because the live config carries a prior off for it under the old " +
 		"short spelling, which cannot resolve against the full name; the audit measured 53 " +
 		"violations, none auto-fixable",
+
+	// The first rule from api-phi-health's own `base` lint layer, which is a different kind of entry
+	// from every one above it. Those are ports of somebody else's published rule, measured against an
+	// upstream that ships a corpus. This is one of ours: the source repository is the only oracle,
+	// and there is no inventory entry because the gate being replaced never enforced it here.
+	//
+	// Registered and not enabled, because ahra's config names no base/ rules at all. See its entry in
+	// the live-wiring exemption map for why that is a pending decision rather than an oversight.
+	"base/no-global-container": "ported from api-phi-health's own base lint layer; registered but " +
+		"not enabled because ahra's config names no base/ rules at all, so where it is enforced is " +
+		"a decision nobody has made yet; the gate being replaced never enforced it here",
+
+	// The same shape as the entry above and for the same reason. Its port is checked against the
+	// source repository rather than an imported corpus: run over all 1,814 TypeScript files of
+	// api-phi-health's base library, it agrees with the real rule on every unsuppressed site.
+	"base/no-console": "ported from api-phi-health's own base lint layer; registered but " +
+		"not enabled because ahra's config names no base/ rules at all, so where it is enforced is " +
+		"a decision nobody has made yet; the gate being replaced never enforced it here",
 
 	// Ported from typescript-eslint and enabled in both engines by this port. Unlike the entry above
 	// it carries no prior decision in the config to override, so enabling is the ordinary path: the

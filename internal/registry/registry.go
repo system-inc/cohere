@@ -24,6 +24,7 @@ import (
 	"github.com/system-inc/verify/internal/configuration"
 	"github.com/system-inc/verify/internal/rule"
 
+	_ "github.com/system-inc/verify/internal/rules/base"
 	_ "github.com/system-inc/verify/internal/rules/core"
 	_ "github.com/system-inc/verify/internal/rules/next"
 	_ "github.com/system-inc/verify/internal/rules/nexus"
