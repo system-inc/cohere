@@ -827,6 +827,14 @@ func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(t *testing.T) {
 		{"a defaulted parameter", "class H extends React.Component { componentDidUpdate = (a = 1) => { f(a); }; render() { return <div />; } }"},
 		{"a rest parameter", "class H extends React.Component { componentDidUpdate = (...a) => { f(a); }; render() { return <div />; } }"},
 		{"a typed parameter", "class H extends React.Component { componentDidUpdate = (previous: Properties) => { f(previous); }; render() { return <div />; } }"},
+
+		// A RETURN annotation is lost by the same rewrite and the parameter check cannot see it,
+		// because it sits outside the parameter list. Measured before the guard existed: the head
+		// is rebuilt as `(params) `, replacing everything between the key and the body, so
+		// `componentDidMount = (): void => {}` was repaired to `componentDidMount() {}` with the
+		// `: void` silently gone. Untyped parameters walked straight past the check above.
+		{"a return annotation", "class H extends React.Component { componentDidMount = (): void => { f(); }; render() { return <div />; } }"},
+		{"a return annotation with untyped parameters", "class H extends React.Component { componentDidUpdate = (previous): boolean => { return f(previous); }; render() { return <div />; } }"},
 	}
 
 	for _, testCase := range cases {

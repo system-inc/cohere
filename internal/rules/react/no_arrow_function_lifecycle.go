@@ -274,6 +274,18 @@ var NoArrowFunctionLifecycle = rule.Rule{
 				return
 			}
 
+			// A return annotation is lost by the same rewrite for the same reason, and it sits
+			// outside the parameter list so the check above cannot see it. The head is rebuilt as
+			// `(params) `, which replaces everything between the key and the body, so
+			// `componentDidMount = (): void => {}` would be repaired to `componentDidMount() {}`
+			// and the `: void` would be gone. Upstream never meets this because its corpus is
+			// JavaScript. Declining matches what this rule already does for a typed parameter:
+			// report the arrow, leave the repair to a human who can see the type.
+			if arrow.Type != nil {
+				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				return
+			}
+
 			head := fmt.Sprintf("(%s) ", parameters)
 			if !isClassField {
 				head = fmt.Sprintf(": function(%s) ", parameters)
