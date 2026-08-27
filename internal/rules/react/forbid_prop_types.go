@@ -154,6 +154,33 @@ func forbidPropTypesMessage(target string) rule.Message {
 // them: a wrapped props object is simply not looked inside. If a settings path is added to
 // `rule.Context`, the arm is `checkNode`'s call-expression branch and the 14 cases are in the
 // corpus waiting.
+//
+// # The same missing setting makes a SIBLING RULE unportable outright, which is worth knowing here
+//
+// `react/prefer-exact-props` is on the audit as an unported line item rated Yes with no violations,
+// and it is not work outstanding. The same `settings.propWrapperFunctions` this arm needs is the
+// only input its reporting branch has: `getExactPropWrapperFunctions(context)` at its line 40 is
+// where `exactWrappers` comes from, and its `propTypes` message requires that set to be non-empty.
+//
+// Where this rule loses 14 of 111 cases to the gap, that one loses everything. Measured against the
+// installed 7.37.5 build on identical input:
+//
+//	no settings                    0 findings
+//	settings.propWrapperFunctions  1 finding, messageId propTypes
+//
+// Its corpus is 31 cases, 17 of which carry a settings block. Replaying all 12 of its REPORTING
+// cases with no settings: all twelve go silent, none survive. Its other message id is `flow` and
+// needs Flow annotations a TypeScript tree does not have. Ahra configures `propWrapperFunctions`
+// nowhere.
+//
+// So a port of it would register, pass a clean fixture set, and be structurally incapable of firing
+// here, which is the shape the audit's zero cannot distinguish from a clean tree. It also ships no
+// fixer, despite reading as though it does: its `meta` block is docs, messages and schema, and the
+// string `fixer` does not appear in the file.
+//
+// Recorded here rather than in a rule file of its own, because this is the file that already
+// explains the missing surface and the next reader chasing that audit line will arrive at the
+// setting before they arrive at the rule.
 var ForbidPropTypes = rule.Rule{
 	Name: "react/forbid-prop-types",
 	// Declared for one arm only: `C.propTypes = someIdentifier` resolves that identifier to the
