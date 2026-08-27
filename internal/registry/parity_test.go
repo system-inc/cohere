@@ -931,6 +931,14 @@ var rulesOutsideTheInventory = map[string]string{
 		"spelling, which cannot resolve against the full name; not enforced by either tool when " +
 		"the inventory was captured",
 
+	// Ported from typescript-eslint and registered, but not enabled and therefore given no inventory
+	// entry, for the same reason as the entry above. VerifySettings.json:373 turns it off under the
+	// old short spelling, which the resolver cannot match against the full registered name.
+	"@typescript-eslint/no-useless-default-assignment": "ported from typescript-eslint; registered " +
+		"but left off because the live config carries a prior off for it under the old short " +
+		"spelling, which cannot resolve against the full name; not enforced by either tool when " +
+		"the inventory was captured",
+
 	// The same shape as the entry above. VerifySettings.json:372 carries the prior off under the
 	// old short spelling, and the reason it cannot resolve is recorded in full beside this rule's
 	// entry in the live-wiring guard's exemption map.

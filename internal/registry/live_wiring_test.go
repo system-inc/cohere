@@ -146,6 +146,13 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// eighty six imported cases pass; turning it on is a decision for whoever wrote that line.
 		"@typescript-eslint/restrict-template-expressions": "registered but left off because VerifySettings.json:366 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 
+		// Same shape as the entry above, for the same reason and at a different line.
+		// VerifySettings.json:373 reads `"typescript/no-useless-default-assignment": "off"`, written
+		// under the old short spelling. The config key is 40 characters and the registered name is 48,
+		// so the key is SHORTER than the name, the trim is a no-op, and the branch never fires.
+		// Measured with two controls that do resolve, rather than read off the brief.
+		"@typescript-eslint/no-useless-default-assignment": "registered but left off because VerifySettings.json:373 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+
 		// The same shape as the entry above, and the same reason. VerifySettings.json:372 reads
 		// `"typescript/no-duplicate-type-constituents": "off"`, written under the old short
 		// spelling, and the resolver cannot match a key that is shorter than the registered name.
