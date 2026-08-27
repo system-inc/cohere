@@ -655,6 +655,30 @@ var rulesOutsideTheInventory = map[string]string{
 	// it and would have proposed a rewrite that does not parse. Found by diffing the two linters
 	// over the real tree, 713 against 711, both extra in one file. After the guard, the two agree
 	// exactly: 711 findings over 190 files with nothing on either side of the diff.
+	// Ported from typescript-eslint, whose stylistic preset carries it, and enabled in both engines
+	// by this port. Outside the inventory for the usual reason: neither of the two tools the
+	// inventory records named this rule when the capture was taken.
+	//
+	// It offers SUGGESTIONS rather than fixes, which is the whole safety story and is worth
+	// recording here because a coverage audit would otherwise read the missing fixer as an
+	// unfinished port. Upstream's `meta` carries `hasSuggestions` and no `fixable`, measured by
+	// running the installed build: `verifyAndFix` on a reporting input returns unchanged source.
+	// That matters, because the getters direction genuinely widens types. Measured through the
+	// TypeScript compiler on the rewritten source, `readonly x: 1 | 2 = 1` becomes a getter of type
+	// `number`, and so does the unannotated `readonly x = 1` that is upstream's own core case. The
+	// widening is upstream's deliberate semantics and is reproduced; it is only defensible because
+	// a human chooses it.
+	//
+	// The field direction preserves types rather than declining, and the mechanism is worth copying
+	// into the next fixable port. It splices the raw source between the parameter list's closing
+	// parenthesis and the body's opening brace instead of re-rendering a signature, so a return
+	// annotation, its spacing and any comment written there all survive byte for byte without being
+	// enumerated. On the real tree every one of its eight findings is an annotated getter, and the
+	// suggestion keeps the annotation.
+	"@typescript-eslint/class-literal-property-style": "ported from typescript-eslint, whose " +
+		"stylistic preset carries it; not enforced by either tool when the inventory was captured; " +
+		"offers suggestions rather than fixes, matching upstream",
+
 	"@typescript-eslint/array-type": "ported from typescript-eslint, whose stylistic preset carries " +
 		"it; not enforced by either tool when the inventory was captured, though the audit measured " +
 		"711 violations it will now clean up",
