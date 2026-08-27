@@ -322,6 +322,16 @@ var rulesOutsideTheInventory = map[string]string{
 	// had rather than a parity gap.
 	"@typescript-eslint/restrict-plus-operands": "ported from typescript-eslint, which recommends it; not enforced by either tool when the inventory was captured",
 
+	// Ported from typescript-eslint and enabled in both engines by this port, the same shape as the
+	// entries around it: it lives in upstream's `strict` preset rather than its `recommended` one, so
+	// a project on the recommended set never had it, and there is no oxlint config in the tree to
+	// have carried it either. A rule the gate never had rather than a parity gap.
+	//
+	// It is a judgment about any TypeScript object rather than about the DOM, so it was enabled on
+	// the universal layer. The audit measured sixteen sites in ahra and none of them is auto-fixable,
+	// so turning this on is a cleanup somebody has to do by hand rather than a command.
+	"@typescript-eslint/no-dynamic-delete": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured",
+
 	// Ported from typescript-eslint, whose strict preset carries it, and enabled in both engines by
 	// this port. It is outside the inventory for the usual reason, that neither tool enforced it when
 	// the capture was taken, but this one has a wrinkle worth recording because the next reader will
