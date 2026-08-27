@@ -141,7 +141,7 @@ func resolveBinary(development bool, verbose bool) (string, error) {
 
 	paths := dispatch.DefaultPaths(moduleDirectory)
 
-	binaryPath, built, err := dispatch.Resolve(paths, "./cmd/verify", development)
+	binaryPath, built, err := dispatch.Resolve(paths, "./command/verify", development)
 	if err != nil {
 		return "", err
 	}

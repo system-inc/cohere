@@ -42,5 +42,5 @@ echo "  Looked, in order:" >&2
 echo "    \$VERIFY_BINARY (unset)" >&2
 echo "    ${installed}" >&2
 echo "    ${dispatcher}" >&2
-echo "  Build it with: go build -o ${dispatcher} ./cmd/verify-dispatch" >&2
+echo "  Build it with: go build -o ${dispatcher} ./command/verify-dispatch" >&2
 exit 1

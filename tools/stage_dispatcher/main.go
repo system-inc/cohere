@@ -1,6 +1,6 @@
 // Command stage_dispatcher stages only the dispatcher package, which compiles nothing.
 //
-// It exists so the install path can be exercised while `cmd/verify` is mid-edit by another author:
+// It exists so the install path can be exercised while `command/verify` is mid-edit by another author:
 // the full release build cross-compiles the real binary and correctly refuses to stage a partial
 // release when that build fails.
 package main

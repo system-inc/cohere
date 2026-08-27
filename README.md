@@ -37,7 +37,7 @@ scratch on every run, once per shard.
 ```sh
 git submodule update --init --depth 1 typescript-go
 go build ./...
-go run ./cmd/verify
+go run ./command/verify
 ```
 
 `verify` cannot verify itself — it is a Go program and its phases check TypeScript. This repo is
@@ -133,7 +133,7 @@ the intuitive reading beside the actual one so the next reader does not correct 
 ## The dispatcher
 
 Rules are compiled in rather than loaded, which is what makes them free to run. The cost is that
-adding a rule means rebuilding, so `cmd/verify-dispatch` pays that cost automatically: it hashes
+adding a rule means rebuilding, so `command/verify-dispatch` pays that cost automatically: it hashes
 everything the binary is built from, looks for `.cache/verify/bin/verify-<platform>-<hash>`, and
 execs it when present or builds it first when absent. Editing a rule costs one rebuild; every run
 after it is a stat and an exec.
@@ -209,7 +209,7 @@ installs correctly and is never found, which on the machine is indistinguishable
 never shipped.
 
 ```sh
-go run ./cmd/verify-release --version 0.1.0 --output dist
+go run ./command/verify-release --version 0.1.0 --output dist
 ```
 
 One command builds all six from one machine, in about two minutes, and it stages rather than
