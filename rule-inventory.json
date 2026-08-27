@@ -1,24 +1,24 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 290,
+  "total": 293,
   "byNamespace": {
-    "(core)": 110,
+    "(core)": 111,
     "@next": 22,
     "@typescript-eslint": 44,
     "better-tailwindcss": 13,
     "nexus": 20,
-    "react": 33,
+    "react": 35,
     "react-hooks": 17,
     "structure": 31
   },
   "bySeverity": {
-    "error": 248,
+    "error": 251,
     "warn": 42
   },
   "byEnabledBy": {
     "pluginDefault": 41,
-    "rulesBlock": 249
+    "rulesBlock": 252
   },
   "rules": [
     {
@@ -1887,6 +1887,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-useless-computed-key",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-useless-escape",
       "sources": [
         "eslint",
@@ -2356,6 +2365,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "react/prefer-stateless-function",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "react/no-render-return-value",
       "sources": [
         "oxlint"
@@ -2416,6 +2434,15 @@
         "oxlint"
       ],
       "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react/require-optimization",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
       "severity": "error",
       "enabledBy": "rulesBlock"
     },
