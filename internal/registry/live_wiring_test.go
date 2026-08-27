@@ -40,6 +40,11 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// which is the asymmetry the control depends on, so the config cannot name it.
 		"import-require-path-alias": "the directional control for the differential",
 
+		// Ported and registered without being enabled, because enabling it is a decision with work
+		// attached rather than a wiring step. The audit measured 54 violations and the rule has no
+		// fixer, so every one is a hand edit; the config has never named it under either spelling.
+		"@typescript-eslint/no-deprecated": "ported and registered; the audit measured 54 violations and the rule has no fixer, so enabling is a decision for whoever takes that cleanup",
+
 		// The live config sets `react/jsx-key` to "off" explicitly, in a block of ten-plus rules
 		// this project has deliberately turned off alongside `react/react-in-jsx-scope`. That is a
 		// decision about this codebase rather than a wiring gap, and flipping it here would

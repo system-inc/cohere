@@ -289,3 +289,97 @@ func typeMatchesInlineSpecifier(t *checker.Type, name string) bool {
 
 	return false
 }
+
+// staticNameOfNode is upstream's `getStaticName`: the name a node contributes to a value specifier.
+//
+// An identifier gives its text; a string literal gives its value, so `a['deprecatedKey']` can be
+// allowlisted by the same `name` that would allowlist `a.deprecatedKey`. Anything else has no static
+// name and matches nothing.
+func staticNameOfNode(node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	switch node.Kind {
+	case ast.KindPrivateIdentifier:
+		// A private field's node text carries the `#`, and estree's `node.name` does not, so a
+		// specifier written `{ name: 'privateProp' }` would never match `#privateProp`. Upstream's
+		// allowlist is written against the estree spelling, so the sigil comes off here.
+		return strings.TrimPrefix(node.Text(), "#"), true
+	case ast.KindIdentifier, ast.KindJsxNamespacedName:
+		return node.Text(), true
+	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
+		return node.Text(), true
+	}
+	return "", false
+}
+
+// valueMatchesSpecifier tests ONE specifier against the value at a node.
+//
+// This is the value half of the option surface, and it asks a different question from the type half
+// above. `typeMatchesSpecifier` asks where a TYPE was declared; this asks whether the NAME written
+// at this node is on the list, and then, for a package specifier, whether the thing that name refers
+// to came from that package.
+//
+// The asymmetry is deliberate upstream and worth keeping: a `file` or `lib` specifier matches on the
+// name alone once the name matches, because a value's declaration file is already the file being
+// linted or is not interesting. Only `package` looks further, because "the `exists` from `fs`" is a
+// different claim from "anything called `exists`".
+func valueMatchesSpecifier(
+	node *ast.Node,
+	specifier TypeOrValueSpecifier,
+	program *compiler.Program,
+	subject *checker.Type,
+) bool {
+	staticName, named := staticNameOfNode(node)
+	if !named {
+		return false
+	}
+	if !slices.Contains(specifier.Name, staticName) {
+		return false
+	}
+	if specifier.From != TypeOrValueSpecifierFromPackage {
+		return true
+	}
+	if subject == nil {
+		return false
+	}
+	// Upstream is `type.getSymbol() ?? type.aliasSymbol`. The two lines above in this file read the
+	// alias the other way round, alias first; the order matters only for an aliased type that also
+	// carries its own symbol, and upstream's order is the one this reproduces.
+	symbol := subject.Symbol()
+	if symbol == nil {
+		symbol = subject.Alias().Symbol()
+	}
+	if symbol == nil {
+		return false
+	}
+	declarations := symbol.Declarations
+	declarationFiles := make([]*ast.SourceFile, 0, len(declarations))
+	for _, declaration := range declarations {
+		declarationFiles = append(declarationFiles, ast.GetSourceFileOfNode(declaration))
+	}
+	return typeDeclaredInPackageDeclarationFile(specifier.Package, declarations, declarationFiles, program)
+}
+
+// ValueMatchesSomeSpecifier tests the value at a node against a whole allowlist.
+//
+// The inline (bare string) form matches on the static name alone, which is upstream's
+// `typeof specifier === 'string'` branch.
+func ValueMatchesSomeSpecifier(
+	node *ast.Node,
+	specifiers []TypeOrValueSpecifier,
+	inlineSpecifiers []string,
+	program *compiler.Program,
+	subject *checker.Type,
+) bool {
+	staticName, named := staticNameOfNode(node)
+	if !named {
+		return false
+	}
+	if slices.Contains(inlineSpecifiers, staticName) {
+		return true
+	}
+	return Some(specifiers, func(s TypeOrValueSpecifier) bool {
+		return valueMatchesSpecifier(node, s, program, subject)
+	})
+}
