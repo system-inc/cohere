@@ -1135,6 +1135,24 @@ var rulesOutsideTheInventory = map[string]string{
 	"grouped-accessor-pairs": "ported from eslint core, which marks it recommended:false; not " +
 		"enforced by either tool when the inventory was captured, and the audit measured zero " +
 		"violations; upstream's enforceForTSTypes option is declined, see the comment above",
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// The audit rated it Maybe and measured 45 sites, so this is a cleanup rather than a guardrail,
+	// and the repair is a suggestion rather than a fix: writing a comment into an empty body asserts
+	// that the emptiness is deliberate, which is a claim about intent that nothing may make
+	// unattended.
+	//
+	// Worth recording because it changes what the typescript-eslint extension is for. That extension
+	// reads as though it adds the TypeScript kinds, and measured against eslint 10.8.1 it does not:
+	// core already exempts a private constructor, a protected constructor, a constructor taking
+	// parameter properties, a decorated method and an override method. The only real difference is
+	// spelling, `private-constructors` against `privateConstructors`, and core refuses the kebab
+	// form at config load. This port is the core rule and refuses it too.
+	"no-empty-function": "ported from eslint core, which marks it recommended:false; not enforced " +
+		"by either tool when the inventory was captured, and the audit measured 45 violations it " +
+		"will now require somebody to work through by hand",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
