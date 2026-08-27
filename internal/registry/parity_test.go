@@ -1603,6 +1603,33 @@ var rulesOutsideTheInventory = map[string]string{
 	"no-implicit-coercion": "ported from eslint core, which marks it recommended:false; not " +
 		"enforced by either tool when the inventory was captured, and the audit measured 52 " +
 		"violations while this port measures 59, of which 55 carry a fix and 4 a suggestion",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// 29 findings across 13 files, exactly what the audit measured, and the installed eslint
+	// reports the same 29 at the same line and column. All 29 carry a fix, and since a fix is
+	// applied unattended the stronger check is the rewrite: this port's fixes were applied to all
+	// 13 real files and the resulting bytes match eslint's own single-pass output byte for byte.
+	//
+	// The judgment is small and the repair is the port. Upstream spends 148 of its 170 reporting
+	// cases on parenthesization, and three separate parser differences had to be measured rather
+	// than transcribed. Our parser puts `++a` and `-a` under one kind where ESTree splits
+	// UpdateExpression from UnaryExpression, and the split decides whether the base is wrapped. It
+	// keeps parentheses ESTree folds, so an operand's own parens would otherwise be doubled. And
+	// `globalThis` resolves to a symbol with ZERO declarations, so an all-ambient test answered
+	// false on the one case it had to accept, which is the trap the brief records against
+	// resolvesToAGlobal met for real.
+	//
+	// One divergence is stated rather than hidden. Upstream drives a reference tracker that follows
+	// Math.pow through four alias forms; resolution cannot, because an alias binds the name to a
+	// local declaration. Upstream's own corpus contains zero alias cases and this tree has none, so
+	// the gap costs findings rather than adding them, which is the safe direction for a rewriting
+	// rule.
+	"prefer-exponentiation-operator": "ported from eslint core, which marks it recommended:false; " +
+		"not enforced by either tool when the inventory was captured, and both the audit and this " +
+		"port measure 29 violations, all auto-fixable and all rewriting identically to eslint",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
