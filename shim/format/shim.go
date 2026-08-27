@@ -1,6 +1,6 @@
 // Package format re-exports typescript-go's formatter.
 //
-// Hand-written rather than generated, for the same reason the parser shim is: gen_shims covers the
+// Hand-written rather than generated, for the same reason the parser shim is: generate_shims covers the
 // packages a headless linter needs, and formatting is not among them.
 //
 // Note this is internal/format, the editor's formatter, and not internal/printer, which is the

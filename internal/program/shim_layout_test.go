@@ -266,7 +266,7 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 const layoutDriftAdvice = "\n" +
 	"The mirror in shim/checker/shim.go has drifted from upstream's layout, so this accessor is " +
 	"reading a different field.\n" +
-	"Two causes are worth separating. If `go run ./tools/gen_shims` now refuses, a substitution in " +
+	"Two causes are worth separating. If `go run ./tools/generate_shims` now refuses, a substitution in " +
 	"shim/checker/extra-shim.json no longer matches the size or alignment of the upstream type it " +
 	"replaces, and its message names which one.\n" +
 	"If the generator is happy and this still fails, the drift is one size alone cannot see: a " +

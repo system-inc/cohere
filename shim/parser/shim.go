@@ -1,6 +1,6 @@
 // Package parser re-exports the typescript-go parser entry points verify needs.
 //
-// Hand-written rather than generated: tools/gen_shims covers the eleven packages tsgolint needed,
+// Hand-written rather than generated: tools/generate_shims covers the eleven packages tsgolint needed,
 // and the parser was not among them because a headless linter is handed a program rather than
 // parsing files itself. Rule fixtures do parse single files, so this exists for them.
 package parser

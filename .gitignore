@@ -15,7 +15,7 @@
 /verify-release
 /vendor_react_fixtures
 /extract_oxc_fixtures
-/gen_shims
+/generate_shims
 /generate_collapse
 /stage_dispatcher
 /dist/
