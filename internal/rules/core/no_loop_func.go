@@ -104,6 +104,40 @@ var messageNoLoopFunc = rule.Message{
 // `for (var i=0; (function() { i; })(), i<l; i++) { }` is clean only because it is an immediately
 // invoked function.
 //
+// # Which node kinds are judged, and why ours are seven where upstream's are three
+//
+// Upstream listens on FunctionDeclaration, FunctionExpression and ArrowFunctionExpression. In
+// ESTree that reaches every function-like shape in the language, because an object shorthand
+// method, a getter, a setter, a class method, a class constructor and a static method ALL carry a
+// FunctionExpression as their `value`. Our parser gives each its own kind, so the same three
+// listeners reach none of them.
+//
+// Measured against the installed eslint 10.8.1 build: all eleven method-like shapes report, and
+// with three listeners verify reported two. The corpus writes no method, accessor or class in any
+// of its 96 cases, so nothing imported could see it. It was found by a cross-linter comparison on
+// the real tree, where eslint reported three findings verify missed, all three object shorthand
+// methods inside a `for(;;)` loop capturing reassigned outer bindings.
+//
+// The loop-boundary climb is widened to match. Without that half, a closure written inside a method
+// would climb past the method, find the loop outside it, and be judged as though it ran once per
+// iteration.
+//
+// # A stated divergence: where the finding points on a method
+//
+// ESTree's FunctionExpression for `onStatement(sql) { ... }` begins at the parameter list, because
+// the key belongs to the enclosing Property rather than to the function. So upstream's finding
+// starts at `(sql)` and ours starts at `onStatement`.
+//
+// Ours is deliberate. The method name is the part a reader navigates by, and a span that opens on
+// an anonymous parameter list tells them which line but not which member. The gate agrees this is
+// not a parity question: `internal/differential/differential.go` keys a finding on file, line and
+// rule, and its comment says column is excluded because the two gates locate findings at different
+// offsets often enough that comparing it would drown the real disagreements. Measured on the real
+// tree, all ten findings match on file and line; three differ in column by exactly the method name.
+//
+// Pinned by TestNoLoopFuncMethodSpanIncludesTheName so a later reader does not narrow it to match
+// upstream's node boundaries without knowing this was a choice.
+//
 // # No fix
 //
 // The repair is either changing a `var` to `let`, which changes the binding's scope and is not
@@ -137,10 +171,16 @@ var NoLoopFunc = rule.Rule{
 			checkLoopFunc(ctx, node, skippedImmediatelyInvoked, referencesByDeclaration)
 		}
 
+		// Every kind whose ESTree counterpart is a FunctionExpression, which is what upstream's
+		// three listeners cover. See loopFuncIsFunctionLike for the measurement.
 		return rule.Listeners{
 			ast.KindFunctionDeclaration: check,
 			ast.KindFunctionExpression:  check,
 			ast.KindArrowFunction:       check,
+			ast.KindMethodDeclaration:   check,
+			ast.KindGetAccessor:         check,
+			ast.KindSetAccessor:         check,
+			ast.KindConstructor:         check,
 		}
 	},
 }
@@ -238,7 +278,9 @@ func loopFuncContainingLoop(node *ast.Node, skippedImmediatelyInvoked map[*ast.N
 				return parent
 			}
 
-		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+			ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
+			ast.KindConstructor:
 			if skippedImmediatelyInvoked[parent] {
 				break
 			}

@@ -513,6 +513,153 @@ func TestNoLoopFuncDestructuredBindingsCarryTheirKind(t *testing.T) {
 	}
 }
 
+// TestNoLoopFuncJudgesEveryMethodLikeShape covers a whole node-kind family the corpus never writes.
+//
+// Upstream listens on FunctionDeclaration, FunctionExpression and ArrowFunctionExpression, and in
+// ESTree that is enough: an object shorthand method, a getter, a setter, a class method and a class
+// constructor ALL carry a FunctionExpression as their value, so one listener reaches every one of
+// them. Our parser gives each its own kind, so the same three listeners reach none of them.
+//
+// The corpus writes no method, accessor or class anywhere in its 96 cases, so nothing imported could
+// see it. It was found by a cross-linter comparison on the real tree: ESLint reported three findings
+// verify missed, all three in one file, all three object shorthand methods inside a `for(;;)` loop
+// capturing reassigned outer bindings.
+//
+// Measured against the installed eslint 10.8.1 build: all eleven rows report, and before the
+// listener was widened verify reported two of them.
+func TestNoLoopFuncJudgesEveryMethodLikeShape(t *testing.T) {
+	cases := []struct {
+		name   string
+		source string
+	}{
+		{"an object shorthand method", "var u; for (var i=0;i<3;i++) { g({ m() { return u; } }); } u = 1;"},
+		{"an object function expression", "var u; for (var i=0;i<3;i++) { g({ m: function () { return u; } }); } u = 1;"},
+		{"an object arrow", "var u; for (var i=0;i<3;i++) { g({ m: () => u }); } u = 1;"},
+		{"an object getter", "var u; for (var i=0;i<3;i++) { g({ get m() { return u; } }); } u = 1;"},
+		{"an object setter", "var u; for (var i=0;i<3;i++) { g({ set m(v) { u; } }); } u = 1;"},
+		{"an object generator method", "var u; for (var i=0;i<3;i++) { g({ *m() { return u; } }); } u = 1;"},
+		{"an object async method", "var u; for (var i=0;i<3;i++) { g({ async m() { return u; } }); } u = 1;"},
+		{"a class method", "var u; for (var i=0;i<3;i++) { g(class { m() { return u; } }); } u = 1;"},
+		{"a class getter", "var u; for (var i=0;i<3;i++) { g(class { get m() { return u; } }); } u = 1;"},
+		{"a class constructor", "var u; for (var i=0;i<3;i++) { g(class { constructor() { u; } }); } u = 1;"},
+		{"a class static method", "var u; for (var i=0;i<3;i++) { g(class { static m() { return u; } }); } u = 1;"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
+			ruletest.ExpectFindings(t, result, "unsafeRefs")
+			const want = "The unsafe reference is to 'u'."
+			got := result.Diagnostics[0].Message.Description
+			if !strings.HasSuffix(got, want) {
+				t.Errorf("message: got %q, want it to end with %q", got, want)
+			}
+		})
+	}
+}
+
+// TestNoLoopFuncMethodLikeShapesStaySilentWhenSafe is the other half of the widened listener.
+//
+// Widening a listener can only add findings, so it needs a clean side or it is a detector rather
+// than a discriminator. These are the same eleven shapes with the capture made safe, so every one of
+// them must stay silent for the same reasons a plain function expression would.
+//
+// Measured against the installed eslint 10.8.1 build: silent on all of them.
+func TestNoLoopFuncMethodLikeShapesStaySilentWhenSafe(t *testing.T) {
+	cases := []struct {
+		name   string
+		source string
+	}{
+		{"a shorthand method capturing a per-iteration let", "for (let i=0;i<3;i++) { g({ m() { return i; } }); }"},
+		{"a shorthand method capturing an unwritten outer binding", "var u; for (var i=0;i<3;i++) { g({ m() { return u; } }); }"},
+		{"a getter capturing a const", "const u = 1; for (var i=0;i<3;i++) { g({ get m() { return u; } }); }"},
+		{"a class method capturing a per-iteration const", "for (const c of cs) { g(class { m() { return c; } }); }"},
+		{"a constructor capturing an unwritten outer binding", "var u; for (var i=0;i<3;i++) { g(class { constructor() { u; } }); }"},
+		{"a method outside any loop", "var u; g({ m() { return u; } }); u = 1;"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ruletest.ExpectClean(t,
+				ruletest.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source))
+		})
+	}
+}
+
+// TestNoLoopFuncNestedClosureInsideAMethodAnchorsOnTheMethod pins the loop-boundary half of the fix.
+//
+// Widening the listener alone is not enough: the climb that finds a function's containing loop has
+// to treat a method as a boundary too, or a closure written inside a method would climb past it,
+// find the loop outside, and be judged as though it ran per iteration.
+//
+// Measured against the installed eslint 10.8.1 build: the inner arrow is NOT reported, because its
+// containing function is the method rather than the loop, and only the method itself is.
+func TestNoLoopFuncNestedClosureInsideAMethodAnchorsOnTheMethod(t *testing.T) {
+	const source = "var u; for (var i=0;i<3;i++) { g({ m() { return () => u; } }); } u = 1;"
+	result := ruletest.RunTyped(t, NoLoopFunc, loopFuncFile, source)
+	ruletest.ExpectFindings(t, result, "unsafeRefs")
+
+	// The finding is on the method, not on the arrow inside it.
+	onDisk := harnessSource(source)
+	got := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
+	const want = "m() { return () => u; }"
+	if got != want {
+		t.Errorf("span: got %q, want %q", got, want)
+	}
+}
+
+// TestNoLoopFuncMethodSpanIncludesTheName pins a stated divergence from upstream.
+//
+// ESTree's FunctionExpression for a shorthand method begins at the parameter list, because the key
+// belongs to the enclosing Property. Upstream therefore reports from `(statementSql)`; we report
+// from `onStatement`, so a reader can see which member is at fault.
+//
+// Measured on the real tree: verify and eslint agree on all ten findings by file and line, and
+// differ in column on exactly the three methods, by exactly the length of the name. The gate keys
+// on file, line and rule and excludes column deliberately, so this is not a parity failure.
+//
+// Asserted here so the choice cannot be quietly narrowed back to upstream's node boundaries.
+func TestNoLoopFuncMethodSpanIncludesTheName(t *testing.T) {
+	cases := []struct {
+		name   string
+		source string
+		want   string
+	}{
+		{
+			"a shorthand method, from its name",
+			"var u; for (var i=0;i<3;i++) { g({ onStatement(sql) { return u; } }); } u = 1;",
+			"onStatement(sql) { return u; }",
+		},
+		{
+			"a getter, including the get keyword",
+			"var u; for (var i=0;i<3;i++) { g({ get m() { return u; } }); } u = 1;",
+			"get m() { return u; }",
+		},
+		{
+			"a class method, from its name",
+			"var u; for (var i=0;i<3;i++) { g(class { m() { return u; } }); } u = 1;",
+			"m() { return u; }",
+		},
+		{
+			"a plain function expression is unaffected, and has no name to include",
+			"var u; for (var i=0;i<3;i++) { g({ m: function () { return u; } }); } u = 1;",
+			"function () { return u; }",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
+			ruletest.ExpectFindings(t, result, "unsafeRefs")
+			onDisk := harnessSource(testCase.source)
+			got := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
+			if got != testCase.want {
+				t.Errorf("span: got %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}
+
 // TestNoLoopFuncAsyncImmediatelyInvokedIsNotSkipped covers the half of the skip the corpus omits.
 //
 // Upstream applies the immediately-invoked skip only to a function that is neither async nor a
