@@ -402,6 +402,16 @@ var rulesOutsideTheInventory = map[string]string{
 	// as in the port's own commit so it cannot land quietly.
 	"@typescript-eslint/non-nullable-type-assertion-style": "ported from typescript-eslint, whose stylistic preset carries it; not enforced by either tool when the inventory was captured, and this port measures 57 violations against the audit's 55, all auto-fixable",
 
+	// Ported from typescript-eslint and enabled in both engines by this port. Upstream carries it in
+	// its STRICT preset, which neither tool being replaced had on, so its absence from the inventory
+	// says nothing about the rule. A rule the gate never had rather than a parity gap.
+	//
+	// The audit measured 15 violations in ahra and this port measures the same count. They are not
+	// auto-fixable and each is a real decision, since turning a static-only class into a module is a
+	// change to how every caller imports it. Most are the same shape, a module-style api object
+	// written as a class of statics.
+	"@typescript-eslint/no-extraneous-class": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured, and the audit measured 15 violations, none auto-fixable",
+
 	// Ported from typescript-eslint and registered, but deliberately NOT enabled: the live config
 	// already turns it off at VerifySettings.json:370 under the `typescript/` spelling, and the port
 	// does not reverse somebody's standing decision. The reason is recorded in full beside its entry
