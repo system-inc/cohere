@@ -112,3 +112,31 @@ func TestOrmColumnNullableParityFires(t *testing.T) {
 		})
 	}
 }
+
+// TestOrmColumnNullableParityKeysOnTheDecoratorName pins the name-shaped behaviour.
+//
+// The rule reads a decorator's callee SPELLING rather than resolving it, which is what keeps the
+// decorator half of this rule free of the type checker. Two consequences, both measured against the
+// real rule, which agrees on both:
+//
+//	a LOCAL function named OrmColumn      REPORTS, it is not the real decorator
+//	a NAMESPACED @N.OrmColumn call        clean, a qualified name is a different symbol
+//
+// The first row looks like a defect and is fidelity. The second is the shelf's `CallName` declining
+// anything that is not a bare identifier, which is deliberate there and is the behaviour the real
+// rule has too.
+//
+// Pinned because a reader meeting the first row will reasonably want to resolve the binding, and
+// doing that would change what the rule is.
+func TestOrmColumnNullableParityKeysOnTheDecoratorName(t *testing.T) {
+	const preamble = "declare function OrmColumn(o?: any): any;\ndeclare function SerializableField(o?: any): any;\n"
+
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, OrmColumnNullableParity,
+		ormColumnNullableParityFile,
+		preamble+"function OrmColumn(o?: any): any { return null; }\nclass A { @OrmColumn({ nullable: true }) x!: string; }"),
+		"columnNullableButTypeNot")
+
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, OrmColumnNullableParity,
+		ormColumnNullableParityFile,
+		preamble+"namespace N { export function OrmColumn(o?: any): any { return null; } }\nclass A { @N.OrmColumn({ nullable: true }) x!: string; }"))
+}

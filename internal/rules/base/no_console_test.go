@@ -237,6 +237,52 @@ func TestNoConsoleFires(t *testing.T) {
 	}
 }
 
+// TestNoConsoleReportsAnyBindingNamedConsole pins the name-shaped behaviour.
+//
+// The rule tests a NAME rather than resolving a binding, which is what keeps it free of the type
+// checker. The consequence is that a local, an import or a parameter called `console` reports even
+// though it shadows the global and is not the global at all:
+//
+//	const console = { log(){} }; console.log('x')      REPORTS
+//	import { console } from './shim'; console.log('x') REPORTS
+//	function f(console: {...}) { console.log('x') }    REPORTS
+//	const o = { console: {...} }; o.console.log('x')   clean, the receiver is o.console
+//	class A { console = {...}; this.console.log('x') } clean, the receiver is this
+//
+// All five measured against the real rule, which agrees on all five. So this is fidelity rather than
+// a defect, and it is pinned here because it looks exactly like a defect: a reader meeting the first
+// three rows will reasonably want to "fix" them by resolving the binding, which would change what
+// the rule is and make it need a checker.
+//
+// The sibling rule `no-global-container` has the same shape and the same behaviour, found the same
+// way. It is a property of every base rule that keys on an identifier's spelling.
+func TestNoConsoleReportsAnyBindingNamedConsole(t *testing.T) {
+	reporting := []string{
+		"function f() { const console = { log(){} }; console.log('x'); }",
+		"import { console } from './shim'; console.log('x');",
+		"function f(console: { log(x: string): void }) { console.log('x'); }",
+	}
+	for index, sourceText := range reporting {
+		t.Run("reports"+strconv.Itoa(index), func(t *testing.T) {
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoConsole, noConsoleFile, sourceText),
+				"noConsole")
+		})
+	}
+
+	// The controls, which is what makes the rows above a measurement of the NAME test rather than of
+	// the rule reporting everything. In both of these the receiver of the member access is not the
+	// bare identifier, so the rule declines.
+	clean := []string{
+		"const o = { console: { log(){} } }; o.console.log('x');",
+		"class A { console = { log(){} }; m() { this.console.log('x'); } }",
+	}
+	for index, sourceText := range clean {
+		t.Run("clean"+strconv.Itoa(index), func(t *testing.T) {
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoConsole, noConsoleFile, sourceText))
+		})
+	}
+}
+
 // TestNoConsoleMatchesTheSourceRepository records the whole-repository comparison.
 //
 // This is the check a base rule gets instead of an imported corpus, and it is stronger than one: the

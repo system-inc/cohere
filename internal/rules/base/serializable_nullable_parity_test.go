@@ -118,3 +118,26 @@ func TestSerializableNullableParityFires(t *testing.T) {
 		})
 	}
 }
+
+// TestSerializableNullableParityKeysOnTheDecoratorName pins the name-shaped behaviour.
+//
+// The same property as the column sibling, measured the same way and agreeing with the real rule on
+// both rows:
+//
+//	a LOCAL function named SerializableField   REPORTS
+//	a NAMESPACED @N.SerializableField call     clean
+//
+// It is a property of every base rule that keys on an identifier's spelling rather than resolving
+// it, and it is written down in both files because each reads as a defect on its own.
+func TestSerializableNullableParityKeysOnTheDecoratorName(t *testing.T) {
+	const preamble = "declare function OrmColumn(o?: any): any;\ndeclare function SerializableField(o?: any): any;\n"
+
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, SerializableNullableParity,
+		serializableNullableParityFile,
+		preamble+"function SerializableField(o?: any): any { return null; }\nclass A { @SerializableField({ optional: true }) x!: string; }"),
+		"decoratorOptionalButTypeNot")
+
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, SerializableNullableParity,
+		serializableNullableParityFile,
+		preamble+"namespace N { export function SerializableField(o?: any): any { return null; } }\nclass A { @N.SerializableField({ optional: true }) x!: string; }"))
+}
