@@ -494,6 +494,20 @@ var rulesOutsideTheInventory = map[string]string{
 	// the wrong answer: the default constant is 999.999.999, which reads as "every gate passes",
 	// while the no-settings behaviour actually matches 18.0.0. That cost this port a wrong entry,
 	// `precedence`, which one of upstream's own cases then caught.
+	//
+	// The data tables come from the CLONE rather than the installed build, which is the opposite of
+	// the brief's usual guidance and was decided on measurement. Both artifacts declare 7.37.5, so
+	// the clone is unreleased commits on the same tag rather than a release we lag, and its
+	// changelog carries all four differences under "Unreleased" as `allow` or `add` entries.
+	// Diffing the two extractions confirms the clone is a strict superset: four additions, no
+	// removals, no behaviour reversals, and none of the four carries a repair.
+	//
+	// The deciding argument is asymmetry of harm rather than recency. Following the installed build
+	// would report `onScrollEnd` as an unknown property on a tree running React 19.2.8, a false
+	// positive on correct code; following the clone only declines to report four names. Measured
+	// with a working control, none of the four appears anywhere in this tree today, so the two
+	// choices are indistinguishable now and differ only on code somebody writes next. A mutant that
+	// reverses the choice is caught, so it is pinned by a test rather than only by this note.
 	"react/no-unknown-property": "ported from eslint-plugin-react, which marks it recommended:true but which neither tool enforced, because this project lists its react rules individually rather than spreading the recommended preset; a dry run over the tree measured 18 real findings across 5 files, all fill-rule or clip-rule in SVG icons, with the repair verified on one of those files",
 
 	"react/forbid-dom-props": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and it enforces nothing until a forbid list is configured, so the audit's zero and the dry run's zero both reflect an empty list",

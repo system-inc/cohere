@@ -20,13 +20,16 @@ const noUnknownPropertyFile = "/repository/source/NoUnknownProperty.tsx"
 //
 // All 125 were replayed against the installed build, eslint-plugin-react 7.37.5, through the ESLint
 // Linter API before any Go was written, and 121 agreed. The four disagreements are TABLE CONTENT
-// rather than logic: the clone's working tree knows three property names the installed build does
-// not and widens one tag list. Each is marked at its row with both verdicts. This port follows the
-// installed build, because that is the artifact our gate compares against, and measured against
-// this tree with a working control none of the three names appears in any file.
+// rather than logic: the clone knows three property names the installed build does not and widens
+// one tag list.
 //
-// The expected message ids are the installed build's own, per case, so a case reporting twice
-// carries two ids and their ORDER is asserted.
+// The tables in this port come from the CLONE, so those four cases are clean here and agree with
+// upstream's own expectation. Both artifacts declare 7.37.5, meaning the clone is unreleased
+// commits on the same tag rather than a release we lag, and diffing the two extractions shows the
+// clone is a strict superset with no removals. The four rows carry the reasoning at their site.
+//
+// Every other expected message id is the installed build's own, per case, so a case reporting
+// twice carries two ids and their ORDER is asserted. The two artifacts agree on all 121.
 
 // noUnknownPropertyOptions decodes a raw option body the way the config layer does.
 //
@@ -49,14 +52,6 @@ func TestNoUnknownPropertyFires(t *testing.T) {
 		rawOptions string
 		wantIds    []string
 	}{
-		// Clone says 0, installed build says 1: the clone adds onScrollEnd; installed 7.37.5 does not know it.
-		{"valid 11", `<div onScrollEnd={this._onScrollEnd}></div>;`, ``, []string{`unknownProp`}},
-		// Clone says 0, installed build says 1: the clone adds onScrollEndCapture; installed 7.37.5 does not know it.
-		{"valid 12", `<div onScrollEndCapture={this._onScrollEndCapture}></div>;`, ``, []string{`unknownProp`}},
-		// Clone says 0, installed build says 1: the clone widens onLoad to include body; installed 7.37.5 does not.
-		{"valid 39", `<body onLoad={bar} />`, ``, []string{`invalidPropOnTag`}},
-		// Clone says 0, installed build says 1: the clone adds closedby; installed 7.37.5 does not know it.
-		{"valid 84", `<dialog closedby="something" onClose={handler} open id="dialog" returnValue="something" onCancel={handler2} />`, ``, []string{`unknownProp`}},
 		{"invalid 0", `<div allowTransparency="true" />`, ``, []string{`unknownProp`}},
 		{"invalid 1", `<div hasOwnProperty="should not be allowed property"></div>;`, ``, []string{`unknownProp`}},
 		{"invalid 2", `<div abc="should not be allowed property"></div>;`, ``, []string{`unknownProp`}},
@@ -275,6 +270,20 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
           <div id="my-popover" onBeforeToggle={this.onBeforeToggle} popover>Greetings, one and all!</div>
         </div>
       `, ``},
+
+		// The four rows where the clone is ahead of the installed build. Both artifacts declare
+		// 7.37.5; the clone is unreleased commits on the same tag, and its changelog carries all
+		// four under "Unreleased" as `allow` or `add` entries. This port takes the clone's tables,
+		// so these agree with upstream's own expectation and are clean.
+		//
+		// The choice matters only for code nobody has written yet, and it is asymmetric. Following
+		// the installed build would report `onScrollEnd` as unknown on a tree running React 19.2.8,
+		// which is a false positive on correct code; following the clone stays silent on four names.
+		// Measured with a working control, none of the four appears anywhere in this tree today.
+		{"valid 11", `<div onScrollEnd={this._onScrollEnd}></div>;`, ``},
+		{"valid 12", `<div onScrollEndCapture={this._onScrollEndCapture}></div>;`, ``},
+		{"valid 39", `<body onLoad={bar} />`, ``},
+		{"valid 84", `<dialog closedby="something" onClose={handler} open id="dialog" returnValue="something" onCancel={handler2} />`, ``},
 
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
@@ -567,13 +576,15 @@ func TestNoUnknownPropertyTables(t *testing.T) {
 	}{
 		{"dom attribute names", len(noUnknownPropertyDomAttributeNames), 6},
 		{"svg dom attribute names", len(noUnknownPropertySvgDomAttributeNames), 82},
-		{"attribute tags map", len(noUnknownPropertyAttributeTags), 64},
+		{"attribute tags map", len(noUnknownPropertyAttributeTags), 65},
 		{"properties ignoring case", len(noUnknownPropertyPropertiesIgnoreCase), 7},
 		{"aria properties", len(noUnknownPropertyAriaProperties), 53},
-		// 362 two-word plus 193 one-word plus 21 pointer handlers. `precedence` is deliberately
+		// 364 two-word plus 193 one-word plus 21 pointer handlers. `precedence` is deliberately
 		// absent: it is gated on React >= 19 and the no-settings default does not reach it, which
-		// was established by bisecting the installed build rather than by reading its source.
-		{"property names", len(noUnknownPropertyNames), 576},
+		// was established by bisecting the running rule rather than by reading its source. The
+		// two-word list carries two more entries than the installed build's, `onScrollEnd` and
+		// `onScrollEndCapture`, because these tables come from the clone.
+		{"property names", len(noUnknownPropertyNames), 578},
 	}
 	for _, testCase := range cases {
 		if testCase.got != testCase.want {

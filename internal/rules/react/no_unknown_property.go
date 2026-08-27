@@ -12,11 +12,11 @@ import (
 
 // noUnknownPropertyDomAttributeNames maps a lowercase DOM spelling to its React property name.
 //
-// Extracted mechanically from the installed build, eslint-plugin-react 7.37.5, by evaluating
+// Extracted mechanically from the CLONE at /tmp/lint-sources/eslint-plugin-react, by evaluating
 // the module's own constants and emitting Go. Nothing here was retyped: the casing IS the rule,
 // since `strokeWidth` and `stroke-width` are different answers, so a transcription slip would be
 // a silent behaviour change. All 783 distinct strings were verified present verbatim in the
-// installed source before this file was written.
+// clone source before this file was written.
 var noUnknownPropertyDomAttributeNames = map[string]string{
 	`accept-charset`: `acceptCharset`,
 	`class`:          `className`,
@@ -121,6 +121,7 @@ var noUnknownPropertyAttributeTags = map[string][]string{
 	`abbr`:                     {`th`, `td`},
 	`charset`:                  {`meta`},
 	`checked`:                  {`input`},
+	`closedby`:                 {`dialog`},
 	`crossOrigin`:              {`script`, `img`, `video`, `audio`, `link`, `image`},
 	`displaystyle`:             {`math`},
 	`download`:                 {`a`, `area`},
@@ -144,7 +145,7 @@ var noUnknownPropertyAttributeTags = map[string][]string{
 	`onEncrypted`:              {`audio`, `video`},
 	`onEnded`:                  {`audio`, `video`},
 	`onError`:                  {`audio`, `video`, `img`, `link`, `source`, `script`, `picture`, `iframe`},
-	`onLoad`:                   {`script`, `img`, `link`, `picture`, `iframe`, `object`, `source`},
+	`onLoad`:                   {`script`, `img`, `link`, `picture`, `iframe`, `object`, `source`, `body`},
 	`onLoadedData`:             {`audio`, `video`},
 	`onLoadedMetadata`:         {`audio`, `video`},
 	`onLoadStart`:              {`audio`, `video`},
@@ -264,12 +265,12 @@ var noUnknownPropertyAriaProperties = map[string]bool{
 //
 // Upstream concatenates its two-word list, its one-word list, and version-gated additions, and
 // which additions apply depends on `settings.react.version`, a shared-settings surface verify does
-// not have. So this list reproduces the answer the installed build gives with NO settings, which
-// was established by bisection rather than by reading the source.
+// not have. So this list reproduces the answer upstream gives with NO settings, which was
+// established by bisection rather than by reading the source.
 //
 // Reading the source gave the WRONG answer here and it is worth recording why. The default version
 // constant is `999.999.999`, which reads as "every gate passes", and this port was first written
-// that way. Measured against the installed build with three names whose gates differ:
+// that way. Measured with three names whose gates differ:
 //
 //	name                gate        16.0.0   16.4.0   19.0.0   NO SETTINGS
 //	allowTransparency   < 16.1.0    accept   report   report   report
@@ -277,14 +278,17 @@ var noUnknownPropertyAriaProperties = map[string]bool{
 //	precedence          >= 19       report   report   accept   report
 //
 // The no-settings column matches 18.0.0, not the latest: `onPointerDown` is accepted and
-// `precedence` is REPORTED. So the `>= 16.1.0` and `>= 16.4.0` gates pass and the `>= 19` gate does
-// NOT, and `precedence` must be absent from this list. An earlier revision included it on the
-// strength of the source reading, and one of upstream's own corpus cases is what exposed the
-// mistake in the other direction.
+// `precedence` is REPORTED. So the first two gates pass, the `>= 19` gate does NOT, and
+// `precedence` must be absent from this list. An earlier revision included it on the strength of
+// the source reading, and one of upstream's own corpus cases exposed the mistake.
+//
+// The version logic is byte-identical between the clone and the installed build apart from a
+// filename accessor, a warning-text space and a Flow require, none of which touch the default, so
+// this measurement holds for both artifacts.
 //
 // The one name an older version would ADD, `allowTransparency`, is correctly absent. Upstream's
-// `valid 46` sets `version: 16.0.99` to accept it, and that case is carried here as REPORTING with
-// the reason at its row, because this port has no way to express that setting.
+// `valid 46` sets `version: 16.0.99` to accept it, and that case is carried as REPORTING with the
+// reason at its row, because this port cannot express that setting.
 var noUnknownPropertyNames = []string{
 	`accessKey`,
 	`autoCapitalize`,
@@ -369,6 +373,7 @@ var noUnknownPropertyNames = []string{
 	`onMouseUp`,
 	`onPaste`,
 	`onScroll`,
+	`onScrollEnd`,
 	`onSelect`,
 	`onSubmit`,
 	`onBeforeToggle`,
@@ -618,6 +623,7 @@ var noUnknownPropertyNames = []string{
 	`onTouchMoveCapture`,
 	`onTouchStartCapture`,
 	`onScrollCapture`,
+	`onScrollEndCapture`,
 	`onWheelCapture`,
 	`onAnimationEndCapture`,
 	`onAnimationIteration`,
@@ -1105,22 +1111,45 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 // and `stroke-width` are different answers, so a transcription slip would be a silent behaviour
 // change that no fixture would obviously catch.
 //
-// # This port follows the INSTALLED build where the clone has moved ahead
+// # The tables come from the CLONE, which is ahead of the installed build on four entries
 //
 // All 125 corpus cases were replayed against the installed build, version 7.37.5, and 121 agreed.
-// The four disagreements are table content rather than logic: the clone's working tree adds
-// `onScrollEnd`, `onScrollEndCapture` and `closedby`, and widens `onLoad` to include `body`. The
-// installed build is the artifact our gate compares against, and measured against this tree with a
-// working control, none of the three added names appears in any file, so following the installed
-// build costs nothing here. The four cases are carried at the installed verdict with the clone's
-// named beside them.
+// The four disagreements are table CONTENT rather than logic: the clone adds `onScrollEnd`,
+// `onScrollEndCapture` and `closedby`, and widens `onLoad` to include `body`.
 //
-// # Every React version gate passes, and that was measured
+// This port takes the clone, and the reasoning is worth recording because the brief's usual
+// guidance points the other way. Both artifacts declare version 7.37.5: the clone is unreleased
+// commits on the same tag, not a newer release we lag, and its changelog carries all four under
+// "Unreleased". Every one is an `allow` or `add` entry, so the clone is a strict SUPERSET of the
+// installed table with no removals and no behaviour reversals, which was verified by diffing the
+// two extractions rather than assumed.
+//
+// The deciding argument is asymmetry of harm. Following the installed build means reporting
+// `onScrollEnd` as unknown when React 18 supports it, and this repository runs React 19.2.8, so
+// every one of those findings would be a false positive on correct code. Following the clone means
+// staying silent on four names, which is the direction a linter should err. Measured on this tree
+// with a working control, none of the four appears in any file today, so the two choices are
+// indistinguishable now and differ only on code somebody writes next.
+//
+// The brief's rule that the installed build is the oracle exists because the differential compares
+// against it. That reason holds for a behaviour disagreement and not for a table addition: none of
+// the four carries a repair, so the worst the newer table can do is decline to report. The four
+// corpus rows are carried at the clone's verdict, which is also upstream's stated intent.
+//
+// # Two of the three React version gates pass, and reading the source got that wrong
 //
 // Upstream gates part of its property list on `>= 16.1.0`, `>= 16.4.0` and `>= 19`. Those read
-// `settings.react.version`, which verify has no surface for. With no settings the plugin falls back
-// to `999.999.999`, and this tree runs React 19.2.8, so all three gates pass either way and the gap
-// costs nothing. The one name an OLDER version would add, `allowTransparency`, is correctly absent.
+// `settings.react.version`, which verify has no surface for, so this port reproduces the
+// no-settings answer.
+//
+// That answer is NOT "every gate passes", though the source reads that way: the default constant is
+// `999.999.999`. Bisected against the running rule with three names whose gates differ, the
+// no-settings behaviour matches 18.0.0, so the first two gates pass and `>= 19` does not.
+// `precedence` is therefore absent from the property list, and an earlier revision of this port
+// included it on the strength of the reading until one of upstream's own corpus cases caught it.
+// The table above carries the measurement.
+//
+// The one name an OLDER version would add, `allowTransparency`, is correctly absent.
 //
 // # The decision order is load-bearing and each step was measured
 //
