@@ -412,6 +412,15 @@ var rulesOutsideTheInventory = map[string]string{
 	// written as a class of statics.
 	"@typescript-eslint/no-extraneous-class": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured, and the audit measured 15 violations, none auto-fixable",
 
+	// Ported from typescript-eslint and enabled in both engines by this port. Upstream carries it in
+	// its STYLISTIC preset, which neither tool being replaced had on, so its absence from the
+	// inventory says nothing about the rule. A rule the gate never had rather than a parity gap.
+	//
+	// The audit measured 5 violations in ahra and this port measures the same count. They are not
+	// auto-fixable, upstream ships no fixer either, and each is a small mechanical rewrite of a
+	// counted loop into a for-of.
+	"@typescript-eslint/prefer-for-of": "ported from typescript-eslint, whose stylistic preset carries it; not enforced by either tool when the inventory was captured, and the audit measured 5 violations, none auto-fixable",
+
 	// Ported from typescript-eslint and registered, but deliberately NOT enabled: the live config
 	// already turns it off at VerifySettings.json:370 under the `typescript/` spelling, and the port
 	// does not reverse somebody's standing decision. The reason is recorded in full beside its entry
