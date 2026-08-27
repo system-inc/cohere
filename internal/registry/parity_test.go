@@ -804,6 +804,25 @@ var rulesOutsideTheInventory = map[string]string{
 	"no-implicit-globals": "ported from eslint core, which marks it recommended:false; not enforced " +
 		"by either tool when the inventory was captured, and the audit measured zero violations",
 
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// This one is a real cleanup rather than a guardrail. The audit measured 172 violations and this
+	// port measures 168 across the tree, none auto-fixable, since upstream ships a SUGGESTION rather
+	// than a fix: adding a radix changes what a call returns for any string whose base was being
+	// inferred, so a human has to choose it per site. That is a decision for Kirk rather than
+	// something this port should quietly land, and it is called out in the commit.
+	//
+	// One deliberate divergence, in the direction of catching more. Upstream asks eslint-scope for
+	// the PROGRAM scope's parseInt, so a block-scoped shadow anywhere in the file exempts every
+	// call; this port resolves per call site, so `{ let parseInt; } parseInt("10")` reports here and
+	// is clean upstream. Both answers are stated in a fixture.
+	"radix": "ported from eslint core, which marks it recommended:false; not enforced by either " +
+		"tool when the inventory was captured, and the audit measured 172 violations while this " +
+		"port measures 168, each needing a per-site decision because upstream offers a suggestion " +
+		"rather than a fix",
+
 	// Ported from eslint core and registered by this port, but enabled in neither engine. Outside
 	// the inventory for the usual reason: upstream marks it `recommended: false`, so a project on
 	// the recommended set never had it, and there is no oxlint config in the tree to have carried
