@@ -65,6 +65,18 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// make, and the audit puts the cost at four sites, three of them `results.sort()` over small
 		// number arrays inside test assertions where the default sort is harmless.
 		"@typescript-eslint/require-array-sort-compare": "the live config turns it off deliberately at VerifySettings.json:370, under the typescript/ spelling",
+
+		// The same situation as the entry above, one line earlier in the same block: the live
+		// config turns this off at VerifySettings.json:369 under the `typescript/` spelling, which
+		// does not resolve against the `@typescript-eslint/` name registered here. Enabling it was
+		// attempted and reverted rather than kept, because the two rules sit in the same
+		// hand-maintained list of deliberate disables and treating them differently would be
+		// arbitrary.
+		//
+		// The audit measures eleven sites, and unlike its neighbour this rule IS auto-fixable, so
+		// the cleanup is a command plus a review of the diff rather than eleven judgments. That
+		// makes it the cheaper of the two to turn on, and it is still not a porter's call.
+		"@typescript-eslint/no-meaningless-void-operator": "the live config turns it off deliberately at VerifySettings.json:369, under the typescript/ spelling",
 	}
 
 	rules := All()

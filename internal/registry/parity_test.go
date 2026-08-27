@@ -385,6 +385,11 @@ var rulesOutsideTheInventory = map[string]string{
 	// enforced it when the capture was taken.
 	"@typescript-eslint/require-array-sort-compare": "ported and registered but left off, matching an explicit off in the live config; not enforced by either tool when the inventory was captured",
 
+	// Ported and registered, deliberately not enabled, for the same reason as the entry above and
+	// against the same block of hand-maintained disables. The reason is recorded in full beside its
+	// entry in the live-wiring guard's exemption map.
+	"@typescript-eslint/no-meaningless-void-operator": "ported and registered but left off, matching an explicit off in the live config; not enforced by either tool when the inventory was captured",
+
 	// Ported from typescript-eslint, whose strict preset carries it, and enabled in both engines by
 	// this port. It is outside the inventory for the usual reason, that neither tool enforced it when
 	// the capture was taken, but this one has a wrinkle worth recording because the next reader will
