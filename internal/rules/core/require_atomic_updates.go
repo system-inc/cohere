@@ -400,6 +400,28 @@ func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings Requ
 		outdatedReadLattice{},
 	)
 
+	// One assignment can be judged more than once, and reporting each judgment would double the
+	// finding.
+	//
+	// The graph lays a `finally` block out TWICE, once for normal completion and once for the path
+	// leaving the `try` through return, throw, or a suspended yield. Both copies carry the same
+	// source positions, so a write inside a `finally` is walked twice and both copies can find it
+	// stale. Measured on the shape that surfaced it, which came off the real tree rather than out of
+	// the corpus:
+	//
+	//	function o() { let g = false; async function f() {
+	//	    if (g) return; g = true; try { await s(); } finally { g = false; } } }
+	//
+	// The installed rule reports `g = false` ONCE, at column 106. Before this, verify reported the
+	// identical span twice. No imported case could see it: upstream's corpus writes no assignment
+	// inside a `finally` at all, and its one try/catch case puts the writes in the arms.
+	//
+	// Deduplicating by the assignment's own position is the right key rather than by block, because
+	// the copies ARE one write in the source. `no-useless-assignment` hit the same duplicate layout
+	// and answered a different question about it, needing every copy to agree before reporting; here
+	// any copy finding it stale is a real race, so the first wins and the rest are the same finding.
+	reported := map[int]bool{}
+
 	for _, block := range graph.Blocks {
 		if !block.Reachable {
 			continue
@@ -413,6 +435,10 @@ func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings Requ
 			if event.isProperty && settings.AllowProperties {
 				return
 			}
+			if event.assignment == nil || reported[event.assignment.Pos()] {
+				return
+			}
+			reported[event.assignment.Pos()] = true
 			reportNonAtomicUpdate(ctx, event)
 		})
 	}

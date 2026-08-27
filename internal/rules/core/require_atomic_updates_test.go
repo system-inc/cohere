@@ -396,3 +396,64 @@ async function main() {
 	result := ruletest.RunTyped(t, RequireAtomicUpdates, "process.ts", source)
 	ruletest.ExpectFindings(t, result, "nonAtomicObjectUpdate", "nonAtomicObjectUpdate")
 }
+
+// TestRequireAtomicUpdatesFinallyReportsOnce pins the duplicate-layout defect the real tree found.
+//
+// The graph lays a `finally` block out twice, once for normal completion and once for the path
+// leaving the `try` abruptly, and both copies carry the same source positions. A write inside a
+// `finally` is therefore judged twice, and before the deduplication in `analyzeRootNonAtomicUpdates`
+// this reported the identical span twice.
+//
+// No imported case can see it: upstream's corpus writes no assignment inside a `finally` at all, and
+// its one try/catch case puts the writes in the arms. This came off `verify --lint` over the real
+// tree, where the guard-flag shape below appears in several files.
+//
+// Measured against the installed eslint 10.8.1: one finding, at the `g = false` in the `finally`.
+// The three controls beside it are what prove the shape is reported for the right reason, since each
+// removes exactly one element and upstream goes silent for two of them.
+func TestRequireAtomicUpdatesFinallyReportsOnce(t *testing.T) {
+	cases := []struct {
+		name   string
+		source string
+		want   []string
+	}{
+		{
+			name:   "a guard flag reset in finally reports once, not once per layout",
+			source: `function o() { let g = false; async function f() { if (g) return; g = true; try { await s(); } finally { g = false; } } }`,
+			want:   []string{"nonAtomicUpdate"},
+		},
+		{
+			name: "without the guard read there is nothing stale",
+			// The control: the `finally` write is still there and the read before the await is gone.
+			source: `function o() { let g = false; async function f() { g = true; try { await s(); } finally { g = false; } } }`,
+		},
+		{
+			name: "without the finally write there is nothing to report",
+			// The other control: the read is there and the write is gone.
+			source: `function o() { let g = false; async function f() { if (g) return; g = true; try { await s(); } finally { } } }`,
+		},
+		{
+			name:   "the same shape without a try still reports once",
+			source: `function o() { let g = false; async function f() { if (g) return; await s(); g = false; } }`,
+			want:   []string{"nonAtomicUpdate"},
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.RunTyped(t, RequireAtomicUpdates, "finally.ts", testCase.source)
+			if len(testCase.want) == 0 {
+				ruletest.ExpectClean(t, result)
+				return
+			}
+			ruletest.ExpectFindings(t, result, testCase.want...)
+			// The span is asserted too, because the defect this pins was two findings over ONE
+			// span, which a count assertion alone would pass once the count was fixed by any means.
+			written := result.SourceFile.Text()
+			got := written[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
+			if got != "g = false" {
+				t.Errorf("finding spans %q, want %q", got, "g = false")
+			}
+		})
+	}
+}
