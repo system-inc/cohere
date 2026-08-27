@@ -1,11 +1,11 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 269,
+  "total": 270,
   "byNamespace": {
     "(core)": 103,
     "@next": 22,
-    "@typescript-eslint": 36,
+    "@typescript-eslint": 37,
     "better-tailwindcss": 13,
     "nexus": 20,
     "react": 27,
@@ -13,257 +13,14 @@
     "structure": 31
   },
   "bySeverity": {
-    "error": 227,
+    "error": 228,
     "warn": 42
   },
   "byEnabledBy": {
     "pluginDefault": 41,
-    "rulesBlock": 228
+    "rulesBlock": 229
   },
   "rules": [
-    {
-      "rule": "better-tailwindcss/enforce-canonical-classes",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "better-tailwindcss/enforce-consistent-class-order",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "better-tailwindcss/enforce-consistent-variant-order",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "better-tailwindcss/enforce-consistent-important-position",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "better-tailwindcss/enforce-consistent-variable-syntax",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "better-tailwindcss/enforce-shorthand-classes",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "better-tailwindcss/no-concatenated-classes",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "better-tailwindcss/no-conflicting-classes",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "better-tailwindcss/no-deprecated-classes",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "better-tailwindcss/no-duplicate-classes",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "better-tailwindcss/no-unknown-classes",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "better-tailwindcss/no-unnecessary-whitespace",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "accessor-pairs",
-      "sources": [
-        "eslint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "array-callback-return",
-      "sources": [
-        "eslint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "arrow-body-style",
-      "sources": [
-        "eslint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "block-scoped-var",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "constructor-super",
-      "sources": [
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "warn",
-      "enabledBy": "pluginDefault"
-    },
-    {
-      "rule": "for-direction",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "getter-return",
-      "sources": [
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "warn",
-      "enabledBy": "pluginDefault"
-    },
-    {
-      "rule": "default-case-last",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-self-compare",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-undef-init",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-throw-literal",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-useless-call",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-alert",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "guard-for-in",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
     {
       "rule": "@next/next/google-font-display",
       "sources": [
@@ -484,6 +241,570 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "@typescript-eslint/await-thenable",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/ban-ts-comment",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/consistent-type-imports",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/default-param-last",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-array-delete",
+      "sources": [
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "@typescript-eslint/no-duplicate-enum-values",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-empty-object-type",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-explicit-any",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-extra-non-null-assertion",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-floating-promises",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-for-in-array",
+      "sources": [
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "@typescript-eslint/no-implied-eval",
+      "sources": [
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "@typescript-eslint/no-import-type-side-effects",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-invalid-this",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-misused-new",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-misused-promises",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-mixed-enums",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-non-null-asserted-optional-chain",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-non-null-assertion",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-require-imports",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-this-alias",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+      "sources": [
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "@typescript-eslint/no-unnecessary-type-constraint",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-unsafe-call",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-unsafe-declaration-merging",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-unsafe-function-type",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-unsafe-unary-minus",
+      "sources": [
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "@typescript-eslint/no-useless-empty-export",
+      "sources": [
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "@typescript-eslint/no-wrapper-object-types",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/only-throw-error",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/prefer-as-const",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/prefer-namespace-keyword",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/prefer-promise-reject-errors",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/prefer-reduce-type-parameter",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/related-getter-setter-pairs",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/switch-exhaustiveness-check",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/triple-slash-reference",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "accessor-pairs",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "array-callback-return",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "arrow-body-style",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/enforce-canonical-classes",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/enforce-consistent-class-order",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/enforce-consistent-important-position",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/enforce-consistent-variable-syntax",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/enforce-consistent-variant-order",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/enforce-shorthand-classes",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/no-concatenated-classes",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/no-conflicting-classes",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/no-deprecated-classes",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/no-duplicate-classes",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/no-unknown-classes",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/no-unnecessary-whitespace",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "better-tailwindcss/tailwind-no-physical-direction",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "block-scoped-var",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "constructor-super",
+      "sources": [
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "default-case-last",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "for-direction",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "getter-return",
+      "sources": [
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "guard-for-in",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "nexus/boundary-no-internal-import",
       "sources": [
         "eslint",
@@ -684,11 +1005,29 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-alert",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-array-constructor",
       "sources": [
         "oxlint"
       ],
       "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-array-constructor",
+      "sources": [
+        "eslint"
+      ],
+      "options": "unknown",
       "severity": "error",
       "enabledBy": "rulesBlock"
     },
@@ -780,6 +1119,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-constructor-return",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-control-regex",
       "sources": [
         "eslint",
@@ -804,6 +1152,15 @@
       "sources": [
         "eslint",
         "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-div-regex",
+      "sources": [
+        "eslint"
       ],
       "options": "no",
       "severity": "error",
@@ -898,6 +1255,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-extend-native",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-extra-bind",
       "sources": [
         "eslint"
@@ -975,13 +1341,13 @@
       "enabledBy": "rulesBlock"
     },
     {
-      "rule": "no-proto",
+      "rule": "no-iterator",
       "sources": [
-        "eslint"
+        "oxlint"
       ],
       "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
     },
     {
       "rule": "no-labels",
@@ -991,24 +1357,6 @@
       "options": "yes",
       "severity": "error",
       "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-extend-native",
-      "sources": [
-        "eslint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-iterator",
-      "sources": [
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "warn",
-      "enabledBy": "pluginDefault"
     },
     {
       "rule": "no-lone-blocks",
@@ -1049,7 +1397,7 @@
       "enabledBy": "rulesBlock"
     },
     {
-      "rule": "no-new",
+      "rule": "no-multi-str",
       "sources": [
         "eslint"
       ],
@@ -1058,7 +1406,7 @@
       "enabledBy": "rulesBlock"
     },
     {
-      "rule": "no-object-constructor",
+      "rule": "no-new",
       "sources": [
         "eslint"
       ],
@@ -1104,51 +1452,6 @@
       "enabledBy": "rulesBlock"
     },
     {
-      "rule": "no-div-regex",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-multi-str",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-octal-escape",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-script-url",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-template-curly-in-string",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
       "rule": "no-obj-calls",
       "sources": [
         "oxlint"
@@ -1158,7 +1461,7 @@
       "enabledBy": "pluginDefault"
     },
     {
-      "rule": "no-return-assign",
+      "rule": "no-object-constructor",
       "sources": [
         "eslint"
       ],
@@ -1176,11 +1479,29 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-octal-escape",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-param-reassign",
       "sources": [
         "eslint"
       ],
       "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-proto",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
       "severity": "error",
       "enabledBy": "rulesBlock"
     },
@@ -1205,12 +1526,48 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-return-assign",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-script-url",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-self-assign",
       "sources": [
         "eslint",
         "oxlint"
       ],
       "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-self-compare",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-sequences",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
       "severity": "error",
       "enabledBy": "rulesBlock"
     },
@@ -1234,19 +1591,19 @@
       "enabledBy": "rulesBlock"
     },
     {
-      "rule": "no-sequences",
-      "sources": [
-        "eslint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
       "rule": "no-sparse-arrays",
       "sources": [
         "eslint",
         "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-template-curly-in-string",
+      "sources": [
+        "eslint"
       ],
       "options": "no",
       "severity": "error",
@@ -1262,10 +1619,28 @@
       "enabledBy": "pluginDefault"
     },
     {
+      "rule": "no-throw-literal",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-unassigned-vars",
       "sources": [
         "eslint",
         "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-undef-init",
+      "sources": [
+        "eslint"
       ],
       "options": "no",
       "severity": "error",
@@ -1328,6 +1703,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-unused-expressions",
+      "sources": [
+        "eslint"
+      ],
+      "options": "unknown",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-unused-labels",
       "sources": [
         "eslint",
@@ -1357,6 +1741,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-unused-vars",
+      "sources": [
+        "eslint"
+      ],
+      "options": "unknown",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-useless-assignment",
       "sources": [
         "eslint"
@@ -1370,6 +1763,15 @@
       "sources": [
         "eslint",
         "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-useless-call",
+      "sources": [
+        "eslint"
       ],
       "options": "no",
       "severity": "error",
@@ -1455,15 +1857,6 @@
       "enabledBy": "rulesBlock"
     },
     {
-      "rule": "require-atomic-updates",
-      "sources": [
-        "eslint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
       "rule": "react-hooks/config",
       "sources": [
         "eslint"
@@ -1491,15 +1884,6 @@
       "options": "no",
       "severity": "error",
       "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "react/forward-ref-uses-ref",
-      "sources": [
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "warn",
-      "enabledBy": "pluginDefault"
     },
     {
       "rule": "react-hooks/gating",
@@ -1541,13 +1925,102 @@
       "enabledBy": "rulesBlock"
     },
     {
-      "rule": "react/jsx-key",
+      "rule": "react-hooks/no-deriving-state-in-effects",
       "sources": [
         "eslint"
       ],
-      "options": "yes",
+      "options": "no",
       "severity": "error",
       "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react-hooks/purity",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react-hooks/refs",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react-hooks/rules-of-hooks",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react-hooks/set-state-in-effect",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react-hooks/set-state-in-render",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react-hooks/static-components",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react-hooks/unsupported-syntax",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react-hooks/use-memo",
+      "sources": [
+        "eslint",
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react-hooks/void-use-memo",
+      "sources": [
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
     },
     {
       "rule": "react/button-has-type",
@@ -1568,7 +2041,16 @@
       "enabledBy": "rulesBlock"
     },
     {
-      "rule": "react/jsx-no-target-blank",
+      "rule": "react/forward-ref-uses-ref",
+      "sources": [
+        "oxlint"
+      ],
+      "options": "no",
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "react/jsx-key",
       "sources": [
         "eslint"
       ],
@@ -1584,6 +2066,15 @@
       "options": "no",
       "severity": "warn",
       "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "react/jsx-no-target-blank",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
     },
     {
       "rule": "react/jsx-no-undef",
@@ -1622,6 +2113,15 @@
       "enabledBy": "pluginDefault"
     },
     {
+      "rule": "react/no-deprecated",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "react/no-did-mount-set-state",
       "sources": [
         "oxlint"
@@ -1647,24 +2147,6 @@
       "options": "no",
       "severity": "warn",
       "enabledBy": "pluginDefault"
-    },
-    {
-      "rule": "react-hooks/no-deriving-state-in-effects",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "react/no-deprecated",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
     },
     {
       "rule": "react/no-find-dom-node",
@@ -1767,89 +2249,9 @@
       "enabledBy": "rulesBlock"
     },
     {
-      "rule": "react-hooks/purity",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "react-hooks/refs",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
       "rule": "react/require-render-return",
       "sources": [
         "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "react-hooks/rules-of-hooks",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "react-hooks/set-state-in-effect",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "react-hooks/set-state-in-render",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "react-hooks/static-components",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "react-hooks/unsupported-syntax",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "react-hooks/use-memo",
-      "sources": [
-        "eslint",
-        "oxlint"
       ],
       "options": "no",
       "severity": "error",
@@ -1865,13 +2267,13 @@
       "enabledBy": "pluginDefault"
     },
     {
-      "rule": "react-hooks/void-use-memo",
+      "rule": "require-atomic-updates",
       "sources": [
-        "oxlint"
+        "eslint"
       ],
-      "options": "no",
-      "severity": "warn",
-      "enabledBy": "pluginDefault"
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
     },
     {
       "rule": "require-yield",
@@ -2194,389 +2596,6 @@
       "enabledBy": "rulesBlock"
     },
     {
-      "rule": "better-tailwindcss/tailwind-no-physical-direction",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/await-thenable",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/ban-ts-comment",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/consistent-type-imports",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/default-param-last",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-array-constructor",
-      "sources": [
-        "eslint"
-      ],
-      "options": "unknown",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-array-delete",
-      "sources": [
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "warn",
-      "enabledBy": "pluginDefault"
-    },
-    {
-      "rule": "@typescript-eslint/no-duplicate-enum-values",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-empty-object-type",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-explicit-any",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-extra-non-null-assertion",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-floating-promises",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-for-in-array",
-      "sources": [
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "warn",
-      "enabledBy": "pluginDefault"
-    },
-    {
-      "rule": "@typescript-eslint/no-import-type-side-effects",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-implied-eval",
-      "sources": [
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "warn",
-      "enabledBy": "pluginDefault"
-    },
-    {
-      "rule": "@typescript-eslint/no-invalid-this",
-      "sources": [
-        "eslint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-mixed-enums",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-misused-new",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-misused-promises",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-non-null-asserted-optional-chain",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-non-null-assertion",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-require-imports",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-this-alias",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
-      "sources": [
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "warn",
-      "enabledBy": "pluginDefault"
-    },
-    {
-      "rule": "@typescript-eslint/no-unnecessary-type-constraint",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-unsafe-declaration-merging",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-unsafe-function-type",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-unsafe-unary-minus",
-      "sources": [
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "warn",
-      "enabledBy": "pluginDefault"
-    },
-    {
-      "rule": "no-unused-expressions",
-      "sources": [
-        "eslint"
-      ],
-      "options": "unknown",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-unused-vars",
-      "sources": [
-        "eslint"
-      ],
-      "options": "unknown",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/no-useless-empty-export",
-      "sources": [
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "warn",
-      "enabledBy": "pluginDefault"
-    },
-    {
-      "rule": "@typescript-eslint/no-wrapper-object-types",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/only-throw-error",
-      "sources": [
-        "eslint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/prefer-as-const",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/prefer-namespace-keyword",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/prefer-reduce-type-parameter",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/prefer-promise-reject-errors",
-      "sources": [
-        "eslint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/switch-exhaustiveness-check",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/triple-slash-reference",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "yes",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "@typescript-eslint/related-getter-setter-pairs",
-      "sources": [
-        "eslint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
       "rule": "use-isnan",
       "sources": [
         "eslint",
@@ -2591,15 +2610,6 @@
       "sources": [
         "eslint",
         "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
-    },
-    {
-      "rule": "no-constructor-return",
-      "sources": [
-        "eslint"
       ],
       "options": "no",
       "severity": "error",
