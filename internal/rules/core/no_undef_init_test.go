@@ -83,6 +83,38 @@ func TestNoUndefInitFires(t *testing.T) {
 	}
 }
 
+// The annotation survives the repair.
+//
+// Upstream's corpus is JavaScript, so not one of its `output` cases carries a type annotation, and
+// a port can pass all eight while destroying every annotated declaration in a TypeScript tree.
+// This is what that looked like: `let x: Thing | undefined = undefined` fixed to `let x`, silently
+// widening to `any`. It compiled, so nothing failed, and the only trace was the diff. Eight files
+// in libraries/structure were rewritten this way before the range was corrected.
+//
+// The definite-assignment case is the same hazard one field over: `!` is a sibling of the name too,
+// and dropping it changes what the compiler will accept.
+func TestNoUndefInitKeepsTheTypeAnnotation(t *testing.T) {
+	cases := []struct {
+		sourceText string
+		wantSource string
+	}{
+		{"let a: number | undefined = undefined;", "let a: number | undefined;"},
+		{"let a: string = undefined;", "let a: string;"},
+		{"let a: Array<{x: number}> | undefined = undefined;", "let a: Array<{x: number}> | undefined;"},
+		{"let a: number | undefined = undefined, b = 1;", "let a: number | undefined, b = 1;"},
+		{"let a = 1, b: string | undefined = undefined;", "let a = 1, b: string | undefined;"},
+		{"let a!: number = undefined;", "let a!: number;"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.sourceText, func(t *testing.T) {
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText),
+				strings.TrimSpace(testCase.wantSource)+"\n")
+		})
+	}
+}
+
 // The repair, asserted by applying it rather than by comparing the fix's text.
 //
 // A fix writing the right string over the wrong span passes a text comparison and is a real defect.

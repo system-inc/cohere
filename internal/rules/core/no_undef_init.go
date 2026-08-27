@@ -195,7 +195,22 @@ func noUndefInitFix(ctx rule.Context, node *ast.Node, name *ast.Node) (rule.Fix,
 		return rule.Fix{}, false
 	}
 
-	removal := core.NewTextRange(name.End(), node.End())
+	// The removal starts after everything the declaration keeps, not after the name. Upstream reads
+	// `node.id.range[1]`, and in ESTree a TypeScript annotation is part of the id node, so that one
+	// offset already sits past it. Here `Type` and `ExclamationToken` are siblings of the name, and
+	// starting at `name.End()` swallows them: `let x: Thing | undefined = undefined` fixed to
+	// `let x`, silently widening the declaration to `any`. It compiles, so nothing fails, and the
+	// only trace is the diff. Measured on eight files in libraries/structure.
+	removalStart := name.End()
+	if declaration := node.AsVariableDeclaration(); declaration != nil {
+		if declaration.Type != nil {
+			removalStart = declaration.Type.End()
+		} else if declaration.ExclamationToken != nil {
+			removalStart = declaration.ExclamationToken.End()
+		}
+	}
+
+	removal := core.NewTextRange(removalStart, node.End())
 	for _, comment := range comments.ForFile(ctx) {
 		// Upstream asks `commentsExistBetween(node.id, lastToken)`, which is this half-open range.
 		// A comment after the initializer but before the terminator sits outside it and is kept,
