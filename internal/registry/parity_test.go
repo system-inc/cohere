@@ -652,6 +652,18 @@ var rulesOutsideTheInventory = map[string]string{
 	"no-await-in-loop": "ported from eslint core, which marks it recommended:false; not enforced " +
 		"by either tool when the inventory was captured, and the audit measured 363 violations " +
 		"while this port measures 366 across 157 files, each needing a per-site judgment",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// The cheapest rule in this batch to turn on: 4 findings, which is exactly the four sites the
+	// audit named, and the installed eslint reports the same four at the same line and column. Each
+	// is a string split across a `+` for line-length reasons, so the repair is joining two literals
+	// and there is no fixer because upstream ships none and the join is not always mechanical.
+	"no-useless-concat": "ported from eslint core, which marks it recommended:false; not enforced " +
+		"by either tool when the inventory was captured, and the audit measured 4 violations, " +
+		"which this port reproduces at the same four positions",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
