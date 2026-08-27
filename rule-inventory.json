@@ -1,24 +1,24 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 304,
+  "total": 305,
   "byNamespace": {
     "(core)": 114,
     "@next": 22,
     "@typescript-eslint": 47,
     "better-tailwindcss": 13,
     "nexus": 20,
-    "react": 40,
+    "react": 41,
     "react-hooks": 17,
     "structure": 31
   },
   "bySeverity": {
-    "error": 262,
+    "error": 263,
     "warn": 42
   },
   "byEnabledBy": {
     "pluginDefault": 41,
-    "rulesBlock": 263
+    "rulesBlock": 264
   },
   "rules": [
     {
@@ -2357,6 +2357,15 @@
     },
     {
       "rule": "react/no-multi-comp",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react/display-name",
       "sources": [
         "eslint"
       ],
