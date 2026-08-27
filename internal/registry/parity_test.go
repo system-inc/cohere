@@ -363,6 +363,25 @@ var rulesOutsideTheInventory = map[string]string{
 	// records what the two tools enforced when it was captured, and neither enforced this one:
 	// upstream marks it `recommended: false`.
 	//
+	// A dry run over the tree found zero findings across 3,516 files against 95,778 registrations,
+	// with no crashes. A seeded probe tree reported two findings on five candidate class fields,
+	// declining a non-lifecycle name, a static field checked against the other list, and a class
+	// with no React base. The fixer was then run against that tree and produced source that lints
+	// clean and parses, converting a block body to a method and a parenthesized object concise body
+	// to a returning block with the parentheses removed.
+	//
+	// This port declines the repair on any parameter that is not a plain identifier, which upstream
+	// ships. Upstream builds its parameter list by mapping each parameter to its identifier name,
+	// undefined for a destructured, defaulted or typed parameter, so it writes the literal text
+	// `undefined` into the repaired source and silently deletes what the parameter said. A fix is
+	// applied unattended, so reporting without one is the subset that can be shown correct. The
+	// typed-parameter case is the one this tree actually contains and upstream's corpus cannot.
+	"react/no-arrow-function-lifecycle": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and a dry run over the tree measured zero findings against 95,778 registrations, with a seeded probe tree confirming both the rule and its repair",
+
+	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory
+	// records what the two tools enforced when it was captured, and neither enforced this one:
+	// upstream marks it `recommended: false`.
+	//
 	// A dry run over the tree found zero findings across 3,516 files against 117,763 registrations,
 	// and the non-zero registration count is what separates a clean tree from an inert rule. A
 	// seeded probe tree reported five findings on eight candidate style props, declining the
