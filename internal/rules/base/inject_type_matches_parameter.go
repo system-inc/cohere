@@ -175,6 +175,22 @@ func readInjectResolvedTypeBrand(ctx rule.Context, decoratorType *checker.Type) 
 //
 // The original resolves a member-expression callee to its property name, so `@Namespace.inject(...)`
 // prints `inject`, and falls back to a printable sentinel so a report always has a name in it.
+//
+// # Why this is not `decorators.CallName`
+//
+// The shelf has a decorator-name reader and three base rules use it, so not calling it deserves a
+// reason rather than looking like an oversight. It answers a narrower question, which its own doc
+// states and a probe confirmed: `@Foo()` gives "Foo", while `@ns.Foo()` and a bare `@Foo` both give
+// the empty string, because every rule using it keys on a bare identifier and treats a qualified
+// name as a different symbol.
+//
+// This rule does not key on the name at all. It PRINTS it, in a message the reader uses to find the
+// decorator, so the empty string is the one answer that helps nobody. Measured against the original:
+// `@Namespace.inject<Service>()` prints `@inject`, which a fixture asserts, and `CallName` would
+// make that `@`. The sentinel exists for the same reason, so a report always names something.
+//
+// If a second rule ever wants this wider reading, that is the moment to lift it beside CallName
+// rather than widening CallName underneath its three existing callers.
 func injectDecoratorName(decorator *ast.Node) string {
 	const fallback = "<decorator>"
 	expression := decorator.AsDecorator().Expression
