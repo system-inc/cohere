@@ -303,6 +303,37 @@ func namespacesOf(remaining []string) []namespaceCount {
 // A reason is required. An entry here says "we looked", and an entry with no reason says only that
 // somebody wanted the test to pass.
 var rulesOutsideTheInventory = map[string]string{
+	// Ported from eslint core and enabled in both engines by this port. The inventory captured
+	// what the two gates enforced on 2026-08-23, and only the namespaced spelling was configured
+	// then, so the bare name is a rule the gate never had rather than a parity gap. No prior `off`
+	// exists for it under either spelling, so enabling is a decision nobody had made rather than
+	// one being reversed.
+	//
+	// It is a judgment about any TypeScript parameter list with no browser or React involvement,
+	// so it was enabled on the universal layer.
+	//
+	// This is NOT a duplicate of `@typescript-eslint/default-param-last`, which is registered and
+	// enabled beside it. That rule declares `extendsBaseRule: true` but imports no
+	// `getESLintCoreRule`, making it a standalone reimplementation, and the two disagree on one
+	// class of input. Core treats a rest parameter as not-required and then reports it
+	// unconditionally once a required parameter has been seen to its right; the rewrite adds a
+	// second gate admitting only optional and defaulted parameters, so it never reports a rest one.
+	// Driving both installed builds over the same inputs, `function f(...a: number[], b: number) {}`
+	// reports at 1:12-1:26 under core and is silent under the sibling, and two further rest shapes
+	// diverge the same way. Replaying all 96 cases of core's own corpus through both produced zero
+	// divergence, so the corpus cannot see this and three fixtures written from the measurement pin
+	// it.
+	//
+	// A dry run over the tree measures zero findings, which is the rule being already covered in
+	// practice rather than a broken port, and the zero is proven rather than assumed. A seeded
+	// violation inside the tree moved the file count from 3,516 to 3,517 and reported at the same
+	// position as the sibling, so the rule is not inert. Counting the subject matter with a parser
+	// over 2,788 files found 20,933 bodied function-likes, 1,324 carrying a defaulted, optional or
+	// rest parameter, and 157 where such a parameter is not in last position; all 157 are followed
+	// only by other defaulted or optional parameters, which is the shape the rule permits, so every
+	// candidate is correctly declined. That counter reports 1 with a seeded violation and 0 without.
+	"default-param-last": "ported from eslint core; only the @typescript-eslint spelling was configured when the inventory was captured, and the two are not the same rule: the namespaced one is a standalone reimplementation that never reports a rest parameter before a required one, while core does, measured on three shapes against both installed builds; a dry run measures zero findings over 157 examined candidates, all correctly declined",
+
 	// Ported from eslint-plugin-react and enabled in both engines by this port. Upstream marks it
 	// `recommended: false`, so it is off in the plugin's own recommended config, and there is no
 	// oxlint config in the tree to have carried it either. A rule the gate never had rather than a
