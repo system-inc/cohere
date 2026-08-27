@@ -359,6 +359,24 @@ var rulesOutsideTheInventory = map[string]string{
 	// the tree is what an empty list produces rather than evidence about the code.
 	"react/forbid-elements": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and it enforces nothing until a forbid list is configured, so the audit's zero and the dry run's zero both reflect an empty list",
 
+	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory
+	// records what the two tools enforced when it was captured, and neither enforced this one:
+	// upstream marks it `recommended: false`, so it is off in the plugin's own recommended config
+	// and nothing turned it on here.
+	//
+	// It is a judgment about JSX attributes, so it was enabled on the frontend layer. A dry run
+	// over the tree found zero findings across 3,516 files with 22,260 registrations, and the
+	// non-zero registration count is what separates a clean tree from an inert rule. A seeded
+	// probe tree holding two `javascript:` anchors and one ordinary one reported exactly the two,
+	// on the attribute rather than the element.
+	//
+	// One half of upstream's option surface has no substrate here and it costs findings. Upstream
+	// also reads `settings.linkComponents` from ESLint's shared settings; verify has no
+	// shared-settings surface, so this port answers as though they were empty. Measured on
+	// upstream's own corpus, that turns two reporting cases silent and drops a third from two
+	// findings to one. Everything configured through the rule's own options is exact.
+	"react/jsx-no-script-url": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and a dry run over the tree measured zero findings against 22,260 registrations, with a seeded probe tree confirming the rule fires",
+
 	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory records
 	// what the two tools enforced when it was captured, and neither enforced this one: upstream marks
 	// it `recommended: false`, so it is off in the plugin's own recommended config and nothing turned
