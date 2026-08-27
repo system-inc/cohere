@@ -649,16 +649,21 @@ class Hello extends React.Component {
 }
 `, didMountFile, false, []string{"noDidMountSetState"}},
 
-		// The file gate. Byte-identical to a reporting case above but written to a `.ts` name, which
-		// is how `source_type().is_jsx()` is spelled here. Upstream's corpus is entirely `.tsx`, so
-		// nothing in it can tell a working gate from an absent one.
+		// No file gate, asserted rather than assumed. Byte-identical to a reporting case above but
+		// written to a `.ts` name. This case previously expected silence, locking in a gate carried
+		// over from the oxc port; eslint-plugin-react, the authority this rule is ported against,
+		// does not gate on the file name at all. A React class in a `.ts` file is ordinary and
+		// legal, and the gate hid it across more `.ts` files than the `.tsx` files it could see.
+		//
+		// Upstream's corpus is entirely `.tsx`, so nothing imported from it can tell a working gate
+		// from an absent one. That is exactly why this case is written by hand.
 		{"reporting source in a non-JSX file", `
 class Hello extends React.Component {
   componentDidMount() {
     this.setState({ data: 1 });
   }
 }
-`, "/repository/source/DidMount.ts", false, nil},
+`, "/repository/source/DidMount.ts", false, []string{"noDidMountSetState"}},
 
 		// The lifecycle name is compared exactly. `componentDidMountSomething` is a different
 		// method and the corpus only ever writes neighbouring lifecycle names, never a prefix of

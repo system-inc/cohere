@@ -133,13 +133,11 @@ var NoDidMountSetState = rule.Rule{
 	// inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/no-did-mount-set-state",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		// oxc gates the whole rule on `source_type().is_jsx()`, so a file the parser does not read
-		// as JSX registers nothing rather than declining node by node. Spelled as the file suffix
-		// for the same reason `no-string-refs` in this package spells it that way: the suffix is
-		// what decides the parser's script kind in the harness and in a real run alike.
-		if !isJsxFileName(ctx.SourceFile.FileName()) {
-			return nil
-		}
+		// No file gate. oxc gated this on `source_type().is_jsx()`, and that gate came along when the
+		// rule was ported from oxc, but the authority here is eslint-plugin-react, which does not
+		// gate on the file name at all. A React class component in a `.ts` file is ordinary and
+		// legal, and the gate made the rule silent on 3,359 of them against 2,118 it could see.
+		// Measured before removal: the same class reported in `.tsx` and produced nothing in `.ts`.
 
 		// An unconfigured rule gets the zero value, which is upstream's `Allowed` default.
 		settings, _ := options.(NoDidMountSetStateOptions)
