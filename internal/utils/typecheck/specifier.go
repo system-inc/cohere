@@ -158,6 +158,60 @@ func typeMatchesSpecifier(
 	specifier TypeOrValueSpecifier,
 	program *compiler.Program,
 ) bool {
+	// A UNION matches only when EVERY member matches, and an INTERSECTION when ANY member does.
+	//
+	// Both recursions are upstream's (`TypeOrValueSpecifier.ts`) and neither was here: this file
+	// was ported from a tsgolint revision that predates them, so a specifier tested against a
+	// composite type saw only the composite's own symbol, which is nil, and answered false.
+	//
+	// The union arm is the one with a corpus behind it. `only-throw-error` valid case 36 allows
+	// `"Promise"` and throws `Promise<T1> | Promise<T2>`, which upstream accepts; its invalid case
+	// 36 is the same union with `| void` added, which upstream reports. That pair is exactly the
+	// `every` semantics and nothing weaker reproduces both rows. Measured on the installed rule:
+	//
+	//	Promise<T1> | Promise<T2>          allow: ["Promise"]   SILENT
+	//	Promise<T1> | Promise<T2> | void   allow: ["Promise"]   REPORTS
+	//	Promise<number> | string           allow: ["Promise"]   REPORTS
+	//	Promise<number> & { a: 1 }         allow: ["Promise"]   SILENT
+	//
+	// The last row is the intersection arm, and it is `some` rather than `every`, which is the
+	// asymmetry a reader would most likely collapse.
+	if IsUnionType(t) {
+		return Every(t.Types(), func(part *checker.Type) bool {
+			return typeMatchesSpecifier(part, specifier, program)
+		})
+	}
+
+	if wholeTypeMatchesSpecifier(t, specifier, program) {
+		return true
+	}
+
+	if IsIntersectionType(t) {
+		return Some(t.Types(), func(part *checker.Type) bool {
+			return typeMatchesSpecifier(part, specifier, program)
+		})
+	}
+
+	return false
+}
+
+// wholeTypeMatchesSpecifier tests ONE type, without descending into a union or an intersection.
+//
+// Upstream writes this as an immediately-invoked closure inside `typeMatchesSpecifier`; it is a
+// named function here because Go has no such expression and because the caller reads better with
+// the three cases separated.
+func wholeTypeMatchesSpecifier(
+	t *checker.Type,
+	specifier TypeOrValueSpecifier,
+	program *compiler.Program,
+) bool {
+	// The error type has a symbol whose name can incidentally match a specifier, so upstream
+	// declines it before any name comparison. `TypeMatchesSomeSpecifier` also skips it, but only
+	// for the top-level type, and this recursion can now reach one in a constituent.
+	if IsIntrinsicErrorType(t) {
+		return false
+	}
+
 	if !typeMatchesStringSpecifier(t, specifier.Name) {
 		return false
 	}
@@ -195,15 +249,43 @@ func TypeMatchesSomeSpecifier(
 	inlineSpecifiers []string,
 	program *compiler.Program,
 ) bool {
-	for _, typePart := range IntersectionTypeParts(t) {
-		if IsIntrinsicErrorType(typePart) {
-			continue
-		}
-		if Some(specifiers, func(s TypeOrValueSpecifier) bool {
-			return typeMatchesSpecifier(t, s, program)
-		}) || typeMatchesStringSpecifier(t, inlineSpecifiers) {
-			return true
-		}
+	if Some(specifiers, func(s TypeOrValueSpecifier) bool {
+		return typeMatchesSpecifier(t, s, program)
+	}) {
+		return true
 	}
+	return Some(inlineSpecifiers, func(name string) bool {
+		return typeMatchesInlineSpecifier(t, name)
+	})
+}
+
+// typeMatchesInlineSpecifier tests the bare-string specifier form, which matches on NAME alone.
+//
+// Upstream expresses this as one branch of `typeMatchesSpecifier`, whose parameter is
+// `string | TypeOrValueSpecifier`, so the union and intersection recursions above it apply to the
+// string form as well. Our `TypeOrValueSpecifier` is a struct with no string alternative, so the
+// inline form is a separate function and the two recursions have to be written here too.
+//
+// Getting that wrong is invisible from the object form's tests. `only-throw-error` valid case 36
+// is `allow: ["Promise"]` over `Promise<T1> | Promise<T2>`, which is the INLINE form over a union:
+// without the `every` recursion here the case reports, and no fixture using the object form can
+// see it.
+func typeMatchesInlineSpecifier(t *checker.Type, name string) bool {
+	if IsUnionType(t) {
+		return Every(t.Types(), func(part *checker.Type) bool {
+			return typeMatchesInlineSpecifier(part, name)
+		})
+	}
+
+	if !IsIntrinsicErrorType(t) && typeMatchesStringSpecifier(t, []string{name}) {
+		return true
+	}
+
+	if IsIntersectionType(t) {
+		return Some(t.Types(), func(part *checker.Type) bool {
+			return typeMatchesInlineSpecifier(part, name)
+		})
+	}
+
 	return false
 }
