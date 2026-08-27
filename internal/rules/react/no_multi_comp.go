@@ -307,6 +307,30 @@ func statelessComponentFor(ctx rule.Context, node *ast.Node, detectedNames map[s
 		return nil, false
 	}
 
+	// A function RETURNED by another function is not a component unless it returns real JSX.
+	//
+	//	const any = () => { return (props) => null }
+	//	const any = () => (props) => null
+	//
+	// Upstream places this arm before every naming test, so the inner function is abandoned no
+	// matter what the outer binding is called. Without it a curried function whose inner half
+	// returns null is detected as a component, because the later arms reach it through the outer
+	// binding's name.
+	//
+	// Added while porting `display-name`, which has five passing cases writing exactly this shape.
+	// `no-multi-comp` had the same gap and its own corpus could not see it: measured against the
+	// installed build, `demo = () => () => null;` beside one real component reports zero findings
+	// upstream and reported one here. `TestNoMultiCompCurriedFunctionsAreNotComponents` pins it.
+	//
+	// The predicate is real JSX rather than JSX-or-null, which is upstream's `isReturningJSX`, so
+	// an inner function returning only null is declined while one returning an element is kept.
+	if parent.Kind == ast.KindReturnStatement ||
+		(parent.Kind == ast.KindArrowFunction && parent.AsArrowFunction().Body == node) {
+		if !returnsJsx(ctx, node) {
+			return nil, false
+		}
+	}
+
 	switch parent.Kind {
 	case ast.KindExportAssignment:
 		// `export default () => <div/>`. Upstream requires real JSX here rather than JSX-or-null,

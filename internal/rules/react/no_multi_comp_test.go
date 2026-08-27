@@ -605,3 +605,58 @@ func TestNoMultiCompCustomPragmaIsNotReproduced(t *testing.T) {
 		DefaultNoMultiCompOptions())
 	rule_testing.ExpectFindings(t, result, "onlyOneComponent")
 }
+
+// TestNoMultiCompCurriedFunctionsAreNotComponents pins a defect this rule shipped with.
+//
+// A function returned by another function is not a component unless it returns real JSX, and
+// `statelessComponentFor` was missing that arm. The inner half of a curried pair was therefore
+// detected through the outer binding's name, and `demo = () => () => null;` beside one real
+// component reported a finding upstream does not.
+//
+// Measured against the installed build on 2026-08-27: both rows below report zero there. This
+// rule's own corpus writes no curried function at all, so nothing in the imported fixture set
+// could see it; it surfaced while porting `display-name`, whose corpus has five passing cases of
+// exactly this shape.
+func TestNoMultiCompCurriedFunctionsAreNotComponents(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+	}{
+		{
+			name:       "one curried function beside a real component",
+			sourceText: "demo = () => () => null;\nfunction Other(){ return <div/>; }\n",
+		},
+		{
+			name:       "two curried functions beside a real component",
+			sourceText: "demo = () => () => null;\nother = () => () => null;\nfunction Other(){ return <div/>; }\n",
+		},
+		{
+			name:       "a curried function expression",
+			sourceText: "demo = function() {return function() {return null;};};\nfunction Other(){ return <div/>; }\n",
+		},
+		{
+			name:       "a curried arrow under an object property",
+			sourceText: "demo = {\n  property: () => () => null\n};\nfunction Other(){ return <div/>; }\n",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile,
+				testCase.sourceText, DefaultNoMultiCompOptions())
+			rule_testing.ExpectClean(t, result)
+		})
+	}
+}
+
+// TestNoMultiCompCurriedInnerReturningJsxIsStillAComponent is the control for the test above.
+//
+// The arm declines on real JSX rather than on JSX-or-null, so an inner function that returns an
+// element is still a component. Without this row, narrowing the arm to decline everything returned
+// by a function would pass the test above while losing a component upstream counts.
+func TestNoMultiCompCurriedInnerReturningJsxIsStillAComponent(t *testing.T) {
+	sourceText := "const make = () => (props) => <div/>;\nfunction Other(){ return <div/>; }\n"
+	result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, sourceText,
+		DefaultNoMultiCompOptions())
+	rule_testing.ExpectFindings(t, result, "onlyOneComponent")
+}
