@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/imports"
 )
 
 // ForbidPropTypesOptions configures which prop types are refused and where they are looked for.
@@ -215,24 +216,24 @@ func (w *forbidPropTypesWalker) collectImports(sourceFile *ast.Node) {
 
 		switch moduleSpecifier.Text() {
 		case "prop-types":
-			if name := forbidPropTypesFirstLocalName(declaration.ImportClause); name != "" {
+			if name := forbidPropTypesFirstLocalName(child); name != "" {
 				w.propTypesPackageName = name
 			}
 
 		case "react":
-			if name := forbidPropTypesFirstLocalName(declaration.ImportClause); name != "" {
+			if name := forbidPropTypesFirstLocalName(child); name != "" {
 				w.reactPackageName = name
 			}
 			// `import { PropTypes } from 'react'` binds the prop types package under whatever
 			// local name that specifier uses.
-			if local := forbidPropTypesLocalNameForImported(declaration.ImportClause, "PropTypes"); local != "" {
+			if local := forbidPropTypesLocalNameForImported(child, "PropTypes"); local != "" {
 				w.propTypesPackageName = local
 			}
 
 		default:
 			// Anything named `PropTypes` coming from a third module means the bare name in this
 			// file is somebody else's. Measured: it makes an otherwise reporting file clean.
-			if forbidPropTypesBindsLocalName(declaration.ImportClause, "PropTypes") {
+			if forbidPropTypesBindsLocalName(child, "PropTypes") {
 				w.isForeignPropTypesPackage = true
 			}
 		}
@@ -240,33 +241,29 @@ func (w *forbidPropTypesWalker) collectImports(sourceFile *ast.Node) {
 	})
 }
 
-// forbidPropTypesFirstLocalName returns the first local binding an import clause introduces.
+// forbidPropTypesFirstLocalName returns the first local binding an import declaration introduces.
 //
 // Upstream reads `node.specifiers[0].local.name`, which is the default import when there is one and
-// otherwise the first named specifier. The clause is walked in that order here.
-func forbidPropTypesFirstLocalName(clause *ast.Node) string {
-	if clause == nil || clause.Kind != ast.KindImportClause {
-		return ""
+// otherwise the first named specifier, so the search order below is upstream's rather than a
+// preference. A namespace import sits between the two in the same slot ESTree would list first
+// after a default, which is why it is consulted before the named list.
+//
+// `imports.BindingsOf` answers which of the three shapes the statement carries, with the default,
+// the namespace and the named specifiers already separated, so the kind switch this used to hold is
+// the utility's rather than each rule's.
+func forbidPropTypesFirstLocalName(node *ast.Node) string {
+	bindings := imports.BindingsOf(node)
+
+	if bindings.Default != nil && bindings.Default.Kind == ast.KindIdentifier {
+		return bindings.Default.Text()
 	}
-	importClause := clause.AsImportClause()
-	if name := importClause.Name(); name != nil && name.Kind == ast.KindIdentifier {
-		return name.Text()
-	}
-	bindings := importClause.NamedBindings
-	if bindings == nil {
-		return ""
-	}
-	switch bindings.Kind {
-	case ast.KindNamespaceImport:
-		if name := bindings.AsNamespaceImport().Name(); name != nil {
+	if bindings.Namespace != nil {
+		if name := bindings.Namespace.Name(); name != nil {
 			return name.Text()
 		}
-	case ast.KindNamedImports:
-		elements := bindings.AsNamedImports().Elements
-		if elements == nil || len(elements.Nodes) == 0 {
-			return ""
-		}
-		if name := elements.Nodes[0].AsImportSpecifier().Name(); name != nil {
+	}
+	for _, specifier := range bindings.Named {
+		if name := specifier.Name(); name != nil {
 			return name.Text()
 		}
 	}
@@ -277,20 +274,10 @@ func forbidPropTypesFirstLocalName(clause *ast.Node) string {
 // name, or "".
 //
 // `import { PropTypes as PT }` binds `PT` locally for the imported `PropTypes`, and upstream reads
-// exactly that pair.
-func forbidPropTypesLocalNameForImported(clause *ast.Node, imported string) string {
-	if clause == nil || clause.Kind != ast.KindImportClause {
-		return ""
-	}
-	bindings := clause.AsImportClause().NamedBindings
-	if bindings == nil || bindings.Kind != ast.KindNamedImports {
-		return ""
-	}
-	elements := bindings.AsNamedImports().Elements
-	if elements == nil {
-		return ""
-	}
-	for _, element := range elements.Nodes {
+// exactly that pair. Only the named list can carry a rename, which is why this reads that field
+// alone rather than the whole Bindings.
+func forbidPropTypesLocalNameForImported(node *ast.Node, imported string) string {
+	for _, element := range imports.BindingsOf(node).Named {
 		specifier := element.AsImportSpecifier()
 		local := specifier.Name()
 		if local == nil {
@@ -312,37 +299,26 @@ func forbidPropTypesLocalNameForImported(clause *ast.Node, imported string) stri
 	return ""
 }
 
-// forbidPropTypesBindsLocalName reports whether an import clause binds a given LOCAL name.
+// forbidPropTypesBindsLocalName reports whether an import declaration binds a given LOCAL name.
 //
 // Upstream tests `node.specifiers.some((x) => x.local.name === 'PropTypes')`, which is the local
 // side rather than the imported one, so `import { Foo as PropTypes } from 'other'` trips the guard.
-func forbidPropTypesBindsLocalName(clause *ast.Node, local string) bool {
-	if clause == nil || clause.Kind != ast.KindImportClause {
-		return false
-	}
-	importClause := clause.AsImportClause()
-	if name := importClause.Name(); name != nil && name.Kind == ast.KindIdentifier &&
-		name.Text() == local {
+// All three binding shapes are searched because `specifiers` holds all three together upstream.
+func forbidPropTypesBindsLocalName(node *ast.Node, local string) bool {
+	bindings := imports.BindingsOf(node)
+
+	if bindings.Default != nil && bindings.Default.Kind == ast.KindIdentifier &&
+		bindings.Default.Text() == local {
 		return true
 	}
-	bindings := importClause.NamedBindings
-	if bindings == nil {
-		return false
-	}
-	switch bindings.Kind {
-	case ast.KindNamespaceImport:
-		name := bindings.AsNamespaceImport().Name()
-		return name != nil && name.Text() == local
-	case ast.KindNamedImports:
-		elements := bindings.AsNamedImports().Elements
-		if elements == nil {
-			return false
+	if bindings.Namespace != nil {
+		if name := bindings.Namespace.Name(); name != nil && name.Text() == local {
+			return true
 		}
-		for _, element := range elements.Nodes {
-			name := element.AsImportSpecifier().Name()
-			if name != nil && name.Text() == local {
-				return true
-			}
+	}
+	for _, specifier := range bindings.Named {
+		if name := specifier.Name(); name != nil && name.Text() == local {
+			return true
 		}
 	}
 	return false
