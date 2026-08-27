@@ -166,7 +166,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// still a decision for whoever wrote that off rather than for a porter.
 		"@typescript-eslint/no-duplicate-type-constituents": "registered but left off because VerifySettings.json:372 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 
-		// The third of this shape, and the reason is the same one. VerifySettings.json:369 reads
+		// The third of this shape, and the reason is the same one. VerifySettings.json:370 reads
 		// `"typescript/unbound-method": "off"`, written under the old short spelling. The key is 25
 		// characters and the registered name is 34, so the key is SHORTER than the name, the trim is
 		// a no-op, and the resolver's slash-boundary branch never fires.
@@ -186,7 +186,24 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		//
 		// The audit puts the cleanup at eighteen sites and the rule is not auto-fixable, so turning
 		// it on is a real decision and it belongs to whoever wrote that off rather than to a porter.
-		"@typescript-eslint/unbound-method": "registered but left off because VerifySettings.json:369 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+		"@typescript-eslint/unbound-method": "registered but left off because VerifySettings.json:370 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+
+		// The fourth of this shape. VerifySettings.json:367 reads
+		// `"typescript/no-base-to-string": "off"`, again under the old short spelling, and again the
+		// key is shorter than the registered name so the resolver's slash-boundary branch cannot
+		// fire. Confirmed by the linter, which prints that the key matches no registered rule.
+		//
+		// This one was dispatched as an ordinary enable, on the understanding that only its sibling
+		// carried a prior decision. It carries one too, and it is the first entry on the brief's own
+		// list of eight stranded `typescript/` keys, so it gets the same treatment rather than a
+		// different one for having been described differently.
+		//
+		// The port agrees with upstream on all three hundred and seventeen of its corpus cases,
+		// including the rendered message text with its interpolated name and three-valued certainty.
+		// The audit measured fifty-three violations and notes that several are deliberate String()
+		// fallbacks in generic serializers that already branch on typeof, so enabling is a judgment
+		// about those sites rather than a cleanup, and it belongs to whoever wrote the off.
+		"@typescript-eslint/no-base-to-string": "registered but left off because VerifySettings.json:367 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 	}
 
 	rules := All()
@@ -199,7 +216,14 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		if _, excused := deliberatelyNotEnabled[subject.Name]; excused {
 			continue
 		}
-		if !resolved.Enabled(subject.Name) {
+		// `StatusOf` rather than `Enabled`, because Enabled collapses two different worlds into
+		// one false. A rule the config turns off is a decision somebody made and recorded; a rule
+		// the config never mentions is a wiring gap. Twelve rules landed deliberately unenabled
+		// tonight, each honouring a standing `off`, and this guard was reporting three of them as
+		// running on nothing alongside genuine gaps. That is a false positive on correct work, and
+		// a guard that cries wolf on the right answer gets ignored on the wrong one.
+		status, _ := resolved.StatusOf(subject.Name)
+		if status == configuration.StatusUnconfigured {
 			unreachable = append(unreachable, subject.Name)
 		}
 	}
@@ -224,8 +248,11 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 
 	if len(unreachable) > 0 {
 		t.Errorf(
-			"%d registered rules are not reachable from the live config, so they run on nothing: %v\n"+
-				"a rule whose name the config cannot resolve passes its own fixtures and lints no files",
+			"%d registered rules are not mentioned by the live config, so they run on nothing and "+
+				"nobody has said whether they should: %v\n"+
+				"a rule whose name the config cannot resolve passes its own fixtures and lints no "+
+				"files. A rule the config explicitly turns off is not this: that is a decision, and "+
+				"it is reported separately by the run itself as scoped off",
 			len(unreachable), unreachable,
 		)
 	}

@@ -1069,6 +1069,18 @@ var rulesOutsideTheInventory = map[string]string{
 		"short spelling, which cannot resolve against the full name; the audit measured 18 " +
 		"violations, none auto-fixable",
 
+	// The fourth of this shape, and the reason is recorded beside its entry in the live-wiring
+	// exemption map. Upstream marks it `recommended`, so the tool being replaced would have carried
+	// it had the key resolved.
+	//
+	// The audit measured 53 violations and rates it Yes, while noting that several sites are
+	// deliberate String() fallbacks in generic serializers that already branch on typeof. So enabling
+	// it is a judgment about those sites rather than a cleanup, and the rule ships no fixer.
+	"@typescript-eslint/no-base-to-string": "ported from typescript-eslint, which recommends it; " +
+		"registered but left off because the live config carries a prior off for it under the old " +
+		"short spelling, which cannot resolve against the full name; the audit measured 53 " +
+		"violations, none auto-fixable",
+
 	// Ported from typescript-eslint and enabled in both engines by this port. Unlike the entry above
 	// it carries no prior decision in the config to override, so enabling is the ordinary path: the
 	// audit measures zero violations, which makes it a guardrail against drift rather than cleanup.
