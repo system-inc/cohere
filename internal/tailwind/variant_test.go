@@ -12,7 +12,7 @@ import (
 )
 
 // The fixture is what the shipped Tailwind 4.3.3 engine answered about variant ordering, captured
-// by tools/gen_tailwind_variant and checked in next to this test.
+// by tools/tailwind/generate_variant and checked in next to this test.
 //
 // Measured rather than transcribed, because the two are different claims and `getVariantOrder` is
 // where they part. Reading `variants.ts` shows every variant holding an `order` number and invites

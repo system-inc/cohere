@@ -7,7 +7,7 @@
 //
 // # The defect, measured on a design system that shares nothing with ours
 //
-// `tools/gen_tailwind_descriptor_base/testdata/independent_theme.css` exists because the two corpus
+// `tools/tailwind/generate_descriptor_base/testdata/independent_theme.css` exists because the two corpus
 // repositories cannot answer a framework-versus-repository question: they both vendor
 // `libraries/structure`, so a fact they agree on may be a fact about the submodule. It declares
 // `@utility synthetic-static` and `@utility synthetic-fn-*`, names no framework contains.

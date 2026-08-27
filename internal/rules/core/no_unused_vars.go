@@ -697,7 +697,7 @@ func isExemptFromUnusedReport(
 	// `mod.rs:388` with the comment "Mapped type keys are always used within the type definition".
 	//
 	// This is a deliberate divergence from ESLint, which DOES report it: measured with ESLint's own
-	// Linter API, `type S<T extends string> = { [K in T]?: string }` reports `K` as unused. oxc is
+	// Linter API, `type S<T extends string> = { [K in T]?: string }` reports `K` as unused_code_report. oxc is
 	// the differential authority, so oxc's answer ships, and the tree agrees with oxc: the one
 	// occurrence in our own source is a correct mapped type that ESLint would have flagged.
 	if candidate.kind == bindingType && candidate.declaration.Parent != nil &&
@@ -732,7 +732,7 @@ func isExemptFromUnusedReport(
 
 	symbol := ctx.TypeChecker.GetSymbolAtLocation(candidate.name)
 	if symbol == nil {
-		// A name the checker cannot resolve is not provably unused. Reporting it would be a guess
+		// A name the checker cannot resolve is not provably unused_code_report. Reporting it would be a guess
 		// in the direction that costs a false positive on code that is very likely fine.
 		return true
 	}

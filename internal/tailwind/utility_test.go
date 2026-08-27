@@ -10,7 +10,7 @@ import (
 )
 
 // The fixture is what the shipped Tailwind 4.3.3 engine did with this repository's own `@utility`
-// blocks, captured by tools/gen_tailwind_utility and checked in next to this test.
+// blocks, captured by tools/tailwind/generate_utility and checked in next to this test.
 //
 // The population is chosen so that a clean result is evidence rather than a coincidence. The
 // registry half is the one Phase 0 measured, so the 18 known exceptions are covered exactly as they
@@ -35,7 +35,7 @@ type utilityCorpus struct {
 	// than named. See TestUtilityFindsThePerDeclarationRoots.
 	PerDeclarationRoots []string `json:"perDeclarationRoots"`
 	// KnownExceptions is the 18 registry classes the descriptor model mispredicts, as reported by
-	// gen_tailwind_descriptors. This is the acceptance criterion for this component.
+	// generate_descriptors. This is the acceptance criterion for this component.
 	KnownExceptions []utilityExceptionFixture `json:"knownExceptions"`
 	// ShadowQuirkProbes is the other exception, recorded and not modelled: four sweep probes hitting
 	// an upstream shadow quirk on `[16/9]`. No `@utility` block is involved and no registry contains
@@ -151,7 +151,7 @@ func utilityBuildEvaluator(t *testing.T, corpus utilityCorpus) (*UtilityEvaluato
 	t.Helper()
 
 	if _, err := os.Stat(filepath.Join(utilityTailwindPackageRoot, "index.css")); err != nil {
-		t.Skipf("tailwindcss install is not present at %s; run tools/gen_tailwind_utility to refresh", utilityTailwindPackageRoot)
+		t.Skipf("tailwindcss install is not present at %s; run tools/tailwind/generate_utility to refresh", utilityTailwindPackageRoot)
 		return nil, false
 	}
 	if _, err := os.Stat(corpus.EntryPath); err != nil {

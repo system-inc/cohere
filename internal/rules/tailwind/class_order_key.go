@@ -31,7 +31,7 @@
 //     resolved the tie either way would separate them.
 //
 // So the population is built once over the whole literal, every class is keyed against it, and the
-// sort reads the keys. `tools/gen_tailwind_variant/enumerate.mjs` says the same thing from the
+// sort reads the keys. `tools/tailwind/generate_variant/enumerate.mjs` says the same thing from the
 // engine's side: "The design system is fresh per call, because the order map is a function of
 // exactly which variants have been parsed into the design system's cache."
 //

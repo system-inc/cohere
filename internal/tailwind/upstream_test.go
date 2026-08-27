@@ -4,7 +4,7 @@ import "testing"
 
 // TestCheckedInTablesMatchTheInstalledEngine is the standing half of the upstream diff.
 //
-// `tools/gen_tailwind_upstream_diff` compares two installed engines and reports which of the port's
+// `tools/tailwind/generate_upstream_diff` compares two installed engines and reports which of the port's
 // tables need regenerating. That is the tool a person runs on a version bump. This is the part that
 // runs on every build: it compares the checked-in tables against the engine actually installed here,
 // so a bump that lands without anyone running the tool fails the suite rather than shipping.
@@ -34,7 +34,7 @@ func TestCheckedInTablesMatchTheInstalledEngine(t *testing.T) {
 	// against the engine separately is what makes either one drifting a failure.
 	if system.TailwindVersion != TailwindVersion {
 		t.Fatalf("the installed engine is Tailwind %s and the checked-in tables were generated against %s; "+
-			"run tools/gen_tailwind_upstream_diff against both to see which tables moved",
+			"run tools/tailwind/generate_upstream_diff against both to see which tables moved",
 			system.TailwindVersion, TailwindVersion)
 	}
 	if system.TailwindVersion != BaseTailwindVersion {
@@ -100,7 +100,7 @@ func TestCheckedInTablesMatchTheInstalledEngine(t *testing.T) {
 //
 // The circularity is not a defect to fix in Go, because Go has no engine to ask: the registry lives
 // behind `designSystem.utilities.keys('static')` and that is JavaScript. The non-circular comparison
-// is `tools/gen_tailwind_upstream_diff`, which loads two real engines and diffs their registries.
+// is `tools/tailwind/generate_upstream_diff`, which loads two real engines and diffs their registries.
 // That tool was proven against a planted control: renaming `sr-only` to `sr-only-planted` in one
 // bundle produced exactly two changes, the addition and the removal, where three genuine patch
 // releases produced zero.

@@ -16,7 +16,7 @@
 /vendor_react_fixtures
 /extract_oxc_fixtures
 /gen_shims
-/gen_tailwind_collapse
+/generate_collapse
 /stage_dispatcher
 /dist/
 

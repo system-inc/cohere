@@ -145,7 +145,7 @@ func fallbackBranchFor(descriptor *Descriptor) UtilityBranch {
 // through `Lookup`'s precedence, so no answer depends on it and the emitters disagreeing with it
 // changes nothing.
 //
-// Deleting it belongs to whoever owns `gen_tailwind_descriptor_base`, since the row is printed rather
+// Deleting it belongs to whoever owns `generate_descriptor_base`, since the row is printed rather
 // than written, and the same probe would reproduce it. Recorded here with the measurement so the
 // disagreement is a known-dead cell rather than an unexplained one.
 //

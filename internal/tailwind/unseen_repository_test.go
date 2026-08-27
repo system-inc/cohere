@@ -120,7 +120,7 @@ func TestTheUnseenRepositorysFunctionalRootIsDeclinedByTheTable(t *testing.T) {
 func unseenDesignSystem(t *testing.T) *LoadedDesignSystem {
 	t.Helper()
 
-	entryPoint, err := filepath.Abs(filepath.Join("..", "..", "tools", "gen_tailwind_descriptor_base", "testdata", "independent_theme.css"))
+	entryPoint, err := filepath.Abs(filepath.Join("..", "..", "tools", "generate_descriptor_base", "testdata", "independent_theme.css"))
 	if err != nil {
 		t.Fatalf("resolving the unseen system's path: %v", err)
 	}

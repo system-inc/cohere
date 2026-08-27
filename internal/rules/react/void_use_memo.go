@@ -92,7 +92,7 @@ var messageUseMemoResultUnused = rule.Message{
 // synthetic fallthrough terminal every function gets is `Void`. So the question is whether the
 // callback contains a reachable `return` statement at all, or is a concise arrow body.
 //
-// **A result is unused.** Upstream records the call's own temporary and deletes it when any later
+// **A result is unused_code_report.** Upstream records the call's own temporary and deletes it when any later
 // instruction or terminal takes it as an operand. Since the very next instruction for `const x =
 // call()` is a store consuming that temporary, this is not liveness: it is whether the call's value
 // is syntactically discarded. Measured boundary, and it is exactly three shapes:
@@ -203,7 +203,7 @@ var VoidUseMemo = rule.Rule{
 				// Upstream's `if (!hasNonVoidReturn) { report } else { record as maybe-unused }`.
 				// The two findings are exclusive for one call, which is why this is an else rather
 				// than a second test: a callback that returns nothing is never also reported as
-				// unused. Measured on React, which gives one finding for
+				// unused_code_report. Measured on React, which gives one finding for
 				// `useMemo(() => { foo(); }, []);` and not two.
 				if !hasNonVoidReturn(callback) {
 					ctx.ReportNode(callback, messageUseMemoCallbackReturnsNothing)

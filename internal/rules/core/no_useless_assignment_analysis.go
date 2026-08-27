@@ -186,7 +186,7 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) map[*ast.Symbol]
 
 // deadStoreRoots returns every node the control-flow graph is defined over in one file.
 //
-// Shaped after `unused.codePathRoots`, deliberately rather than incidentally: two consumers of one
+// Shaped after `unused_code_report.codePathRoots`, deliberately rather than incidentally: two consumers of one
 // graph inventing two root sets would drift, and the set is a property of the graph rather than of
 // either rule. `control_flow_graph.IsRoot` is the graph's own answer, so it is asked rather than restated —
 // which additionally picks up property initializers, a root `unused` enumerates by hand.
@@ -246,7 +246,7 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 	//
 	// The graph lays a `finally` block out TWICE, once for normal completion and once for the path
 	// leaving the `try` through `return`, `throw`, or a suspended `yield`. Both copies carry the
-	// same source positions. `unused.FindUnreachable` hit this first and keyed liveness on source
+	// same source positions. `unused_code_report.FindUnreachable` hit this first and keyed liveness on source
 	// position rather than block identity, because for its question — can this statement run — any
 	// reachable copy settles it.
 	//

@@ -60,7 +60,7 @@ const (
 //   - Max / MaxIsUBrace describe the `b` endpoint.
 //
 // For RegexCharBreaker:
-//   - Value, Max, IsUBrace are unused.
+//   - Value, Max, IsUBrace are unused_code_report.
 //
 // Start / End are byte offsets within the pattern text covering the element's
 // source extent.

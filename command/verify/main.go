@@ -24,7 +24,7 @@ import (
 	"github.com/system-inc/verify/internal/registry"
 	"github.com/system-inc/verify/internal/release"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/unused"
+	"github.com/system-inc/verify/internal/unused_code_report"
 )
 
 // processStart is stamped before anything else runs, so the phase line can say how much of the run
@@ -481,7 +481,7 @@ func run() error {
 		}
 	}
 
-	// Phase 5: unused. A report, run only when asked for, and never a reason to fail a build.
+	// Phase 5: unused_code_report. A report, run only when asked for, and never a reason to fail a build.
 	if !runUnused {
 		report.record(phaseUnused, outcomeSkipped, 0, "not requested — this is a report, ask for it with --unused")
 	} else {
@@ -503,13 +503,13 @@ func run() error {
 			)
 		}
 
-		unusedResult, err := unused.Run(ctx, graph, projectFiles, *unusedDeep)
+		unusedResult, err := unused_code_report.Run(ctx, graph, projectFiles, *unusedDeep)
 		if err != nil {
 			return fmt.Errorf("running the unused report: %w", err)
 		}
 		unusedDuration := time.Since(unusedStart)
 
-		unused.Write(os.Stdout, unusedResult, *unusedAll)
+		unused_code_report.Write(os.Stdout, unusedResult, *unusedAll)
 
 		// Deliberately NOT added to `findings`. The exit code is the gate's verdict, and this phase
 		// is not part of the gate: an export held for an external consumer is unused and correct, so

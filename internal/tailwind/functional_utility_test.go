@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// functionalFixture is one probe captured by tools/gen_tailwind_functional/enumerate.mjs.
+// functionalFixture is one probe captured by tools/tailwind/generate_functional/enumerate.mjs.
 type functionalFixture struct {
 	ProbeCount    int `json:"probeCount"`
 	RejectedCount int `json:"rejectedCount"`

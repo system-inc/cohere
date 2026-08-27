@@ -39,7 +39,7 @@ var messageUnusedLabel = rule.Message{
 // only question that would need type information. `A: { var A = 0; console.log(A); break A; }` is
 // the case that proves the distinction: the variable `A` shadows nothing, because a label and a
 // variable live in different namespaces entirely, and a rule resolving `A` as a value would find the
-// variable and conclude the label was unused.
+// variable and conclude the label was unused_code_report.
 //
 // The walk goes upward from each jump rather than downward from each label, and stops at the first
 // enclosing label whose name matches. Stopping matters: `A: { A: { break A; } }` has two labels of

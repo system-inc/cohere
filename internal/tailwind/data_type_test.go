@@ -8,7 +8,7 @@ import (
 )
 
 // The fixture is what the shipped Tailwind 4.3.3 engine answered for every shape in the corpus,
-// captured by tools/gen_tailwind_datatype and checked in next to this test.
+// captured by tools/tailwind/generate_data_type and checked in next to this test.
 //
 // Measured rather than transcribed, because reading the source and asking the engine are different
 // claims and they disagree in ways a careful reader would not predict. Two examples that this suite

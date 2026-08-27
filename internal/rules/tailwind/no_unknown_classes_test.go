@@ -48,7 +48,7 @@ const unknownFixtureSearchRoot = "/Users/kirkouimet/Projects/ahra/app/_theme/sty
 // declares and no framework contains must read as known, and the shipped table could only answer
 // that for the repository it was generated from.
 //
-// The names come from `tools/gen_tailwind_descriptor_base/testdata/independent_theme.css`, which
+// The names come from `tools/tailwind/generate_descriptor_base/testdata/independent_theme.css`, which
 // exists so a framework fact can be told from a repository fact. `synthetic-static` and
 // `synthetic-fn-*` appear in no framework table and in neither corpus repository, so a rule that
 // calls them known has consulted this stylesheet rather than a table.
@@ -624,7 +624,7 @@ func independentLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 		t.Fatalf("resolving the repository root: %v", err)
 	}
 	source := filepath.Join(repositoryRoot,
-		"tools", "gen_tailwind_descriptor_base", "testdata", "independent_theme.css")
+		"tools", "generate_descriptor_base", "testdata", "independent_theme.css")
 	contents, err := os.ReadFile(source)
 	if err != nil {
 		t.Skipf("no independent theme at %s: %v", source, err)

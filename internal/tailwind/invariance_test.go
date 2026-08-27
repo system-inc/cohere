@@ -16,7 +16,7 @@ import (
 // observation wearing two names. Two design systems that cannot differ cannot detect a table that
 // varies.
 //
-// Re-measured against `tools/gen_tailwind_descriptor_base/testdata/independent_theme.css`, which
+// Re-measured against `tools/tailwind/generate_descriptor_base/testdata/independent_theme.css`, which
 // shares no submodule, both claims held: the same 44 families down to the value each was discovered
 // at, over a registry differing by 25 functional roots, and the same 88 registrations across four
 // design systems. The generators now carry `-verify-invariance-against` so that measurement is

@@ -8,7 +8,7 @@
 // The claim was measured before any of this was written, against the shipped engine on two
 // repositories: 37,625 of 37,643 registry classes, every sampled modifier class, and 132,199 of
 // 132,203 arbitrary probes over 327 roots and 527 value shapes. See
-// `tools/gen_tailwind_descriptors/README.md`, which is the specification this file implements. The
+// `tools/tailwind/generate_descriptors/README.md`, which is the specification this file implements. The
 // numbers there are reproduced by running the extractor, not quoted from memory.
 //
 // # The descriptor is four things, and each correction cost a population of mispredictions

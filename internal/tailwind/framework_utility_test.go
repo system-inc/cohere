@@ -122,7 +122,7 @@ func TestFrameworkFunctionalUtilitiesMatchTheEngine(t *testing.T) {
 
 // TestFrameworkFunctionalUtilitiesCoverTheUnprobableRoots is why this wave matters beyond its size.
 //
-// `gen_tailwind_collapse` reports eight roots it cannot reach with any probe value, so they are in
+// `generate_collapse` reports eight roots it cannot reach with any probe value, so they are in
 // KnownRoots and absent from every property table. Seven of the eight are answered by this table.
 // Asserted by name, because the point is which roots stopped being unanswerable rather than how many.
 //

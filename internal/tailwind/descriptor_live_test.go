@@ -19,7 +19,7 @@ import (
 // because it needs a fixture file generated against that repository, which is untracked for the same
 // reason the table is. Reproduce it with:
 //
-//	node tools/gen_tailwind_descriptor_table/fixtures.mjs \
+//	node tools/tailwind/generate_descriptor_table/fixtures.mjs \
 //	    ~/Projects/connected/www-connected-app/app/_theme/styles/theme.css > /tmp/connected_fixtures.json
 //
 // The corpus repositories are read from disk. When one is missing the test skips rather than

@@ -533,7 +533,7 @@ func TestValueDependentReadingsAreRecorded(t *testing.T) {
 // size, one layer further from the thing being asked.
 //
 // So the table stays, and it stays for a stated reason rather than by default: the alternative is a
-// table of equal size describing something Tailwind does not own. `gen_tailwind_collapse` measures it
+// table of equal size describing something Tailwind does not own. `generate_collapse` measures it
 // against the engine by canonicalizing 57,970 root pairs, and refuses a second design system whose
 // registry matches the first, which is the guard that makes an invariance claim mean something.
 //

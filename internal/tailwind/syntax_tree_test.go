@@ -8,7 +8,7 @@ import (
 )
 
 // The fixture is what the shipped Tailwind 4.3.3 engine built and read, captured by
-// tools/gen_tailwind_ast and checked in next to this test.
+// tools/tailwind/generate_syntax_tree and checked in next to this test.
 //
 // Measured rather than transcribed, because `getPropertySort` does not do what a reading of it
 // suggests. It looks like a tree walk and is a breadth-first queue; it appears to exclude

@@ -10,7 +10,7 @@ import (
 )
 
 // The fixture is what the shipped Tailwind 4.3.3 parser built for every stylesheet in the corpus,
-// captured by tools/gen_tailwind_cssparser and checked in next to this test.
+// captured by tools/tailwind/generate_css_parser and checked in next to this test.
 //
 // Measured rather than transcribed, because the two are different claims and the custom-property
 // branch is where they part. Reading `css-parser.ts` suggests a `--foo` declaration is normalized

@@ -10,7 +10,7 @@ import (
 )
 
 // The fixture is the theme the shipped Tailwind 4.3.3 engine resolved for every stylesheet in the
-// corpus, captured by tools/gen_tailwind_theme and checked in next to this test.
+// corpus, captured by tools/tailwind/generate_theme and checked in next to this test.
 //
 // Measured rather than transcribed, because the two are different claims and the ignored-key map is
 // where they part. Reading `theme.ts` suggests `--font` names every key beginning `--font-`; asking

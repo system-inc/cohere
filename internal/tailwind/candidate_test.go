@@ -10,7 +10,7 @@ import (
 )
 
 // The fixture is what the shipped Tailwind 4.3.3 candidate parser read for every class in the
-// corpus, captured by tools/gen_tailwind_candidate and checked in next to this test.
+// corpus, captured by tools/tailwind/generate_candidate and checked in next to this test.
 //
 // Measured rather than transcribed, and the thing measurement buys here is order. `parseCandidate`
 // is a generator; 2,760 of the 5,056 classes in this fixture yield more than one reading, and the

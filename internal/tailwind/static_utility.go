@@ -15,7 +15,7 @@
 //
 // It also makes a wrong entry loud rather than plausible. A transposed reading is a number that
 // still sorts; a transposed property name is visible against the engine's own compiled tree, which
-// is what `tools/gen_tailwind_statics/enumerate.mjs` captures.
+// is what `tools/tailwind/generate_statics/enumerate.mjs` captures.
 package tailwind
 
 // StaticDeclaration is one declaration of a static utility's compiled body.

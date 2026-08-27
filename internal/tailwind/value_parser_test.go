@@ -10,7 +10,7 @@ import (
 )
 
 // The fixture is the tree the shipped Tailwind 4.3.3 value parser produced for every shape in the
-// corpus, captured by tools/gen_tailwind_valueparser and checked in next to this test.
+// corpus, captured by tools/tailwind/generate_value_parser and checked in next to this test.
 //
 // Measured rather than transcribed. Several of this parser's behaviors fall out of JavaScript
 // semantics rather than intent, and a careful reader writing expectations by hand would get them
