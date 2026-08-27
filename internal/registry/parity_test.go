@@ -1066,6 +1066,24 @@ var rulesOutsideTheInventory = map[string]string{
 		"the ahra tree with no fixer and a human judgment at every site; not enforced by either " +
 		"tool when the inventory was captured",
 
+	// Ported from typescript-eslint and ENABLED, unlike most entries here, which are registered and
+	// off. It sits outside the inventory because the gate being replaced does not enforce it: the
+	// three siblings in the family are all listed and this one is not, so the inventory is stale
+	// rather than deliberate on this rule.
+	//
+	// Enabled on measurement rather than on principle. A dry run over the ahra tree reports 435
+	// findings across 132 files, and ESLint over the same 132 files reports 432, with ZERO findings
+	// ESLint has that this misses. The three extra rows are one shape, `const { value } = await
+	// reader.read()` off `fetch(...).body`, where typescript-go resolves the stream's element type
+	// as `any` and TypeScript resolves it as `Uint8Array<ArrayBuffer>`. The rule file carries the
+	// evidence that this is the checker rather than the port, including a sibling rule reporting the
+	// same `any` at the same three sites.
+	"@typescript-eslint/no-unsafe-assignment": "ported from typescript-eslint and enabled; not " +
+		"enforced by the gate being replaced when the inventory was captured, though its three " +
+		"siblings in the no-unsafe family are listed; measured at 435 findings across 132 files on " +
+		"the ahra tree against ESLint's 432 over the same files, with no findings missed and the " +
+		"three extra rows traced to a checker difference in generic resolution through fetch",
+
 	// Ported from typescript-eslint and registered, but not enabled and therefore given no inventory
 	// entry, because an entry asserts the gate being replaced enforces it and the config says the
 	// opposite. VerifySettings.json:366 turns it off under the old short spelling, which the
