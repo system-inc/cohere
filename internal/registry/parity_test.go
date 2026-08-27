@@ -562,6 +562,27 @@ var rulesOutsideTheInventory = map[string]string{
 	// through resolution and was probed against all eight upstream cases before being built on.
 	"symbol-description": "ported from eslint core, which marks it recommended:false; not enforced " +
 		"by either tool when the inventory was captured, and the audit measured zero violations",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// The audit measured zero violations, so this is a guardrail against drift rather than a
+	// cleanup, and the audit rated it Yes on exactly that basis. The tree writes almost no labels
+	// at all.
+	//
+	// It reads the type checker, which upstream does not, and that is the port rather than an
+	// addition. Upstream asks eslint-scope for a variable of the label's name walking outward to the
+	// global scope; `GetSymbolsInScope` asks the same question, and the meaning it is asked for is
+	// what had to match. `SymbolFlagsValue` was measured against sixteen inputs on the installed
+	// build rather than chosen, because upstream clashes with a function, a class, a let and a
+	// const, not only with a var.
+	//
+	// Two upstream behaviours are reproduced rather than improved on, and both read as false
+	// positives: a label named `Object` or `undefined` REPORTS, because the scope chain ends at the
+	// global scope where every standard library name is a variable.
+	"no-label-var": "ported from eslint core, which marks it recommended:false; not enforced by " +
+		"either tool when the inventory was captured, and the audit measured zero violations",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
