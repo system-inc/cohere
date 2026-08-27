@@ -373,6 +373,28 @@ var rulesOutsideTheInventory = map[string]string{
 		"of a configured-globals surface, see the comment above",
 
 	// Ported from typescript-eslint, whose stylistic preset carries it, and enabled in both engines
+	// by this port. Outside the inventory for the usual reason, and this one is worth stating
+	// carefully because it LOOKS like a parity gap and is not: the rule audit measured 711
+	// violations in the ahra tree, so the rule finds real work. Those 711 came from running the rule
+	// explicitly, not from either tool enforcing it, and the inventory records what was enforced
+	// when it was captured. A rule that finds work is not the same as a rule the gate had.
+	//
+	// So enabling this one is a cleanup rather than a guardrail, unlike the two entries below it.
+	// The rule is fully fixable and the repair was checked against upstream's rather than eyeballed:
+	// all ninety-nine of upstream's own before-and-after pairs reproduce byte for byte, and on a
+	// file holding six real shapes from this tree the two fixers wrote identical output.
+	//
+	// One defect worth recording because no fixture could see it. A heritage clause is its own node
+	// type in TSESTree, so upstream's type-reference visitor never fires on `interface I extends
+	// Array<string> {}`; typescript-go reuses `KindTypeReference` there, so the first draft reported
+	// it and would have proposed a rewrite that does not parse. Found by diffing the two linters
+	// over the real tree, 713 against 711, both extra in one file. After the guard, the two agree
+	// exactly: 711 findings over 190 files with nothing on either side of the diff.
+	"@typescript-eslint/array-type": "ported from typescript-eslint, whose stylistic preset carries " +
+		"it; not enforced by either tool when the inventory was captured, though the audit measured " +
+		"711 violations it will now clean up",
+
+	// Ported from typescript-eslint, whose stylistic preset carries it, and enabled in both engines
 	// by this port. Outside the inventory for the usual reason: neither of the two tools the
 	// inventory records named this rule when the capture was taken. Like the ban-tslint-comment
 	// entry below it, the ahra tree already satisfies it, so enabling it is a guardrail against
