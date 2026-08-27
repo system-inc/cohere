@@ -347,6 +347,18 @@ var rulesOutsideTheInventory = map[string]string{
 	// component's propTypes is an object in development and undefined in the build users run.
 	"react/forbid-foreign-prop-types": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and the audit measured zero violations in ahra, which a dry run over the tree reproduced",
 
+	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory records
+	// what the two tools enforced when it was captured, and neither enforced this one: upstream marks
+	// it `recommended: false`, so it is off in the plugin's own recommended config and nothing turned
+	// it on here, which is why it is outside the inventory rather than a parity gap.
+	//
+	// It is a judgment about JSX elements, so it was enabled on the frontend layer. This rule is
+	// unusual in that it enforces NOTHING until somebody writes a forbid list: the whole judgment is
+	// supplied by the config, and an unconfigured rule declines every element. So it is registered and
+	// enabled as scaffolding for a decision this project has not made yet, and the dry run's zero over
+	// the tree is what an empty list produces rather than evidence about the code.
+	"react/forbid-elements": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and it enforces nothing until a forbid list is configured, so the audit's zero and the dry run's zero both reflect an empty list",
+
 	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory
 	// records what the two tools enforced when it was captured, and neither enforced this one:
 	// upstream marks it `recommended: false`, so it is off in the plugin's own recommended config,
