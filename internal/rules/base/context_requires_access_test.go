@@ -402,3 +402,36 @@ func TestDecodeContextRequiresAccessOptions(t *testing.T) {
 		}
 	})
 }
+
+// Parameter shapes that must not take the linter down.
+//
+// A probe written while checking whether this rule needed the upstream `resolveDecoratedParameterNode`
+// helper panicked on the third of these: `Node.Text()` raises `Unhandled case in Node.Text:
+// *ast.BindingPattern` for a destructured parameter name. The walk recovers per FILE rather than per
+// rule, so one such panic costs every rule its verdict on that file.
+//
+// This rule is safe by construction rather than by guard -- it never reads a parameter's name, only
+// its decorators, its type annotation and its question token, and it reports on the enclosing
+// member's name rather than the parameter's. These rows turn that argument into a measurement, since
+// an argument about what a rule does not call is exactly the kind that stops being true after an
+// edit.
+func TestContextRequiresAccessSurvivesUnusualParameters(t *testing.T) {
+	for _, source := range []string{
+		// A destructured parameter, whose name is a binding pattern rather than an identifier.
+		"class A { m(@InjectRequestContext(AccountRequestContextKey) { a }: { a: string }) {} }",
+		"class A { m(@InjectRequestContext(AccountRequestContextKey) [a]: string[]) {} }",
+		// A rest parameter.
+		"class A { m(@InjectRequestContext(AccountRequestContextKey) ...rest: string[]) {} }",
+		// A computed member name, where the enclosing member's own name is not an identifier
+		// either, so the report target falls back to the member itself.
+		"class A { [computed](@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+	} {
+		t.Run(source, func(t *testing.T) {
+			// The assertion is that this returns at all. What it reports is covered above; a panic
+			// here would be invisible to every other test in this file, which all use ordinary
+			// parameters.
+			rule_testing.RunWithOptions(t, ContextRequiresAccess, contextRequiresAccessFile,
+				source, contextRequiresAccessLiveOptions())
+		})
+	}
+}
