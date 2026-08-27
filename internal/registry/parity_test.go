@@ -285,6 +285,13 @@ var rulesOutsideTheInventory = map[string]string{
 	// parity gap.
 	"use-unknown-in-catch-callback-variable": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured",
 
+	// Ported from typescript-eslint and enabled in both engines by this port, the same shape as the
+	// entries around it. Unlike the one above, this rule IS in upstream's recommended preset, so its
+	// absence from the inventory says something about the configuration being replaced rather than
+	// about the rule: neither tool named it when the inventory was captured. A rule the gate never
+	// had rather than a parity gap.
+	"restrict-plus-operands": "ported from typescript-eslint, which recommends it; not enforced by either tool when the inventory was captured",
+
 	// Ported from typescript-eslint and enabled in both engines by this port, so like the entry above
 	// it is a rule the gate never had rather than a parity gap. The inventory records what the two
 	// tools enforced when it was captured and neither enforced this one: the eslint side had no
