@@ -297,8 +297,26 @@ var rulesOutsideTheInventory = map[string]string{
 	// beside a namespace, an enum beside a namespace, and a pair of overload signatures. The
 	// typescript-eslint variant is silent on every one of those and is what is ported here, so the
 	// bare registered name means the typescript variant rather than the core rule it is spelled like.
+	//
+	// One of upstream's two options is deliberately not ported, and the decline is recorded here
+	// rather than only in the rule's doc comment because this is where a coverage audit looks.
+	// `builtinGlobals` reports a declaration that shadows a global. It is not a gap in our checker:
+	// probed with a control, a local `var Object` SHADOWS rather than merges, so the scope
+	// enumeration returns only the local declaration and the standard library's `Object` is not in
+	// scope at all, answering identically to a name that is not a builtin. There is nothing for the
+	// option to compare against.
+	//
+	// The verdict is eslint's environment model rather than name resolution, and upstream's own
+	// corpus is what proves it: `var Object = 0;` appears as a CLEAN case and as a REPORTING case
+	// under the SAME `builtinGlobals: true`, separated only by whether the file is a module. Sixteen
+	// of upstream's 52 cases carry the option and are omitted from the fixtures, pinned by
+	// `TestNoRedeclareBuiltinGlobalsIsOutOfScope` rather than left as silence. The same reasoning
+	// covers upstream's `/*global b:false*/` case, which needs a directive-globals surface we also
+	// do not have. Reinstating either means building a configured-globals surface first, not
+	// changing this rule.
 	"no-redeclare": "ported from typescript-eslint and enabled by that port; not enforced by either " +
-		"tool when the inventory was captured",
+		"tool when the inventory was captured; upstream's builtinGlobals option is declined for want " +
+		"of a configured-globals surface, see the comment above",
 
 	// A house rule with no upstream on either side, written from reasoning rather than ported, so
 	// no inventory entry could exist for it. It guards verify's own type-based React rules rather
