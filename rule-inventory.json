@@ -1,24 +1,24 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 293,
+  "total": 296,
   "byNamespace": {
-    "(core)": 111,
+    "(core)": 112,
     "@next": 22,
-    "@typescript-eslint": 44,
+    "@typescript-eslint": 45,
     "better-tailwindcss": 13,
     "nexus": 20,
-    "react": 35,
+    "react": 36,
     "react-hooks": 17,
     "structure": 31
   },
   "bySeverity": {
-    "error": 251,
+    "error": 254,
     "warn": 42
   },
   "byEnabledBy": {
     "pluginDefault": 41,
-    "rulesBlock": 252
+    "rulesBlock": 255
   },
   "rules": [
     {
@@ -469,6 +469,15 @@
       "options": "no",
       "severity": "warn",
       "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "@typescript-eslint/no-restricted-types",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
     },
     {
       "rule": "@typescript-eslint/no-unnecessary-qualifier",
@@ -1764,6 +1773,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-unneeded-ternary",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-unsafe-finally",
       "sources": [
         "eslint",
@@ -2262,6 +2280,15 @@
         "eslint"
       ],
       "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react/no-access-state-in-setstate",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
       "severity": "error",
       "enabledBy": "rulesBlock"
     },
