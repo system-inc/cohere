@@ -255,7 +255,6 @@ var ignoredTopLevelKeys = map[string]string{
 		"honour. Ignored deliberately, and it stays in the config because oxlint still reads it " +
 		"while both tools run side by side.",
 
-
 	"settings": "per-plugin configuration for the JavaScript plugins above, and it is the entry " +
 		"most worth re-reading. `settings.better-tailwindcss.entryPoint` names this repository's " +
 		"root stylesheet, and `findTailwindEntryPoint` does not read it -- it probes a hardcoded " +
@@ -438,6 +437,7 @@ func pluginDefaultRules() map[string]string {
 		"react/no-render-return-value":        "react",
 		"react/no-string-refs":                "react",
 		"react/no-this-in-sfc":                "react",
+		"react/no-unescaped-entities":         "react",
 		"react/no-unsafe":                     "react",
 		"react/no-will-update-set-state":      "react",
 		"react/void-dom-elements-no-children": "react",
