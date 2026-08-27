@@ -449,6 +449,7 @@ func run() error {
 		printCrashCoverage(result.Coverage)
 		printSuppressionCoverage(result.Coverage)
 		printConfigCoverage(result.Coverage)
+		printOrphanedConfigKeys(rules, lintConfig)
 
 		if *showTiming {
 			printTimings(os.Stdout, result.Timings, lintDuration)
@@ -849,6 +850,61 @@ func printConfigCoverage(coverage program.Coverage) {
 	sort.Strings(unconfigured)
 	for _, name := range unconfigured {
 		fmt.Printf("  config: rule %s is not in the config, so it ran on no files — nobody has said whether it should\n", name)
+	}
+}
+
+// printOrphanedConfigKeys says which config entries name a rule that does not exist.
+//
+// This is the inverse of the unconfigured line above, and it is the failure the rename of every
+// rule to its upstream spelling introduced. The resolver matches a config key exactly, or trims a
+// prefix off it on a `/` boundary, so a key that is LONGER than the rule name resolves and a key
+// that is SHORTER never can. `typescript/no-base-to-string` cannot reach a rule registered as
+// `@typescript-eslint/no-base-to-string`: there is no prefix to trim, only one to add.
+//
+// Left silent, this reads as the opposite of what happened. The rule reports "nobody has said
+// whether it should run" while someone did say, in the config, in a key sitting three lines above
+// one that works. A deliberate `off` that stops applying is worse than one that was never written,
+// because the config still shows the decision and the run no longer honors it.
+//
+// Keys naming a rule verify has not ported yet are the expected case and not an error: a decision
+// recorded ahead of the rule is how this migration is supposed to work. They are counted and named
+// separately so the two are never confused.
+func printOrphanedConfigKeys(rules []rule.Rule, config *configuration.Config) {
+	if config == nil {
+		return
+	}
+
+	registered := make(map[string]bool, len(rules))
+	for _, registeredRule := range rules {
+		registered[registeredRule.Name] = true
+	}
+
+	// A key resolves if some registered rule matches it exactly, or ends with it on a `/` boundary.
+	// This mirrors settingFor rather than reimplementing it loosely, because a check that disagreed
+	// with the resolver would report keys that work and miss keys that do not.
+	resolves := func(key string) bool {
+		for name := range registered {
+			if name == key || strings.HasSuffix(name, "/"+key) {
+				return true
+			}
+		}
+		return false
+	}
+
+	orphaned := make([]string, 0)
+	for key := range config.Rules {
+		if !resolves(key) {
+			orphaned = append(orphaned, key)
+		}
+	}
+	sort.Strings(orphaned)
+
+	for _, key := range orphaned {
+		setting := config.Rules[key]
+		fmt.Printf(
+			"  config: key %q matches no registered rule, so its %s never applies — either the rule is not ported yet, or the key is spelled for an older name\n",
+			key, setting.Severity,
+		)
 	}
 }
 
