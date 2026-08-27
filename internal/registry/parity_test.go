@@ -1078,6 +1078,22 @@ var rulesOutsideTheInventory = map[string]string{
 	// as `any` and TypeScript resolves it as `Uint8Array<ArrayBuffer>`. The rule file carries the
 	// evidence that this is the checker rather than the port, including a sibling rule reporting the
 	// same `any` at the same three sites.
+	// Ported from typescript-eslint and enabled. Upstream marks it `recommended: 'strict'` and
+	// calls it "too opinionated to be recommended", which is why the gate being replaced does not
+	// carry it.
+	//
+	// Enabled on a measured zero, not an assumed one. A dry run over the ahra tree reports 0
+	// findings against 3,516 registrations, and ESLint over all 3,505 TypeScript files in the tree
+	// reports 0 as well, with zero parse problems. Neither zero is inertness: a seeded file carrying
+	// one overload pair per message id makes this rule report all four and makes ESLint report the
+	// three its version supports, and the same ESLint harness that returned zero over the tree
+	// returns a finding when handed that file.
+	"@typescript-eslint/unified-signatures": "ported from typescript-eslint and enabled; upstream " +
+		"marks it recommended:'strict' and too opinionated to recommend, so the gate being " +
+		"replaced does not enforce it; measured at zero findings on the ahra tree against 3,516 " +
+		"registrations, matching ESLint's zero over all 3,505 TypeScript files, with a seeded probe " +
+		"confirming all four message ids fire",
+
 	"@typescript-eslint/no-unsafe-assignment": "ported from typescript-eslint and enabled; not " +
 		"enforced by the gate being replaced when the inventory was captured, though its three " +
 		"siblings in the no-unsafe family are listed; measured at 435 findings across 132 files on " +
