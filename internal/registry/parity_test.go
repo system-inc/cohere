@@ -1346,6 +1346,24 @@ var rulesOutsideTheInventory = map[string]string{
 	// eslint declines, file by file. That agreement is on real code rather than on the corpus, and
 	// it is the number that matters here because a fix is applied unattended and the engine's only
 	// guard is that the result parses, which every one of these declines would have passed.
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// A real cleanup rather than a guardrail. Most of the port is the fixer's REFUSALS: 44 of
+	// upstream's 78 failing cases carry `output: null`, against 25 fix vectors, because unwrapping
+	// an else can collide with a name already in the enclosing scope or rejoin two statements
+	// through automatic semicolon insertion.
+	//
+	// One narrow divergence, recorded in a test rather than left implicit and running toward
+	// declining. `GetSymbolsInScope` answers whether a name is visible at the if statement and not
+	// at which scope depth it was bound, so five of upstream's fix vectors report here and withhold
+	// the repair where upstream repairs. The finding still fires in all five.
+	//
+	"no-else-return": "ported from eslint core, which marks it recommended:false; not enforced by " +
+		"either tool when the inventory was captured, and the audit measured 31 violations, most of " +
+		"them auto-fixable",
+
 	"no-lonely-if": "ported from eslint core, which marks it recommended:false; not enforced by " +
 		"either tool when the inventory was captured, and the audit measured 16 violations, which " +
 		"this port reproduces at the same positions with the same 7 repairs and 9 declines",
