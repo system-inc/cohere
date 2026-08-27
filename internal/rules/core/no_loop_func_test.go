@@ -618,6 +618,11 @@ func TestNoLoopFuncNestedClosureInsideAMethodAnchorsOnTheMethod(t *testing.T) {
 // differ in column on exactly the three methods, by exactly the length of the name. The gate keys
 // on file, line and rule and excludes column deliberately, so this is not a parity failure.
 //
+// It is also the tree's convention rather than this rule's invention: `require-yield` shipped
+// first, anchors the same way, and diverges from upstream in the same direction. The last case here
+// asserts the two rules agree with each other on one input, which is the property that would break
+// if someone narrowed either of them to match an upstream node boundary.
+//
 // Asserted here so the choice cannot be quietly narrowed back to upstream's node boundaries.
 func TestNoLoopFuncMethodSpanIncludesTheName(t *testing.T) {
 	cases := []struct {
@@ -658,6 +663,22 @@ func TestNoLoopFuncMethodSpanIncludesTheName(t *testing.T) {
 			}
 		})
 	}
+
+	// The convention, asserted across two rules rather than described. `require-yield` anchors on
+	// the same node for the same reason and predates this rule; if either is narrowed to an
+	// upstream node boundary, this stops holding.
+	t.Run("require-yield anchors a method the same way", func(t *testing.T) {
+		const source = "const o = { *onStatement(sql) { return 1; } };"
+		result := ruletest.Run(t, RequireYield, loopFuncFile, source)
+		if len(result.Diagnostics) != 1 {
+			t.Fatalf("expected 1 finding from require-yield, got %d", len(result.Diagnostics))
+		}
+		got := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
+		const want = "*onStatement(sql) { return 1; }"
+		if got != want {
+			t.Errorf("require-yield span: got %q, want %q", got, want)
+		}
+	})
 }
 
 // TestNoLoopFuncAsyncImmediatelyInvokedIsNotSkipped covers the half of the skip the corpus omits.

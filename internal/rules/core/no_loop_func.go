@@ -128,12 +128,26 @@ var messageNoLoopFunc = rule.Message{
 // the key belongs to the enclosing Property rather than to the function. So upstream's finding
 // starts at `(sql)` and ours starts at `onStatement`.
 //
-// Ours is deliberate. The method name is the part a reader navigates by, and a span that opens on
-// an anonymous parameter list tells them which line but not which member. The gate agrees this is
-// not a parity question: `internal/differential/differential.go` keys a finding on file, line and
-// rule, and its comment says column is excluded because the two gates locate findings at different
-// offsets often enough that comparing it would drown the real disagreements. Measured on the real
-// tree, all ten findings match on file and line; three differ in column by exactly the method name.
+// Ours is deliberate, and it is the tree's convention rather than this rule's invention.
+// `require-yield` shipped before this rule, listens on `KindMethodDeclaration` and reports the
+// node, and diverges from upstream on the same axis in the same direction. Measured on
+// `const o = { *onStatement(sql) { return 1; } };`:
+//
+//	eslint require-yield   "*onStatement"                     the ESTree node it was handed
+//	verify require-yield   "*onStatement(sql) { return 1; }"  the whole method declaration
+//	eslint no-loop-func    "(statementSql) { return u; }"     the FunctionExpression value
+//	verify no-loop-func    "onStatement(statementSql) { ... }" the whole method declaration
+//
+// The two upstream spans do not even agree with each other, because each rule reports whichever
+// ESTree node its listener happened to receive, and for a method those are different nodes. Ours
+// agree, because both anchor on the one node our parser gives a method.
+//
+// The method name is the part a reader navigates by, and a span opening on an anonymous parameter
+// list tells them which line but not which member. The gate agrees this is not a parity question:
+// `internal/differential/differential.go` keys a finding on file, line and rule, and its comment
+// says column is excluded because the two gates locate findings at different offsets often enough
+// that comparing it would drown the real disagreements. Measured on the real tree, all ten findings
+// match on file and line; three differ in column by exactly the method name.
 //
 // Pinned by TestNoLoopFuncMethodSpanIncludesTheName so a later reader does not narrow it to match
 // upstream's node boundaries without knowing this was a choice.
