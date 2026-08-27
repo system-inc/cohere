@@ -79,3 +79,59 @@ func TestPartitionAndKindSeparatesAllTwentyThree(t *testing.T) {
 	}
 	t.Logf("partition-and-kind: %d disagreements over %d cases (identity alone had 7)", disagreements, len(cases))
 }
+
+// TestNoRedeclareTypeAliasBelongsToNoMergeSet pins the shape that produced this rule's only finding
+// on the real tree, which neither the corpus nor the 23-case set covers.
+//
+// The finding was `type TrackedPromiseType<T>` beside `namespace TrackedPromiseType`, the deliberate
+// type-plus-companion-namespace idiom, and it reads as a false positive until you check the merge
+// sets. Upstream exempts all-interfaces, all-namespaces, class with interface and namespace, and
+// function with namespace. A type alias is in none of them, so it merges with nothing and every
+// pairing reports. Verified against the installed build case by case rather than read off the source.
+//
+// The property that makes this its own shape rather than a variant of the covered ones: it reports
+// under BOTH option values. `class A {} namespace A {}` is silent by default and reports with
+// `ignoreDeclarationMerge` off, so its verdict moves with the option. A type alias has no exemption
+// to turn off, so both columns below are the same.
+func TestNoRedeclareTypeAliasBelongsToNoMergeSet(t *testing.T) {
+	for _, testCase := range []struct {
+		label      string
+		sourceText string
+	}{
+		// The real-tree shape, generics and exports included, since that is what actually reported.
+		{"the TrackedPromise shape", "export type TrackedPromiseType<T> = { promise: Promise<T> };\nexport namespace TrackedPromiseType { export function create<T>() {} }"},
+		{"type then namespace", "type X = { a: number };\nnamespace X { export function create() {} }"},
+		// Order flipped, because a rule reading only the first declaration's kind would pass the
+		// row above and fail this one.
+		{"namespace then type", "namespace X { export function create() {} }\ntype X = { a: number };"},
+		{"type then interface", "type X = { a: number };\ninterface X { b: number }"},
+		{"type then enum", "type X = 1;\nenum X { A }"},
+	} {
+		t.Run(testCase.label, func(t *testing.T) {
+			// Default options, which is what the live config gives this rule.
+			ruletest.ExpectFindings(t,
+				ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, nil),
+				"redeclared")
+
+			// And with the merge exemptions explicitly off, which must not move the verdict. This is
+			// the half that separates a type alias from a class: there is no exemption to lift.
+			ruletest.ExpectFindings(t,
+				ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, redeclareOptions(false)),
+				"redeclared")
+		})
+	}
+
+	// The controls, and the reason the five above are the merge sets working rather than the rule
+	// reporting every namespace pairing it sees. Both are silent by default and both report once the
+	// exemption is lifted, so the option is what moves them and membership is what moves the others.
+	for _, sourceText := range []string{
+		"interface X { a: number }\nnamespace X { export function create() {} }",
+		"class X {}\nnamespace X { export function create() {} }",
+	} {
+		ruletest.ExpectClean(t,
+			ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, sourceText, nil))
+		ruletest.ExpectFindings(t,
+			ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, sourceText, redeclareOptions(false)),
+			"redeclared")
+	}
+}
