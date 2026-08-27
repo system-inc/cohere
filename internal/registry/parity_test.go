@@ -277,6 +277,29 @@ var rulesOutsideTheInventory = map[string]string{
 	// the capture is not a parity gap; it is a rule the gate never had.
 	"import-require-path-alias": "not enforced by either tool when the inventory was captured, and enabled after it",
 
+	// Ported from typescript-eslint and enabled in both engines by this port, the same shape as the
+	// no-redeclare entry below. The inventory records what the two tools enforced when it was
+	// captured, and neither enforced this one: it is in typescript-eslint's `strict` preset rather
+	// than its `recommended` one, so a project on the recommended set never had it, and there is no
+	// oxlint config in the tree to have carried it either. A rule the gate never had rather than a
+	// parity gap.
+	"use-unknown-in-catch-callback-variable": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured",
+
+	// Ported from typescript-eslint and enabled in both engines by this port, so like the entry above
+	// it is a rule the gate never had rather than a parity gap. The inventory records what the two
+	// tools enforced when it was captured and neither enforced this one: the eslint side had no
+	// `@typescript-eslint/no-redeclare` line until this port added it, and there is no oxlint config
+	// in the tree to have carried it either.
+	//
+	// Worth naming which rule this is, because two different ones share the spelling and they
+	// disagree. Core `no-redeclare` reports all five of TypeScript's legitimate declaration merges,
+	// measured against the installed build: two interfaces, a class beside an interface, a class
+	// beside a namespace, an enum beside a namespace, and a pair of overload signatures. The
+	// typescript-eslint variant is silent on every one of those and is what is ported here, so the
+	// bare registered name means the typescript variant rather than the core rule it is spelled like.
+	"no-redeclare": "ported from typescript-eslint and enabled by that port; not enforced by either " +
+		"tool when the inventory was captured",
+
 	// A house rule with no upstream on either side, written from reasoning rather than ported, so
 	// no inventory entry could exist for it. It guards verify's own type-based React rules rather
 	// than the source: in a file where a hook call resolves to `any`, `set-state-in-render` and
