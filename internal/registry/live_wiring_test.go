@@ -46,6 +46,25 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// override it silently, so the rule is ported, registered and inventoried while staying
 		// off. Turning it on is a config change for whoever owns that block to make.
 		"react/jsx-key": "the live config turns react/jsx-key off deliberately, beside react-in-jsx-scope",
+
+		// The live config already turns this rule off, at VerifySettings.json:370, under the
+		// spelling `typescript/require-array-sort-compare`. Somebody decided against it, and the
+		// port does not get to reverse that.
+		//
+		// What makes this worth spelling out is that enabling it would have LOOKED like a normal
+		// port rather than like an override. The registered name here is the full
+		// `@typescript-eslint/` spelling, and `settingFor` resolves an exact match first and then a
+		// suffix trim on a `/` boundary, so the existing `typescript/` key does not resolve against
+		// it. Measured directly against `settingFor`: the bare and `typescript/` spellings both
+		// resolve to that "off" and the `@typescript-eslint/` one does not. Adding an "error" line
+		// would therefore have silently won over a standing decision through a spelling difference,
+		// with nothing in any diff to show that is what happened.
+		//
+		// So the rule is ported, registered and tested while staying off, the same shape as
+		// `react/jsx-key` above. Turning it on is a config change for whoever owns that "off" to
+		// make, and the audit puts the cost at four sites, three of them `results.sort()` over small
+		// number arrays inside test assertions where the default sort is harmless.
+		"@typescript-eslint/require-array-sort-compare": "the live config turns it off deliberately at VerifySettings.json:370, under the typescript/ spelling",
 	}
 
 	rules := All()
