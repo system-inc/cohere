@@ -375,6 +375,17 @@ var rulesOutsideTheInventory = map[string]string{
 	// recoverable from the source, so nothing may rewrite one unattended.
 	"@typescript-eslint/prefer-enum-initializers": "ported from typescript-eslint, which ships it in no preset; not enforced by either tool when the inventory was captured",
 
+	// Ported from typescript-eslint and enabled in both engines by this port. Upstream carries it in
+	// its STRICT preset rather than its recommended one, so neither tool being replaced had it on and
+	// its absence from the inventory says nothing about the rule. A rule the gate never had rather
+	// than a parity gap.
+	//
+	// The audit measured two violations in ahra, both in one test file, and both are the shape the
+	// rule exists to catch: an enum member computed from another member outside a bitwise expression.
+	// It ships no fixer, upstream or here, because the correct literal is not recoverable from the
+	// source.
+	"@typescript-eslint/prefer-literal-enum-member": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured, and the audit measured 2 violations in one test file",
+
 	// Ported from typescript-eslint and registered, but deliberately NOT enabled: the live config
 	// already turns it off at VerifySettings.json:370 under the `typescript/` spelling, and the port
 	// does not reverse somebody's standing decision. The reason is recorded in full beside its entry
