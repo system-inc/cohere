@@ -39,6 +39,13 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// The differential harness's verify-only control. The gate's oxlint plugin has no such rule,
 		// which is the asymmetry the control depends on, so the config cannot name it.
 		"import-require-path-alias": "the directional control for the differential",
+
+		// The live config sets `react/jsx-key` to "off" explicitly, in a block of ten-plus rules
+		// this project has deliberately turned off alongside `react/react-in-jsx-scope`. That is a
+		// decision about this codebase rather than a wiring gap, and flipping it here would
+		// override it silently, so the rule is ported, registered and inventoried while staying
+		// off. Turning it on is a config change for whoever owns that block to make.
+		"jsx-key": "the live config turns react/jsx-key off deliberately, beside react-in-jsx-scope",
 	}
 
 	rules := All()
