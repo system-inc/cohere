@@ -985,6 +985,37 @@ var rulesOutsideTheInventory = map[string]string{
 	"no-lonely-if": "ported from eslint core, which marks it recommended:false; not enforced by " +
 		"either tool when the inventory was captured, and the audit measured 16 violations, which " +
 		"this port reproduces at the same positions with the same 7 repairs and 9 declines",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// 50 findings across 19 files, exactly what the audit measured, and the installed eslint reports
+	// the same 50 at the same line and column. It is fixable, so the number that matters more is
+	// the rewrite: this port's fixes were applied to all 19 real files and the resulting bytes
+	// match eslint's own output byte for byte, including the one finding both tools decline.
+	//
+	// Its fixer found a defect no upstream fixture could contain. `as` and `satisfies` bind LOOSER
+	// than every arithmetic operator, and upstream's precedence table has no row for either because
+	// its corpus is JavaScript, so a port inheriting that table ranks them tightest and expands
+	// `x += 1 as number` to `x = x + 1 as number`, which asserts the type of the sum rather than of
+	// the addend. Caught by comparing the two parses directly, and pinned by a fixture that fails
+	// when the precedence row is reverted.
+	"operator-assignment": "ported from eslint core, which marks it recommended:false; not " +
+		"enforced by either tool when the inventory was captured, and the audit measured 50 " +
+		"violations, which this port reproduces at the same positions and rewrites identically",
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// The audit rated it Yes and measured 61 sites, which makes this a cleanup rather than a
+	// guardrail, and the rule catches a defect rather than a preference: the Promise constructor
+	// discards whatever its executor returns, so a returned value is dead at best and a missing
+	// resolve at worst. It ships suggestions rather than a fix, matching upstream, because both
+	// repairs change what the code means.
+	"no-promise-executor-return": "ported from eslint core, which marks it recommended:false; not " +
+		"enforced by either tool when the inventory was captured, and the audit measured 61 " +
+		"violations it will now require somebody to work through by hand",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
