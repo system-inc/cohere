@@ -137,6 +137,21 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// on; somebody has to decide to spend the 2,846 decisions.
 		"@typescript-eslint/no-unsafe-type-assertion": "registered but left off pending a decision about volume: measured at 2,846 findings across 672 files on the ahra tree with the installed 8.67.0 build, no fixer, every site a human judgment",
 
+		// Registered but deliberately not enabled, and the reason is that turning it on is a
+		// stylistic decision with edits attached rather than a correctness one. Upstream marks it
+		// `recommended: false` and neither gate enforced it, so nothing is being reversed here and
+		// no prior `off` exists under either spelling; the decision has simply not been made.
+		//
+		// Measured with the rule temporarily enabled and the config restored afterward: 11 findings
+		// across 10 files, from 173,533 registrations over 3,516 files, 12.3ms, zero crashed files.
+		// Every finding was read at its source and every one is a real unnecessary brace, mostly
+		// `className={'...'}` where a plain string attribute says the same thing. Unlike the volume
+		// case above, this one DOES ship a fixer and all eleven repairs were verified byte for byte
+		// against the installed 7.37.5 build, so adopting it is one fix run rather than eleven
+		// judgments. It is left off because eleven files changing spelling is still somebody's call
+		// about house style, not because anything about the port is unfinished.
+		"react/jsx-curly-brace-presence": "registered but left off pending a decision about house style: 11 findings across 10 files on the ahra tree, every one verified against the installed 7.37.5 build at the same position and with the same repair text, and all of them mechanically fixable",
+
 		// Registered but deliberately not enabled, because the config already carries a standing
 		// decision against this rule and that decision cannot be seen by the resolver.
 		// the config key `typescript/restrict-template-expressions` reads `"typescript/restrict-template-expressions": "off"`, written

@@ -541,6 +541,31 @@ var rulesOutsideTheInventory = map[string]string{
 	// reverses the choice is caught, so it is pinned by a test rather than only by this note.
 	"react/no-unknown-property": "ported from eslint-plugin-react, which marks it recommended:true but which neither tool enforced, because this project lists its react rules individually rather than spreading the recommended preset; a dry run over the tree measured 18 real findings across 5 files, all fill-rule or clip-rule in SVG icons, with the repair verified on one of those files",
 
+	// Ported from eslint-plugin-react, and REGISTERED WITHOUT BEING ENABLED. The inventory records
+	// what the two tools enforced when it was captured, and neither enforced this one: upstream
+	// marks it `recommended: false`, so it is off in the plugin's own recommended config and
+	// nothing turned it on here. No prior `off` exists for it under either the full name or the
+	// bare one, so there is no standing decision being reversed; there is simply one nobody has
+	// made, and it is left for Kirk because turning it on carries eleven edits with it.
+	//
+	// Measured with the rule temporarily enabled and the config restored afterward: 11 findings
+	// across 10 files, from 173,533 registrations over 3,516 files, in 12.3ms, with zero crashed
+	// files. The non-zero registration count is what separates a clean tree from an inert rule.
+	// Every finding was read at its source and every one is a real unnecessary brace: seven
+	// attributes written `className={'...'}` or `whileTap={'pressed'}` that a plain string
+	// attribute expresses, two backtick templates with no substitution, and two children written
+	// as a wrapped element or a wrapped punctuation string.
+	//
+	// The same eleven were then driven through the installed rule, 7.37.5, over the same files:
+	// identical file, line and column on all eleven, and identical REPAIR TEXT on all eleven,
+	// with a seeded violation and a seeded clean case controlling the harness on both sides.
+	// Two of the eleven first read as disagreements and were the instrument rather than the rule,
+	// which is worth recording because the next differential will hit it: ESLint counts offsets
+	// in UTF-16 code units and verify counts them in bytes, so on any file holding a non-ASCII
+	// character the two spans differ by exactly the extra UTF-8 bytes before the position while
+	// naming the same character and proposing the same text.
+	"react/jsx-curly-brace-presence": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured; registered but left UNENABLED because a dry run measured 11 real findings across 10 files that somebody has to decide about, every one of them matched against the installed rule at the same line and column and carrying the same repair text",
+
 	"react/forbid-dom-props": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and it enforces nothing until a forbid list is configured, so the audit's zero and the dry run's zero both reflect an empty list",
 
 	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory
