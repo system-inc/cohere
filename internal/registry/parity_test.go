@@ -304,6 +304,17 @@ var rulesOutsideTheInventory = map[string]string{
 	// oxlint config in the tree to have carried it either. A rule the gate never had rather than a
 	// parity gap.
 	//
+	// It is a judgment about React keys, so it was enabled on the frontend layer. The audit
+	// measured eighty-four violations, the largest of this batch, so enabling it is a real cleanup
+	// rather than a guardrail. Each is a list whose keys are array positions, which React reuses
+	// across a reorder and which therefore carries element state onto the wrong item.
+	"react/no-array-index-key": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and the audit measured eighty-four violations in ahra",
+
+	// Ported from eslint-plugin-react and enabled in both engines by this port. Upstream marks it
+	// `recommended: false`, so it is off in the plugin's own recommended config, and there is no
+	// oxlint config in the tree to have carried it either. A rule the gate never had rather than a
+	// parity gap.
+	//
 	// It is a judgment about React context providers, so it was enabled on the frontend layer.
 	// Unlike the three react entries below it, the audit measured eighteen violations rather than
 	// zero, so enabling it is a cleanup rather than only a guardrail. Each is a value handed to a
@@ -687,6 +698,40 @@ var rulesOutsideTheInventory = map[string]string{
 	// Two narrowings are recorded at the line rather than left silent, both costing findings rather
 	// than adding them. A sentinel written as a named constant is evaluated upstream and declined
 	// here, and this tree has none. A regex receiver is resolved only through a file-scope variable.
+	// Ported from typescript-eslint and enabled in both engines by this port. Outside the inventory
+	// for the usual reason: neither tool named it when the capture was taken. Upstream ships it in
+	// no preset at all, which is why it was never enforced anywhere.
+	//
+	// The repair rebuilds a signature, which is the shape that lost type information twice in this
+	// project. It is safe here for the same reason `class-literal-property-style` is: the parts that
+	// can hold anything are COPIED as raw source rather than re-rendered. The parameter list is
+	// spliced from its opening parenthesis to its closing one and the type parameter list is copied
+	// whole, so a generic constraint, an optional parameter, a rest parameter and a comment inside
+	// the parentheses all survive without being enumerated. Eleven rows pin that, and each rewrite
+	// was additionally checked through the compiler to confirm the member's type is unchanged.
+	//
+	// Upstream declines in three places and all three are reproduced: a `this` return type has no
+	// property spelling, a member inside a module declaration is reported without a repair, and a
+	// `readonly` function property is offered as a SUGGESTION because converting it drops the
+	// modifier and the member becomes reassignable. That last one is the same judgment this project
+	// applies when it withholds a fixer that would change meaning, arrived at independently.
+	//
+	// One divergence in fix SHAPE with no divergence in judgment. Upstream attaches the whole-group
+	// rewrite for a set of overloads to every signature in it, producing overlapping fixes that
+	// ESLint resolves by applying one per pass and re-linting. Our engine flattens fixes into
+	// independent proposals and refuses an overlap, so the repair is attached to the first signature
+	// only and written as the single merged replacement ESLint actually performs. Measured: the two
+	// write identical source.
+	//
+	// The audit recorded 39 violations and this rule finds 49. That is the audit's number being
+	// stale rather than a divergence: driven over the same twenty-five files, this rule and the
+	// installed build produce byte-identical finding sets, 49 against 49 with nothing on either side
+	// of the diff, including the one the audit quotes as its example.
+	"@typescript-eslint/method-signature-style": "ported from typescript-eslint, which ships it in " +
+		"no preset; not enforced by either tool when the inventory was captured; its overload repair " +
+		"is written as one merged replacement because this engine refuses the overlapping pair " +
+		"upstream emits",
+
 	"@typescript-eslint/prefer-includes": "ported from typescript-eslint, whose stylistic preset " +
 		"carries it; not enforced by either tool when the inventory was captured; its regex half " +
 		"reads patterns through a reader written on regexsyntax because the shelf walker cannot " +
