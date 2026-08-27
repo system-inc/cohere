@@ -1,23 +1,23 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 219,
+  "total": 225,
   "byNamespace": {
-    "(core)": 67,
+    "(core)": 69,
     "better-tailwindcss": 12,
     "nextjs": 22,
     "nexus": 20,
-    "react": 34,
+    "react": 36,
     "structure": 32,
-    "typescript": 32
+    "typescript": 34
   },
   "bySeverity": {
-    "error": 178,
-    "warn": 41
+    "error": 183,
+    "warn": 42
   },
   "byEnabledBy": {
-    "rulesBlock": 179,
-    "pluginDefault": 40
+    "rulesBlock": 184,
+    "pluginDefault": 41
   },
   "rules": [
     {
@@ -904,6 +904,15 @@
       "enabledBy": "pluginDefault"
     },
     {
+      "rule": "no-new-wrappers",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-nonoctal-decimal-escape",
       "sources": [
         "eslint",
@@ -1369,6 +1378,15 @@
       "enabledBy": "pluginDefault"
     },
     {
+      "rule": "react/no-unescaped-entities",
+      "sources": [
+        "oxlint"
+      ],
+      "options": "yes",
+      "severity": "warn",
+      "enabledBy": "pluginDefault"
+    },
+    {
       "rule": "react/no-unsafe",
       "sources": [
         "oxlint"
@@ -1411,6 +1429,15 @@
       "sources": [
         "eslint",
         "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react/require-render-return",
+      "sources": [
+        "eslint"
       ],
       "options": "no",
       "severity": "error",
@@ -2095,6 +2122,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "typescript/only-throw-error",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "typescript/prefer-as-const",
       "sources": [
         "eslint",
@@ -2135,6 +2171,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "typescript/related-getter-setter-pairs",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "use-isnan",
       "sources": [
         "eslint",
@@ -2149,6 +2194,15 @@
       "sources": [
         "eslint",
         "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-constructor-return",
+      "sources": [
+        "eslint"
       ],
       "options": "no",
       "severity": "error",
