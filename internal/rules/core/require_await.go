@@ -228,8 +228,17 @@ func requireAwaitContainsAwait(node *ast.Node) bool {
 // for any using, which measured true on a plain `const` in a for-of header.
 //
 // The correct test compares the block-scoped bits for equality, which is the idiom typescript-go
-// uses at `ast/utilities.go:1214`. Measured across four shapes: `await using` answers true while
-// `using`, `const` and `let` answer false.
+// uses at `ast/utilities.go:1214`. Measured across all five declaration kinds, with the raw flag
+// value recorded so the next reader can check this without re-probing:
+//
+//	await using   flags=8198   naive=true    correct=true
+//	using         flags=8196   naive=true    correct=false
+//	const         flags=8194   naive=true    correct=false
+//	let           flags=8193   naive=false   correct=false
+//	var           flags=8192   naive=false   correct=false
+//
+// So the naive test is wrong on three of the five rather than only on const, and the two it gets
+// right are the two nobody would have thought to check.
 func requireAwaitIsAwaitUsing(list *ast.Node) bool {
 	return list.Flags&ast.NodeFlagsBlockScoped == ast.NodeFlagsAwaitUsing
 }
