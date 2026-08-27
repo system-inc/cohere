@@ -300,6 +300,18 @@ func namespacesOf(remaining []string) []namespaceCount {
 // somebody wanted the test to pass.
 var rulesOutsideTheInventory = map[string]string{
 	// Ported from eslint-plugin-react and enabled in both engines by this port. Upstream marks it
+	// `recommended: false`, so it is off in the plugin's own recommended config, and there is no
+	// oxlint config in the tree to have carried it either. A rule the gate never had rather than a
+	// parity gap.
+	//
+	// It is a judgment about React context providers, so it was enabled on the frontend layer.
+	// Unlike the three react entries below it, the audit measured eighteen violations rather than
+	// zero, so enabling it is a cleanup rather than only a guardrail. Each is a value handed to a
+	// provider that is rebuilt every render, which defeats the identity comparison every consumer
+	// of that context relies on.
+	"react/jsx-no-constructed-context-values": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and the audit measured eighteen violations in ahra",
+
+	// Ported from eslint-plugin-react and enabled in both engines by this port. Upstream marks it
 	// `recommended: false`, the same shape as the state-in-constructor entry below: it is off in
 	// the plugin's own recommended config, and there is no oxlint config in the tree to have
 	// carried it either. A rule the gate never had rather than a parity gap.
@@ -915,6 +927,14 @@ var rulesOutsideTheInventory = map[string]string{
 	// resolver cannot match against the full registered name, so enabling would reverse that
 	// decision through a spelling difference rather than because anybody changed their mind.
 	"@typescript-eslint/restrict-template-expressions": "ported from typescript-eslint; registered " +
+		"but left off because the live config carries a prior off for it under the old short " +
+		"spelling, which cannot resolve against the full name; not enforced by either tool when " +
+		"the inventory was captured",
+
+	// The same shape as the entry above. VerifySettings.json:372 carries the prior off under the
+	// old short spelling, and the reason it cannot resolve is recorded in full beside this rule's
+	// entry in the live-wiring guard's exemption map.
+	"@typescript-eslint/no-duplicate-type-constituents": "ported from typescript-eslint; registered " +
 		"but left off because the live config carries a prior off for it under the old short " +
 		"spelling, which cannot resolve against the full name; not enforced by either tool when " +
 		"the inventory was captured",

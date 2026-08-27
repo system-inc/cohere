@@ -145,6 +145,19 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// nothing in the diff to show a decision was reversed. The port is complete and its
 		// eighty six imported cases pass; turning it on is a decision for whoever wrote that line.
 		"@typescript-eslint/restrict-template-expressions": "registered but left off because VerifySettings.json:366 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+
+		// The same shape as the entry above, and the same reason. VerifySettings.json:372 reads
+		// `"typescript/no-duplicate-type-constituents": "off"`, written under the old short
+		// spelling, and the resolver cannot match a key that is shorter than the registered name.
+		// Confirmed by the linter itself rather than by argument: a `--lint` run prints
+		// `config: key "typescript/no-duplicate-type-constituents" matches no registered rule, so
+		// its off never applies`, which is the instrument that now names all thirteen orphans.
+		//
+		// The port is complete and agrees with upstream on all eighty two of its corpus cases plus
+		// fifteen more TypeScript shapes measured against the installed build. The audit puts the
+		// cleanup at three sites and the rule is auto-fixable, so turning it on is cheap; it is
+		// still a decision for whoever wrote that off rather than for a porter.
+		"@typescript-eslint/no-duplicate-type-constituents": "registered but left off because VerifySettings.json:372 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 	}
 
 	rules := All()
