@@ -74,12 +74,12 @@ command that established it, or do not state it.
 
 ## Check the shelf before writing any helper
 
-`internal/utils/` is 20 packages and 85 files, with `ecmascript/` subdivided by question:
+`internal/utilities/` is 20 packages and 85 files, with `ecmascript/` subdivided by question:
 `binding`, `imports`, `literal`, `module`, `property`, `reference`, `regexp`, `regexpattern`,
 `regexsyntax`, `scope`. Alongside it: `comments`, `controlflow`, `hir`, `jsx`, `nextjs`, `react`,
 `text`, `typecheck`.
 
-**Search everything reachable, not only `internal/utils/`.** The `shim/` packages expose
+**Search everything reachable, not only `internal/utilities/`.** The `shim/` packages expose
 typescript-go's own helpers by linkname and are invisible to a search of the utils shelf. An author
 needing an edit distance nearly used `core.GetSpellingSuggestionForStrings`: closest name on any
 shelf, reachable, and wrong, because it charges 0.1 for a case-only substitution and 2 for anything
