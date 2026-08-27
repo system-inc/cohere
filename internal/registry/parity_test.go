@@ -668,6 +668,31 @@ var rulesOutsideTheInventory = map[string]string{
 	// over the real tree, 713 against 711, both extra in one file. After the guard, the two agree
 	// exactly: 711 findings over 190 files with nothing on either side of the diff.
 	// Ported from typescript-eslint, whose stylistic preset carries it, and enabled in both engines
+	// by this port. Outside the inventory for the usual reason: neither tool named it at capture.
+	//
+	// The rule is two rules in one file and only one of them has exposure here. Measured on this
+	// tree with a control: five `indexOf` presence comparisons against 260 regex `test` sites, and
+	// the dry run splits its thirty findings five to twenty five the same way. So the regex half
+	// carries the value, and it is also the half with no substrate on the shelf.
+	//
+	// That absence is worth recording because the obvious build is wrong. `regexpattern.Walk` looks
+	// like the right foundation and cannot answer this rule's question: run over these patterns it
+	// renders an unescaped dot as a dot, renders an anchored pattern and a grouped one and a
+	// non-capturing group all as the bare text, and renders an alternation as one run of
+	// characters. A port built on it would rewrite an anchored pattern into a substring test, which
+	// is wrong, and upstream's corpus writes only three of those shapes so no imported fixture
+	// would catch it. The shelf's own doc says a caller wanting alternation should reach for the
+	// layer underneath, and that is what this does.
+	//
+	// Two narrowings are recorded at the line rather than left silent, both costing findings rather
+	// than adding them. A sentinel written as a named constant is evaluated upstream and declined
+	// here, and this tree has none. A regex receiver is resolved only through a file-scope variable.
+	"@typescript-eslint/prefer-includes": "ported from typescript-eslint, whose stylistic preset " +
+		"carries it; not enforced by either tool when the inventory was captured; its regex half " +
+		"reads patterns through a reader written on regexsyntax because the shelf walker cannot " +
+		"distinguish an anchor or an alternation from a literal",
+
+	// Ported from typescript-eslint, whose stylistic preset carries it, and enabled in both engines
 	// by this port. Outside the inventory for the usual reason: neither of the two tools the
 	// inventory records named this rule when the capture was taken.
 	//
