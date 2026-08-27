@@ -361,6 +361,24 @@ var rulesOutsideTheInventory = map[string]string{
 
 	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory
 	// records what the two tools enforced when it was captured, and neither enforced this one:
+	// upstream marks it `recommended: false`.
+	//
+	// Like `forbid-elements`, this rule enforces nothing until a forbid list is configured, so the
+	// audit's zero and the dry run's zero both reflect an empty list rather than a clean tree. A
+	// seeded probe tree with a configured list reported three findings on five candidate
+	// attributes, declining a component tag, an unlisted prop and a tag whose first character has
+	// no case.
+	//
+	// The clone and the INSTALLED build disagree here and this port follows the installed build.
+	// The clone's working tree carries a `disallowedValues` feature and a second message id that
+	// the installed 7.37.5 does not have; replaying upstream's own corpus against the installed
+	// build disagrees on exactly the three cases exercising it. The installed build is the artifact
+	// our gate compares against, so a `disallowedValues` key is accepted by the schema and ignored,
+	// exactly as the installed build ignores it.
+	"react/forbid-dom-props": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and it enforces nothing until a forbid list is configured, so the audit's zero and the dry run's zero both reflect an empty list",
+
+	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory
+	// records what the two tools enforced when it was captured, and neither enforced this one:
 	// upstream marks it `recommended: false`, so it is off in the plugin's own recommended config
 	// and nothing turned it on here.
 	//
