@@ -1211,10 +1211,45 @@ var rulesOutsideTheInventory = map[string]string{
 		"not enabled because ahra's config names no base/ rules at all, so where it is enforced is " +
 		"a decision nobody has made yet; the gate being replaced never enforced it here",
 
+	// The same shape as the entries above, with the strongest oracle of the four. This one was
+	// checked against api-phi-health's ACTUAL Provider decorator and TypedInjectionKey rather than a
+	// synthetic stand-in, on a file seeded inside that project's tsconfig include, and the rendered
+	// types matched character for character including `string | ObjectFactory<string> | undefined`.
+	//
+	// It is the first base rule here that reads the type checker. Every judgment it makes is a
+	// checker question, so the plain harness would leave it silently and vacuously green, which a
+	// fixture asserts against directly.
+	// The two Verify parity rules, ported together because they share their anchor: both judge a
+	// class property or a constructor parameter property, and both read the property key's type
+	// through the checker. The judgments differ entirely, so what they share is the traversal and
+	// the shared decorator utility rather than any decision.
+	//
+	// Both were checked against the REAL ESLint rules driven over api-phi-health, and that oracle
+	// earned its place: it corrected a fixture asserting that a `VerifyBy` decorator suppresses
+	// array parity, which it does not, and it settled that a non-Verify decorator beside a
+	// validation rule still reports.
+	"base/verify-optional-parity": "ported from api-phi-health's own base lint layer; " +
+		"registered but not enabled anywhere, because that project has no VerifySettings.json and " +
+		"ahra's config names no base/ rules; which trees enforce it is a decision nobody has made yet",
+
+	"base/verify-array-parity": "ported from api-phi-health's own base lint layer; " +
+		"registered but not enabled anywhere, for the same reason as its sibling above",
+
+	"base/provider-return-matches-token": "ported from api-phi-health's own base lint layer; " +
+		"registered but not enabled because ahra's config names no base/ rules at all, so where it " +
+		"is enforced is a decision nobody has made yet; the gate being replaced never enforced it here",
+
 	// The same shape as the two entries above and for the same reason. Its port is checked against
 	// the source repository rather than an imported corpus: driven through the real rule loaded out
 	// of api-phi-health, thirteen invented shapes were measured rather than assumed, including four
 	// the original knowingly misses.
+	// The first type-aware base rule I have taken. Same reasoning as its siblings, and its port is
+	// checked the same way: twelve invented shapes driven through the real rule with a real program,
+	// including three placements on non-parameters that a mutant would otherwise have reached.
+	"base/inject-type-matches-parameter": "ported from api-phi-health's own base lint layer; " +
+		"registered but not enabled because ahra's config names no base/ rules at all, so where it " +
+		"is enforced is a decision nobody has made yet; the gate being replaced never enforced it here",
+
 	"base/no-hand-built-declared-error": "ported from api-phi-health's own base lint layer; " +
 		"registered but not enabled because ahra's config names no base/ rules at all, so where it " +
 		"is enforced is a decision nobody has made yet; the gate being replaced never enforced it here",
