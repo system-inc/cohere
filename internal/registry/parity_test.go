@@ -1129,6 +1129,11 @@ var rulesOutsideTheInventory = map[string]string{
 		"layer; registered but not enabled because ahra's config names no base/ rules at all, so " +
 		"where it is enforced is a pending decision rather than one this port should make",
 
+	// Registered and not enabled, same reason as its sibling above.
+	"base/graphql-nullable-parity": "ported from api-phi-health's own base lint layer; registered " +
+		"but not enabled because ahra's config names no base/ rules at all, so where it is " +
+		"enforced is a pending decision rather than one this port should make",
+
 	// Registered and not enabled, because ahra's config names no base/ rules at all. See its entry in
 	// the live-wiring exemption map for why that is a pending decision rather than an oversight.
 	"base/no-global-container": "ported from api-phi-health's own base lint layer; registered but " +
