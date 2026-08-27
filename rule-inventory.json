@@ -1,24 +1,24 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 313,
+  "total": 317,
   "byNamespace": {
-    "(core)": 119,
+    "(core)": 120,
     "@next": 22,
-    "@typescript-eslint": 49,
+    "@typescript-eslint": 50,
     "better-tailwindcss": 13,
     "nexus": 20,
-    "react": 42,
+    "react": 44,
     "react-hooks": 17,
     "structure": 31
   },
   "bySeverity": {
-    "error": 271,
+    "error": 275,
     "warn": 42
   },
   "byEnabledBy": {
     "pluginDefault": 41,
-    "rulesBlock": 272
+    "rulesBlock": 276
   },
   "rules": [
     {
@@ -681,6 +681,15 @@
         "eslint"
       ],
       "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/return-await",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
       "severity": "error",
       "enabledBy": "rulesBlock"
     },
@@ -1987,6 +1996,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-useless-return",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-var",
       "sources": [
         "eslint",
@@ -2419,6 +2437,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "react/boolean-prop-naming",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "react/no-danger",
       "sources": [
         "eslint"
@@ -2592,6 +2619,15 @@
     },
     {
       "rule": "react/no-unused-class-component-methods",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react/no-unused-state",
       "sources": [
         "eslint"
       ],

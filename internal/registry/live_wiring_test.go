@@ -210,6 +210,29 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// about those sites rather than a cleanup, and it belongs to whoever wrote the off.
 		"@typescript-eslint/no-base-to-string": "registered but left off because the config key `typescript/no-base-to-string` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 
+		// A THIRD shape: not turned off, and not unmentioned for want of a config layer, but held
+		// back because enabling it is a codebase-wide convention decision rather than a cleanup.
+		//
+		// This rule requires an options object and is INERT without one. Upstream reads its pattern
+		// from `context.options[0]`, and ESLint fills a schema default only into an options object
+		// that is present, so a bare `"error"` makes every listener early-return. Measured on the
+		// installed build with one violating input three ways: no options reports zero, `{}` reports
+		// one, an explicit pattern reports one. `EnableRule.ts` writes a bare `"error"`, which is
+		// exactly the inert state, so enabling it through the usual path would have registered a
+		// rule that lints nothing while looking enforced.
+		//
+		// Registered with RequiresOptions and a decoder that refuses empty input, so that state now
+		// fails loudly with the pattern to write rather than passing silently.
+		//
+		// Left unenabled because the pattern it would enforce is a naming convention for the whole
+		// tree. Measured with the documented default `^(is|has)[A-Z]([A-Za-z0-9]?)+`: 313 findings
+		// across 168 files, spot-checked against the installed build on three files which agreed
+		// exactly. They are correct rather than false: `open`, `modal`, `openOnPress` and
+		// `sessionIdHttpOnlyCookieExists` are all real boolean props that do not start with is or
+		// has. Adopting that convention, choosing a different pattern, or declining is Kirk's call,
+		// and the config line is where he would say so.
+		"react/boolean-prop-naming": "registered but not enabled because it requires an options object and is inert without one, and because its documented default pattern reports 313 findings across 168 files, which is a naming convention for the whole tree rather than a cleanup a porter should choose",
+
 		// A DIFFERENT shape from every entry above it, and the first of its kind in this map.
 		//
 		// The entries above are rules the live config deliberately turned off, where the exemption
