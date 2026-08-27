@@ -116,6 +116,13 @@ var NoUnsafeCall = rule.Rule{
 				// pins the option above the rule.
 				if !type_checking.IsStrictCompilerOptionEnabled(
 					ctx.Program.Options(), ctx.Program.Options().NoImplicitThis) {
+					// A mutation replacing this call with `subject` SURVIVES the whole fixture set,
+					// and it is not a blind spot: the enclosing gate is false under this harness's
+					// tsconfig, so nothing reaches the line at all. Scored both ways to be sure of
+					// the reason rather than assuming it. Mutating this line alone survives;
+					// mutating it TOGETHER with the gate above fails 20 lines, which is the
+					// control proving the line is load-bearing and only the gate is unreachable.
+					// A single-site sweep structurally cannot see this.
 					thisExpression := type_checking.GetThisExpression(subject)
 					if thisExpression != nil {
 						thisType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression)
