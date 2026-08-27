@@ -372,6 +372,29 @@ var rulesOutsideTheInventory = map[string]string{
 		"tool when the inventory was captured; upstream's builtinGlobals option is declined for want " +
 		"of a configured-globals surface, see the comment above",
 
+	// Ported from typescript-eslint, whose stylistic preset carries it, and enabled in both engines
+	// by this port. Outside the inventory for the usual reason: the inventory records what the two
+	// tools enforced when it was captured, and neither named this rule. It is in upstream's
+	// `stylistic` preset rather than its `recommended` one, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// Worth recording that the ahra tree has zero violations of it today, measured by the rule audit
+	// and reproduced by this port's dry run, which offered the rule 3,503 files and found nothing in
+	// any of them. So enabling it buys no cleanup and is a guardrail against drift, which is a
+	// different kind of value than a rule that finds work.
+	//
+	// One divergence, recorded here as well as at the line because this is where a coverage audit
+	// looks. Upstream's fixer widens its removal by one character on each side without testing what
+	// those characters are, so measured on the installed build it rewrites `x;// tslint:disable` to
+	// `x` and `/* tslint:disable */let x = 1;` to `et x = 1;`. The second is refused by this
+	// project's parse guard and the first is not, and a fix is applied unattended. This port widens
+	// only onto whitespace, which reproduces all eight of upstream's own corpus outputs byte for
+	// byte while declining to delete a character that is not blank. The judgment is identical: the
+	// same inputs report, at the same span, with the same rendered text.
+	"@typescript-eslint/ban-tslint-comment": "ported from typescript-eslint, whose stylistic preset " +
+		"carries it; not enforced by either tool when the inventory was captured; upstream's " +
+		"one-character-either-side fixer is narrowed to widen only onto whitespace, see the comment above",
+
 	// A house rule with no upstream on either side, written from reasoning rather than ported, so
 	// no inventory entry could exist for it. It guards verify's own type-based React rules rather
 	// than the source: in a file where a hook call resolves to `any`, `set-state-in-render` and
