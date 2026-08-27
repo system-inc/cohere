@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utilities/jsx"
 )
 
 // JsxFragmentsMode selects which of the two fragment spellings the file is expected to use.
@@ -188,13 +189,17 @@ var JsxFragments = rule.Rule{
 				if opening == nil {
 					return
 				}
-				element := opening.AsJsxOpeningElement()
-				judgeNamed(node, element.TagName, element.Attributes)
+				// `jsx.ElementParts` reads the tag name and attributes off whichever of the two
+				// element kinds it is handed, which is the shelf's answer to the fact that our
+				// parser splits what ESTree spells as one node. Reaching for the accessor directly
+				// is what `TestRulePackagesDoNotReachPastWrappedAccessors` exists to catch.
+				tagName, attributes := jsx.ElementParts(opening)
+				judgeNamed(node, tagName, attributes)
 			},
 
 			ast.KindJsxSelfClosingElement: func(node *ast.Node) {
-				element := node.AsJsxSelfClosingElement()
-				judgeNamed(node, element.TagName, element.Attributes)
+				tagName, attributes := jsx.ElementParts(node)
+				judgeNamed(node, tagName, attributes)
 			},
 		}
 	},
