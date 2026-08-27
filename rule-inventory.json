@@ -1,11 +1,11 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 305,
+  "total": 307,
   "byNamespace": {
-    "(core)": 114,
+    "(core)": 115,
     "@next": 22,
-    "@typescript-eslint": 47,
+    "@typescript-eslint": 48,
     "better-tailwindcss": 13,
     "nexus": 20,
     "react": 41,
@@ -13,12 +13,12 @@
     "structure": 31
   },
   "bySeverity": {
-    "error": 263,
+    "error": 265,
     "warn": 42
   },
   "byEnabledBy": {
     "pluginDefault": 41,
-    "rulesBlock": 264
+    "rulesBlock": 266
   },
   "rules": [
     {
@@ -572,6 +572,15 @@
       "options": "no",
       "severity": "warn",
       "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "@typescript-eslint/no-unused-private-class-members",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
     },
     {
       "rule": "@typescript-eslint/no-useless-empty-export",
@@ -1648,6 +1657,15 @@
         "oxlint"
       ],
       "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-restricted-globals",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
       "severity": "error",
       "enabledBy": "rulesBlock"
     },
