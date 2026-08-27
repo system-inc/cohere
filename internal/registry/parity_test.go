@@ -364,6 +364,16 @@ var rulesOutsideTheInventory = map[string]string{
 	// recoverable from the source, so nothing may rewrite one unattended.
 	"@typescript-eslint/prefer-enum-initializers": "ported from typescript-eslint, which ships it in no preset; not enforced by either tool when the inventory was captured",
 
+	// Ported from typescript-eslint and registered, but deliberately NOT enabled: the live config
+	// already turns it off at VerifySettings.json:370 under the `typescript/` spelling, and the port
+	// does not reverse somebody's standing decision. The reason is recorded in full beside its entry
+	// in the live-wiring guard's own exemption map, which is where a reader looking at why it runs on
+	// nothing will land.
+	//
+	// It is outside the inventory for the ordinary reason on top of that: neither tool being replaced
+	// enforced it when the capture was taken.
+	"@typescript-eslint/require-array-sort-compare": "ported and registered but left off, matching an explicit off in the live config; not enforced by either tool when the inventory was captured",
+
 	// Ported from typescript-eslint, whose strict preset carries it, and enabled in both engines by
 	// this port. It is outside the inventory for the usual reason, that neither tool enforced it when
 	// the capture was taken, but this one has a wrinkle worth recording because the next reader will
@@ -499,6 +509,18 @@ var rulesOutsideTheInventory = map[string]string{
 	"no-eq-null": "ported from eslint core, which marks it recommended:false; not enforced by either " +
 		"tool when the inventory was captured, and the audit measured 57 violations it will now " +
 		"require somebody to work through by hand",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// The audit measured three sites in ahra and rated the rule Maybe, so this is a small cleanup
+	// rather than a guardrail. Two of the three are the same shape, `(bucket ??= {})` inside a
+	// declarator, which is a chain upstream reports because ESTree's AssignmentExpression covers all
+	// sixteen assignment operators rather than only `=`. That widening is the largest gap between
+	// this rule's corpus and its behaviour and it is measured rather than inferred.
+	"no-multi-assign": "ported from eslint core, which marks it recommended:false; not enforced by " +
+		"either tool when the inventory was captured, and the audit measured 3 violations",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
