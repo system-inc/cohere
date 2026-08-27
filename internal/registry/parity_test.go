@@ -292,6 +292,23 @@ var rulesOutsideTheInventory = map[string]string{
 	// had rather than a parity gap.
 	"restrict-plus-operands": "ported from typescript-eslint, which recommends it; not enforced by either tool when the inventory was captured",
 
+	// Ported from typescript-eslint, whose strict preset carries it, and enabled in both engines by
+	// this port. It is outside the inventory for the usual reason, that neither tool enforced it when
+	// the capture was taken, but this one has a wrinkle worth recording because the next reader will
+	// meet it.
+	//
+	// The live verify config names this rule TWICE, once as `typescript/no-misused-spread` set to
+	// "off" in a hand-maintained list of deliberately disabled rules, and once as the bare
+	// `no-misused-spread` set to "error" that enabling it added. They are different key strings, so
+	// this is not a duplicate key and nothing silently wins: `settingFor` tries the exact registry
+	// name first and only then falls back to a prefixed one, so the bare "error" resolves and the
+	// rule runs. Measured on a seeded tree carrying both keys, which reported.
+	//
+	// The stale "off" is therefore inert rather than harmful, and it is left alone rather than
+	// removed, because it is somebody's recorded decision about the prefixed spelling and reversing
+	// it is not this port's call. The eslint side carries no such contradiction.
+	"no-misused-spread": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured",
+
 	// Ported from typescript-eslint and enabled in both engines by this port, so like the entry above
 	// it is a rule the gate never had rather than a parity gap. The inventory records what the two
 	// tools enforced when it was captured and neither enforced this one: the eslint side had no
