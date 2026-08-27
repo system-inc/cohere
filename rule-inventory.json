@@ -1,24 +1,24 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 277,
+  "total": 279,
   "byNamespace": {
-    "(core)": 106,
+    "(core)": 107,
     "@next": 22,
     "@typescript-eslint": 37,
     "better-tailwindcss": 13,
     "nexus": 20,
-    "react": 31,
+    "react": 32,
     "react-hooks": 17,
     "structure": 31
   },
   "bySeverity": {
-    "error": 235,
+    "error": 237,
     "warn": 42
   },
   "byEnabledBy": {
     "pluginDefault": 41,
-    "rulesBlock": 236
+    "rulesBlock": 238
   },
   "rules": [
     {
@@ -1330,6 +1330,15 @@
       "enabledBy": "pluginDefault"
     },
     {
+      "rule": "no-inner-declarations",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-invalid-regexp",
       "sources": [
         "eslint",
@@ -2138,6 +2147,15 @@
       "options": "no",
       "severity": "warn",
       "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "react/no-object-type-as-default-prop",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
     },
     {
       "rule": "react/self-closing-comp",
