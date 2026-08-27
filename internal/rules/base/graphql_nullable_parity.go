@@ -152,6 +152,12 @@ var GraphQlNullableParity = rule.Rule{
 				}
 
 				if decoratorName == "GraphQlArgument" {
+					// Load-bearing, and more directly so than the same guard in this rule's
+					// sibling: the argument arm has nothing below it to decline a wrong owner, so
+					// removing this reports a bogus finding on a decorator placed on a property, a
+					// method, a class or a getter, reading that node's own type as if it were a
+					// parameter's. All four measured, and all four silent upstream, where
+					// `resolveDecoratedParameterNode` answers null for a non-parameter owner.
 					if owner.Kind != ast.KindParameter {
 						return
 					}

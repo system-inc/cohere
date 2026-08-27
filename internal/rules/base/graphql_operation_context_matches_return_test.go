@@ -80,6 +80,22 @@ func TestGraphQlOperationContextMatchesReturnStaysSilent(t *testing.T) {
 		// and compares equal to itself. Its asymmetric sibling reports and is in the fires list; the
 		// pair is what pins the `== 1` rather than `>= 1`.
 		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(@InjectGraphQlOperationContext() c: GraphQlOperationContext<ThingOne | ThingTwo>): Promise<ThingOne | ThingTwo> {\n    void c;\n    return new ThingOne();\n  }\n}\n",
+
+		// The decorator on something that is NOT a parameter, inside a local class declared in an
+		// operation method. This is the one shape that reaches past the enclosing-method walk with a
+		// non-parameter owner, and it is what makes the parameter kind guard load-bearing rather
+		// than defensive.
+		//
+		// The obvious placements do not test it. A decorator on a class, a method, a property or an
+		// accessor at the top level all reach this listener with a non-parameter parent, measured,
+		// and all four are then declined by the enclosing-method walk because a class member has no
+		// enclosing method. Only a local class INSIDE a method finds one, and without the guard the
+		// rule reports a bogus mismatch on its property and a bogus wrongBaseType on its method.
+		//
+		// Silent upstream, measured: the original's resolveDecoratedParameterNode answers null for
+		// a non-parameter owner, which is the same job this guard does. Both shapes below.
+		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(): Promise<ThingOne> {\n    class Inner {\n      @InjectGraphQlOperationContext()\n      p: GraphQlOperationContext<ThingTwo> = null as never;\n    }\n    void Inner;\n    return new ThingOne();\n  }\n}\n",
+		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(): Promise<ThingOne> {\n    class Inner {\n      @InjectGraphQlOperationContext()\n      m(): GraphQlOperationContext<ThingTwo> {\n        return null as never;\n      }\n    }\n    void Inner;\n    return new ThingOne();\n  }\n}\n",
 	}
 	for index, sourceText := range cases {
 		t.Run(graphQlOperationContextCaseName(index), func(t *testing.T) {

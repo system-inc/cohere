@@ -108,6 +108,19 @@ func TestGraphQlNullableParityStaysSilent(t *testing.T) {
 		// implementations rather than a bug in this one.
 		"class C {\n  @GraphQlField(() => String, { nullable: true })\n  get computed(): string {\n    return '';\n  }\n}\n",
 		"class C {\n  @GraphQlField(() => String, { nullable: true })\n  get computed(): string | null {\n    return null;\n  }\n}\n",
+
+		// An argument decorator on something that is NOT a parameter. Unlike the operation
+		// decorators, the argument arm has nothing below it to decline a wrong owner, so the
+		// parameter kind guard is directly load-bearing: measured, ALL FOUR of these report a bogus
+		// decoratorNullableButTypeNot without it, reading the property's or the class's own type as
+		// if it were a parameter's.
+		//
+		// Silent upstream, measured on a seeded file: the original's resolveDecoratedParameterNode
+		// answers null for a non-parameter owner and the rule returns.
+		"class C {\n  @GraphQlArgument('a', () => String, { nullable: true })\n  a!: string;\n}\n",
+		"class C {\n  @GraphQlArgument('a', () => String, { nullable: true })\n  m(): string {\n    return '';\n  }\n}\n",
+		"@GraphQlArgument('a', () => String, { nullable: true })\nclass C {\n  a!: string;\n}\n",
+		"class C {\n  @GraphQlArgument('a', () => String, { nullable: true })\n  get g(): string {\n    return '';\n  }\n}\n",
 	}
 	for index, sourceText := range cases {
 		t.Run(graphQlNullableParityCaseName(index), func(t *testing.T) {

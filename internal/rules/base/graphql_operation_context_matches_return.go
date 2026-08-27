@@ -85,6 +85,18 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 				// AssignmentPattern, and probed on all three shapes our parser answers
 				// KindParameter for each. That is fidelity to what the rule decides rather than to
 				// how the original obtained it.
+				//
+				// The KIND GUARD is the one part of that helper that survives, and it is
+				// load-bearing rather than defensive. A decorator can sit on a class, a method, a
+				// property or an accessor, and all four reach this listener with a non-parameter
+				// parent, measured. Most are then declined by the enclosing-method walk below,
+				// because a class member has no enclosing method, which is why the obvious
+				// placements cannot prove the guard. The shape that can is a decorator on a member
+				// of a LOCAL CLASS declared inside an operation method: the walk finds the outer
+				// method, and without this guard the rule reports a bogus mismatch on its property
+				// and a bogus wrongBaseType on its method. Both are silent upstream, where
+				// `resolveDecoratedParameterNode` answers null for a non-parameter owner, and both
+				// are pinned as fixtures.
 				parameterNode := node.Parent
 				if parameterNode == nil || parameterNode.Kind != ast.KindParameter {
 					return
