@@ -439,15 +439,16 @@ func TestNoThisInSfcAccessorSplit(t *testing.T) {
 	}
 }
 
-// The file-suffix gate, which silences the rule rather than narrowing it.
+// No file-suffix gate, asserted rather than assumed.
 //
-// oxc gates the whole rule on `source_type().is_jsx()`, and this package spells that as the file
-// suffix. A `.ts` file registers no listener, so the same source that reports as `.tsx` is silent.
-// Asserted so a later change to the gate fails here rather than in a dry run.
-func TestNoThisInSfcDeclinesANonJsxSuffix(t *testing.T) {
+// oxc gated the whole rule on `source_type().is_jsx()` and this package spelled that as the file
+// suffix, so a `.ts` file registered no listener at all. eslint-plugin-react, the authority this
+// rule is ported against, has no such gate, and a function component in a `.ts` file is ordinary.
+// Both suffixes now report the same source.
+func TestNoThisInSfcReportsUnderAnySuffix(t *testing.T) {
 	const sourceText = "function Foo(props) {\n  return this.props.a;\n}\n"
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoThisInSfc, thisInSfcFile, sourceText), "noThisInSfc")
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoThisInSfc, "/repository/source/Thing.ts", sourceText))
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoThisInSfc, "/repository/source/Thing.ts", sourceText), "noThisInSfc")
 }
 
 // A `this` in the ARGUMENT of an element access, which the parent-kind check accepts.

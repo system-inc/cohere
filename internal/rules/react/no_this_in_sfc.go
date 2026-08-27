@@ -173,18 +173,10 @@ var NoThisInSfc = rule.Rule{
 	// no files, and still pass every fixture in this package.
 	Name: "react/no-this-in-sfc",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		// oxc gates the whole rule on `source_type().is_jsx()` through `should_run`, so a file the
-		// parser does not read as JSX registers nothing rather than declining node by node.
-		// Spelled as the file suffix the way the rest of this package spells it, because the suffix
-		// is what decides the script kind in the harness and in a real run alike.
-		//
-		// One measured divergence, stated rather than closed, and it is the package's convention
-		// rather than this rule's choice: oxlint reads a bare `.js` file as JSX and reports there,
-		// while `isJsxFileName` answers only for `.tsx` and `.jsx`. Checked by copying a reporting
-		// fixture to `.js` and to `.ts`: `.js` produced a finding and `.ts` produced none.
-		if !isJsxFileName(ctx.SourceFile.FileName()) {
-			return nil
-		}
+		// No file gate. oxc gated this on `source_type().is_jsx()` and that gate came along with the
+		// port from oxc, but the authority here is eslint-plugin-react, which does not gate on the
+		// file name at all. React code in a `.ts` file is ordinary and legal, and the gate made this
+		// rule silent across more `.ts` files than the `.tsx` files it could see.
 
 		return rule.Listeners{
 			ast.KindThisKeyword: func(node *ast.Node) {
