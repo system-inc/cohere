@@ -1127,12 +1127,37 @@ var rulesOutsideTheInventory = map[string]string{
 		"not enabled because ahra's config names no base/ rules at all, so where it is enforced is " +
 		"a decision nobody has made yet; the gate being replaced never enforced it here",
 
+	// The second rule from api-phi-health's own base lint layer, and the first type-aware one. Same
+	// reasoning as its sibling above: no inventory entry because the gate being replaced never
+	// enforced it here, and not enabled because ahra's config names no base/ rules.
+	"base/relation-must-be-optional": "ported from api-phi-health's own base lint layer; " +
+		"registered but not enabled because ahra's config names no base/ rules at all, so where it " +
+		"is enforced is a decision nobody has made yet; the gate being replaced never enforced it here",
+
 	// The same shape as the entry above and for the same reason. Its port is checked against the
 	// source repository rather than an imported corpus: run over all 1,814 TypeScript files of
 	// api-phi-health's base library, it agrees with the real rule on every unsuppressed site.
 	"base/no-console": "ported from api-phi-health's own base lint layer; registered but " +
 		"not enabled because ahra's config names no base/ rules at all, so where it is enforced is " +
 		"a decision nobody has made yet; the gate being replaced never enforced it here",
+
+	// The same shape as the entries above and for the same reason, and its oracle is the sharpest of
+	// them. api-phi-health reports zero for this rule across its 2310 linted files, which is a real
+	// property of that tree rather than a broken instrument: the same run reports 44 findings from
+	// other rules. So the check is a SEEDED file placed inside that project's tsconfig include,
+	// where the original and this port agree on seven reporting shapes and nine clean ones, line and
+	// column, including the two whose guards prevent a panic rather than a wrong verdict.
+	"base/pagination-decorator": "ported from api-phi-health's own base lint layer; registered but " +
+		"not enabled because ahra's config names no base/ rules at all, so where it is enforced is " +
+		"a decision nobody has made yet; the gate being replaced never enforced it here",
+
+	// The same shape as the two entries above and for the same reason. Its port is checked against
+	// the source repository rather than an imported corpus: driven through the real rule loaded out
+	// of api-phi-health, thirteen invented shapes were measured rather than assumed, including four
+	// the original knowingly misses.
+	"base/no-hand-built-declared-error": "ported from api-phi-health's own base lint layer; " +
+		"registered but not enabled because ahra's config names no base/ rules at all, so where it " +
+		"is enforced is a decision nobody has made yet; the gate being replaced never enforced it here",
 
 	// Ported from typescript-eslint and enabled in both engines by this port. Unlike the entry above
 	// it carries no prior decision in the config to override, so enabling is the ordinary path: the

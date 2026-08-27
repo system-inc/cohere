@@ -216,8 +216,16 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// question about which trees run base's rules, which is Kirk's to answer rather than a
 		// porter's. Recorded here so that "unmentioned" reads as a pending decision rather than as a
 		// port somebody forgot to wire.
-		"base/no-global-container": "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
-		"base/no-console":          "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/no-hand-built-declared-error": "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/no-global-container":          "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+
+		// Same shape and same reason as the entry above: ahra's config names no base/ rules, so there
+		// is nothing to reverse and nothing anybody has decided yet. The source repository runs this
+		// one at `warn` rather than `error`, which is a severity question for whoever enables it here
+		// and is recorded so the answer is not silently `error` by default.
+		"base/relation-must-be-optional": "registered but not enabled because ahra's config names no base/ rules at all; the source repository runs it at warn rather than error, which is part of the same pending decision",
+		"base/no-console":                "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/pagination-decorator":      "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
 	}
 
 	rules := All()
