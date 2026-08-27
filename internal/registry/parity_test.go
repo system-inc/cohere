@@ -1142,6 +1142,32 @@ var rulesOutsideTheInventory = map[string]string{
 		"registered but not enabled because ahra's config names no base/ rules at all, so where it " +
 		"is enforced is a decision nobody has made yet; the gate being replaced never enforced it here",
 
+	// The third rule from api-phi-health's own base lint layer. Same reasoning as its two siblings:
+	// no inventory entry because the gate being replaced never enforced it here, and not enabled
+	// because ahra's config names no base/ rules.
+	"base/orm-column-requires-declare": "ported from api-phi-health's own base lint layer; " +
+		"registered but not enabled because ahra's config names no base/ rules at all, so where it " +
+		"is enforced is a decision nobody has made yet; the gate being replaced never enforced it here",
+
+	// The same shape, and its port is likewise checked against the source repository rather than an
+	// imported corpus. The original rule was driven over all 2,556 TypeScript files of
+	// api-phi-health through the ESLint Linter API, and its net verdict there is zero: eight sites
+	// reach the rule and all eight carry an author-written disable with a stated reason.
+	//
+	// That zero needed separating from a rule that never looked, and stripping the disable
+	// directives is what did it: the same run then reports all eight, in the two files the exemption
+	// paths do not cover. The fixtures are the original's verdicts on thirty-nine designed inputs,
+	// twenty-two of which exist to prove a gate declines.
+	//
+	// The gates are all substring or suffix tests on a filename, which widen easily and silently, so
+	// four near misses are pinned as REPORTING rather than left implied: `source/latest/` and
+	// `source/protest/` both contain the letters of a test directory, `schema-tools` looks like the
+	// schema builder, and `NotBaseError.ts` ends in a capture-path filename without its separator.
+	// Mutating either gate into its wider spelling fails those rows.
+	"base/no-bare-throw": "ported from api-phi-health's own base lint layer; registered but not " +
+		"enabled because ahra's config names no base/ rules at all, so where it is enforced is a " +
+		"decision nobody has made yet; the gate being replaced never enforced it here",
+
 	// The same shape as the entry above and for the same reason. Its port is checked against the
 	// source repository rather than an imported corpus: run over all 1,814 TypeScript files of
 	// api-phi-health's base library, it agrees with the real rule on every unsuppressed site.

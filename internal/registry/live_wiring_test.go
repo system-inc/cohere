@@ -223,7 +223,12 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// is nothing to reverse and nothing anybody has decided yet. The source repository runs this
 		// one at `warn` rather than `error`, which is a severity question for whoever enables it here
 		// and is recorded so the answer is not silently `error` by default.
-		"base/relation-must-be-optional":                "registered but not enabled because ahra's config names no base/ rules at all; the source repository runs it at warn rather than error, which is part of the same pending decision",
+		"base/relation-must-be-optional": "registered but not enabled because ahra's config names no base/ rules at all; the source repository runs it at warn rather than error, which is part of the same pending decision",
+
+		// Same shape and same reason as its two siblings above. The source repository runs this one
+		// at error, unlike relation-must-be-optional's warn, which is worth knowing when the pending
+		// decision is finally made rather than discovering it after enabling.
+		"base/orm-column-requires-declare":              "registered but not enabled because ahra's config names no base/ rules at all; the source repository runs it at error, which is part of the same pending decision",
 		"base/context-requires-access":                  "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make. This rule additionally ships with NO default requirements, so enabling it without supplying the protected context keys would look enabled while enforcing nothing",
 		"base/no-console":                               "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
 		"base/orm-column-nullable-parity":               "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",

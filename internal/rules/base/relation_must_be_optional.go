@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/decorators"
 	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
@@ -13,10 +14,10 @@ import (
 // why: the nullability-parity rules read the same set to skip properties this rule governs instead.
 // Those rules are separate ports, and two copies of a three-name set is exactly how the source
 // repository's five drifting copies of `getDecoratorName` came about.
-var relationDecorators = map[string]bool{
-	"OrmManyToOne": true,
-	"OrmOneToMany": true,
-	"OrmOneToOne":  true,
+var relationDecorators = map[string]struct{}{
+	"OrmManyToOne": {},
+	"OrmOneToMany": {},
+	"OrmOneToOne":  {},
 }
 
 // RelationMustBeOptional requires an ORM relation property to admit `undefined`.
@@ -48,7 +49,7 @@ var relationDecorators = map[string]bool{
 // The source's `hasDecoratorInSet` requires a call expression with an identifier callee, so
 // `@OrmManyToOne()` matches and a bare `@OrmManyToOne` does not. Measured: the bare form is silent.
 // That differs from the sibling rule for `declare`, whose helper accepts the bare form too, and the
-// two are deliberately not merged.
+// two are deliberately not merged. This rule therefore uses the shelf helper and that one does not.
 //
 // # Cost
 //
@@ -67,7 +68,12 @@ var RelationMustBeOptional = rule.Rule{
 				if ctx.TypeChecker == nil {
 					return
 				}
-				if !hasRelationDecorator(node) {
+				// The shelf's HasDecoratorInSet, which was measured to agree with the source's
+				// `hasDecoratorInSet` exactly: both require a call expression with a bare identifier
+				// callee, so `@OrmManyToOne()` matches while `@OrmManyToOne` and `@Orm.ManyToOne()`
+				// do not. The sibling rule in this package deliberately does NOT use it, for the
+				// reason recorded there.
+				if !decorators.HasDecoratorInSet(node, relationDecorators) {
 					return
 				}
 
@@ -97,36 +103,6 @@ var RelationMustBeOptional = rule.Rule{
 			},
 		}
 	},
-}
-
-// hasRelationDecorator is the source library's `hasRelationDecorator`, which wraps
-// `hasDecoratorInSet` over the relation set.
-//
-// The call-expression requirement is the source's and is reproduced: a decorator has to be
-// `@Name(...)` with a bare identifier callee. A bare `@Name` and a namespaced `@Namespace.Name()`
-// both fail it, which is measured behavior rather than an omission.
-func hasRelationDecorator(node *ast.Node) bool {
-	modifiers := node.Modifiers()
-	if modifiers == nil {
-		return false
-	}
-	for _, modifier := range modifiers.Nodes {
-		if modifier.Kind != ast.KindDecorator {
-			continue
-		}
-		expression := modifier.AsDecorator().Expression
-		if expression == nil || expression.Kind != ast.KindCallExpression {
-			continue
-		}
-		callee := expression.AsCallExpression().Expression
-		if callee == nil || callee.Kind != ast.KindIdentifier {
-			continue
-		}
-		if relationDecorators[callee.AsIdentifier().Text] {
-			return true
-		}
-	}
-	return false
 }
 
 // typeIncludesUndefined is the source library's `typeIncludesUndefined`.
