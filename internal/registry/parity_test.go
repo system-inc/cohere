@@ -373,6 +373,24 @@ var rulesOutsideTheInventory = map[string]string{
 		"of a configured-globals surface, see the comment above",
 
 	// Ported from typescript-eslint, whose stylistic preset carries it, and enabled in both engines
+	// by this port. Outside the inventory for the usual reason: neither of the two tools the
+	// inventory records named this rule when the capture was taken. Like the ban-tslint-comment
+	// entry below it, the ahra tree already satisfies it, so enabling it is a guardrail against
+	// drift rather than a cleanup.
+	//
+	// No divergence in judgment, and two parser differences worth naming because both would read as
+	// divergences to someone diffing the two implementations. TSESTree wraps an exported declaration
+	// in an export node and typescript-go carries `export` as a modifier, so upstream's unwrapping
+	// recursion has nothing to unwrap here; the reported span is identical either way, measured.
+	// And TSESTree folds a method, a getter, a setter and a constructor into one node type while
+	// giving an ABSTRACT method a separate type that upstream's switch does not name, so an
+	// abstract member is silently not a method to this rule. That exclusion has to be written out
+	// against our parser rather than inherited, and it was measured with a concrete control so that
+	// silence could be told apart from a shape the rule never reached.
+	"@typescript-eslint/adjacent-overload-signatures": "ported from typescript-eslint, whose " +
+		"stylistic preset carries it; not enforced by either tool when the inventory was captured",
+
+	// Ported from typescript-eslint, whose stylistic preset carries it, and enabled in both engines
 	// by this port. Outside the inventory for the usual reason: the inventory records what the two
 	// tools enforced when it was captured, and neither named this rule. It is in upstream's
 	// `stylistic` preset rather than its `recommended` one, so a project on the recommended set
