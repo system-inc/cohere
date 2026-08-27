@@ -165,6 +165,28 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// cleanup at three sites and the rule is auto-fixable, so turning it on is cheap; it is
 		// still a decision for whoever wrote that off rather than for a porter.
 		"@typescript-eslint/no-duplicate-type-constituents": "registered but left off because VerifySettings.json:372 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+
+		// The third of this shape, and the reason is the same one. VerifySettings.json:369 reads
+		// `"typescript/unbound-method": "off"`, written under the old short spelling. The key is 25
+		// characters and the registered name is 34, so the key is SHORTER than the name, the trim is
+		// a no-op, and the resolver's slash-boundary branch never fires.
+		//
+		// Confirmed by the linter rather than by argument. A `--lint` run prints all three of:
+		//
+		//	rule @typescript-eslint/unbound-method was offered no files
+		//	rule @typescript-eslint/unbound-method is not in the config, so it ran on no files
+		//	key "typescript/unbound-method" matches no registered rule, so its off never applies
+		//
+		// The port is complete and agrees with upstream on two hundred and ten of its two hundred
+		// and eleven corpus cases, plus seventeen further shapes measured against the installed
+		// build. The one disagreement is a union whose constituents reach different arms of the
+		// danger test, where the two type checkers normalize the constituent order differently; it
+		// reports the same node with the same span and the other message, and it is recorded in its
+		// own test rather than smoothed over.
+		//
+		// The audit puts the cleanup at eighteen sites and the rule is not auto-fixable, so turning
+		// it on is a real decision and it belongs to whoever wrote that off rather than to a porter.
+		"@typescript-eslint/unbound-method": "registered but left off because VerifySettings.json:369 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 	}
 
 	rules := All()

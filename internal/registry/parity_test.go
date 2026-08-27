@@ -1017,11 +1017,32 @@ var rulesOutsideTheInventory = map[string]string{
 		"spelling, which cannot resolve against the full name; not enforced by either tool when " +
 		"the inventory was captured",
 
+	// The third of this shape. VerifySettings.json:369 carries the prior off under the old short
+	// spelling, and the reason it cannot resolve, including the three lines the linter itself prints
+	// about the orphaned key, is recorded beside this rule's entry in the live-wiring exemption map.
+	//
+	// Upstream marks it `recommended`, so the tool being replaced would have carried it had the key
+	// resolved. The audit measured eighteen violations and the rule ships no fixer, so enabling it is
+	// eighteen hand decisions rather than a fix run, which is a decision for whoever wrote that off.
+	"@typescript-eslint/unbound-method": "ported from typescript-eslint, which recommends it; " +
+		"registered but left off because the live config carries a prior off for it under the old " +
+		"short spelling, which cannot resolve against the full name; the audit measured 18 " +
+		"violations, none auto-fixable",
+
 	// Ported from typescript-eslint and enabled in both engines by this port. Unlike the entry above
 	// it carries no prior decision in the config to override, so enabling is the ordinary path: the
 	// audit measures zero violations, which makes it a guardrail against drift rather than cleanup.
 	// Outside the inventory for the usual reason, that neither tool enforced it at capture time.
 	"@typescript-eslint/prefer-find": "ported from typescript-eslint, whose stylistic preset carries it; not enforced by either tool when the inventory was captured",
+
+	// Ported from typescript-eslint and enabled in both engines by this port. No prior decision in
+	// the config to override: neither spelling of the key appears there, confirmed against the
+	// linter's own orphaned-key report rather than by grep alone. Outside the inventory for the
+	// usual reason, that neither tool enforced it when the capture was taken.
+	//
+	// Worth naming the cost: the audit measures 43 sites, so enabling this is real cleanup rather
+	// than a guardrail, though the rule is auto-fixable at most of them.
+	"@typescript-eslint/consistent-indexed-object-style": "ported from typescript-eslint, whose stylistic preset carries it; not enforced by either tool when the inventory was captured",
 
 	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
 	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
