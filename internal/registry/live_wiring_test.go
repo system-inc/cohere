@@ -77,6 +77,34 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// the cleanup is a command plus a review of the diff rather than eleven judgments. That
 		// makes it the cheaper of the two to turn on, and it is still not a porter's call.
 		"@typescript-eslint/no-meaningless-void-operator": "the live config turns it off deliberately at VerifySettings.json:369, under the typescript/ spelling",
+
+		// Left off for a reason that is not a config decision at all: the rule cannot see its own
+		// subject in this architecture, so enabling it would wire up a rule that is guaranteed to
+		// report nothing on every file forever.
+		//
+		// The rule judges whether a file begins with a byte order mark. Measured against
+		// `osvfs.FS().ReadFile`, which is the read every source file in a real run goes through:
+		// a file whose first three bytes on disk are `ef bb bf` arrives as text beginning with
+		// `65 78 70`, the mark already removed, while an unmarked control of the same length is
+		// unchanged and a mark written in the MIDDLE of a file survives intact. So the stripping is
+		// specific to position zero, which is the one position this rule asks about, and it happens
+		// below every rule rather than in any of them. `cachedvfs` over the same reads gives the
+		// same answer, so it is not the cache.
+		//
+		// A dry run against the ahra tree agrees: the rule is offered all 3,513 files, registers a
+		// listener on all 3,513, and reports zero. A seeded two-file tree holding one genuinely
+		// marked file reports zero as well, and that zero is what separates this from the audit's
+		// predicted zero. The audit rated it Yes on the strength of a clean tree; the tree is clean
+		// AND the rule could not tell if it were not.
+		//
+		// The rule is ported, tested and registered anyway rather than abandoned, because the port
+		// itself is correct against upstream and the missing piece is one line elsewhere: a lint
+		// phase that read the file's real bytes, or a source-file flag carrying whether a mark was
+		// stripped, makes it work as written. Worth knowing while that is decided: the FIX phase
+		// reads through `os.ReadFile` and keeps the mark, while the lint phase reads through
+		// `osvfs` and does not, so the two phases disagree by three bytes about where everything in
+		// a marked file lives.
+		"unicode-bom": "the leading byte order mark is stripped by osvfs before any rule runs, so the rule cannot see its own subject; measured against osvfs.FS().ReadFile with an unmarked control and a mid-file control",
 	}
 
 	rules := All()

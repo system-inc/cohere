@@ -583,6 +583,23 @@ var rulesOutsideTheInventory = map[string]string{
 	// global scope where every standard library name is a variable.
 	"no-label-var": "ported from eslint core, which marks it recommended:false; not enforced by " +
 		"either tool when the inventory was captured, and the audit measured zero violations",
+
+	// Ported from eslint core and registered by this port, but enabled in neither engine. Outside
+	// the inventory for the usual reason: upstream marks it `recommended: false`, so a project on
+	// the recommended set never had it, and there is no oxlint config in the tree to have carried
+	// it either.
+	//
+	// Left off for a reason that is a measurement rather than a
+	// preference: `osvfs` strips a leading byte order mark before any rule runs, so this rule
+	// cannot see the one thing it judges. The full measurement, with both controls, is in
+	// `deliberatelyNotEnabled` in live_wiring_test.go and in the rule's own doc comment.
+	//
+	// The audit rated it Yes on the strength of zero violations in the tree. That zero is real and
+	// it is also what the rule would report on a tree full of marks, which is why it is not
+	// evidence here.
+	"unicode-bom": "ported from eslint core, which marks it recommended:false; registered but left " +
+		"off because osvfs strips the leading byte order mark before any rule runs, so the rule " +
+		"cannot see its own subject; not enforced by either tool when the inventory was captured",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
