@@ -117,6 +117,20 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// cases plus eight more measured shapes. Nothing here needs fixing before it can be turned
 		// on; somebody has to decide to spend the 2,846 decisions.
 		"@typescript-eslint/no-unsafe-type-assertion": "registered but left off pending a decision about volume: measured at 2,846 findings across 672 files on the ahra tree with the installed 8.67.0 build, no fixer, every site a human judgment",
+
+		// Registered but deliberately not enabled, because the config already carries a standing
+		// decision against this rule and that decision cannot be seen by the resolver.
+		// VerifySettings.json:366 reads `"typescript/restrict-template-expressions": "off"`, written
+		// under the old short spelling. `settingFor` matches a key exactly, then trims the RULE NAME
+		// off the CONFIG KEY and requires what remains to end in a slash; the old key is SHORTER
+		// than the full name, so the trim is a no-op and the branch never fires. Measured rather
+		// than read: `"typescript/restrict-template-expressions".endswith("@typescript-eslint/restrict-template-expressions")`
+		// is false.
+		//
+		// So enabling this would reverse somebody's decision through a spelling difference, with
+		// nothing in the diff to show a decision was reversed. The port is complete and its
+		// eighty six imported cases pass; turning it on is a decision for whoever wrote that line.
+		"@typescript-eslint/restrict-template-expressions": "registered but left off because VerifySettings.json:366 carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
 	}
 
 	rules := All()

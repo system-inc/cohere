@@ -781,6 +781,16 @@ var rulesOutsideTheInventory = map[string]string{
 		"the ahra tree with no fixer and a human judgment at every site; not enforced by either " +
 		"tool when the inventory was captured",
 
+	// Ported from typescript-eslint and registered, but not enabled and therefore given no inventory
+	// entry, because an entry asserts the gate being replaced enforces it and the config says the
+	// opposite. VerifySettings.json:366 turns it off under the old short spelling, which the
+	// resolver cannot match against the full registered name, so enabling would reverse that
+	// decision through a spelling difference rather than because anybody changed their mind.
+	"@typescript-eslint/restrict-template-expressions": "ported from typescript-eslint; registered " +
+		"but left off because the live config carries a prior off for it under the old short " +
+		"spelling, which cannot resolve against the full name; not enforced by either tool when " +
+		"the inventory was captured",
+
 	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
 	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
 	// never had it, and there is no oxlint config in the tree to have carried it either.
