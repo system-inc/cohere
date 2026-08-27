@@ -173,10 +173,31 @@ type RequireAtomicUpdatesOptions struct {
 // `modules/art/ArtTerminal.ts:414-416` and `modules/phi/social/PhiSocialTerminal.ts:480-482` are
 // that pattern over `console.log`, `console.info` and `process.stdout.write`. Measured on the
 // installed rule, the SAME source reports when `console` is a declared global and is silent when it
-// is not, and this project's ESLint config declares no globals at all, which is why ESLint sees
-// nothing there. Checked rather than assumed: a seeded `alert()` in `ArtTerminal.ts` was reported by
-// the same ESLint run, so the file is linted and the silence is the rule declining rather than the
-// file being skipped.
+// is not.
+//
+// Why those two names are undeclared HERE is narrower than "the config has no globals", and the
+// narrow version is the one that survives a grep. `StructureLintConfiguration.ts` declares globals
+// in two places and the two lists differ:
+//
+//	line 91   the JavaScript block's own list: __dirname, __filename, module, require,
+//	          process, console, global, Buffer. Spread into the JS config at line 441,
+//	          which applies to `**/*.{mjs,js,jsx}`.
+//	line 158  StructureJavaScriptAndTypeScriptGlobals: React, document, window, navigator,
+//	          setTimeout, clearTimeout, setInterval, clearInterval. This is the ONLY list
+//	          the TypeScript block gets, at line 460.
+//
+// So `console` and `process` are declared for JavaScript files and not for TypeScript ones, and
+// every finding in this class is in a `.ts` file. A reader who checks "no globals anywhere" will
+// find eight of them and reasonably doubt the rest of this note; the true statement is that these
+// two specific names are absent from the list `.ts` files receive.
+//
+// Two controls, because a zero here has three plausible causes and reading the config separates
+// none of them. A seeded `alert()` in `ArtTerminal.ts` was reported by the same ESLint run, so the
+// file is linted and the silence is the rule declining rather than the file being skipped. And a
+// seeded pair in that same file, two structurally identical writes in one `finally`, one over a
+// locally declared object and one over `console`, produced exactly one ESLint finding: the local
+// one. Same file, same shape, same run, opposite verdicts, which is the resolution difference
+// isolated to the one variable that changed.
 //
 // These are true positives. Two overlapping calls to such a wrapper restore in the wrong order and
 // the second restore installs a filter that was already torn down, which is the last-writer-wins

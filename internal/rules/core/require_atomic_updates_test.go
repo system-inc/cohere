@@ -522,3 +522,64 @@ declare function use(value: unknown): void;
 		ruletest.ExpectClean(t, result)
 	})
 }
+
+// TestRequireAtomicUpdatesRestoreInFinallyIsJudged pins the shape behind seven of the eight findings
+// verify reports on the real tree that ESLint does not.
+//
+// A handler saved into a local, replaced, and restored in a `finally` after an await is a real
+// last-writer-wins race: two overlapping calls restore in the wrong order and the second installs a
+// handler that was already torn down. `modules/art/ArtTerminal.ts:414-416` and
+// `modules/phi/social/PhiSocialTerminal.ts:480-482` are that pattern over `console.log`,
+// `console.info` and `process.stdout.write`.
+//
+// ESLint is silent on it here, and the cause is which globals a `.ts` file receives from this
+// project's config rather than a difference in judgment. The rule's doc comment carries the two
+// lists and the measurement; what this test pins is that the judgment itself does not depend on the
+// binding being a global. The two cases are the same shape over a local and over an ambient
+// declaration, and both report, which is what makes the ESLint difference attributable to resolution
+// rather than to the shape being one we get wrong.
+//
+// This mirrors the control seeded into `ArtTerminal.ts` itself: two structurally identical writes in
+// one `finally`, one over a locally declared object and one over `console`, produced exactly one
+// ESLint finding, the local one. Same file, same run, opposite verdicts.
+func TestRequireAtomicUpdatesRestoreInFinallyIsJudged(t *testing.T) {
+	t.Run("restoring a local object's property is judged", func(t *testing.T) {
+		result := ruletest.RunTyped(t, RequireAtomicUpdates, "restore.ts",
+			`declare function callback(): Promise<void>;
+const holder = { slot: 0 };
+async function withRestore() {
+    const saved = holder.slot;
+    try { await callback(); }
+    finally { holder.slot = saved; }
+}`)
+		ruletest.ExpectFindings(t, result, "nonAtomicObjectUpdate")
+	})
+
+	t.Run("restoring through an ambient declaration is judged the same way", func(t *testing.T) {
+		// The binding is declared rather than local, which is the only thing that changes. Both
+		// report here, so the shape is not what separates verify from ESLint on the real tree.
+		result := ruletest.RunTyped(t, RequireAtomicUpdates, "restore.ts",
+			`declare function callback(): Promise<void>;
+declare const ambientHolder: { slot: number };
+async function withRestore() {
+    const saved = ambientHolder.slot;
+    try { await callback(); }
+    finally { ambientHolder.slot = saved; }
+}`)
+		ruletest.ExpectFindings(t, result, "nonAtomicObjectUpdate")
+	})
+
+	t.Run("with no read before the suspension there is nothing stale", func(t *testing.T) {
+		// The control. Without the saved read there is no pre-suspension value for the restore to be
+		// built from, and this is silent, which keeps the two rows above from passing on a rule that
+		// reports every property write in a finally.
+		result := ruletest.RunTyped(t, RequireAtomicUpdates, "restore.ts",
+			`declare function callback(): Promise<void>;
+const holder = { slot: 0 };
+async function withRestore() {
+    try { await callback(); }
+    finally { holder.slot = 0; }
+}`)
+		ruletest.ExpectClean(t, result)
+	})
+}
