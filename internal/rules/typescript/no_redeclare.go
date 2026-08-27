@@ -115,6 +115,30 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 // kinds in the group. The checker is still needed for the scope partition itself, which is what
 // `ast.GetLocals` reads.
 //
+// # The second wrong predicate, recorded because it is the more convincing one
+//
+// Having found that the count collapses for duplicate classes, the natural next move is to compare
+// SYMBOL IDENTITY instead: two duplicate classes resolve to two distinct symbols while a merging
+// pair resolves to one shared symbol, which reads as exactly the discrimination this rule wants. It
+// is not, and it fails in both directions. Measured over the same 23 shapes, identity disagrees
+// with upstream on 7:
+//
+//	var a = 1; var a = 2;                      ONE shared symbol, and this REPORTS
+//	function F() {} function F() {}            ONE shared symbol, and this REPORTS
+//	enum H {A} enum H {B}                      ONE shared symbol, and this REPORTS
+//	var d = 1; type d = string;                ONE shared symbol, and this REPORTS
+//	function f1() { var x = 1; }
+//	function f2() { var x = 2; }               TWO symbols, and this is CLEAN
+//
+// Identity is right for the class and interface merge family and wrong for the plain duplicates,
+// which are the most common shapes the rule has to catch. Nothing in this file uses it: the two
+// false positives are answered by the scope partition, since a name in two non-overlapping scopes
+// is two groups of one rather than one group of two, and the five false negatives are answered by
+// the kind arithmetic, since a var beside a var belongs to no merge set. Recorded rather than left
+// out because identity is the predicate that looks right, and a later reader simplifying this rule
+// toward it would pass the merge fixtures and break `var a = 1; var a = 2;`.
+// `TestPartitionAndKindSeparatesAllTwentyThree` asserts all 23 so that edit fails loudly.
+//
 // # The merge arithmetic, which is upstream's and reproduced rather than reasoned about
 //
 // With `ignoreDeclarationMerge` on, a group is exempt when it is all interfaces, all namespaces, or
