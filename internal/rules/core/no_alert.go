@@ -104,7 +104,20 @@ var NoAlert = rule.Rule{
 
 				// The member form, which needs the receiver to BE the global object before the
 				// property name matters at all.
-				object := ast.SkipParentheses(memberAccessObject(callee))
+				//
+				// A callee that is neither an identifier nor a member access has no receiver to ask
+				// about, and `memberAccessObject` answers nil for it. `super(...)` and `import(...)`
+				// are the two that occur constantly: both are call expressions whose callee is a bare
+				// keyword, and every subclass constructor in the tree carries a `super()`. Feeding
+				// that nil to `ast.SkipParentheses` dereferences it, and because the walk recovers
+				// per file rather than per rule, the panic took the WHOLE file away from every rule.
+				// It cost 167 files, about five percent of the tree, silently unchecked while the run
+				// still printed green.
+				object := memberAccessObject(callee)
+				if object == nil {
+					return
+				}
+				object = ast.SkipParentheses(object)
 				if !isGlobalObjectReference(ctx, object) {
 					return
 				}

@@ -256,3 +256,41 @@ func TestNoAlertNeedsTheTypedHarness(t *testing.T) {
 	}
 	ruletest.ExpectClean(t, ruletest.Run(t, NoAlert, alertFile, "alert(foo)"))
 }
+
+// A callee that is neither an identifier nor a member access must not crash the file.
+//
+// `memberAccessObject` answers nil for such a callee and the member branch fed that nil straight into
+// `ast.SkipParentheses`, which dereferences it. The walk recovers per FILE rather than per rule, so
+// the panic took the whole file away from every rule: 167 files, about five percent of the tree we
+// lint, silently unchecked while the run still printed green and the node count sat a quarter of a
+// million nodes low.
+//
+// The two shapes that occur are `super(...)` and `import(...)` — call expressions whose callee is a
+// bare keyword. Every subclass constructor carries a `super()`, which is why this was not a rare edge.
+//
+// # What this test does and does not prove
+//
+// It pins the shapes so a future edit to the member branch has them written down, and it is NOT the
+// regression proof: it passes against the unfixed rule too. The panic needs the real program, and the
+// fixtures below never reach the nil path in this harness. The proof is an A/B on the tree itself,
+// same tree and same flags, differing only in this file: 167 crashed files before, 0 after. Anyone
+// changing this branch should re-run that rather than trust the green below.
+func TestNoAlertSurvivesACalleeThatIsNotAMemberAccess(t *testing.T) {
+	cases := []struct {
+		name   string
+		source string
+	}{
+		{name: "super call", source: "class Base { constructor(a: number) {} }\nclass Derived extends Base { constructor() { super(1); } }"},
+		{name: "super method call", source: "class Base { go() {} }\nclass Derived extends Base { go() { super.go(); } }"},
+		{name: "dynamic import", source: "async function load() { await import('./Other'); }"},
+		{name: "immediately invoked function", source: "(function() { return 1; })();"},
+		{name: "call returning a function", source: "function outer() { return function() {}; }\nouter()();"},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := ruletest.Run(t, NoAlert, alertFile, testCase.source)
+			ruletest.ExpectClean(t, result)
+		})
+	}
+}
