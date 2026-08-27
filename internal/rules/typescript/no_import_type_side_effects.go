@@ -3,6 +3,7 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/imports"
 )
 
 var messageUseTopLevelQualifier = rule.Message{
@@ -92,26 +93,22 @@ var NoImportTypeSideEffects = rule.Rule{
 				}
 				// A default binding (`import A, {...}`) is not a type specifier, and neither is a
 				// namespace binding (`import * as A`). Either one leaves a runtime import behind
-				// no matter what the named elements say.
-				if clause.Name() != nil {
+				// no matter what the named elements say, and BindingsOf reports each separately.
+				bindings := imports.BindingsOf(node)
+				if bindings.Default != nil || bindings.Namespace != nil {
 					return
 				}
-				if clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
+				if len(bindings.Named) == 0 {
 					return
 				}
-
-				elements := clause.NamedBindings.AsNamedImports().Elements
-				if elements == nil || len(elements.Nodes) == 0 {
-					return
-				}
-				for _, element := range elements.Nodes {
+				for _, element := range bindings.Named {
 					if element.Kind != ast.KindImportSpecifier || !element.AsImportSpecifier().IsTypeOnly {
 						return
 					}
 				}
 
-				fixes := make([]rule.Fix, 0, len(elements.Nodes)+1)
-				for _, element := range elements.Nodes {
+				fixes := make([]rule.Fix, 0, len(bindings.Named)+1)
+				for _, element := range bindings.Named {
 					// Both ends are token ranges rather than node ranges. `Pos()` on the imported
 					// name sits immediately after the `type` keyword, before the whitespace that
 					// separates them, so ending the removal there leaves that whitespace behind and
