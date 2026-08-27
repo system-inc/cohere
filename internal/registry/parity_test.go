@@ -772,6 +772,22 @@ var rulesOutsideTheInventory = map[string]string{
 	"consistent-this": "ported from eslint core, which marks it recommended:false; not enforced by " +
 		"either tool when the inventory was captured, and the audit measured zero violations",
 
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// The audit measured zero violations and that zero has a cause worth stating: two of the three
+	// ported judgments fire only in a SCRIPT, and a scan of this tree found 3174 files carrying a
+	// top level import or export against 2 that do not. So it is a guardrail rather than a cleanup,
+	// and the fixtures prove the rule can fire rather than leaving the zero to speak for itself.
+	//
+	// Three of upstream's five messages are ported. The other two need a configured-globals surface,
+	// declined here on the same measured grounds as `@typescript-eslint/no-redeclare`'s
+	// `builtinGlobals`. The decline is an upgrade that does not happen rather than a finding that
+	// goes missing, except for one shape, and all of it is pinned by a test.
+	"no-implicit-globals": "ported from eslint core, which marks it recommended:false; not enforced " +
+		"by either tool when the inventory was captured, and the audit measured zero violations",
+
 	// Ported from eslint core and registered by this port, but enabled in neither engine. Outside
 	// the inventory for the usual reason: upstream marks it `recommended: false`, so a project on
 	// the recommended set never had it, and there is no oxlint config in the tree to have carried
