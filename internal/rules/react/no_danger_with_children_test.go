@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // dangerWithChildrenFile is where the fixtures pretend to live.
@@ -56,8 +56,8 @@ func TestNoDangerWithChildrenFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "noDangerWithChildren")
+			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
 		})
 	}
 }
@@ -97,8 +97,8 @@ func TestNoDangerWithChildrenStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -138,8 +138,8 @@ func TestNoDangerWithChildrenPointsAtTheWholeElement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "noDangerWithChildren")
+			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
 			finding := result.Diagnostics[0]
 			reported := testCase.sourceText[finding.Range.Pos():finding.Range.End()]
 			if reported != testCase.wantReported {
@@ -155,9 +155,9 @@ func TestNoDangerWithChildrenPointsAtTheWholeElement(t *testing.T) {
 // is not a guard: a doubled word or a stray prefix is a substring match away from passing while the
 // message is wrong. This message interpolates nothing, so the assertion is exact.
 func TestNoDangerWithChildrenRendersItsMessage(t *testing.T) {
-	result := ruletest.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
+	result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
 		"<div dangerouslySetInnerHTML={{ __html: \"HTML\" }}>Children</div>")
-	ruletest.ExpectFindings(t, result, "noDangerWithChildren")
+	rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
 	got := result.Diagnostics[0].Message.Description
 	if got != messageNoDangerWithChildren.Description {
 		t.Fatalf("want the message %q, got %q", messageNoDangerWithChildren.Description, got)
@@ -173,7 +173,7 @@ func TestNoDangerWithChildrenRendersItsMessage(t *testing.T) {
 // None of these appears in the imported corpus, which writes every call as `React.createElement`,
 // so nothing upstream ships can tell the two apart. That is exactly why they are here: the shelf's
 // `IsCreateElementCall` is a name-shaped invitation to simplify this rule into reporting where
-// upstream is silent, and `internal/utils/react`'s own doc comment names this rule when warning
+// upstream is silent, and `internal/utilities/react`'s own doc comment names this rule when warning
 // about it. Each case below would flip if someone swapped the inline test for the helper.
 //
 // oxc destructures `Expression::StaticMemberExpression` at `no_danger_with_children.rs:76` and then
@@ -183,27 +183,27 @@ func TestNoDangerWithChildrenMatchesUpstreamsNarrowerCalleeTest(t *testing.T) {
 	danger := "{ dangerouslySetInnerHTML: { __html: \"HTML\" } }"
 
 	t.Run("a bare createElement call is silent, where the shelf helper would accept it", func(t *testing.T) {
-		result := ruletest.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
+		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
 			"createElement(\"div\", "+danger+", \"Children\");")
-		ruletest.ExpectClean(t, result)
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("a computed member is silent, where the shelf helper would accept it", func(t *testing.T) {
-		result := ruletest.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
+		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
 			"React[\"createElement\"](\"div\", "+danger+", \"Children\");")
-		ruletest.ExpectClean(t, result)
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("document.createElement reports, where the shelf helper would reject it", func(t *testing.T) {
-		result := ruletest.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
+		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
 			"document.createElement(\"div\", "+danger+", \"Children\");")
-		ruletest.ExpectFindings(t, result, "noDangerWithChildren")
+		rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
 	})
 
 	t.Run("any other object is accepted, since the receiver is never checked", func(t *testing.T) {
-		result := ruletest.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
+		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
 			"Preact.createElement(\"div\", "+danger+", \"Children\");")
-		ruletest.ExpectFindings(t, result, "noDangerWithChildren")
+		rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
 	})
 }
 
@@ -256,11 +256,11 @@ func TestNoDangerWithChildrenReadsKeysThatNeedNoEvaluation(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
 			if testCase.wantFinding {
-				ruletest.ExpectFindings(t, result, "noDangerWithChildren")
+				rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
 			} else {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 			}
 		})
 	}
@@ -311,8 +311,8 @@ func TestNoDangerWithChildrenDeclinesCallsTooShortToCarryProps(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

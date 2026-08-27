@@ -7,8 +7,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/comments"
-	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
+	"github.com/system-inc/verify/internal/utilities/comments"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/imports"
 )
 
 // Four or fewer double-slash lines read fine as a stack; the block delimiters would be noise.

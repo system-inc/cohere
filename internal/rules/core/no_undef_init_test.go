@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // undefInitFile is where the fixtures pretend to live.
@@ -40,8 +40,8 @@ func TestNoUndefInitStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText))
 		})
 	}
 }
@@ -76,8 +76,8 @@ func TestNoUndefInitFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText),
 				"unnecessaryUndefinedInit")
 		})
 	}
@@ -111,8 +111,8 @@ func TestNoUndefInitFixes(t *testing.T) {
 			// carries a trailing newline the upstream `output` string does not. Transforming the
 			// expectation the same way the harness transforms the input is the honest fix; padding
 			// the rule to emit one would be a rule change made to satisfy a harness detail.
-			ruletest.ExpectFixedSource(t,
-				ruletest.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText),
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText),
 				strings.TrimSpace(testCase.wantSource)+"\n")
 		})
 	}
@@ -149,7 +149,7 @@ func TestNoUndefInitDeclinesToFix(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -166,7 +166,7 @@ func TestNoUndefInitDeclinesToFix(t *testing.T) {
 // nothing between the format string and the reader checks it. A verb swapped into the name's slot
 // produces a finding with the right id, the right span and a sentence naming the wrong thing.
 func TestNoUndefInitNamesTheBinding(t *testing.T) {
-	result := ruletest.RunTyped(t, NoUndefInit, undefInitFile, "let someBinding = undefined;")
+	result := rule_testing.RunTyped(t, NoUndefInit, undefInitFile, "let someBinding = undefined;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
@@ -198,7 +198,7 @@ func TestNoUndefInitReportsTheWholeDeclarator(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -234,13 +234,13 @@ func TestNoUndefInitDeclinesAShadowedUndefined(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText))
 		})
 	}
 
 	// The control: the same shape with nothing shadowing the name, so the silence above is a
 	// measurement about the shadow rather than about the surrounding code.
-	ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoUndefInit, undefInitFile,
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUndefInit, undefInitFile,
 		"function f() { let foo = undefined; return foo; }"), "unnecessaryUndefinedInit")
 }
 
@@ -267,8 +267,8 @@ func TestNoUndefInitIgnoresAnAmbientDeclaration(t *testing.T) {
 		"/repository/source/Ambient.d.ts": "declare var undefined: any;\n",
 		"/repository/source/Use.ts":       "let a = undefined;\n",
 	}
-	ruletest.ExpectFindings(t,
-		ruletest.RunTypedFiles(t, NoUndefInit, reporting, "/repository/source/Use.ts"),
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTypedFiles(t, NoUndefInit, reporting, "/repository/source/Use.ts"),
 		"unnecessaryUndefinedInit")
 
 	// The control: a shadow written in source, in the same two-file program, is a real shadow.
@@ -276,11 +276,11 @@ func TestNoUndefInitIgnoresAnAmbientDeclaration(t *testing.T) {
 		"/repository/source/Ambient.d.ts": "declare var undefined: any;\n",
 		"/repository/source/Use.ts":       "var undefined = 5;\nlet a = undefined;\n",
 	}
-	ruletest.ExpectClean(t,
-		ruletest.RunTypedFiles(t, NoUndefInit, shadowed, "/repository/source/Use.ts"))
+	rule_testing.ExpectClean(t,
+		rule_testing.RunTypedFiles(t, NoUndefInit, shadowed, "/repository/source/Use.ts"))
 }
 
-// The typed harness is required, so a later revert to `ruletest.Run` fails loudly.
+// The typed harness is required, so a later revert to `rule_testing.Run` fails loudly.
 //
 // The rule guards on a nil checker and returns, so under the plain harness it goes completely
 // silent: every clean case passes vacuously and every reporting case fails in a way that reads as a
@@ -289,5 +289,5 @@ func TestNoUndefInitNeedsTheTypedHarness(t *testing.T) {
 	if !NoUndefInit.NeedsTypeChecker {
 		t.Fatal("this rule resolves `undefined` through the checker and must declare it")
 	}
-	ruletest.ExpectClean(t, ruletest.Run(t, NoUndefInit, undefInitFile, "let a = undefined;"))
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUndefInit, undefInitFile, "let a = undefined;"))
 }

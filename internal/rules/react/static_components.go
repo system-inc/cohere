@@ -3,7 +3,7 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/hir"
+	"github.com/system-inc/verify/internal/utilities/high_level_intermediate_representation"
 )
 
 // StaticComponents flags a component value created during render and then used as a JSX tag.
@@ -38,7 +38,7 @@ import (
 // join. `let C; if (cond) { C = createComponent(); } else { C = Default; } return <C />;` reports,
 // and it reports because the component is dynamic on *one* path. That is a phi node. Answering it
 // from the syntax tree means re-deriving evaluation order and control flow per rule, which is the
-// duplication `internal/utils/hir` exists to end.
+// duplication `internal/utilities/hir` exists to end.
 //
 // So this lowers each function-like node, builds single-assignment form, and runs upstream's own
 // algorithm over the result: a map from value to the span that made it dynamic, propagated forward
@@ -106,10 +106,10 @@ var StaticComponents = rule.Rule{
 			// and once standalone with no enclosing context.
 			ast.KindSourceFile: func(node *ast.Node) {
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
-					// Shared with the other rules that lower this same function; see hir.ForFunction.
+					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
 					// Construct runs inside the cached computation, because it mutates in place and is
 					// not idempotent.
-					lowered := hir.ForFunction(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
 					if lowered == nil {
 						return
 					}
@@ -151,7 +151,7 @@ func forEachCompiledFunction(root *ast.Node, visit func(*ast.Node)) {
 //
 // `Blocks` is in reverse postorder, which is what makes a single forward walk correct for
 // everything except a back edge, and the back edge is upstream's limitation too.
-func reportDynamicComponents(ctx rule.Context, function *hir.Function) {
+func reportDynamicComponents(ctx rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
@@ -159,7 +159,7 @@ func reportDynamicComponents(ctx rule.Context, function *hir.Function) {
 	// Value to the span of whatever made it dynamic. Upstream keys this by identifier and carries
 	// an optional span; single-assignment form means one entry per value rather than per binding,
 	// which is the property that makes the propagation below sound without a fixpoint.
-	dynamic := map[hir.IdentifierId]hir.IdentifierId{}
+	dynamic := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId{}
 
 	for _, block := range function.Blocks {
 		// A phi is dynamic when any operand reaching it is. Upstream stops at the first such
@@ -185,22 +185,22 @@ func reportDynamicComponents(ctx rule.Context, function *hir.Function) {
 			// Creating a function during render is the case the rule is named for. The other three
 			// are values whose identity this pass cannot prove stable: a call, a construction, or a
 			// method call could return anything, including a fresh component each time.
-			case *hir.FunctionExpression:
+			case *high_level_intermediate_representation.FunctionExpression:
 				dynamic[target] = target
-			case *hir.CallExpression:
+			case *high_level_intermediate_representation.CallExpression:
 				dynamic[target] = value.Callee.Identifier
-			case *hir.NewExpression:
+			case *high_level_intermediate_representation.NewExpression:
 				dynamic[target] = value.Callee.Identifier
-			case *hir.MethodCall:
+			case *high_level_intermediate_representation.MethodCall:
 				dynamic[target] = value.Property.Identifier
 
 			// Reading and writing carry taint along, which is what makes an alias chain of any
 			// length behave like the value at its head.
-			case *hir.LoadLocal:
+			case *high_level_intermediate_representation.LoadLocal:
 				if creator, ok := dynamic[value.Place.Identifier]; ok {
 					dynamic[target] = creator
 				}
-			case *hir.StoreLocal:
+			case *high_level_intermediate_representation.StoreLocal:
 				if creator, ok := dynamic[value.Value.Identifier]; ok {
 					dynamic[target] = creator
 					dynamic[value.LValue.Identifier] = creator
@@ -209,7 +209,7 @@ func reportDynamicComponents(ctx rule.Context, function *hir.Function) {
 			// A tag naming a value is the only shape that can carry taint. A host element such as
 			// `div` and a member expression such as `obj.Inner` both arrive with no Place, so both
 			// are silent regardless of what their names resolve to.
-			case *hir.JsxExpression:
+			case *high_level_intermediate_representation.JsxExpression:
 				if value.Tag.Place == nil {
 					continue
 				}
@@ -261,7 +261,7 @@ func reportDynamicComponents(ctx rule.Context, function *hir.Function) {
 // is what makes this divergence dangerous rather than obvious. Fidelity is the authority here, the
 // gate is upstream's, and improving on it silently would make our findings and oxc's disagree on
 // real code while both looked correct.
-func analyzeCompiledFunction(ctx rule.Context, function *hir.Function) {
+func analyzeCompiledFunction(ctx rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
@@ -304,7 +304,7 @@ func analyzeCompiledFunction(ctx rule.Context, function *hir.Function) {
 // The defect this replaced was invisible in the obvious fixture: with no leading newline the
 // element's raw start coincides with the tag identifier's start, so the span read correctly. oxc's
 // tester writes its cases with a leading newline, which is the only reason it was caught.
-func identifierNode(function *hir.Function, id hir.IdentifierId) *ast.Node {
+func identifierNode(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -321,7 +321,7 @@ func identifierNode(function *hir.Function, id hir.IdentifierId) *ast.Node {
 // put, so it is quoted into the message instead. Read from the source text rather than rebuilt from
 // the representation, because the representation holds values rather than syntax and
 // `props.foo.bar()` has no readable spelling there.
-func staticComponentsMessage(ctx rule.Context, function *hir.Function, creator hir.IdentifierId) rule.Message {
+func staticComponentsMessage(ctx rule.Context, function *high_level_intermediate_representation.Function, creator high_level_intermediate_representation.IdentifierId) rule.Message {
 	created := ""
 	if node := identifierNode(function, creator); node != nil && ctx.SourceFile != nil {
 		span := rule.TokenRange(ctx.SourceFile, node)
@@ -355,11 +355,11 @@ func staticComponentsMessage(ctx rule.Context, function *hir.Function, creator h
 // or call a hook. Measured: `function Widget() { const C = mk(); return C; }` is capitalized and is
 // still not compiled, because it returns a value rather than an element.
 //
-// The name half is deliberately taken from `hir.Function.Kind` rather than recomputed, so this rule
+// The name half is deliberately taken from `high_level_intermediate_representation.Function.Kind` rather than recomputed, so this rule
 // and the representation cannot drift into disagreeing about what a component name is. Upstream's
 // test is `is_ascii_uppercase`, and `classifyFunction` is ASCII too, so they agree today.
-func isCompilationUnit(function *hir.Function) bool {
-	if function == nil || function.Kind == hir.FunctionKindOther {
+func isCompilationUnit(function *high_level_intermediate_representation.Function) bool {
+	if function == nil || function.Kind == high_level_intermediate_representation.FunctionKindOther {
 		return false
 	}
 	return createsJsx(function.Node)

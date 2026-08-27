@@ -8,7 +8,7 @@ import (
 
 	"github.com/system-inc/verify/internal/rule"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The corpus for restrict-plus-operands, taken verbatim from upstream's own tester.
@@ -105,8 +105,8 @@ func TestRestrictPlusOperandsStaysSilent(t *testing.T) {
 		{"upstream valid 58", "let foo = '1' + 1n;", RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(true)}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -185,8 +185,8 @@ func TestRestrictPlusOperandsFires(t *testing.T) {
 		{"upstream invalid 59", "let foo = '1' + 1n;", RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}, []string{"mismatched"}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -263,7 +263,7 @@ func TestRestrictPlusOperandsMessages(t *testing.T) {
 		{"upstream invalid 59", "let foo = '1' + 1n;", RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}, []string{"Operands of '+' operations must be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `string` + `bigint`."}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
 				t.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
 			}
@@ -303,7 +303,7 @@ func TestRestrictPlusOperandsSpans(t *testing.T) {
 		{"upstream invalid 43", "\nlet foo: string | undefined;\nfoo += 'some data';\n      ", RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(false), AllowBoolean: restrictPlusOperandsBool(false), AllowNullish: restrictPlusOperandsBool(false), AllowNumberAndString: restrictPlusOperandsBool(false), AllowRegExp: restrictPlusOperandsBool(false), SkipCompoundAssignments: false}, []string{"foo"}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
@@ -378,9 +378,9 @@ func TestRestrictPlusOperandsDecoder(t *testing.T) {
 			t.Fatal("the two configurations decode the same, so this proves nothing")
 		}
 
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, source,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, source,
 			RestrictPlusOperandsOptions{}))
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, source,
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, source,
 			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}), "mismatched")
 	})
 }
@@ -431,7 +431,7 @@ func TestRestrictPlusOperandsStringLikeRenderings(t *testing.T) {
 }
 
 // TestRestrictPlusOperandsRequiresTheTypedHarness asserts the rule declares the checker and that the
-// plain harness cannot prove it, so a later revert to ruletest.Run fails loudly.
+// plain harness cannot prove it, so a later revert to rule_testing.Run fails loudly.
 func TestRestrictPlusOperandsRequiresTheTypedHarness(t *testing.T) {
 	if !RestrictPlusOperands.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
@@ -439,8 +439,8 @@ func TestRestrictPlusOperandsRequiresTheTypedHarness(t *testing.T) {
 
 	const source = "let foo = 1n + 1;"
 
-	ruletest.ExpectFindings(t, ruletest.RunTyped(t, RestrictPlusOperands, restrictPlusOperandsFile, source), "bigintAndNumber")
-	ruletest.ExpectClean(t, ruletest.Run(t, RestrictPlusOperands, restrictPlusOperandsFile, source))
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, RestrictPlusOperands, restrictPlusOperandsFile, source), "bigintAndNumber")
+	rule_testing.ExpectClean(t, rule_testing.Run(t, RestrictPlusOperands, restrictPlusOperandsFile, source))
 }
 
 // TestRestrictPlusOperandsSurvivesMalformedExpressions runs the rule over `+` shapes where an
@@ -476,7 +476,7 @@ func TestRestrictPlusOperandsSurvivesMalformedExpressions(t *testing.T) {
 		t.Run(fmt.Sprintf("shape-%d", index), func(t *testing.T) {
 			// A panic fails the test. Findings are deliberately unasserted: what the rule concludes
 			// about a malformed shape belongs in its own fixture.
-			ruletest.RunTyped(t, RestrictPlusOperands, restrictPlusOperandsFile, source)
+			rule_testing.RunTyped(t, RestrictPlusOperands, restrictPlusOperandsFile, source)
 		})
 	}
 }
@@ -501,21 +501,21 @@ func TestRestrictPlusOperandsSurvivesMalformedExpressions(t *testing.T) {
 // The non-distinguishing row is kept below as the control that makes that visible.
 func TestRestrictPlusOperandsIndividualComplaintSuppressesThePair(t *testing.T) {
 	t.Run("an impossible operand suppresses the bigint pair complaint", func(t *testing.T) {
-		result := ruletest.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile,
+		result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile,
 			"declare const a: number | {};\nconst x = a + 1n;", nil)
-		ruletest.ExpectFindings(t, result, "invalid")
+		rule_testing.ExpectFindings(t, result, "invalid")
 	})
 
 	t.Run("the mismatched arm is off by default, so this shape cannot see the gate", func(t *testing.T) {
-		result := ruletest.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile,
+		result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile,
 			"declare const a: string | symbol;\nconst x = a + 1;", nil)
-		ruletest.ExpectFindings(t, result, "invalid")
+		rule_testing.ExpectFindings(t, result, "invalid")
 	})
 
 	t.Run("with the mismatched arm on, the same suppression holds", func(t *testing.T) {
-		result := ruletest.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile,
+		result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile,
 			"declare const a: string | symbol;\nconst x = a + 1;",
 			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)})
-		ruletest.ExpectFindings(t, result, "invalid")
+		rule_testing.ExpectFindings(t, result, "invalid")
 	})
 }

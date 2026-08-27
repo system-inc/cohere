@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // evalFile is where the fixtures pretend to live.
@@ -20,17 +20,17 @@ const evalFile = "/repository/source/Eval.ts"
 // Cases upstream gates behind an `env` configuration we do not have are marked at the case. See the
 // divergence note on the rule itself.
 
-// TestNoEvalRequiresTypedHarness exists because a revert to ruletest.Run would be silent.
+// TestNoEvalRequiresTypedHarness exists because a revert to rule_testing.Run would be silent.
 //
 // The rule declares NeedsTypeChecker, and the plain harness hands it a nil checker. Every clean case
 // below would then pass vacuously while the rule reported nothing at all. This asserts the
 // difference is observable: a direct call fires under the typed harness, and the whole rule goes
 // quiet without it.
 func TestNoEvalRequiresTypedHarness(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.RunTyped(t, NoEval, evalFile, "var EVAL = eval; EVAL('foo')"), "noEval")
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoEval, evalFile, "var EVAL = eval; EVAL('foo')"))
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTyped(t, NoEval, evalFile, "var EVAL = eval; EVAL('foo')"), "noEval")
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoEval, evalFile, "var EVAL = eval; EVAL('foo')"))
 }
 
 func TestNoEvalFires(t *testing.T) {
@@ -77,8 +77,8 @@ func TestNoEvalFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoEval, evalFile, testCase.sourceText), testCase.wantIds...)
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoEval, evalFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -147,7 +147,7 @@ func TestNoEvalStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoEval, evalFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoEval, evalFile, testCase.sourceText))
 		})
 	}
 }
@@ -189,7 +189,7 @@ func TestNoEvalAllowIndirect(t *testing.T) {
 	}
 	for _, sourceText := range allowed {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(
 				t, NoEval, evalFile, sourceText, NoEvalOptions{AllowIndirect: true}))
 		})
 	}
@@ -197,7 +197,7 @@ func TestNoEvalAllowIndirect(t *testing.T) {
 	// The direct call is still reported with the option on. That is the whole point of the option
 	// being narrower than off.
 	t.Run("a direct call is still reported", func(t *testing.T) {
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(
 			t, NoEval, evalFile, "eval('foo')", NoEvalOptions{AllowIndirect: true}), "noEval")
 	})
 }
@@ -235,7 +235,7 @@ func TestNoEvalSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoEval, evalFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoEval, evalFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
 			}

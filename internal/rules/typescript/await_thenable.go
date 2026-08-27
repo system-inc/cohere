@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 // AwaitThenable flags `await` applied to a value that is not a Thenable, `for await...of` over a
@@ -34,13 +34,13 @@ import (
 // suggestion moved from `rule.RuleSuggestion{FixesArr: []rule.RuleFix{...}}` to
 // `rule.Suggestion{Fixes: []rule.Fix{...}}`. The three fix constructors map one to one:
 // `RuleFixRemoveRange` is `rule.RemoveRange`, and `RuleFixRemove(file, node)` is `ctx.RemoveNode`,
-// which are the same expression under different names since `typecheck.TrimNodeTextRange` and
+// which are the same expression under different names since `type_checking.TrimNodeTextRange` and
 // `rule.TokenRange` are both `GetRangeOfTokenAtPosition(file, node.Pos()).WithEnd(node.End())`. No
 // predicate, no tri-state and no traversal was touched.
 //
 // The reported SPANS are unchanged, and that is the part worth naming. While this rule was adapted,
 // `upstream.Adapt` wrapped every node report in `rule.TokenRange(SourceFile, node)` because
-// tsgolint's own runner does the same through `typecheck.TrimNodeTextRange`. Our native
+// tsgolint's own runner does the same through `type_checking.TrimNodeTextRange`. Our native
 // `ctx.ReportNodeWithSuggestions` applies exactly that trim itself, so absorbing the rule preserves
 // the behavior rather than relying on the adapter to supply it. Passing `node.Loc` instead would
 // include leading trivia, so an indented `await 0` would report the text "\n  await 0" and an
@@ -122,9 +122,9 @@ var AwaitThenable = rule.Rule{
 			ast.KindAwaitExpression: func(node *ast.Node) {
 				awaitArgument := node.AsAwaitExpression().Expression
 				awaitArgumentType := ctx.TypeChecker.GetTypeAtLocation(awaitArgument)
-				certainty := typecheck.NeedsToBeAwaited(ctx.TypeChecker, awaitArgument, awaitArgumentType)
+				certainty := type_checking.NeedsToBeAwaited(ctx.TypeChecker, awaitArgument, awaitArgumentType)
 
-				if certainty == typecheck.TypeAwaitableNever {
+				if certainty == type_checking.TypeAwaitableNever {
 					ctx.ReportNodeWithSuggestions(node, buildAwaitMessage(), rule.Suggestion{
 						Message: buildRemoveAwaitMessage(),
 						Fixes: []rule.Fix{
@@ -140,18 +140,18 @@ var AwaitThenable = rule.Rule{
 				}
 
 				exprType := ctx.TypeChecker.GetTypeAtLocation(stmt.Expression)
-				if typecheck.IsTypeAnyType(exprType) {
+				if type_checking.IsTypeAnyType(exprType) {
 					return
 				}
 
-				for _, typePart := range typecheck.UnionTypeParts(exprType) {
-					if typecheck.GetWellKnownSymbolPropertyOfType(typePart, "asyncIterator", ctx.TypeChecker) != nil {
+				for _, typePart := range type_checking.UnionTypeParts(exprType) {
+					if type_checking.GetWellKnownSymbolPropertyOfType(typePart, "asyncIterator", ctx.TypeChecker) != nil {
 						return
 					}
 				}
 
 				ctx.ReportRangeWithSuggestions(
-					typecheck.GetForStatementHeadLoc(ctx.SourceFile, node),
+					type_checking.GetForStatementHeadLoc(ctx.SourceFile, node),
 					buildForAwaitOfNonAsyncIterableMessage(),
 					// Note that this suggestion causes broken code for sync iterables
 					// of promises, since the loop variable is not awaited.
@@ -176,12 +176,12 @@ var AwaitThenable = rule.Rule{
 						continue
 					}
 					initType := ctx.TypeChecker.GetTypeAtLocation(init)
-					if typecheck.IsTypeAnyType(initType) {
+					if type_checking.IsTypeAnyType(initType) {
 						continue
 					}
 
-					for _, typePart := range typecheck.UnionTypeParts(initType) {
-						if typecheck.GetWellKnownSymbolPropertyOfType(typePart, "asyncDispose", ctx.TypeChecker) != nil {
+					for _, typePart := range type_checking.UnionTypeParts(initType) {
+						if type_checking.GetWellKnownSymbolPropertyOfType(typePart, "asyncDispose", ctx.TypeChecker) != nil {
 							continue DeclaratorLoop
 						}
 					}

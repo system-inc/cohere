@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // throwLiteralFile is where the fixtures pretend to live.
@@ -58,8 +58,8 @@ func TestNoThrowLiteralStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText))
 		})
 	}
 }
@@ -89,8 +89,8 @@ func TestNoThrowLiteralFiresObject(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText), "object")
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText), "object")
 		})
 	}
 }
@@ -109,8 +109,8 @@ func TestNoThrowLiteralFiresUndef(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText), "undef")
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, testCase.sourceText), "undef")
 		})
 	}
 }
@@ -127,24 +127,24 @@ func TestNoThrowLiteralFiresUndef(t *testing.T) {
 // pinned by asserting the run completes at all.
 func TestNoThrowLiteralHandlesShapesTheCorpusOmits(t *testing.T) {
 	t.Run("?? yields either operand, so an Error on the left is clean", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTyped(t, NoThrowLiteral, throwLiteralFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
 			"declare const foo: unknown;\nthrow new Error() ?? 'literal';\n"))
 	})
 
 	t.Run("?? with literals on both sides reports", func(t *testing.T) {
-		ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoThrowLiteral, throwLiteralFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
 			"declare const foo: unknown;\nthrow 'a' ?? 'b';\n"), "object")
 	})
 
 	t.Run("??= yields either operand", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTyped(t, NoThrowLiteral, throwLiteralFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
 			"declare let foo: unknown;\nthrow foo ??= 'literal';\n"))
 	})
 
 	t.Run("a throw with no argument does not crash", func(t *testing.T) {
 		// Reporting or not is beside the point; not panicking is the assertion. The parser recovers
 		// from this and hands back a ThrowStatement whose Expression is nil.
-		ruletest.RunTyped(t, NoThrowLiteral, throwLiteralFile, "function f() { throw; }")
+		rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, "function f() { throw; }")
 	})
 }
 
@@ -155,7 +155,7 @@ func TestNoThrowLiteralHandlesShapesTheCorpusOmits(t *testing.T) {
 // worth reading.
 func TestNoThrowLiteralReportsTheWholeStatement(t *testing.T) {
 	const sourceText = "throw 'error';"
-	result := ruletest.RunTyped(t, NoThrowLiteral, throwLiteralFile, sourceText)
+	result := rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
@@ -173,16 +173,16 @@ func TestNoThrowLiteralReportsTheWholeStatement(t *testing.T) {
 // `undefined` name test reports `throw a`. Both halves are asserted here, with the reporting form as
 // the control.
 func TestNoThrowLiteralUndefOnlyForTheGlobal(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.RunTyped(t, NoThrowLiteral, throwLiteralFile,
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
 		"function foo(undefined) { throw undefined; }"))
-	ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoThrowLiteral, throwLiteralFile,
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
 		"function foo() { throw undefined; }"), "undef")
 }
 
-// The typed harness is required, so a later revert to `ruletest.Run` fails loudly.
+// The typed harness is required, so a later revert to `rule_testing.Run` fails loudly.
 func TestNoThrowLiteralNeedsTheTypedHarness(t *testing.T) {
 	if !NoThrowLiteral.NeedsTypeChecker {
 		t.Fatal("this rule resolves `undefined` through the checker and must declare it")
 	}
-	ruletest.ExpectClean(t, ruletest.Run(t, NoThrowLiteral, throwLiteralFile, "throw 'error';"))
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoThrowLiteral, throwLiteralFile, "throw 'error';"))
 }

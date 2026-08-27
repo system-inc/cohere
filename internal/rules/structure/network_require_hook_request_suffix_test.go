@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The import is what switches the whole family on, so every fixture carries it. A file without it
@@ -115,7 +115,7 @@ func TestNetworkRequireHookRequestSuffixFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NetworkRequireHookRequestSuffix, testCase.fileName,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix, testCase.fileName,
 				requestSuffixDeclarations+testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -172,7 +172,7 @@ func TestNetworkRequireHookRequestSuffixStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NetworkRequireHookRequestSuffix, testCase.fileName,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix, testCase.fileName,
 				requestSuffixDeclarations+testCase.sourceText))
 		})
 	}
@@ -195,11 +195,11 @@ func TestNetworkRequireHookRequestSuffixJudgesTheBaseName(t *testing.T) {
 	source := "export function useUserRequest() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
 
 	// A correct file name inside an unrelated directory stays silent.
-	ruletest.ExpectClean(t, ruletest.Run(t, NetworkRequireHookRequestSuffix,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix,
 		"/repository/source/User/UserRequest.ts", requestSuffixDeclarations+source))
 
 	// A wrong file name inside a directory that ends in Request still fires.
-	ruletest.ExpectFindings(t, ruletest.Run(t, NetworkRequireHookRequestSuffix,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix,
 		"/repository/source/UserRequest/Helper.ts", requestSuffixDeclarations+source),
 		"fileShouldEndWithRequest")
 }
@@ -217,13 +217,13 @@ func TestNetworkRequireHookRequestSuffixNeedsTheImport(t *testing.T) {
 		"declare const gqlDocument: unknown;\n" +
 		"export function useUser() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
 
-	ruletest.ExpectClean(t, ruletest.Run(t, NetworkRequireHookRequestSuffix, plainNamedFile, withoutImport))
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix, plainNamedFile, withoutImport))
 
 	// The control: the same source with the import restored must fire both findings. Without this
 	// half the test above would pass on a rule that reports nothing at all.
 	withImport := requestSuffixDeclarations +
 		"export function useUser() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
 
-	ruletest.ExpectFindings(t, ruletest.Run(t, NetworkRequireHookRequestSuffix, plainNamedFile, withImport),
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkRequireHookRequestSuffix, plainNamedFile, withImport),
 		"hookShouldEndWithRequest", "fileShouldEndWithRequest")
 }

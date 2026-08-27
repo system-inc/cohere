@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/controlflow"
+	"github.com/system-inc/verify/internal/utilities/control_flow_graph"
 )
 
 var (
@@ -138,7 +138,7 @@ var (
 // oxc's `is_react_hook_name` tests the fourth character with `char::is_uppercase`, which is Unicode.
 // ESLint's is `/^use[A-Z0-9]/`, which is not. Reproduced as oxc, which means this rule's hook
 // predicate is Unicode-uppercase-or-ASCII-digit, and that is why it cannot use
-// `internal/utils/react.IsHookName` — see below.
+// `internal/utilities/react.IsHookName` — see below.
 //
 // One more difference is cosmetic rather than behavioural and is recorded so nobody re-derives it:
 // for `Namespace.useThing()` oxc renders the hook name as `useThing` and ESLint renders it as
@@ -147,7 +147,7 @@ var (
 //
 // # The shelf helper that is wrong for this rule, measured in three directions
 //
-// `internal/utils/react.IsHookName` is exactly the shape this reaches for and would be wrong on
+// `internal/utilities/react.IsHookName` is exactly the shape this reaches for and would be wrong on
 // every case in this rule's corpus that discriminates. Its body requires a name longer than `use`
 // and tests `unicode.IsUpper` alone. Against both oracles, run on `Hook.use()`, `Hook.use42()` and
 // `Hook.useHook()` from upstream's own case 133:
@@ -177,7 +177,7 @@ var (
 //
 // # The control-flow graph, and the one place it does not answer the question
 //
-// This is the first rule in the catalog to consume `internal/utils/controlflow`, which is a
+// This is the first rule in the catalog to consume `internal/utilities/controlflow`, which is a
 // basic-block graph vendored from rslint whose block layout deliberately mirrors ESLint's own code
 // path analysis. Whether that mirroring actually holds for the shapes this rule turns on had never
 // been tested, so it was probed against both oracles before anything was built on it. Sixteen
@@ -400,15 +400,15 @@ func reportInlineEffectEventEscape(ctx rule.Context, call *ast.Node) {
 // carry the same positions, so the first **reachable** block a position lands in is the one that
 // answers for it.
 type hookPathFacts struct {
-	analysis *controlflow.PathAnalysis[hookEvent]
-	blocks   map[int]*controlflow.Block[hookEvent]
+	analysis *control_flow_graph.PathAnalysis[hookEvent]
+	blocks   map[int]*control_flow_graph.Block[hookEvent]
 }
 
 type hookEvent struct {
 	position int
 }
 
-func (f *hookPathFacts) blockOf(call *ast.Node) (*controlflow.Block[hookEvent], bool) {
+func (f *hookPathFacts) blockOf(call *ast.Node) (*control_flow_graph.Block[hookEvent], bool) {
 	block, found := f.blocks[call.Pos()]
 	return block, found
 }
@@ -418,9 +418,9 @@ func factsForRoot(cache map[*ast.Node]*hookPathFacts, root *ast.Node) *hookPathF
 		return existing
 	}
 
-	blocks := map[int]*controlflow.Block[hookEvent]{}
-	graph := controlflow.Build(root, controlflow.Hooks[hookEvent]{
-		Expression: func(builder *controlflow.Builder[hookEvent], node *ast.Node) {
+	blocks := map[int]*control_flow_graph.Block[hookEvent]{}
+	graph := control_flow_graph.Build(root, control_flow_graph.Hooks[hookEvent]{
+		Expression: func(builder *control_flow_graph.Builder[hookEvent], node *ast.Node) {
 			if node == nil || node.Kind != ast.KindCallExpression {
 				return
 			}
@@ -454,7 +454,7 @@ func factsForRoot(cache map[*ast.Node]*hookPathFacts, root *ast.Node) *hookPathF
 		},
 	})
 
-	facts := &hookPathFacts{analysis: controlflow.AnalyzePaths(graph), blocks: blocks}
+	facts := &hookPathFacts{analysis: control_flow_graph.AnalyzePaths(graph), blocks: blocks}
 	cache[root] = facts
 	return facts
 }
@@ -489,7 +489,7 @@ func isHookCallee(callee *ast.Node) bool {
 // isHookIdentifierName reports React's Hook naming shape: `use`, or `use` followed by an uppercase
 // letter or an ASCII digit.
 //
-// Not `internal/utils/react.IsHookName`, and the reason is at the rule's doc comment. Bare `use` and
+// Not `internal/utilities/react.IsHookName`, and the reason is at the rule's doc comment. Bare `use` and
 // `use42` are Hooks to both upstream implementations and are not to the shelf function, and
 // upstream's corpus turns on both.
 func isHookIdentifierName(name string) bool {
@@ -505,7 +505,7 @@ func isHookIdentifierName(name string) bool {
 
 // isComponentIdentifierName reports a name starting with an ASCII capital.
 //
-// Not `internal/utils/react.IsLikelyComponentName`, which tests `unicode.IsUpper`. oxc's
+// Not `internal/utilities/react.IsLikelyComponentName`, which tests `unicode.IsUpper`. oxc's
 // `is_react_component_name` is `is_ascii_uppercase`, and the two disagree on `Éomponent`. The hook
 // predicate above is deliberately the Unicode one and this one is deliberately not, because that is
 // how oxc spells them: `utils/react.rs:761` is `is_uppercase`, `:785` is `is_ascii_uppercase`. One

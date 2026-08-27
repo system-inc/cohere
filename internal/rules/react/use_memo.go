@@ -90,7 +90,7 @@ var messageUseMemoCallbackReassignsOuterVariable = rule.Message{
 //
 // # Where the answer lives, and why this does not use the intermediate representation
 //
-// This rule was written after `internal/utils/hir` landed, and it is the kind of rule that package
+// This rule was written after `internal/utilities/hir` landed, and it is the kind of rule that package
 // exists for: upstream's seven diagnostic constructors sit in `dropManualMemoization`, an
 // optimization pass, and in `validateUseMemo`, a validator, and both read an instruction stream
 // rather than syntax. The obvious move was to lower and transcribe.
@@ -116,7 +116,7 @@ var messageUseMemoCallbackReassignsOuterVariable = rule.Message{
 // field as `BindingKind GlobalBindingKind` with five variants, and **lowering never sets it to
 // anything but `GlobalBindingKindGlobal`**. Probed directly: `import {useMemo} from 'react'` and a
 // bare undeclared `useMemo` both lower to `LoadGlobal name="useMemo" bindingKind=0 source="" imported=""`,
-// which is indistinguishable. `internal/utils/hir/lower.go:61` says so in its own words, and adds
+// which is indistinguishable. `internal/utilities/hir/lower.go:61` says so in its own words, and adds
 // that `FunctionExpression.Captures` is always empty and that this "is the largest single gap and it
 // matters most to the memoization rules". This is one of those rules.
 //

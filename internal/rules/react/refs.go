@@ -6,7 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/hir"
+	"github.com/system-inc/verify/internal/utilities/high_level_intermediate_representation"
 )
 
 // Refs flags reading or writing a ref's `current` property during render.
@@ -66,11 +66,11 @@ import (
 // Upstream is `for iteration in 0..10` over the whole function, with one `changed` flag on a
 // per-identifier map, and it emits a non-convergence diagnostic if still moving at ten. That is
 // chaotic iteration keyed by identifier, not a per-block entry/exit lattice, so neither
-// `controlflow.Solve` nor a dominator tree is the right instrument even in principle.
+// `control_flow_graph.Solve` nor a dominator tree is the right instrument even in principle.
 //
-// It is also worth recording that `controlflow.Solve[V,E]` is mechanically unreachable from this
-// representation regardless of fit: `controlflow.Block`'s `index`, `final` and `thrown` fields are
-// unexported and set only by `controlflow.Build`, so a caller holding a `hir.Function` cannot
+// It is also worth recording that `control_flow_graph.Solve[V,E]` is mechanically unreachable from this
+// representation regardless of fit: `control_flow_graph.Block`'s `index`, `final` and `thrown` fields are
+// unexported and set only by `control_flow_graph.Build`, so a caller holding a `high_level_intermediate_representation.Function` cannot
 // construct one. `ssa.go` and `postdominator.go` both already record this in their headers. Three
 // rules shipped on this representation have now read that machinery and deliberately used none of
 // it, so the bar for reaching for it is high and this rule does not clear it.
@@ -125,7 +125,7 @@ import (
 // alone would have produced the wrong rule here in both directions; every row above is a
 // measurement, and rows 3 and 5 are reproduced as silence deliberately.
 //
-// This rule keys the name test on `hir.Identifier.Name`, which is the binding name for a named
+// This rule keys the name test on `high_level_intermediate_representation.Identifier.Name`, which is the binding name for a named
 // value and empty for a temporary, giving the same partition without re-deriving it.
 //
 // # `Ref` alone does not match, and that is upstream's text rather than an oversight
@@ -173,7 +173,7 @@ var Refs = rule.Rule{
 					return
 				}
 				refsForEachCompiledFunction(node, func(functionNode *ast.Node) {
-					lowered := hir.ForFunction(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
 					if lowered == nil {
 						return
 					}
@@ -210,7 +210,7 @@ func refsForEachCompiledFunction(root *ast.Node, visit func(*ast.Node)) {
 // like a component or a hook AND its body actually creates JSX or calls a hook. A function that is
 // not a unit is walked past into the functions it contains, because one of those may be a unit even
 // when its wrapper is not.
-func refsAnalyzeCompilationUnit(ctx rule.Context, function *hir.Function) {
+func refsAnalyzeCompilationUnit(ctx rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
@@ -229,7 +229,7 @@ func refsAnalyzeCompilationUnit(ctx rule.Context, function *hir.Function) {
 // refsIsCompilationUnit reports whether upstream would compile this function.
 //
 // Both halves of `getReactFunctionType` are required and the name alone is not enough. The name
-// half is taken from `hir.Function.Kind` rather than recomputed, so this rule and the
+// half is taken from `high_level_intermediate_representation.Function.Kind` rather than recomputed, so this rule and the
 // representation cannot drift about what a component name is. The body half asks whether the
 // function creates JSX or calls a hook.
 //
@@ -239,8 +239,8 @@ func refsAnalyzeCompilationUnit(ctx rule.Context, function *hir.Function) {
 // component with no JSX is a real subject: `function useHook({value}) { const ref = useRef(null);
 // ref.current = value; return ref; }` is the shipped fixture
 // `error.invalid-write-but-dont-read-ref-in-render` and it contains no JSX at all.
-func refsIsCompilationUnit(function *hir.Function) bool {
-	if function == nil || function.Kind == hir.FunctionKindOther {
+func refsIsCompilationUnit(function *high_level_intermediate_representation.Function) bool {
+	if function == nil || function.Kind == high_level_intermediate_representation.FunctionKindOther {
 		return false
 	}
 	return refsCreatesJsxOrCallsHook(function)
@@ -250,7 +250,7 @@ func refsIsCompilationUnit(function *hir.Function) bool {
 //
 // The non-descent is the point rather than an optimization: a component whose body is only a
 // callback returning JSX is not itself a component to upstream.
-func refsCreatesJsxOrCallsHook(function *hir.Function) bool {
+func refsCreatesJsxOrCallsHook(function *high_level_intermediate_representation.Function) bool {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := refsInstructionAt(function, instructionId)
@@ -258,9 +258,9 @@ func refsCreatesJsxOrCallsHook(function *hir.Function) bool {
 				continue
 			}
 			switch value := instruction.Value.(type) {
-			case *hir.JsxExpression, *hir.JsxFragment:
+			case *high_level_intermediate_representation.JsxExpression, *high_level_intermediate_representation.JsxFragment:
 				return true
-			case *hir.LoadGlobal:
+			case *high_level_intermediate_representation.LoadGlobal:
 				if refsIsHookName(value.Name) {
 					return true
 				}
@@ -276,7 +276,7 @@ func refsCreatesJsxOrCallsHook(function *hir.Function) bool {
 			// in that file is spelled through the namespace. `unsupported_syntax.go`'s
 			// `isCompilerHookCallee` already accepts both spellings, which is what makes this a gap
 			// rather than a decision.
-			case *hir.MethodCall:
+			case *high_level_intermediate_representation.MethodCall:
 				if refsIsHookName(refsPrimitiveStringAt(function, value.Property)) {
 					return true
 				}
@@ -291,12 +291,12 @@ func refsCreatesJsxOrCallsHook(function *hir.Function) bool {
 // A namespaced call lowers its property to a `Primitive` rather than keeping it as syntax, so
 // `React.useRef` arrives as a `MethodCall` whose `Property` place is defined by `Primitive{useRef}`.
 // Empty for anything else, which reads as "not a hook name" at the one call site.
-func refsPrimitiveStringAt(function *hir.Function, place hir.Place) string {
+func refsPrimitiveStringAt(function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) string {
 	for _, instruction := range function.Instructions {
 		if instruction == nil || instruction.LValue.Identifier != place.Identifier {
 			continue
 		}
-		if primitive, isPrimitive := instruction.Value.(*hir.Primitive); isPrimitive {
+		if primitive, isPrimitive := instruction.Value.(*high_level_intermediate_representation.Primitive); isPrimitive {
 			if text, isText := primitive.Value.(string); isText {
 				return text
 			}
@@ -320,7 +320,7 @@ func refsIsHookName(name string) bool {
 }
 
 // refsInstructionAt returns one instruction by id, or nil when the id is out of range.
-func refsInstructionAt(function *hir.Function, id hir.InstructionId) *hir.Instruction {
+func refsInstructionAt(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.InstructionId) *high_level_intermediate_representation.Instruction {
 	if function == nil || int(id) >= len(function.Instructions) {
 		return nil
 	}
@@ -329,10 +329,10 @@ func refsInstructionAt(function *hir.Function, id hir.InstructionId) *hir.Instru
 
 // refsIdentifierNode returns the syntax a value came from, or nil for a pure temporary.
 //
-// This is the seam `hir.Identifier.Node` documents itself as existing for: the node goes to the
+// This is the seam `high_level_intermediate_representation.Identifier.Node` documents itself as existing for: the node goes to the
 // checker rather than to a local inference pass. Reporting through it rather than through a Place's
 // range matters because a Place's range is the range of the node that produced the INSTRUCTION.
-func refsIdentifierNode(function *hir.Function, id hir.IdentifierId) *ast.Node {
+func refsIdentifierNode(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -344,7 +344,7 @@ func refsIdentifierNode(function *hir.Function, id hir.IdentifierId) *ast.Node {
 }
 
 // refsIdentifierName returns a value's source binding name, empty for a temporary.
-func refsIdentifierName(function *hir.Function, id hir.IdentifierId) string {
+func refsIdentifierName(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) string {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return ""
 	}
@@ -384,7 +384,7 @@ func refsIsRefLikeName(name string) bool {
 // The symbol is compared positively rather than checked for non-nil. The shim is a hand-mirrored
 // struct read through `unsafe.Pointer` and has returned a silently wrong type before, so asserting
 // that what came back is what was asked for is the only check that can see that class of failure.
-func refsIsUseRefType(ctx rule.Context, function *hir.Function, id hir.IdentifierId) bool {
+func refsIsUseRefType(ctx rule.Context, function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) bool {
 	if ctx.TypeChecker == nil {
 		return false
 	}
@@ -402,7 +402,7 @@ func refsIsUseRefType(ctx rule.Context, function *hir.Function, id hir.Identifie
 	// `RefCallback` is a TYPE ALIAS, so it lands on the alias and its symbol is an anonymous
 	// function type. A predicate reading only one field answers false for the other, which is the
 	// same asymmetry `set_state_in_render.go` documents from the opposite side, and
-	// `internal/utils/typecheck/specifier.go:39` already does this alias-then-symbol fallback for
+	// `internal/utilities/typecheck/specifier.go:39` already does this alias-then-symbol fallback for
 	// exactly this reason. Probed on our own checker rather than inferred.
 	if alias := shimchecker.Type_alias(valueType); alias != nil {
 		if aliasSymbol := alias.Symbol(); aliasSymbol != nil && aliasSymbol.Name == "RefCallback" {
@@ -451,7 +451,7 @@ const (
 // refsAccessType is one lattice element.
 //
 // Flattened into a single struct with a kind tag rather than an interface hierarchy, because unlike
-// `hir.InstructionValue` this set is small, closed to this file, and every consumer switches on the
+// `high_level_intermediate_representation.InstructionValue` this set is small, closed to this file, and every consumer switches on the
 // kind anyway. The fields that are meaningful depend on Kind and the equality below is what keeps
 // that honest.
 type refsAccessType struct {
@@ -467,9 +467,9 @@ type refsAccessType struct {
 
 	// Span is where the ref value was accessed, carried so a finding can point at the access rather
 	// than at the operand that happened to reach the check.
-	Span       hir.IdentifierId
+	Span       high_level_intermediate_representation.IdentifierId
 	HasSpan    bool
-	RefSpan    hir.IdentifierId
+	RefSpan    high_level_intermediate_representation.IdentifierId
 	HasRefSpan bool
 
 	// Value is what a structure carries inside it, nil when it carries nothing.
@@ -485,7 +485,7 @@ type refsFunctionType struct {
 	// during render commits that finding at the CALL site rather than inside the function.
 	ReadRefEffect bool
 	// RefAccessSpan is where inside the function the ref was touched.
-	RefAccessSpan    hir.IdentifierId
+	RefAccessSpan    high_level_intermediate_representation.IdentifierId
 	HasRefAccessSpan bool
 	// ReturnType is what the function yields.
 	ReturnType *refsAccessType
@@ -673,7 +673,7 @@ func refsDestructure(t *refsAccessType) *refsAccessType {
 // Registered on the fallthrough of an `if` whose test is a guard, and CONSUMED by the first write
 // it authorizes, which is what makes a second write under one guard still report.
 type refsSafeBlock struct {
-	Block hir.BlockId
+	Block high_level_intermediate_representation.BlockId
 	RefId int
 }
 
@@ -702,7 +702,7 @@ const (
 type refsFinding struct {
 	Kind refsFindingKind
 	// Value is the identifier to point the finding at.
-	Value    hir.IdentifierId
+	Value    high_level_intermediate_representation.IdentifierId
 	HasValue bool
 	// Node overrides where the finding points when the value alone would point at the wrong syntax.
 	//
@@ -721,8 +721,8 @@ type refsFinding struct {
 // head without the lattice map carrying an entry per link.
 type refsEnvironment struct {
 	changed     bool
-	data        map[hir.IdentifierId]*refsAccessType
-	temporaries map[hir.IdentifierId]hir.IdentifierId
+	data        map[high_level_intermediate_representation.IdentifierId]*refsAccessType
+	temporaries map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId
 	// names carries a source binding name onto the temporary that loaded it.
 	//
 	// Populated ONLY from LoadLocal, which is upstream's `set_name` and is called from exactly one
@@ -731,29 +731,29 @@ type refsEnvironment struct {
 	// load's result never receives a name, so the name test finds nothing to match on the outer
 	// access. Propagating names through property loads as well would look more thorough and would
 	// disagree with React on real code, measured on the executable in both directions.
-	names map[hir.IdentifierId]string
+	names map[high_level_intermediate_representation.IdentifierId]string
 	// propertyNames is the property a load read, keyed by the value it produced. Consulted only by
 	// the exact `props.ref` shape; see setPropertyName's call site.
-	propertyNames map[hir.IdentifierId]string
+	propertyNames map[high_level_intermediate_representation.IdentifierId]string
 	// declarations and byDeclaration recover a value whose single-assignment numbering did not
 	// unify. See `get`.
 	// accessNodes is the member-expression node a ref VALUE came from, so a finding underlines the
 	// whole access rather than only the object identifier.
-	accessNodes   map[hir.IdentifierId]*ast.Node
-	declarations  map[hir.IdentifierId]hir.DeclarationId
-	byDeclaration map[hir.DeclarationId]*refsAccessType
+	accessNodes   map[high_level_intermediate_representation.IdentifierId]*ast.Node
+	declarations  map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.DeclarationId
+	byDeclaration map[high_level_intermediate_representation.DeclarationId]*refsAccessType
 	refIdSeed     int
 }
 
 func newRefsEnvironment() *refsEnvironment {
 	return &refsEnvironment{
-		data:          map[hir.IdentifierId]*refsAccessType{},
-		temporaries:   map[hir.IdentifierId]hir.IdentifierId{},
-		names:         map[hir.IdentifierId]string{},
-		propertyNames: map[hir.IdentifierId]string{},
-		accessNodes:   map[hir.IdentifierId]*ast.Node{},
-		declarations:  map[hir.IdentifierId]hir.DeclarationId{},
-		byDeclaration: map[hir.DeclarationId]*refsAccessType{},
+		data:          map[high_level_intermediate_representation.IdentifierId]*refsAccessType{},
+		temporaries:   map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId{},
+		names:         map[high_level_intermediate_representation.IdentifierId]string{},
+		propertyNames: map[high_level_intermediate_representation.IdentifierId]string{},
+		accessNodes:   map[high_level_intermediate_representation.IdentifierId]*ast.Node{},
+		declarations:  map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.DeclarationId{},
+		byDeclaration: map[high_level_intermediate_representation.DeclarationId]*refsAccessType{},
 	}
 }
 
@@ -765,14 +765,14 @@ func (env *refsEnvironment) nextRefId() int {
 }
 
 // operandId resolves an identifier through the temporaries side map.
-func (env *refsEnvironment) operandId(key hir.IdentifierId) hir.IdentifierId {
+func (env *refsEnvironment) operandId(key high_level_intermediate_representation.IdentifierId) high_level_intermediate_representation.IdentifierId {
 	if resolved, found := env.temporaries[key]; found {
 		return resolved
 	}
 	return key
 }
 
-func (env *refsEnvironment) define(key hir.IdentifierId, value hir.IdentifierId) {
+func (env *refsEnvironment) define(key high_level_intermediate_representation.IdentifierId, value high_level_intermediate_representation.IdentifierId) {
 	resolved := env.operandId(value)
 	env.temporaries[key] = resolved
 	// The access node travels with the value along an alias chain, so `const v = ref.current;`
@@ -785,7 +785,7 @@ func (env *refsEnvironment) define(key hir.IdentifierId, value hir.IdentifierId)
 }
 
 // carryAccessNode copies a recorded access node from one value to another.
-func (env *refsEnvironment) carryAccessNode(to hir.IdentifierId, from hir.IdentifierId) {
+func (env *refsEnvironment) carryAccessNode(to high_level_intermediate_representation.IdentifierId, from high_level_intermediate_representation.IdentifierId) {
 	if node, ok := env.accessNodes[env.operandId(from)]; ok {
 		env.accessNodes[to] = node
 		return
@@ -796,35 +796,35 @@ func (env *refsEnvironment) carryAccessNode(to hir.IdentifierId, from hir.Identi
 }
 
 // setName carries a source name onto a temporary, upstream's `set_name`.
-func (env *refsEnvironment) setName(function *hir.Function, target hir.IdentifierId, source hir.IdentifierId) {
+func (env *refsEnvironment) setName(function *high_level_intermediate_representation.Function, target high_level_intermediate_representation.IdentifierId, source high_level_intermediate_representation.IdentifierId) {
 	if name := refsIdentifierName(function, source); name != "" {
 		env.names[target] = name
 	}
 }
 
 // setName2 records a name directly onto a value, used for a global's own name.
-func (env *refsEnvironment) setName2(target hir.IdentifierId, name string) {
+func (env *refsEnvironment) setName2(target high_level_intermediate_representation.IdentifierId, name string) {
 	if name != "" {
 		env.names[target] = name
 	}
 }
 
 // setPropertyName records the property a load read, as the result's name in this position.
-func (env *refsEnvironment) setPropertyName(target hir.IdentifierId, property string) {
+func (env *refsEnvironment) setPropertyName(target high_level_intermediate_representation.IdentifierId, property string) {
 	if property != "" {
 		env.propertyNames[target] = property
 	}
 }
 
 // nameOf is the value's own binding name, or the one a LoadLocal carried onto it.
-func (env *refsEnvironment) nameOf(function *hir.Function, id hir.IdentifierId) string {
+func (env *refsEnvironment) nameOf(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) string {
 	if name := refsIdentifierName(function, id); name != "" {
 		return name
 	}
 	return env.names[id]
 }
 
-func (env *refsEnvironment) get(key hir.IdentifierId) *refsAccessType {
+func (env *refsEnvironment) get(key high_level_intermediate_representation.IdentifierId) *refsAccessType {
 	if found, ok := env.data[env.operandId(key)]; ok {
 		return found
 	}
@@ -839,12 +839,12 @@ func (env *refsEnvironment) get(key hir.IdentifierId) *refsAccessType {
 	//
 	// So the value is looked up by declaration when the identifier itself has no entry. That is
 	// sound here because a declaration groups exactly the values one source binding takes
-	// (`hir.Identifier.Declaration`), and it is conservative in the direction this rule wants: it
+	// (`high_level_intermediate_representation.Identifier.Declaration`), and it is conservative in the direction this rule wants: it
 	// can only find a ref that some other numbering of the same binding already proved.
 	//
 	// This is a workaround for a representation defect rather than a transcription of upstream,
 	// which has no such gap. It belongs in lowering; see the report.
-	for _, candidate := range [2]hir.IdentifierId{key, env.operandId(key)} {
+	for _, candidate := range [2]high_level_intermediate_representation.IdentifierId{key, env.operandId(key)} {
 		if declaration, ok := env.declarations[candidate]; ok {
 			if found, ok := env.byDeclaration[declaration]; ok {
 				return found
@@ -860,7 +860,7 @@ func (env *refsEnvironment) get(key hir.IdentifierId) *refsAccessType {
 // fixpoint's only termination signal. The comparison uses `refsTypeEqual`, which ignores minted ref
 // identity: reading that comparison as ordinary equality is the defect that would prevent
 // convergence.
-func (env *refsEnvironment) set(key hir.IdentifierId, value *refsAccessType) {
+func (env *refsEnvironment) set(key high_level_intermediate_representation.IdentifierId, value *refsAccessType) {
 	operandId := env.operandId(key)
 	current, hadCurrent := env.data[operandId]
 	widened := refsJoin(value, current, env.nextRefId)
@@ -887,7 +887,7 @@ func (env *refsEnvironment) set(key hir.IdentifierId, value *refsAccessType) {
 
 // noteDeclaration records which source binding a value belongs to, so `get` can recover a value
 // whose single-assignment numbering did not unify with the one that was written.
-func (env *refsEnvironment) noteDeclaration(function *hir.Function, id hir.IdentifierId) {
+func (env *refsEnvironment) noteDeclaration(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return
 	}
@@ -902,7 +902,7 @@ func (env *refsEnvironment) noteDeclaration(function *hir.Function, id hir.Ident
 // iterate the whole function in block order until the environment stops moving or ten rounds pass.
 // `Blocks` is in reverse postorder, which is what lets a single forward pass settle an acyclic
 // region in one round; a loop needs the second round, which is what the bound is for.
-func refsSweepFunction(ctx rule.Context, function *hir.Function) []refsFinding {
+func refsSweepFunction(ctx rule.Context, function *high_level_intermediate_representation.Function) []refsFinding {
 	env := newRefsEnvironment()
 	refsCollectTemporaries(ctx, function, env)
 
@@ -932,7 +932,7 @@ func refsSweepFunction(ctx rule.Context, function *hir.Function) []refsFinding {
 // that IS a ref is deliberately NOT aliased. That is what keeps `ref` and `ref.current` distinct,
 // which is the entire distinction between "you passed a ref somewhere" and "you read a ref's
 // value". Aliasing them would collapse two of the four diagnostics into one.
-func refsCollectTemporaries(ctx rule.Context, function *hir.Function, env *refsEnvironment) {
+func refsCollectTemporaries(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment) {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := refsInstructionAt(function, instructionId)
@@ -940,11 +940,11 @@ func refsCollectTemporaries(ctx rule.Context, function *hir.Function, env *refsE
 				continue
 			}
 			env.noteDeclaration(function, instruction.LValue.Identifier)
-			hir.EachInstructionPlace(instruction, func(place hir.Place, role hir.PlaceRole) {
+			high_level_intermediate_representation.EachInstructionPlace(instruction, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 				env.noteDeclaration(function, place.Identifier)
 			})
 			switch value := instruction.Value.(type) {
-			case *hir.LoadLocal:
+			case *high_level_intermediate_representation.LoadLocal:
 				env.setName(function, instruction.LValue.Identifier, value.Place.Identifier)
 				env.define(instruction.LValue.Identifier, value.Place.Identifier)
 			// There is deliberately NO LoadContext arm here, and it is worth saying why, because
@@ -960,17 +960,17 @@ func refsCollectTemporaries(ctx rule.Context, function *hir.Function, env *refsE
 			// `error.invalid-aliased-ref-in-callback-invoked-during-render-` silent. Two mechanisms
 			// covering one case is one mechanism plus a thing that will drift, so the redundant one
 			// is gone. Upstream has no LoadContext arm here either.
-			case *hir.StoreLocal:
+			case *high_level_intermediate_representation.StoreLocal:
 				env.define(instruction.LValue.Identifier, value.Value.Identifier)
 				env.define(value.LValue.Identifier, value.Value.Identifier)
-			case *hir.LoadGlobal:
+			case *high_level_intermediate_representation.LoadGlobal:
 				// A hook is called through a temporary that a LoadGlobal produced, so the callee's
 				// own Name is empty and a hook test keyed on it never fires. Recording the global's
 				// name here is what makes `useEffect(...)` recognizable as a hook call at all.
 				// Without it every hook call is scored as an ordinary function call and a ref passed
 				// to one reports spuriously, which was five of this corpus's residuals.
 				env.setName2(instruction.LValue.Identifier, value.Name)
-			case *hir.PropertyLoad:
+			case *high_level_intermediate_representation.PropertyLoad:
 				// The loaded PROPERTY names the result, which is what carries `props.ref` into the
 				// name test. Upstream reaches the same place by unifying a nested `Type::Property`,
 				// whose `object_name` is resolved when the outer `.current` unifies against it
@@ -1019,7 +1019,7 @@ func refsCollectTemporaries(ctx rule.Context, function *hir.Function, env *refsE
 // `props.ref.current` the object is `t11` with an empty name, and `t11` resolves through the
 // temporaries map to the value produced by the `ref` property load. `refsEnvironment.operandId` is
 // upstream's `Env::operand_id` and is the resolution that recovers it.
-func refsIsRefBinding(ctx rule.Context, function *hir.Function, env *refsEnvironment, id hir.IdentifierId) bool {
+func refsIsRefBinding(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, id high_level_intermediate_representation.IdentifierId) bool {
 	if refsIsUseRefType(ctx, function, id) {
 		return true
 	}
@@ -1048,7 +1048,7 @@ func refsIsRefBinding(ctx rule.Context, function *hir.Function, env *refsEnviron
 // Returns the findings this round produced. Findings are recomputed each round rather than
 // accumulated, because the same instruction is visited on every round and an accumulating list
 // would report each finding up to ten times.
-func refsRunOneRound(ctx rule.Context, function *hir.Function, env *refsEnvironment) []refsFinding {
+func refsRunOneRound(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment) []refsFinding {
 	var findings []refsFinding
 
 	// Parameters are seeded from their declared type. A parameter that is a ref by type or by name
@@ -1061,7 +1061,7 @@ func refsRunOneRound(ctx rule.Context, function *hir.Function, env *refsEnvironm
 	// `<div>{value}</div>` where value came out of a ref reports, but a function returning a ref is
 	// allowed to be rendered. Gathered once per round because a use can precede its definition
 	// across a back edge.
-	interpolatedAsJsx := map[hir.IdentifierId]bool{}
+	interpolatedAsJsx := map[high_level_intermediate_representation.IdentifierId]bool{}
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := refsInstructionAt(function, instructionId)
@@ -1069,11 +1069,11 @@ func refsRunOneRound(ctx rule.Context, function *hir.Function, env *refsEnvironm
 				continue
 			}
 			switch value := instruction.Value.(type) {
-			case *hir.JsxExpression:
+			case *high_level_intermediate_representation.JsxExpression:
 				for _, child := range value.Children {
 					interpolatedAsJsx[child.Identifier] = true
 				}
-			case *hir.JsxFragment:
+			case *high_level_intermediate_representation.JsxFragment:
 				for _, child := range value.Children {
 					interpolatedAsJsx[child.Identifier] = true
 				}
@@ -1122,7 +1122,7 @@ func refsRunOneRound(ctx rule.Context, function *hir.Function, env *refsEnvironm
 			// reports. Upstream walks `each_instruction_value_operand`, which is the value's
 			// operands and not the lvalue. Measured: with the lvalue included,
 			// `if (ref.current == null) { ref.current = 1; }` reports once and is clean upstream.
-			hir.EachPlace(instruction.Value, func(place hir.Place, role hir.PlaceRole) {
+			high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 				if current := env.get(place.Identifier); current != nil && current.Kind == refsGuard {
 					findings = append(findings, refsFinding{Kind: refsFindingValueAccess, Value: place.Identifier, HasValue: true})
 				}
@@ -1134,7 +1134,7 @@ func refsRunOneRound(ctx rule.Context, function *hir.Function, env *refsEnvironm
 			refsApplyDeclaredType(ctx, function, env, instruction.LValue.Identifier)
 		}
 
-		if branch, isIf := block.Terminal.(*hir.If); isIf {
+		if branch, isIf := block.Terminal.(*high_level_intermediate_representation.If); isIf {
 			if test := env.get(branch.Test.Identifier); test != nil && test.Kind == refsGuard && test.HasRefId {
 				alreadyRegistered := false
 				for _, safe := range safeBlocks {
@@ -1148,8 +1148,8 @@ func refsRunOneRound(ctx rule.Context, function *hir.Function, env *refsEnvironm
 			}
 		}
 
-		_, isReturn := block.Terminal.(*hir.Return)
-		hir.EachTerminalPlace(block.Terminal, func(place hir.Place, role hir.PlaceRole) {
+		_, isReturn := block.Terminal.(*high_level_intermediate_representation.Return)
+		high_level_intermediate_representation.EachTerminalPlace(block.Terminal, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 			if isReturn {
 				// Returning a ref object is allowed; returning a ref VALUE is not. That asymmetry is
 				// what makes `return ref;` clean in a hook while `return ref.current;` reports.
@@ -1167,7 +1167,7 @@ func refsRunOneRound(ctx rule.Context, function *hir.Function, env *refsEnvironm
 //
 // Consulted whenever the instruction switch has nothing better to say. A value the checker types as
 // `RefObject` enters as a ref; everything else enters as none.
-func refsSeedType(ctx rule.Context, function *hir.Function, id hir.IdentifierId, env *refsEnvironment) *refsAccessType {
+func refsSeedType(ctx rule.Context, function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId, env *refsEnvironment) *refsAccessType {
 	if refsIsRefBinding(ctx, function, env, id) {
 		return &refsAccessType{Kind: refsRef, RefId: env.nextRefId(), HasRefId: true}
 	}
@@ -1179,7 +1179,7 @@ func refsSeedType(ctx rule.Context, function *hir.Function, id hir.IdentifierId,
 // Upstream runs this after every instruction, so a ref reaching a value through a shape the switch
 // does not model is still recognized. Skipped when the value is already a ref, so the join does not
 // mint an id on every round and stall the fixpoint.
-func refsApplyDeclaredType(ctx rule.Context, function *hir.Function, env *refsEnvironment, id hir.IdentifierId) {
+func refsApplyDeclaredType(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, id high_level_intermediate_representation.IdentifierId) {
 	if !refsIsRefBinding(ctx, function, env, id) {
 		return
 	}
@@ -1206,7 +1206,7 @@ func refsApplyDeclaredType(ctx rule.Context, function *hir.Function, env *refsEn
 //
 // The looser of the two read checks. Used where a function carrying a ref is legitimately allowed
 // to be there, such as a return value or a JSX child.
-func refsCheckDirectValueAccess(env *refsEnvironment, id hir.IdentifierId, findings []refsFinding) []refsFinding {
+func refsCheckDirectValueAccess(env *refsEnvironment, id high_level_intermediate_representation.IdentifierId, findings []refsFinding) []refsFinding {
 	current := env.get(id)
 	if current == nil {
 		return findings
@@ -1218,7 +1218,7 @@ func refsCheckDirectValueAccess(env *refsEnvironment, id hir.IdentifierId, findi
 }
 
 // refsCheckValueAccess reports a bare ref value OR a function whose body reads one.
-func refsCheckValueAccess(env *refsEnvironment, id hir.IdentifierId, findings []refsFinding) []refsFinding {
+func refsCheckValueAccess(env *refsEnvironment, id high_level_intermediate_representation.IdentifierId, findings []refsFinding) []refsFinding {
 	current := env.get(id)
 	if current == nil {
 		return findings
@@ -1234,7 +1234,7 @@ func refsCheckValueAccess(env *refsEnvironment, id hir.IdentifierId, findings []
 }
 
 // refsCheckPassedToFunction reports handing a ref, or a ref-reading function, to a call.
-func refsCheckPassedToFunction(env *refsEnvironment, id hir.IdentifierId, findings []refsFinding) []refsFinding {
+func refsCheckPassedToFunction(env *refsEnvironment, id high_level_intermediate_representation.IdentifierId, findings []refsFinding) []refsFinding {
 	current := env.get(id)
 	if current == nil {
 		return findings
@@ -1250,7 +1250,7 @@ func refsCheckPassedToFunction(env *refsEnvironment, id hir.IdentifierId, findin
 }
 
 // refsCheckUpdate reports writing through a ref during render.
-func refsCheckUpdate(env *refsEnvironment, id hir.IdentifierId, node *ast.Node, findings []refsFinding) []refsFinding {
+func refsCheckUpdate(env *refsEnvironment, id high_level_intermediate_representation.IdentifierId, node *ast.Node, findings []refsFinding) []refsFinding {
 	current := env.get(id)
 	if current == nil {
 		return findings
@@ -1269,10 +1269,10 @@ func refsCheckUpdate(env *refsEnvironment, id hir.IdentifierId, node *ast.Node, 
 // not know about fails toward reporting rather than toward silence.
 func refsTransfer(
 	ctx rule.Context,
-	function *hir.Function,
+	function *high_level_intermediate_representation.Function,
 	env *refsEnvironment,
-	instruction *hir.Instruction,
-	interpolatedAsJsx map[hir.IdentifierId]bool,
+	instruction *high_level_intermediate_representation.Instruction,
+	interpolatedAsJsx map[high_level_intermediate_representation.IdentifierId]bool,
 	findings []refsFinding,
 	safeBlocks *[]refsSafeBlock,
 ) []refsFinding {
@@ -1281,33 +1281,33 @@ func refsTransfer(
 	switch value := instruction.Value.(type) {
 	// Rendering a ref value is a read. A function that merely CARRIES a ref may be rendered, which
 	// is why this is the direct check rather than the general one.
-	case *hir.JsxExpression, *hir.JsxFragment:
-		hir.EachPlace(instruction.Value, func(place hir.Place, role hir.PlaceRole) {
+	case *high_level_intermediate_representation.JsxExpression, *high_level_intermediate_representation.JsxFragment:
+		high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 			findings = refsCheckDirectValueAccess(env, place.Identifier, findings)
 		})
 
 	// Reading a property off a ref produces a ref VALUE, which is the element the whole rule is
 	// about. Reading a property off a structure yields what the structure carries.
-	case *hir.PropertyLoad:
+	case *high_level_intermediate_representation.PropertyLoad:
 		findings = refsPropertyLoadTransfer(ctx, function, env, instruction, value.Object.Identifier, target, findings)
 
-	case *hir.ComputedLoad:
+	case *high_level_intermediate_representation.ComputedLoad:
 		findings = refsCheckDirectValueAccess(env, value.Property.Identifier, findings)
 		findings = refsPropertyLoadTransfer(ctx, function, env, instruction, value.Object.Identifier, target, findings)
 
 	// A cast is a no-op at runtime and carries its operand's element through unchanged.
-	case *hir.TypeCastExpression:
+	case *high_level_intermediate_representation.TypeCastExpression:
 		env.set(target, refsCarryOrSeed(ctx, function, env, value.Value.Identifier, target))
 
-	case *hir.LoadLocal:
+	case *high_level_intermediate_representation.LoadLocal:
 		env.carryAccessNode(target, value.Place.Identifier)
 		env.set(target, refsCarryOrSeed(ctx, function, env, value.Place.Identifier, target))
 
-	case *hir.LoadContext:
+	case *high_level_intermediate_representation.LoadContext:
 		env.carryAccessNode(target, value.Place.Identifier)
 		env.set(target, refsCarryOrSeed(ctx, function, env, value.Place.Identifier, target))
 
-	case *hir.StoreLocal:
+	case *high_level_intermediate_representation.StoreLocal:
 		stored := refsCarryOrSeed(ctx, function, env, value.Value.Identifier, value.LValue.Identifier)
 		env.carryAccessNode(value.LValue.Identifier, value.Value.Identifier)
 		env.carryAccessNode(target, value.Value.Identifier)
@@ -1322,13 +1322,13 @@ func refsTransfer(
 			env.byDeclaration[declaration] = stored
 		}
 
-	case *hir.StoreContext:
+	case *high_level_intermediate_representation.StoreContext:
 		env.set(value.LValue.Identifier, refsCarryOrSeed(ctx, function, env, value.Value.Identifier, value.LValue.Identifier))
 		env.set(target, refsCarryOrSeed(ctx, function, env, value.Value.Identifier, target))
 
 	// Destructuring distributes what the source structure carries to every bound name, which is how
 	// `const {current} = ref` reaches the same verdict as `ref.current`.
-	case *hir.Destructure:
+	case *high_level_intermediate_representation.Destructure:
 		var carried *refsAccessType
 		if source := env.get(value.Value.Identifier); source != nil && source.Kind == refsStructure && source.Value != nil {
 			carried = source.Value
@@ -1337,18 +1337,18 @@ func refsTransfer(
 			carried = refsSeedType(ctx, function, target, env)
 		}
 		env.set(target, carried)
-		hir.EachPlace(instruction.Value, func(place hir.Place, role hir.PlaceRole) {
-			if role == hir.PlaceRoleDefine {
+		high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
+			if role == high_level_intermediate_representation.PlaceRoleDefine {
 				env.set(place.Identifier, carried)
 			}
 		})
 
 	// A nested function is analysed as an inner subject and its verdict is recorded ON THE VALUE.
 	// A ref touched inside it does not report there; it reports where the function is CALLED.
-	case *hir.FunctionExpression:
+	case *high_level_intermediate_representation.FunctionExpression:
 		findings = refsNestedFunctionTransfer(ctx, function, env, instruction, value, target, findings)
 
-	case *hir.CallExpression:
+	case *high_level_intermediate_representation.CallExpression:
 		findings = refsCallTransfer(ctx, function, env, instruction, value.Callee.Identifier, interpolatedAsJsx, findings)
 
 	// A method call keeps its receiver, so `object.foo()` arrives here rather than as a property
@@ -1360,7 +1360,7 @@ func refsTransfer(
 	// ordinary call with a ref-carrying argument, which reports the wrong one of the four
 	// diagnostics. Two corpus fixtures are this shape and both said `refPassedToFunction` where
 	// upstream says `functionAccessesRef`.
-	case *hir.MethodCall:
+	case *high_level_intermediate_representation.MethodCall:
 		// `React.useEffect(...)` is a METHOD call, so the hook's name is the property rather than a
 		// binding, and the hook test cannot see it without this. Recording it is what makes the
 		// namespaced spelling behave like the bare import.
@@ -1381,9 +1381,9 @@ func refsTransfer(
 
 	// An aggregate becomes a structure carrying the join of what its elements carry, so a ref put
 	// into an object is still findable through the object.
-	case *hir.ObjectExpression, *hir.ArrayExpression:
+	case *high_level_intermediate_representation.ObjectExpression, *high_level_intermediate_representation.ArrayExpression:
 		var elementTypes []*refsAccessType
-		hir.EachPlace(instruction.Value, func(place hir.Place, role hir.PlaceRole) {
+		high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 			// An aggregate feeding a call whose RESULT is a ref is the mergeRefs shape, and
 			// collecting refs into a list is the entire point of it. Upstream reaches the same
 			// silence through the aliasing effects of the call rather than at the aggregate, so the
@@ -1418,34 +1418,34 @@ func refsTransfer(
 			env.set(target, &refsAccessType{Kind: refsStructure, Value: joined})
 		}
 
-	case *hir.PropertyStore:
+	case *high_level_intermediate_representation.PropertyStore:
 		findings = refsStoreTransfer(env, instruction, value.Object.Identifier, &value.Value, nil, findings, safeBlocks)
 
-	case *hir.ComputedStore:
+	case *high_level_intermediate_representation.ComputedStore:
 		findings = refsStoreTransfer(env, instruction, value.Object.Identifier, &value.Value, &value.Property, findings, safeBlocks)
 
-	case *hir.PropertyDelete:
+	case *high_level_intermediate_representation.PropertyDelete:
 		findings = refsCheckUpdate(env, value.Object.Identifier, instruction.Node, findings)
 
-	case *hir.ComputedDelete:
+	case *high_level_intermediate_representation.ComputedDelete:
 		findings = refsCheckUpdate(env, value.Object.Identifier, instruction.Node, findings)
 		findings = refsCheckValueAccess(env, value.Property.Identifier, findings)
 
 	// `undefined` and `null` are nullable, which is only interesting because a comparison against
 	// one of them is what turns a ref value into a guard.
-	case *hir.LoadGlobal:
+	case *high_level_intermediate_representation.LoadGlobal:
 		if value.Name == "undefined" {
 			env.set(target, &refsAccessType{Kind: refsNullable})
 		}
 
-	case *hir.Primitive:
+	case *high_level_intermediate_representation.Primitive:
 		if value.Value == nil {
 			env.set(target, &refsAccessType{Kind: refsNullable})
 		}
 
 	// `!ref.current` is both a read AND a guard: it reports, and it marks the result so the write it
 	// authorizes does not report a second time on the same line.
-	case *hir.UnaryExpression:
+	case *high_level_intermediate_representation.UnaryExpression:
 		if value.Operator == "!" {
 			if operand := env.get(value.Value.Identifier); operand != nil && operand.Kind == refsRefValue && operand.HasRefId {
 				env.set(target, &refsAccessType{Kind: refsGuard, RefId: operand.RefId, HasRefId: true})
@@ -1457,15 +1457,15 @@ func refsTransfer(
 
 	// Comparing a ref value against null produces a guard rather than a finding. Comparing it
 	// against anything else is an ordinary read and reports.
-	case *hir.BinaryExpression:
+	case *high_level_intermediate_representation.BinaryExpression:
 		findings = refsBinaryTransfer(env, instruction, value, target, findings)
 
-	case *hir.StartMemoize, *hir.FinishMemoize:
+	case *high_level_intermediate_representation.StartMemoize, *high_level_intermediate_representation.FinishMemoize:
 		// Markers. Nothing to do, and named explicitly so they do not fall into the default arm's
 		// operand check, which would report a memoized ref.
 
 	default:
-		hir.EachPlace(instruction.Value, func(place hir.Place, role hir.PlaceRole) {
+		high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 			findings = refsCheckValueAccess(env, place.Identifier, findings)
 		})
 	}
@@ -1477,7 +1477,7 @@ func refsTransfer(
 //
 // `refsIsRefBinding` reaches the checker through `Identifier.Node`, which a call's temporary lvalue
 // does not have. This asks the same question of the call expression instead.
-func refsCallResultIsRef(ctx rule.Context, instruction *hir.Instruction) bool {
+func refsCallResultIsRef(ctx rule.Context, instruction *high_level_intermediate_representation.Instruction) bool {
 	if ctx.TypeChecker == nil || instruction == nil || instruction.Node == nil {
 		return false
 	}
@@ -1531,7 +1531,7 @@ func refsCallResultIsRef(ctx rule.Context, instruction *hir.Instruction) bool {
 //
 // The state hooks are deliberately NOT exempt here, for the same reason they are not at the call:
 // `useState`, `useReducer` and `useMemo` run what they are given during render.
-func refsAggregateIsExempt(ctx rule.Context, function *hir.Function, env *refsEnvironment, instruction *hir.Instruction) bool {
+func refsAggregateIsExempt(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, instruction *high_level_intermediate_representation.Instruction) bool {
 	aggregate := instruction.LValue.Identifier
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
@@ -1539,11 +1539,11 @@ func refsAggregateIsExempt(ctx rule.Context, function *hir.Function, env *refsEn
 			if candidate == nil || candidate.Id <= instruction.Id {
 				continue
 			}
-			var args []hir.Argument
+			var args []high_level_intermediate_representation.Argument
 			switch call := candidate.Value.(type) {
-			case *hir.CallExpression:
+			case *high_level_intermediate_representation.CallExpression:
 				args = call.Args
-			case *hir.MethodCall:
+			case *high_level_intermediate_representation.MethodCall:
 				args = call.Args
 			default:
 				continue
@@ -1558,9 +1558,9 @@ func refsAggregateIsExempt(ctx rule.Context, function *hir.Function, env *refsEn
 				}
 				calleeName := ""
 				switch call := candidate.Value.(type) {
-				case *hir.CallExpression:
+				case *high_level_intermediate_representation.CallExpression:
 					calleeName = env.nameOf(function, call.Callee.Identifier)
-				case *hir.MethodCall:
+				case *high_level_intermediate_representation.MethodCall:
 					calleeName = refsMethodName(function, candidate)
 				}
 				if refsIsHookName(calleeName) && calleeName != "useState" &&
@@ -1574,7 +1574,7 @@ func refsAggregateIsExempt(ctx rule.Context, function *hir.Function, env *refsEn
 }
 
 // refsCarryOrSeed passes an operand's element through, falling back to its declared type.
-func refsCarryOrSeed(ctx rule.Context, function *hir.Function, env *refsEnvironment, from hir.IdentifierId, to hir.IdentifierId) *refsAccessType {
+func refsCarryOrSeed(ctx rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, from high_level_intermediate_representation.IdentifierId, to high_level_intermediate_representation.IdentifierId) *refsAccessType {
 	if current := env.get(from); current != nil {
 		return current
 	}
@@ -1587,11 +1587,11 @@ func refsCarryOrSeed(ctx rule.Context, function *hir.Function, env *refsEnvironm
 // the structure carries. Otherwise it falls back to the declared type.
 func refsPropertyLoadTransfer(
 	ctx rule.Context,
-	function *hir.Function,
+	function *high_level_intermediate_representation.Function,
 	env *refsEnvironment,
-	instruction *hir.Instruction,
-	object hir.IdentifierId,
-	target hir.IdentifierId,
+	instruction *high_level_intermediate_representation.Instruction,
+	object high_level_intermediate_representation.IdentifierId,
+	target high_level_intermediate_representation.IdentifierId,
 	findings []refsFinding,
 ) []refsFinding {
 	objectType := env.get(object)
@@ -1635,11 +1635,11 @@ func refsPropertyLoadTransfer(
 // choice and is what lets a captured ref be visible inside the nested function at all.
 func refsNestedFunctionTransfer(
 	ctx rule.Context,
-	function *hir.Function,
+	function *high_level_intermediate_representation.Function,
 	env *refsEnvironment,
-	instruction *hir.Instruction,
-	value *hir.FunctionExpression,
-	target hir.IdentifierId,
+	instruction *high_level_intermediate_representation.Instruction,
+	value *high_level_intermediate_representation.FunctionExpression,
+	target high_level_intermediate_representation.IdentifierId,
 	findings []refsFinding,
 ) []refsFinding {
 	inner := refsNestedFunction(function, value.Function)
@@ -1727,9 +1727,9 @@ func refsNestedFunctionTransfer(
 // This is a gap in lowering rather than in this rule, and it is worked around here rather than
 // repaired there because a change to `Returns` would move every pass built on this representation
 // at once. It deserves a fix upstream of this file; see the report.
-func refsReturnedValue(function *hir.Function) hir.IdentifierId {
+func refsReturnedValue(function *high_level_intermediate_representation.Function) high_level_intermediate_representation.IdentifierId {
 	for _, block := range function.Blocks {
-		if terminal, isReturn := block.Terminal.(*hir.Return); isReturn {
+		if terminal, isReturn := block.Terminal.(*high_level_intermediate_representation.Return); isReturn {
 			return terminal.Value.Identifier
 		}
 	}
@@ -1740,7 +1740,7 @@ func refsReturnedValue(function *hir.Function) hir.IdentifierId {
 //
 // The representation gives a method call its receiver and a Place for the property, but the
 // property's NAME lives on the syntax rather than on the value, so it is read back from the node.
-func refsMethodName(function *hir.Function, instruction *hir.Instruction) string {
+func refsMethodName(function *high_level_intermediate_representation.Function, instruction *high_level_intermediate_representation.Instruction) string {
 	if instruction == nil || instruction.Node == nil {
 		return ""
 	}
@@ -1761,7 +1761,7 @@ func refsMethodName(function *hir.Function, instruction *hir.Instruction) string
 }
 
 // refsNestedFunction resolves a function id within its parent.
-func refsNestedFunction(function *hir.Function, id hir.FunctionId) *hir.Function {
+func refsNestedFunction(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.FunctionId) *high_level_intermediate_representation.Function {
 	if function == nil || int(id) >= len(function.Functions) {
 		return nil
 	}
@@ -1779,11 +1779,11 @@ func refsNestedFunction(function *hir.Function, id hir.FunctionId) *hir.Function
 // render and so genuinely would read the ref then.
 func refsCallTransfer(
 	ctx rule.Context,
-	function *hir.Function,
+	function *high_level_intermediate_representation.Function,
 	env *refsEnvironment,
-	instruction *hir.Instruction,
-	callee hir.IdentifierId,
-	interpolatedAsJsx map[hir.IdentifierId]bool,
+	instruction *high_level_intermediate_representation.Instruction,
+	callee high_level_intermediate_representation.IdentifierId,
+	interpolatedAsJsx map[high_level_intermediate_representation.IdentifierId]bool,
 	findings []refsFinding,
 ) []refsFinding {
 	target := instruction.LValue.Identifier
@@ -1829,17 +1829,17 @@ func refsCallTransfer(
 		// Producing a ref (the `mergeRefs` shape) or calling a hook: only a bare ref VALUE in the
 		// arguments is a problem, because the ref object itself is what these legitimately take.
 		case isRefResult || (isHook && !isStateHook):
-			hir.EachPlace(instruction.Value, func(place hir.Place, role hir.PlaceRole) {
+			high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 				findings = refsCheckDirectValueAccess(env, place.Identifier, findings)
 			})
 		// The result is rendered, so a function carrying a ref is acceptable but a ref value is not.
 		case interpolatedAsJsx[target]:
-			hir.EachPlace(instruction.Value, func(place hir.Place, role hir.PlaceRole) {
+			high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 				findings = refsCheckValueAccess(env, place.Identifier, findings)
 			})
 		// An ordinary call: passing a ref to it may read the ref during render.
 		default:
-			hir.EachPlace(instruction.Value, func(place hir.Place, role hir.PlaceRole) {
+			high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 				if place.Identifier == callee {
 					return
 				}
@@ -1860,10 +1860,10 @@ func refsCallTransfer(
 // `ref-initialization-linear`, which writes twice under one guard, reports exactly once.
 func refsStoreTransfer(
 	env *refsEnvironment,
-	instruction *hir.Instruction,
-	object hir.IdentifierId,
-	stored *hir.Place,
-	computedKey *hir.Place,
+	instruction *high_level_intermediate_representation.Instruction,
+	object high_level_intermediate_representation.IdentifierId,
+	stored *high_level_intermediate_representation.Place,
+	computedKey *high_level_intermediate_representation.Place,
 	findings []refsFinding,
 	safeBlocks *[]refsSafeBlock,
 ) []refsFinding {
@@ -1905,9 +1905,9 @@ func refsStoreTransfer(
 // ordinary read and reports.
 func refsBinaryTransfer(
 	env *refsEnvironment,
-	instruction *hir.Instruction,
-	value *hir.BinaryExpression,
-	target hir.IdentifierId,
+	instruction *high_level_intermediate_representation.Instruction,
+	value *high_level_intermediate_representation.BinaryExpression,
+	target high_level_intermediate_representation.IdentifierId,
 	findings []refsFinding,
 ) []refsFinding {
 	leftType := env.get(value.Left.Identifier)
@@ -1997,7 +1997,7 @@ func refsMessageFor(kind refsFindingKind) rule.Message {
 // node that produced the INSTRUCTION, and reporting through the node routes via `rule.TokenRange`,
 // which trims leading trivia at the harness. A finding whose value is a pure temporary with no
 // syntactic source falls back to the function's own node rather than being dropped.
-func refsReport(ctx rule.Context, function *hir.Function, finding refsFinding) {
+func refsReport(ctx rule.Context, function *high_level_intermediate_representation.Function, finding refsFinding) {
 	message := refsMessageFor(finding.Kind)
 	if finding.Node != nil {
 		ctx.ReportNode(finding.Node, message)

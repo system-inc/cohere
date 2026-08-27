@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // willUpdateSetStateFile is where the fixtures pretend to live.
@@ -134,9 +134,9 @@ func TestNoWillUpdateSetStateFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoWillUpdateSetState, willUpdateSetStateFile,
+			result := rule_testing.RunWithOptions(t, NoWillUpdateSetState, willUpdateSetStateFile,
 				testCase.sourceText, NoWillUpdateSetStateOptions{Mode: testCase.option})
-			ruletest.ExpectFindings(t, result, "noSetStateInComponentWillUpdate")
+			rule_testing.ExpectFindings(t, result, "noSetStateInComponentWillUpdate")
 		})
 	}
 }
@@ -238,9 +238,9 @@ func TestNoWillUpdateSetStateStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoWillUpdateSetState, willUpdateSetStateFile,
+			result := rule_testing.RunWithOptions(t, NoWillUpdateSetState, willUpdateSetStateFile,
 				testCase.sourceText, NoWillUpdateSetStateOptions{Mode: testCase.option})
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -277,7 +277,7 @@ func TestNoWillUpdateSetStateReportsAtTheCallee(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoWillUpdateSetState, willUpdateSetStateFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoWillUpdateSetState, willUpdateSetStateFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
@@ -300,7 +300,7 @@ func TestNoWillUpdateSetStateReportsAtTheCallee(t *testing.T) {
 
 // An unconfigured rule gets the permissive default, and the option is what changes that answer.
 //
-// `ruletest.Run` hands the rule a nil options value rather than a zero-valued struct, so a rule
+// `rule_testing.Run` hands the rule a nil options value rather than a zero-valued struct, so a rule
 // reading its options with an unchecked type assertion panics on every real file while every
 // fixture using `RunWithOptions` stays green. This asserts the plain harness works, which is the
 // shape the linter actually runs in for a rule configured with a bare severity.
@@ -308,19 +308,19 @@ func TestNoWillUpdateSetStateDefaultsToAllowingNestedFunctions(t *testing.T) {
 	const callbackSource = "class Hello extends React.Component {\n" +
 		"  componentWillUpdate() { on(function() { this.setState({}); }); }\n}\n"
 
-	ruletest.ExpectClean(t, ruletest.Run(t, NoWillUpdateSetState, willUpdateSetStateFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoWillUpdateSetState, willUpdateSetStateFile,
 		callbackSource))
 
-	ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, NoWillUpdateSetState,
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoWillUpdateSetState,
 		willUpdateSetStateFile, callbackSource,
 		NoWillUpdateSetStateOptions{Mode: "disallow-in-func"}),
 		"noSetStateInComponentWillUpdate")
 
 	// An unrecognized value reads as the default rather than as a second disallowing mode. Neither
 	// upstream has to decide this, because ESLint's schema rejects an unlisted string before the
-	// rule runs and oxc's serde fails the config. The permissive reading is the one that cannot
+	// rule runs and oxc's serde fails the configuration. The permissive reading is the one that cannot
 	// start reporting on a typo in somebody's settings file.
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoWillUpdateSetState,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoWillUpdateSetState,
 		willUpdateSetStateFile, callbackSource,
 		NoWillUpdateSetStateOptions{Mode: "disallow_in_func"}))
 }
@@ -332,9 +332,9 @@ func TestNoWillUpdateSetStateDefaultsToAllowingNestedFunctions(t *testing.T) {
 // `ExpectFindings` takes one id per finding and the table asserts exactly one. Measured on the
 // release binary, which prints two diagnostics for this source at two different columns.
 func TestNoWillUpdateSetStateReportsEachCallSite(t *testing.T) {
-	result := ruletest.Run(t, NoWillUpdateSetState, willUpdateSetStateFile,
+	result := rule_testing.Run(t, NoWillUpdateSetState, willUpdateSetStateFile,
 		"class Hello extends React.Component {\n"+
 			"  componentWillUpdate() { this.setState({}); this.setState({}); }\n}\n")
-	ruletest.ExpectFindings(t, result, "noSetStateInComponentWillUpdate",
+	rule_testing.ExpectFindings(t, result, "noSetStateInComponentWillUpdate",
 		"noSetStateInComponentWillUpdate")
 }

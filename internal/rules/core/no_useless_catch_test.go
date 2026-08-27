@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestNoUselessCatchReportsBareRethrows(t *testing.T) {
@@ -23,8 +23,8 @@ func TestNoUselessCatchReportsBareRethrows(t *testing.T) {
 		{"nested inside another try", `try { try { foo(); } catch (err) { throw err; } } catch (outer) { log(outer); }`, "unnecessaryCatch"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUselessCatch, "file.ts", testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.wantId)
+			result := rule_testing.Run(t, NoUselessCatch, "file.ts", testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
 	}
 }
@@ -50,7 +50,7 @@ func TestNoUselessCatchAcceptsClausesThatDoWork(t *testing.T) {
 		{"a throw elsewhere in the function", `function f() { throw error; }`},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoUselessCatch, "file.ts", testCase.source))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCatch, "file.ts", testCase.source))
 		})
 	}
 }
@@ -60,15 +60,15 @@ func TestNoUselessCatchAcceptsClausesThatDoWork(t *testing.T) {
 // repair that deletes a finally the author needs.
 func TestNoUselessCatchReportsTheNodeMatchingTheRepair(t *testing.T) {
 	const withoutFinally = `try { foo(); } catch (err) { throw err; }`
-	result := ruletest.Run(t, NoUselessCatch, "file.ts", withoutFinally)
-	ruletest.ExpectFindings(t, result, "unnecessaryCatch")
+	result := rule_testing.Run(t, NoUselessCatch, "file.ts", withoutFinally)
+	rule_testing.ExpectFindings(t, result, "unnecessaryCatch")
 	if got := withoutFinally[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; got != withoutFinally {
 		t.Fatalf("reported range = %q, want the whole try statement", got)
 	}
 
 	const withFinally = `try { foo(); } catch (err) { throw err; } finally { cleanUp(); }`
-	result = ruletest.Run(t, NoUselessCatch, "file.ts", withFinally)
-	ruletest.ExpectFindings(t, result, "unnecessaryCatchClause")
+	result = rule_testing.Run(t, NoUselessCatch, "file.ts", withFinally)
+	rule_testing.ExpectFindings(t, result, "unnecessaryCatchClause")
 	const wantClause = `catch (err) { throw err; }`
 	if got := withFinally[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; got != wantClause {
 		t.Fatalf("reported range = %q, want %q", got, wantClause)

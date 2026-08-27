@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const displayNameFile = "/repository/source/components/Field.tsx"
@@ -52,7 +52,7 @@ func TestReactComponentNoDisplayNameFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ReactComponentNoDisplayName, displayNameFile, testCase.sourceText)
+			result := rule_testing.Run(t, ReactComponentNoDisplayName, displayNameFile, testCase.sourceText)
 			ids := result.MessageIds()
 			if len(ids) != testCase.wantCount {
 				t.Fatalf("expected %d findings, got %d: %v", testCase.wantCount, len(ids), ids)
@@ -116,7 +116,7 @@ func TestReactComponentNoDisplayNameStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ReactComponentNoDisplayName, displayNameFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoDisplayName, displayNameFile, testCase.sourceText))
 		})
 	}
 }
@@ -134,10 +134,10 @@ func TestReactComponentNoDisplayNameStaysSilent(t *testing.T) {
 func TestReactComponentNoDisplayNameDependsOnDeclarationOrder(t *testing.T) {
 	declaredFirst := "declare function memo(component: unknown): unknown;\n" +
 		"export const Field = memo(function () { return null; });\nField.displayName = 'Field';\n"
-	ruletest.ExpectClean(t, ruletest.Run(t, ReactComponentNoDisplayName, displayNameFile, declaredFirst))
+	rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoDisplayName, displayNameFile, declaredFirst))
 
 	assignedFirst := "declare function memo(component: unknown): unknown;\n" +
 		"Field.displayName = 'Field';\nexport const Field = memo(function () { return null; });\n"
-	ruletest.ExpectFindings(t, ruletest.Run(t, ReactComponentNoDisplayName, displayNameFile, assignedFirst),
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentNoDisplayName, displayNameFile, assignedFirst),
 		"noDisplayNameAssignment")
 }

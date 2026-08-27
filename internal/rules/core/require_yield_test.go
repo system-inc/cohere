@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const requireYieldFile = "/repository/source/Thing.ts"
@@ -29,7 +29,7 @@ func TestRequireYieldFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, RequireYield, requireYieldFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, RequireYield, requireYieldFile, testCase.sourceText),
 				"missingYield")
 		})
 	}
@@ -66,7 +66,7 @@ func TestRequireYieldStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, RequireYield, requireYieldFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, RequireYield, requireYieldFile, testCase.sourceText))
 		})
 	}
 }

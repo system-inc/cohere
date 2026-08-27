@@ -3,7 +3,7 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	utilsreact "github.com/system-inc/verify/internal/utils/react"
+	utilsreact "github.com/system-inc/verify/internal/utilities/react"
 )
 
 var messageNoDidMountSetState = rule.Message{
@@ -21,7 +21,7 @@ var messageNoDidMountSetState = rule.Message{
 // oxc's config is the bare enum `AllowedOrDisallowInFunc`, deserialized from the string
 // `"disallow-in-func"` sitting alone in the options array rather than from an object with a key.
 // There is no `meta.schema` to consult because this rule has no ESLint source in this tree; the
-// authority is oxc's `utils/config.rs:41`, which declares exactly two variants, `Allowed` (the
+// authority is oxc's `utils/configuration.rs:41`, which declares exactly two variants, `Allowed` (the
 // default) and `DisallowInFunc`, with `rename_all = "kebab-case"`.
 //
 // Our option decoding is object-shaped, so the enum is spelled as the boolean it actually is. One
@@ -117,7 +117,7 @@ type NoDidMountSetStateOptions struct {
 //
 // The factory-name set is narrower than the shelf helper this rule calls. See
 // `isEs5ComponentCallStrict` below: oxc accepts only `createReactClass` and
-// `React.createReactClass`, while `internal/utils/react` also accepts `createClass`. Following the
+// `React.createReactClass`, while `internal/utilities/react` also accepts `createClass`. Following the
 // shelf would report on clean upstream code.
 //
 // # Where the finding points
@@ -391,7 +391,7 @@ func isLifecycleComponentMethod(node *ast.Node, lifecycleMethodName string) bool
 
 // isEs5ComponentCallStrict is `IsEs5ComponentCall` narrowed to the factory name oxc accepts.
 //
-// The shelf helper is deliberately wider than this rule's upstream. `internal/utils/react` accepts
+// The shelf helper is deliberately wider than this rule's upstream. `internal/utilities/react` accepts
 // `createClass` and `React.createClass` as well as the `createReactClass` spellings, on the
 // reasoning that rules meet both halves of the ecosystem. oxc does not: `CREATE_CLASS` at
 // `oxc_linter/src/utils/react.rs:554` is the single constant `"createReactClass"`, and both arms of

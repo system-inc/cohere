@@ -5,7 +5,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/hir"
+	"github.com/system-inc/verify/internal/utilities/high_level_intermediate_representation"
 )
 
 var messageSetStateInEffect = rule.Message{
@@ -132,11 +132,11 @@ var messageSetStateInEffect = rule.Message{
 // in the effect does not exempt it.
 //
 // **Both halves are implemented here.** The value-taint half tracks a `refDerivedValues` set through
-// the effect's blocks; the control-dominance half asks `hir.ControlDominators` whether the block
+// the effect's blocks; the control-dominance half asks `high_level_intermediate_representation.ControlDominators` whether the block
 // holding the setter is control-dependent on a branch whose test is ref-derived.
 //
 // The control half was missing for a while and the file said so, because
-// `internal/utils/hir/postdominator.go` had the tree and kept it unexported: it exposed
+// `internal/utilities/hir/postdominator.go` had the tree and kept it unexported: it exposed
 // `UnconditionalBlocks`, which answers "does this block lie on every path to a return", the question
 // `set-state-in-render` asks. The frontier is a different question over the same tree and
 // additionally needs the branch test's Place, so `ControlDominators` sits beside it on the shelf
@@ -159,7 +159,7 @@ var messageSetStateInEffect = rule.Message{
 //   - **A `useCallback` or `useMemo` wrapper is invisible to both sides**, because upstream deletes
 //     it before this validator runs and this rule now reads a graph prepared the same way: the
 //     erasure, then the inlining pass that follows it one line later upstream. See
-//     `hir.ForFunctionWithoutManualMemoization`; the fixtures are
+//     `high_level_intermediate_representation.ForFunctionWithoutManualMemoization`; the fixtures are
 //     `TestSetStateInEffectSeesThroughManualMemoization` and
 //     `TestSetStateInEffectReachesThroughAMemoizedCallbackThatReturnsAFunction`.
 //   - **A setter reached through a callback is silent, by the same mechanism running the other
@@ -177,7 +177,7 @@ var messageSetStateInEffect = rule.Message{
 // an import from an unrelated module, and is silent on the latter two. That distinction lives in
 // `Environment.getGlobalDeclaration`'s switch over binding kinds. This rule cannot make it: our
 // lowering leaves `LoadGlobal.BindingKind` at `Global` for every global, never populating `Source`
-// or `Imported`, documented at `internal/utils/hir/lower.go:58` and confirmed still true here.
+// or `Imported`, documented at `internal/utilities/hir/lower.go:58` and confirmed still true here.
 //
 // The divergence is therefore that a function named exactly `useEffect`, `useLayoutEffect` or
 // `useInsertionEffect` that is NOT React's would be treated as an effect. Its practical reach is
@@ -252,9 +252,9 @@ var SetStateInEffect = rule.Rule{
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
 					// Manual memoization is erased first, because upstream validates a graph
 					// where `useMemo` and `useCallback` are already gone; see
-					// hir.ForFunctionWithoutManualMemoization for why that is a separate cache
+					// high_level_intermediate_representation.ForFunctionWithoutManualMemoization for why that is a separate cache
 					// entry rather than a step in the shared one.
-					lowered := hir.ForFunctionWithoutManualMemoization(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(ctx, functionNode)
 					if lowered == nil {
 						return
 					}
@@ -276,14 +276,14 @@ var SetStateInEffect = rule.Rule{
 // is silent because nothing compiles it, and this reports. That is a divergence in the permissive
 // direction on a shape that does not occur, since a `useState` call outside a component or hook is
 // itself a rules-of-hooks violation that a different rule already reports.
-func reportSetStateInEffects(ctx rule.Context, function *hir.Function) {
+func reportSetStateInEffects(ctx rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
 
 	// Value to the Place that made it a setter. Upstream's `setStateFunctions`, keyed the same way.
 	// Single-assignment form is what lets this be one entry per value rather than per binding.
-	setStateFunctions := map[hir.IdentifierId]hir.Place{}
+	setStateFunctions := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place{}
 
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
@@ -298,7 +298,7 @@ func reportSetStateInEffects(ctx rule.Context, function *hir.Function) {
 			// length behave like the setter at its head. Transcribed from upstream even though the
 			// checker already follows a direct alias, because this is also what carries a setter
 			// into the map that the nested-function scan below consults.
-			case *hir.LoadLocal:
+			case *high_level_intermediate_representation.LoadLocal:
 				if origin, ok := setStateFunctions[value.Place.Identifier]; ok {
 					setStateFunctions[target] = origin
 				}
@@ -312,11 +312,11 @@ func reportSetStateInEffects(ctx rule.Context, function *hir.Function) {
 			// `isSetterPlace`, whose own type branch is caught by 22 lines. A captured setter that
 			// is never called cannot produce a finding by any route, so no input can distinguish
 			// the two versions.
-			case *hir.LoadContext:
+			case *high_level_intermediate_representation.LoadContext:
 				if origin, ok := setStateFunctions[value.Place.Identifier]; ok {
 					setStateFunctions[target] = origin
 				}
-			case *hir.StoreLocal:
+			case *high_level_intermediate_representation.StoreLocal:
 				if origin, ok := setStateFunctions[value.Value.Identifier]; ok {
 					setStateFunctions[value.LValue.Identifier] = origin
 					setStateFunctions[target] = origin
@@ -340,7 +340,7 @@ func reportSetStateInEffects(ctx rule.Context, function *hir.Function) {
 			// where most callbacks are event handlers. It is upstream's condition, it is kept for
 			// fidelity, and the fixture that would "cover" it is in the silent test asserting the
 			// observable behaviour both versions share.
-			case *hir.FunctionExpression:
+			case *high_level_intermediate_representation.FunctionExpression:
 				if !anyOperandIsSetter(ctx, function, value, setStateFunctions) {
 					continue
 				}
@@ -357,9 +357,9 @@ func reportSetStateInEffects(ctx rule.Context, function *hir.Function) {
 					setStateFunctions[target] = callee
 				}
 
-			case *hir.CallExpression:
+			case *high_level_intermediate_representation.CallExpression:
 				handleEffectCall(ctx, function, target, value.Callee, value.Args, setStateFunctions)
-			case *hir.MethodCall:
+			case *high_level_intermediate_representation.MethodCall:
 				// `React.useEffect(...)`. The property Place is the callee, exactly as upstream
 				// selects `instr.value.property` for a MethodCall.
 				handleEffectCall(ctx, function, target, value.Property, value.Args, setStateFunctions)
@@ -386,11 +386,11 @@ func reportSetStateInEffects(ctx rule.Context, function *hir.Function) {
 // here.
 func handleEffectCall(
 	ctx rule.Context,
-	function *hir.Function,
-	target hir.IdentifierId,
-	callee hir.Place,
-	args []hir.Argument,
-	setStateFunctions map[hir.IdentifierId]hir.Place,
+	function *high_level_intermediate_representation.Function,
+	target high_level_intermediate_representation.IdentifierId,
+	callee high_level_intermediate_representation.Place,
+	args []high_level_intermediate_representation.Argument,
+	setStateFunctions map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place,
 ) {
 	firstArgument, hasFirst := firstIdentifierArgument(args)
 	if !hasFirst {
@@ -420,20 +420,20 @@ func handleEffectCall(
 // of the same name.
 func findSetStateCall(
 	ctx rule.Context,
-	function *hir.Function,
-	setStateFunctions map[hir.IdentifierId]hir.Place,
-) (hir.Place, bool) {
+	function *high_level_intermediate_representation.Function,
+	setStateFunctions map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place,
+) (high_level_intermediate_representation.Place, bool) {
 	if function == nil {
-		return hir.Place{}, false
+		return high_level_intermediate_representation.Place{}, false
 	}
 
-	refDerived := map[hir.IdentifierId]bool{}
-	local := map[hir.IdentifierId]hir.Place{}
+	refDerived := map[high_level_intermediate_representation.IdentifierId]bool{}
+	local := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place{}
 	for id, place := range setStateFunctions {
 		local[id] = place
 	}
 
-	isDerivedFromRef := func(place hir.Place) bool {
+	isDerivedFromRef := func(place high_level_intermediate_representation.Place) bool {
 		return refDerived[place.Identifier] || isRefTyped(ctx, function, place)
 	}
 
@@ -444,7 +444,7 @@ func findSetStateCall(
 	// and a branch on `reference.current` taints through the same loop that later reaches the
 	// setter. The predicate is only ever CALLED at a setter, by which point every instruction above
 	// it in the walk has been seen.
-	isRefControlledBlock := hir.ControlDominators(function, isDerivedFromRef)
+	isRefControlledBlock := high_level_intermediate_representation.ControlDominators(function, isDerivedFromRef)
 
 	for _, block := range function.Blocks {
 		// A phi joining a ref-derived operand is ref-derived. Upstream does the same, and it is
@@ -467,7 +467,7 @@ func findSetStateCall(
 
 			// `ref.current` is the canonical ref read. Upstream special-cases exactly this shape,
 			// keying on the property name and the object being ref-typed.
-			if load, isLoad := instruction.Value.(*hir.PropertyLoad); isLoad {
+			if load, isLoad := instruction.Value.(*high_level_intermediate_representation.PropertyLoad); isLoad {
 				if load.Property == "current" && isRefTyped(ctx, function, load.Object) {
 					refDerived[target] = true
 				}
@@ -491,7 +491,7 @@ func findSetStateCall(
 				//
 				// The setter map two hundred lines up already does this for its own `StoreLocal`
 				// arm, which is what makes the omission here a slip rather than a decision.
-				if store, isStore := instruction.Value.(*hir.StoreLocal); isStore {
+				if store, isStore := instruction.Value.(*high_level_intermediate_representation.StoreLocal); isStore {
 					refDerived[store.LValue.Identifier] = true
 				}
 
@@ -516,13 +516,13 @@ func findSetStateCall(
 				//
 				// Removed rather than kept with a fixture, because a test written for a branch that
 				// no input can reach asserts nothing.
-				if destructure, isDestructure := instruction.Value.(*hir.Destructure); isDestructure {
+				if destructure, isDestructure := instruction.Value.(*high_level_intermediate_representation.Destructure); isDestructure {
 					markPatternRefDerived(destructure.LValue, refDerived)
 				}
 			}
 
 			switch value := instruction.Value.(type) {
-			case *hir.LoadLocal:
+			case *high_level_intermediate_representation.LoadLocal:
 				if origin, ok := local[value.Place.Identifier]; ok {
 					local[target] = origin
 				}
@@ -537,7 +537,7 @@ func findSetStateCall(
 			// question can be asked of that place while the CALL is attributed to the temporary.
 			// Upstream has no equivalent arm because its `setStateFunctions` map is threaded into
 			// the nested scan by the caller rather than rebuilt from the graph.
-			case *hir.LoadContext:
+			case *high_level_intermediate_representation.LoadContext:
 				// Keyed by the temporary this defines, VALUED by the captured place, because that
 				// place carries the span of the name as written at THIS call site. Upstream returns
 				// `callee`, the Place inside the function doing the calling, and reporting the
@@ -560,32 +560,32 @@ func findSetStateCall(
 					local[target] = value.Place
 				}
 
-			case *hir.StoreLocal:
+			case *high_level_intermediate_representation.StoreLocal:
 				if origin, ok := local[value.Value.Identifier]; ok {
 					local[value.LValue.Identifier] = origin
 					local[target] = origin
 				}
-			case *hir.CallExpression:
+			case *high_level_intermediate_representation.CallExpression:
 				if !isSetterPlace(ctx, function, value.Callee, local) {
 					continue
 				}
 				// The value-taint half of the ref exemption: a setter fed a ref-derived value is
 				// synchronizing React with something outside it, which is what effects are for.
 				if argument, ok := firstIdentifierArgument(value.Args); ok && refDerived[argument] {
-					return hir.Place{}, false
+					return high_level_intermediate_representation.Place{}, false
 				}
 				// The control-dominance half: a setter that only runs when a branch on a ref says
 				// so is the same synchronization written the other way. `if (previous.current !==
 				// value) setValue(value)` reaches here with an argument that is not ref-derived,
 				// and upstream is silent on it because the ref decides whether the call happens.
 				if isRefControlledBlock(block.Id) {
-					return hir.Place{}, false
+					return high_level_intermediate_representation.Place{}, false
 				}
 				return value.Callee, true
 			}
 		}
 	}
-	return hir.Place{}, false
+	return high_level_intermediate_representation.Place{}, false
 }
 
 // instructionReadsRefDerived reports whether any operand of this instruction is ref-derived.
@@ -596,23 +596,23 @@ func findSetStateCall(
 // the covered set explicitly is deliberate: a silent default that answered "no operands" for an
 // unhandled instruction would drop the exemption and produce a false positive, which is the
 // direction that costs a user rather than the direction that costs a finding.
-func instructionReadsRefDerived(instruction *hir.Instruction, isDerived func(hir.Place) bool) bool {
+func instructionReadsRefDerived(instruction *high_level_intermediate_representation.Instruction, isDerived func(high_level_intermediate_representation.Place) bool) bool {
 	switch value := instruction.Value.(type) {
-	case *hir.LoadLocal:
+	case *high_level_intermediate_representation.LoadLocal:
 		return isDerived(value.Place)
-	case *hir.StoreLocal:
+	case *high_level_intermediate_representation.StoreLocal:
 		return isDerived(value.Value)
-	case *hir.PropertyLoad:
+	case *high_level_intermediate_representation.PropertyLoad:
 		return isDerived(value.Object)
-	case *hir.Destructure:
+	case *high_level_intermediate_representation.Destructure:
 		return isDerived(value.Value)
-	case *hir.ComputedLoad:
+	case *high_level_intermediate_representation.ComputedLoad:
 		return isDerived(value.Object) || isDerived(value.Property)
-	case *hir.BinaryExpression:
+	case *high_level_intermediate_representation.BinaryExpression:
 		return isDerived(value.Left) || isDerived(value.Right)
-	case *hir.UnaryExpression:
+	case *high_level_intermediate_representation.UnaryExpression:
 		return isDerived(value.Value)
-	case *hir.CallExpression:
+	case *high_level_intermediate_representation.CallExpression:
 		if isDerived(value.Callee) {
 			return true
 		}
@@ -621,7 +621,7 @@ func instructionReadsRefDerived(instruction *hir.Instruction, isDerived func(hir
 				return true
 			}
 		}
-	case *hir.MethodCall:
+	case *high_level_intermediate_representation.MethodCall:
 		if isDerived(value.Receiver) || isDerived(value.Property) {
 			return true
 		}
@@ -643,7 +643,7 @@ func instructionReadsRefDerived(instruction *hir.Instruction, isDerived func(hir
 // enclosing map straight to a scan of the nested body looks correct, compiles, and matches on
 // nothing, because every key names a value the nested function's table has never heard of.
 //
-// The edge is documented at `internal/utils/hir/lower.go:315`: `Captures[i]` and `nested.Context[i]`
+// The edge is documented at `internal/utilities/hir/lower.go:315`: `Captures[i]` and `nested.Context[i]`
 // name the same source binding seen from the two sides, in the same order, and the order is
 // guaranteed rather than incidental. So the translation is an index-wise walk of those two slices.
 //
@@ -654,11 +654,11 @@ func instructionReadsRefDerived(instruction *hir.Instruction, isDerived func(hir
 // The lengths are compared rather than assumed equal: a partially lowered function is exactly the
 // input a linter is handed, and a mismatched pair would otherwise index out of range.
 func translateAcrossCaptures(
-	value *hir.FunctionExpression,
-	nested *hir.Function,
-	outer map[hir.IdentifierId]hir.Place,
-) map[hir.IdentifierId]hir.Place {
-	inner := map[hir.IdentifierId]hir.Place{}
+	value *high_level_intermediate_representation.FunctionExpression,
+	nested *high_level_intermediate_representation.Function,
+	outer map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place,
+) map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place {
+	inner := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place{}
 	if value == nil || nested == nil {
 		return inner
 	}
@@ -679,11 +679,11 @@ func translateAcrossCaptures(
 // included: `const {height = fallback} = ref.current...` binds `height` from a ref on the path where
 // the property exists, and a pass that skipped the default would exempt the one path and not the
 // other, which is a distinction upstream does not draw either.
-func markPatternRefDerived(pattern hir.Pattern, refDerived map[hir.IdentifierId]bool) {
+func markPatternRefDerived(pattern high_level_intermediate_representation.Pattern, refDerived map[high_level_intermediate_representation.IdentifierId]bool) {
 	switch shape := pattern.(type) {
-	case *hir.PlacePattern:
+	case *high_level_intermediate_representation.PlacePattern:
 		refDerived[shape.Place.Identifier] = true
-	case *hir.ObjectPattern:
+	case *high_level_intermediate_representation.ObjectPattern:
 		for _, property := range shape.Properties {
 			if property.Value != nil {
 				markPatternRefDerived(property.Value, refDerived)
@@ -695,7 +695,7 @@ func markPatternRefDerived(pattern hir.Pattern, refDerived map[hir.IdentifierId]
 		if shape.Rest != nil {
 			refDerived[shape.Rest.Identifier] = true
 		}
-	case *hir.ArrayPattern:
+	case *high_level_intermediate_representation.ArrayPattern:
 		for _, element := range shape.Elements {
 			// A hole from `[a, , b]` has a nil Value and binds nothing.
 			if element.Value != nil {
@@ -736,7 +736,7 @@ func markPatternRefDerived(pattern hir.Pattern, refDerived map[hir.IdentifierId]
 // standard, and a reader comparing the two implementations should find the same test in both. Both
 // spread fixtures are also kept, in `TestSetStateInEffectSpreadArgument`, since they assert real
 // upstream behaviour even though they cannot see this particular branch.
-func firstIdentifierArgument(args []hir.Argument) (hir.IdentifierId, bool) {
+func firstIdentifierArgument(args []high_level_intermediate_representation.Argument) (high_level_intermediate_representation.IdentifierId, bool) {
 	if len(args) == 0 || args[0].Spread {
 		return 0, false
 	}
@@ -750,9 +750,9 @@ func firstIdentifierArgument(args []hir.Argument) (hir.IdentifierId, bool) {
 // always empty and this branch could never fire.
 func anyOperandIsSetter(
 	ctx rule.Context,
-	function *hir.Function,
-	value *hir.FunctionExpression,
-	setStateFunctions map[hir.IdentifierId]hir.Place,
+	function *high_level_intermediate_representation.Function,
+	value *high_level_intermediate_representation.FunctionExpression,
+	setStateFunctions map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place,
 ) bool {
 	for _, capture := range value.Captures {
 		if _, known := setStateFunctions[capture.Identifier]; known {
@@ -782,9 +782,9 @@ func anyOperandIsSetter(
 // isSetterPlace reports whether a callee is a setter, by type or by the propagation map.
 func isSetterPlace(
 	ctx rule.Context,
-	function *hir.Function,
-	place hir.Place,
-	known map[hir.IdentifierId]hir.Place,
+	function *high_level_intermediate_representation.Function,
+	place high_level_intermediate_representation.Place,
+	known map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.Place,
 ) bool {
 	if _, ok := known[place.Identifier]; ok {
 		return true
@@ -812,12 +812,12 @@ const setStateTypeAliasName = "Dispatch"
 const refTypeSymbolName = "RefObject"
 
 // isSetterTyped asks the checker whether a value is a `useState` setter.
-func isSetterTyped(ctx rule.Context, function *hir.Function, place hir.Place) bool {
+func isSetterTyped(ctx rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) bool {
 	return typeAliasNameOf(ctx, function, place) == setStateTypeAliasName
 }
 
 // isRefTyped asks the checker whether a value is a ref object.
-func isRefTyped(ctx rule.Context, function *hir.Function, place hir.Place) bool {
+func isRefTyped(ctx rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) bool {
 	node := setStateInEffectIdentifierNodeOf(function, place.Identifier)
 	if node == nil || ctx.TypeChecker == nil {
 		return false
@@ -831,7 +831,7 @@ func isRefTyped(ctx rule.Context, function *hir.Function, place hir.Place) bool 
 }
 
 // typeAliasNameOf returns the name of the type alias on a value, or the empty string.
-func typeAliasNameOf(ctx rule.Context, function *hir.Function, place hir.Place) string {
+func typeAliasNameOf(ctx rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) string {
 	node := setStateInEffectIdentifierNodeOf(function, place.Identifier)
 	if node == nil || ctx.TypeChecker == nil {
 		return ""
@@ -866,7 +866,7 @@ const (
 // `import {useEffect as useFx}` report and `import {somethingElse as useEffect}` stay silent, which
 // is upstream's `binding.imported` rule. It is also what makes `React.useEffect` need no separate
 // member-expression case: the property access resolves to the same declaration.
-func effectHookKind(ctx rule.Context, function *hir.Function, callee hir.Place) effectHookKindOf {
+func effectHookKind(ctx rule.Context, function *high_level_intermediate_representation.Function, callee high_level_intermediate_representation.Place) effectHookKindOf {
 	node := setStateInEffectIdentifierNodeOf(function, callee.Identifier)
 	if node == nil || ctx.TypeChecker == nil {
 		return effectHookNone
@@ -915,7 +915,7 @@ func effectHookKind(ctx rule.Context, function *hir.Function, callee hir.Place) 
 // uncommitted files, so an unprefixed helper name in a shared package is a collision waiting on
 // timing rather than on judgment.
 //
-// **Both of these should be lifted to `internal/utils/hir` later, and neither is lifted now.** They
+// **Both of these should be lifted to `internal/utilities/hir` later, and neither is lifted now.** They
 // are genuinely general: "resolve the nested function this expression creates" and "get the syntax
 // node behind a value" are questions about the representation, not about either rule, and the house
 // rule is that two helpers doing almost the same thing is worse than one slightly the wrong shape.
@@ -927,7 +927,7 @@ func effectHookKind(ctx rule.Context, function *hir.Function, callee hir.Place) 
 //
 // The index is bounds-checked rather than trusted: `Functions` is populated by lowering, and a
 // malformed or partially lowered function is exactly the input a linter is handed.
-func setStateInEffectNestedFunction(function *hir.Function, value *hir.FunctionExpression) *hir.Function {
+func setStateInEffectNestedFunction(function *high_level_intermediate_representation.Function, value *high_level_intermediate_representation.FunctionExpression) *high_level_intermediate_representation.Function {
 	if function == nil || value == nil || int(value.Function) >= len(function.Functions) {
 		return nil
 	}
@@ -938,7 +938,7 @@ func setStateInEffectNestedFunction(function *hir.Function, value *hir.FunctionE
 //
 // This is the seam `Identifier.Node` documents itself as existing for: the node goes to the checker
 // rather than to a local inference pass, which is why this rule needs no type inference.
-func setStateInEffectIdentifierNodeOf(function *hir.Function, id hir.IdentifierId) *ast.Node {
+func setStateInEffectIdentifierNodeOf(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -956,7 +956,7 @@ func setStateInEffectIdentifierNodeOf(function *hir.Function, id hir.IdentifierI
 // Our Diagnostic has one Range, so the primary is kept where upstream puts it and the containing
 // effect is not named. That is a deliberate shape difference rather than dropped information: the
 // setter is the line a reader has to change.
-func reportSetter(ctx rule.Context, function *hir.Function, setter hir.Place) {
+func reportSetter(ctx rule.Context, function *high_level_intermediate_representation.Function, setter high_level_intermediate_representation.Place) {
 	// `Place.Range` rather than `Identifier.Node`, and the distinction is the whole correctness of
 	// this function.
 	//

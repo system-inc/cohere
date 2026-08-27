@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // TestConsistencyOrganizeImportsClassification is the differential against the TypeScript rule.
@@ -170,8 +170,8 @@ func TestConsistencyOrganizeImportsClassification(t *testing.T) {
 				"export const X = 1;",
 				"",
 			}, "\n")
-			result := ruletest.Run(t, ConsistencyOrganizeImports, "/repository/app/Thing.tsx", source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyOrganizeImports, "/repository/app/Thing.tsx", source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

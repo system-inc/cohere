@@ -5,14 +5,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/config"
+	"github.com/system-inc/verify/internal/configuration"
 )
 
 // The live config, which is the only thing that decides whether a registered rule ever runs.
 const liveConfigPath = "/Users/kirkouimet/Projects/ahra/VerifySettings.json"
 
 // A rule's fixture proves it works. The config decides whether it runs, and nothing else connects
-// the two: `ruletest` never reads `VerifySettings.json`, so a rule can pass both directions of its own
+// the two: `rule_testing` never reads `VerifySettings.json`, so a rule can pass both directions of its own
 // pair and be inert on every real file.
 //
 // That happened. The first `@next/next` rule registered as `next-no-assign-module-variable` while
@@ -27,7 +27,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		t.Skipf("the live config is not present at %s", liveConfigPath)
 	}
 
-	loaded, err := config.Load(liveConfigPath)
+	loaded, err := configuration.Load(liveConfigPath)
 	if err != nil {
 		t.Fatalf("loading the live config: %v", err)
 	}

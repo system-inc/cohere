@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // octalFile is where the fixtures pretend to live.
@@ -63,8 +63,8 @@ func TestNoOctalFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoOctal, octalFile, testCase.sourceText), "noOctal")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText), "noOctal")
 		})
 	}
 }
@@ -117,7 +117,7 @@ func TestNoOctalStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoOctal, octalFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText))
 		})
 	}
 }
@@ -166,8 +166,8 @@ func TestNoOctalOnSourceOurParserAcceptsAndESLintRejects(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoOctal, octalFile, testCase.sourceText), "noOctal")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText), "noOctal")
 		})
 	}
 }
@@ -201,8 +201,8 @@ func TestNoOctalReportsTheLiteralSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoOctal, octalFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "noOctal")
+			result := rule_testing.Run(t, NoOctal, octalFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "noOctal")
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
 				t.Errorf("reported span = %q, want %q", reported, testCase.want)
@@ -224,24 +224,24 @@ func TestNoOctalReportsTheLiteralSpan(t *testing.T) {
 // is upstream's recommended fix. That is what makes this a discrimination rather than a restatement.
 func TestNoOctalReadsRawTextRatherThanTheCookedValue(t *testing.T) {
 	// Both cook to "493". The legacy spelling reports and the modern one must not.
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoOctal, octalFile, "var a = 0755;"), "noOctal")
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoOctal, octalFile, "var a = 0o755;"))
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoOctal, octalFile, "var a = 0755;"), "noOctal")
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoOctal, octalFile, "var a = 0o755;"))
 
 	// `07` cooks to "7", indistinguishable from a plain `7`, which must stay clean.
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoOctal, octalFile, "var a = 07;"), "noOctal")
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoOctal, octalFile, "var a = 7;"))
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoOctal, octalFile, "var a = 07;"), "noOctal")
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoOctal, octalFile, "var a = 7;"))
 
 	// `000` and `0e5` both cook to "0", as does a bare `0`. Only the first is the legacy form.
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoOctal, octalFile, "var a = 000;"), "noOctal")
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoOctal, octalFile, "var a = 0e5;"))
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoOctal, octalFile, "var a = 0;"))
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoOctal, octalFile, "var a = 000;"), "noOctal")
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoOctal, octalFile, "var a = 0e5;"))
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoOctal, octalFile, "var a = 0;"))
 }
 
 // Several literals in one file report several times, and each finding points at its own literal.
@@ -251,8 +251,8 @@ func TestNoOctalReadsRawTextRatherThanTheCookedValue(t *testing.T) {
 // separates per-node work from per-file work.
 func TestNoOctalReportsEachLiteralSeparately(t *testing.T) {
 	source := "var a = 0755, b = 0o755, c = 07, d = 0, e = 08;"
-	result := ruletest.Run(t, NoOctal, octalFile, source)
-	ruletest.ExpectFindings(t, result, "noOctal", "noOctal", "noOctal")
+	result := rule_testing.Run(t, NoOctal, octalFile, source)
+	rule_testing.ExpectFindings(t, result, "noOctal", "noOctal", "noOctal")
 
 	want := []string{"0755", "07", "08"}
 	for index, diagnostic := range result.Diagnostics {

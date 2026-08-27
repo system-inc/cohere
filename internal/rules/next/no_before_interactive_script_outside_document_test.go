@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The seven passing cases from oxc's corpus, copied byte for byte out of the extractor's dump rather
@@ -54,8 +54,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnUpstreamPassCases(t *
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -101,8 +101,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnUpstreamFailCases(t *tes
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
+			result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
 		})
 	}
 }
@@ -116,8 +116,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnUpstreamFailCases(t *tes
 func TestNoBeforeInteractiveScriptOutsideDocumentPointsAtTheStrategyAttribute(t *testing.T) {
 	source := "import Script from \"next/script\";\nexport default function Index() {\n  return <Script src=\"/a.js\" strategy=\"beforeInteractive\" />;\n}\n"
 
-	result := ruletest.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
-	ruletest.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
+	result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
 
 	diagnostic := result.Diagnostics[0]
 	reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
@@ -137,8 +137,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentPointsAtTheStrategyAttribute(t 
 func TestNoBeforeInteractiveScriptOutsideDocumentRendersItsMessage(t *testing.T) {
 	source := "import Script from \"next/script\";\nexport default function Index() {\n  return <Script strategy=\"beforeInteractive\" />;\n}\n"
 
-	result := ruletest.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
-	ruletest.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
+	result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
 
 	got := result.Diagnostics[0].Message
 	if got.Id != "noBeforeInteractiveScriptOutsideDocument" {
@@ -311,8 +311,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnCasesUpstreamDoesNotW
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -386,8 +386,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnCasesUpstreamDoesNotWrit
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
+			result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, "noBeforeInteractiveScriptOutsideDocument")
 		})
 	}
 }
@@ -398,8 +398,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnCasesUpstreamDoesNotWrit
 func TestNoBeforeInteractiveScriptOutsideDocumentReportsEveryElement(t *testing.T) {
 	source := "import Script from \"next/script\";\nexport default function Index() {\n  return (\n    <>\n      <Script src=\"/a.js\" strategy=\"beforeInteractive\" />\n      <Script id=\"b\" strategy=\"beforeInteractive\"></Script>\n    </>\n  );\n}\n"
 
-	result := ruletest.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
-	ruletest.ExpectFindings(t, result,
+	result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(t, result,
 		"noBeforeInteractiveScriptOutsideDocument",
 		"noBeforeInteractiveScriptOutsideDocument")
 }

@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // TestNoEmptyPatternReportsEmptyPatterns is the fixture that must fire.
@@ -30,8 +30,8 @@ func TestNoEmptyPatternReportsEmptyPatterns(t *testing.T) {
 		{"var [] = foo;", "unexpectedArray"},
 		{"for (const {} of list) {}", "unexpectedObject"},
 	} {
-		result := ruletest.Run(t, NoEmptyPattern, "pattern.ts", testCase.source)
-		ruletest.ExpectFindings(t, result, testCase.wantId)
+		result := rule_testing.Run(t, NoEmptyPattern, "pattern.ts", testCase.source)
+		rule_testing.ExpectFindings(t, result, testCase.wantId)
 	}
 }
 
@@ -62,8 +62,8 @@ func TestNoEmptyPatternStaysSilentOnRealBindings(t *testing.T) {
 		"const emptyArray: string[] = [];",
 		"foo({});",
 	} {
-		result := ruletest.Run(t, NoEmptyPattern, "clean.ts", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, NoEmptyPattern, "clean.ts", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -72,8 +72,8 @@ func TestNoEmptyPatternStaysSilentOnRealBindings(t *testing.T) {
 // The option defaults off, so a registry that forgets to wire it must produce the strict rule
 // rather than a silent one. This is the fixture that would catch that inversion.
 func TestNoEmptyPatternWithoutOptionsIsStrict(t *testing.T) {
-	result := ruletest.RunWithOptions(t, NoEmptyPattern, "strict.ts", "function foo({}) {}", nil)
-	ruletest.ExpectFindings(t, result, "unexpectedObject")
+	result := rule_testing.RunWithOptions(t, NoEmptyPattern, "strict.ts", "function foo({}) {}", nil)
+	rule_testing.ExpectFindings(t, result, "unexpectedObject")
 }
 
 // TestNoEmptyPatternAllowsParameterObjectPatternsWhenConfigured pins what the option turns off.
@@ -87,8 +87,8 @@ func TestNoEmptyPatternAllowsParameterObjectPatternsWhenConfigured(t *testing.T)
 		"const quux = ({} = {}) => {};",
 		"class C { method({}) {} }",
 	} {
-		result := ruletest.RunWithOptions(t, NoEmptyPattern, "allowed.ts", source, options)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.RunWithOptions(t, NoEmptyPattern, "allowed.ts", source, options)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -113,7 +113,7 @@ func TestNoEmptyPatternKeepsReportingDespiteOption(t *testing.T) {
 		{"const item = ({} = { bar: 1 }) => {};", "unexpectedObject"},
 		{"const {} = foo;", "unexpectedObject"},
 	} {
-		result := ruletest.RunWithOptions(t, NoEmptyPattern, "still.ts", testCase.source, options)
-		ruletest.ExpectFindings(t, result, testCase.wantId)
+		result := rule_testing.RunWithOptions(t, NoEmptyPattern, "still.ts", testCase.source, options)
+		rule_testing.ExpectFindings(t, result, testCase.wantId)
 	}
 }

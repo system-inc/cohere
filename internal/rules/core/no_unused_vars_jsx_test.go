@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The JSX half of upstream's corpus, run under a `.tsx` filename because that is what makes the
@@ -81,7 +81,7 @@ var noUnusedVarsUpstreamJsxReports = []string{
 // these cases would not have caught.
 func TestNoUnusedVarsStaysSilentOnUpstreamJsxCleanCases(t *testing.T) {
 	for _, source := range noUnusedVarsUpstreamJsxClean {
-		result := ruletest.RunTyped(t, NoUnusedVars, "a.tsx", source)
+		result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", source)
 		if len(result.Diagnostics) != 0 {
 			t.Errorf("want clean, got %d findings for %q", len(result.Diagnostics), source)
 		}
@@ -94,7 +94,7 @@ func TestNoUnusedVarsStaysSilentOnUpstreamJsxCleanCases(t *testing.T) {
 // here: 17 of 17 report. If that ever stops being true this fails and names the case.
 func TestNoUnusedVarsFiresOnUpstreamJsxReportingCases(t *testing.T) {
 	for _, source := range noUnusedVarsUpstreamJsxReports {
-		result := ruletest.RunTyped(t, NoUnusedVars, "a.tsx", source)
+		result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", source)
 		if len(result.Diagnostics) == 0 {
 			t.Errorf("want at least one finding, got none for %q", source)
 		}
@@ -109,13 +109,13 @@ func TestNoUnusedVarsFiresOnUpstreamJsxReportingCases(t *testing.T) {
 // re-opened it would pass every case above.
 func TestNoUnusedVarsJsxDoesNotReopenTheFactoryExemption(t *testing.T) {
 	const source = "import React from 'react';\nexport const A = () => <div />;\n"
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.tsx", source); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", source); len(result.Diagnostics) != 0 {
 		t.Errorf("the JSX factory import must stay exempt; got %d findings", len(result.Diagnostics))
 	}
 	// The control: a genuinely unused import in the same file still reports, so the case above
 	// cannot be passing because the rule went silent on `.tsx` altogether.
 	const control = "import React from 'react';\nimport { unused } from './m';\nexport const A = () => <div />;\n"
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.tsx", control); len(result.Diagnostics) != 1 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", control); len(result.Diagnostics) != 1 {
 		t.Errorf("control: an unused import beside the factory must report; got %d",
 			len(result.Diagnostics))
 	}

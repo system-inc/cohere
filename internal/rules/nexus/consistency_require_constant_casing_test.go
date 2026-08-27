@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const constantCasingFile = "/repository/source/Thing.ts"
@@ -130,8 +130,8 @@ func TestConsistencyRequireConstantCasingFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.wantId)
+			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
 	}
 }
@@ -314,8 +314,8 @@ func TestConsistencyRequireConstantCasingStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -325,12 +325,12 @@ func TestConsistencyRequireConstantCasingStaysSilent(t *testing.T) {
 func TestConsistencyRequireConstantCasingFrameworkNames(t *testing.T) {
 	source := "export const runtime = 'edge';\n"
 
-	reported := ruletest.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, source)
-	ruletest.ExpectFindings(t, reported, "requirePascalCaseExported")
+	reported := rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, source)
+	rule_testing.ExpectFindings(t, reported, "requirePascalCaseExported")
 
-	exempt := ruletest.RunWithOptions(t, ConsistencyRequireConstantCasing, constantCasingFile, source,
+	exempt := rule_testing.RunWithOptions(t, ConsistencyRequireConstantCasing, constantCasingFile, source,
 		ConsistencyRequireConstantCasingOptions{FrameworkConstantNames: []string{"runtime"}})
-	ruletest.ExpectClean(t, exempt)
+	rule_testing.ExpectClean(t, exempt)
 }
 
 // The suggestion has to be a name the rule's own predicates accept, or the reader who takes it gets
@@ -352,7 +352,7 @@ func TestConsistencyRequireConstantCasingSuggestionsAreAccepted(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
+			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
@@ -404,7 +404,7 @@ func TestConsistencyRequireConstantCasingSuggestionText(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
+			result := rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}

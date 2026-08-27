@@ -49,11 +49,11 @@ func TestEveryRuleShipsAFixturePair(t *testing.T) {
 				t.Errorf("rule %s has no test file at %s, so nothing proves it fires or stays quiet",
 					name, filepath.Base(testPath))
 			case !assertions.expectsFindings:
-				t.Errorf("rule %s never calls ruletest.ExpectFindings, so nothing proves it can fire; "+
+				t.Errorf("rule %s never calls rule_testing.ExpectFindings, so nothing proves it can fire; "+
 					"a rule that cannot be shown to detect is indistinguishable from one that is inert",
 					name)
 			case !assertions.expectsClean:
-				t.Errorf("rule %s never calls ruletest.ExpectClean, so nothing proves it stays quiet; "+
+				t.Errorf("rule %s never calls rule_testing.ExpectClean, so nothing proves it stays quiet; "+
 					"a violation-only corpus proves a rule can detect and never that it can discriminate",
 					name)
 			case proposesAFix(t, path) && !assertions.expectsFixedSource:
@@ -80,7 +80,7 @@ type harnessAssertions struct {
 	expectsFixedSource bool
 }
 
-// harnessAssertionsIn reads a test file for calls to the two ruletest assertions.
+// harnessAssertionsIn reads a test file for calls to the two rule_testing assertions.
 //
 // The names are read from the harness rather than remembered. Two sweeps tonight searched for
 // invented names, `Valid:`/`Invalid:` and `ExpectNoFindings`, and each returned a confident wrong
@@ -107,7 +107,7 @@ func harnessAssertionsIn(t *testing.T, path string) harnessAssertions {
 			return true
 		}
 		packageIdentifier, isIdentifier := selector.X.(*ast.Ident)
-		if !isIdentifier || packageIdentifier.Name != "ruletest" {
+		if !isIdentifier || packageIdentifier.Name != "rule_testing" {
 			return true
 		}
 		switch selector.Sel.Name {

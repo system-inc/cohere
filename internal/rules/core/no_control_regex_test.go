@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // controlRegexFile is where the fixtures pretend to live.
@@ -36,8 +36,8 @@ func TestNoControlRegexFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoControlRegex, controlRegexFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoControlRegex, controlRegexFile, testCase.sourceText),
 				"noControlRegex")
 		})
 	}
@@ -73,8 +73,8 @@ func TestNoControlRegexStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoControlRegex, controlRegexFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoControlRegex, controlRegexFile, testCase.sourceText))
 		})
 	}
 }
@@ -85,7 +85,7 @@ func TestNoControlRegexStaysSilent(t *testing.T) {
 // its 57 failing inputs produce 34. Its corpus proves the batching only indirectly, through a
 // snapshot count a porter has to go and read. This asserts it directly: three escapes, one finding.
 func TestNoControlRegexReportsOncePerPattern(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoControlRegex, controlRegexFile, "export const r = /\\x01\\x02\\x03/;"),
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoControlRegex, controlRegexFile, "export const r = /\\x01\\x02\\x03/;"),
 		"noControlRegex")
 }

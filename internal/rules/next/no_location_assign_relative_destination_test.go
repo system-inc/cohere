@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const locationAssignFile = "/repository/source/Navigate.tsx"
@@ -71,7 +71,7 @@ func TestNoLocationAssignRelativeDestinationFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoLocationAssignRelativeDestination,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLocationAssignRelativeDestination,
 				locationAssignFile, testCase.sourceText), "noLocationAssign")
 		})
 	}
@@ -149,7 +149,7 @@ func TestNoLocationAssignRelativeDestinationStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoLocationAssignRelativeDestination,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLocationAssignRelativeDestination,
 				locationAssignFile, testCase.sourceText))
 		})
 	}
@@ -200,7 +200,7 @@ func TestNoLocationAssignRelativeDestinationPointsAtTheNavigation(t *testing.T) 
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoLocationAssignRelativeDestination,
+			result := rule_testing.Run(t, NoLocationAssignRelativeDestination,
 				locationAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -219,7 +219,7 @@ func TestNoLocationAssignRelativeDestinationPointsAtTheNavigation(t *testing.T) 
 // constant would move with the rule under any edit, so an assertion against it can never fail and
 // reads as a guard while guarding nothing.
 func TestNoLocationAssignRelativeDestinationRendersItsMessage(t *testing.T) {
-	result := ruletest.Run(t, NoLocationAssignRelativeDestination,
+	result := rule_testing.Run(t, NoLocationAssignRelativeDestination,
 		locationAssignFile, "location.assign('/dashboard');\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 	tailwindengine "github.com/system-inc/verify/internal/tailwind"
 )
 
@@ -17,12 +17,12 @@ import (
 //
 // Same reason `enforce_consistent_class_order_test.go` gives, and the same trap. The rule now reads
 // the live design system, so it declares `ReadsProgram` and returns nil listeners when the Program
-// is nil. `ruletest.Run` hands it exactly that. So every fixture in this file that kept using
-// `ruletest.Run` after the swap would exercise the nil-Program branch: the reporting half would fail
+// is nil. `rule_testing.Run` hands it exactly that. So every fixture in this file that kept using
+// `rule_testing.Run` after the swap would exercise the nil-Program branch: the reporting half would fail
 // loudly and the whole silent half would pass while proving nothing.
 //
 // Measured before these were converted: with the rule swapped and the fixtures still on
-// `ruletest.Run`, the eight reporting cases failed and all thirteen silent cases passed. Thirteen
+// `rule_testing.Run`, the eight reporting cases failed and all thirteen silent cases passed. Thirteen
 // green assertions over a rule that never ran.
 //
 // `TestUnknownClassFixturesActuallyRan` is what stops the converted file from going green on nothing
@@ -76,10 +76,10 @@ func unknownFixturePackageRoot() string {
 // runUnknownFixture runs the rule against a one-file program that has a real design system.
 //
 // The symlink is planted before the program is built, into the same temp directory
-// `ruletest.RunTypedFiles` writes the fixture files to, so the rule's own upward walk finds it.
+// `rule_testing.RunTypedFiles` writes the fixture files to, so the rule's own upward walk finds it.
 // Pointing the `@import` at an absolute path instead does not work: the rule never resolves the
 // import itself, it walks up for `node_modules/tailwindcss` and declines when the walk fails.
-func runUnknownFixture(t *testing.T, fileName string, source string) ruletest.Result {
+func runUnknownFixture(t *testing.T, fileName string, source string) rule_testing.Result {
 	t.Helper()
 	return runUnknownFixtureWithOptions(t, fileName, source, nil)
 }
@@ -90,7 +90,7 @@ func runUnknownFixtureWithOptions(
 	fileName string,
 	source string,
 	options any,
-) ruletest.Result {
+) rule_testing.Result {
 	t.Helper()
 
 	packageRoot := unknownFixturePackageRoot()
@@ -114,9 +114,9 @@ func runUnknownFixtureWithOptions(
 	}
 
 	if options == nil {
-		return ruletest.RunTypedFilesWithSetup(t, NoUnknownClasses, files, fileName, plantPackage)
+		return rule_testing.RunTypedFilesWithSetup(t, NoUnknownClasses, files, fileName, plantPackage)
 	}
-	return ruletest.RunTypedFilesWithSetupAndOptions(
+	return rule_testing.RunTypedFilesWithSetupAndOptions(
 		t, NoUnknownClasses, files, fileName, options, plantPackage)
 }
 
@@ -200,7 +200,7 @@ func TestNoUnknownClassesReportsTypos(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runUnknownFixture(t, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -300,7 +300,7 @@ func TestNoUnknownClassesStaysSilent(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runUnknownFixture(t, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -580,7 +580,7 @@ func TestUnknownClassFixturesActuallyRan(t *testing.T) {
 
 	result := runUnknownFixture(t, "Component.tsx",
 		`const element = <div className="synthetic-static flx" />;`)
-	ruletest.ExpectFindings(t, result, "unknownClass")
+	rule_testing.ExpectFindings(t, result, "unknownClass")
 }
 
 // unknownFixtureLiveSystem builds the corpus repository's design system, for the unit-level tests.

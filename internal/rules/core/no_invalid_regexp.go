@@ -7,7 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	esregexp "github.com/system-inc/verify/internal/utils/ecmascript/regexp"
+	esregexp "github.com/system-inc/verify/internal/utilities/ecmascript/regexp"
 )
 
 var messageInvalidRegexp = rule.Message{

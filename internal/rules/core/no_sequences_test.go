@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // sequencesFile is where the fixtures pretend to live.
@@ -137,8 +137,8 @@ func TestNoSequencesFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText, testCase.options)
-			ruletest.ExpectFindings(t, result, "unexpectedCommaExpression")
+			result := rule_testing.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(t, result, "unexpectedCommaExpression")
 
 			// Upstream's columns are one-based; the diagnostic carries a zero-based offset. Every
 			// fixture here is one line, so the column is the offset plus one.
@@ -241,8 +241,8 @@ func TestNoSequencesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText, testCase.options))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -268,9 +268,9 @@ func TestNoSequencesReportsBothHalvesOfANestedPair(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText,
 				decodedSequenceOptions(t, `{"allowInParentheses": false}`))
-			ruletest.ExpectFindings(t, result,
+			rule_testing.ExpectFindings(t, result,
 				"unexpectedCommaExpression", "unexpectedCommaExpression")
 
 			got := []int{}
@@ -301,11 +301,11 @@ func TestNoSequencesOptionDefaultsToAllowingParentheses(t *testing.T) {
 	parenthesized := "var foo = (1, 2);"
 
 	t.Run("nil options, the shape the live config produces", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoSequences, sequencesFile, parenthesized, nil))
+		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoSequences, sequencesFile, parenthesized, nil))
 	})
 
 	t.Run("an empty object", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoSequences, sequencesFile, parenthesized,
+		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoSequences, sequencesFile, parenthesized,
 			decodedSequenceOptions(t, `{}`)))
 	})
 
@@ -313,12 +313,12 @@ func TestNoSequencesOptionDefaultsToAllowingParentheses(t *testing.T) {
 		// Not a redundant spelling of the empty object: this is the value `rule.DecodeOptionsInto`
 		// would have produced, and it is the reason the field is a pointer. If AllowInParentheses
 		// were a plain bool this case would report and every other fixture would stay green.
-		ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoSequences, sequencesFile, parenthesized,
+		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoSequences, sequencesFile, parenthesized,
 			NoSequencesOptions{}))
 	})
 
 	t.Run("explicitly false", func(t *testing.T) {
-		ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, NoSequences, sequencesFile, parenthesized,
+		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoSequences, sequencesFile, parenthesized,
 			decodedSequenceOptions(t, `{"allowInParentheses": false}`)), "unexpectedCommaExpression")
 	})
 

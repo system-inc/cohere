@@ -3,7 +3,7 @@ package nexus
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const nexusFile = "/repository/libraries/nexus/code-quality/Thing.ts"
@@ -23,8 +23,8 @@ func TestBoundaryNoNexusOutsideImportFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "forbiddenOutsideImport")
+			result := rule_testing.Run(t, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "forbiddenOutsideImport")
 		})
 	}
 }
@@ -61,8 +61,8 @@ func TestBoundaryNoNexusOutsideImportStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, BoundaryNoNexusOutsideImport, testCase.fileName, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, BoundaryNoNexusOutsideImport, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -114,7 +114,7 @@ func TestBoundaryNoNexusOutsideImportReportsTheSpecifier(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
+			result := rule_testing.Run(t, BoundaryNoNexusOutsideImport, nexusFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}

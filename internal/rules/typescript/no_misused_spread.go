@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 // NoMisusedSpreadOptions is the rule's option surface, matching upstream's schema.
@@ -14,7 +14,7 @@ import (
 // rule's wire type. An empty allow list is the default and is also the correct zero value, so a rule
 // handed nil options behaves correctly without any fallback.
 type NoMisusedSpreadOptions struct {
-	Allow       []typecheck.TypeOrValueSpecifier
+	Allow       []type_checking.TypeOrValueSpecifier
 	AllowInline []string
 }
 
@@ -120,12 +120,12 @@ var NoMisusedSpread = rule.Rule{
 		settings, _ := options.(NoMisusedSpreadOptions)
 
 		allowed := func(t *checker.Type) bool {
-			return typecheck.TypeMatchesSomeSpecifier(t, settings.Allow, settings.AllowInline, ctx.Program)
+			return type_checking.TypeMatchesSomeSpecifier(t, settings.Allow, settings.AllowInline, ctx.Program)
 		}
 
 		// checkArrayOrCallSpread is the one-question arm: a string spread into an array or a call.
 		checkArrayOrCallSpread := func(spread *ast.Node, argument *ast.Node) {
-			argumentType := typecheck.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
+			argumentType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
 			if argumentType == nil || allowed(argumentType) {
 				return
 			}
@@ -136,13 +136,13 @@ var NoMisusedSpread = rule.Rule{
 
 		// checkObjectSpread is the cascade. Every arm returns, so the first match wins.
 		checkObjectSpread := func(spread *ast.Node, argument *ast.Node) {
-			argumentType := typecheck.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
+			argumentType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
 			if argumentType == nil || allowed(argumentType) {
 				return
 			}
 
 			if noMisusedSpreadIsTypeRecurser(argumentType, func(t *checker.Type) bool {
-				return typecheck.IsPromiseLike(ctx.Program, ctx.TypeChecker, t)
+				return type_checking.IsPromiseLike(ctx.Program, ctx.TypeChecker, t)
 			}) {
 				ctx.ReportNodeWithSuggestions(spread, buildNoPromiseSpreadInObjectMessage(),
 					noMisusedSpreadAwaitSuggestion(ctx, argument))
@@ -237,7 +237,7 @@ var NoMisusedSpread = rule.Rule{
 // by whichever arm its first matching constituent belongs to rather than being declined for not
 // being uniformly one thing.
 func noMisusedSpreadIsTypeRecurser(t *checker.Type, predicate func(*checker.Type) bool) bool {
-	if typecheck.IsUnionType(t) || typecheck.IsIntersectionType(t) {
+	if type_checking.IsUnionType(t) || type_checking.IsIntersectionType(t) {
 		for _, part := range t.Types() {
 			if noMisusedSpreadIsTypeRecurser(part, predicate) {
 				return true
@@ -250,7 +250,7 @@ func noMisusedSpreadIsTypeRecurser(t *checker.Type, predicate func(*checker.Type
 
 func noMisusedSpreadIsString(t *checker.Type) bool {
 	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
-		return typecheck.IsTypeFlagSet(part, checker.TypeFlagsStringLike)
+		return type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLike)
 	})
 }
 
@@ -267,20 +267,20 @@ func noMisusedSpreadIsArray(typeChecker *checker.Checker, t *checker.Type) bool 
 // a namespace object and spreading it is meaningful. Upstream reports only the former.
 func noMisusedSpreadIsFunctionWithoutProperties(typeChecker *checker.Checker, t *checker.Type) bool {
 	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
-		return len(typecheck.GetCallSignatures(typeChecker, part)) > 0 &&
+		return len(type_checking.GetCallSignatures(typeChecker, part)) > 0 &&
 			len(checker.Checker_getPropertiesOfType(typeChecker, part)) == 0
 	})
 }
 
 func noMisusedSpreadIsIterable(typeChecker *checker.Checker, t *checker.Type) bool {
 	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
-		return typecheck.GetWellKnownSymbolPropertyOfType(part, "iterator", typeChecker) != nil
+		return type_checking.GetWellKnownSymbolPropertyOfType(part, "iterator", typeChecker) != nil
 	})
 }
 
 func noMisusedSpreadIsMap(ctx rule.Context, t *checker.Type) bool {
 	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
-		return typecheck.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, part, "Map", "ReadonlyMap", "WeakMap")
+		return type_checking.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, part, "Map", "ReadonlyMap", "WeakMap")
 	})
 }
 
@@ -292,7 +292,7 @@ func noMisusedSpreadIsMap(ctx rule.Context, t *checker.Type) bool {
 // something with a construct signature is an instance of that class.
 func noMisusedSpreadIsClassInstance(typeChecker *checker.Checker, t *checker.Type) bool {
 	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
-		if len(typecheck.GetConstructSignatures(typeChecker, part)) > 0 {
+		if len(type_checking.GetConstructSignatures(typeChecker, part)) > 0 {
 			return false
 		}
 
@@ -323,7 +323,7 @@ func noMisusedSpreadIsClassInstance(typeChecker *checker.Checker, t *checker.Typ
 			if declaredType == nil {
 				continue
 			}
-			if len(typecheck.GetConstructSignatures(typeChecker, declaredType)) > 0 {
+			if len(type_checking.GetConstructSignatures(typeChecker, declaredType)) > 0 {
 				return true
 			}
 		}
@@ -338,7 +338,7 @@ func noMisusedSpreadIsClassInstance(typeChecker *checker.Checker, t *checker.Typ
 // symbol's value declaration is literally a class declaration or a class expression.
 func noMisusedSpreadIsClassDeclaration(t *checker.Type) bool {
 	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
-		if typecheck.IsObjectType(part) &&
+		if type_checking.IsObjectType(part) &&
 			checker.Type_objectFlags(part)&checker.ObjectFlagsInstantiationExpressionType != 0 {
 			return true
 		}
@@ -382,7 +382,7 @@ func noMisusedSpreadAwaitSuggestion(ctx rule.Context, argument *ast.Node) rule.S
 		inner = unwrapped
 	}
 
-	if typecheck.IsHigherPrecedenceThanAwait(inner) {
+	if type_checking.IsHigherPrecedenceThanAwait(inner) {
 		return rule.Suggestion{
 			Message: buildAddAwaitMessage(),
 			Fixes:   []rule.Fix{ctx.InsertBefore(argument, "await ")},
@@ -412,7 +412,7 @@ func noMisusedSpreadAwaitSuggestion(ctx rule.Context, argument *ast.Node) rule.S
 // Returns nothing when the type is a union with a non-Map constituent, matching upstream: the
 // rewrite is only sound if every constituent is a Map, and the finding is still reported without it.
 func noMisusedSpreadMapSuggestions(ctx rule.Context, spread *ast.Node, argument *ast.Node, argumentType *checker.Type) []rule.Suggestion {
-	for _, part := range typecheck.UnionTypeParts(argumentType) {
+	for _, part := range type_checking.UnionTypeParts(argumentType) {
 		if !noMisusedSpreadIsMap(ctx, part) {
 			return nil
 		}
@@ -431,7 +431,7 @@ func noMisusedSpreadMapSuggestions(ctx rule.Context, spread *ast.Node, argument 
 	// A weak-precedence inner node keeps its parentheses, because `Object.fromEntries(map, map)`
 	// would pass two arguments where the comma expression meant one. Upstream's general fixer makes
 	// the same decision through the same predicate.
-	if !typecheck.IsStrongPrecedenceNode(inner) {
+	if !type_checking.IsStrongPrecedenceNode(inner) {
 		innerText = "(" + innerText + ")"
 	}
 
@@ -576,14 +576,14 @@ func DecodeNoMisusedSpreadOptions(raw []byte) (any, error) {
 			continue
 		}
 
-		specifier := typecheck.TypeOrValueSpecifier{Name: entry.Name, Path: entry.Path, Package: entry.Package}
+		specifier := type_checking.TypeOrValueSpecifier{Name: entry.Name, Path: entry.Path, Package: entry.Package}
 		switch entry.From {
 		case "file":
-			specifier.From = typecheck.TypeOrValueSpecifierFromFile
+			specifier.From = type_checking.TypeOrValueSpecifierFromFile
 		case "lib":
-			specifier.From = typecheck.TypeOrValueSpecifierFromLib
+			specifier.From = type_checking.TypeOrValueSpecifierFromLib
 		case "package":
-			specifier.From = typecheck.TypeOrValueSpecifierFromPackage
+			specifier.From = type_checking.TypeOrValueSpecifierFromPackage
 		default:
 			continue
 		}

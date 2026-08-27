@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/hir"
+	"github.com/system-inc/verify/internal/utilities/high_level_intermediate_representation"
 )
 
 var setStateInRenderMessage = rule.Message{
@@ -111,7 +111,7 @@ var setStateInUseMemoMessage = rule.Message{
 //	for (const p of props) { setState(true); }                    setState inside: CLEAN
 //
 // and an early return before the call makes it clean while leaving the syntax around the call
-// unchanged. `hir.UnconditionalBlocks` is the port of upstream's `computeUnconditionalBlocks`; its
+// unchanged. `high_level_intermediate_representation.UnconditionalBlocks` is the port of upstream's `computeUnconditionalBlocks`; its
 // file explains why forward dominance, which this tree already had in two places, answers the wrong
 // question and would have reported the early-return case.
 //
@@ -168,10 +168,10 @@ var SetStateInRender = rule.Rule{
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
-					// Shared with the other rules that lower this same function; see hir.ForFunction.
+					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
 					// Construct runs inside the cached computation, because it mutates in place and is
 					// not idempotent.
-					lowered := hir.ForFunction(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
 					if lowered == nil {
 						return
 					}
@@ -194,7 +194,7 @@ var SetStateInRender = rule.Rule{
 //
 // A function the gate declines is still descended into, because a component nested inside a plain
 // wrapper is a unit even when the wrapper is not.
-func analyzeSetStateSubject(ctx rule.Context, function *hir.Function) {
+func analyzeSetStateSubject(ctx rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
@@ -204,7 +204,7 @@ func analyzeSetStateSubject(ctx rule.Context, function *hir.Function) {
 		}
 		return
 	}
-	reportSetStateInRender(ctx, function, function.Node, true, map[hir.IdentifierId]bool{})
+	reportSetStateInRender(ctx, function, function.Node, true, map[high_level_intermediate_representation.IdentifierId]bool{})
 }
 
 // reportSetStateInRender is upstream's `validate_impl` over one lowered function.
@@ -239,12 +239,12 @@ func analyzeSetStateSubject(ctx rule.Context, function *hir.Function) {
 // the scope walk early and make a binding in the component invisible to a callback inside it.
 func reportSetStateInRender(
 	ctx rule.Context,
-	function *hir.Function,
+	function *high_level_intermediate_representation.Function,
 	compiledUnit *ast.Node,
 	emit bool,
-	unconditionalSetStateFunctions map[hir.IdentifierId]bool,
+	unconditionalSetStateFunctions map[high_level_intermediate_representation.IdentifierId]bool,
 ) bool {
-	unconditional := hir.UnconditionalBlocks(function)
+	unconditional := high_level_intermediate_representation.UnconditionalBlocks(function)
 	reported := false
 
 	for _, block := range function.Blocks {
@@ -259,7 +259,7 @@ func reportSetStateInRender(
 			// along, which is what makes an alias chain of any length behave like its head. The
 			// setter's own type is followed by the checker instead, so these two arms exist only
 			// for values that are not setters themselves but call one.
-			case *hir.LoadLocal:
+			case *high_level_intermediate_representation.LoadLocal:
 				if unconditionalSetStateFunctions[value.Place.Identifier] {
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
@@ -269,11 +269,11 @@ func reportSetStateInRender(
 			// calling something it closed over reaches the setter through `LoadContext` and nothing
 			// else. Without this arm the three-level fixture is silent: inside `bar`, the call is
 			// `Call $4()` where `$4 = LoadContext foo$1`.
-			case *hir.LoadContext:
+			case *high_level_intermediate_representation.LoadContext:
 				if unconditionalSetStateFunctions[value.Place.Identifier] {
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
-			case *hir.StoreLocal:
+			case *high_level_intermediate_representation.StoreLocal:
 				if unconditionalSetStateFunctions[value.Value.Identifier] {
 					unconditionalSetStateFunctions[value.LValue.Identifier] = true
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
@@ -283,7 +283,7 @@ func reportSetStateInRender(
 			// setter, which is upstream's own `has_set_state_operand` guard. Without it every
 			// callback in every component would be walked, and with it the walk is bounded by what
 			// the function can actually reach.
-			case *hir.FunctionExpression:
+			case *high_level_intermediate_representation.FunctionExpression:
 				nested := nestedFunction(function, value)
 				if nested == nil {
 					continue
@@ -327,7 +327,7 @@ func reportSetStateInRender(
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
 
-			case *hir.CallExpression:
+			case *high_level_intermediate_representation.CallExpression:
 				// An optional call is silent upstream. See the rule comment.
 				if value.Optional {
 					continue
@@ -363,7 +363,7 @@ func reportSetStateInRender(
 //
 // The index is bounds-checked rather than trusted: `Functions` is populated by lowering and a
 // malformed or partially lowered function is exactly the input a linter is handed.
-func nestedFunction(function *hir.Function, value *hir.FunctionExpression) *hir.Function {
+func nestedFunction(function *high_level_intermediate_representation.Function, value *high_level_intermediate_representation.FunctionExpression) *high_level_intermediate_representation.Function {
 	if value == nil || int(value.Function) >= len(function.Functions) {
 		return nil
 	}
@@ -408,12 +408,12 @@ func nestedFunction(function *hir.Function, value *hir.FunctionExpression) *hir.
 // in evaluation order, which `Function.Blocks` being in reverse postorder already guarantees.
 func setterCapturesOf(
 	ctx rule.Context,
-	enclosing *hir.Function,
-	value *hir.FunctionExpression,
-	nested *hir.Function,
-	unconditionalSetStateFunctions map[hir.IdentifierId]bool,
-) (map[hir.IdentifierId]bool, bool) {
-	translated := map[hir.IdentifierId]bool{}
+	enclosing *high_level_intermediate_representation.Function,
+	value *high_level_intermediate_representation.FunctionExpression,
+	nested *high_level_intermediate_representation.Function,
+	unconditionalSetStateFunctions map[high_level_intermediate_representation.IdentifierId]bool,
+) (map[high_level_intermediate_representation.IdentifierId]bool, bool) {
+	translated := map[high_level_intermediate_representation.IdentifierId]bool{}
 	for index, captured := range value.Captures {
 		isSetter := unconditionalSetStateFunctions[captured.Identifier] ||
 			isStateSetter(ctx, enclosing, captured.Identifier)
@@ -439,7 +439,7 @@ func setterCapturesOf(
 // `ActionDispatch`, which `useReducer` produces, is deliberately not accepted. Upstream gives it a
 // different built-in shape and its own diagnostics, and a dispatch called during render is not the
 // same defect.
-func isStateSetter(ctx rule.Context, function *hir.Function, id hir.IdentifierId) bool {
+func isStateSetter(ctx rule.Context, function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) bool {
 	if ctx.TypeChecker == nil {
 		return false
 	}
@@ -463,7 +463,7 @@ func isStateSetter(ctx rule.Context, function *hir.Function, id hir.IdentifierId
 //
 // This is the seam `Identifier.Node` documents itself as existing for: the node goes to the checker
 // rather than to a local inference pass.
-func identifierNodeOf(function *hir.Function, id hir.IdentifierId) *ast.Node {
+func identifierNodeOf(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -480,7 +480,7 @@ func identifierNodeOf(function *hir.Function, id hir.IdentifierId) *ast.Node {
 // golden for `setX(1)` underlines four characters and the one for `aliased(2)` underlines seven.
 // Reporting through `ctx.ReportNode` routes via `rule.TokenRange`, which trims leading trivia at
 // the harness.
-func reportSetterCall(ctx rule.Context, function *hir.Function, id hir.IdentifierId, message rule.Message) {
+func reportSetterCall(ctx rule.Context, function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId, message rule.Message) {
 	if node := identifierNodeOf(function, id); node != nil {
 		ctx.ReportNode(node, message)
 		return

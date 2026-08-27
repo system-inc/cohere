@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // setterReturnFile is where the fixtures pretend to live.
@@ -73,8 +73,8 @@ func TestNoSetterReturnFires(t *testing.T) {
 			for index := range wantIds {
 				wantIds[index] = "noSetterReturn"
 			}
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoSetterReturn, setterReturnFile, testCase.sourceText), wantIds...)
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoSetterReturn, setterReturnFile, testCase.sourceText), wantIds...)
 		})
 	}
 }
@@ -208,8 +208,8 @@ func TestNoSetterReturnStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoSetterReturn, setterReturnFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoSetterReturn, setterReturnFile, sourceText))
 		})
 	}
 }
@@ -241,7 +241,7 @@ func TestNoSetterReturnSpansTheWholeStatement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoSetterReturn, setterReturnFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoSetterReturn, setterReturnFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("wanted %d diagnostics, got %d",
 					len(testCase.wantSpans), len(result.Diagnostics))

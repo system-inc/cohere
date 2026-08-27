@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The imported corpus is two cases and the measured corpus is sixty five.
@@ -16,7 +16,7 @@ import (
 // choose between them there.
 //
 // React ships no `VoidUseMemo` golden at all. The 325 fixtures vendored at
-// `internal/reactconformance` were searched for the category name and for both message texts and
+// `internal/react_conformance` were searched for the category name and for both message texts and
 // contain neither, with a control search for "useMemo() callbacks may not accept parameters"
 // finding `error.invalid-useMemo-callback-args.expect.md` in the same command, so the zero is a
 // real absence rather than a bad pattern. The two error-named fixtures a porter would expect to
@@ -242,8 +242,8 @@ func TestVoidUseMemoFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, VoidUseMemo, "component.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.want...)
+			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.want...)
 		})
 	}
 }
@@ -495,8 +495,8 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, VoidUseMemo, "component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -553,7 +553,7 @@ func TestVoidUseMemoSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, VoidUseMemo, "component.tsx", testCase.source)
+			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 			}
@@ -595,10 +595,10 @@ func TestVoidUseMemoMessages(t *testing.T) {
 // claim is now about source order.
 func TestVoidUseMemoReportsBothKindsInSourceOrder(t *testing.T) {
 	unusedFirst := "function Component() {\n  useMemo(() => { return 1; }, []);\n  const x = useMemo(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n"
-	result := ruletest.Run(t, VoidUseMemo, "component.tsx", unusedFirst)
-	ruletest.ExpectFindings(t, result, "useMemoResultUnused", "useMemoCallbackReturnsNothing")
+	result := rule_testing.Run(t, VoidUseMemo, "component.tsx", unusedFirst)
+	rule_testing.ExpectFindings(t, result, "useMemoResultUnused", "useMemoCallbackReturnsNothing")
 
 	voidFirst := "function Component() {\n  const x = useMemo(() => { foo(); }, []);\n  useMemo(() => { return 1; }, []);\n  return <div>{x}</div>;\n}\n"
-	result = ruletest.Run(t, VoidUseMemo, "component.tsx", voidFirst)
-	ruletest.ExpectFindings(t, result, "useMemoCallbackReturnsNothing", "useMemoResultUnused")
+	result = rule_testing.Run(t, VoidUseMemo, "component.tsx", voidFirst)
+	rule_testing.ExpectFindings(t, result, "useMemoCallbackReturnsNothing", "useMemoResultUnused")
 }

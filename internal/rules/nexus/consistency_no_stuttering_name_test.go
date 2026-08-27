@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const stutterFile = "/repository/source/Thing.ts"
@@ -26,8 +26,8 @@ func TestConsistencyNoStutteringNameFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoStutteringName, stutterFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "stutteringName")
+			result := rule_testing.Run(t, ConsistencyNoStutteringName, stutterFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "stutteringName")
 		})
 	}
 }
@@ -52,8 +52,8 @@ func TestConsistencyNoStutteringNameStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoStutteringName, stutterFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyNoStutteringName, stutterFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -63,18 +63,18 @@ func TestConsistencyNoStutteringNameRespectsTheGenericNamesOption(t *testing.T) 
 	// stops being checked once a caller names its own vocabulary.
 	options := ConsistencyNoStutteringNameOptions{GenericNames: []string{"payload"}}
 
-	custom := ruletest.RunWithOptions(t, ConsistencyNoStutteringName, stutterFile,
+	custom := rule_testing.RunWithOptions(t, ConsistencyNoStutteringName, stutterFile,
 		"export const a = payload.payload;\n", options)
-	ruletest.ExpectFindings(t, custom, "stutteringName")
+	rule_testing.ExpectFindings(t, custom, "stutteringName")
 
-	replaced := ruletest.RunWithOptions(t, ConsistencyNoStutteringName, stutterFile,
+	replaced := rule_testing.RunWithOptions(t, ConsistencyNoStutteringName, stutterFile,
 		"export const a = result.result;\n", options)
-	ruletest.ExpectClean(t, replaced)
+	rule_testing.ExpectClean(t, replaced)
 }
 
 func TestConsistencyNoStutteringNameNamesTheWord(t *testing.T) {
-	result := ruletest.Run(t, ConsistencyNoStutteringName, stutterFile, "export const a = outcome.outcome;\n")
-	ruletest.ExpectFindings(t, result, "stutteringName")
+	result := rule_testing.Run(t, ConsistencyNoStutteringName, stutterFile, "export const a = outcome.outcome;\n")
+	rule_testing.ExpectFindings(t, result, "stutteringName")
 
 	description := result.Diagnostics[0].Message.Description
 	if !strings.Contains(description, `"outcome.outcome"`) {

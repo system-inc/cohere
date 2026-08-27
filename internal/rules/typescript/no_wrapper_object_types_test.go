@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const wrapperObjectFile = "/repository/source/Thing.ts"
@@ -36,7 +36,7 @@ func TestNoWrapperObjectTypesFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
 				"bannedWrapperObjectType")
 		})
 	}
@@ -48,8 +48,8 @@ func TestNoWrapperObjectTypesFires(t *testing.T) {
 // One report for the whole annotation would leave the second name unfixed and the author would
 // repair half the problem, so the count is asserted rather than assumed.
 func TestNoWrapperObjectTypesReportsEachWrapper(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoWrapperObjectTypes, wrapperObjectFile, "export type MyType = Number & String;\n"),
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, "export type MyType = Number & String;\n"),
 		"bannedWrapperObjectType", "bannedWrapperObjectType")
 }
 
@@ -75,8 +75,8 @@ func TestNoWrapperObjectTypesFixesToThePrimitive(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.Run(t, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
 				testCase.wantSource)
 		})
 	}
@@ -87,7 +87,7 @@ func TestNoWrapperObjectTypesFixesToThePrimitive(t *testing.T) {
 // `class C implements number {}` does not compile, so replacing the name there would hand the author
 // a repair that breaks the build. oxc makes the same distinction.
 func TestNoWrapperObjectTypesOffersNoFixForImplements(t *testing.T) {
-	result := ruletest.Run(t, NoWrapperObjectTypes, wrapperObjectFile, "export class MyClass implements Number {}\n")
+	result := rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, "export class MyClass implements Number {}\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
@@ -133,7 +133,7 @@ func TestNoWrapperObjectTypesStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText))
 		})
 	}
 }

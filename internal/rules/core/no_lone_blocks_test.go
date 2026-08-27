@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // noLoneBlocksFile is where the fixtures pretend to live.
@@ -67,7 +67,7 @@ func TestNoLoneBlocksStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
 		})
 	}
 }
@@ -112,8 +112,8 @@ func TestNoLoneBlocksFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -126,11 +126,11 @@ func TestNoLoneBlocksFires(t *testing.T) {
 // `sourceType: "module"`, one under `"script"`. A TypeScript file is a module and a module body is
 // always strict, so the block-scoped reading is the only reachable one and the block is clean.
 func TestNoLoneBlocksTreatsEveryFileAsStrict(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile, "{ function bar() {} }"))
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, "{ function bar() {} }"))
 
 	// The control, so the silence above is about the function declaration rather than about the
 	// rule declining every block: the same shape holding a `var` reports.
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
 		"{ var bar = 1; }"), "redundantBlock")
 }
 
@@ -154,13 +154,13 @@ func TestNoLoneBlocksExemptsTypeScriptBlockScopedDeclarations(t *testing.T) {
 		"{ namespace N {} }",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
 		})
 	}
 
 	// The control: a block holding only a statement still reports, so the exemptions above are
 	// about the declaration kinds rather than about the rule going quiet on this shape.
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
 		"{ foo(); }"), "redundantBlock")
 }
 
@@ -181,13 +181,13 @@ func TestNoLoneBlocksDoesNotReportAStaticBlockBody(t *testing.T) {
 		"class C { static { if (foo) { block; } } }",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText))
 		})
 	}
 
 	// A real block INSIDE a static block still reports, and as nested, which is what shows the
 	// guard is about the body node rather than about static blocks generally.
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
 		"class C { static { { block; } } }"), "redundantNestedBlock")
 }
 
@@ -232,8 +232,8 @@ func TestNoLoneBlocksMatchesTheInstalledBuild(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -247,7 +247,7 @@ func TestNoLoneBlocksMatchesTheInstalledBuild(t *testing.T) {
 func TestNoLoneBlocksSpansTheBlock(t *testing.T) {
 	const sourceText = "{ {let y = 1;} }"
 
-	result := ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText)
+	result := rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText)
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("wanted two diagnostics, got %d", len(result.Diagnostics))
 	}
@@ -312,8 +312,8 @@ func TestNoLoneBlocksIdentityNotJustLength(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -333,18 +333,18 @@ func TestNoLoneBlocksIdentityNotJustLength(t *testing.T) {
 // reasonably conclude the exemption was broken.
 func TestNoLoneBlocksSecondArmOutranksTheBindingExemption(t *testing.T) {
 	// Sole statement of a function body: reports, bindings notwithstanding.
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
 		"function f() { { let x = 1; void x; } }"), "redundantNestedBlock")
 
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
 		"function f() { { type Local = number; const v: Local = 1; void v; } }"),
 		"redundantNestedBlock")
 
 	// One statement beside it, so the second arm no longer applies and the binding exemption is
 	// what decides. Both go clean.
-	ruletest.ExpectClean(t, ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
 		"function f() { { let x = 1; void x; } g(); }"))
 
-	ruletest.ExpectClean(t, ruletest.Run(t, NoLoneBlocks, noLoneBlocksFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
 		"function f() { g(); { type Local = number; const v: Local = 1; void v; } }"))
 }

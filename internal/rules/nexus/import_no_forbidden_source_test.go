@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const forbiddenSourceFile = "/repository/source/Thing.tsx"
@@ -64,8 +64,8 @@ func TestImportNoForbiddenSourceFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ImportNoForbiddenSource, forbiddenSourceFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.wantId)
+			result := rule_testing.Run(t, ImportNoForbiddenSource, forbiddenSourceFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
 
 			// A fixable rule whose fix is never checked is half-tested: the finding proves it saw
 			// the problem, the fix text proves it would repair it rather than corrupt the file.
@@ -85,7 +85,7 @@ func TestImportNoForbiddenSourceFires(t *testing.T) {
 			//
 			// The expectation is derived from the case rather than written out, so a new row cannot
 			// forget it and cannot disagree with itself.
-			ruletest.ExpectFixedSource(t, result,
+			rule_testing.ExpectFixedSource(t, result,
 				strings.Replace(testCase.sourceText, quotedSourceOf(testCase.sourceText), testCase.wantFix, 1))
 		})
 	}
@@ -104,8 +104,8 @@ func TestImportNoForbiddenSourceReportsAtTheSpecifier(t *testing.T) {
 		"// eslint-disable-next-line nexus/import-no-forbidden-source\n" +
 		"import NextImage from 'next/image';\n"
 
-	result := ruletest.Run(t, ImportNoForbiddenSource, forbiddenSourceFile, sourceText)
-	ruletest.ExpectFindings(t, result, "forbiddenImageImport")
+	result := rule_testing.Run(t, ImportNoForbiddenSource, forbiddenSourceFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "forbiddenImageImport")
 
 	line, _ := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
 	const importLine = 3 // zero-based, so the fourth line
@@ -132,8 +132,8 @@ func TestImportNoForbiddenSourceStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ImportNoForbiddenSource, forbiddenSourceFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ImportNoForbiddenSource, forbiddenSourceFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

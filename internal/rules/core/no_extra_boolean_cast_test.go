@@ -6,7 +6,7 @@ import (
 
 	"github.com/system-inc/verify/internal/rule"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // extraBooleanCastFile is where the fixtures pretend to live.
@@ -488,8 +488,8 @@ func TestNoExtraBooleanCastFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
 					testCase.sourceText, testCase.options), testCase.messageIds...)
 		})
 	}
@@ -563,8 +563,8 @@ func TestNoExtraBooleanCastStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
+			rule_testing.ExpectClean(t,
+				rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
 					testCase.sourceText, testCase.options))
 		})
 	}
@@ -573,7 +573,7 @@ func TestNoExtraBooleanCastStaysSilent(t *testing.T) {
 // The Boolean-call repairs, asserted through the shared harness.
 //
 // These 199 entries are the ones whose only finding is a redundant `Boolean(...)`, so every repair
-// is a Fix and `ruletest.ExpectFixedSource` can apply them. It is the shelf's assertion and it
+// is a Fix and `rule_testing.ExpectFixedSource` can apply them. It is the shelf's assertion and it
 // refuses overlapping fixes rather than guessing which wins, which is stricter than anything written
 // here would be.
 //
@@ -789,8 +789,8 @@ func TestNoExtraBooleanCastFixesBooleanCalls(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
 					testCase.sourceText, testCase.options), testCase.wantSource)
 		})
 	}
@@ -798,7 +798,7 @@ func TestNoExtraBooleanCastFixesBooleanCalls(t *testing.T) {
 
 // The repairs that involve a double negation, which the shared harness cannot apply.
 //
-// `ruletest.ExpectFixedSource` reads Fixes only, and correctly so: a Suggestion is not something the
+// `rule_testing.ExpectFixedSource` reads Fixes only, and correctly so: a Suggestion is not something the
 // engine applies, and a harness that silently applied one would be asserting a rewrite that never
 // happens in production. These 183 entries each carry at least one `!!` finding, whose repair is a
 // Suggestion, so they are applied here instead.
@@ -999,7 +999,7 @@ func TestNoExtraBooleanCastSuggestsTheRightRepairs(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
+			result := rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
 				testCase.sourceText, testCase.options)
 			if got := applyEveryRepair(testCase.sourceText, result); got != testCase.wantSource {
 				t.Fatalf("applying the repairs gave %q, wanted %q", got, testCase.wantSource)
@@ -1018,7 +1018,7 @@ func TestNoExtraBooleanCastSuggestsTheRightRepairs(t *testing.T) {
 // ordering `internal/fix` uses. Overlapping repairs are skipped rather than applied: a nested cast
 // such as `Boolean(Boolean(a))` reports twice with the outer repair spanning the inner one, and
 // upstream's fixer lands one pass too.
-func applyEveryRepair(sourceText string, result ruletest.Result) string {
+func applyEveryRepair(sourceText string, result rule_testing.Result) string {
 	type edit struct {
 		start int
 		end   int
@@ -1098,7 +1098,7 @@ func TestNoExtraBooleanCastReportsTheRightSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
+			result := rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans),
@@ -1122,7 +1122,7 @@ func TestNoExtraBooleanCastReportsTheRightSpan(t *testing.T) {
 // which is the only occurrence of that declaration in its 946 rules, so there is no second rule to
 // copy the shape from and nothing else in this package would notice if the two were swapped.
 func TestNoExtraBooleanCastSplitsFixFromSuggestion(t *testing.T) {
-	booleanCall := ruletest.Run(t, NoExtraBooleanCast, extraBooleanCastFile, "if (Boolean(foo)) {}")
+	booleanCall := rule_testing.Run(t, NoExtraBooleanCast, extraBooleanCastFile, "if (Boolean(foo)) {}")
 	if len(booleanCall.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding for the Boolean call, got %d", len(booleanCall.Diagnostics))
 	}
@@ -1135,7 +1135,7 @@ func TestNoExtraBooleanCastSplitsFixFromSuggestion(t *testing.T) {
 			len(booleanCall.Diagnostics[0].Suggestions))
 	}
 
-	doubleNegation := ruletest.Run(t, NoExtraBooleanCast, extraBooleanCastFile, "if (!!foo) {}")
+	doubleNegation := rule_testing.Run(t, NoExtraBooleanCast, extraBooleanCastFile, "if (!!foo) {}")
 	if len(doubleNegation.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding for the double negation, got %d",
 			len(doubleNegation.Diagnostics))
@@ -1161,7 +1161,7 @@ func TestNoExtraBooleanCastDeclinesToRepairMultipleArguments(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText)
+			result := rule_testing.Run(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
@@ -1234,9 +1234,9 @@ func TestNoExtraBooleanCastAcceptsTheDeprecatedOptionSpelling(t *testing.T) {
 func TestNoExtraBooleanCastParenthesisesLogicalOperandsUnderCoalescing(t *testing.T) {
 	const sourceText = "if (a ?? Boolean(b && c)) {}"
 
-	result := ruletest.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText,
+	result := rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText,
 		NoExtraBooleanCastOptions{EnforceForInnerExpressions: true})
-	ruletest.ExpectFixedSource(t, result, "if (a ?? (b && c)) {}")
+	rule_testing.ExpectFixedSource(t, result, "if (a ?? (b && c)) {}")
 }
 
 // A second case written for a survivor, covering the other half of the token-boundary padding.
@@ -1255,6 +1255,6 @@ func TestNoExtraBooleanCastParenthesisesLogicalOperandsUnderCoalescing(t *testin
 func TestNoExtraBooleanCastPadsTheTrailingTokenBoundary(t *testing.T) {
 	const sourceText = "!Boolean()in x"
 
-	result := ruletest.Run(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText)
-	ruletest.ExpectFixedSource(t, result, "true in x")
+	result := rule_testing.Run(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText)
+	rule_testing.ExpectFixedSource(t, result, "true in x")
 }

@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const apiParameterPageFile = "/repository/app/account/page.tsx"
@@ -61,7 +61,7 @@ func TestNextRequireApiParameterNameFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NextRequireApiParameterName, testCase.fileName,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NextRequireApiParameterName, testCase.fileName,
 				testCase.sourceText), testCase.wantId)
 		})
 	}
@@ -135,7 +135,7 @@ func TestNextRequireApiParameterNameStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NextRequireApiParameterName, testCase.fileName,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NextRequireApiParameterName, testCase.fileName,
 				testCase.sourceText))
 		})
 	}
@@ -147,7 +147,7 @@ func TestNextRequireApiParameterNameStaysSilent(t *testing.T) {
 // wrong range here silently rewrites something else, and no fixture that only checks message ids
 // would notice.
 func TestNextRequireApiParameterNameFixesTheFieldName(t *testing.T) {
-	result := ruletest.Run(t, NextRequireApiParameterName, apiParameterPageFile,
+	result := rule_testing.Run(t, NextRequireApiParameterName, apiParameterPageFile,
 		"export async function generateMetadata(argument: { parameters: unknown }) {\n    return argument;\n}\n")
 
 	if len(result.Diagnostics) != 1 {
@@ -163,14 +163,14 @@ func TestNextRequireApiParameterNameFixesTheFieldName(t *testing.T) {
 
 	// The text is half the fix and the range is the other half. Writing "params" over the wrong span
 	// produces the right characters in the wrong place, and every assertion above still passes.
-	ruletest.ExpectFixedSource(t, result,
+	rule_testing.ExpectFixedSource(t, result,
 		"export async function generateMetadata(argument: { params: unknown }) {\n    return argument;\n}\n")
 
-	searchResult := ruletest.Run(t, NextRequireApiParameterName, apiParameterPageFile,
+	searchResult := rule_testing.Run(t, NextRequireApiParameterName, apiParameterPageFile,
 		"export async function generateMetadata(argument: { searchParameters: unknown }) {\n    return argument;\n}\n")
 	if text := searchResult.Diagnostics[0].Fixes[0].Text; text != "searchParams" {
 		t.Fatalf("want the fix to write searchParams, got %q", text)
 	}
-	ruletest.ExpectFixedSource(t, searchResult,
+	rule_testing.ExpectFixedSource(t, searchResult,
 		"export async function generateMetadata(argument: { searchParams: unknown }) {\n    return argument;\n}\n")
 }

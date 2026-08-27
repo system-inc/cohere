@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 // PreferPromiseRejectErrorsOptions is upstream's option struct, plus the one split our wire format
@@ -21,7 +21,7 @@ import (
 // zero value a nil-options rule receives already IS the default. only-throw-error needs pointers
 // because its defaults are true and absent has to stay distinguishable from false.
 type PreferPromiseRejectErrorsOptions struct {
-	Allow                []typecheck.TypeOrValueSpecifier
+	Allow                []type_checking.TypeOrValueSpecifier
 	AllowInline          []string
 	AllowEmptyReject     bool
 	AllowThrowingAny     bool
@@ -138,7 +138,7 @@ func buildPreferPromiseRejectErrorsMessage() rule.Message {
 //
 // What has been established, so the next person does not repeat it:
 //
-//   - It is not the rule's shape. Handed that file's own text through `ruletest.RunTyped`, this
+//   - It is not the rule's shape. Handed that file's own text through `rule_testing.RunTyped`, this
 //     rule finds all SIX, at exactly upstream's lines. Reduced versions of the nesting -- arrow
 //     executor and function executor, each wrapping a `socket.connect` callback around an async
 //     IIFE -- both report here.
@@ -151,7 +151,7 @@ func buildPreferPromiseRejectErrorsMessage() rule.Message {
 //     divergence in the rule's judgment.
 //
 // It is stated here rather than in a fixture because a fixture would have to assert the wrong
-// number to stay green: through `ruletest` the rule already agrees with upstream on all six.
+// number to stay green: through `rule_testing` the rule already agrees with upstream on all six.
 //
 // # Cost
 //
@@ -199,21 +199,21 @@ var PreferPromiseRejectErrors = rule.Rule{
 				return
 			}
 
-			if typecheck.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ctx.Program) {
+			if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ctx.Program) {
 				return
 			}
-			if settings.AllowThrowingAny && typecheck.IsTypeAnyType(argumentType) {
+			if settings.AllowThrowingAny && type_checking.IsTypeAnyType(argumentType) {
 				return
 			}
-			if settings.AllowThrowingUnknown && typecheck.IsTypeUnknownType(argumentType) {
+			if settings.AllowThrowingUnknown && type_checking.IsTypeUnknownType(argumentType) {
 				return
 			}
-			if typecheck.IsErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
+			if type_checking.IsErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
 				return
 			}
 			// A readonly Error-like is a separate predicate upstream and not subsumed by the one
 			// above: `Readonly<Error>` is not assignable through the same path.
-			if typecheck.IsReadonlyErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
+			if type_checking.IsReadonlyErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
 				return
 			}
 
@@ -243,8 +243,8 @@ var PreferPromiseRejectErrors = rule.Rule{
 				if receiverType == nil {
 					return
 				}
-				if !typecheck.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, receiverType) &&
-					!typecheck.IsPromiseLike(ctx.Program, ctx.TypeChecker, receiverType) {
+				if !type_checking.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, receiverType) &&
+					!type_checking.IsPromiseLike(ctx.Program, ctx.TypeChecker, receiverType) {
 					return
 				}
 
@@ -262,7 +262,7 @@ var PreferPromiseRejectErrors = rule.Rule{
 					return
 				}
 				calleeType := ctx.TypeChecker.GetTypeAtLocation(callee)
-				if calleeType == nil || !typecheck.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, calleeType) {
+				if calleeType == nil || !type_checking.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, calleeType) {
 					return
 				}
 
@@ -525,16 +525,16 @@ func DecodePreferPromiseRejectErrorsOptions(raw []byte) (any, error) {
 			continue
 		}
 
-		specifier := typecheck.TypeOrValueSpecifier{Name: entry.Name, Path: entry.Path, Package: entry.Package}
+		specifier := type_checking.TypeOrValueSpecifier{Name: entry.Name, Path: entry.Path, Package: entry.Package}
 		switch entry.From {
 		case "file":
-			specifier.From = typecheck.TypeOrValueSpecifierFromFile
+			specifier.From = type_checking.TypeOrValueSpecifierFromFile
 		case "lib":
-			specifier.From = typecheck.TypeOrValueSpecifierFromLib
+			specifier.From = type_checking.TypeOrValueSpecifierFromLib
 		// This arm has no fixture that can see it, and the reason is a HARNESS limit rather than a
 		// gap. A `from: package` specifier resolves against a package declaration, which upstream's
 		// own corpus writes as an ambient `declare module 'errors'`, and ruletest pins
-		// `moduleDetection: "force"` (internal/ruletest/program.go:27), under which that module is
+		// `moduleDetection: "force"` (internal/rule_testing/program.go:27), under which that module is
 		// unresolvable. Measured: the imported type comes back as `any`, confirmed by the same input
 		// going clean under `allowThrowingAny`. An `any` carries no symbol, so no specifier can
 		// match it and this arm cannot change a verdict here.
@@ -543,7 +543,7 @@ func DecodePreferPromiseRejectErrorsOptions(raw []byte) (any, error) {
 		// and `lib` arms beside it are both caught, which is the control saying the sweep can see
 		// this switch at all.
 		case "package":
-			specifier.From = typecheck.TypeOrValueSpecifierFromPackage
+			specifier.From = type_checking.TypeOrValueSpecifierFromPackage
 		default:
 			continue
 		}

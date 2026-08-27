@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/reference"
 )
 
 // messageGlobalReassignmentId is the finding's id, and messageGlobalReassignmentReason is
@@ -73,11 +73,11 @@ const messageGlobalReassignmentReason = "Render has to be able to run at any tim
 //	function Component() { let x = 1; const f = () => { x = 2; }; f(); } silent
 //
 // The second is a closure capture, and it is the case the intermediate representation in
-// `internal/utils/hir` gets wrong. See the note on routes below.
+// `internal/utilities/hir` gets wrong. See the note on routes below.
 //
 // # Why this does not read the HIR, which lowers `StoreGlobal` directly
 //
-// `internal/utils/hir` landed the same day as this rule and emits a `StoreGlobal` instruction,
+// `internal/utilities/hir` landed the same day as this rule and emits a `StoreGlobal` instruction,
 // which reads as the whole detection already done. It was not used, and the reasons were measured
 // rather than inferred. Both were re-probed at `19ac208`, the commit that taught lowering to resolve
 // captures, because the first probe predated it and a stale measurement is worse than none.
@@ -101,7 +101,7 @@ const messageGlobalReassignmentReason = "Render has to be able to run at any tim
 //	  lowering the COMPONENT  ->  StoreContext reassign x$2 = $1     correct, and silent
 //	  lowering the ARROW      ->  StoreGlobal x = $1                 still the old answer
 //
-// `hir.Lower` takes one function and builds its own identifier table, and
+// `high_level_intermediate_representation.Lower` takes one function and builds its own identifier table, and
 // `lowerAssignmentTarget` emits `StoreGlobal` for any target not in that table, so which answer a
 // consumer gets depends on which node it handed the lowering. A rule built on this would have had
 // to be careful about its own traversal in a way nothing in the instruction set signals.
@@ -114,7 +114,7 @@ const messageGlobalReassignmentReason = "Render has to be able to run at any tim
 //
 // # The third route, and why it was not taken either
 //
-// `internal/utils/ecmascript/reference` already answers "does this identifier write to its
+// `internal/utilities/ecmascript/reference` already answers "does this identifier write to its
 // binding", and `core/no-global-assign` already answers a question one word away from this one.
 // Neither is the whole rule, but the structural half is genuinely the same question, and it is
 // reused here rather than rewritten. Its doc comment records the 625-false-positive incident where
@@ -526,7 +526,7 @@ func isInsideCatchOrFinally(node *ast.Node, root *ast.Node) bool {
 // `return <div />; g = 1;` is silent upstream, measured with a control. This reproduces the shape
 // the corpus and the probes exercise rather than real reachability: only a sibling statement in the
 // same list is considered, and only the four completions that end a block. A full answer belongs in
-// `internal/utils/controlflow` rather than here, and this rule does not need one, since unreachable
+// `internal/utilities/controlflow` rather than here, and this rule does not need one, since unreachable
 // code after a return is the only form either upstream's corpus or these probes produce.
 func followsAnAbruptCompletion(node *ast.Node, root *ast.Node) bool {
 	for current := node; current != nil && current != root; current = current.Parent {

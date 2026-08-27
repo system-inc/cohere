@@ -9,7 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/config"
+	"github.com/system-inc/verify/internal/configuration"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/suppression"
 )
@@ -666,9 +666,9 @@ func (g *Graph) rulesFor(
 	rules []rule.Rule,
 	scopedOff map[string]int,
 	unconfigured map[string]int,
-) ([]rule.Rule, map[string]any, config.Resolved, error) {
+) ([]rule.Rule, map[string]any, configuration.Resolved, error) {
 	if g.LintConfig == nil {
-		return rules, nil, config.Resolved{}, nil
+		return rules, nil, configuration.Resolved{}, nil
 	}
 
 	resolution := g.LintConfig.Resolve(sourceFile.FileName())
@@ -680,13 +680,13 @@ func (g *Graph) rulesFor(
 	options := map[string]any{}
 	for _, subject := range rules {
 		switch status, _ := resolution.StatusOf(subject.Name); status {
-		case config.StatusScopedOff:
+		case configuration.StatusScopedOff:
 			// Someone configured this rule off, here or tree-wide. Counted rather than dropped
 			// silently, because a rule absent across a directory is otherwise indistinguishable
 			// from a rule with nothing to report.
 			scopedOff[subject.Name]++
 			continue
-		case config.StatusUnconfigured:
+		case configuration.StatusUnconfigured:
 			// Nobody has said whether this rule should run. That is a different fact from a
 			// deliberate exclusion and it is counted separately, or a rule waiting on a decision
 			// reads as one somebody already made.

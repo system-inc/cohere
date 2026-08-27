@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // unreachableLoopFile is where the fixtures pretend to live.
@@ -33,8 +33,8 @@ func TestNoUnreachableLoopFires(t *testing.T) {
 			for index := range wantIds {
 				wantIds[index] = "invalid"
 			}
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUnreachableLoop, unreachableLoopFile, testCase.source), wantIds...)
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, testCase.source), wantIds...)
 		})
 	}
 }
@@ -47,8 +47,8 @@ func TestNoUnreachableLoopFires(t *testing.T) {
 func TestNoUnreachableLoopStaysSilent(t *testing.T) {
 	for _, source := range unreachableLoopCleanCases {
 		t.Run(source, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUnreachableLoop, unreachableLoopFile, source))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, source))
 		})
 	}
 }
@@ -74,8 +74,8 @@ func TestNoUnreachableLoopOptions(t *testing.T) {
 			for index := range wantIds {
 				wantIds[index] = "invalid"
 			}
-			ruletest.ExpectFindings(t,
-				ruletest.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, testCase.source, decoded),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, testCase.source, decoded),
 				wantIds...)
 		})
 	}
@@ -89,12 +89,12 @@ func TestNoUnreachableLoopOptions(t *testing.T) {
 // inverted under nil would pass every option fixture in the table above, because each of those
 // arrives through the decoder with a real value.
 func TestNoUnreachableLoopHandlesNilOptions(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, "while (a) break;", nil),
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, "while (a) break;", nil),
 		"invalid")
 
-	ruletest.ExpectClean(t,
-		ruletest.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, "while (a) { bar(); }", nil))
+	rule_testing.ExpectClean(t,
+		rule_testing.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, "while (a) { bar(); }", nil))
 }
 
 // TestNoUnreachableLoopSpans asserts where the finding points, which no message-id fixture can see.
@@ -146,13 +146,13 @@ func TestNoUnreachableLoopSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnreachableLoop, unreachableLoopFile, testCase.source)
+			result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, testCase.source)
 			if len(result.Diagnostics) != len(testCase.reports) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.reports), len(result.Diagnostics))
 			}
 			for index, want := range testCase.reports {
 				diagnostic := result.Diagnostics[index]
-				// ruletest.Run does not trim the source, unlike RunTyped, so the file on disk and
+				// rule_testing.Run does not trim the source, unlike RunTyped, so the file on disk and
 				// the literal here are the same bytes and this slice needs no adjustment.
 				got := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != want {
@@ -170,7 +170,7 @@ func TestNoUnreachableLoopSpans(t *testing.T) {
 // against the rule's own constant, because comparing a diagnostic to the constant it was built from
 // is an equality that moves in both directions under mutation and cannot fail.
 func TestNoUnreachableLoopMessage(t *testing.T) {
-	result := ruletest.Run(t, NoUnreachableLoop, unreachableLoopFile, "while (a) break;")
+	result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, "while (a) break;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 	}
@@ -204,8 +204,8 @@ func TestNoUnreachableLoopIgnoringEveryKindDisablesTheRule(t *testing.T) {
 
 	// Five loops, one of every kind, every one of them invalid without the option.
 	const source = "while (a) break; do break; while (b); for (;;) break; for (c in d) break; for (e of f) break;"
-	ruletest.ExpectClean(t,
-		ruletest.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, source, decoded))
+	rule_testing.ExpectClean(t,
+		rule_testing.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, source, decoded))
 }
 
 // TestNoUnreachableLoopJudgesEachRootSeparately covers a shape the corpus does not write.
@@ -214,14 +214,14 @@ func TestNoUnreachableLoopIgnoringEveryKindDisablesTheRule(t *testing.T) {
 // unreachable, and the two reachability questions are different: the function is never called, yet
 // the loop inside it is perfectly reachable within the function's own graph. Upstream gets this
 // from having one code path per function; here it comes from judging a loop only in the root
-// returned by `controlflow.RootOf`, and without that guard the outer graph's walk past the nested
+// returned by `control_flow_graph.RootOf`, and without that guard the outer graph's walk past the nested
 // body would answer the wrong question.
 //
 // Measured against the installed eslint 10.8.1 build: both loops report.
 func TestNoUnreachableLoopJudgesEachRootSeparately(t *testing.T) {
 	const source = "function outer() { return; function inner() { while (a) break; } } while (b) break;"
-	result := ruletest.Run(t, NoUnreachableLoop, unreachableLoopFile, source)
-	ruletest.ExpectFindings(t, result, "invalid", "invalid")
+	result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, source)
+	rule_testing.ExpectFindings(t, result, "invalid", "invalid")
 
 	wantSpans := []string{"while (a) break;", "while (b) break;"}
 	for index, want := range wantSpans {
@@ -236,7 +236,7 @@ func TestNoUnreachableLoopJudgesEachRootSeparately(t *testing.T) {
 // nor a function, which the corpus has no cases for because ESLint's tester runs at ES2018 and a
 // class static block is ES2022.
 //
-// Both are roots in `controlflow.IsRoot`, so a rule enumerating only files and functions would go
+// Both are roots in `control_flow_graph.IsRoot`, so a rule enumerating only files and functions would go
 // silent on them. Measured against the installed eslint 10.8.1 build at ecmaVersion 2022: both
 // report.
 func TestNoUnreachableLoopInNonFunctionRoots(t *testing.T) {
@@ -259,8 +259,8 @@ func TestNoUnreachableLoopInNonFunctionRoots(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnreachableLoop, unreachableLoopFile, testCase.source)
-			ruletest.ExpectFindings(t, result, "invalid")
+			result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, testCase.source)
+			rule_testing.ExpectFindings(t, result, "invalid")
 			got := testCase.source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if got != testCase.want {
 				t.Errorf("span: got %q, want %q", got, testCase.want)

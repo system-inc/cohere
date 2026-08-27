@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // paramReassignFile is where the fixtures pretend to live.
@@ -91,9 +91,9 @@ func TestNoParamReassignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText+" "+testCase.messageId, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+			result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 				testCase.sourceText, testCase.options)
-			ruletest.ExpectFindings(t, result, testCase.messageId)
+			rule_testing.ExpectFindings(t, result, testCase.messageId)
 
 			finding := result.Diagnostics[0]
 
@@ -198,7 +198,7 @@ func TestNoParamReassignStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoParamReassign,
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -234,13 +234,13 @@ func TestNoParamReassignStopsAtAConciseArrowBody(t *testing.T) {
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, NoParamReassign,
+			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options), testCase.messageId)
 		})
 	}
 
 	t.Run("a concise arrow that merely reads", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 			"const f = (a) => a.b;", decodedParamOptions(t, `{"props": true}`)))
 	})
 
@@ -260,7 +260,7 @@ func TestNoParamReassignStopsAtAConciseArrowBody(t *testing.T) {
 	}
 	for _, sourceText := range silentAcrossAFunctionBoundary {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoParamReassign,
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, sourceText, decodedParamOptions(t, `{"props": true}`)))
 		})
 	}
@@ -282,7 +282,7 @@ func TestNoParamReassignSeesPostfixUpdates(t *testing.T) {
 	}
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, NoParamReassign,
+			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, sourceText, decodedParamOptions(t, `{"props": true}`)),
 				"assignmentToFunctionParamProp")
 		})
@@ -310,7 +310,7 @@ func TestNoParamReassignSeesIntoParameterDefaults(t *testing.T) {
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, NoParamReassign,
+			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options), testCase.messageId)
 		})
 	}
@@ -329,7 +329,7 @@ func TestNoParamReassignSeesIntoParameterDefaults(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoParamReassign,
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -361,9 +361,9 @@ func TestNoParamReassignReachesIntoClassBodies(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+			result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 				testCase.sourceText, testCase.options)
-			ruletest.ExpectFindings(t, result, testCase.messageId)
+			rule_testing.ExpectFindings(t, result, testCase.messageId)
 			if got := result.Diagnostics[0].Message.Description; got != "Assignment to function parameter 'a'." &&
 				got != "Assignment to property of function parameter 'a'." {
 				t.Errorf("message %q names the wrong parameter", got)
@@ -400,9 +400,9 @@ func TestNoParamReassignAttributesAShadowedWriteToOneFunction(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+			result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 				testCase.sourceText, nil)
-			ruletest.ExpectFindings(t, result, "assignmentToFunctionParam")
+			rule_testing.ExpectFindings(t, result, "assignmentToFunctionParam")
 			want := "Assignment to function parameter '" + testCase.wantName + "'."
 			if got := result.Diagnostics[0].Message.Description; got != want {
 				t.Errorf("message %q, want %q", got, want)
@@ -420,7 +420,7 @@ func TestNoParamReassignNeedsTheTypedHarness(t *testing.T) {
 	if !NoParamReassign.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring the checker, which makes every silent fixture vacuous")
 	}
-	ruletest.ExpectClean(t, ruletest.Run(t, NoParamReassign, paramReassignFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoParamReassign, paramReassignFile,
 		"function foo(bar) { bar = 13; }"))
 }
 
@@ -429,12 +429,12 @@ func TestNoParamReassignOptions(t *testing.T) {
 	propertyWrite := "function foo(a) { a.b = 0; }"
 
 	t.Run("nil options, the shape the live config produces", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoParamReassign,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 			paramReassignFile, propertyWrite, nil))
 	})
 
 	t.Run("a zero-value struct declines property writes", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoParamReassign,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
 			paramReassignFile, propertyWrite, NoParamReassignOptions{}))
 	})
 
@@ -465,9 +465,9 @@ func TestNoParamReassignOptions(t *testing.T) {
 		// hides findings.
 		options := decodedParamOptions(t,
 			`{"props": true, "ignorePropertyModificationsForRegex": ["^(unclosed"]}`)
-		result := ruletest.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+		result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 			propertyWrite, options)
-		ruletest.ExpectFindings(t, result, "assignmentToFunctionParamProp")
+		rule_testing.ExpectFindings(t, result, "assignmentToFunctionParamProp")
 	})
 
 	t.Run("a pattern Go accepts and JavaScript does not is still a pattern", func(t *testing.T) {
@@ -477,9 +477,9 @@ func TestNoParamReassignOptions(t *testing.T) {
 		// recorded rather than papered over.
 		options := decodedParamOptions(t,
 			`{"props": true, "ignorePropertyModificationsForRegex": ["^(?!x)a$"]}`)
-		result := ruletest.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+		result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 			propertyWrite, options)
-		ruletest.ExpectFindings(t, result, "assignmentToFunctionParamProp")
+		rule_testing.ExpectFindings(t, result, "assignmentToFunctionParamProp")
 	})
 
 	t.Run("both lists apply together", func(t *testing.T) {
@@ -488,9 +488,9 @@ func TestNoParamReassignOptions(t *testing.T) {
 		// parameter matching neither and reporting.
 		options := decodedParamOptions(t,
 			`{"props": true, "ignorePropertyModificationsFor": ["one"], "ignorePropertyModificationsForRegex": ["^tw"]}`)
-		result := ruletest.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+		result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
 			"function foo(one, two, three) { one.a = 0; two.a = 0; three.a = 0; }", options)
-		ruletest.ExpectFindings(t, result, "assignmentToFunctionParamProp")
+		rule_testing.ExpectFindings(t, result, "assignmentToFunctionParamProp")
 		if got := result.Diagnostics[0].Message.Description; got != "Assignment to property of function parameter 'three'." {
 			t.Errorf("reported %q, want the third parameter", got)
 		}

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const abbreviatedFile = "/repository/source/Thing.tsx"
@@ -137,8 +137,8 @@ func TestConsistencyNoAbbreviatedIdentifierFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -210,8 +210,8 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -309,9 +309,9 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, ConsistencyNoAbbreviatedIdentifier,
+			result := rule_testing.RunWithOptions(t, ConsistencyNoAbbreviatedIdentifier,
 				testCase.fileName, testCase.sourceText, options)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -320,9 +320,9 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
 // guard everything. `boundary-no-project-import` was enabled and inert for months because a missing
 // option made it decline every file, which looks exactly like a clean run.
 func TestConsistencyNoAbbreviatedIdentifierRunsWithoutOptions(t *testing.T) {
-	result := ruletest.Run(t, ConsistencyNoAbbreviatedIdentifier,
+	result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier,
 		"/repository/app/blog/page.tsx", "export default function Page({ params }) {\n    return params;\n}\n")
-	ruletest.ExpectFindings(t, result, "noParams", "noParams")
+	rule_testing.ExpectFindings(t, result, "noParams", "noParams")
 }
 
 // The suggested name travels in the message, since there is no fix to carry it. A message naming
@@ -352,7 +352,7 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected a finding for %q", testCase.sourceText)
 			}
@@ -457,7 +457,7 @@ func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(t *testing.T) 
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoAbbreviatedIdentifier, "/repository/source/Thing.ts", testCase.sourceText)
+			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, "/repository/source/Thing.ts", testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected a finding, got none")
 			}

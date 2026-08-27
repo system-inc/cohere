@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 func buildNoMixedEnumsMessage() rule.Message {
@@ -397,7 +397,7 @@ func noMixedEnumsClassify(ctx rule.Context, member *ast.Node) noMixedEnumsMember
 	if initializerType == nil {
 		return noMixedEnumsNumber
 	}
-	if typecheck.IsTypeFlagSet(initializerType, checker.TypeFlagsStringLike) {
+	if type_checking.IsTypeFlagSet(initializerType, checker.TypeFlagsStringLike) {
 		return noMixedEnumsString
 	}
 	return noMixedEnumsNumber

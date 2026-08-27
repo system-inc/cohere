@@ -3,7 +3,7 @@ package tailwind
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Expectations measured by running `better-tailwindcss/no-deprecated-classes` over probe fixtures
@@ -111,8 +111,8 @@ func TestNoDeprecatedClassesReportsRenames(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDeprecatedClasses, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.Run(t, NoDeprecatedClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -170,8 +170,8 @@ func TestNoDeprecatedClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDeprecatedClasses, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoDeprecatedClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -222,7 +222,7 @@ func TestNoDeprecatedClassesFixMatchesUpstream(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDeprecatedClasses, "Component.tsx", testCase.source)
+			result := rule_testing.Run(t, NoDeprecatedClasses, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("expected a finding, got none")
 			}
@@ -243,7 +243,7 @@ func TestNoDeprecatedClassesFixMatchesUpstream(t *testing.T) {
 // `bg-black/50` and requires knowing which color the author meant. A fix here would have to invent
 // one.
 func TestRemovedUtilitiesProposeNoFix(t *testing.T) {
-	result := ruletest.Run(t, NoDeprecatedClasses, "Component.tsx",
+	result := rule_testing.Run(t, NoDeprecatedClasses, "Component.tsx",
 		`const element = <div className="bg-opacity-50" />;`)
 
 	if len(result.Diagnostics) != 1 {

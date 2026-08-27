@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/imports"
 )
 
 // The aliases that point out of nexus and into the things built on top of it.

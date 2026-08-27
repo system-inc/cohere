@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 // The corpus for no-misused-spread, taken verbatim from upstream's own tester.
@@ -69,17 +69,17 @@ func TestNoMisusedSpreadStaysSilent(t *testing.T) {
 		{"upstream valid 30", "file.ts", "\nconst o = { ...'test' };\n    ", nil},
 		{"upstream valid 31", "file.ts", "\nconst str: string = 'test';\nconst a = [...str];\n      ", NoMisusedSpreadOptions{AllowInline: []string{"string"}}},
 		{"upstream valid 32", "file.ts", "\nfunction f() {}\n\nconst a = { ...f };\n      ", NoMisusedSpreadOptions{AllowInline: []string{"f"}}},
-		{"upstream valid 33", "file.ts", "\ndeclare const iterator: Iterable<string>;\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{Allow: []typecheck.TypeOrValueSpecifier{{From: typecheck.TypeOrValueSpecifierFromLib, Name: []string{"Iterable"}}}}},
-		{"upstream valid 34", "file.ts", "\ntype BrandedString = string & { __brand: 'safe' };\n\ndeclare const brandedString: BrandedString;\n\nconst spreadBrandedString = [...brandedString];\n      ", NoMisusedSpreadOptions{Allow: []typecheck.TypeOrValueSpecifier{{From: typecheck.TypeOrValueSpecifierFromFile, Name: []string{"BrandedString"}}}}},
+		{"upstream valid 33", "file.ts", "\ndeclare const iterator: Iterable<string>;\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Iterable"}}}}},
+		{"upstream valid 34", "file.ts", "\ntype BrandedString = string & { __brand: 'safe' };\n\ndeclare const brandedString: BrandedString;\n\nconst spreadBrandedString = [...brandedString];\n      ", NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"BrandedString"}}}}},
 		{"upstream valid 35", "file.ts", "\ntype CustomIterable = {\n  [Symbol.iterator]: () => Generator<string>;\n};\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{AllowInline: []string{"CustomIterable"}}},
-		{"upstream valid 36", "file.ts", "\ntype CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{Allow: []typecheck.TypeOrValueSpecifier{{From: typecheck.TypeOrValueSpecifierFromFile, Name: []string{"CustomIterable"}}}}},
-		{"upstream valid 37", "file.ts", "\ndeclare module 'module' {\n  export type CustomIterable = {\n    [Symbol.iterator]: () => string;\n  };\n}\n\nimport { CustomIterable } from 'module';\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{Allow: []typecheck.TypeOrValueSpecifier{{From: typecheck.TypeOrValueSpecifierFromPackage, Name: []string{"CustomIterable"}, Package: "module"}}}},
+		{"upstream valid 36", "file.ts", "\ntype CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomIterable"}}}}},
+		{"upstream valid 37", "file.ts", "\ndeclare module 'module' {\n  export type CustomIterable = {\n    [Symbol.iterator]: () => string;\n  };\n}\n\nimport { CustomIterable } from 'module';\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromPackage, Name: []string{"CustomIterable"}, Package: "module"}}}},
 		{"upstream valid 38", "file.ts", "\nclass A {\n  a = 1;\n}\n\nconst a = new A();\n\nconst o = { ...a };\n      ", NoMisusedSpreadOptions{AllowInline: []string{"A"}}},
 		{"upstream valid 39", "file.ts", "\nconst a = {\n  ...class A {\n    static value = 1;\n  },\n};\n      ", NoMisusedSpreadOptions{AllowInline: []string{"A"}}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -192,8 +192,8 @@ func TestNoMisusedSpreadFires(t *testing.T) {
 		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", nil, []string{"noPromiseSpreadInObject"}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -242,7 +242,7 @@ func TestNoMisusedSpreadSuggestions(t *testing.T) {
 		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", nil, "addAwait", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...await promise} />;\n      "}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("want at least one finding, got none")
 			}
@@ -303,7 +303,7 @@ func TestNoMisusedSpreadSpans(t *testing.T) {
 		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", []string{"{...promise}"}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, nil)
+			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, testCase.fileName, testCase.sourceText, nil)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
@@ -327,7 +327,7 @@ func TestNoMisusedSpreadSpans(t *testing.T) {
 // its allow list uses a `from: package` specifier naming that module. Reproducing it needs `module`
 // to be a resolvable package name, which means `@types/node` on the program.
 //
-// `ruletest` pins `types: []` deliberately, so that a fixture cannot pick up whatever happens to be
+// `rule_testing` pins `types: []` deliberately, so that a fixture cannot pick up whatever happens to be
 // installed near the temp directory and pass or fail by machine. With no node types the input is
 // TypeScript error 2664, "Invalid module name in augmentation", and the rule is silent.
 //
@@ -344,20 +344,20 @@ func TestNoMisusedSpreadSpans(t *testing.T) {
 // missing.
 func TestNoMisusedSpreadCaseThatCannotBeExpressedHere(t *testing.T) {
 	t.Run("the same iterable shape without an ambient module reports", func(t *testing.T) {
-		result := ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
+		result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
 			"type CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\ndeclare const iterator: CustomIterable;\nconst a = { ...iterator };", nil)
-		ruletest.ExpectFindings(t, result, "noIterableSpreadInObject")
+		rule_testing.ExpectFindings(t, result, "noIterableSpreadInObject")
 	})
 
 	t.Run("an allow specifier naming that type silences it", func(t *testing.T) {
 		// The other half of what case 61 was testing, expressed with a `from: file` specifier, which
 		// needs no package resolution.
-		result := ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
+		result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
 			"type CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\ndeclare const iterator: CustomIterable;\nconst a = { ...iterator };",
-			NoMisusedSpreadOptions{Allow: []typecheck.TypeOrValueSpecifier{
-				{From: typecheck.TypeOrValueSpecifierFromFile, Name: []string{"CustomIterable"}},
+			NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{
+				{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomIterable"}},
 			}})
-		ruletest.ExpectClean(t, result)
+		rule_testing.ExpectClean(t, result)
 	})
 }
 
@@ -408,14 +408,14 @@ func TestNoMisusedSpreadCascadeOrdering(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
-			ruletest.ExpectFindings(t, result, testCase.wantId)
+			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
 	}
 }
 
 // TestNoMisusedSpreadRequiresTheTypedHarness asserts the rule declares the checker and that the
-// plain harness cannot prove it, so a later revert to ruletest.Run fails loudly.
+// plain harness cannot prove it, so a later revert to rule_testing.Run fails loudly.
 func TestNoMisusedSpreadRequiresTheTypedHarness(t *testing.T) {
 	if !NoMisusedSpread.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
@@ -423,8 +423,8 @@ func TestNoMisusedSpreadRequiresTheTypedHarness(t *testing.T) {
 
 	const source = "const a = [...'test'];"
 
-	ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoMisusedSpread, noMisusedSpreadFile, source), "noStringSpread")
-	ruletest.ExpectClean(t, ruletest.Run(t, NoMisusedSpread, noMisusedSpreadFile, source))
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoMisusedSpread, noMisusedSpreadFile, source), "noStringSpread")
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoMisusedSpread, noMisusedSpreadFile, source))
 }
 
 // TestNoMisusedSpreadSurvivesMalformedSpreads runs the rule over spread shapes where a node it
@@ -458,7 +458,7 @@ func TestNoMisusedSpreadSurvivesMalformedSpreads(t *testing.T) {
 	for index, source := range sources {
 		t.Run(fmt.Sprintf("shape-%d", index), func(t *testing.T) {
 			// A panic fails the test. Findings are deliberately unasserted.
-			ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source, nil)
+			rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source, nil)
 		})
 	}
 }
@@ -499,7 +499,7 @@ func TestNoMisusedSpreadDecoder(t *testing.T) {
 		if len(got.Allow) != 1 || len(got.Allow[0].Name) != 1 || got.Allow[0].Name[0] != "Map" {
 			t.Fatalf("got %+v, want one specifier naming Map", got)
 		}
-		if got.Allow[0].From != typecheck.TypeOrValueSpecifierFromLib {
+		if got.Allow[0].From != type_checking.TypeOrValueSpecifierFromLib {
 			t.Errorf("the from field decoded as %v, want lib", got.Allow[0].From)
 		}
 	})
@@ -514,16 +514,16 @@ func TestNoMisusedSpreadDecoder(t *testing.T) {
 		// and is silent on the binding below, so the narrowness is upstream's rather than ours.
 		const source = "const str: string = 'test';\nconst a = [...str];"
 
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source,
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source,
 			decode(t, `{}`)), "noStringSpread")
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source,
 			decode(t, `{"allow": ["string"]}`)))
 	})
 
 	t.Run("an inline specifier matches by type name, so a literal is not covered", func(t *testing.T) {
 		// The other half of the measurement above, kept because it is the surprising direction and
 		// a later reader would otherwise assume `allow: ["string"]` covers every string.
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
 			"const a = [...'test'];", decode(t, `{"allow": ["string"]}`)), "noStringSpread")
 	})
 }
@@ -548,17 +548,17 @@ func TestNoMisusedSpreadDecoder(t *testing.T) {
 // than an absence: without them a rule that had simply stopped working would pass this test.
 func TestNoMisusedSpreadNewExpressionIsSilent(t *testing.T) {
 	t.Run("a string spread in a new expression is silent, matching upstream", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
 			"class C {\n  constructor(...a: string[]) {}\n}\ndeclare const s: string;\nconst x = new C(...s);", nil))
 	})
 
 	t.Run("the same spread in an array reports", func(t *testing.T) {
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
 			"declare const s: string;\nconst x = [...s];", nil), "noStringSpread")
 	})
 
 	t.Run("the same spread in a call reports", func(t *testing.T) {
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
 			"declare function f(...a: string[]): void;\ndeclare const s: string;\nf(...s);", nil), "noStringSpread")
 	})
 }
@@ -609,8 +609,8 @@ func TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
-			ruletest.ExpectFindings(t, result, "noMapSpreadInObject")
+			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(t, result, "noMapSpreadInObject")
 
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
 			want := strings.TrimSpace(testCase.wantOutput) + "\n"
@@ -648,8 +648,8 @@ func TestNoMisusedSpreadMergedClassDeclarations(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
-			ruletest.ExpectFindings(t, result, "noClassInstanceSpreadInObject")
+			result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(t, result, "noClassInstanceSpreadInObject")
 		})
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The corpus for use-unknown-in-catch-callback-variable, taken verbatim from upstream's own tester.
@@ -70,8 +70,8 @@ func TestUseUnknownInCatchCallbackVariableStaysSilent(t *testing.T) {
 		{"upstream valid 30", "\ntype InvalidHandler = (arg: any) => void;\nPromise.resolve().catch(<InvalidHandler>(\n  function (err /* awkward spot for comment */) {\n    throw err;\n  }\n));\n    "}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -115,8 +115,8 @@ func TestUseUnknownInCatchCallbackVariableFires(t *testing.T) {
 		{"upstream invalid 25", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ", []string{"useUnknown", "useUnknown", "useUnknown"}}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -166,7 +166,7 @@ func TestUseUnknownInCatchCallbackVariableSuggestions(t *testing.T) {
 		{"upstream invalid 25", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ", "addUnknownTypeAnnotationSuggestion", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || ((err: unknown) => {}),\n);\n      "}}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("want at least one finding, got none")
 			}
@@ -219,14 +219,14 @@ func TestUseUnknownInCatchCallbackVariableSuggestions(t *testing.T) {
 // something a literal-only test would lose, so it pins the reach as well as the limit.
 func TestUseUnknownInCatchCallbackVariableComputedKeyDivergence(t *testing.T) {
 	t.Run("a let-bound key is silent here and reports upstream", func(t *testing.T) {
-		result := ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, "\nlet method = 'catch';\nPromise.resolve()[method]((error: Error) => {});\n      ")
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, "\nlet method = 'catch';\nPromise.resolve()[method]((error: Error) => {});\n      ")
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("a const-bound key reports, which a string-literal test would miss", func(t *testing.T) {
-		result := ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
+		result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
 			"\nconst method = 'catch';\nPromise.resolve()[method]((error: Error) => {});\n      ")
-		ruletest.ExpectFindings(t, result, "useUnknown")
+		rule_testing.ExpectFindings(t, result, "useUnknown")
 	})
 }
 
@@ -256,8 +256,8 @@ func TestUseUnknownInCatchCallbackVariableComputedKeyDivergence(t *testing.T) {
 func TestUseUnknownInCatchCallbackVariableThisParameter(t *testing.T) {
 	const source = "interface W {\n  z: number;\n}\ndeclare const p: Promise<void>;\np.catch(function (this: W, err: Error) {});"
 
-	result := ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
-	ruletest.ExpectFindings(t, result, "useUnknown")
+	result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
+	rule_testing.ExpectFindings(t, result, "useUnknown")
 
 	text := strings.TrimSpace(source) + "\n"
 	reported := text[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
@@ -272,21 +272,21 @@ func TestUseUnknownInCatchCallbackVariableThisParameter(t *testing.T) {
 	}
 
 	t.Run("a this parameter alone is clean, so this is no checker parameter", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
 			"interface W {\n  z: number;\n}\ndeclare const p: Promise<void>;\np.catch(function (this: W) {});"))
 	})
 
 	t.Run("an unknown err is clean, so the decision reads err rather than this", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
 			"interface W {\n  z: number;\n}\ndeclare const p: Promise<void>;\np.catch(function (this: W, err: unknown) {});"))
 	})
 }
 
 // TestUseUnknownInCatchCallbackVariableRequiresTheTypedHarness asserts the rule declares the checker
-// and that the plain harness cannot prove it, so a later revert to ruletest.Run fails loudly.
+// and that the plain harness cannot prove it, so a later revert to rule_testing.Run fails loudly.
 //
 // This rule is the silent kind rather than the panicking kind, which is the more dangerous of the
-// two. Under ruletest.Run the checker is nil, Run returns nil listeners, and every StaysSilent case
+// two. Under rule_testing.Run the checker is nil, Run returns nil listeners, and every StaysSilent case
 // above would pass VACUOUSLY while every Fires case failed. The count below is what makes the
 // difference visible: a rule that fires on nothing is not the same as a rule that discriminates.
 func TestUseUnknownInCatchCallbackVariableRequiresTheTypedHarness(t *testing.T) {
@@ -296,11 +296,11 @@ func TestUseUnknownInCatchCallbackVariableRequiresTheTypedHarness(t *testing.T) 
 
 	const source = "Promise.resolve().catch((err: Error) => {\n  throw err;\n});"
 
-	typed := ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
-	ruletest.ExpectFindings(t, typed, "useUnknown")
+	typed := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
+	rule_testing.ExpectFindings(t, typed, "useUnknown")
 
-	untyped := ruletest.Run(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
-	ruletest.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
+	rule_testing.ExpectClean(t, untyped)
 }
 
 // TestUseUnknownInCatchCallbackVariableMessages pins the rendered text of every message.
@@ -344,7 +344,7 @@ func TestUseUnknownInCatchCallbackVariableMessages(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
@@ -389,7 +389,7 @@ func TestUseUnknownInCatchCallbackVariableParentheses(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("want a finding: a parenthesis is invisible to upstream and must be here too")
 			}
@@ -419,7 +419,7 @@ func TestUseUnknownInCatchCallbackVariableParentheses(t *testing.T) {
 // So this is a guard against the rule's own arithmetic and indexing on shapes it was not written
 // for, which is a real thing to guard, and it is NOT evidence that the nil check is load-bearing.
 //
-// This runs through the TYPED harness. Under ruletest.Run the rule returns before installing a
+// This runs through the TYPED harness. Under rule_testing.Run the rule returns before installing a
 // listener, so the untyped harness would pass without executing a line of it.
 func TestUseUnknownInCatchCallbackVariableSurvivesMalformedCalls(t *testing.T) {
 	sources := []string{
@@ -459,7 +459,7 @@ func TestUseUnknownInCatchCallbackVariableSurvivesMalformedCalls(t *testing.T) {
 			// A panic fails the test. The assertion is only that this returns at all: what the rule
 			// concludes about a malformed shape belongs in its own fixture, and asserting it here
 			// would make this guard fail for reasons that are not crashes.
-			ruletest.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
+			rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
 		})
 	}
 }

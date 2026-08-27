@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const relatedGetterSetterPairsFile = "/repository/source/Accessors.ts"
@@ -42,7 +42,7 @@ func TestRelatedGetterSetterPairsStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, RelatedGetterSetterPairs,
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText))
 		})
 	}
@@ -69,7 +69,7 @@ func TestRelatedGetterSetterPairsFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunTyped(t, RelatedGetterSetterPairs,
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText), "mismatch")
 		})
 	}
@@ -105,7 +105,7 @@ func TestRelatedGetterSetterPairsSpans(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, RelatedGetterSetterPairs,
+			result := rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
@@ -172,7 +172,7 @@ func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunTyped(t, RelatedGetterSetterPairs,
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText), "mismatch")
 		})
 	}
@@ -232,7 +232,7 @@ func TestRelatedGetterSetterPairsStaysSilentOnMeasuredShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, RelatedGetterSetterPairs,
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText))
 		})
 	}
@@ -259,7 +259,7 @@ func TestRelatedGetterSetterPairsSpansOnMeasuredShapes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, RelatedGetterSetterPairs,
+			result := rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
@@ -294,7 +294,7 @@ func TestRelatedGetterSetterPairsReportsInSourceOrder(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, RelatedGetterSetterPairs,
+			result := rule_testing.RunTyped(t, RelatedGetterSetterPairs,
 				relatedGetterSetterPairsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("want %d diagnostics, got %d", len(testCase.want), len(result.Diagnostics))
@@ -319,7 +319,7 @@ func TestRelatedGetterSetterPairsReportsInSourceOrder(t *testing.T) {
 // ever removed and the shim's nil tolerance changes underneath it.
 func TestRelatedGetterSetterPairsRequiresTheTypedHarness(t *testing.T) {
 	source := "class C {\n  get value(): number { return 1; }\n  set value(v: string) {}\n}"
-	ruletest.ExpectClean(t, ruletest.Run(t, RelatedGetterSetterPairs,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, RelatedGetterSetterPairs,
 		relatedGetterSetterPairsFile, source))
 }
 
@@ -331,7 +331,7 @@ func TestRelatedGetterSetterPairsRequiresTheTypedHarness(t *testing.T) {
 // mutation and passes while the message is wrong.
 func TestRelatedGetterSetterPairsMessage(t *testing.T) {
 	source := "class C {\n  get value(): number { return 1; }\n  set value(v: string) {}\n}"
-	result := ruletest.RunTyped(t, RelatedGetterSetterPairs, relatedGetterSetterPairsFile, source)
+	result := rule_testing.RunTyped(t, RelatedGetterSetterPairs, relatedGetterSetterPairsFile, source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}

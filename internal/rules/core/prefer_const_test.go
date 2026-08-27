@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // preferConstFile is where the fixtures pretend to live.
@@ -88,12 +88,12 @@ func TestPreferConstFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "preferConst"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 		})
 	}
 }
@@ -267,8 +267,8 @@ func TestPreferConstStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText))
 		})
 	}
 }
@@ -287,9 +287,9 @@ func TestPreferConstDestructuringOption(t *testing.T) {
 	allMode := PreferConstOptions{Destructuring: PreferConstDestructuringAll}
 
 	t.Run("any reports the unwritten binding of a mixed pattern", func(t *testing.T) {
-		result := ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			"let {a = 0, b} = obj; b = 0; foo(a, b);", anyMode)
-		ruletest.ExpectFindings(t, result, "preferConst")
+		rule_testing.ExpectFindings(t, result, "preferConst")
 		reported := reportedTextOf(t, result, 0)
 		if reported != "a" {
 			t.Fatalf("reported %q, want the unwritten binding \"a\"", reported)
@@ -297,43 +297,43 @@ func TestPreferConstDestructuringOption(t *testing.T) {
 	})
 
 	t.Run("all declines the same mixed pattern", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			"let {a, b} = obj; b = 0;", allMode))
 	})
 
 	t.Run("all declines a mixed pattern written by an update", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			"let a, b; ({a, b} = obj); b++;", allMode))
 	})
 
 	t.Run("all declines a rest binding that is written", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			"let { name, ...otherStuff } = obj; otherStuff = {};", allMode))
 	})
 
 	t.Run("any reports the unwritten binding beside a written rest", func(t *testing.T) {
-		result := ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			"let { name, ...otherStuff } = obj; otherStuff = {};", anyMode)
-		ruletest.ExpectFindings(t, result, "preferConst")
+		rule_testing.ExpectFindings(t, result, "preferConst")
 		if reported := reportedTextOf(t, result, 0); reported != "name" {
 			t.Fatalf("reported %q, want \"name\"", reported)
 		}
 	})
 
 	t.Run("all reports a pattern where every binding qualifies", func(t *testing.T) {
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			"let {a = 0, b} = obj; foo(a, b);", allMode), "preferConst", "preferConst")
 	})
 
 	t.Run("all reports a nested pattern where every binding qualifies", func(t *testing.T) {
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			"let {a: {b, c}} = {a: {b: 1, c: 2}}", allMode), "preferConst", "preferConst")
 	})
 
 	t.Run("any reports the unwritten binding of a nested pattern", func(t *testing.T) {
-		result := ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			"let {a: {b, c}} = {a: {b: 1, c: 2}}; b = 3;", anyMode)
-		ruletest.ExpectFindings(t, result, "preferConst")
+		rule_testing.ExpectFindings(t, result, "preferConst")
 		if reported := reportedTextOf(t, result, 0); reported != "c" {
 			t.Fatalf("reported %q, want \"c\"", reported)
 		}
@@ -343,8 +343,8 @@ func TestPreferConstDestructuringOption(t *testing.T) {
 	// flipping the zero value is otherwise invisible.
 	t.Run("the default matches any", func(t *testing.T) {
 		source := "let {a = 0, b} = obj; b = 0; foo(a, b);"
-		ruletest.ExpectFindings(t,
-			ruletest.RunTyped(t, PreferConst, preferConstFile, source), "preferConst")
+		rule_testing.ExpectFindings(t,
+			rule_testing.RunTyped(t, PreferConst, preferConstFile, source), "preferConst")
 	})
 }
 
@@ -377,17 +377,17 @@ func TestPreferConstIgnoreReadBeforeAssignOption(t *testing.T) {
 
 	for _, testCase := range bothWays {
 		t.Run(testCase.name+", ignoring", func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 				testCase.sourceText, ignoring))
 		})
 		t.Run(testCase.name+", not ignoring", func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+			result := rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 				testCase.sourceText, notIgnoring)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "preferConst"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 		})
 	}
 
@@ -397,9 +397,9 @@ func TestPreferConstIgnoreReadBeforeAssignOption(t *testing.T) {
 	// read".
 	t.Run("a read after the declaration reports either way", func(t *testing.T) {
 		source := "let x = 0; function foo() { bar(x); }"
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			source, ignoring), "preferConst")
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			source, notIgnoring), "preferConst")
 	})
 
@@ -407,18 +407,18 @@ func TestPreferConstIgnoreReadBeforeAssignOption(t *testing.T) {
 	// precedes the write, and reports it otherwise.
 	t.Run("an uninitialized binding read before its write", func(t *testing.T) {
 		source := "let x; function foo() { bar(x); } x = 0;"
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			source, ignoring))
-		ruletest.ExpectFindings(t, ruletest.RunTyped(t, PreferConst, preferConstFile, source),
+		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferConst, preferConstFile, source),
 			"preferConst")
 	})
 
 	// Upstream's static-block pair, both polarities.
 	t.Run("a static block reading a later declaration", func(t *testing.T) {
 		source := "class C { static { a; } } let a = 1;"
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, PreferConst, preferConstFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, PreferConst, preferConstFile,
 			source, ignoring))
-		ruletest.ExpectFindings(t, ruletest.RunTyped(t, PreferConst, preferConstFile, source),
+		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferConst, preferConstFile, source),
 			"preferConst")
 	})
 }
@@ -428,7 +428,7 @@ func TestPreferConstIgnoreReadBeforeAssignOption(t *testing.T) {
 // Brief step 8: ExpectFindings asserts message ids and count and nothing else, so a rule whose
 // defect is WHERE it points passes a complete fixture pair while being wrong. A clone shipped 187
 // green fixtures over a rule whose findings all pointed at the wrong place.
-func reportedTextOf(t *testing.T, result ruletest.Result, index int) string {
+func reportedTextOf(t *testing.T, result rule_testing.Result, index int) string {
 	t.Helper()
 	if index >= len(result.Diagnostics) {
 		t.Fatalf("wanted diagnostic %d, got %d", index, len(result.Diagnostics))
@@ -467,7 +467,7 @@ func TestPreferConstReportsAtTheBinding(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
 			}
@@ -517,8 +517,8 @@ func TestPreferConstFixesTheKeyword(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText)
-			ruletest.ExpectFixedSource(t, result, testCase.want)
+			result := rule_testing.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText)
+			rule_testing.ExpectFixedSource(t, result, testCase.want)
 		})
 	}
 }
@@ -533,8 +533,8 @@ func TestPreferConstWithholdsTheFix(t *testing.T) {
 	// compile: the one failure the fix engine structurally cannot refuse.
 	t.Run("a list where another declarator is written", func(t *testing.T) {
 		source := "let x = 'x', y = 'y'; x = 1"
-		result := ruletest.RunTyped(t, PreferConst, preferConstFile, source)
-		ruletest.ExpectFindings(t, result, "preferConst")
+		result := rule_testing.RunTyped(t, PreferConst, preferConstFile, source)
+		rule_testing.ExpectFindings(t, result, "preferConst")
 		if len(result.Diagnostics[0].Fixes) != 0 {
 			t.Fatalf("offered a fix that would rewrite `x` into a const it then writes to")
 		}
@@ -543,8 +543,8 @@ func TestPreferConstWithholdsTheFix(t *testing.T) {
 	// A list holding a declarator with no initializer. `const d;` does not parse.
 	t.Run("a list holding an uninitialized declarator", func(t *testing.T) {
 		source := "let {a, b} = c, d;"
-		result := ruletest.RunTyped(t, PreferConst, preferConstFile, source)
-		ruletest.ExpectFindings(t, result, "preferConst", "preferConst")
+		result := rule_testing.RunTyped(t, PreferConst, preferConstFile, source)
+		rule_testing.ExpectFindings(t, result, "preferConst", "preferConst")
 		for index, finding := range result.Diagnostics {
 			if len(finding.Fixes) != 0 {
 				t.Fatalf("finding %d offered a fix producing `const ..., d;` which does not parse", index)
@@ -556,15 +556,15 @@ func TestPreferConstWithholdsTheFix(t *testing.T) {
 	// not parse and the write is a separate statement, so there is a finding and no fix.
 	t.Run("an uninitialized binding written separately", func(t *testing.T) {
 		source := "let x; x = 0;"
-		result := ruletest.RunTyped(t, PreferConst, preferConstFile, source)
-		ruletest.ExpectFindings(t, result, "preferConst")
+		result := rule_testing.RunTyped(t, PreferConst, preferConstFile, source)
+		rule_testing.ExpectFindings(t, result, "preferConst")
 		if len(result.Diagnostics[0].Fixes) != 0 {
 			t.Fatalf("offered a fix producing `const x;` which does not parse")
 		}
 	})
 }
 
-// TestPreferConstNeedsTheTypedHarness makes a revert to ruletest.Run fail loudly.
+// TestPreferConstNeedsTheTypedHarness makes a revert to rule_testing.Run fail loudly.
 //
 // Brief step 9: a rule declaring NeedsTypeChecker gets a nil checker from the plain harness, goes
 // completely silent, and every StaysSilent case then passes vacuously while every Fires case fails
@@ -574,9 +574,9 @@ func TestPreferConstNeedsTheTypedHarness(t *testing.T) {
 	if !PreferConst.NeedsTypeChecker {
 		t.Fatal("PreferConst stopped declaring NeedsTypeChecker; the fixtures below assume it")
 	}
-	ruletest.ExpectClean(t, ruletest.Run(t, PreferConst, preferConstFile, "let x = 1; foo(x);"))
-	ruletest.ExpectFindings(t,
-		ruletest.RunTyped(t, PreferConst, preferConstFile, "let x = 1; foo(x);"), "preferConst")
+	rule_testing.ExpectClean(t, rule_testing.Run(t, PreferConst, preferConstFile, "let x = 1; foo(x);"))
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTyped(t, PreferConst, preferConstFile, "let x = 1; foo(x);"), "preferConst")
 }
 
 // TestPreferConstUsesNodeIdentityNotDeclarationKind is the trap from brief step 8b.
@@ -588,8 +588,8 @@ func TestPreferConstNeedsTheTypedHarness(t *testing.T) {
 // declarations that exit through a different path.
 func TestPreferConstUsesNodeIdentityNotDeclarationKind(t *testing.T) {
 	// The outer `a` is never written and must report; the inner `a` is written and must not.
-	result := ruletest.RunTyped(t, PreferConst, preferConstFile, "let a = 1; { let a = 1; a = 2; }")
-	ruletest.ExpectFindings(t, result, "preferConst")
+	result := rule_testing.RunTyped(t, PreferConst, preferConstFile, "let a = 1; { let a = 1; a = 2; }")
+	rule_testing.ExpectFindings(t, result, "preferConst")
 	if got := reportedTextOf(t, result, 0); got != "a" {
 		t.Fatalf("reported %q, want the outer binding", got)
 	}
@@ -600,8 +600,8 @@ func TestPreferConstUsesNodeIdentityNotDeclarationKind(t *testing.T) {
 
 	// The mirror image, so a rule that simply reports the first of two matching names fails one of
 	// the pair whichever way it errs.
-	mirror := ruletest.RunTyped(t, PreferConst, preferConstFile, "let a = 1; a = 2; { let a = 1; foo(a); }")
-	ruletest.ExpectFindings(t, mirror, "preferConst")
+	mirror := rule_testing.RunTyped(t, PreferConst, preferConstFile, "let a = 1; a = 2; { let a = 1; foo(a); }")
+	rule_testing.ExpectFindings(t, mirror, "preferConst")
 	// Offset 24, counted off the literal rather than read back off the rule: `let a = 1; a = 2; { `
 	// is twenty characters and `let ` is four more.
 	if position := mirror.Diagnostics[0].Range.Pos(); position != 24 {
@@ -628,7 +628,7 @@ func TestPreferConstSeesRestTargets(t *testing.T) {
 	}
 	for _, source := range written {
 		t.Run("written "+source, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, PreferConst, preferConstFile, source))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferConst, preferConstFile, source))
 		})
 	}
 
@@ -646,8 +646,8 @@ func TestPreferConstSeesRestTargets(t *testing.T) {
 	}
 	for _, testCase := range notWritten {
 		t.Run("read "+testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText), "preferConst")
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, PreferConst, preferConstFile, testCase.sourceText), "preferConst")
 		})
 	}
 }

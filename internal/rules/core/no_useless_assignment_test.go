@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Corpus imported verbatim from oxc's inline Tester block by tools/extract_oxc_fixtures
@@ -160,7 +160,7 @@ const noUselessAssignmentFile = "/repository/source/Component.tsx"
 func TestNoUselessAssignmentSurvey(t *testing.T) {
 	falsePositives := 0
 	for index, source := range noUselessAssignmentUpstreamPass {
-		result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source)
+		result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source)
 		if len(result.Diagnostics) != 0 {
 			falsePositives++
 			t.Errorf("clean upstream case %d reported %d findings; upstream reports none\n%s",
@@ -170,7 +170,7 @@ func TestNoUselessAssignmentSurvey(t *testing.T) {
 
 	caught, expected := 0, 0
 	for _, entry := range noUselessAssignmentUpstreamFail {
-		result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, entry.source)
+		result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, entry.source)
 		expected += entry.count
 		if len(result.Diagnostics) > entry.count {
 			t.Errorf("failing upstream case reported %d findings against upstream's %d, which is a "+
@@ -198,12 +198,12 @@ func TestNoUselessAssignmentFires(t *testing.T) {
 	for index := range noUselessAssignmentUpstreamFail {
 		entry := noUselessAssignmentUpstreamFail[index]
 		t.Run(fmt.Sprintf("upstream fail %d", index), func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, entry.source)
+			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, entry.source)
 			wantIds := make([]string, entry.count)
 			for position := range wantIds {
 				wantIds[position] = "noUselessAssignment"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 		})
 	}
 }
@@ -217,8 +217,8 @@ func TestNoUselessAssignmentFires(t *testing.T) {
 func TestNoUselessAssignmentStaysSilent(t *testing.T) {
 	for index, source := range noUselessAssignmentUpstreamPass {
 		t.Run(fmt.Sprintf("upstream pass %d", index), func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source))
 		})
 	}
 }
@@ -259,7 +259,7 @@ func TestNoUselessAssignmentPointsAtTheIdentifier(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantText) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantText))
 			}
@@ -295,10 +295,10 @@ func TestNoUselessAssignmentNeedsTheTypedHarness(t *testing.T) {
 	if !NoUselessAssignment.NeedsTypeChecker {
 		t.Fatal("the rule no longer declares NeedsTypeChecker, so the fixtures below assert nothing")
 	}
-	if findings := len(ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics); findings != 1 {
+	if findings := len(rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics); findings != 1 {
 		t.Fatalf("the typed harness produced %d findings, want 1", findings)
 	}
-	if findings := len(ruletest.Run(t, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics); findings != 0 {
+	if findings := len(rule_testing.Run(t, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics); findings != 0 {
 		t.Errorf("the untyped harness produced %d findings; it hands a nil checker, so this rule "+
 			"is silent there and a fixture using it would pass vacuously", findings)
 	}
@@ -326,7 +326,7 @@ func TestNoUselessAssignmentBoundary(t *testing.T) {
 	for _, entry := range recovered {
 		t.Run(entry.name, func(t *testing.T) {
 			imported := noUselessAssignmentUpstreamFail[entry.index]
-			result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, imported.source)
+			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, imported.source)
 			if len(result.Diagnostics) != imported.count {
 				t.Fatalf("got %d findings, want upstream's %d; this shape was declined by the "+
 					"inverted implementation and is recovered because %s",
@@ -416,7 +416,7 @@ func TestNoUselessAssignmentConditionalWritesDoNotKill(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
@@ -502,7 +502,7 @@ func TestNoUselessAssignmentSelfReferentialWritesStayLive(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
@@ -555,7 +555,7 @@ func TestNoUselessAssignmentShorthandPropertyIsARead(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
@@ -593,7 +593,7 @@ func TestNoUselessAssignmentSwitchFlow(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}

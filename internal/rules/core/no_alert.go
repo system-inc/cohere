@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/property"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/property"
 )
 
 // buildNoAlertMessage renders the finding, which names the function being called.
@@ -69,7 +69,7 @@ var noAlertProhibited = map[string]bool{
 //
 // Upstream reports `this.alert(foo)` at the top level of a SCRIPT, where `this` is the global
 // object, and its `isGlobalThisReferenceOrGlobalWindow` has an arm for exactly that. Our harness and
-// our tree are modules: `internal/ruletest/program.go` pins `moduleDetection: "force"`, and in a
+// our tree are modules: `internal/rule_testing/program.go` pins `moduleDetection: "force"`, and in a
 // module top-level `this` is `undefined` rather than the global.
 //
 // Measured rather than reasoned: driving the installed rule with `sourceType: "module"` returns

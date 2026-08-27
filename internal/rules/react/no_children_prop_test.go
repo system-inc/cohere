@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // childrenPropFile is where the fixtures pretend to live.
@@ -43,8 +43,8 @@ func TestNoChildrenPropFires(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
 		})
 	}
 }
@@ -102,7 +102,7 @@ func TestNoChildrenPropStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoChildrenProp, childrenPropFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
 		})
 	}
 }
@@ -134,7 +134,7 @@ func TestNoChildrenPropPointsAtTheName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoChildrenProp, childrenPropFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoChildrenProp, childrenPropFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
@@ -156,7 +156,7 @@ func TestNoChildrenPropPointsAtTheName(t *testing.T) {
 // interpolation at all, which is itself the thing being pinned, since a later edit adding a `%s`
 // without a value would render a stray verb and every other test here would stay green.
 func TestNoChildrenPropRendersItsMessage(t *testing.T) {
-	result := ruletest.Run(t, NoChildrenProp, childrenPropFile, `<div children />;`)
+	result := rule_testing.Run(t, NoChildrenProp, childrenPropFile, `<div children />;`)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 	}
@@ -198,8 +198,8 @@ func TestNoChildrenPropCoversEveryPropertyKind(t *testing.T) {
 	}
 	for _, sourceText := range reports {
 		t.Run("reports "+sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
 		})
 	}
 
@@ -220,7 +220,7 @@ func TestNoChildrenPropCoversEveryPropertyKind(t *testing.T) {
 	}
 	for _, sourceText := range silent {
 		t.Run("silent on "+sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoChildrenProp, childrenPropFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
 		})
 	}
 }
@@ -233,7 +233,7 @@ func TestNoChildrenPropCoversEveryPropertyKind(t *testing.T) {
 // afterwards takes down every file in the tree containing a computed key, and no imported fixture
 // covers one.
 func TestNoChildrenPropSurvivesAComputedKey(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
 		"declare const key: string;\nReact.createElement(\"div\", {[key]: 1});\n"))
 }
 
@@ -244,7 +244,7 @@ func TestNoChildrenPropSurvivesAComputedKey(t *testing.T) {
 // not the property name, and reading the cooked text of the first chunk would report on a property
 // that is actually called something else at runtime.
 func TestNoChildrenPropDeclinesASubstitutingTemplateKey(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
 		"declare const part: string;\nReact.createElement(\"div\", {[`children${part}`]: 1});\n"))
 }
 
@@ -264,8 +264,8 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(t *testing.T) {
 	}
 	for _, sourceText := range reports {
 		t.Run("reports "+sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
 		})
 	}
 
@@ -275,7 +275,7 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(t *testing.T) {
 	}
 	for _, sourceText := range silent {
 		t.Run("silent on "+sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoChildrenProp, childrenPropFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
 		})
 	}
 }
@@ -287,7 +287,7 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(t *testing.T) {
 // `JSXAttributeName::Identifier` and returning early on anything else, so the silence is upstream's
 // judgment rather than a gap in ours.
 func TestNoChildrenPropDeclinesANamespacedAttributeName(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
 		`<svg xlink:children="x" />;`))
 }
 
@@ -297,7 +297,7 @@ func TestNoChildrenPropDeclinesANamespacedAttributeName(t *testing.T) {
 // would be a divergence nothing asked for, and the imported corpus never writes a duplicate key so
 // it cannot say which behavior was ported.
 func TestNoChildrenPropReportsOncePerCall(t *testing.T) {
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
 		`React.createElement("div", {children: 1, "children": 2});`), "noChildrenProp")
 }
 
@@ -308,7 +308,7 @@ func TestNoChildrenPropReportsOncePerCall(t *testing.T) {
 // exists because "reports once" and "reports per occurrence" are both defensible and only one of
 // them is upstream's, per surface.
 func TestNoChildrenPropReportsPerJsxAttribute(t *testing.T) {
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
 		`<div children="a" children="b" />;`), "noChildrenProp", "noChildrenProp")
 }
 
@@ -337,7 +337,7 @@ func TestNoChildrenPropSurvivesDegenerateInput(t *testing.T) {
 					t.Fatalf("panicked rather than reporting: %v", recovered)
 				}
 			}()
-			ruletest.ExpectClean(t, ruletest.Run(t, NoChildrenProp, childrenPropFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile, sourceText))
 		})
 	}
 }

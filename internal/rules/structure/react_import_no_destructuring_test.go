@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const reactImportFile = "/repository/source/components/Field.tsx"
@@ -80,7 +80,7 @@ func TestReactImportNoDestructuringFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, ReactImportNoDestructuring, reactImportFile,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactImportNoDestructuring, reactImportFile,
 				testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -131,7 +131,7 @@ func TestReactImportNoDestructuringStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ReactImportNoDestructuring, reactImportFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactImportNoDestructuring, reactImportFile, testCase.sourceText))
 		})
 	}
 }
@@ -144,7 +144,7 @@ func TestReactImportNoDestructuringStaysSilent(t *testing.T) {
 // dispatched would move it silently.
 func TestReactImportNoDestructuringDependsOnImportOrder(t *testing.T) {
 	// The ordinary case: the import is above the use, and both are reported.
-	ruletest.ExpectFindings(t, ruletest.Run(t, ReactImportNoDestructuring, reactImportFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactImportNoDestructuring, reactImportFile,
 		"import React, { useState } from 'react';\nexport function Field() { return useState(0); }\n"),
 		"noNamedImport", "noCallWithoutPrefix")
 
@@ -152,7 +152,7 @@ func TestReactImportNoDestructuringDependsOnImportOrder(t *testing.T) {
 	// depend on anything earlier, but the call is not, because the set was empty when it was
 	// visited. Recorded as the rule's behavior rather than defended as correct: the shape is not
 	// one anyone writes, and matching the original matters more than improving on it here.
-	ruletest.ExpectFindings(t, ruletest.Run(t, ReactImportNoDestructuring, reactImportFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactImportNoDestructuring, reactImportFile,
 		"export function Field() { return useState(0); }\nimport React, { useState } from 'react';\n"),
 		"noNamedImport")
 }

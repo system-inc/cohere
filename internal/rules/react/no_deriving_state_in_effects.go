@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/hir"
+	"github.com/system-inc/verify/internal/utilities/high_level_intermediate_representation"
 )
 
 var messageNoDerivingStateInEffects = rule.Message{
@@ -130,7 +130,7 @@ var NoDerivingStateInEffects = rule.Rule{
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
 					// Manual memoization is erased first, because upstream validates a graph where
 					// `useMemo` and `useCallback` are already gone.
-					lowered := hir.ForFunctionWithoutManualMemoization(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(ctx, functionNode)
 					if lowered == nil {
 						return
 					}
@@ -143,16 +143,16 @@ var NoDerivingStateInEffects = rule.Rule{
 
 // reportDerivedComputationsInEffects is upstream's `validateNoDerivedComputationsInEffects` over one
 // lowered function: the gather loop, then a judgment per candidate effect.
-func reportDerivedComputationsInEffects(ctx rule.Context, function *hir.Function) {
+func reportDerivedComputationsInEffects(ctx rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
 
 	// Upstream's three maps, keyed the same way. Single-assignment form is what lets each be one
 	// entry per value rather than per binding.
-	candidateDependencies := map[hir.IdentifierId]*hir.ArrayExpression{}
-	functions := map[hir.IdentifierId]*hir.FunctionExpression{}
-	locals := map[hir.IdentifierId]hir.IdentifierId{}
+	candidateDependencies := map[high_level_intermediate_representation.IdentifierId]*high_level_intermediate_representation.ArrayExpression{}
+	functions := map[high_level_intermediate_representation.IdentifierId]*high_level_intermediate_representation.FunctionExpression{}
+	locals := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId{}
 
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
@@ -163,15 +163,15 @@ func reportDerivedComputationsInEffects(ctx rule.Context, function *hir.Function
 			target := instruction.LValue.Identifier
 
 			switch value := instruction.Value.(type) {
-			case *hir.LoadLocal:
+			case *high_level_intermediate_representation.LoadLocal:
 				locals[target] = value.Place.Identifier
-			case *hir.ArrayExpression:
+			case *high_level_intermediate_representation.ArrayExpression:
 				candidateDependencies[target] = value
-			case *hir.FunctionExpression:
+			case *high_level_intermediate_representation.FunctionExpression:
 				functions[target] = value
-			case *hir.CallExpression:
+			case *high_level_intermediate_representation.CallExpression:
 				derivedEffectCandidate(ctx, function, value.Callee, value.Args, candidateDependencies, functions, locals)
-			case *hir.MethodCall:
+			case *high_level_intermediate_representation.MethodCall:
 				// `React.useEffect(...)`. The property Place is the callee, exactly as upstream
 				// selects `instr.value.property` for a MethodCall.
 				derivedEffectCandidate(ctx, function, value.Property, value.Args, candidateDependencies, functions, locals)
@@ -197,12 +197,12 @@ func reportDerivedComputationsInEffects(ctx rule.Context, function *hir.Function
 // That is why this is not a syntactic test.
 func derivedEffectCandidate(
 	ctx rule.Context,
-	function *hir.Function,
-	callee hir.Place,
-	args []hir.Argument,
-	candidateDependencies map[hir.IdentifierId]*hir.ArrayExpression,
-	functions map[hir.IdentifierId]*hir.FunctionExpression,
-	locals map[hir.IdentifierId]hir.IdentifierId,
+	function *high_level_intermediate_representation.Function,
+	callee high_level_intermediate_representation.Place,
+	args []high_level_intermediate_representation.Argument,
+	candidateDependencies map[high_level_intermediate_representation.IdentifierId]*high_level_intermediate_representation.ArrayExpression,
+	functions map[high_level_intermediate_representation.IdentifierId]*high_level_intermediate_representation.FunctionExpression,
+	locals map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId,
 ) {
 	if len(args) != 2 || args[0].Spread || args[1].Spread {
 		return
@@ -236,7 +236,7 @@ func derivedEffectCandidate(
 
 	// `deps.elements.every(element => element.kind === 'Identifier')` upstream: a hole or a spread
 	// in the dependency array abandons the effect rather than being skipped.
-	dependencies := make([]hir.IdentifierId, 0, len(deps.Elements))
+	dependencies := make([]high_level_intermediate_representation.IdentifierId, 0, len(deps.Elements))
 	for _, element := range deps.Elements {
 		// The `Hole` half is SUBSUMED and kept for fidelity, with the measurement recorded rather
 		// than the branch deleted. A hole lowers to a real `<hole>` element, so this is reachable,
@@ -282,10 +282,10 @@ func derivedEffectCandidate(
 // is not a pure derivation, so partial credit would report on effects upstream leaves alone.
 func validateDerivedEffect(
 	ctx rule.Context,
-	enclosing *hir.Function,
-	effectFunction *hir.Function,
-	effectValue *hir.FunctionExpression,
-	effectDeps []hir.IdentifierId,
+	enclosing *high_level_intermediate_representation.Function,
+	effectFunction *high_level_intermediate_representation.Function,
+	effectValue *high_level_intermediate_representation.FunctionExpression,
+	effectDeps []high_level_intermediate_representation.IdentifierId,
 ) {
 	// The captures are places in the ENCLOSING function, which is what makes them comparable to the
 	// dependency identifiers gathered there. `effectFunction.Context` holds the same values renamed
@@ -324,14 +324,14 @@ func validateDerivedEffect(
 	// Upstream seeds `values` directly from `effectDeps` because its context operands carry the same
 	// identifier ids inside and out; ours are renamed by lowering, so the seed is translated through
 	// the context list, which is index-aligned with the captures.
-	values := map[hir.IdentifierId][]hir.IdentifierId{}
+	values := map[high_level_intermediate_representation.IdentifierId][]high_level_intermediate_representation.IdentifierId{}
 	for index, capture := range captures {
 		if index >= len(effectFunction.Context) {
 			break
 		}
 		if containsIdentifier(effectDeps, capture.Identifier) {
 			inner := effectFunction.Context[index].Identifier
-			values[inner] = []hir.IdentifierId{capture.Identifier}
+			values[inner] = []high_level_intermediate_representation.IdentifierId{capture.Identifier}
 		}
 	}
 	// This guard is UNREACHABLE today and is kept deliberately, because what makes it unreachable
@@ -354,8 +354,8 @@ func validateDerivedEffect(
 		return
 	}
 
-	seenBlocks := map[hir.BlockId]bool{}
-	var setStateLocations []hir.Place
+	seenBlocks := map[high_level_intermediate_representation.BlockId]bool{}
+	var setStateLocations []high_level_intermediate_representation.Place
 
 	for _, block := range effectFunction.Blocks {
 		// A predecessor not yet seen is a back edge, and upstream refuses to analyse a loop.
@@ -368,8 +368,8 @@ func validateDerivedEffect(
 		}
 
 		for _, phi := range block.Phis {
-			aggregate := map[hir.IdentifierId]bool{}
-			for _, predecessor := range hir.PhiOperandsInOrder(phi) {
+			aggregate := map[high_level_intermediate_representation.IdentifierId]bool{}
+			for _, predecessor := range high_level_intermediate_representation.PhiOperandsInOrder(phi) {
 				operand := phi.Operands[predecessor]
 				for _, dep := range values[operand.Identifier] {
 					aggregate[dep] = true
@@ -388,9 +388,9 @@ func validateDerivedEffect(
 
 			switch value := instruction.Value.(type) {
 			// Upstream's inert set: a constant contributes no taint and is not a reason to give up.
-			case *hir.Primitive, *hir.JsxText, *hir.LoadGlobal:
+			case *high_level_intermediate_representation.Primitive, *high_level_intermediate_representation.JsxText, *high_level_intermediate_representation.LoadGlobal:
 
-			case *hir.LoadLocal:
+			case *high_level_intermediate_representation.LoadLocal:
 				if deps, ok := values[value.Place.Identifier]; ok {
 					values[instruction.LValue.Identifier] = deps
 				}
@@ -400,15 +400,15 @@ func validateDerivedEffect(
 			// context read for us. Without this arm every dep read inside the effect loses its taint
 			// at the first use and the rule can never report. Measured: removing it makes all five
 			// reporting fixtures go silent.
-			case *hir.LoadContext:
+			case *high_level_intermediate_representation.LoadContext:
 				if deps, ok := values[value.Place.Identifier]; ok {
 					values[instruction.LValue.Identifier] = deps
 				}
 
-			case *hir.ComputedLoad, *hir.PropertyLoad, *hir.BinaryExpression, *hir.TemplateLiteral,
-				*hir.CallExpression, *hir.MethodCall:
-				aggregate := map[hir.IdentifierId]bool{}
-				hir.EachPlace(instruction.Value, func(place hir.Place, _ hir.PlaceRole) {
+			case *high_level_intermediate_representation.ComputedLoad, *high_level_intermediate_representation.PropertyLoad, *high_level_intermediate_representation.BinaryExpression, *high_level_intermediate_representation.TemplateLiteral,
+				*high_level_intermediate_representation.CallExpression, *high_level_intermediate_representation.MethodCall:
+				aggregate := map[high_level_intermediate_representation.IdentifierId]bool{}
+				high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, _ high_level_intermediate_representation.PlaceRole) {
 					for _, dep := range values[place.Identifier] {
 						aggregate[dep] = true
 					}
@@ -417,7 +417,7 @@ func validateDerivedEffect(
 					values[instruction.LValue.Identifier] = identifiersOf(aggregate, effectDeps)
 				}
 
-				call, isCall := instruction.Value.(*hir.CallExpression)
+				call, isCall := instruction.Value.(*high_level_intermediate_representation.CallExpression)
 				// The `Spread` half is SUBSUMED, measured rather than assumed. `setV(...[x])`
 				// does lower to a single spread argument, so the branch is reachable in the sense
 				// that matters, but the effect never gets this far: building the spread's operand
@@ -456,7 +456,7 @@ func validateDerivedEffect(
 		// A derived value read by a terminal is a branch condition or a return, which is again more
 		// than a derivation.
 		abandon := false
-		hir.EachTerminalPlace(block.Terminal, func(place hir.Place, _ hir.PlaceRole) {
+		high_level_intermediate_representation.EachTerminalPlace(block.Terminal, func(place high_level_intermediate_representation.Place, _ high_level_intermediate_representation.PlaceRole) {
 			if _, ok := values[place.Identifier]; ok {
 				abandon = true
 			}
@@ -480,7 +480,7 @@ func validateDerivedEffect(
 // through the node points every finding at the `useState` destructure. The range is trimmed of
 // leading trivia because a Place's range starts at the raw start of the reference, which includes
 // the newline and indentation before it.
-func reportDerivedSetter(ctx rule.Context, function *hir.Function, setter hir.Place) {
+func reportDerivedSetter(ctx rule.Context, function *high_level_intermediate_representation.Function, setter high_level_intermediate_representation.Place) {
 	if span := trimmedRange(ctx, setter.Range); span.Pos() < span.End() {
 		ctx.ReportRange(span, messageNoDerivingStateInEffects)
 		return
@@ -515,7 +515,7 @@ func reportDerivedSetter(ctx rule.Context, function *hir.Function, setter hir.Pl
 // lines of checker reads; when both rules are settled they want one shared
 // `declaredHookName(ctx, function, place) string` in the package, with each rule keeping only its
 // own accepted set. That is one commit, after, not a unilateral edit now.
-func isUseEffectExactly(ctx rule.Context, function *hir.Function, callee hir.Place) bool {
+func isUseEffectExactly(ctx rule.Context, function *high_level_intermediate_representation.Function, callee high_level_intermediate_representation.Place) bool {
 	node := setStateInEffectIdentifierNodeOf(function, callee.Identifier)
 	if node == nil || ctx.TypeChecker == nil {
 		return false
@@ -573,14 +573,14 @@ func isUseEffectExactly(ctx rule.Context, function *hir.Function, callee hir.Pla
 // the intermediate representation rather than a helper for this rule. Recorded here so the next
 // reader can see the limit was measured rather than assumed, and so it is findable when the fold
 // lands: this function should be deleted then, not extended.
-func dependencyIsFoldedConstant(function *hir.Function, dependency hir.IdentifierId) bool {
+func dependencyIsFoldedConstant(function *high_level_intermediate_representation.Function, dependency high_level_intermediate_representation.IdentifierId) bool {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
 			if instruction == nil {
 				continue
 			}
-			store, isStore := instruction.Value.(*hir.StoreLocal)
+			store, isStore := instruction.Value.(*high_level_intermediate_representation.StoreLocal)
 			if !isStore || store.LValue.Identifier != dependency {
 				continue
 			}
@@ -593,14 +593,14 @@ func dependencyIsFoldedConstant(function *hir.Function, dependency hir.Identifie
 }
 
 // definesPrimitive answers whether a value was produced by a literal.
-func definesPrimitive(function *hir.Function, identifier hir.IdentifierId) bool {
+func definesPrimitive(function *high_level_intermediate_representation.Function, identifier high_level_intermediate_representation.IdentifierId) bool {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
 			if instruction == nil || instruction.LValue.Identifier != identifier {
 				continue
 			}
-			_, isPrimitive := instruction.Value.(*hir.Primitive)
+			_, isPrimitive := instruction.Value.(*high_level_intermediate_representation.Primitive)
 			return isPrimitive
 		}
 	}
@@ -609,7 +609,7 @@ func definesPrimitive(function *hir.Function, identifier hir.IdentifierId) bool 
 
 // containsIdentifier is a linear scan because a dependency array is short. A map would cost a
 // build per effect to answer at most a handful of questions.
-func containsIdentifier(identifiers []hir.IdentifierId, want hir.IdentifierId) bool {
+func containsIdentifier(identifiers []high_level_intermediate_representation.IdentifierId, want high_level_intermediate_representation.IdentifierId) bool {
 	for _, identifier := range identifiers {
 		if identifier == want {
 			return true
@@ -625,8 +625,8 @@ func containsIdentifier(identifiers []hir.IdentifierId, want hir.IdentifierId) b
 // is how many distinct entries it holds. It is fixed anyway because an unordered slice stored into a
 // map that later feeds a phi aggregate makes the whole pass produce different intermediate values
 // between runs, which is the class of bug `TestLowerIsDeterministic` exists to catch one layer down.
-func identifiersOf(set map[hir.IdentifierId]bool, order []hir.IdentifierId) []hir.IdentifierId {
-	result := make([]hir.IdentifierId, 0, len(set))
+func identifiersOf(set map[high_level_intermediate_representation.IdentifierId]bool, order []high_level_intermediate_representation.IdentifierId) []high_level_intermediate_representation.IdentifierId {
+	result := make([]high_level_intermediate_representation.IdentifierId, 0, len(set))
 	for _, identifier := range order {
 		if set[identifier] {
 			result = append(result, identifier)
@@ -662,8 +662,8 @@ func identifiersOf(set map[hir.IdentifierId]bool, order []hir.IdentifierId) []hi
 // consequence of how this file happens to build its slices rather than something the type system
 // enforces. A future writer that appends without deduplicating would make the difference real, and
 // this comment is what tells them the guard is load-bearing again at that point.
-func distinctCount(identifiers []hir.IdentifierId) int {
-	seen := map[hir.IdentifierId]bool{}
+func distinctCount(identifiers []high_level_intermediate_representation.IdentifierId) int {
+	seen := map[high_level_intermediate_representation.IdentifierId]bool{}
 	for _, identifier := range identifiers {
 		seen[identifier] = true
 	}

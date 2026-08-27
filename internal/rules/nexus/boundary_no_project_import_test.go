@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const baseLibraryFile = "/repo/libraries/base/source/Thing.ts"
@@ -28,8 +28,8 @@ func TestBoundaryNoProjectImportFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BoundaryNoProjectImport, baseLibraryFile, testCase.source, baseLibraryOptions)
-			ruletest.ExpectFindings(t, result, "forbiddenProjectImport")
+			result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, baseLibraryFile, testCase.source, baseLibraryOptions)
+			rule_testing.ExpectFindings(t, result, "forbiddenProjectImport")
 		})
 	}
 }
@@ -54,8 +54,8 @@ func TestBoundaryNoProjectImportStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BoundaryNoProjectImport, testCase.fileName, testCase.source, testCase.options)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, testCase.fileName, testCase.source, testCase.options)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -66,7 +66,7 @@ func TestBoundaryNoProjectImportStaysSilent(t *testing.T) {
 func TestBoundaryNoProjectImportReportsAtTheSpecifier(t *testing.T) {
 	sourceText := "// Dependencies\n// a second comment\nimport { helper } from '@project/source/Helper';\\n"
 
-	result := ruletest.RunWithOptions(t, BoundaryNoProjectImport, baseLibraryFile, sourceText, baseLibraryOptions)
+	result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, baseLibraryFile, sourceText, baseLibraryOptions)
 	if len(result.Diagnostics) == 0 {
 		t.Fatalf("expected a finding, got none")
 	}

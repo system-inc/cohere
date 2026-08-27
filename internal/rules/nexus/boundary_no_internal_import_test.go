@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestBoundaryNoInternalImportFires(t *testing.T) {
@@ -48,8 +48,8 @@ func TestBoundaryNoInternalImportFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, BoundaryNoInternalImport, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.wantId)
+			result := rule_testing.Run(t, BoundaryNoInternalImport, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
 	}
 }
@@ -101,8 +101,8 @@ func TestBoundaryNoInternalImportStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, BoundaryNoInternalImport, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, BoundaryNoInternalImport, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -113,7 +113,7 @@ func TestBoundaryNoInternalImportStaysSilent(t *testing.T) {
 func TestBoundaryNoInternalImportReportsAtTheSpecifier(t *testing.T) {
 	sourceText := "// Dependencies\n// a second comment\nimport { Detail } from '../widget/internal/Detail';\\n"
 
-	result := ruletest.RunWithOptions(t, BoundaryNoInternalImport, "/repo/source/other/Thing.ts", sourceText, nil)
+	result := rule_testing.RunWithOptions(t, BoundaryNoInternalImport, "/repo/source/other/Thing.ts", sourceText, nil)
 	if len(result.Diagnostics) == 0 {
 		t.Fatalf("expected a finding, got none")
 	}

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // A `.tsx` name, because the gate this rule turns on is "does this function create JSX", and
@@ -34,8 +34,8 @@ const upstreamEvalFixture = `function Component(props) {
 // `with` statement or an inline class declaration inside a component, checked by grepping the
 // full 1,835-input fixture list at the pinned sha rather than only the 453 vendored here.
 func TestUnsupportedSyntaxFiresOnUpstreamCorpus(t *testing.T) {
-	result := ruletest.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
-	ruletest.ExpectFindings(t, result, "unsupportedEval")
+	result := rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
+	rule_testing.ExpectFindings(t, result, "unsupportedEval")
 
 	// The span is asserted against a literal typed here rather than against the rule's own
 	// message constant, so a mutation moving both sides together cannot stay green.
@@ -65,7 +65,7 @@ func TestUnsupportedSyntaxFiresOnUpstreamCorpus(t *testing.T) {
 // fixture can cook an escape without anything going red. Reading the bytes removes the
 // transcription step instead of verifying it.
 func TestUnsupportedSyntaxStaysSilentOnUpstreamCorpus(t *testing.T) {
-	path := filepath.Join("..", "..", "reactconformance", "testdata", "fixtures", "error.todo-kitchensink.js")
+	path := filepath.Join("..", "..", "react_conformance", "testdata", "fixtures", "error.todo-kitchensink.js")
 	sourceBytes, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("reading the vendored fixture: %v", err)
@@ -75,7 +75,7 @@ func TestUnsupportedSyntaxStaysSilentOnUpstreamCorpus(t *testing.T) {
 	if !strings.Contains(string(sourceBytes), "class Bar {") {
 		t.Fatal("the vendored kitchensink fixture no longer declares an inline class, so this case tests nothing")
 	}
-	ruletest.ExpectClean(t, ruletest.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, string(sourceBytes)))
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, string(sourceBytes)))
 }
 
 // TestUnsupportedSyntaxFires covers the reporting cases upstream does not ship.
@@ -401,8 +401,8 @@ function Component(props: Props) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -755,8 +755,8 @@ func TestUnsupportedSyntaxStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText))
 		})
 	}
 }
@@ -771,7 +771,7 @@ func TestUnsupportedSyntaxStaysSilent(t *testing.T) {
 // rule whose upstream fixtures were fetched at write time would have nothing to compare against
 // later, which is the argument for the vendoring rather than an incidental convenience of it.
 func TestUnsupportedSyntaxTranscriptionMatchesTheVendoredCorpus(t *testing.T) {
-	path := filepath.Join("..", "..", "reactconformance", "testdata", "fixtures", "error.invalid-eval-unsupported.js")
+	path := filepath.Join("..", "..", "react_conformance", "testdata", "fixtures", "error.invalid-eval-unsupported.js")
 	sourceBytes, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("reading the vendored fixture: %v", err)
@@ -796,12 +796,12 @@ func TestUnsupportedSyntaxTranscriptionMatchesTheVendoredCorpus(t *testing.T) {
 func TestUnsupportedSyntaxRequiresTheTypedHarness(t *testing.T) {
 	// The control first. Under the typed harness this input reports, which is what makes the
 	// silence below a measurement of the harness rather than of the input.
-	typed := ruletest.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
+	typed := rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
 	if len(typed.Diagnostics) != 1 {
 		t.Fatalf("typed harness: want 1 diagnostic, got %d", len(typed.Diagnostics))
 	}
 
-	untyped := ruletest.Run(t, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
+	untyped := rule_testing.Run(t, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
 	if len(untyped.Diagnostics) != 0 {
 		t.Errorf("plain harness: want 0 diagnostics from the guarded eval arm, got %d",
 			len(untyped.Diagnostics))
@@ -859,7 +859,7 @@ func TestUnsupportedSyntaxPointsAtTheRightNode(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}

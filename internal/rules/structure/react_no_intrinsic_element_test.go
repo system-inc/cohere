@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const anchorFile = "/repository/source/components/Page.tsx"
@@ -57,7 +57,7 @@ func TestReactNoAnchorElementFires(t *testing.T) {
 			if testCase.name == "an anchor in a differently placed Link.tsx" {
 				fileName = "/repository/source/widgets/Link.tsx"
 			}
-			result := ruletest.Run(t, ReactNoAnchorElement, fileName, testCase.sourceText)
+			result := rule_testing.Run(t, ReactNoAnchorElement, fileName, testCase.sourceText)
 			ids := result.MessageIds()
 			if len(ids) != testCase.wantCount {
 				t.Fatalf("expected %d findings, got %d: %v", testCase.wantCount, len(ids), ids)
@@ -131,7 +131,7 @@ func TestReactNoAnchorElementStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ReactNoAnchorElement, testCase.fileName, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactNoAnchorElement, testCase.fileName, testCase.sourceText))
 		})
 	}
 }
@@ -139,10 +139,10 @@ func TestReactNoAnchorElementStaysSilent(t *testing.T) {
 func TestReactNoHorizontalRuleElementFires(t *testing.T) {
 	// hr is written self-closing essentially always, so this is the shape that matters most and it
 	// is the one a JsxOpeningElement-only listener misses entirely.
-	ruletest.ExpectFindings(t, ruletest.Run(t, ReactNoHorizontalRuleElement, anchorFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactNoHorizontalRuleElement, anchorFile,
 		"export function Page() {\n    return <div><hr /></div>;\n}\n"), "noHrElement")
 
-	ruletest.ExpectFindings(t, ruletest.Run(t, ReactNoHorizontalRuleElement, anchorFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactNoHorizontalRuleElement, anchorFile,
 		"export function Page() {\n    return <div><hr /><hr /></div>;\n}\n"), "noHrElement", "noHrElement")
 }
 
@@ -178,7 +178,7 @@ func TestReactNoHorizontalRuleElementStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ReactNoHorizontalRuleElement, testCase.fileName, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactNoHorizontalRuleElement, testCase.fileName, testCase.sourceText))
 		})
 	}
 }

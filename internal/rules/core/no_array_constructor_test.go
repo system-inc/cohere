@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // arrayConstructorFile is where the fixtures pretend to live.
@@ -96,8 +96,8 @@ func TestNoArrayConstructorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -172,8 +172,8 @@ func TestNoArrayConstructorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText))
 		})
 	}
 }
@@ -200,8 +200,8 @@ func TestNoArrayConstructorDeclinesOtherConstructors(t *testing.T) {
 		"new ArrayLike();",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
 		})
 	}
 }
@@ -215,8 +215,8 @@ func TestNoArrayConstructorDeclinesOtherConstructors(t *testing.T) {
 func TestNoArrayConstructorDeclinesBareOptionalCalls(t *testing.T) {
 	for _, sourceText := range []string{"Array?.();", "Array?.(1, 2);", "Array?.(...args);"} {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
 		})
 	}
 }
@@ -233,15 +233,15 @@ func TestNoArrayConstructorDeclinesAShadowedArray(t *testing.T) {
 		"import { Array } from './Shim';\nexport const a = new Array(1, 2);\n",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText))
 		})
 	}
 }
 
 // The guard that makes every fixture in this file mean something.
 //
-// This rule declares NeedsTypeChecker, so `ruletest.Run` hands it a nil checker,
+// This rule declares NeedsTypeChecker, so `rule_testing.Run` hands it a nil checker,
 // `resolvesToAGlobal` answers false, and the rule reports nothing at all. Every Fires case above
 // would still pass under the syntax-only harness if it were used, because the assertions there
 // would be comparing empty against empty only if they expected nothing, and every StaysSilent case
@@ -255,7 +255,7 @@ func TestNoArrayConstructorNeedsTheTypedHarness(t *testing.T) {
 	if !NoArrayConstructor.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker; the shadow fixtures no longer mean anything")
 	}
-	result := ruletest.Run(t, NoArrayConstructor, arrayConstructorFile, "new Array()")
+	result := rule_testing.Run(t, NoArrayConstructor, arrayConstructorFile, "new Array()")
 	if len(result.Diagnostics) != 0 {
 		t.Fatalf("expected the syntax-only harness to see nothing, got %v", result.MessageIds())
 	}
@@ -297,7 +297,7 @@ func TestNoArrayConstructorSuggestsAnArrayLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -349,7 +349,7 @@ func TestNoArrayConstructorKeepsCommentsAmongArguments(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -380,7 +380,7 @@ func TestNoArrayConstructorKeepsCommentsAmongArguments(t *testing.T) {
 // may be applied unattended.
 func TestNoArrayConstructorNeverProposesAnAutomaticFix(t *testing.T) {
 	sourceText := "const value = 1;\nFn\nArray()\n"
-	result := ruletest.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText)
+	result := rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}

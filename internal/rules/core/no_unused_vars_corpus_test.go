@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The corpus below is oxc's own, extracted verbatim by `tools/extract_oxc_fixtures -dump` and
@@ -15,7 +15,7 @@ import (
 // `test_d_ts` cases run under a `.d.ts` extension upstream, which this rule skips entirely, so
 // running them as `.ts` would assert the opposite of upstream's intent.
 //
-// The `test_vars_self_use_js` cases run under `.js`, and `ruletest`'s generated tsconfig includes
+// The `test_vars_self_use_js` cases run under `.js`, and `rule_testing`'s generated tsconfig includes
 // only `**/*.ts` and `**/*.tsx`, so a `.js` fixture fails to build a program at all rather than
 // producing a verdict. Its one clean case is
 // `export function promisify() { var fn; function fn() {} return fn; }`, which is clean ONLY as
@@ -746,7 +746,7 @@ var noUnusedVarsUpstreamReports = []string{
 // clean here. All 409 pass, which is the half of the corpus that catches a rule reporting too much.
 func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(t *testing.T) {
 	for _, source := range noUnusedVarsUpstreamClean {
-		result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", source)
+		result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source)
 		if len(result.Diagnostics) != 0 {
 			t.Errorf("want clean, got %d findings for %q", len(result.Diagnostics), source)
 		}
@@ -768,7 +768,7 @@ func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(t *testing.T) {
 func TestNoUnusedVarsFiresOnUpstreamReportingCases(t *testing.T) {
 	silent := 0
 	for _, source := range noUnusedVarsUpstreamReports {
-		if len(ruletest.RunTyped(t, NoUnusedVars, "a.ts", source).Diagnostics) == 0 {
+		if len(rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source).Diagnostics) == 0 {
 			silent++
 		}
 	}

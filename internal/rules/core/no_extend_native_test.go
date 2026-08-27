@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // extendNativeFile is where the fixtures pretend to live.
@@ -53,7 +53,7 @@ func TestNoExtendNativeFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+			result := rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.builtins) {
 				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.builtins), len(result.Diagnostics))
@@ -109,7 +109,7 @@ func TestNoExtendNativeStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoExtendNative,
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
 				extendNativeFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -135,7 +135,7 @@ func TestNoExtendNativeReportsTheWholeExtension(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+			result := rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
 				testCase.sourceText, nil)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -172,7 +172,7 @@ func TestNoExtendNativeDeclinesShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoExtendNative,
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
 				extendNativeFile, testCase.sourceText, nil))
 		})
 	}
@@ -199,9 +199,9 @@ func TestNoExtendNativeDecodesItsOptions(t *testing.T) {
 	}
 
 	// And the decoded value reaches the rule: the same input reports without the exception.
-	ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
 		"Object.prototype.p = 0", decoded))
-	if got := len(ruletest.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+	if got := len(rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
 		"Object.prototype.p = 0", nil).Diagnostics); got != 1 {
 		t.Fatalf("without the exception the same input gave %d diagnostics", got)
 	}
@@ -213,21 +213,21 @@ func TestNoExtendNativeDecodesItsOptions(t *testing.T) {
 // turns a decode error on empty input into nil, and a type assertion on nil yields the zero value.
 // The zero value being correct here is a coincidence worth pinning rather than relying on.
 func TestNoExtendNativeDefaultsWithoutTheDecoder(t *testing.T) {
-	ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
 		"Object.prototype.p = 0", nil), "unexpected")
 }
 
 // The typed harness is required, and a revert to the plain one must fail loudly.
 //
-// The rule guards on a nil checker, so under `ruletest.Run` it goes silent rather than panicking,
+// The rule guards on a nil checker, so under `rule_testing.Run` it goes silent rather than panicking,
 // and every StaysSilent case above would pass vacuously.
 func TestNoExtendNativeNeedsTheTypedHarness(t *testing.T) {
 	const source = "Object.prototype.p = 0"
 
-	ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
 		source, nil), "unexpected")
 
-	if got := len(ruletest.RunWithOptions(t, NoExtendNative, extendNativeFile,
+	if got := len(rule_testing.RunWithOptions(t, NoExtendNative, extendNativeFile,
 		source, nil).Diagnostics); got != 0 {
 		t.Fatalf("the untyped harness produced %d diagnostics, so the nil-checker guard has moved "+
 			"and this test no longer measures what it claims", got)
@@ -258,7 +258,7 @@ func TestNoExtendNativeDeclinesReadingAPrototypeProperty(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoExtendNative,
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
 				extendNativeFile, testCase.sourceText, nil))
 		})
 	}
@@ -289,7 +289,7 @@ func TestNoExtendNativeDeclinesADefineCallOnAnotherReceiver(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoExtendNative,
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtendNative,
 				extendNativeFile, testCase.sourceText, nil))
 		})
 	}
@@ -318,7 +318,7 @@ func TestNoExtendNativeReadsATemplateSubscript(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
+			result := rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
 				testCase.sourceText, nil)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

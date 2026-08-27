@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const propertyAliasFile = "/repository/source/Thing.ts"
@@ -38,7 +38,7 @@ func TestConsistencyNoPropertyAliasFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText),
 				"noPropertyAlias")
 		})
 	}
@@ -93,7 +93,7 @@ func TestConsistencyNoPropertyAliasStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText))
 		})
 	}
 }

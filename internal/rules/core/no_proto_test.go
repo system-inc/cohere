@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // protoFile is where the fixtures pretend to live.
@@ -34,8 +34,8 @@ func TestNoProtoFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoProto, protoFile, testCase.sourceText), "unexpectedProto")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoProto, protoFile, testCase.sourceText), "unexpectedProto")
 		})
 	}
 }
@@ -60,7 +60,7 @@ func TestNoProtoStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoProto, protoFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoProto, protoFile, testCase.sourceText))
 		})
 	}
 }
@@ -71,7 +71,7 @@ func TestNoProtoStaysSilent(t *testing.T) {
 // record upstream's choice rather than ours. The finding covers the whole member access including
 // the object, which is why the assignment case starts at offset 0 and not at the bracket.
 //
-// `ruletest.Run` does not trim its input, so these offsets index the literal directly. The trimming
+// `rule_testing.Run` does not trim its input, so these offsets index the literal directly. The trimming
 // hazard the brief describes applies to `RunTyped`, which this rule does not use.
 func TestNoProtoReportsTheWholeAccess(t *testing.T) {
 	cases := []struct {
@@ -87,7 +87,7 @@ func TestNoProtoReportsTheWholeAccess(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoProto, protoFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoProto, protoFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -104,7 +104,7 @@ func TestNoProtoReportsTheWholeAccess(t *testing.T) {
 // The message, asserted against literals typed here rather than against the rule's own constants,
 // which would move with it.
 func TestNoProtoReportsWhyItMatters(t *testing.T) {
-	result := ruletest.Run(t, NoProto, protoFile, "var a = test.__proto__;")
+	result := rule_testing.Run(t, NoProto, protoFile, "var a = test.__proto__;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
@@ -135,7 +135,7 @@ func TestNoProtoDeclinesShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoProto, protoFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoProto, protoFile, testCase.sourceText))
 		})
 	}
 }
@@ -155,8 +155,8 @@ func TestNoProtoReportsThroughOptionalChaining(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoProto, protoFile, testCase.sourceText), "unexpectedProto")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoProto, protoFile, testCase.sourceText), "unexpectedProto")
 		})
 	}
 }

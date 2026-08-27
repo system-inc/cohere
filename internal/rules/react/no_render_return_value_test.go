@@ -3,7 +3,7 @@ package react
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // renderReturnValueFile is where the fixtures pretend to live.
@@ -72,8 +72,8 @@ func TestNoRenderReturnValueFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "noRenderReturnValue")
+			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "noRenderReturnValue")
 		})
 	}
 }
@@ -135,8 +135,8 @@ func TestNoRenderReturnValueStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -154,8 +154,8 @@ func TestNoRenderReturnValueStaysSilent(t *testing.T) {
 // on oxlint: two findings, both at column 21 of the same line.
 func TestNoRenderReturnValueReportsTwiceInsideANestedArrow(t *testing.T) {
 	const sourceText = "var f = () => () => ReactDOM.render(<div />, x);"
-	result := ruletest.Run(t, NoRenderReturnValue, renderReturnValueFile, sourceText)
-	ruletest.ExpectFindings(t, result, "noRenderReturnValue", "noRenderReturnValue")
+	result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "noRenderReturnValue", "noRenderReturnValue")
 }
 
 // TestNoRenderReturnValueReachesAnywhereInsideAnArrowExpressionBody is the second half of the rule.
@@ -184,8 +184,8 @@ func TestNoRenderReturnValueReachesAnywhereInsideAnArrowExpressionBody(t *testin
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "noRenderReturnValue")
+			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "noRenderReturnValue")
 		})
 	}
 }
@@ -212,8 +212,8 @@ func TestNoRenderReturnValueSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "noRenderReturnValue")
+			result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "noRenderReturnValue")
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d diagnostics, want 1", len(result.Diagnostics))
 			}

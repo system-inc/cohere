@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // asyncPromiseExecutorFile is where the fixtures pretend to live.
@@ -30,8 +30,8 @@ func TestNoAsyncPromiseExecutorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText),
 				"noAsyncPromiseExecutor")
 		})
 	}
@@ -54,8 +54,8 @@ func TestNoAsyncPromiseExecutorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText))
 		})
 	}
 }
@@ -92,8 +92,8 @@ func TestNoAsyncPromiseExecutorFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText),
 				"noAsyncPromiseExecutor")
 		})
 	}
@@ -149,8 +149,8 @@ func TestNoAsyncPromiseExecutorStaysSilentOnCasesUpstreamDoesNotCover(t *testing
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile, testCase.sourceText))
 		})
 	}
 }
@@ -185,7 +185,7 @@ func TestNoAsyncPromiseExecutorPointsAtTheKeyword(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile,
+			result := rule_testing.Run(t, NoAsyncPromiseExecutor, asyncPromiseExecutorFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

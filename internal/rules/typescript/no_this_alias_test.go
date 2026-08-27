@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const thisAliasFile = "/repository/source/Thing.ts"
@@ -82,9 +82,9 @@ func TestNoThisAliasFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoThisAlias, thisAliasFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile, testCase.sourceText,
 				decodeThisAliasOptionsForTest(t, testCase.configuration))
-			ruletest.ExpectFindings(t, result, testCase.expected...)
+			rule_testing.ExpectFindings(t, result, testCase.expected...)
 		})
 	}
 }
@@ -137,7 +137,7 @@ func TestNoThisAliasStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoThisAlias, thisAliasFile,
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile,
 				testCase.sourceText, decodeThisAliasOptionsForTest(t, testCase.configuration)))
 		})
 	}
@@ -151,14 +151,14 @@ func TestNoThisAliasStaysSilent(t *testing.T) {
 func TestNoThisAliasDeclinesJavaScript(t *testing.T) {
 	const source = "const self = this;"
 
-	ruletest.ExpectFindings(t,
-		ruletest.RunWithOptions(t, NoThisAlias, "/repository/source/Thing.ts", source,
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunWithOptions(t, NoThisAlias, "/repository/source/Thing.ts", source,
 			NoThisAliasOptions{}),
 		"thisAssignment")
 
 	for _, fileName := range []string{"/repository/source/Thing.js", "/repository/source/Thing.jsx"} {
-		ruletest.ExpectClean(t,
-			ruletest.RunWithOptions(t, NoThisAlias, fileName, source, NoThisAliasOptions{}))
+		rule_testing.ExpectClean(t,
+			rule_testing.RunWithOptions(t, NoThisAlias, fileName, source, NoThisAliasOptions{}))
 	}
 }
 
@@ -194,7 +194,7 @@ func TestNoThisAliasPointsAtTheAliasItself(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoThisAlias, thisAliasFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile, testCase.sourceText,
 				decodeThisAliasOptionsForTest(t, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -214,13 +214,13 @@ func TestNoThisAliasPointsAtTheAliasItself(t *testing.T) {
 // because comparing a finding to the constant it was built from is an equality that moves with any
 // mutation of that constant and therefore guards nothing.
 func TestNoThisAliasMessagesSayWhichJudgmentFired(t *testing.T) {
-	identifier := ruletest.RunWithOptions(t, NoThisAlias, thisAliasFile, "const self = this;",
+	identifier := rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile, "const self = this;",
 		NoThisAliasOptions{})
 	if len(identifier.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(identifier.Diagnostics))
 	}
 
-	destructure := ruletest.RunWithOptions(t, NoThisAlias, thisAliasFile,
+	destructure := rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile,
 		"const { props } = this;", NoThisAliasOptions{ReportDestructuring: true})
 	if len(destructure.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(destructure.Diagnostics))

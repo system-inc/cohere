@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const unsafeFunctionFile = "/repository/source/Thing.ts"
@@ -29,7 +29,7 @@ func TestNoUnsafeFunctionTypeFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText),
 				"bannedFunctionType")
 		})
 	}
@@ -78,7 +78,7 @@ func TestNoUnsafeFunctionTypeStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText))
 		})
 	}
 }

@@ -3,7 +3,7 @@ package react
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // jsxNoUndefFile is where the fixtures pretend to live.
@@ -79,8 +79,8 @@ func TestJsxNoUndefFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.findings...)
+			result := rule_testing.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
 	}
 }
@@ -137,13 +137,13 @@ func TestJsxNoUndefStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
 
-// TestJsxNoUndefNeedsTheTypedHarness pins that this rule cannot be run through `ruletest.Run`.
+// TestJsxNoUndefNeedsTheTypedHarness pins that this rule cannot be run through `rule_testing.Run`.
 //
 // The plain harness hands the rule a nil checker, and the rule's own guard then returns before
 // reporting anything, which makes every silent case above pass vacuously and looks from the outside
@@ -152,11 +152,11 @@ func TestJsxNoUndefStaysSilent(t *testing.T) {
 func TestJsxNoUndefNeedsTheTypedHarness(t *testing.T) {
 	source := "var React; React.render(<App />);"
 
-	untyped := ruletest.Run(t, JsxNoUndef, jsxNoUndefFile, source)
-	ruletest.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(t, JsxNoUndef, jsxNoUndefFile, source)
+	rule_testing.ExpectClean(t, untyped)
 
-	typed := ruletest.RunTyped(t, JsxNoUndef, jsxNoUndefFile, source)
-	ruletest.ExpectFindings(t, typed, "jsxIdentifierNotDefined")
+	typed := rule_testing.RunTyped(t, JsxNoUndef, jsxNoUndefFile, source)
+	rule_testing.ExpectFindings(t, typed, "jsxIdentifierNotDefined")
 }
 
 // TestJsxNoUndefPointsAtTheReferencedIdentifier asserts where each finding lands and what it says.
@@ -182,8 +182,8 @@ func TestJsxNoUndefPointsAtTheReferencedIdentifier(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "jsxIdentifierNotDefined")
+			result := rule_testing.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "jsxIdentifierNotDefined")
 
 			finding := result.Diagnostics[0]
 			reported := testCase.sourceText[finding.Range.Pos():finding.Range.End()]

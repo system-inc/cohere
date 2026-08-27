@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // TestNoEmptyReportsEmptyBlocks is the fixture that must fire.
@@ -23,8 +23,8 @@ func TestNoEmptyReportsEmptyBlocks(t *testing.T) {
 		{"label: {}", "unexpectedBlock"},
 		{"switch (foo) {}", "unexpectedSwitch"},
 	} {
-		result := ruletest.Run(t, NoEmpty, "empty.ts", testCase.source)
-		ruletest.ExpectFindings(t, result, testCase.wantId)
+		result := rule_testing.Run(t, NoEmpty, "empty.ts", testCase.source)
+		rule_testing.ExpectFindings(t, result, testCase.wantId)
 	}
 }
 
@@ -33,11 +33,11 @@ func TestNoEmptyReportsEmptyBlocks(t *testing.T) {
 // A try statement has up to three blocks and each is its own claim about what happens there, so an
 // empty try, catch, and finally are three findings rather than one.
 func TestNoEmptyReportsEachEmptyBlockOfATryStatement(t *testing.T) {
-	result := ruletest.Run(t, NoEmpty, "try.ts", "try { work(); } catch (error) {} finally {}")
-	ruletest.ExpectFindings(t, result, "unexpectedBlock", "unexpectedBlock")
+	result := rule_testing.Run(t, NoEmpty, "try.ts", "try { work(); } catch (error) {} finally {}")
+	rule_testing.ExpectFindings(t, result, "unexpectedBlock", "unexpectedBlock")
 
-	all := ruletest.Run(t, NoEmpty, "all.ts", "try {} catch (error) {} finally {}")
-	ruletest.ExpectFindings(t, all, "unexpectedBlock", "unexpectedBlock", "unexpectedBlock")
+	all := rule_testing.Run(t, NoEmpty, "all.ts", "try {} catch (error) {} finally {}")
+	rule_testing.ExpectFindings(t, all, "unexpectedBlock", "unexpectedBlock", "unexpectedBlock")
 }
 
 // TestNoEmptyAcceptsAnyCommentAsIntent pins the escape hatch.
@@ -55,8 +55,8 @@ func TestNoEmptyAcceptsAnyCommentAsIntent(t *testing.T) {
 		"if (foo) {\n\t/* multi\n\t   line */\n}",
 		"if (foo) { /* one */ /* two */ }",
 	} {
-		result := ruletest.Run(t, NoEmpty, "commented.ts", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, NoEmpty, "commented.ts", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -76,7 +76,7 @@ func TestNoEmptyIsNotFooledByCommentMarkersInStrings(t *testing.T) {
 		"switch (/[/*]/.test(input) ? 1 : 2) {}",
 		`if (label === '/* empty */') {}`,
 	} {
-		result := ruletest.Run(t, NoEmpty, "strings.ts", source)
+		result := rule_testing.Run(t, NoEmpty, "strings.ts", source)
 		if len(result.Diagnostics) != 1 {
 			t.Fatalf("expected 1 finding for %q, got %d: %v", source, len(result.Diagnostics), result.MessageIds())
 		}
@@ -106,8 +106,8 @@ func TestNoEmptyExemptsFunctionBodies(t *testing.T) {
 		"const obj = { method() {} };",
 		"class C { private handle = () => {}; }",
 	} {
-		result := ruletest.Run(t, NoEmpty, "functions.ts", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, NoEmpty, "functions.ts", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -126,8 +126,8 @@ func TestNoEmptyStaysSilentOnBlocksWithContent(t *testing.T) {
 		"interface Empty {}",
 		"enum Empty {}",
 	} {
-		result := ruletest.Run(t, NoEmpty, "content.ts", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, NoEmpty, "content.ts", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -136,8 +136,8 @@ func TestNoEmptyStaysSilentOnBlocksWithContent(t *testing.T) {
 // The option defaults off, so a registry that forgets to wire it must produce the strict rule rather
 // than a silent one.
 func TestNoEmptyWithoutOptionsReportsEmptyCatch(t *testing.T) {
-	result := ruletest.RunWithOptions(t, NoEmpty, "strict.ts", "try { work(); } catch (error) {}", nil)
-	ruletest.ExpectFindings(t, result, "unexpectedBlock")
+	result := rule_testing.RunWithOptions(t, NoEmpty, "strict.ts", "try { work(); } catch (error) {}", nil)
+	rule_testing.ExpectFindings(t, result, "unexpectedBlock")
 }
 
 // TestNoEmptyAllowEmptyCatchExemptsOnlyTheCatch pins the option's exact reach.
@@ -153,18 +153,18 @@ func TestNoEmptyAllowEmptyCatchExemptsOnlyTheCatch(t *testing.T) {
 		"try { work(); } catch {}",
 		"try { work(); } catch (error) {} finally { cleanup(); }",
 	} {
-		result := ruletest.RunWithOptions(t, NoEmpty, "allowed.ts", source, options)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.RunWithOptions(t, NoEmpty, "allowed.ts", source, options)
+		rule_testing.ExpectClean(t, result)
 	}
 
-	finallyStillReports := ruletest.RunWithOptions(t, NoEmpty, "finally.ts",
+	finallyStillReports := rule_testing.RunWithOptions(t, NoEmpty, "finally.ts",
 		"try { work(); } catch (error) {} finally {}", options)
-	ruletest.ExpectFindings(t, finallyStillReports, "unexpectedBlock")
+	rule_testing.ExpectFindings(t, finallyStillReports, "unexpectedBlock")
 
-	tryStillReports := ruletest.RunWithOptions(t, NoEmpty, "try.ts",
+	tryStillReports := rule_testing.RunWithOptions(t, NoEmpty, "try.ts",
 		"try {} catch (error) {}", options)
-	ruletest.ExpectFindings(t, tryStillReports, "unexpectedBlock")
+	rule_testing.ExpectFindings(t, tryStillReports, "unexpectedBlock")
 
-	otherBlocksStillReport := ruletest.RunWithOptions(t, NoEmpty, "other.ts", "if (foo) {}", options)
-	ruletest.ExpectFindings(t, otherBlocksStillReport, "unexpectedBlock")
+	otherBlocksStillReport := rule_testing.RunWithOptions(t, NoEmpty, "other.ts", "if (foo) {}", options)
+	rule_testing.ExpectFindings(t, otherBlocksStillReport, "unexpectedBlock")
 }

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // octalEscapeFile is where the fixtures pretend to live.
@@ -98,8 +98,8 @@ func TestNoOctalEscapeFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "octalEscapeSequence")
+			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "octalEscapeSequence")
 
 			// The sequence is interpolated into the message, so the id assertion above cannot see
 			// it. Upstream states a `data.sequence` per case and it is not always the digits a
@@ -177,7 +177,7 @@ func TestNoOctalEscapeStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoOctalEscape, octalEscapeFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoOctalEscape, octalEscapeFile, sourceText))
 		})
 	}
 }
@@ -218,8 +218,8 @@ func TestNoOctalEscapeProductionWidths(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "octalEscapeSequence")
+			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "octalEscapeSequence")
 			wantPrefix := "Do not use the octal escape `\\" + testCase.wantSequence + "`."
 			if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, wantPrefix) {
 				t.Errorf("message %q does not begin with %q", got, wantPrefix)
@@ -251,7 +251,7 @@ func TestNoOctalEscapeReportsTheWholeLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
@@ -287,7 +287,7 @@ func TestNoOctalEscapeReportsOncePerLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantFindings {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantFindings)
 			}
@@ -318,7 +318,7 @@ func TestNoOctalEscapeDeclinesOtherLiteralKinds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText))
 		})
 	}
 }
@@ -329,7 +329,7 @@ func TestNoOctalEscapeDeclinesOtherLiteralKinds(t *testing.T) {
 // The id literal is typed here rather than read from the rule's own constant, so a rename cannot
 // move both sides at once and stay green.
 func TestNoOctalEscapeMessage(t *testing.T) {
-	result := ruletest.Run(t, NoOctalEscape, octalEscapeFile, `'\01'`)
+	result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, `'\01'`)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}

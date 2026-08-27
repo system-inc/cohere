@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // callerFile is where the fixtures pretend to live.
@@ -25,8 +25,8 @@ func TestNoCallerFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoCaller, callerFile, testCase.sourceText), "noCaller")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoCaller, callerFile, testCase.sourceText), "noCaller")
 		})
 	}
 }
@@ -50,7 +50,7 @@ func TestNoCallerStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoCaller, callerFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoCaller, callerFile, testCase.sourceText))
 		})
 	}
 }
@@ -62,10 +62,10 @@ func TestNoCallerStaysSilent(t *testing.T) {
 // name; the second is the behavior `isIdentifierNamed` gives us for free by skipping parentheses,
 // and upstream's `is_specific_id` does the same, so it is parity rather than divergence.
 func TestNoCallerReadsTheReceiver(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoCaller, callerFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoCaller, callerFile,
 		"declare const options: { callee: number };\nexport const a = options.callee;\n"))
 
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoCaller, callerFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoCaller, callerFile,
 		"export function f() { return (arguments).callee; }\n"), "noCaller")
 }
 
@@ -80,7 +80,7 @@ func TestNoCallerReadsTheReceiver(t *testing.T) {
 // expectation is most likely to be wrong in the same direction as the code that produced it.
 func TestNoCallerReportsTheProperty(t *testing.T) {
 	const source = "var x = arguments.callee"
-	result := ruletest.Run(t, NoCaller, callerFile, source)
+	result := rule_testing.Run(t, NoCaller, callerFile, source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // uselessCallFile is where the fixtures pretend to live.
@@ -48,8 +48,8 @@ func TestNoUselessCallStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
 	}
 }
@@ -93,8 +93,8 @@ func TestNoUselessCallFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText), "unnecessaryCall")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText), "unnecessaryCall")
 		})
 	}
 }
@@ -125,11 +125,11 @@ func TestNoUselessCallKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
 	}
 
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoUselessCall, uselessCallFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,
 		"obj?.foo.bar.call(obj?.foo, 1, 2);"), "unnecessaryCall")
 }
 
@@ -156,12 +156,12 @@ func TestNoUselessCallDeclinesAComputedAccess(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
 	}
 
 	// The control, so the silence above is about the brackets rather than about the receiver.
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoUselessCall, uselessCallFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,
 		"obj[\"foo\"].call(obj, 1, 2);"), "unnecessaryCall")
 }
 
@@ -192,11 +192,11 @@ func TestNoUselessCallDeclinesOtherMethods(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
 	}
 
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoUselessCall, uselessCallFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,
 		"obj.foo.call(obj, 1, 2);"), "unnecessaryCall")
 }
 
@@ -217,7 +217,7 @@ func TestNoUselessCallNamesTheMethod(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -235,7 +235,7 @@ func TestNoUselessCallNamesTheMethod(t *testing.T) {
 // satisfies every assertion above while pointing past the arguments that make the finding true.
 func TestNoUselessCallReportsTheWholeCall(t *testing.T) {
 	const sourceText = "obj.foo.call(obj, 1, 2);"
-	result := ruletest.Run(t, NoUselessCall, uselessCallFile, sourceText)
+	result := rule_testing.Run(t, NoUselessCall, uselessCallFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
@@ -253,14 +253,14 @@ func TestNoUselessCallReportsTheWholeCall(t *testing.T) {
 // the reader to make two different edits. Upstream's clean case `foo.apply(null, args)` is the first
 // half; the second is asserted with the array literal in place.
 func TestNoUselessCallLeavesVariadicApplyToPreferSpread(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoUselessCall, uselessCallFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,
 		"declare const args: number[];\nfoo.apply(null, args);\n"))
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoUselessCall, uselessCallFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,
 		"foo.apply(null, [1, 2]);"), "unnecessaryCall")
 
 	// And the mirror, so the partition is asserted from both sides rather than assumed.
-	ruletest.ExpectFindings(t, ruletest.Run(t, PreferSpread, uselessCallFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, PreferSpread, uselessCallFile,
 		"declare const args: number[];\nfoo.apply(null, args);\n"), "preferSpread")
-	ruletest.ExpectClean(t, ruletest.Run(t, PreferSpread, uselessCallFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, PreferSpread, uselessCallFile,
 		"foo.apply(null, [1, 2]);"))
 }

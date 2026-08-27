@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
-	"github.com/system-inc/verify/internal/utils/ecmascript/regexsyntax"
+	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/regexsyntax"
 )
 
 // backreferenceFile is where the fixtures pretend to live.
@@ -120,8 +120,8 @@ func TestNoUselessBackreferenceFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText),
 				testCase.findings...)
 		})
 	}
@@ -238,8 +238,8 @@ func TestNoUselessBackreferenceStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
 		})
 	}
 }
@@ -255,12 +255,12 @@ func TestNoUselessBackreferenceStaysSilent(t *testing.T) {
 // the flag the same text is a syntax error and the whole pattern is upstream's business, not this
 // rule's.
 func TestNoUselessBackreferenceStillReportsBesideALegacyOctal(t *testing.T) {
-	result := ruletest.Run(t, NoUselessBackreference, backreferenceFile, `/\1(a)\2/`)
-	ruletest.ExpectFindings(t, result, "backreferenceBeforeItsGroup")
+	result := rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `/\1(a)\2/`)
+	rule_testing.ExpectFindings(t, result, "backreferenceBeforeItsGroup")
 
 	// The same text under `u` is a syntax error, so the rule steps aside entirely.
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoUselessBackreference, backreferenceFile, `/\1(a)\2/u`))
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `/\1(a)\2/u`))
 }
 
 // TestNoUselessBackreferenceHandlesConstructorArgumentShapesUpstreamNeverExercises covers two
@@ -280,22 +280,22 @@ func TestNoUselessBackreferenceStillReportsBesideALegacyOctal(t *testing.T) {
 // parses without `u`. Only the template form returns early.
 func TestNoUselessBackreferenceHandlesConstructorArgumentShapesUpstreamNeverExercises(t *testing.T) {
 	t.Run("a regex literal argument reports once, not twice", func(t *testing.T) {
-		ruletest.ExpectFindings(t,
-			ruletest.Run(t, NoUselessBackreference, backreferenceFile, `RegExp(/\1(a)/, '')`),
+		rule_testing.ExpectFindings(t,
+			rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `RegExp(/\1(a)/, '')`),
 			"backreferenceBeforeItsGroup")
 	})
 
 	t.Run("an unreadable template flags argument skips the call", func(t *testing.T) {
-		ruletest.ExpectClean(t,
-			ruletest.Run(t, NoUselessBackreference, backreferenceFile,
+		rule_testing.ExpectClean(t,
+			rule_testing.Run(t, NoUselessBackreference, backreferenceFile,
 				"RegExp('\\\\1(a)', `${flags}`)"))
 	})
 
 	// The contrast that makes the line above a real distinction rather than a blanket skip: an
 	// identifier is unreadable too, and upstream still checks the pattern with no flags.
 	t.Run("an identifier flags argument still checks the pattern", func(t *testing.T) {
-		ruletest.ExpectFindings(t,
-			ruletest.Run(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a)', flags)`),
+		rule_testing.ExpectFindings(t,
+			rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a)', flags)`),
 			"backreferenceBeforeItsGroup")
 	})
 }
@@ -319,8 +319,8 @@ func TestNoUselessBackreferenceReportsAShadowedRegExp(t *testing.T) {
 	}
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUselessBackreference, backreferenceFile, sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUselessBackreference, backreferenceFile, sourceText),
 				"backreferenceBeforeItsGroup")
 		})
 	}
@@ -361,7 +361,7 @@ func TestNoUselessBackreferencePointsAtTheBackreference(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.reported), len(result.Diagnostics))
 			}
@@ -439,8 +439,8 @@ func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *test
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
 		})
 	}
 
@@ -449,13 +449,13 @@ func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *test
 	// check in opensQuantifier a real decision rather than an unreachable guard: read it as a
 	// quantifier and the pattern is judged well-formed under `u` when it is not.
 	t.Run("a literal brace does not suppress the finding", func(t *testing.T) {
-		ruletest.ExpectFindings(t,
-			ruletest.Run(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}')`),
+		rule_testing.ExpectFindings(t,
+			rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}')`),
 			"backreferenceBeforeItsGroup")
 	})
 	t.Run("the same brace under u is a syntax error", func(t *testing.T) {
-		ruletest.ExpectClean(t,
-			ruletest.Run(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}', 'u')`))
+		rule_testing.ExpectClean(t,
+			rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}', 'u')`))
 	})
 }
 

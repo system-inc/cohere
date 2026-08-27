@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // exhaustiveDepsFile is where the fixtures pretend to live.
@@ -222,8 +222,8 @@ func TestExhaustiveDepsFires(t *testing.T) {
 
 	for index, testCase := range cases {
 		t.Run(exhaustiveDepsCaseName(index, testCase.sourceText), func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -388,8 +388,8 @@ func TestExhaustiveDepsStaysSilent(t *testing.T) {
 
 	for index, sourceText := range cases {
 		t.Run(exhaustiveDepsCaseName(index, sourceText), func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, sourceText))
 		})
 	}
 }
@@ -429,7 +429,7 @@ func TestExhaustiveDepsScopeIsStated(t *testing.T) {
 
 	for index, testCase := range cases {
 		t.Run(exhaustiveDepsCaseName(index, testCase.sourceText), func(t *testing.T) {
-			result := ruletest.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			for _, diagnostic := range result.Diagnostics {
 				if diagnostic.Message.Id == "exhaustiveDepsRefCleanup" ||
 					diagnostic.Message.Id == "exhaustiveDepsStaleAssignment" {
@@ -471,17 +471,17 @@ func exhaustiveDepsIndexLabel(value int) string {
 // The failure this guards is silence rather than a crash: `GetSymbolAtLocation` on a nil checker
 // returns nil rather than panicking, so every reference would look unresolved, every dependency
 // would look external, and the rule would go completely quiet while every StaysSilent case above
-// passed vacuously. A later revert to `ruletest.Run` would look like a green suite.
+// passed vacuously. A later revert to `rule_testing.Run` would look like a green suite.
 func TestExhaustiveDepsRequiresTheTypedHarness(t *testing.T) {
 	if !ExhaustiveDeps.NeedsTypeChecker {
 		t.Fatal("this rule resolves every identifier through the checker and must declare it")
 	}
 	source := "function C(props) { useEffect(() => { console.log(props.foo); }, []); }"
-	if findings := ruletest.Run(t, ExhaustiveDeps, exhaustiveDepsFile, source); len(findings.Diagnostics) != 0 {
+	if findings := rule_testing.Run(t, ExhaustiveDeps, exhaustiveDepsFile, source); len(findings.Diagnostics) != 0 {
 		t.Fatalf("the untyped harness produced %d findings, so this test is not measuring what it claims",
 			len(findings.Diagnostics))
 	}
-	if findings := ruletest.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, source); len(findings.Diagnostics) != 1 {
+	if findings := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, source); len(findings.Diagnostics) != 1 {
 		t.Fatalf("the typed harness produced %d findings, want 1", len(findings.Diagnostics))
 	}
 }
@@ -540,13 +540,13 @@ func TestExhaustiveDepsAdditionalHooks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("the decoder refused %s: %v", testCase.optionsJson, err)
 			}
-			result := ruletest.RunTypedWithOptions(t, ExhaustiveDeps, exhaustiveDepsFile,
+			result := rule_testing.RunTypedWithOptions(t, ExhaustiveDeps, exhaustiveDepsFile,
 				testCase.sourceText, decoded)
 			if len(testCase.wantIds) == 0 {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -603,7 +603,7 @@ func TestExhaustiveDepsSuggestsTheCorrectedArray(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding to read the advice from, got %d",
 					len(result.Diagnostics))
@@ -635,7 +635,7 @@ func TestExhaustiveDepsSuggestsTheCorrectedArray(t *testing.T) {
 // change moving the rewrite into `Fixes` would be invisible to every other test here.
 func TestExhaustiveDepsProposesNoAutomaticFix(t *testing.T) {
 	source := "function C(props) { useEffect(() => { console.log(props.foo); }, []); }"
-	result := ruletest.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, source)
+	result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
@@ -680,12 +680,12 @@ func TestExhaustiveDepsConstructionRecursesThroughBranches(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if testCase.reports {
-				ruletest.ExpectFindings(t, result, "exhaustiveDepsConstruction")
+				rule_testing.ExpectFindings(t, result, "exhaustiveDepsConstruction")
 				return
 			}
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -715,7 +715,7 @@ func TestExhaustiveDepsPointsAtTheRightNode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("no finding to read a span from")
 			}
@@ -791,7 +791,7 @@ func TestExhaustiveDepsNonEffectRebuildsTheArray(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
 				t.Fatalf("want one finding carrying one suggestion, got %d findings",
 					len(result.Diagnostics))

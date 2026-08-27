@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // requireRenderReturnFile is where the fixtures pretend to live.
@@ -129,8 +129,8 @@ func TestRequireRenderReturnFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.findings...)
+			result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
 	}
 }
@@ -233,8 +233,8 @@ func TestRequireRenderReturnStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -248,7 +248,7 @@ func TestRequireRenderReturnStaysSilent(t *testing.T) {
 // upstream cases would all still pass.
 //
 // Each expectation below is the exact text the installed build underlines, taken from its
-// reported columns rather than from reading the rule. `ruletest.Run` does not trim the fixture, so
+// reported columns rather than from reading the rule. `rule_testing.Run` does not trim the fixture, so
 // the slice out of the literal and the bytes on disk are the same string.
 func TestRequireRenderReturnSpan(t *testing.T) {
 	cases := []struct {
@@ -306,7 +306,7 @@ func TestRequireRenderReturnSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
+			result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -326,7 +326,7 @@ func TestRequireRenderReturnSpan(t *testing.T) {
 // emits these in whatever order the map iterated.
 func TestRequireRenderReturnSpansAreInSourceOrder(t *testing.T) {
 	sourceText := "class A extends React.Component { render() { } }\nvar B = createReactClass({ render: function() { } });\n"
-	result := ruletest.Run(t, RequireRenderReturn, requireRenderReturnFile, sourceText)
+	result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, sourceText)
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("want 2 diagnostics, got %d", len(result.Diagnostics))
 	}
@@ -375,8 +375,8 @@ func TestRequireRenderReturnHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
-			result := ruletest.Run(t, RequireRenderReturn, fileName, sourceText)
-			ruletest.ExpectFindings(t, result, "noRenderReturn")
+			result := rule_testing.Run(t, RequireRenderReturn, fileName, sourceText)
+			rule_testing.ExpectFindings(t, result, "noRenderReturn")
 		})
 	}
 }
@@ -389,6 +389,6 @@ func TestRequireRenderReturnHasNoFileGate(t *testing.T) {
 // explicitly reaches the rule the same way the live config does, and it still reports.
 func TestRequireRenderReturnIgnoresOptions(t *testing.T) {
 	const sourceText = "class Hello extends React.Component {\n  render() {}\n}\n"
-	result := ruletest.RunWithOptions(t, RequireRenderReturn, requireRenderReturnFile, sourceText, nil)
-	ruletest.ExpectFindings(t, result, "noRenderReturn")
+	result := rule_testing.RunWithOptions(t, RequireRenderReturn, requireRenderReturnFile, sourceText, nil)
+	rule_testing.ExpectFindings(t, result, "noRenderReturn")
 }

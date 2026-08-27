@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // unsafeNegationFile is where the fixtures pretend to live.
@@ -46,8 +46,8 @@ func TestNoUnsafeNegationFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options), "unexpected")
 		})
 	}
@@ -96,8 +96,8 @@ func TestNoUnsafeNegationStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
+			rule_testing.ExpectClean(t,
+				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options))
 		})
 	}
@@ -140,8 +140,8 @@ func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
+			rule_testing.ExpectClean(t,
+				rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile, testCase.sourceText,
 					testCase.options))
 		})
 	}
@@ -155,8 +155,8 @@ func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(t *testing.T) {
 // and walked up to its parent would report twice here, and the message-id fixtures above use inputs
 // where the two designs agree.
 func TestNoUnsafeNegationReportsADoubleNegationOnce(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoUnsafeNegation, unsafeNegationFile, "!!a in b"), "unexpected")
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoUnsafeNegation, unsafeNegationFile, "!!a in b"), "unexpected")
 }
 
 // Where the finding points, which the message-id fixtures above cannot see.
@@ -187,7 +187,7 @@ func TestNoUnsafeNegationPointsAtTheNegatedOperand(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
+			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -251,7 +251,7 @@ func TestNoUnsafeNegationSuggestsBothRewrites(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
+			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -286,7 +286,7 @@ func TestNoUnsafeNegationSuggestsBothRewrites(t *testing.T) {
 // that emitted the same message for both, or that built the second from the first, would leave a
 // human choosing between two identical-looking options.
 func TestNoUnsafeNegationLabelsItsSuggestionsDistinctly(t *testing.T) {
-	result := ruletest.Run(t, NoUnsafeNegation, unsafeNegationFile, "!a in b")
+	result := rule_testing.Run(t, NoUnsafeNegation, unsafeNegationFile, "!a in b")
 	if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 2 {
 		t.Fatalf("wanted one diagnostic carrying two suggestions")
 	}
@@ -317,7 +317,7 @@ func TestNoUnsafeNegationNamesTheOperator(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.want, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
+			result := rule_testing.RunWithOptions(t, NoUnsafeNegation, unsafeNegationFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

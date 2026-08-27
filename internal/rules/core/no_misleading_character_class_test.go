@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // misleadingCharacterClassFile is where the fixtures pretend to live.
@@ -164,8 +164,8 @@ func TestNoMisleadingCharacterClassFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -230,8 +230,8 @@ func TestNoMisleadingCharacterClassStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, testCase))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, testCase))
 		})
 	}
 }
@@ -269,8 +269,8 @@ func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
 
 	for _, testCase := range cleanOnlyWithTheOption {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -293,8 +293,8 @@ func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
 
 	for _, testCase := range reportedEitherWay {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -311,8 +311,8 @@ func TestNoMisleadingCharacterClassIsCleanHereRegardlessOfTheOption(t *testing.T
 		"/[�d83d\\udc4d]/u // U+D83D + Backslash + \"udc4d\"",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile, sourceText))
 		})
 	}
 }
@@ -356,7 +356,7 @@ func TestNoMisleadingCharacterClassPointsAtTheOffendingPair(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantSpans),
@@ -394,7 +394,7 @@ func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("wanted a diagnostic, got none")
@@ -425,7 +425,7 @@ func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(t *testing.T) {
 // So two things are asserted: the rule never proposes an unattended fix, and it withholds even the
 // suggestion when the pattern holds a construct the flag would break.
 func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(t *testing.T) {
-	result := ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+	result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 		"var r = /[👍]/")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -444,7 +444,7 @@ func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(t *testing.T) {
 		"var r = /[👍]{/",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("wanted a diagnostic, got none")
@@ -464,7 +464,7 @@ func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(t *testing.T) {
 func TestNoMisleadingCharacterClassDoesNotSuggestAFlagThatIsAlreadyThere(t *testing.T) {
 	for _, sourceText := range []string{"var r = /[Á]/u", "var r = /[Á]/v"} {
 		t.Run(sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 				sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -571,8 +571,8 @@ func TestNoMisleadingCharacterClassCoversOurOwnDecisions(t *testing.T) {
 
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -682,8 +682,8 @@ func TestNoMisleadingCharacterClassCoversOurOwnDecisions(t *testing.T) {
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 					testCase.sourceText))
 		})
 	}

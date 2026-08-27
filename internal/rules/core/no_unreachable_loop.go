@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/controlflow"
+	"github.com/system-inc/verify/internal/utilities/control_flow_graph"
 )
 
 // NoUnreachableLoopOptions configures which loop kinds the rule judges.
@@ -66,7 +66,7 @@ var messageUnreachableLoop = rule.Message{
 // `isAnySegmentReachable` says the position it stands at is reachable; `Program:exit` reports
 // whatever was recorded and never had a loop event.
 //
-// `internal/utils/controlflow` answers all three. Its `Loop` hook is documented as running "where
+// `internal/utilities/controlflow` answers all three. Its `Loop` hook is documented as running "where
 // control flows back into a loop for another iteration of it" and it is handed the loop node
 // directly, so upstream's `loopsByTargetSegments` map from segment to loop has no counterpart here:
 // the event already names its loop. `Builder.Current().Reachable` is the reachability question, at
@@ -202,8 +202,8 @@ func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoU
 	}
 
 	for _, root := range unreachableLoopRootsIn(sourceFile) {
-		controlflow.Build(root, controlflow.Hooks[struct{}]{
-			Statement: func(builder *controlflow.Builder[struct{}], node *ast.Node) {
+		control_flow_graph.Build(root, control_flow_graph.Hooks[struct{}]{
+			Statement: func(builder *control_flow_graph.Builder[struct{}], node *ast.Node) {
 				name, isLoop := unreachableLoopKindNames[node.Kind]
 				if !isLoop || slices.Contains(settings.Ignore, name) {
 					return
@@ -219,13 +219,13 @@ func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoU
 				// function expression, arrow, method, accessor, class static block and property
 				// initializer are each opaque to `expr` for the same reason.
 				//
-				// Probed over 20 root shapes covering every kind `controlflow.IsRoot` names,
+				// Probed over 20 root shapes covering every kind `control_flow_graph.IsRoot` names,
 				// including a loop in a function nested inside an unreachable region: a
-				// `controlflow.RootOf(node) != root` test fired 0 times while its inverted control
+				// `control_flow_graph.RootOf(node) != root` test fired 0 times while its inverted control
 				// fired 21, so the guard would decline nothing. It was written, scored with the
 				// sweep, and removed as unreachable rather than kept as reassurance.
 				//
-				// The verdict names the callers it was taken over: `controlflow.Build`'s own
+				// The verdict names the callers it was taken over: `control_flow_graph.Build`'s own
 				// statement and expression walks, at the pin in `roots.go` / `statements.go` /
 				// `expressions.go` as of this commit. If the builder ever descends into a nested
 				// root, this is void and the guard has to come back.
@@ -247,7 +247,7 @@ func reportUnreachableLoops(ctx rule.Context, sourceFile *ast.Node, settings NoU
 					stateFor(node)
 				}
 			},
-			Loop: func(builder *controlflow.Builder[struct{}], loop *ast.Node) {
+			Loop: func(builder *control_flow_graph.Builder[struct{}], loop *ast.Node) {
 				// The gate this rule rests on. See the doc comment: our builder raises the
 				// body-end event from unreachable positions and upstream's analysis does not.
 				if builder.Current().Reachable {
@@ -285,7 +285,7 @@ func unreachableLoopRootsIn(sourceFile *ast.Node) []*ast.Node {
 		if node == nil {
 			return
 		}
-		if controlflow.IsRoot(node) {
+		if control_flow_graph.IsRoot(node) {
 			roots = append(roots, node)
 		}
 		node.ForEachChild(func(child *ast.Node) bool {

@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const constAssignmentFile = "/repository/source/components/Thing.tsx"
@@ -48,12 +48,12 @@ func TestReactComponentNoConstAssignmentFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ReactComponentNoConstAssignment, constAssignmentFile, testCase.sourceText)
+			result := rule_testing.Run(t, ReactComponentNoConstAssignment, constAssignmentFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "noConstAssignment"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -86,8 +86,8 @@ func TestReactComponentNoConstAssignmentStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, ReactComponentNoConstAssignment, testCase.fileName, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, ReactComponentNoConstAssignment, testCase.fileName, testCase.sourceText))
 		})
 	}
 }

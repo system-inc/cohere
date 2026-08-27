@@ -3,7 +3,7 @@ package tailwind
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Parentheses are real nodes in this AST, and every rule in this package missed them.
@@ -19,42 +19,42 @@ func TestParenthesizedClassExpressionsAreRead(t *testing.T) {
 	testCases := []struct {
 		name    string
 		source  string
-		subject func(*testing.T, string) ruletest.Result
+		subject func(*testing.T, string) rule_testing.Result
 	}{
 		{
 			name:   "duplicate inside parentheses",
 			source: `const element = <div className={('flex flex')} />;`,
-			subject: func(t *testing.T, source string) ruletest.Result {
-				return ruletest.Run(t, NoDuplicateClasses, "Component.tsx", source)
+			subject: func(t *testing.T, source string) rule_testing.Result {
+				return rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", source)
 			},
 		},
 		{
 			// The depth is the author's choice, so the unwrap has to recurse.
 			name:   "duplicate inside nested parentheses",
 			source: `const element = <div className={(('flex flex'))} />;`,
-			subject: func(t *testing.T, source string) ruletest.Result {
-				return ruletest.Run(t, NoDuplicateClasses, "Component.tsx", source)
+			subject: func(t *testing.T, source string) rule_testing.Result {
+				return rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", source)
 			},
 		},
 		{
 			name:   "duplicate inside a parenthesized call argument",
 			source: `const merged = mergeClassNames(('flex flex'));`,
-			subject: func(t *testing.T, source string) ruletest.Result {
-				return ruletest.Run(t, NoDuplicateClasses, "Component.tsx", source)
+			subject: func(t *testing.T, source string) rule_testing.Result {
+				return rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", source)
 			},
 		},
 		{
 			name:   "glued fragment inside parentheses",
 			source: "const element = <div className={(`px-${size}`)} />;",
-			subject: func(t *testing.T, source string) ruletest.Result {
-				return ruletest.Run(t, NoConcatenatedClasses, "Component.tsx", source)
+			subject: func(t *testing.T, source string) rule_testing.Result {
+				return rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx", source)
 			},
 		},
 		{
 			name:   "doubled space inside parentheses",
 			source: `const element = <div className={('flex  items-center')} />;`,
-			subject: func(t *testing.T, source string) ruletest.Result {
-				return ruletest.Run(t, NoUnnecessaryWhitespace, "Component.tsx", source)
+			subject: func(t *testing.T, source string) rule_testing.Result {
+				return rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", source)
 			},
 		},
 	}
@@ -79,34 +79,34 @@ func TestParenthesesDoNotCauseFalseFindings(t *testing.T) {
 	testCases := []struct {
 		name    string
 		source  string
-		subject func(*testing.T, string) ruletest.Result
+		subject func(*testing.T, string) rule_testing.Result
 	}{
 		{
 			name:   "clean classes inside parentheses",
 			source: `const element = <div className={('flex items-center')} />;`,
-			subject: func(t *testing.T, source string) ruletest.Result {
-				return ruletest.Run(t, NoDuplicateClasses, "Component.tsx", source)
+			subject: func(t *testing.T, source string) rule_testing.Result {
+				return rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", source)
 			},
 		},
 		{
 			name:   "clean template inside parentheses",
 			source: "const element = <div className={(`flex ${extra}`)} />;",
-			subject: func(t *testing.T, source string) ruletest.Result {
-				return ruletest.Run(t, NoConcatenatedClasses, "Component.tsx", source)
+			subject: func(t *testing.T, source string) rule_testing.Result {
+				return rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx", source)
 			},
 		},
 		{
 			name:   "single spaces inside parentheses",
 			source: `const element = <div className={('flex items-center')} />;`,
-			subject: func(t *testing.T, source string) ruletest.Result {
-				return ruletest.Run(t, NoUnnecessaryWhitespace, "Component.tsx", source)
+			subject: func(t *testing.T, source string) rule_testing.Result {
+				return rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", source)
 			},
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, testCase.subject(t, testCase.source))
+			rule_testing.ExpectClean(t, testCase.subject(t, testCase.source))
 		})
 	}
 }

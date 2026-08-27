@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestGoogleFontPreconnectReports(t *testing.T) {
@@ -41,8 +41,8 @@ func TestGoogleFontPreconnectReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, GoogleFontPreconnect, "Component.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, messageGoogleFontPreconnect.Id)
+			result := rule_testing.Run(t, GoogleFontPreconnect, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, messageGoogleFontPreconnect.Id)
 		})
 	}
 }
@@ -96,8 +96,8 @@ func TestGoogleFontPreconnectIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, GoogleFontPreconnect, "Component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, GoogleFontPreconnect, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

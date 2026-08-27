@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const pageStateFile = "/repository/app/account/page.tsx"
@@ -47,7 +47,7 @@ func TestNextNoPageStateFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NextNoPageState, pageStateFile,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NextNoPageState, pageStateFile,
 				pageStateDeclarations+testCase.sourceText), "pageStateRemounts")
 		})
 	}
@@ -121,7 +121,7 @@ func TestNextNoPageStateStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NextNoPageState, testCase.fileName,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NextNoPageState, testCase.fileName,
 				pageStateDeclarations+testCase.sourceText))
 		})
 	}

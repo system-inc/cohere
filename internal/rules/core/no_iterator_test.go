@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // iteratorFile is where the fixtures pretend to live.
@@ -29,8 +29,8 @@ func TestNoIteratorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoIterator, iteratorFile, testCase.sourceText), "noIterator")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoIterator, iteratorFile, testCase.sourceText), "noIterator")
 		})
 	}
 }
@@ -54,7 +54,7 @@ func TestNoIteratorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoIterator, iteratorFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoIterator, iteratorFile, testCase.sourceText))
 		})
 	}
 }
@@ -65,7 +65,7 @@ func TestNoIteratorStaysSilent(t *testing.T) {
 // port reading a template's cooked text without checking for substitutions would report this while
 // upstream does not. `staticPropertyName` declines it by kind, and this pins that.
 func TestNoIteratorDeclinesASubstitutingTemplate(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoIterator, iteratorFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIterator, iteratorFile,
 		"declare const part: string;\nexport const a = test[`__iterator${part}__`];\n"))
 }
 
@@ -92,7 +92,7 @@ func TestNoIteratorSuggestsTheRightSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoIterator, iteratorFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoIterator, iteratorFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}

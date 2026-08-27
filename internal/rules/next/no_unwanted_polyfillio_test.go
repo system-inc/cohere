@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The upstream cases are copied byte for byte out of oxc's tester block through the extractor's
@@ -108,8 +108,8 @@ func TestNoUnwantedPolyfillioReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.want...)
+			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.want...)
 		})
 	}
 }
@@ -242,8 +242,8 @@ func TestNoUnwantedPolyfillioIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -254,7 +254,7 @@ func TestNoUnwantedPolyfillioIsSilent(t *testing.T) {
 // own range.
 func TestNoUnwantedPolyfillioPointsAtTheSourceAttribute(t *testing.T) {
 	source := "export const A = () => <script src='https://polyfill.io/v3/polyfill.min.js' />;"
-	result := ruletest.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
+	result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
@@ -268,7 +268,7 @@ func TestNoUnwantedPolyfillioPointsAtTheSourceAttribute(t *testing.T) {
 	// carrying this test for the first arm alone, which is why both are asserted rather than one
 	// standing in for the other.
 	duplicateSource := "export const A = () => <script src='https://polyfill-fastly.io/v3/p.js?features=Promise' />;"
-	duplicateResult := ruletest.Run(t, NoUnwantedPolyfillio, "Component.tsx", duplicateSource)
+	duplicateResult := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", duplicateSource)
 	if len(duplicateResult.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding on the duplicate arm, got %d", len(duplicateResult.Diagnostics))
 	}
@@ -329,7 +329,7 @@ func TestNoUnwantedPolyfillioNamesTheFeaturesItFound(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
+			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
@@ -364,7 +364,7 @@ func TestNoUnwantedPolyfillioUsesStableMessageIds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
+			result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
@@ -380,7 +380,7 @@ func TestNoUnwantedPolyfillioUsesStableMessageIds(t *testing.T) {
 // than containment: a containment check passes on a string that has grown extra text.
 func TestNoUnwantedPolyfillioSecurityMessageText(t *testing.T) {
 	source := "export const A = () => <script src='https://polyfill.io/v3/polyfill.min.js' />;"
-	result := ruletest.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
+	result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
@@ -399,7 +399,7 @@ func TestNoUnwantedPolyfillioSecurityMessageText(t *testing.T) {
 // one code path loses, and half the imported corpus still passes without it.
 func TestNoUnwantedPolyfillioSecurityArmReturnsBeforeTheFeatureCheck(t *testing.T) {
 	source := "export const A = () => <script src='https://cdn.polyfill.io/v2/polyfill.min.js?features=Promise' />;"
-	result := ruletest.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
+	result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}

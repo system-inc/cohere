@@ -5,7 +5,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // parameterPropertyFile is where the fixtures pretend to live.
@@ -76,7 +76,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(parameterPropertyCaseName(testCase.number), func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t,
+			rule_testing.ExpectClean(t, rule_testing.Run(t,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText))
 		})
 	}
@@ -118,7 +118,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentFires(t *testing.T) {
 			for index := range wantIds {
 				wantIds[index] = "unnecessaryAssign"
 			}
-			ruletest.ExpectFindings(t, ruletest.Run(t,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText),
 				wantIds...)
 		})
@@ -162,7 +162,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentSuggestsTheRepair(t *testing.T)
 
 	for _, testCase := range cases {
 		t.Run(parameterPropertyCaseName(testCase.number), func(t *testing.T) {
-			result := ruletest.Run(t,
+			result := rule_testing.Run(t,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.before)
 			got := applyEveryParameterPropertySuggestion(t, testCase.before, result)
 			if got != testCase.after {
@@ -175,10 +175,10 @@ func TestNoUnnecessaryParameterPropertyAssignmentSuggestsTheRepair(t *testing.T)
 // applyEveryParameterPropertySuggestion rewrites the source with every suggestion this rule offered.
 //
 // Applied back to front so that an earlier edit does not shift the offsets a later one was computed
-// against. `ruletest` has no suggestion applier, only `ExpectFixedSource` for fixes, so this exists
+// against. `rule_testing` has no suggestion applier, only `ExpectFixedSource` for fixes, so this exists
 // rather than the assertion being skipped: a rule whose only repair is a suggestion would otherwise
 // ship with nothing checking where the repair points.
-func applyEveryParameterPropertySuggestion(t *testing.T, source string, result ruletest.Result) string {
+func applyEveryParameterPropertySuggestion(t *testing.T, source string, result rule_testing.Result) string {
 	t.Helper()
 
 	type edit struct {
@@ -217,7 +217,7 @@ func applyEveryParameterPropertySuggestion(t *testing.T, source string, result r
 // other fixture in this file, because no `ExpectFindings` assertion can observe a panic. This test
 // exists to make that guard visible: it fails by crashing rather than by mismatching.
 func TestNoUnnecessaryParameterPropertyAssignmentSurvivesADestructuredParameterProperty(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t,
+	rule_testing.ExpectClean(t, rule_testing.Run(t,
 		NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile,
 		"class Foo {\n  constructor(public { a }: { a: string }) {\n    this.a = a;\n  }\n}\n"))
 }
@@ -228,7 +228,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentSurvivesADestructuredParameterP
 // Comparing a diagnostic with the very constant it was reported from is equality that looks correct
 // and moves in lockstep under mutation, so it can never fail. These are literals.
 func TestNoUnnecessaryParameterPropertyAssignmentMessage(t *testing.T) {
-	result := ruletest.Run(t, NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile,
+	result := rule_testing.Run(t, NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile,
 		"class Foo {\n  constructor(public name: unknown) {\n    this.name = name;\n  }\n}\n")
 
 	if len(result.Diagnostics) != 1 {
@@ -285,7 +285,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t,
+			result := rule_testing.Run(t,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -368,7 +368,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(t *test
 
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText),
 				"unnecessaryAssign")
 		})
@@ -436,7 +436,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(t *test
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t,
+			rule_testing.ExpectClean(t, rule_testing.Run(t,
 				NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile, testCase.sourceText))
 		})
 	}

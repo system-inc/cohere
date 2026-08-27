@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/config"
+	"github.com/system-inc/verify/internal/configuration"
 	"github.com/system-inc/verify/internal/differential"
 )
 
@@ -110,10 +110,10 @@ func TestABareRuleNameFindsItsPluginPrefixedConfigKey(t *testing.T) {
 
 // configFrom writes a lint config to disk and loads it through the real loader.
 //
-// Built through config.Load rather than by hand so the test exercises the same parsing, override
+// Built through configuration.Load rather than by hand so the test exercises the same parsing, override
 // ordering, and root resolution the command does. A hand-built Config would test this guard against
 // a shape the loader never produces.
-func configFrom(t *testing.T, raw map[string]any) *config.Config {
+func configFrom(t *testing.T, raw map[string]any) *configuration.Config {
 	t.Helper()
 
 	directory := t.TempDir()
@@ -126,7 +126,7 @@ func configFrom(t *testing.T, raw map[string]any) *config.Config {
 		t.Fatal(err)
 	}
 
-	loaded, err := config.Load(path)
+	loaded, err := configuration.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const sparseArrayFile = "/repository/source/Thing.ts"
@@ -23,7 +23,7 @@ func TestNoSparseArraysFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoSparseArrays, sparseArrayFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoSparseArrays, sparseArrayFile, testCase.sourceText),
 				"unexpectedSparseArray")
 		})
 	}
@@ -48,7 +48,7 @@ func TestNoSparseArraysStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoSparseArrays, sparseArrayFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSparseArrays, sparseArrayFile, testCase.sourceText))
 		})
 	}
 }
@@ -56,7 +56,7 @@ func TestNoSparseArraysStaysSilent(t *testing.T) {
 // One finding per array rather than one per hole, so a two-hole array reports once. Reported on the
 // literal rather than the hole because the hole has no text of its own to point at.
 func TestNoSparseArraysReportsOncePerArray(t *testing.T) {
-	result := ruletest.Run(t, NoSparseArrays, sparseArrayFile, "export const Values = [1, , , 4];\n")
+	result := rule_testing.Run(t, NoSparseArrays, sparseArrayFile, "export const Values = [1, , , 4];\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want exactly one finding for a two-hole array, got %d", len(result.Diagnostics))
 	}

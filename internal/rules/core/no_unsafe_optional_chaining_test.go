@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // unsafeOptionalChainingFile is where the fixtures pretend to live.
@@ -48,8 +48,8 @@ func TestNoUnsafeOptionalChainingFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 					testCase.sourceText), "unsafeOptionalChain")
 		})
 	}
@@ -74,8 +74,8 @@ func TestNoUnsafeOptionalChainingReportsPerChain(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 					testCase.sourceText), "unsafeOptionalChain", "unsafeOptionalChain")
 		})
 	}
@@ -168,8 +168,8 @@ func TestNoUnsafeOptionalChainingStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 					testCase.sourceText))
 		})
 	}
@@ -182,21 +182,21 @@ func TestNoUnsafeOptionalChainingStaysSilent(t *testing.T) {
 // zero value of whatever the decoder produced.
 func TestNoUnsafeOptionalChainingArithmeticOption(t *testing.T) {
 	// Omitting the option entirely leaves arithmetic clean.
-	ruletest.ExpectClean(t, ruletest.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo - bar;"))
 
 	// An options object that says nothing about it, upstream's `[{}]`.
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo - bar;", NoUnsafeOptionalChainingOptions{}))
 
 	// Explicit false, upstream's `[{ "disallowArithmeticOperators": false }]`.
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo - bar;",
 		NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: false}))
 
 	// Explicit true, upstream's only options-carrying fail case. Note the distinct message id:
 	// arithmetic on `undefined` yields NaN rather than throwing, so it is a different judgment.
-	ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "bar + obj?.foo;",
 		NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: true}), "unsafeArithmetic")
 }
@@ -242,7 +242,7 @@ func TestNoUnsafeOptionalChainingReportsTheChainSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
+			result := rule_testing.Run(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantTexts),
@@ -263,7 +263,7 @@ func TestNoUnsafeOptionalChainingReportsTheChainSpan(t *testing.T) {
 // and could point at the operator or the whole binary expression without any fixture noticing.
 func TestNoUnsafeOptionalChainingReportsTheArithmeticSpan(t *testing.T) {
 	source := "bar + obj?.foo;"
-	result := ruletest.RunWithOptions(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
+	result := rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 		source, NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: true})
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -334,10 +334,10 @@ func TestNoUnsafeOptionalChainingCoversEveryUnsafeContext(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Every case runs with the option on, which changes nothing for the usage cases
 			// (their contexts are unsafe regardless) and enables the arithmetic ones.
-			result := ruletest.RunWithOptions(t, NoUnsafeOptionalChaining,
+			result := rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
 				unsafeOptionalChainingFile, testCase.sourceText,
 				NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: true})
-			ruletest.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
 	}
 }
@@ -372,7 +372,7 @@ func TestNoUnsafeOptionalChainingDeclinesSafeContextsUnderTheOption(t *testing.T
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoUnsafeOptionalChaining,
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining,
 				unsafeOptionalChainingFile, testCase.sourceText,
 				NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: true}))
 		})
@@ -394,18 +394,18 @@ func TestNoUnsafeOptionalChainingDeclinesSafeContextsUnderTheOption(t *testing.T
 // visible; either case alone passes under the wrong predicate.
 func TestNoUnsafeOptionalChainingDistinguishesChainRootFromChainMembership(t *testing.T) {
 	// Inside one chain: `.bar` short-circuits with the rest and is safe.
-	ruletest.ExpectClean(t, ruletest.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo.bar;"))
-	ruletest.ExpectClean(t, ruletest.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo.bar.baz;"))
-	ruletest.ExpectClean(t, ruletest.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.[key].bar;"))
-	ruletest.ExpectClean(t, ruletest.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo.bar();"))
 
 	// Parenthesized, which ends the chain: the same access is now unsafe.
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "(obj?.foo).bar;"), "unsafeOptionalChain")
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoUnsafeOptionalChaining,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "(obj?.[key]).bar;"), "unsafeOptionalChain")
 }

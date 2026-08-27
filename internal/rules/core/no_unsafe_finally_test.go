@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // TestNoUnsafeFinallyReportsEscapingControlFlow is the fixture that must fire.
@@ -25,8 +25,8 @@ func TestNoUnsafeFinallyReportsEscapingControlFlow(t *testing.T) {
 		{"for (var x of arr) try {} finally { break; }", "unsafeBreak"},
 		{"do { try {} finally { break; } } while (true);", "unsafeBreak"},
 	} {
-		result := ruletest.Run(t, NoUnsafeFinally, "finally.ts", testCase.source)
-		ruletest.ExpectFindings(t, result, testCase.wantId)
+		result := rule_testing.Run(t, NoUnsafeFinally, "finally.ts", testCase.source)
+		rule_testing.ExpectFindings(t, result, testCase.wantId)
 	}
 }
 
@@ -47,8 +47,8 @@ func TestNoUnsafeFinallyReportsThroughNestedStatements(t *testing.T) {
 		{"var foo = function() { try {} finally { { throw new Error(); } } };", "unsafeThrow"},
 		{"var foo = function() { try {} finally { try {} catch (e) { return 1; } } };", "unsafeReturn"},
 	} {
-		result := ruletest.Run(t, NoUnsafeFinally, "nested.ts", testCase.source)
-		ruletest.ExpectFindings(t, result, testCase.wantId)
+		result := rule_testing.Run(t, NoUnsafeFinally, "nested.ts", testCase.source)
+		rule_testing.ExpectFindings(t, result, testCase.wantId)
 	}
 }
 
@@ -68,8 +68,8 @@ func TestNoUnsafeFinallyReportsLabeledJumpsLeavingFinally(t *testing.T) {
 		{"label: for (;;) try {} finally { continue label; }", "unsafeContinue"},
 		{"label: while (true) { try {} finally { while (true) { break label; } } }", "unsafeBreak"},
 	} {
-		result := ruletest.Run(t, NoUnsafeFinally, "labeled.ts", testCase.source)
-		ruletest.ExpectFindings(t, result, testCase.wantId)
+		result := rule_testing.Run(t, NoUnsafeFinally, "labeled.ts", testCase.source)
+		rule_testing.ExpectFindings(t, result, testCase.wantId)
 	}
 }
 
@@ -80,9 +80,9 @@ func TestNoUnsafeFinallyReportsLabeledJumpsLeavingFinally(t *testing.T) {
 // absorbs one and not the other. A rule that used one stopping set for both would go silent here
 // while every other fixture stayed green.
 func TestNoUnsafeFinallyReportsContinueThroughSwitch(t *testing.T) {
-	result := ruletest.Run(t, NoUnsafeFinally, "switch.ts",
+	result := rule_testing.Run(t, NoUnsafeFinally, "switch.ts",
 		"while (true) try {} finally { switch (true) { case true: continue; } }")
-	ruletest.ExpectFindings(t, result, "unsafeContinue")
+	rule_testing.ExpectFindings(t, result, "unsafeContinue")
 }
 
 // TestNoUnsafeFinallyStaysSilentWhenTheJumpIsAbsorbed is the half that catches a rule firing on
@@ -145,7 +145,7 @@ func TestNoUnsafeFinallyStaysSilentWhenTheJumpIsAbsorbed(t *testing.T) {
 		"var foo = function() { try {} finally { while (true) { (function() { return 1; })(); break; } } };",
 		"var foo = function() { try {} finally { (function() { class C { method() { return (() => { return 1; })(); } } })(); } };",
 	} {
-		result := ruletest.Run(t, NoUnsafeFinally, "clean.ts", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, NoUnsafeFinally, "clean.ts", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }

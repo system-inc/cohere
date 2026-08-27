@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // prototypeBuiltinsFile is where the fixtures pretend to live.
@@ -57,8 +57,8 @@ func TestNoPrototypeBuiltinsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText),
 				"noPrototypeBuiltins")
 		})
 	}
@@ -115,8 +115,8 @@ func TestNoPrototypeBuiltinsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText))
 		})
 	}
 }
@@ -141,8 +141,8 @@ func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(t *testing.T) {
 
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText),
 				"noPrototypeBuiltins")
 		})
 	}
@@ -151,14 +151,14 @@ func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(t *testing.T) {
 	// receiver, and defining `hasOwnProperty` on your own class is how you would legitimately
 	// provide it. Nothing in the imported corpus covers a class body.
 	t.Run("a class declaring the method itself", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile,
+		rule_testing.ExpectClean(t, rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile,
 			"class C { hasOwnProperty(key: string) { return false; } }"))
 	})
 
 	// Two receivers in one file report twice. Nothing upstream carries more than one finding per
 	// input, so the rule's per-call behavior is otherwise unmeasured.
 	t.Run("two calls in one file report twice", func(t *testing.T) {
-		ruletest.ExpectFindings(t, ruletest.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile,
+		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile,
 			"foo.hasOwnProperty('a');\nbar.isPrototypeOf(baz);\n"),
 			"noPrototypeBuiltins", "noPrototypeBuiltins")
 	})
@@ -199,7 +199,7 @@ func TestNoPrototypeBuiltinsPointsAtTheMemberExpression(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -213,10 +213,10 @@ func TestNoPrototypeBuiltinsPointsAtTheMemberExpression(t *testing.T) {
 
 // The rule declares no type checker, so the untyped harness must be enough.
 //
-// If a later change reaches for `ctx.TypeChecker`, the rule goes silent under `ruletest.Run` and
+// If a later change reaches for `ctx.TypeChecker`, the rule goes silent under `rule_testing.Run` and
 // every clean case above starts passing vacuously. This asserts the plain harness still fires.
 func TestNoPrototypeBuiltinsNeedsNoTypeChecker(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, "foo.hasOwnProperty('bar')"),
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, "foo.hasOwnProperty('bar')"),
 		"noPrototypeBuiltins")
 }

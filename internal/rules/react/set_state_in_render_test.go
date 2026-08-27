@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The corpus for this rule is React's own, not oxc's.
@@ -15,7 +15,7 @@ import (
 // oxc's linter rule file carries a single pass case and a single fail case, because its body is
 // `run_react_compiler_rule(ctx, ErrorCategory::RenderSetState)` and the judgment lives in the
 // compiler crate. React ships ten fixtures whose golden expects `Cannot call setState during
-// render`, vendored at `internal/reactconformance/testdata/fixtures`, and every source string below
+// render`, vendored at `internal/react_conformance/testdata/fixtures`, and every source string below
 // is one of them byte for byte. They were copied programmatically and are byte-verified against
 // their vendored originals by TestFixturesMatchTheVendoredCorpusByte.
 //
@@ -57,7 +57,7 @@ import (
 //
 // # Why a local declaration file rather than the real @types/react
 //
-// `ruletest`'s tsconfig sets `types: []` and points at a temp directory, deliberately, so that a
+// `rule_testing`'s tsconfig sets `types: []` and points at a temp directory, deliberately, so that a
 // fixture cannot pick up whatever happens to be installed near the test. There is no `node_modules`
 // to resolve. `reactStateDeclarations` below is the minimum of `@types/react` this rule reads, and
 // the two declarations that matter are copied in the shape upstream writes them: `Dispatch` is a
@@ -104,9 +104,9 @@ const reactStateDeclarations = `declare module 'react' {
 const reactImport = "import {useState} from 'react';\n"
 
 // runSetStateFixture runs one source against the rule with the React declarations available.
-func runSetStateFixture(t *testing.T, source string) ruletest.Result {
+func runSetStateFixture(t *testing.T, source string) rule_testing.Result {
 	t.Helper()
-	return ruletest.RunTypedFiles(t, SetStateInRender, map[string]string{
+	return rule_testing.RunTypedFiles(t, SetStateInRender, map[string]string{
 		"react.d.ts":  reactStateDeclarations,
 		"fixture.tsx": source,
 	}, "fixture.tsx")
@@ -201,7 +201,7 @@ func TestSetStateInRenderFires(t *testing.T) {
 				source = reactImport + source
 			}
 			result := runSetStateFixture(t, source)
-			ruletest.ExpectFindings(t, result, testCase.want...)
+			rule_testing.ExpectFindings(t, result, testCase.want...)
 		})
 	}
 }
@@ -225,7 +225,7 @@ func TestSetStateInRenderStaysSilentOnFixturesTheShippedRuleDoesNotReport(t *tes
 	// matching the NAME, under a pragma that defaults to off and that the ESLint rule exposes no
 	// option for. Measured: the shipped rule produces nothing on this input, with or without the
 	// import, so we and React agree here and only the compiler golden differs.
-	ruletest.ExpectClean(t, runSetStateFixture(t, reactImport+propInRender))
+	rule_testing.ExpectClean(t, runSetStateFixture(t, reactImport+propInRender))
 }
 
 // TestSetStateInRenderReportsWhereTheCheckerBeatsReactsInference records a DIVERGENCE, in the
@@ -251,7 +251,7 @@ func TestSetStateInRenderStaysSilentOnFixturesTheShippedRuleDoesNotReport(t *tes
 // Both calls report, `setState` and its alias `aliased`, for the same reason as the canonical case.
 func TestSetStateInRenderReportsWhereTheCheckerBeatsReactsInference(t *testing.T) {
 	result := runSetStateFixture(t, reactImport+hookReturn)
-	ruletest.ExpectFindings(t, result, "setStateInRender", "setStateInRender")
+	rule_testing.ExpectFindings(t, result, "setStateInRender", "setStateInRender")
 }
 
 // TestSetStateInRenderStaysSilentOnTheCorpusAsWritten runs every vendored fixture byte for byte,
@@ -280,7 +280,7 @@ func TestSetStateInRenderStaysSilentOnTheCorpusAsWritten(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, runSetStateFixture(t, testCase.source))
+			rule_testing.ExpectClean(t, runSetStateFixture(t, testCase.source))
 		})
 	}
 }
@@ -470,7 +470,7 @@ func TestSetStateInRenderStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, runSetStateFixture(t, testCase.source))
+			rule_testing.ExpectClean(t, runSetStateFixture(t, testCase.source))
 		})
 	}
 }
@@ -488,7 +488,7 @@ func TestSetStateInRenderFiresInsideAHook(t *testing.T) {
 		"  setX(1);\n"+
 		"  return x;\n"+
 		"}\n")
-	ruletest.ExpectFindings(t, result, "setStateInRender")
+	rule_testing.ExpectFindings(t, result, "setStateInRender")
 }
 
 // TestSetStateInRenderFollowsAnAliasChain checks that taint travels any distance.
@@ -505,7 +505,7 @@ func TestSetStateInRenderFollowsAnAliasChain(t *testing.T) {
 		"  b(1);\n"+
 		"  return x;\n"+
 		"}\n")
-	ruletest.ExpectFindings(t, result, "setStateInRender")
+	rule_testing.ExpectFindings(t, result, "setStateInRender")
 }
 
 // TestSetStateInRenderFollowsACustomHook checks the capability the checker supplies and upstream
@@ -524,7 +524,7 @@ func TestSetStateInRenderFollowsACustomHook(t *testing.T) {
 		"  setState(1);\n"+
 		"  return state;\n"+
 		"}\n")
-	ruletest.ExpectFindings(t, result, "setStateInRender")
+	rule_testing.ExpectFindings(t, result, "setStateInRender")
 }
 
 // TestSetStateInRenderReportsInsideUseMemo covers the validator's second arm.
@@ -540,7 +540,7 @@ func TestSetStateInRenderReportsInsideUseMemo(t *testing.T) {
 			"  const y = useMemo(() => { setX(1); return 1; }, []);\n"+
 			"  return y;\n"+
 			"}\n")
-		ruletest.ExpectFindings(t, result, "setStateInUseMemo")
+		rule_testing.ExpectFindings(t, result, "setStateInUseMemo")
 	})
 
 	t.Run("a conditional call inside a useMemo callback still reports", func(t *testing.T) {
@@ -550,7 +550,7 @@ func TestSetStateInRenderReportsInsideUseMemo(t *testing.T) {
 			"  const y = useMemo(() => { if (props.c) { setX(1); } return 1; }, []);\n"+
 			"  return y;\n"+
 			"}\n")
-		ruletest.ExpectFindings(t, result, "setStateInUseMemo")
+		rule_testing.ExpectFindings(t, result, "setStateInUseMemo")
 	})
 }
 
@@ -572,7 +572,7 @@ func TestSetStateInRenderBailsOutPerFunctionRatherThanPerFile(t *testing.T) {
 		"  setY(1);\n"+
 		"  return y;\n"+
 		"}\n")
-	ruletest.ExpectFindings(t, result, "setStateInRender")
+	rule_testing.ExpectFindings(t, result, "setStateInRender")
 }
 
 // TestSetStateInRenderPointsAtTheCallee asserts WHERE the finding lands, which no message-id
@@ -583,7 +583,7 @@ func TestSetStateInRenderBailsOutPerFunctionRatherThanPerFile(t *testing.T) {
 // pointing at the call, at the statement, or at the argument satisfies every count assertion above.
 //
 // The source is sliced the way the HARNESS wrote it rather than the way the literal reads.
-// `ruletest.RunTyped` writes `strings.TrimSpace(contents)+"\n"`, so a fixture carrying leading
+// `rule_testing.RunTyped` writes `strings.TrimSpace(contents)+"\n"`, so a fixture carrying leading
 // whitespace is one byte offset on disk from the Go string, and slicing the literal reports a span
 // shifted by one. That is transformed here rather than worked around.
 func TestSetStateInRenderPointsAtTheCallee(t *testing.T) {
@@ -647,9 +647,9 @@ func TestSetStateInRenderRequiresTheTypedHarness(t *testing.T) {
 		t.Fatal("the rule reads the type checker and must declare NeedsTypeChecker")
 	}
 	// The untyped harness hands the rule a nil checker. The rule must decline rather than panic.
-	result := ruletest.Run(t, SetStateInRender, "fixture.tsx",
+	result := rule_testing.Run(t, SetStateInRender, "fixture.tsx",
 		"function Component() {\n  const [x, setX] = useState(0);\n  setX(1);\n  return x;\n}\n")
-	ruletest.ExpectClean(t, result)
+	rule_testing.ExpectClean(t, result)
 }
 
 // TestSetStateInRenderIsRegistered checks the rule reached the catalog under the name the inventory
@@ -697,7 +697,7 @@ func TestFixturesMatchTheVendoredCorpusByte(t *testing.T) {
 		{propInRender, "error.invalid-unconditional-set-state-prop-in-render.js"},
 	}
 
-	directory := filepath.Join("..", "..", "reactconformance", "testdata", "fixtures")
+	directory := filepath.Join("..", "..", "react_conformance", "testdata", "fixtures")
 	for _, testCase := range cases {
 		t.Run(testCase.fileName, func(t *testing.T) {
 			vendored, err := os.ReadFile(filepath.Join(directory, testCase.fileName))
@@ -745,7 +745,7 @@ func TestSetStateInRenderFindsATransitiveSetterCapturedAfterAnother(t *testing.T
 		"  bar();\n"+
 		"  return x;\n"+
 		"}\n")
-	ruletest.ExpectFindings(t, result, "setStateInRender")
+	rule_testing.ExpectFindings(t, result, "setStateInRender")
 }
 
 // TestSetStateInRenderFindsADirectlyCapturedSetterAfterAnother is the case above with the wrapper
@@ -763,7 +763,7 @@ func TestSetStateInRenderFindsADirectlyCapturedSetterAfterAnother(t *testing.T) 
 		"  foo();\n"+
 		"  return x;\n"+
 		"}\n")
-	ruletest.ExpectFindings(t, result, "setStateInRender")
+	rule_testing.ExpectFindings(t, result, "setStateInRender")
 }
 
 // TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo covers a defect a MUTATION found and no
@@ -793,7 +793,7 @@ func TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo(t *testing.T) {
 			"  const y = useMemo(() => { const [a, setA] = useState(1); setA(2); return a; }, []);\n"+
 			"  return y;\n"+
 			"}\n")
-		ruletest.ExpectFindings(t, result, "setStateInUseMemo")
+		rule_testing.ExpectFindings(t, result, "setStateInUseMemo")
 	})
 
 	t.Run("conditional inside a useMemo callback still reports", func(t *testing.T) {
@@ -802,11 +802,11 @@ func TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo(t *testing.T) {
 			"  const y = useMemo(() => { const [a, setA] = useState(1); if (props.c) { setA(2); } return a; }, []);\n"+
 			"  return y;\n"+
 			"}\n")
-		ruletest.ExpectFindings(t, result, "setStateInUseMemo")
+		rule_testing.ExpectFindings(t, result, "setStateInUseMemo")
 	})
 
 	t.Run("the same body inside a useCallback is clean", func(t *testing.T) {
-		ruletest.ExpectClean(t, runSetStateFixture(t, "import {useState, useCallback} from 'react';\n"+
+		rule_testing.ExpectClean(t, runSetStateFixture(t, "import {useState, useCallback} from 'react';\n"+
 			"function Component() {\n"+
 			"  const f = useCallback(() => { const [a, setA] = useState(1); setA(2); }, []);\n"+
 			"  return f;\n"+
@@ -814,7 +814,7 @@ func TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo(t *testing.T) {
 	})
 
 	t.Run("a plain nested arrow declaring its own setter is clean", func(t *testing.T) {
-		ruletest.ExpectClean(t, runSetStateFixture(t, reactImport+
+		rule_testing.ExpectClean(t, runSetStateFixture(t, reactImport+
 			"function Component() {\n"+
 			"  const f = () => { const [a, setA] = useState(0); setA(1); };\n"+
 			"  f();\n"+

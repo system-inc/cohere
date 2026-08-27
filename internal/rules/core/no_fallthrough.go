@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/comments"
+	"github.com/system-inc/verify/internal/utilities/comments"
 )
 
 // NoFallthroughOptions configures which comments excuse a fallthrough and which clauses are exempt.
@@ -227,7 +227,7 @@ func fallthroughCommentBetween(ctx rule.Context, clause *ast.Node, nextClauseSta
 
 // lastCommentIn returns the last comment fully inside a range, when it matches.
 //
-// This used to carry its own scanner sweep, because `internal/utils/comments` could not see a
+// This used to carry its own scanner sweep, because `internal/utilities/comments` could not see a
 // comment that was the only content of a block and this rule's corpus contains exactly that:
 // `switch(foo) { case 0: { /* falls through */ } case 1: b(); }` returned zero comments from the
 // shelf. The shelf was fixed, so the local scan is gone and this filters the shared scan instead.

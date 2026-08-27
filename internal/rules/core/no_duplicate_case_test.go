@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestNoDuplicateCaseReportsRepeatedTest(t *testing.T) {
@@ -28,12 +28,12 @@ func TestNoDuplicateCaseReportsRepeatedTest(t *testing.T) {
 		{"nested switch has its own duplicate", `switch (a) { case 1: switch (b) { case 2: break; case 2: break; } break; }`, 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDuplicateCase, "file.ts", testCase.source)
+			result := rule_testing.Run(t, NoDuplicateCase, "file.ts", testCase.source)
 			wantIds := make([]string, testCase.want)
 			for index := range wantIds {
 				wantIds[index] = "unexpected"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 		})
 	}
 }
@@ -49,8 +49,8 @@ func TestNoDuplicateCaseReportsTheTestExpressionWithoutTrivia(t *testing.T) {
   case 1:
     break;
 }`
-	result := ruletest.Run(t, NoDuplicateCase, "file.ts", source)
-	ruletest.ExpectFindings(t, result, "unexpected")
+	result := rule_testing.Run(t, NoDuplicateCase, "file.ts", source)
+	rule_testing.ExpectFindings(t, result, "unexpected")
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "1" {
@@ -88,7 +88,7 @@ func TestNoDuplicateCaseAcceptsDistinctTests(t *testing.T) {
 		{"template literals with different substitutions", "switch (a) { case `t${x}`: break; case `t${y}`: break; }"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoDuplicateCase, "file.ts", testCase.source))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDuplicateCase, "file.ts", testCase.source))
 		})
 	}
 }

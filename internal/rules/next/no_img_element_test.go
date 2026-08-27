@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The fail cases are oxc's own, plus the paired `<img></img>` form, which our tree reaches at a
@@ -54,8 +54,8 @@ export const MyComponent = () => <img src={somePicture.src} alt='foo' />;`,
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoImgElement, "Component.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, messageNoImgElement.Id)
+			result := rule_testing.Run(t, NoImgElement, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, messageNoImgElement.Id)
 			if result.Diagnostics[0].Message.Id != "noImgElement" {
 				t.Fatalf("unexpected message id %q", result.Diagnostics[0].Message.Id)
 			}
@@ -124,8 +124,8 @@ export class MyComponent {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoImgElement, "Component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoImgElement, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

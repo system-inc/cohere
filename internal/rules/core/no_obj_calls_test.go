@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // objCallsFile is where the fixtures pretend to live.
@@ -90,8 +90,8 @@ func TestNoObjCallsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTypedFiles(t, NoObjCalls,
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTypedFiles(t, NoObjCalls,
 					map[string]string{objCallsFile: testCase.sourceText}, objCallsFile),
 				testCase.wantIds...)
 		})
@@ -166,8 +166,8 @@ func TestNoObjCallsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTypedFiles(t, NoObjCalls,
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTypedFiles(t, NoObjCalls,
 					map[string]string{objCallsFile: testCase.sourceText}, objCallsFile))
 		})
 	}
@@ -193,8 +193,8 @@ func TestNoObjCallsOurOwnCases(t *testing.T) {
 			// correct, which is still a divergence.
 			"var x = (globalThis?.Reflect)();",
 		} {
-			ruletest.ExpectClean(t,
-				ruletest.RunTypedFiles(t, NoObjCalls,
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTypedFiles(t, NoObjCalls,
 					map[string]string{objCallsFile: sourceText}, objCallsFile))
 		}
 	})
@@ -217,8 +217,8 @@ func TestNoObjCallsOurOwnCases(t *testing.T) {
 			// A constructible global, so that "not in the set" is tested under `new` too.
 			"new Date();",
 		} {
-			ruletest.ExpectClean(t,
-				ruletest.RunTypedFiles(t, NoObjCalls,
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTypedFiles(t, NoObjCalls,
 					map[string]string{objCallsFile: sourceText}, objCallsFile))
 		}
 	})
@@ -226,8 +226,8 @@ func TestNoObjCallsOurOwnCases(t *testing.T) {
 	t.Run("Temporal is not in oxc's set and is not in ours", func(t *testing.T) {
 		// ESLint's list is Atomics, JSON, Math, Reflect, Intl and Temporal. oxc's omits Temporal,
 		// and oxc is the port target, so this stays clean deliberately rather than by oversight.
-		ruletest.ExpectClean(t,
-			ruletest.RunTypedFiles(t, NoObjCalls,
+		rule_testing.ExpectClean(t,
+			rule_testing.RunTypedFiles(t, NoObjCalls,
 				map[string]string{objCallsFile: "var x = Temporal;"}, objCallsFile))
 	})
 
@@ -261,7 +261,7 @@ func TestNoObjCallsOurOwnCases(t *testing.T) {
 			{"let m = globalThis.Math; new m();", []string{"new m()"}},
 		}
 		for _, spanCase := range spanCases {
-			result := ruletest.RunTypedFiles(t, NoObjCalls,
+			result := rule_testing.RunTypedFiles(t, NoObjCalls,
 				map[string]string{objCallsFile: spanCase.sourceText}, objCallsFile)
 			if len(result.Diagnostics) != len(spanCase.want) {
 				t.Fatalf("%q: got %d findings, want %d",
@@ -281,7 +281,7 @@ func TestNoObjCallsOurOwnCases(t *testing.T) {
 		// Upstream passes `ident.name`, so an alias reports the alias. `let m = globalThis.Math;
 		// new m();` snapshots as "`m` is not a function", not "`Math`". ESLint answers differently
 		// here, with a second message naming both; this follows oxc.
-		result := ruletest.RunTypedFiles(t, NoObjCalls,
+		result := rule_testing.RunTypedFiles(t, NoObjCalls,
 			map[string]string{objCallsFile: "let m = globalThis.Math; new m();"}, objCallsFile)
 		if len(result.Diagnostics) != 1 {
 			t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -298,8 +298,8 @@ func TestNoObjCallsOurOwnCases(t *testing.T) {
 		// checker cannot answer this one, because the real `globalThis` does not resolve to a
 		// declaration-file declaration through `GetSymbolAtLocation`, so the shadow and the global
 		// are indistinguishable by the mechanism the identifier arm uses.
-		ruletest.ExpectFindings(t,
-			ruletest.RunTypedFiles(t, NoObjCalls,
+		rule_testing.ExpectFindings(t,
+			rule_testing.RunTypedFiles(t, NoObjCalls,
 				map[string]string{objCallsFile: "function f(globalThis: any) { globalThis.Math(); }"},
 				objCallsFile),
 			"noObjCalls")
@@ -310,15 +310,15 @@ func TestNoObjCallsOurOwnCases(t *testing.T) {
 		// as a dotted one. Our member arm reads only the dotted form, so this is a deliberate
 		// narrowing: `globalThis["Math"]()` is not in upstream's corpus in either direction, and
 		// reporting it would be a divergence nothing measured.
-		ruletest.ExpectClean(t,
-			ruletest.RunTypedFiles(t, NoObjCalls,
+		rule_testing.ExpectClean(t,
+			rule_testing.RunTypedFiles(t, NoObjCalls,
 				map[string]string{objCallsFile: `globalThis["Math"]();`}, objCallsFile))
 	})
 }
 
 // The typed harness is not a preference, and this test is why.
 //
-// `NeedsTypeChecker` is what gets `ctx.TypeChecker` populated. Under `ruletest.Run` it is nil,
+// `NeedsTypeChecker` is what gets `ctx.TypeChecker` populated. Under `rule_testing.Run` it is nil,
 // `resolvesToAGlobal` returns false for every identifier, and the rule reports nothing at all. Every
 // case in `TestNoObjCallsStaysSilent` would still pass, vacuously, so the clean half of the corpus
 // cannot detect the mistake. This asserts the declaration and the silence together, so a revert to
@@ -329,13 +329,13 @@ func TestNoObjCallsRequiresTheTypedHarness(t *testing.T) {
 	}
 
 	// The identifier arm goes silent without a checker. Asserted rather than described.
-	ruletest.ExpectClean(t, ruletest.Run(t, NoObjCalls, objCallsFile, "Math();"))
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoObjCalls, objCallsFile, "Math();"))
 
 	// And the member arm does not, because it reads spelling rather than resolution. Recorded so
 	// that "the untyped harness is useless for this rule" is stated at the precision it is true at:
 	// half the rule still fires, which is what makes the failure look like a rule bug.
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoObjCalls, objCallsFile, "globalThis.Math();"), "noObjCalls")
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoObjCalls, objCallsFile, "globalThis.Math();"), "noObjCalls")
 }
 
 // The registry entry, so that a rule that passes every fixture and lints zero files fails here.

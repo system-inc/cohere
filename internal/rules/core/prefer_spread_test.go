@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // TestPreferSpreadReportsRedundantThisArgument is the fixture that must fire.
@@ -25,8 +25,8 @@ func TestPreferSpreadReportsRedundantThisArgument(t *testing.T) {
 		"class C { #foo; m(args: any) { obj.#foo.apply(obj, args); } }",
 		"wrap(foo.apply(null, args));",
 	} {
-		result := ruletest.Run(t, PreferSpread, "apply.ts", source)
-		ruletest.ExpectFindings(t, result, "preferSpread")
+		result := rule_testing.Run(t, PreferSpread, "apply.ts", source)
+		rule_testing.ExpectFindings(t, result, "preferSpread")
 	}
 }
 
@@ -42,12 +42,12 @@ func TestPreferSpreadReadsBothMemberAccessForms(t *testing.T) {
 		`obj["foo"].apply(obj, args);`,
 		`obj["foo"].apply(obj["foo"] && obj, args);`,
 	} {
-		result := ruletest.Run(t, PreferSpread, "computed.ts", source)
+		result := rule_testing.Run(t, PreferSpread, "computed.ts", source)
 		if source == `obj["foo"].apply(obj["foo"] && obj, args);` {
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 			continue
 		}
-		ruletest.ExpectFindings(t, result, "preferSpread")
+		rule_testing.ExpectFindings(t, result, "preferSpread")
 	}
 }
 
@@ -64,8 +64,8 @@ func TestPreferSpreadIgnoresCommentsAndWhitespace(t *testing.T) {
 		"[].concat.apply([\n/* comment */\n], args);",
 		"[1, 2].concat.apply([1, 2], args);",
 	} {
-		result := ruletest.Run(t, PreferSpread, "trivia.ts", source)
-		ruletest.ExpectFindings(t, result, "preferSpread")
+		result := rule_testing.Run(t, PreferSpread, "trivia.ts", source)
+		rule_testing.ExpectFindings(t, result, "preferSpread")
 	}
 }
 
@@ -82,8 +82,8 @@ func TestPreferSpreadSeesThroughGroupingParentheses(t *testing.T) {
 		"(foo.apply)(null, args);",
 		"(obj.foo).apply(obj, args);",
 	} {
-		result := ruletest.Run(t, PreferSpread, "parens.ts", source)
-		ruletest.ExpectFindings(t, result, "preferSpread")
+		result := rule_testing.Run(t, PreferSpread, "parens.ts", source)
+		rule_testing.ExpectFindings(t, result, "preferSpread")
 	}
 }
 
@@ -100,8 +100,8 @@ func TestPreferSpreadHandlesOptionalChaining(t *testing.T) {
 		"a?.b.c.foo.apply(a?.b.c, args);",
 		"(a?.b).c.foo.apply((a?.b).c, args);",
 	} {
-		result := ruletest.Run(t, PreferSpread, "optional.ts", source)
-		ruletest.ExpectFindings(t, result, "preferSpread")
+		result := rule_testing.Run(t, PreferSpread, "optional.ts", source)
+		rule_testing.ExpectFindings(t, result, "preferSpread")
 	}
 }
 
@@ -116,8 +116,8 @@ func TestPreferSpreadKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
 		"(a?.b).c.foo.apply(a?.b.c, args);",
 		"a?.b.c.foo.apply((a?.b).c, args);",
 	} {
-		result := ruletest.Run(t, PreferSpread, "divergence.ts", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, PreferSpread, "divergence.ts", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -140,8 +140,8 @@ func TestPreferSpreadStaysSilentWhenTheThisBindingMatters(t *testing.T) {
 		"(obj as any).foo.apply(obj, args);",
 		"[1, 2].concat.apply([1, 3], args);",
 	} {
-		result := ruletest.Run(t, PreferSpread, "binding.ts", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, PreferSpread, "binding.ts", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -158,8 +158,8 @@ func TestPreferSpreadLeavesArrayLiteralsToNoUselessCall(t *testing.T) {
 		"foo.apply(null, ([1, 2]));",
 		"obj.foo.apply(obj, ...args);",
 	} {
-		result := ruletest.Run(t, PreferSpread, "literals.ts", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, PreferSpread, "literals.ts", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -180,7 +180,7 @@ func TestPreferSpreadIgnoresCallsThatAreNotApply(t *testing.T) {
 		"foo(...args);",
 		"obj.foo(...args);",
 	} {
-		result := ruletest.Run(t, PreferSpread, "other.ts", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, PreferSpread, "other.ts", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }

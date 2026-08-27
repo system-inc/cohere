@@ -8,7 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/program"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const translationsConfig = `{
@@ -30,7 +30,7 @@ const translationsConfig = `{
 // reaching it through the program instead of through the filesystem is the whole porting decision.
 // A fixture that faked the English side would be testing the comparison while skipping the part
 // most likely to be wrong.
-func runOnTranslations(t *testing.T, files map[string]string, subjectRelativePath string) ruletest.Result {
+func runOnTranslations(t *testing.T, files map[string]string, subjectRelativePath string) rule_testing.Result {
 	t.Helper()
 
 	directory := t.TempDir()
@@ -76,7 +76,7 @@ func runOnTranslations(t *testing.T, files map[string]string, subjectRelativePat
 	if listeners != nil {
 		walkForTest(subject.AsNode(), listeners)
 	}
-	return ruletest.Result{Diagnostics: diagnostics, SourceFile: subject}
+	return rule_testing.Result{Diagnostics: diagnostics, SourceFile: subject}
 }
 
 func walkForTest(node *ast.Node, listeners rule.Listeners) {
@@ -175,7 +175,7 @@ func TestLocalizationNoUntranslatedValueFires(t *testing.T) {
 				"translations/en.ts": englishTranslations,
 				"translations/es.ts": testCase.spanish,
 			}, "translations/es.ts")
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -210,7 +210,7 @@ func TestLocalizationNoUntranslatedValueStaysSilent(t *testing.T) {
 				"translations/en.ts": englishTranslations,
 				"translations/es.ts": testCase.spanish,
 			}, "translations/es.ts")
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -249,7 +249,7 @@ func TestLocalizationNoUntranslatedValueDeclinesFilesThatAreNotLocaleData(t *tes
 			}
 			files[testCase.relativePath] = copiedFromEnglish
 			result := runOnTranslations(t, files, testCase.relativePath)
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -262,7 +262,7 @@ func TestLocalizationNoUntranslatedValueReadsUnderscoreTranslationsDirectories(t
 		"_translations/en.ts": englishTranslations,
 		"_translations/es.ts": "export default {\n    Greeting: 'Hello there',\n};\n",
 	}, "_translations/es.ts")
-	ruletest.ExpectFindings(t, result, "identicalToSource")
+	rule_testing.ExpectFindings(t, result, "identicalToSource")
 }
 
 // A locale file whose en.ts is missing is declined rather than reported on.
@@ -273,7 +273,7 @@ func TestLocalizationNoUntranslatedValueDeclinesWithoutAnEnglishSibling(t *testi
 	result := runOnTranslations(t, map[string]string{
 		"translations/es.ts": "export default {\n    Greeting: 'Hello there',\n};\n",
 	}, "translations/es.ts")
-	ruletest.ExpectClean(t, result)
+	rule_testing.ExpectClean(t, result)
 }
 
 // The rule reports and never rewrites: the repair is a translation, which a rule cannot write.
@@ -282,7 +282,7 @@ func TestLocalizationNoUntranslatedValueProposesNoFix(t *testing.T) {
 		"translations/en.ts": englishTranslations,
 		"translations/es.ts": "export default {\n    Greeting: 'Hello there',\n};\n",
 	}, "translations/es.ts")
-	ruletest.ExpectFindings(t, result, "identicalToSource")
+	rule_testing.ExpectFindings(t, result, "identicalToSource")
 
 	if len(result.Diagnostics[0].Fixes) != 0 {
 		t.Fatalf("expected no fixes, got %d", len(result.Diagnostics[0].Fixes))
@@ -320,5 +320,5 @@ func TestLocalizationNoUntranslatedValueDeclinesOrdinaryFiles(t *testing.T) {
 		"app/Probe.ts":       "export default {\n    Greeting: 'Hello there',\n};\n",
 	}, "app/Probe.ts")
 
-	ruletest.ExpectClean(t, result)
+	rule_testing.ExpectClean(t, result)
 }

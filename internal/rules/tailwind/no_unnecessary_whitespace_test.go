@@ -3,7 +3,7 @@ package tailwind
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Expectations measured by running `better-tailwindcss/no-unnecessary-whitespace` with `--fix` over
@@ -84,8 +84,8 @@ func TestNoUnnecessaryWhitespaceReportsPadding(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnnecessaryWhitespace, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.Run(t, NoUnnecessaryWhitespace, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -158,8 +158,8 @@ func TestNoUnnecessaryWhitespaceStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnnecessaryWhitespace, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoUnnecessaryWhitespace, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -210,7 +210,7 @@ func TestNoUnnecessaryWhitespaceFixMatchesUpstream(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
+			result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("expected a finding, got none")
 			}

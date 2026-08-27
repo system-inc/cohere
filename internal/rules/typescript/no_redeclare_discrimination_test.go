@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // TestPartitionAndKindSeparatesAllTwentyThree runs the exact 23 cases from the earlier identity
@@ -67,7 +67,7 @@ func TestPartitionAndKindSeparatesAllTwentyThree(t *testing.T) {
 
 	disagreements := 0
 	for _, testCase := range cases {
-		result := ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, nil)
+		result := rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, nil)
 		got := len(result.Diagnostics)
 		if got != testCase.wantCount {
 			disagreements++
@@ -109,14 +109,14 @@ func TestNoRedeclareTypeAliasBelongsToNoMergeSet(t *testing.T) {
 	} {
 		t.Run(testCase.label, func(t *testing.T) {
 			// Default options, which is what the live config gives this rule.
-			ruletest.ExpectFindings(t,
-				ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, nil),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, nil),
 				"redeclared")
 
 			// And with the merge exemptions explicitly off, which must not move the verdict. This is
 			// the half that separates a type alias from a class: there is no exemption to lift.
-			ruletest.ExpectFindings(t,
-				ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, redeclareOptions(false)),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, redeclareOptions(false)),
 				"redeclared")
 		})
 	}
@@ -128,10 +128,10 @@ func TestNoRedeclareTypeAliasBelongsToNoMergeSet(t *testing.T) {
 		"interface X { a: number }\nnamespace X { export function create() {} }",
 		"class X {}\nnamespace X { export function create() {} }",
 	} {
-		ruletest.ExpectClean(t,
-			ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, sourceText, nil))
-		ruletest.ExpectFindings(t,
-			ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, sourceText, redeclareOptions(false)),
+		rule_testing.ExpectClean(t,
+			rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, sourceText, nil))
+		rule_testing.ExpectFindings(t,
+			rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, sourceText, redeclareOptions(false)),
 			"redeclared")
 	}
 }

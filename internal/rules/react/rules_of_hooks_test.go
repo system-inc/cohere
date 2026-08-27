@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The corpus below is oxc's own, copied from `rules_of_hooks.rs` through the extractor rather
@@ -690,8 +690,8 @@ func TestRulesOfHooksStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, RulesOfHooks, "component.jsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -1289,8 +1289,8 @@ func TestRulesOfHooksFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, RulesOfHooks, "component.jsx", testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.ids...)
+			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})
 	}
 }
@@ -1361,7 +1361,7 @@ func TestRulesOfHooksSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, RulesOfHooks, "component.jsx", testCase.source)
+			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected exactly one finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
 			}
@@ -1439,7 +1439,7 @@ func TestRulesOfHooksBeyondTheCorpus(t *testing.T) {
 			name:   "bareUseIsAHook",
 			source: "function notAComponent() {\n  use(promise);\n}\n",
 			ids:    []string{"rulesOfHooksNotComponent"},
-			reason: "`internal/utils/react.IsHookName` answers false for a bare `use`, and both " +
+			reason: "`internal/utilities/react.IsHookName` answers false for a bare `use`, and both " +
 				"upstream implementations answer true. No upstream case writes bare `use` inside a " +
 				"badly-named function, so nothing in the imported corpus separates the shelf helper " +
 				"from this rule's own predicate on this input.",
@@ -1524,12 +1524,12 @@ func TestRulesOfHooksBeyondTheCorpus(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, RulesOfHooks, "component.jsx", testCase.source)
+			result := rule_testing.Run(t, RulesOfHooks, "component.jsx", testCase.source)
 			if len(testCase.ids) == 0 {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
-			ruletest.ExpectFindings(t, result, testCase.ids...)
+			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})
 	}
 }

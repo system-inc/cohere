@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Every rule in this package is run over shapes where a node it reaches for is legitimately absent,
@@ -94,7 +94,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 				// findings are deliberately not checked: what each rule concludes about these
 				// shapes belongs in its own pair, and asserting it here would make this guard fail
 				// for reasons that are not crashes.
-				ruletest.Run(t, currentRule, "shapes.ts", source)
+				rule_testing.Run(t, currentRule, "shapes.ts", source)
 			})
 		}
 	}

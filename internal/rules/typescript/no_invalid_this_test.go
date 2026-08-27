@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // invalidThisFile is where the fixtures pretend to live.
@@ -74,13 +74,13 @@ func TestNoInvalidThisFires(t *testing.T) {
 
 	for index, testCase := range cases {
 		t.Run(strings.TrimSpace(firstLineOf(testCase.source)), func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, testCase.settings)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "unexpectedThis"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 			_ = index
 		})
 	}
@@ -142,7 +142,7 @@ func TestNoInvalidThisStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(strings.TrimSpace(firstLineOf(testCase.source)), func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, testCase.settings))
 		})
 	}
@@ -209,7 +209,7 @@ func TestNoInvalidThisJsDocAttachment(t *testing.T) {
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings()))
 		})
 	}
@@ -245,13 +245,13 @@ func TestNoInvalidThisJsDocAttachment(t *testing.T) {
 
 	for _, testCase := range reports {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings())
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "unexpectedThis"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -292,7 +292,7 @@ func TestNoInvalidThisSeesThroughParentheses(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings()))
 		})
 	}
@@ -337,7 +337,7 @@ func TestDecodeNoInvalidThisOptions(t *testing.T) {
 	// The fallback has to produce the documented default rather than the zero value, and a rule
 	// that got this wrong would report every capitalized constructor function in the tree.
 	t.Run("nil options fall back to the default", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 			"function Foo() {\n  this.x = 1;\n}", nil))
 	})
 }
@@ -347,9 +347,9 @@ func TestDecodeNoInvalidThisOptions(t *testing.T) {
 // compared to itself moves under mutation.
 func TestNoInvalidThisSpansTheKeyword(t *testing.T) {
 	const source = "function foo() {\n  console.log(this);\n}\n"
-	result := ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile, source,
+	result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile, source,
 		DefaultNoInvalidThisSettings())
-	ruletest.ExpectFindings(t, result, "unexpectedThis")
+	rule_testing.ExpectFindings(t, result, "unexpectedThis")
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "this" {
@@ -373,13 +373,13 @@ func TestNoInvalidThisMessage(t *testing.T) {
 // nothing for it. Both `this` reads below resolve against the same enclosing function, so a port
 // that pushed for arrows would report the outer one and silently exempt the inner.
 func TestNoInvalidThisArrowsInheritTheBinding(t *testing.T) {
-	result := ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 		"function foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}",
 		DefaultNoInvalidThisSettings())
-	ruletest.ExpectFindings(t, result, "unexpectedThis", "unexpectedThis")
+	rule_testing.ExpectFindings(t, result, "unexpectedThis", "unexpectedThis")
 
 	// And the same two reads inside a bound function are both silent, for the same reason.
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 		"class A {\n  foo() {\n    console.log(this);\n    z(x => console.log(x, this));\n  }\n}",
 		DefaultNoInvalidThisSettings()))
 }
@@ -444,13 +444,13 @@ func TestNoInvalidThisNullishReceiversDoNotBind(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings())
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "unexpectedThis"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -467,16 +467,16 @@ func TestNoInvalidThisNullishReceiversDoNotBind(t *testing.T) {
 func TestNoInvalidThisTitlecaseNamesReadAsConstructors(t *testing.T) {
 	const titlecase = "\u01C5"
 
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 		"function "+titlecase+"oo() {\n  this.x;\n}", DefaultNoInvalidThisSettings()))
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 		"var "+titlecase+"oo = function () {\n  this.x;\n};", DefaultNoInvalidThisSettings()))
 
 	// The controls: a lowercase name reports in both positions, so the silence above is the name
 	// test answering rather than the fixture failing to reach the rule.
-	ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 		"function foo() {\n  this.x;\n}", DefaultNoInvalidThisSettings()), "unexpectedThis")
-	ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 		"var foo = function () {\n  this.x;\n};", DefaultNoInvalidThisSettings()), "unexpectedThis")
 }
 
@@ -537,13 +537,13 @@ func TestNoInvalidThisBindingShapesBeyondTheCorpus(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoInvalidThis, invalidThisFile,
+			result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 				testCase.source, DefaultNoInvalidThisSettings())
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "unexpectedThis"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }

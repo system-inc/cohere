@@ -2,7 +2,7 @@ package unused
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/utils/controlflow"
+	"github.com/system-inc/verify/internal/utilities/control_flow_graph"
 )
 
 // Unreachable is one statement that cannot run.
@@ -67,8 +67,8 @@ type statementEvent struct {
 // unreachableInRoot walks one code path root and reports the statements laid out in blocks nothing
 // reaches.
 func unreachableInRoot(root *ast.Node) []Unreachable {
-	graph := controlflow.Build(root, controlflow.Hooks[statementEvent]{
-		Statement: func(builder *controlflow.Builder[statementEvent], node *ast.Node) {
+	graph := control_flow_graph.Build(root, control_flow_graph.Hooks[statementEvent]{
+		Statement: func(builder *control_flow_graph.Builder[statementEvent], node *ast.Node) {
 			builder.Emit(statementEvent{node: node})
 		},
 	})

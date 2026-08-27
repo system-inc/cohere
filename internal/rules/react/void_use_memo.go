@@ -81,7 +81,7 @@ var messageUseMemoResultUnused = rule.Message{
 // is the cargo cult the port brief names, and here it would additionally have to *reproduce a
 // lookup failure* to stay faithful, which is a strange thing to build machinery for.
 //
-// The intermediate representation in `internal/utils/hir` was read before this was written, and
+// The intermediate representation in `internal/utilities/hir` was read before this was written, and
 // nothing in it is used. Recorded plainly so the next reader does not assume the omission was an
 // oversight: this rule was the first candidate consumer after that package landed, and it declined.
 //

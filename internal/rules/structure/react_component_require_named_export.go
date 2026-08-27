@@ -3,8 +3,8 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/module"
-	"github.com/system-inc/verify/internal/utils/react"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
+	"github.com/system-inc/verify/internal/utilities/react"
 )
 
 var messageComponentRequiresNamedExport = rule.Message{

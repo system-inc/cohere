@@ -7,7 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // noArrayDeleteFile is the fixture name every case in this file runs under.
@@ -82,7 +82,7 @@ func TestNoArrayDeleteStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText))
 		})
 	}
 }
@@ -158,7 +158,7 @@ func TestNoArrayDeleteFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText), "noArrayDelete")
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText), "noArrayDelete")
 		})
 	}
 }
@@ -213,7 +213,7 @@ func TestNoArrayDeleteSuggestions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
@@ -327,7 +327,7 @@ func TestNoArrayDeleteSpans(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
@@ -368,10 +368,10 @@ func TestNoArrayDeleteSpans(t *testing.T) {
 }
 
 // TestNoArrayDeleteRequiresTheTypedHarness asserts the rule declares the checker, so a later revert
-// to ruletest.Run fails loudly instead of going green.
+// to rule_testing.Run fails loudly instead of going green.
 //
 // This rule is the silent kind rather than the panicking kind, which is the more dangerous of the
-// two. The listener dereferences ctx.TypeChecker, and under ruletest.Run that field is nil, so a
+// two. The listener dereferences ctx.TypeChecker, and under rule_testing.Run that field is nil, so a
 // fixture set moved to the untyped harness would see every Fires case fail and every StaysSilent
 // case pass VACUOUSLY, having proven nothing at all.
 //
@@ -390,7 +390,7 @@ func TestNoArrayDeleteRequiresTheTypedHarness(t *testing.T) {
 
 	// A finding the typed harness produces and the untyped one cannot.
 	source := "declare const arr: number[];\ndelete arr[0];\n"
-	typed := ruletest.RunTyped(t, NoArrayDelete, noArrayDeleteFile, source)
+	typed := rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, source)
 	if len(typed.Diagnostics) != 1 {
 		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
 	}

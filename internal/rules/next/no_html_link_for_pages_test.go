@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The upstream corpus, copied byte for byte from oxc's tester block and verified mechanically
@@ -52,8 +52,8 @@ func htmlLinkSource(element string) string {
 func TestNoHtmlLinkForPagesReportsTheUpstreamCorpus(t *testing.T) {
 	for _, element := range upstreamFailCases {
 		t.Run(element, func(t *testing.T) {
-			result := ruletest.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(element))
-			ruletest.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
+			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(element))
+			rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
 		})
 	}
 }
@@ -61,8 +61,8 @@ func TestNoHtmlLinkForPagesReportsTheUpstreamCorpus(t *testing.T) {
 func TestNoHtmlLinkForPagesIsSilentOnTheUpstreamCorpus(t *testing.T) {
 	for _, element := range upstreamPassCases {
 		t.Run(element, func(t *testing.T) {
-			result := ruletest.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(element))
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(element))
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -125,8 +125,8 @@ func TestNoHtmlLinkForPagesReportsCasesUpstreamDoesNotWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(testCase.element))
-			ruletest.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
+			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(testCase.element))
+			rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
 		})
 	}
 }
@@ -195,8 +195,8 @@ func TestNoHtmlLinkForPagesIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(testCase.element))
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(testCase.element))
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -225,8 +225,8 @@ func TestNoHtmlLinkForPagesPointsAtTheOpeningElement(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			source := htmlLinkSource(testCase.element)
-			result := ruletest.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", source)
-			ruletest.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
+			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", source)
+			rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
 
 			diagnostic := result.Diagnostics[0]
 			reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
@@ -246,8 +246,8 @@ func TestNoHtmlLinkForPagesPointsAtTheOpeningElement(t *testing.T) {
 // different raw elements through the same shape, and a report site handed the wrong message value
 // satisfies an identifier assertion whenever the two identifiers happen to match.
 func TestNoHtmlLinkForPagesCarriesItsOwnMessage(t *testing.T) {
-	result := ruletest.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(`<a href='/about'>About</a>`))
-	ruletest.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
+	result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(`<a href='/about'>About</a>`))
+	rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
 
 	wantDescription := "This is a raw <a> element pointing at an internal route. Use `Link` from " +
 		"`next/link`, which navigates on the client and prefetches the destination. A plain <a> " +

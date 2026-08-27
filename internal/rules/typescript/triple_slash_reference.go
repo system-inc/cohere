@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/comments"
+	"github.com/system-inc/verify/internal/utilities/comments"
 )
 
 // messageTripleSlashReference names the referenced module in its own text.
@@ -126,7 +126,7 @@ var TripleSlashReference = rule.Rule{
 		// rather than ride on Go's zero. This is not defensive coding: it is the normal path for a
 		// rule configured as a bare `"error"`. The config layer hands `Run` a nil `options` in that
 		// case, because `rule.DecodeOptionsInto` reports an error on empty input and
-		// `config.OptionsRegistry.Decode` translates that into nil for a rule whose options merely
+		// `configuration.OptionsRegistry.Decode` translates that into nil for a rule whose options merely
 		// tune it. A bare type assertion then yields three empty settings, which match no arm, and
 		// the rule goes silent on every file while every fixture stays green because fixtures reach
 		// the rule through the decoder. Found by the dry run rather than by the suite: 3,407 files,

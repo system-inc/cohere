@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The six invalid cases are React's own, vendored at
@@ -140,8 +140,8 @@ func TestStaticComponentsFires(t *testing.T) {
 `},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, StaticComponents, "component.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, "staticComponents")
+			result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, "staticComponents")
 		})
 	}
 }
@@ -166,8 +166,8 @@ func TestStaticComponentsTreatsTheOutermostComponentAsTheUnit(t *testing.T) {
 }
 `
 	parsed := strings.TrimSpace(source) + "\n"
-	result := ruletest.RunTyped(t, StaticComponents, "component.tsx", source)
-	ruletest.ExpectFindings(t, result, "staticComponents")
+	result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", source)
+	rule_testing.ExpectFindings(t, result, "staticComponents")
 	reported := parsed[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "Inner" {
 		t.Errorf("span points at %q, want %q", reported, "Inner")
@@ -188,7 +188,7 @@ func TestStaticComponentsTreatsTheOutermostComponentAsTheUnit(t *testing.T) {
 func TestStaticComponentsSpanSkipsTriviaBeforeTheTag(t *testing.T) {
 	source := "function O() {\n  const C = mk();\n  return < /*c*/ C />;\n}\n"
 	parsed := strings.TrimSpace(source) + "\n"
-	result := ruletest.RunTyped(t, StaticComponents, "component.tsx", source)
+	result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
@@ -289,8 +289,8 @@ function Outer() {
 `},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, StaticComponents, "component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -302,16 +302,16 @@ function Outer() {
 //
 // # Slice what was PARSED, not what was passed
 //
-// `ruletest.RunTyped` writes each fixture to disk as `strings.TrimSpace(contents)+"\n"`, so a case
+// `rule_testing.RunTyped` writes each fixture to disk as `strings.TrimSpace(contents)+"\n"`, so a case
 // carrying leading or trailing whitespace is parsed as a DIFFERENT string from the one handed to
 // it. oxc's tester writes every case with a leading newline and this file copies them verbatim, so
 // every diagnostic offset here is shifted one byte from the Go literal. Slicing the literal reports
 // `<Componen` for a finding that is correctly on `Component`, which reads exactly like an
-// off-by-one in the rule and is not one. `ruletest.Run`, the untyped harness, does not trim, so the
+// off-by-one in the rule and is not one. `rule_testing.Run`, the untyped harness, does not trim, so the
 // trap is invisible to any rule that does not need the checker.
 func TestStaticComponentsSpan(t *testing.T) {
 	parsed := strings.TrimSpace(scTesterFail) + "\n"
-	result := ruletest.RunTyped(t, StaticComponents, "component.tsx", scTesterFail)
+	result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", scTesterFail)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
@@ -326,7 +326,7 @@ func TestStaticComponentsSpan(t *testing.T) {
 // strings.Contains, because a Contains predicate is weaker than the property it guards and would
 // stay green through a wrong interpolation.
 func TestStaticComponentsMessageNamesCreationSite(t *testing.T) {
-	result := ruletest.RunTyped(t, StaticComponents, "component.tsx", scTesterFail)
+	result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", scTesterFail)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
@@ -339,13 +339,13 @@ func TestStaticComponentsMessageNamesCreationSite(t *testing.T) {
 // The rule declares NeedsTypeChecker, and it is load-bearing rather than decorative: lowering
 // without a checker resolves every reference as a global, so no value is ever named, no taint can
 // attach, and the rule goes silent on every input while looking healthy. This asserts the typed
-// harness is required, so a later revert to `ruletest.Run` fails loudly here rather than turning
+// harness is required, so a later revert to `rule_testing.Run` fails loudly here rather than turning
 // every fixture above into a vacuous pass.
 func TestStaticComponentsRequiresTypeChecker(t *testing.T) {
 	if !StaticComponents.NeedsTypeChecker {
 		t.Fatal("rule must declare NeedsTypeChecker; lowering without one names no values and the rule silently reports nothing")
 	}
-	untyped := ruletest.Run(t, StaticComponents, "component.tsx", scTesterFail)
+	untyped := rule_testing.Run(t, StaticComponents, "component.tsx", scTesterFail)
 	if len(untyped.Diagnostics) != 0 {
 		t.Fatalf("expected the untyped harness to produce nothing, got %d", len(untyped.Diagnostics))
 	}

@@ -3,7 +3,7 @@ package next
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/nextjs"
+	"github.com/system-inc/verify/internal/utilities/nextjs"
 )
 
 var messageNoHeadImportInDocument = rule.Message{
@@ -113,12 +113,12 @@ var messageNoHeadImportInDocument = rule.Message{
 // `splitPath` to the backslash survived the whole table, two Windows-shaped fixtures were added to
 // kill it, and it survived again. The second survival is what sent me to read instead of guess.
 //
-// `ruletest.Run` passes the file name through `tspath.NormalizePath` before the program is built, so
+// `rule_testing.Run` passes the file name through `tspath.NormalizePath` before the program is built, so
 // a rule handed `pages\_document.tsx` sees `/pages/_document.tsx`. Probed directly: every backslash
 // is a forward slash by the time `ctx.SourceFile.FileName()` answers. So the two fixtures were exact
 // duplicates of their forward-slash twins, asserting nothing, and they were deleted rather than left
 // to read as coverage. The separator handling is covered where it can be, in
-// `internal/utils/nextjs`'s own tests, which call the predicate directly and bypass the harness.
+// `internal/utilities/nextjs`'s own tests, which call the predicate directly and bypass the harness.
 //
 // A mutant that survives after the fixture written to kill it is not a fixture problem by default.
 //

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // stringRefsFile is where the fixtures pretend to live.
@@ -53,12 +53,12 @@ func TestNoStringRefsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{
 					NoTemplateLiterals: testCase.noTemplateLiterals,
 					CheckThisRefs:      testCase.checkThisRefs,
 				})
-			ruletest.ExpectFindings(t, result, testCase.findings...)
+			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
 	}
 }
@@ -84,7 +84,7 @@ func TestNoStringRefsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoStringRefs, stringRefsFile,
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile,
 				testCase.sourceText, NoStringRefsOptions{
 					NoTemplateLiterals: testCase.noTemplateLiterals,
 					CheckThisRefs:      testCase.checkThisRefs,
@@ -129,8 +129,8 @@ func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoStringRefs, stringRefsFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoStringRefs, stringRefsFile, testCase.sourceText),
 				testCase.findings...)
 		})
 	}
@@ -187,7 +187,7 @@ func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoStringRefs, stringRefsFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoStringRefs, stringRefsFile, testCase.sourceText))
 		})
 	}
 }
@@ -262,13 +262,13 @@ func TestNoStringRefsSpellingsOfTheRefsRead(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{CheckThisRefs: true})
 			if len(testCase.findings) == 0 {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
-			ruletest.ExpectFindings(t, result, testCase.findings...)
+			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
 	}
 }
@@ -437,13 +437,13 @@ func TestNoStringRefsEnclosingComponentIsAScopeWalk(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{CheckThisRefs: true})
 			if testCase.reports {
-				ruletest.ExpectFindings(t, result, "thisRefsDeprecated")
+				rule_testing.ExpectFindings(t, result, "thisRefsDeprecated")
 				return
 			}
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -471,8 +471,8 @@ func TestNoStringRefsHasNoFileGate(t *testing.T) {
 		"/repository/source/Hello.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunWithOptions(t, NoStringRefs, fileName, sourceText,
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunWithOptions(t, NoStringRefs, fileName, sourceText,
 					NoStringRefsOptions{CheckThisRefs: true}),
 				"thisRefsDeprecated")
 		})
@@ -529,14 +529,14 @@ func TestDecodeNoStringRefsOptions(t *testing.T) {
 // the decoder. This bypasses the decoder entirely, which is the only way to see that.
 func TestNoStringRefsWithNilOptions(t *testing.T) {
 	// The template half is off, so a template ref is clean.
-	ruletest.ExpectClean(t, ruletest.Run(t, NoStringRefs, stringRefsFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoStringRefs, stringRefsFile,
 		"const a = <div ref={`hello`} />;\n"))
 	// The refs half is off, so a component's `this.refs` is clean.
-	ruletest.ExpectClean(t, ruletest.Run(t, NoStringRefs, stringRefsFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoStringRefs, stringRefsFile,
 		"class H extends React.Component { m() { return this.refs.x; } }\n"))
 	// The attribute half is on regardless, so a string ref still reports. Without this the two
 	// assertions above would pass on a rule that registered no listeners at all.
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoStringRefs, stringRefsFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoStringRefs, stringRefsFile,
 		"const a = <div ref=\"hello\" />;\n"), "stringInRefDeprecated")
 }
 
@@ -593,7 +593,7 @@ func TestNoStringRefsPointsAtTheRightNode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoStringRefs, stringRefsFile, testCase.sourceText,
 				NoStringRefsOptions{CheckThisRefs: true})
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))

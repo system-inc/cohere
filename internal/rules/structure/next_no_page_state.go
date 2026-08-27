@@ -3,7 +3,7 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/react"
+	"github.com/system-inc/verify/internal/utilities/react"
 )
 
 var messagePageStateRemounts = rule.Message{

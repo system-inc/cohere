@@ -133,11 +133,11 @@ func ruleLocalFunctionNames(t *testing.T) []ruleLocalFunction {
 func exportedUtilityNames(t *testing.T) map[string]string {
 	t.Helper()
 
-	files, err := filepath.Glob("../utils/*/*/*.go")
+	files, err := filepath.Glob("../utilities/*/*/*.go")
 	if err != nil {
 		t.Fatalf("globbing utility files: %v", err)
 	}
-	nested, err := filepath.Glob("../utils/*/*.go")
+	nested, err := filepath.Glob("../utilities/*/*.go")
 	if err != nil {
 		t.Fatalf("globbing utility files: %v", err)
 	}

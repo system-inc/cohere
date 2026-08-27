@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // arrayCallbackReturnCorpusProvenance records where the imported cases came from and how they were
@@ -39,7 +39,7 @@ const arrayCallbackReturnCorpusProvenance = "eslint/tests/lib/rules/array-callba
 // reports on correct code while every reporting case stays green.
 func TestArrayCallbackReturnStaysSilent(t *testing.T) {
 	for _, testCase := range arrayCallbackReturnCleanCases {
-		result := ruletest.RunWithOptions(
+		result := rule_testing.RunWithOptions(
 			t, ArrayCallbackReturn, "clean.ts", testCase.source, testCase.options)
 		if len(result.Diagnostics) != 0 {
 			t.Errorf("reported %v on a clean case\n%s", result.MessageIds(), testCase.source)
@@ -56,7 +56,7 @@ func TestArrayCallbackReturnStaysSilent(t *testing.T) {
 // in traversal order gets the reverse and every count assertion still passes.
 func TestArrayCallbackReturnFires(t *testing.T) {
 	for _, testCase := range arrayCallbackReturnReportingCases {
-		result := ruletest.RunWithOptions(
+		result := rule_testing.RunWithOptions(
 			t, ArrayCallbackReturn, "fires.ts", testCase.source, testCase.options)
 		got := result.MessageIds()
 		if len(got) != len(testCase.wantIds) {
@@ -90,7 +90,7 @@ func TestArrayCallbackReturnSuggestions(t *testing.T) {
 		if testCase.suggestions == nil {
 			continue
 		}
-		result := ruletest.RunWithOptions(
+		result := rule_testing.RunWithOptions(
 			t, ArrayCallbackReturn, "suggest.ts", testCase.source, testCase.options)
 		written := result.SourceFile.Text()
 
@@ -132,7 +132,7 @@ func TestArrayCallbackReturnSuggestions(t *testing.T) {
 // applyArrayCallbackFixes applies a suggestion's edits to a source string.
 //
 // Applied back to front so an earlier edit does not shift the offsets a later one was computed
-// against. `ruletest` can apply a Fix but has no suggestion applier, so this is the hand-rolled half
+// against. `rule_testing` can apply a Fix but has no suggestion applier, so this is the hand-rolled half
 // the brief warns to budget for.
 func applyArrayCallbackFixes(source string, fixes []rule.Fix) string {
 	ordered := make([]rule.Fix, len(fixes))
@@ -193,7 +193,7 @@ func TestArrayCallbackReturnSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, ArrayCallbackReturn, "span.ts", testCase.source, nil)
+			result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "span.ts", testCase.source, nil)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("reported %d findings, want %d: %v",
 					len(result.Diagnostics), len(testCase.want), result.MessageIds())
@@ -249,7 +249,7 @@ func TestArrayCallbackReturnMessageText(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, ArrayCallbackReturn, "text.ts", testCase.source, nil)
+			result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "text.ts", testCase.source, nil)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("reported %d findings, want 1", len(result.Diagnostics))
 			}
@@ -298,15 +298,15 @@ func TestArrayCallbackReturnOptionsDecode(t *testing.T) {
 		if !decoded.(ArrayCallbackReturnOptions).AllowImplicit {
 			t.Fatalf("decoded %#v", decoded)
 		}
-		result := ruletest.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
+		result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
 			`foo.filter(function() { return; })`, decoded)
-		ruletest.ExpectClean(t, result)
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("without allowImplicit a bare return reports", func(t *testing.T) {
-		result := ruletest.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
+		result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
 			`foo.filter(function() { return; })`, nil)
-		ruletest.ExpectFindings(t, result, "expectedReturnValue")
+		rule_testing.ExpectFindings(t, result, "expectedReturnValue")
 	})
 
 	t.Run("checkForEach turns the judgment around", func(t *testing.T) {
@@ -314,14 +314,14 @@ func TestArrayCallbackReturnOptionsDecode(t *testing.T) {
 		if err != nil {
 			t.Fatalf("decode: %v", err)
 		}
-		result := ruletest.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
+		result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
 			`foo.forEach(x => x)`, decoded)
-		ruletest.ExpectFindings(t, result, "expectedNoReturnValue")
+		rule_testing.ExpectFindings(t, result, "expectedNoReturnValue")
 	})
 
 	t.Run("without checkForEach a forEach returning a value is clean", func(t *testing.T) {
-		result := ruletest.RunWithOptions(t, ArrayCallbackReturn, "o.ts", `foo.forEach(x => x)`, nil)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts", `foo.forEach(x => x)`, nil)
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("allowVoid accepts void and adds a second suggestion", func(t *testing.T) {
@@ -329,15 +329,15 @@ func TestArrayCallbackReturnOptionsDecode(t *testing.T) {
 		if err != nil {
 			t.Fatalf("decode: %v", err)
 		}
-		clean := ruletest.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
+		clean := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
 			`foo.forEach(x => void x)`, decoded)
-		ruletest.ExpectClean(t, clean)
+		rule_testing.ExpectClean(t, clean)
 
 		// The option changes what is OFFERED, not only what is reported, and only asserting the
 		// finding would miss half of it.
-		offered := ruletest.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
+		offered := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
 			`foo.forEach(x => x)`, decoded)
-		ruletest.ExpectFindings(t, offered, "expectedNoReturnValue")
+		rule_testing.ExpectFindings(t, offered, "expectedNoReturnValue")
 		if len(offered.Diagnostics[0].Suggestions) != 2 {
 			t.Fatalf("offered %d suggestions under allowVoid, want 2",
 				len(offered.Diagnostics[0].Suggestions))
@@ -347,12 +347,12 @@ func TestArrayCallbackReturnOptionsDecode(t *testing.T) {
 	t.Run("nil options bypass the decoder and keep every default off", func(t *testing.T) {
 		// This is the shape a bare `"error"` produces. It reaches the rule without passing through
 		// the decoder above, so no fixture routed through `decode` can see it.
-		result := ruletest.RunWithOptions(t, ArrayCallbackReturn, "o.ts", `foo.forEach(x => x)`, nil)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts", `foo.forEach(x => x)`, nil)
+		rule_testing.ExpectClean(t, result)
 
-		reports := ruletest.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
+		reports := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "o.ts",
 			`foo.filter(function() { return; })`, nil)
-		ruletest.ExpectFindings(t, reports, "expectedReturnValue")
+		rule_testing.ExpectFindings(t, reports, "expectedReturnValue")
 	})
 
 	t.Run("an empty object decodes to all three defaults off", func(t *testing.T) {
@@ -371,7 +371,7 @@ func TestArrayCallbackReturnOptionsDecode(t *testing.T) {
 //
 // "Can this callback run off its end" is not syntactic, and the pair below differs only in whether
 // the `if` has an `else`. Upstream asks `isAnySegmentReachable` at the function's exit; this asks
-// `controlflow.Graph.EndReachable`, which is documented as answering that question.
+// `control_flow_graph.Graph.EndReachable`, which is documented as answering that question.
 //
 // The third case is the one a naive "does the body end with a return" test gets wrong.
 func TestArrayCallbackReturnReachability(t *testing.T) {
@@ -403,12 +403,12 @@ func TestArrayCallbackReturnReachability(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, ArrayCallbackReturn, "reach.ts", testCase.source, nil)
+			result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "reach.ts", testCase.source, nil)
 			if len(testCase.want) == 0 {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
-			ruletest.ExpectFindings(t, result, testCase.want...)
+			rule_testing.ExpectFindings(t, result, testCase.want...)
 		})
 	}
 }
@@ -484,12 +484,12 @@ func TestArrayCallbackReturnCalleeShapes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, ArrayCallbackReturn, "callee.ts", testCase.source, nil)
+			result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "callee.ts", testCase.source, nil)
 			if len(testCase.want) == 0 {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
-			ruletest.ExpectFindings(t, result, testCase.want...)
+			rule_testing.ExpectFindings(t, result, testCase.want...)
 		})
 	}
 }
@@ -529,12 +529,12 @@ func TestArrayCallbackReturnAsyncAndGenerator(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, ArrayCallbackReturn, "async.ts", testCase.source, nil)
+			result := rule_testing.RunWithOptions(t, ArrayCallbackReturn, "async.ts", testCase.source, nil)
 			if len(testCase.want) == 0 {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
-			ruletest.ExpectFindings(t, result, testCase.want...)
+			rule_testing.ExpectFindings(t, result, testCase.want...)
 		})
 	}
 }
@@ -595,7 +595,7 @@ func TestArrayCallbackReturnVoidParenthesization(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(
+			result := rule_testing.RunWithOptions(
 				t, ArrayCallbackReturn, "void.ts", testCase.source, options)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("reported %d findings, want 1", len(result.Diagnostics))

@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const debuggerFile = "/repository/source/Thing.ts"
@@ -22,7 +22,7 @@ func TestNoDebuggerFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoDebugger, debuggerFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDebugger, debuggerFile, testCase.sourceText),
 				"unexpectedDebugger")
 		})
 	}
@@ -44,7 +44,7 @@ func TestNoDebuggerStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoDebugger, debuggerFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDebugger, debuggerFile, testCase.sourceText))
 		})
 	}
 }
@@ -52,7 +52,7 @@ func TestNoDebuggerStaysSilent(t *testing.T) {
 // The fix removes the statement rather than commenting it out, because there is no form of it that
 // belongs in committed code.
 func TestNoDebuggerRemovesTheStatement(t *testing.T) {
-	result := ruletest.Run(t, NoDebugger, debuggerFile, "export function run() {\n    debugger;\n}\n")
+	result := rule_testing.Run(t, NoDebugger, debuggerFile, "export function run() {\n    debugger;\n}\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
@@ -71,5 +71,5 @@ func TestNoDebuggerRemovesTheStatement(t *testing.T) {
 	// before it. Asserted as it actually is rather than as it reads best: a fixture that states a
 	// tidier result than the engine produces is a fixture that will be "fixed" by making the engine
 	// wrong.
-	ruletest.ExpectFixedSource(t, result, "export function run() {\n    \n}\n")
+	rule_testing.ExpectFixedSource(t, result, "export function run() {\n    \n}\n")
 }

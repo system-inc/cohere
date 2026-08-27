@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // didMountFile is where the fixtures pretend to live.
@@ -155,9 +155,9 @@ func TestNoDidMountSetStateFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
 				NoDidMountSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
-			ruletest.ExpectFindings(t, result, "noDidMountSetState")
+			rule_testing.ExpectFindings(t, result, "noDidMountSetState")
 		})
 	}
 }
@@ -287,9 +287,9 @@ func TestNoDidMountSetStateStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, testCase.sourceText,
 				NoDidMountSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -576,7 +576,7 @@ class Hello extends React.Component {
 `, didMountFile, false, []string{"noDidMountSetState"}},
 
 		// The ES5 factory name set, which is NARROWER than the shelf helper this rule calls.
-		// `internal/utils/react.IsEs5ComponentCall` accepts `createClass` as well, and oxc's
+		// `internal/utilities/react.IsEs5ComponentCall` accepts `createClass` as well, and oxc's
 		// `CREATE_CLASS` at `oxc_linter/src/utils/react.rs:554` is the single constant
 		// `createReactClass`. Both of these are clean on the release binary and a port following
 		// the shelf reports on both. Nothing in the corpus writes `createClass`.
@@ -697,13 +697,13 @@ class Hello extends React.Component {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoDidMountSetState, testCase.fileName, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoDidMountSetState, testCase.fileName, testCase.sourceText,
 				NoDidMountSetStateOptions{DisallowInFunc: testCase.disallowInFunc})
 			if len(testCase.findings) == 0 {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
-			ruletest.ExpectFindings(t, result, testCase.findings...)
+			rule_testing.ExpectFindings(t, result, testCase.findings...)
 		})
 	}
 }
@@ -728,9 +728,9 @@ class Hello extends React.Component {
   }
 }
 `
-	result := ruletest.RunWithOptions(t, NoDidMountSetState, didMountFile, sourceText,
+	result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, sourceText,
 		NoDidMountSetStateOptions{})
-	ruletest.ExpectFindings(t, result, "noDidMountSetState")
+	rule_testing.ExpectFindings(t, result, "noDidMountSetState")
 
 	diagnostic := result.Diagnostics[0]
 	reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
@@ -757,9 +757,9 @@ class Hello extends React.Component {
   }
 }
 `
-	result := ruletest.RunWithOptions(t, NoDidMountSetState, didMountFile, sourceText,
+	result := rule_testing.RunWithOptions(t, NoDidMountSetState, didMountFile, sourceText,
 		NoDidMountSetStateOptions{})
-	ruletest.ExpectFindings(t, result, "noDidMountSetState")
+	rule_testing.ExpectFindings(t, result, "noDidMountSetState")
 
 	diagnostic := result.Diagnostics[0]
 	reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]

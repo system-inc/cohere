@@ -3,7 +3,7 @@ package nexus
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestConsistencyNoUtilsFolderFires(t *testing.T) {
@@ -17,8 +17,8 @@ func TestConsistencyNoUtilsFolderFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.fileName, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoUtilsFolder, testCase.fileName, "export const Value = 1;\n")
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.Run(t, ConsistencyNoUtilsFolder, testCase.fileName, "export const Value = 1;\n")
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -35,8 +35,8 @@ func TestConsistencyNoUtilsFolderStaysSilent(t *testing.T) {
 	}
 	for _, fileName := range cases {
 		t.Run(fileName, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoUtilsFolder, fileName, "export const Value = 1;\n")
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyNoUtilsFolder, fileName, "export const Value = 1;\n")
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

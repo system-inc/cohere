@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const hookDestructuringFile = "/repository/source/hooks/useThing.ts"
@@ -68,7 +68,7 @@ func TestReactHookNoDestructuringFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, ReactHookNoDestructuring, hookDestructuringFile,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactHookNoDestructuring, hookDestructuringFile,
 				hookDestructuringDeclarations+testCase.sourceText), "noDestructuringInHook")
 		})
 	}
@@ -137,7 +137,7 @@ func TestReactHookNoDestructuringStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ReactHookNoDestructuring, hookDestructuringFile,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactHookNoDestructuring, hookDestructuringFile,
 				hookDestructuringDeclarations+testCase.sourceText))
 		})
 	}

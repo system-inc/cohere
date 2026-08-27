@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // unusedLabelsFile is where the fixtures pretend to live.
@@ -60,8 +60,8 @@ func TestNoUnusedLabelsFires(t *testing.T) {
 			for index := range expected {
 				expected[index] = "unusedLabel"
 			}
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), expected...)
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), expected...)
 		})
 	}
 }
@@ -97,7 +97,7 @@ func TestNoUnusedLabelsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText))
 		})
 	}
 }
@@ -127,7 +127,7 @@ func TestNoUnusedLabelsPointsAtTheLabelOnly(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.reported), len(result.Diagnostics))
 			}
@@ -187,8 +187,8 @@ func TestNoUnusedLabelsFixRemovesTheLabel(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }
@@ -229,7 +229,7 @@ func TestNoUnusedLabelsDeclinesUnsafeFixes(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected the label to still be reported, got no findings")
 			}
@@ -280,7 +280,7 @@ func TestNoUnusedLabelsDeclinesFixesInEveryDirectivePosition(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected the label to still be reported, got no findings")
 			}
@@ -317,8 +317,8 @@ func TestNoUnusedLabelsFixesOuterLabelsOverADirective(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }
@@ -352,8 +352,8 @@ func TestNoUnusedLabelsFixesAStringOutsideDirectivePosition(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }
@@ -388,8 +388,8 @@ func TestNoUnusedLabelsFixesDespiteACommentOutsideTheSpan(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }
@@ -401,10 +401,10 @@ func TestNoUnusedLabelsFixesDespiteACommentOutsideTheSpan(t *testing.T) {
 // directive position by checking for a Program or function ancestor: a namespace body is neither,
 // so the fix applies, and the walk has to survive the extra node kind rather than assume it.
 func TestNoUnusedLabelsHandlesTypeScriptContainers(t *testing.T) {
-	result := ruletest.Run(t, NoUnusedLabels, unusedLabelsFile,
+	result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile,
 		"namespace Outer { A: { foo(); } }")
-	ruletest.ExpectFindings(t, result, "unusedLabel")
-	ruletest.ExpectFixedSource(t, result, "namespace Outer { { foo(); } }")
+	rule_testing.ExpectFindings(t, result, "unusedLabel")
+	rule_testing.ExpectFixedSource(t, result, "namespace Outer { { foo(); } }")
 }
 
 // A jump may not name a label outside the function holding it, and the rule has to agree.
@@ -448,8 +448,8 @@ func TestNoUnusedLabelsDoesNotLetAJumpEscapeItsFunction(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "unusedLabel")
+			result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "unusedLabel")
 
 			source := result.SourceFile.Text()
 			reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
@@ -467,9 +467,9 @@ func TestNoUnusedLabelsDoesNotLetAJumpEscapeItsFunction(t *testing.T) {
 // matching name rather than marking every label of that name: a rule walking the whole stack and
 // setting each match would call the outer label used and report nothing.
 func TestNoUnusedLabelsMarksOnlyTheNearestMatchingLabel(t *testing.T) {
-	result := ruletest.Run(t, NoUnusedLabels, unusedLabelsFile,
+	result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile,
 		"A: { A: { break A; } }")
-	ruletest.ExpectFindings(t, result, "unusedLabel")
+	rule_testing.ExpectFindings(t, result, "unusedLabel")
 
 	source := result.SourceFile.Text()
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
@@ -511,8 +511,8 @@ func TestNoUnusedLabelsFixesWhenThePrecedingTokenTerminates(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }

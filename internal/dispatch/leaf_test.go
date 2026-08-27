@@ -26,7 +26,7 @@ var allowedRuleImports = map[string]bool{
 // nothing, and refusing them would push legitimate dependencies into a worse shape for no measured
 // gain.
 //
-// `internal/utils/` is the shared utility layer, which is the thing rules are supposed to reach
+// `internal/utilities/` is the shared utility layer, which is the thing rules are supposed to reach
 // for. It also now holds what vendoring leaves behind: `ecmascript/` is a ported ECMAScript regex
 // parser the regex rules read patterns with, and `typecheck/` is tsgolint's type-checker helper
 // shelf. Neither is re-synced against anything, so both move when we change a shared decision
@@ -59,7 +59,7 @@ var allowedRuleImports = map[string]bool{
 // in this same file exists to prevent. Two guards of ours would have been pulling against each
 // other, and the measurement is what says which one was wrong.
 var allowedRuleImportPrefixes = []string{
-	"github.com/system-inc/verify/internal/utils/",
+	"github.com/system-inc/verify/internal/utilities/",
 }
 
 // A rule edit must not trigger a deep rebuild, and this is a build-time check rather than a review

@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // constructorReturnFile is where the fixtures pretend to live.
@@ -89,8 +89,8 @@ func TestNoConstructorReturnFires(t *testing.T) {
 			for index := range wantIds {
 				wantIds[index] = "noConstructorReturn"
 			}
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoConstructorReturn, constructorReturnFile, testCase.sourceText), wantIds...)
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoConstructorReturn, constructorReturnFile, testCase.sourceText), wantIds...)
 		})
 	}
 }
@@ -156,8 +156,8 @@ func TestNoConstructorReturnStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoConstructorReturn, constructorReturnFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoConstructorReturn, constructorReturnFile, sourceText))
 		})
 	}
 }
@@ -187,7 +187,7 @@ func TestNoConstructorReturnSpansTheWholeStatement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoConstructorReturn, constructorReturnFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoConstructorReturn, constructorReturnFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("wanted %d diagnostics, got %d",
 					len(testCase.wantSpans), len(result.Diagnostics))
@@ -209,7 +209,7 @@ func TestNoConstructorReturnSpansTheWholeStatement(t *testing.T) {
 // above passes, and an id assertion comparing against the constant the rule reports with is an
 // equality whose two sides move together under mutation. Both are typed out here.
 func TestNoConstructorReturnReportsItsOwnMessage(t *testing.T) {
-	result := ruletest.Run(t, NoConstructorReturn, constructorReturnFile,
+	result := rule_testing.Run(t, NoConstructorReturn, constructorReturnFile,
 		"class C { constructor() { return 1 } }")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted 1 diagnostic, got %d", len(result.Diagnostics))

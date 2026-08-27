@@ -6,7 +6,7 @@
 //
 // # Why not the regexsyntax bracket scanner
 //
-// `internal/utils/ecmascript/regexsyntax` has ClassEnd and SkipPatternEscape, which also walk
+// `internal/utilities/ecmascript/regexsyntax` has ClassEnd and SkipPatternEscape, which also walk
 // brackets, and they were read before this was written. They are the wrong primitives. They scan
 // JavaScript *regular-expression literal syntax*: they take RegexFlags, treat `[` as nesting only
 // under the v flag, understand `\q{...}`, and decode UTF-8 runes because a regex class can contain

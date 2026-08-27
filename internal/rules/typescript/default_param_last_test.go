@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const defaultParamLastFile = "/repository/source/Parameters.ts"
@@ -228,8 +228,8 @@ func TestDefaultParamLastFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.messageIds...)
+			result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
 		})
 	}
 }
@@ -376,8 +376,8 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -395,7 +395,7 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 // same 45 inputs, converted from line and column to byte offsets over the trimmed source. All 45
 // agreed with the corpus's own stated columns.
 //
-// ruletest.Run does not trim, so the literal here and the file on disk are the same bytes and the
+// rule_testing.Run does not trim, so the literal here and the file on disk are the same bytes and the
 // slice is not offset. The typed harness would trim; this rule needs no checker.
 func TestDefaultParamLastSpans(t *testing.T) {
 	cases := []struct {
@@ -561,7 +561,7 @@ func TestDefaultParamLastSpans(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
+			result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
@@ -583,7 +583,7 @@ func TestDefaultParamLastSpans(t *testing.T) {
 // The rule interpolates nothing, so there is no rendered text and no format string to guard; a
 // rule.Message is {Id, Description} and both halves are asserted directly.
 func TestDefaultParamLastMessageReadsAsWritten(t *testing.T) {
-	result := ruletest.Run(t, DefaultParamLast, defaultParamLastFile,
+	result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile,
 		"function foo(a = 1, b: number) {}")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))

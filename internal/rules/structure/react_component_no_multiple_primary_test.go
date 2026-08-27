@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const componentFile = "/repository/source/components/Thing.tsx"
@@ -130,8 +130,8 @@ func TestReactComponentNoMultiplePrimaryFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ReactComponentNoMultiplePrimary, componentFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.Run(t, ReactComponentNoMultiplePrimary, componentFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -264,8 +264,8 @@ func TestReactComponentNoMultiplePrimaryStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ReactComponentNoMultiplePrimary, testCase.fileName, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ReactComponentNoMultiplePrimary, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -290,7 +290,7 @@ func TestReactComponentNoMultiplePrimaryCountsCodeLinesOnly(t *testing.T) {
 		helperBody
 
 	t.Run("clean", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.Run(t, ReactComponentNoMultiplePrimary, componentFile,
+		rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoMultiplePrimary, componentFile,
 			component("Primary", 80)+documented))
 	})
 
@@ -302,7 +302,7 @@ func TestReactComponentNoMultiplePrimaryCountsCodeLinesOnly(t *testing.T) {
 			interior += "    const value" + itoa(filler) + " = properties.value;\n\n"
 		}
 		interior += "    return <span>{properties.value}</span>;\n}\n"
-		ruletest.ExpectClean(t, ruletest.Run(t, ReactComponentNoMultiplePrimary, componentFile,
+		rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoMultiplePrimary, componentFile,
 			component("Primary", 80)+interior))
 	})
 }
@@ -323,7 +323,7 @@ func TestReactComponentNoMultiplePrimaryRespectsTheDepthLimit(t *testing.T) {
 
 	// The primary is a real component, so the file has one. The buried one does not read as a
 	// component to the gate, so there is nothing to report.
-	ruletest.ExpectClean(t, ruletest.Run(t, ReactComponentNoMultiplePrimary, componentFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoMultiplePrimary, componentFile,
 		component("Primary", 80)+deeplyBuried))
 
 	// The same component with its JSX at a reachable depth does read as one, which is what proves
@@ -331,7 +331,7 @@ func TestReactComponentNoMultiplePrimaryRespectsTheDepthLimit(t *testing.T) {
 	shallow := "export function Shallow(properties: { value: number }) {\n" +
 		strings.Repeat("    const filler = properties.value;\n", 28) +
 		"    return (<span />);\n}\n"
-	ruletest.ExpectFindings(t, ruletest.Run(t, ReactComponentNoMultiplePrimary, componentFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentNoMultiplePrimary, componentFile,
 		component("Primary", 80)+shallow), "noMultiplePrimary")
 }
 
@@ -342,12 +342,12 @@ func TestReactComponentNoMultiplePrimaryOptions(t *testing.T) {
 
 	// Raising the helper ceiling above the secondary's size makes it a helper, and one large
 	// component with one helper is a quiet file.
-	relaxed := ruletest.RunWithOptions(t, ReactComponentNoMultiplePrimary, componentFile, source,
+	relaxed := rule_testing.RunWithOptions(t, ReactComponentNoMultiplePrimary, componentFile, source,
 		ReactComponentNoMultiplePrimaryOptions{MaximumComponentLines: 60, MaximumHelperLines: 40})
-	ruletest.ExpectClean(t, relaxed)
+	rule_testing.ExpectClean(t, relaxed)
 
 	// Lowering the component ceiling makes both components large, which is still two primaries.
-	strict := ruletest.RunWithOptions(t, ReactComponentNoMultiplePrimary, componentFile, source,
+	strict := rule_testing.RunWithOptions(t, ReactComponentNoMultiplePrimary, componentFile, source,
 		ReactComponentNoMultiplePrimaryOptions{MaximumComponentLines: 10, MaximumHelperLines: 5})
-	ruletest.ExpectFindings(t, strict, "noMultiplePrimary")
+	rule_testing.ExpectFindings(t, strict, "noMultiplePrimary")
 }

@@ -9,7 +9,7 @@ import (
 
 // formatScript calls into the loaded bundles.
 //
-// The options mirror the ahra Prettier config. They are passed explicitly rather than resolved from
+// The options mirror the ahra Prettier configuration. They are passed explicitly rather than resolved from
 // a .prettierrc because resolution is Node's job and this runtime has no filesystem: the config is
 // the caller's to supply, and hardcoding it here would silently ignore a project that configured
 // something else.

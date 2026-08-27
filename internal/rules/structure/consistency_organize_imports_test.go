@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The corpus is written rather than imported, because this is a house rule and no oxc
@@ -12,7 +12,7 @@ import (
 // a belief about one. A rule with no imported floor is a weaker artifact than a ported one and
 // the next reader should know which kind this is.
 //
-// The probe that produced these needed `files: ['**/*.ts', '**/*.tsx']` in its flat config. Without
+// The probe that produced these needed `files: ['**/*.ts', '**/*.tsx']` in its flat configuration. Without
 // it ESLint matches no configuration for a TypeScript file and reports nothing, and the first run
 // of 400 real files came back clean for exactly that reason. The control that caught it was the
 // tree's own fixture, which is a known violation and must report.
@@ -93,8 +93,8 @@ func TestConsistencyOrganizeImportsFires(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyOrganizeImports, "/repository/app/Thing.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, "importsNotOrganized")
+			result := rule_testing.Run(t, ConsistencyOrganizeImports, "/repository/app/Thing.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, "importsNotOrganized")
 
 			span := result.Diagnostics[0].Range
 			got := testCase.source[span.Pos():span.End()]
@@ -194,8 +194,8 @@ func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
 			if fileName == "" {
 				fileName = "/repository/app/Thing.tsx"
 			}
-			result := ruletest.Run(t, ConsistencyOrganizeImports, fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyOrganizeImports, fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -219,8 +219,8 @@ func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
 // Each case below was run against the original for comparison, and the divergences are the point.
 func TestConsistencyOrganizeImportsFixesTheSection(t *testing.T) {
 	// The ordinary case, which is every one of the 109 files this landed for.
-	ruletest.ExpectFixedSource(t,
-		ruletest.Run(t, ConsistencyOrganizeImports, "Component.tsx",
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.Run(t, ConsistencyOrganizeImports, "Component.tsx",
 			"import alpha from 'alpha';\nimport React from 'react';\n"),
 		"// Dependencies - Frameworks\nimport React from 'react';\n\n// Dependencies - Third-party\nimport alpha from 'alpha';\n")
 
@@ -229,14 +229,14 @@ func TestConsistencyOrganizeImportsFixesTheSection(t *testing.T) {
 	 * import sorts next, because a trailing comment is syntactically the leading trivia of the
 	 * following statement, so the note ends up describing a module it was never about.
 	 */
-	ruletest.ExpectFixedSource(t,
-		ruletest.Run(t, ConsistencyOrganizeImports, "Component.tsx",
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.Run(t, ConsistencyOrganizeImports, "Component.tsx",
 			"import zebra from 'zebra'; // note about zebra\nimport React from 'react';\n"),
 		"// Dependencies - Frameworks\nimport React from 'react';\n\n// Dependencies - Third-party\nimport zebra from 'zebra'; // note about zebra\n")
 
 	// A comment above a non-first import travels with it and keeps suppressing what it suppressed.
-	ruletest.ExpectFixedSource(t,
-		ruletest.Run(t, ConsistencyOrganizeImports, "Component.tsx",
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.Run(t, ConsistencyOrganizeImports, "Component.tsx",
 			"import React from 'react';\n// eslint-disable-next-line no-explicit-any\nimport alpha from 'alpha';\n"),
 		"// Dependencies - Frameworks\nimport React from 'react';\n\n// Dependencies - Third-party\n// eslint-disable-next-line no-explicit-any\nimport alpha from 'alpha';\n")
 }
@@ -253,9 +253,9 @@ func TestConsistencyOrganizeImportsDeclinesToFixWhatItCannotMove(t *testing.T) {
 	 * correct alternative: the canonical form has no place to put a statement mid-section when the
 	 * imports around it are being reordered.
 	 */
-	interleaved := ruletest.Run(t, ConsistencyOrganizeImports, "Component.tsx",
+	interleaved := rule_testing.Run(t, ConsistencyOrganizeImports, "Component.tsx",
 		"import alpha from 'alpha';\nconsole.info('between');\nimport React from 'react';\n")
-	ruletest.ExpectFindings(t, interleaved, "importsNotOrganized")
+	rule_testing.ExpectFindings(t, interleaved, "importsNotOrganized")
 	if len(interleaved.Diagnostics) > 0 && len(interleaved.Diagnostics[0].Fixes) > 0 {
 		t.Error("a file with an interleaved statement must not be fixed")
 	}
@@ -266,9 +266,9 @@ func TestConsistencyOrganizeImportsDeclinesToFixWhatItCannotMove(t *testing.T) {
 	 * written for. The original deletes it outright, which is worse and is the defect this refusal
 	 * exists to avoid inheriting.
 	 */
-	suppressed := ruletest.Run(t, ConsistencyOrganizeImports, "Component.tsx",
+	suppressed := rule_testing.Run(t, ConsistencyOrganizeImports, "Component.tsx",
 		"// eslint-disable-next-line no-explicit-any\nimport alpha from 'alpha';\nimport React from 'react';\n")
-	ruletest.ExpectFindings(t, suppressed, "importsNotOrganized")
+	rule_testing.ExpectFindings(t, suppressed, "importsNotOrganized")
 	if len(suppressed.Diagnostics) > 0 && len(suppressed.Diagnostics[0].Fixes) > 0 {
 		t.Error("a file whose suppression precedes the section must not be fixed")
 	}

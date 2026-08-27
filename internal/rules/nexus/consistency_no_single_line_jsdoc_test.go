@@ -3,7 +3,7 @@ package nexus
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const jsDocFile = "/repository/source/Thing.ts"
@@ -26,8 +26,8 @@ func TestConsistencyNoSingleLineJsDocFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "useSimpleComment")
+			result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "useSimpleComment")
 		})
 	}
 }
@@ -57,8 +57,8 @@ func TestConsistencyNoSingleLineJsDocStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -66,8 +66,8 @@ func TestConsistencyNoSingleLineJsDocStaysSilent(t *testing.T) {
 // TestConsistencyNoSingleLineJsDocFixes pins the fix text, because a fix that lands wrong is worse
 // than no fix: the finding disappears and the damage is committed.
 func TestConsistencyNoSingleLineJsDocFixes(t *testing.T) {
-	result := ruletest.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, "/** Does the thing. */\nexport const value = 1;\n")
-	ruletest.ExpectFindings(t, result, "useSimpleComment")
+	result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, "/** Does the thing. */\nexport const value = 1;\n")
+	rule_testing.ExpectFindings(t, result, "useSimpleComment")
 
 	fixes := result.Diagnostics[0].Fixes
 	if len(fixes) != 1 {
@@ -93,8 +93,8 @@ func TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "useSimpleComment")
+			result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "useSimpleComment")
 			if len(result.Diagnostics[0].Fixes) != 0 {
 				t.Fatalf("expected no fix, got %d", len(result.Diagnostics[0].Fixes))
 			}

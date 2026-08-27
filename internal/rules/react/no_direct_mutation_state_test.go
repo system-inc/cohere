@@ -3,7 +3,7 @@ package react
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // directMutationStateFile is where the fixtures pretend to live.
@@ -182,13 +182,13 @@ func TestNoDirectMutationStateFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDirectMutationState, directMutationStateFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
 			for index := range wantIds {
 				wantIds[index] = "noDirectMutationState"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
 				if index >= len(result.Diagnostics) {
@@ -286,8 +286,8 @@ func TestNoDirectMutationStateStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoDirectMutationState, directMutationStateFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, testCase.sourceText))
 		})
 	}
 }
@@ -477,17 +477,17 @@ class Outer extends React.Component {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDirectMutationState, directMutationStateFile, testCase.source)
+			result := rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, testCase.source)
 
 			if len(testCase.wantSpans) == 0 {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
 			wantIds := make([]string, len(testCase.wantSpans))
 			for index := range wantIds {
 				wantIds[index] = "noDirectMutationState"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
 				if index >= len(result.Diagnostics) {
@@ -513,13 +513,13 @@ func TestNoDirectMutationStateDeclinesNonJsxFiles(t *testing.T) {
 class A extends React.Component {
   m() { this.state.x = 1; }
 }`
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoDirectMutationState, "/repository/source/Plain.ts", source))
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoDirectMutationState, "/repository/source/Plain.ts", source))
 
 	// The control: the identical source in a JSX file does report, so the silence above is the
 	// suffix and not the source.
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoDirectMutationState, directMutationStateFile, source), "noDirectMutationState")
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, source), "noDirectMutationState")
 }
 
 // TestNoDirectMutationStateMessage asserts the rendered message exactly.
@@ -528,7 +528,7 @@ class A extends React.Component {
 // is not a guard: a description carrying a doubled word or a stray interpolation would satisfy a
 // substring check while being wrong on screen.
 func TestNoDirectMutationStateMessage(t *testing.T) {
-	result := ruletest.Run(t, NoDirectMutationState, directMutationStateFile, `
+	result := rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, `
 class A extends React.Component {
   m() { this.state.x = 1; }
 }`)

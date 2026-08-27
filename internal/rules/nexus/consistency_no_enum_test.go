@@ -3,7 +3,7 @@ package nexus
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestConsistencyNoEnumFires(t *testing.T) {
@@ -16,8 +16,8 @@ func TestConsistencyNoEnumFires(t *testing.T) {
 	}
 	for name, source := range cases {
 		t.Run(name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoEnum, "probe.ts", source)
-			ruletest.ExpectFindings(t, result, "noEnum")
+			result := rule_testing.Run(t, ConsistencyNoEnum, "probe.ts", source)
+			rule_testing.ExpectFindings(t, result, "noEnum")
 		})
 	}
 }
@@ -33,8 +33,8 @@ func TestConsistencyNoEnumStaysSilent(t *testing.T) {
 	}
 	for name, source := range cases {
 		t.Run(name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoEnum, "probe.ts", source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyNoEnum, "probe.ts", source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

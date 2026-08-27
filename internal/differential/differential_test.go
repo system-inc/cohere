@@ -317,7 +317,7 @@ func TestUnknownConfigurationDoesNotExcuseEveryRule(t *testing.T) {
 		VerifyPopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 22},
 		GatePopulation:   Population{FilesWalked: 3407},
 		VerifyRules:      map[string]bool{"consistency-no-enum": true},
-		// ConfiguredRules deliberately nil: the caller did not read the config.
+		// ConfiguredRules deliberately nil: the caller did not read the configuration.
 	})
 
 	if len(report.Differences) != 1 {
@@ -377,7 +377,7 @@ func TestAPluginPrefixedConfigKeyKeepsTheRuleName(t *testing.T) {
 	}
 }
 
-// The verdict must state its own scope when it covers less than the config.
+// The verdict must state its own scope when it covers less than the configuration.
 //
 // A comparison can only speak about rules verify implements. The rest of the config is enabled in
 // the gate, unported, and never compared, so a bare "agrees" reads as broader than the test. On

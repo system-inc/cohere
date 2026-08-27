@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // This rule has no upstream corpus on either side. It is a house rule Kirk asked for directly, so
@@ -17,7 +17,7 @@ import (
 //
 // # How both a resolvable and an unresolvable React live in one harness
 //
-// `ruletest`'s tsconfig sets `types: []` and points at a fresh temp directory, so `@types/react`
+// `rule_testing`'s tsconfig sets `types: []` and points at a fresh temp directory, so `@types/react`
 // can never resolve in a fixture and there is no `node_modules` to reach. The passing case
 // therefore supplies its own React through a sibling declaration file using `declare module
 // 'react'`, which is a global augmentation the program picks up from any file in the include set;
@@ -45,18 +45,18 @@ const reactHookAnyTypeReactDeclarations = `declare module 'react' {
 }`
 
 // runReactHookAnyTypeWithReact runs a fixture with React's declarations resolvable.
-func runReactHookAnyTypeWithReact(t *testing.T, source string) ruletest.Result {
+func runReactHookAnyTypeWithReact(t *testing.T, source string) rule_testing.Result {
 	t.Helper()
-	return ruletest.RunTypedFiles(t, ReactHookAnyType, map[string]string{
+	return rule_testing.RunTypedFiles(t, ReactHookAnyType, map[string]string{
 		"react.d.ts":  reactHookAnyTypeReactDeclarations,
 		"fixture.tsx": source,
 	}, "fixture.tsx")
 }
 
 // runReactHookAnyTypeWithoutReact runs a fixture with nothing declaring React at all.
-func runReactHookAnyTypeWithoutReact(t *testing.T, source string) ruletest.Result {
+func runReactHookAnyTypeWithoutReact(t *testing.T, source string) rule_testing.Result {
 	t.Helper()
-	return ruletest.RunTypedFiles(t, ReactHookAnyType, map[string]string{
+	return rule_testing.RunTypedFiles(t, ReactHookAnyType, map[string]string{
 		"fixture.tsx": source,
 	}, "fixture.tsx")
 }
@@ -159,13 +159,13 @@ export function Widget() {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			var result ruletest.Result
+			var result rule_testing.Result
 			if testCase.withReact {
 				result = runReactHookAnyTypeWithReact(t, testCase.source)
 			} else {
 				result = runReactHookAnyTypeWithoutReact(t, testCase.source)
 			}
-			ruletest.ExpectFindings(t, result, testCase.want...)
+			rule_testing.ExpectFindings(t, result, testCase.want...)
 		})
 	}
 }
@@ -311,13 +311,13 @@ export function Widget() {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			var result ruletest.Result
+			var result rule_testing.Result
 			if testCase.withReact {
 				result = runReactHookAnyTypeWithReact(t, testCase.source)
 			} else {
 				result = runReactHookAnyTypeWithoutReact(t, testCase.source)
 			}
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -331,7 +331,7 @@ export function Widget() {
 //
 // The source is sliced with the finding's own range rather than compared against a literal offset,
 // and the source is taken from the same constant the harness was handed. That matters here:
-// `ruletest.RunTypedFiles` writes `strings.TrimSpace(contents)+"\n"`, so a fixture with leading
+// `rule_testing.RunTypedFiles` writes `strings.TrimSpace(contents)+"\n"`, so a fixture with leading
 // whitespace sits one byte off its Go literal and a hand-computed offset reports the wrong text.
 // Trimming the same way is what keeps the two aligned.
 func TestReactHookAnyTypeSpan(t *testing.T) {
@@ -534,7 +534,7 @@ export function Widget() {
 	}
 
 	// The untyped harness hands the rule a nil checker, which it must decline rather than crash on.
-	untyped := ruletest.Run(t, ReactHookAnyType, "fixture.tsx", source)
+	untyped := rule_testing.Run(t, ReactHookAnyType, "fixture.tsx", source)
 	if len(untyped.Diagnostics) != 0 {
 		t.Errorf("the untyped harness produced %d findings, want 0; this rule cannot answer without "+
 			"a checker and must decline rather than guess", len(untyped.Diagnostics))
@@ -670,7 +670,7 @@ func TestReactHookAnyTypeFlagReadAgreesWithTheCheckersOwnName(t *testing.T) {
 export function Widget() {
     return useSubject();
 }`
-			ruletest.RunTypedFiles(t, probe, map[string]string{"fixture.tsx": source}, "fixture.tsx")
+			rule_testing.RunTypedFiles(t, probe, map[string]string{"fixture.tsx": source}, "fixture.tsx")
 
 			if visited != 1 {
 				// A measurement that visited nothing reads exactly like agreement, which is the

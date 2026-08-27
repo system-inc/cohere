@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const separateExportFile = "/repository/source/components/Button.tsx"
@@ -41,7 +41,7 @@ func TestReactComponentNoSeparateNamedExportFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, ReactComponentNoSeparateNamedExport,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentNoSeparateNamedExport,
 				separateExportFile, testCase.sourceText), "noSeparateNamedExport")
 		})
 	}
@@ -159,7 +159,7 @@ func TestReactComponentNoSeparateNamedExportStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ReactComponentNoSeparateNamedExport,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoSeparateNamedExport,
 				testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -181,15 +181,15 @@ func TestReactComponentNoSeparateNamedExportStaysSilent(t *testing.T) {
 // have agreed with me.
 func TestReactComponentNoSeparateNamedExportFixDeletesTheStatement(t *testing.T) {
 	source := "function Button() {\n    return <button />;\n}\nexport { Button };\n"
-	ruletest.ExpectFixedSource(t,
-		ruletest.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, source),
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, source),
 		"function Button() {\n    return <button />;\n}\n\n")
 
 	// A list holding several names goes as one statement, which is what makes the single report
 	// per statement the right shape.
 	multiple := "function Button() {\n    return <button />;\n}\nfunction Panel() {\n    return <div />;\n}\n" +
 		"export { Button, Panel };\n"
-	ruletest.ExpectFixedSource(t,
-		ruletest.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, multiple),
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, multiple),
 		"function Button() {\n    return <button />;\n}\nfunction Panel() {\n    return <div />;\n}\n\n")
 }

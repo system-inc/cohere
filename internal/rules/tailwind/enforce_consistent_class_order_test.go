@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Expectations measured by diffing the rule against the engine's own sort over the whole corpus,
@@ -16,13 +16,13 @@ import (
 // # Why every fixture here runs through a program
 //
 // The rule reads the live design system, so it declares `ReadsProgram` and takes `ctx.Program` to
-// find the repository's stylesheet. `ruletest.Run` hands a rule a nil Program, and the rule's own
+// find the repository's stylesheet. `rule_testing.Run` hands a rule a nil Program, and the rule's own
 // decline path returns nil listeners for that case rather than reporting. So every fixture in this
-// file that used `ruletest.Run` after the swap would have exercised the nil-Program branch: the
+// file that used `rule_testing.Run` after the swap would have exercised the nil-Program branch: the
 // reporting half would have failed loudly, and the whole silent half would have passed while
 // proving nothing at all.
 //
-// That is the vacuous-probe shape `ruletest.RunTyped`'s own comment describes one level up, and it
+// That is the vacuous-probe shape `rule_testing.RunTyped`'s own comment describes one level up, and it
 // is worth naming because it is the failure that hides: a suite going green on a rule that never
 // ran. So the fixtures run through `RunTypedFiles`, which writes a real tsconfig and a real
 // stylesheet into a temp directory, and the rule finds that stylesheet through the same entry-point
@@ -104,8 +104,8 @@ const classOrderFixtureSearchRoot = "/Users/kirkouimet/Projects/ahra/app/_theme/
 // nothing on the silent half.
 //
 // The symlink is planted before the program is built, into the same temp directory
-// `ruletest.RunTypedFiles` writes the fixture files to, so the rule's own upward walk finds it.
-func runClassOrderFixture(t *testing.T, fileName string, source string) ruletest.Result {
+// `rule_testing.RunTypedFiles` writes the fixture files to, so the rule's own upward walk finds it.
+func runClassOrderFixture(t *testing.T, fileName string, source string) rule_testing.Result {
 	t.Helper()
 
 	packageRoot := classOrderFixturePackageRoot()
@@ -114,7 +114,7 @@ func runClassOrderFixture(t *testing.T, fileName string, source string) ruletest
 			"built and these fixtures would measure a decline rather than an order")
 	}
 
-	return ruletest.RunTypedFilesWithSetup(t, EnforceConsistentClassOrder, map[string]string{
+	return rule_testing.RunTypedFilesWithSetup(t, EnforceConsistentClassOrder, map[string]string{
 		fileName:                        source,
 		classOrderFixtureStylesheetPath: classOrderFixtureStylesheet,
 	}, fileName, func(root string) {
@@ -189,7 +189,7 @@ func TestEnforceConsistentClassOrderReportsMisordering(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runClassOrderFixture(t, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -290,7 +290,7 @@ func TestEnforceConsistentClassOrderStaysSilent(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runClassOrderFixture(t, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -665,5 +665,5 @@ func TestClassOrderFixturesActuallyRan(t *testing.T) {
 	// silent half pass while the reporting half failed.
 	result := runClassOrderFixture(t, "Component.tsx",
 		`const element = <div className="items-center flex" />;`)
-	ruletest.ExpectFindings(t, result, "inconsistentClassOrder")
+	rule_testing.ExpectFindings(t, result, "inconsistentClassOrder")
 }

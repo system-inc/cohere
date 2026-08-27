@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/module"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
 )
 
 // ConsistencyRequireConstantCasingOptions names exported constants a framework or library reads

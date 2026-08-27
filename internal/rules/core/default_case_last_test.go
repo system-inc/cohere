@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // defaultCaseLastFile is where the fixtures pretend to live.
@@ -50,8 +50,8 @@ func TestDefaultCaseLastStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText))
 		})
 	}
 }
@@ -79,8 +79,8 @@ func TestDefaultCaseLastFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText), "notLast")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText), "notLast")
 		})
 	}
 }
@@ -109,7 +109,7 @@ func TestDefaultCaseLastReportsTheDefaultClause(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText)
+			result := rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -132,6 +132,6 @@ func TestDefaultCaseLastReportsTheDefaultClause(t *testing.T) {
 // port looping over every clause without returning reports twice. The imported corpus cannot see
 // this because upstream never wrote it.
 func TestDefaultCaseLastReportsOnceForTwoDefaults(t *testing.T) {
-	ruletest.ExpectFindings(t, ruletest.Run(t, DefaultCaseLast, defaultCaseLastFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile,
 		"switch (foo) { default: break; default: break; case 1: break; }"), "notLast")
 }

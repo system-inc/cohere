@@ -3,7 +3,7 @@ package react
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // isMountedFile is where the fixtures pretend to live.
@@ -68,8 +68,8 @@ func TestNoIsMountedFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoIsMounted, isMountedFile, testCase.sourceText), "noIsMounted")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoIsMounted, isMountedFile, testCase.sourceText), "noIsMounted")
 		})
 	}
 }
@@ -113,7 +113,7 @@ func TestNoIsMountedStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoIsMounted, isMountedFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoIsMounted, isMountedFile, testCase.sourceText))
 		})
 	}
 }
@@ -174,8 +174,8 @@ func TestNoIsMountedFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoIsMounted, isMountedFile, testCase.sourceText), "noIsMounted")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoIsMounted, isMountedFile, testCase.sourceText), "noIsMounted")
 		})
 	}
 }
@@ -242,7 +242,7 @@ func TestNoIsMountedStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoIsMounted, isMountedFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoIsMounted, isMountedFile, testCase.sourceText))
 		})
 	}
 }
@@ -268,8 +268,8 @@ func TestNoIsMountedReportsTheWholeCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoIsMounted, isMountedFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "noIsMounted")
+			result := rule_testing.Run(t, NoIsMounted, isMountedFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "noIsMounted")
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -290,8 +290,8 @@ func TestNoIsMountedReportsEachCallSeparately(t *testing.T) {
                 b() { this.isMounted(); }
             }`
 
-	result := ruletest.Run(t, NoIsMounted, isMountedFile, sourceText)
-	ruletest.ExpectFindings(t, result, "noIsMounted", "noIsMounted")
+	result := rule_testing.Run(t, NoIsMounted, isMountedFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "noIsMounted", "noIsMounted")
 	for index, diagnostic := range result.Diagnostics {
 		reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != "this.isMounted()" {
@@ -303,7 +303,7 @@ func TestNoIsMountedReportsEachCallSeparately(t *testing.T) {
 // The rendered message is asserted exactly rather than by substring, because a fixture whose
 // predicate is weaker than the property it guards is not a guard.
 func TestNoIsMountedMessageText(t *testing.T) {
-	result := ruletest.Run(t, NoIsMounted, isMountedFile, "class W { m() { this.isMounted(); } }")
+	result := rule_testing.Run(t, NoIsMounted, isMountedFile, "class W { m() { this.isMounted(); } }")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}

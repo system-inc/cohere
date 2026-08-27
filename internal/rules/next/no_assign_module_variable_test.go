@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const assignModuleFile = "/repository/source/Thing.ts"
@@ -26,7 +26,7 @@ func TestNoAssignModuleVariableFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoAssignModuleVariable, assignModuleFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoAssignModuleVariable, assignModuleFile, testCase.sourceText),
 				"noAssignModuleVariable")
 		})
 	}
@@ -52,7 +52,7 @@ func TestNoAssignModuleVariableStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoAssignModuleVariable, assignModuleFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoAssignModuleVariable, assignModuleFile, testCase.sourceText))
 		})
 	}
 }

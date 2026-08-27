@@ -6,7 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 // RestrictPlusOperandsOptions is the rule's option surface, matching upstream's schema exactly.
@@ -207,7 +207,7 @@ var RestrictPlusOperands = rule.Rule{
 		typeOf := func(node *ast.Node) *checker.Type {
 			return checker.Checker_getBaseTypeOfLiteralType(
 				ctx.TypeChecker,
-				typecheck.GetConstrainedTypeAtLocation(ctx.TypeChecker, node),
+				type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, node),
 			)
 		}
 
@@ -220,7 +220,7 @@ var RestrictPlusOperands = rule.Rule{
 
 			// Both sides the same primitive is the overwhelmingly common case and the only one that
 			// needs no further thought.
-			if leftType == rightType && typecheck.IsTypeFlagSet(leftType,
+			if leftType == rightType && type_checking.IsTypeFlagSet(leftType,
 				checker.TypeFlagsBigIntLike|checker.TypeFlagsNumberLike|checker.TypeFlagsStringLike) {
 				return
 			}
@@ -255,7 +255,7 @@ var RestrictPlusOperands = rule.Rule{
 
 				// A RegExp carries the object flag as well as its name, so it has to be named before
 				// the generic object test below would swallow it.
-				for _, subBaseType := range typecheck.UnionTypeParts(side.baseType) {
+				for _, subBaseType := range type_checking.UnionTypeParts(side.baseType) {
 					var reportThisPart bool
 					if ctx.TypeChecker.TypeToString(subBaseType) == "RegExp" {
 						// Reported when RegExps are forbidden, and ALSO when they are allowed but
@@ -263,7 +263,7 @@ var RestrictPlusOperands = rule.Rule{
 						reportThisPart = !settings.allowRegExp ||
 							restrictPlusOperandsIsTypeFlagSetInUnion(side.otherType, checker.TypeFlagsNumberLike)
 					} else {
-						reportThisPart = (!settings.allowAny && typecheck.IsTypeAnyType(subBaseType)) ||
+						reportThisPart = (!settings.allowAny && type_checking.IsTypeAnyType(subBaseType)) ||
 							restrictPlusOperandsIsDeeplyObjectType(subBaseType)
 					}
 
@@ -376,7 +376,7 @@ func restrictPlusOperandsStringLike(settings restrictPlusOperandsSettings) strin
 
 // restrictPlusOperandsIsTypeFlagSetInUnion asks whether ANY member of a union carries a flag.
 //
-// Distinct from typecheck.IsTypeFlagSet, which asks the type itself. `string | null` is the input
+// Distinct from type_checking.IsTypeFlagSet, which asks the type itself. `string | null` is the input
 // that separates them: it has a `null` MEMBER while the union type itself carries neither the null
 // flag nor the undefined one, so this answers true and the plain test answers false.
 //
@@ -384,8 +384,8 @@ func restrictPlusOperandsStringLike(settings restrictPlusOperandsSettings) strin
 // upstream spells with an `isTypeFlagSet` imported from its `../util`, because that import is
 // union-aware too. See the note on the rule about why the source reads as though it is not.
 func restrictPlusOperandsIsTypeFlagSetInUnion(t *checker.Type, flags checker.TypeFlags) bool {
-	for _, part := range typecheck.UnionTypeParts(t) {
-		if typecheck.IsTypeFlagSet(part, flags) {
+	for _, part := range type_checking.UnionTypeParts(t) {
+		if type_checking.IsTypeFlagSet(part, flags) {
 			return true
 		}
 	}
@@ -398,15 +398,15 @@ func restrictPlusOperandsIsTypeFlagSetInUnion(t *checker.Type, flags checker.Typ
 // own spelling. The distinction matters because `string & {}` is an intersection whose members are
 // NOT all objects, so it is not reported, while `{} & {}` is.
 func restrictPlusOperandsIsDeeplyObjectType(t *checker.Type) bool {
-	parts := typecheck.UnionTypeParts(t)
-	if typecheck.IsIntersectionType(t) {
-		parts = typecheck.IntersectionTypeParts(t)
+	parts := type_checking.UnionTypeParts(t)
+	if type_checking.IsIntersectionType(t) {
+		parts = type_checking.IntersectionTypeParts(t)
 	}
 	if len(parts) == 0 {
 		return false
 	}
 	for _, part := range parts {
-		if !typecheck.IsObjectType(part) {
+		if !type_checking.IsObjectType(part) {
 			return false
 		}
 	}

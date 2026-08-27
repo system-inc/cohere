@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // redeclareFile is where the fixtures pretend to live.
@@ -81,8 +81,8 @@ func TestNoRedeclareFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options)
-			ruletest.ExpectFindings(t, result, testCase.messageIds...)
+			result := rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
 		})
 	}
 }
@@ -114,8 +114,8 @@ func TestNoRedeclareStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -137,18 +137,18 @@ func TestNoRedeclareStaysSilent(t *testing.T) {
 func TestNoRedeclareBuiltinGlobalsIsOutOfScope(t *testing.T) {
 	// Upstream reports this in script mode with `builtinGlobals: true`, and is clean on it in module
 	// mode with the same option. We are silent on both, having no such option.
-	ruletest.ExpectClean(t,
-		ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "var Object = 0;", nil))
+	rule_testing.ExpectClean(t,
+		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "var Object = 0;", nil))
 
 	// Upstream reports this against a name a comment directive introduced. We have no
 	// directive-globals surface, so it is silent for the same reason.
-	ruletest.ExpectClean(t,
-		ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "/*global b:false*/ var b = 1;", nil))
+	rule_testing.ExpectClean(t,
+		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "/*global b:false*/ var b = 1;", nil))
 
 	// The control for both, and the reason the two silences above are a scoped decline rather than a
 	// dead rule: an ordinary redeclaration in the same file shape still reports.
-	ruletest.ExpectFindings(t,
-		ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "var b = 1; var b = 2;", nil),
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "var b = 1; var b = 2;", nil),
 		"redeclared")
 }
 
@@ -160,13 +160,13 @@ func TestNoRedeclareBuiltinGlobalsIsOutOfScope(t *testing.T) {
 // vacuously while every Fires case failed in a way that reads like a rule defect.
 func TestNoRedeclareRequiresTheTypedHarness(t *testing.T) {
 	// The typed harness reports.
-	ruletest.ExpectFindings(t,
-		ruletest.RunTyped(t, NoRedeclare, redeclareFile, "var a = 1; var a = 2;"), "redeclared")
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTyped(t, NoRedeclare, redeclareFile, "var a = 1; var a = 2;"), "redeclared")
 
 	// The plain one hands the rule no checker, so it declines. Silence here is the correct answer
 	// and not a finding this rule missed.
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoRedeclare, redeclareFile, "var a = 1; var a = 2;"))
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoRedeclare, redeclareFile, "var a = 1; var a = 2;"))
 }
 
 // TestNoRedeclareDefaultsToIgnoringDeclarationMerge is the decoder test, and it exists because this
@@ -195,10 +195,10 @@ func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(t *testing.T) {
 
 	// And the same distinction reaching the rule, since the two lines above only prove the decoder
 	// parses. A bare "error" configuration is nil options, and the merge must stay exempt there.
-	ruletest.ExpectClean(t,
-		ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}", nil))
-	ruletest.ExpectFindings(t,
-		ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}", redeclareOptions(false)),
+	rule_testing.ExpectClean(t,
+		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}", nil))
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}", redeclareOptions(false)),
 		"redeclared")
 }
 
@@ -235,7 +235,7 @@ func TestNoRedeclareSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
@@ -256,7 +256,7 @@ func TestNoRedeclareSpans(t *testing.T) {
 // constant. Comparing to the constant would look correct and would move with any mutation of it,
 // which is how a message-text mutant survives a test written the obvious way.
 func TestNoRedeclareMessage(t *testing.T) {
-	result := ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "var a = 3;\nvar a = 10;", nil)
+	result := rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "var a = 3;\nvar a = 10;", nil)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
@@ -285,15 +285,15 @@ func TestNoRedeclareMergeSetsSubsumeTheAllOneKindCases(t *testing.T) {
 		"interface A {}\nnamespace A {}",
 		"namespace A {}\ninterface A {}\nnamespace A {}",
 	} {
-		ruletest.ExpectClean(t,
-			ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile, sourceText, nil))
+		rule_testing.ExpectClean(t,
+			rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, sourceText, nil))
 	}
 
 	// The control, and the reason the four silences above are the sets working rather than the rule
 	// being inert on these kinds: add a second CLASS and the class set's primary count passes one,
 	// so the exemption lapses and exactly the extra class reports.
-	ruletest.ExpectFindings(t,
-		ruletest.RunTypedWithOptions(t, NoRedeclare, redeclareFile,
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile,
 			"interface A {}\nclass A {}\nclass A {}\nnamespace A {}", nil),
 		"redeclared")
 }

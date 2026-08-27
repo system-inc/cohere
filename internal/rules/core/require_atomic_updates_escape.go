@@ -3,7 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/controlflow"
+	"github.com/system-inc/verify/internal/utilities/control_flow_graph"
 )
 
 // deferredAtomicEvent is one event waiting to be placed, carrying the construct it belongs to and
@@ -60,7 +60,7 @@ type deferredAtomicEvent struct {
 // reads inside its own operand.
 func placeDeferredEvents(
 	ctx rule.Context,
-	graph *controlflow.Graph[atomicEvent],
+	graph *control_flow_graph.Graph[atomicEvent],
 	escapes map[*ast.Symbol]bool,
 	root *ast.Node,
 ) {
@@ -274,7 +274,7 @@ func propertyAssignmentHeadedBy(identifier *ast.Node) (*ast.Node, bool) {
 // have. The equivalent question over the checker is asked from the declaration side instead: a
 // binding whose declaration sits outside this root is reachable from outside it, and a binding
 // declared inside is reachable from outside only if some occurrence of it lives in a nested root.
-// Both are computed from `controlflow.RootOf`, which is the same boundary the graph itself uses, so
+// Both are computed from `control_flow_graph.RootOf`, which is the same boundary the graph itself uses, so
 // the answer cannot disagree with the graph about what "this function" means.
 func escapesEnclosingFunction(
 	ctx rule.Context,
@@ -332,7 +332,7 @@ func computeEscape(ctx rule.Context, symbol *ast.Symbol, root *ast.Node) bool {
 		if declaration == nil {
 			continue
 		}
-		if controlflow.RootOf(declaration) == root {
+		if control_flow_graph.RootOf(declaration) == root {
 			declaredInside = true
 			break
 		}
@@ -374,7 +374,7 @@ func symbolIsReadFromNestedRoot(ctx rule.Context, symbol *ast.Symbol, root *ast.
 			return false
 		}
 		if node.Kind == ast.KindIdentifier && node.Text() == name {
-			if !isNonReferenceIdentifier(node) && controlflow.RootOf(node) != root {
+			if !isNonReferenceIdentifier(node) && control_flow_graph.RootOf(node) != root {
 				if resolveOccurrence(ctx, node) == symbol {
 					captured = true
 					return true

@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const forDirectionFile = "/repository/source/Loop.ts"
@@ -46,7 +46,7 @@ func TestForDirectionFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, ForDirection, forDirectionFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile, testCase.sourceText),
 				"incorrectDirection")
 		})
 	}
@@ -103,7 +103,7 @@ func TestForDirectionStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ForDirection, forDirectionFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ForDirection, forDirectionFile, testCase.sourceText))
 		})
 	}
 }
@@ -131,24 +131,24 @@ func TestForDirectionStaysSilent(t *testing.T) {
 func TestForDirectionReportsOncePerLoop(t *testing.T) {
 	// The same counter on both sides. Qualifies on the left only, since the wrong direction
 	// differs by side and one update cannot be both.
-	ruletest.ExpectFindings(t, ruletest.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
 		"export function run() { for(let i = 0; i < i; i--) {} }\n"), "incorrectDirection")
 
 	// Different counters, one modified. Qualifies on the left only.
-	ruletest.ExpectFindings(t, ruletest.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; i--) {} }\n"), "incorrectDirection")
 
 	// Both counters modified, still one finding. The right-hand operand does not qualify: for
 	// `i < j` the wrong direction on the right is an increment, and `j--` is a decrement.
-	ruletest.ExpectFindings(t, ruletest.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; i--, j--) {} }\n"), "incorrectDirection")
 
 	// The right-hand operand in isolation, which is what pins the direction mapping rather than
 	// leaving it inferred from the case above.
-	ruletest.ExpectClean(t, ruletest.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; j--) {} }\n"))
 
 	// And the shape that does qualify on the right, so the mapping is pinned in both directions.
-	ruletest.ExpectFindings(t, ruletest.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; j++) {} }\n"), "incorrectDirection")
 }

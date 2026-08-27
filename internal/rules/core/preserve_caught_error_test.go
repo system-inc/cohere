@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The case strings in this file were extracted mechanically from oxc's inline corpus at
@@ -179,12 +179,12 @@ func TestPreserveCaughtErrorFires(t *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		result := ruletest.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", testCase.source, testCase.options)
+		result := rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", testCase.source, testCase.options)
 		if len(result.Diagnostics) != len(testCase.wantIds) {
 			t.Errorf("case %d: got %d findings, want %d\n%s", index, len(result.Diagnostics), len(testCase.wantIds), testCase.source)
 			continue
 		}
-		ruletest.ExpectFindings(t, result, testCase.wantIds...)
+		rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 	}
 }
 
@@ -211,9 +211,9 @@ func TestPreserveCaughtErrorStaysSilent(t *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		result := ruletest.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", testCase.source, testCase.options)
+		result := rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", testCase.source, testCase.options)
 		t.Run(strconv.Itoa(index), func(t *testing.T) {
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -341,7 +341,7 @@ func TestPreserveCaughtErrorAppliesUpstreamRepairs(t *testing.T) {
 	}
 
 	for index, vector := range vectors {
-		result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", vector.before)
+		result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", vector.before)
 
 		// The typed harness writes `strings.TrimSpace(source) + "\n"` to disk, so the text the
 		// rule and the fix engine actually see is not byte-identical to the corpus string. The
@@ -355,7 +355,7 @@ func TestPreserveCaughtErrorAppliesUpstreamRepairs(t *testing.T) {
 					t.Errorf("vector %d panicked: %v", index, recovered)
 				}
 			}()
-			ruletest.ExpectFixedSource(t, result, want)
+			rule_testing.ExpectFixedSource(t, result, want)
 		})
 	}
 }
@@ -376,13 +376,13 @@ func TestPreserveCaughtErrorAppliesUpstreamRepairs(t *testing.T) {
 // something small and unambiguous to fail against.
 func TestPreserveCaughtErrorResolvesTheCauseBindingBySymbol(t *testing.T) {
 	rightBinding := `try { a(); } catch (err) { throw new Error("m", { cause: err }); }`
-	if result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", rightBinding); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", rightBinding); len(result.Diagnostics) != 0 {
 		t.Errorf("the caught binding itself must be accepted, got %d findings", len(result.Diagnostics))
 	}
 
 	shadowed := `try { a(); } catch (err) { if (w) { const err = other; throw new Error("m", { cause: err }); } }`
-	result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", shadowed)
-	ruletest.ExpectFindings(t, result, "preserveCaughtError")
+	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", shadowed)
+	rule_testing.ExpectFindings(t, result, "preserveCaughtError")
 }
 
 // TestPreserveCaughtErrorDoesNotDescendIntoANestedFunction pins one of the two non-descents.
@@ -399,7 +399,7 @@ func TestPreserveCaughtErrorDoesNotDescendIntoANestedFunction(t *testing.T) {
 		`try { a(); } catch (err) { class K { m() { throw new Error("m"); } } }`,
 	}
 	for index, source := range silent {
-		if result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source); len(result.Diagnostics) != 0 {
+		if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source); len(result.Diagnostics) != 0 {
 			t.Errorf("case %d: a throw inside a nested function must be silent, got %d findings:\n%s",
 				index, len(result.Diagnostics), source)
 		}
@@ -421,19 +421,19 @@ func TestPreserveCaughtErrorDoesDescendIntoAnArrowFunction(t *testing.T) {
 		`try { a(); } catch (err) { const f = () => { const g = () => { throw new Error("m"); }; g(); }; f(); }`,
 	}
 	for index, source := range reporting {
-		result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source)
+		result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
 		if len(result.Diagnostics) != 1 {
 			t.Errorf("case %d: a throw inside an arrow function reports upstream, got %d findings:\n%s",
 				index, len(result.Diagnostics), source)
 			continue
 		}
-		ruletest.ExpectFindings(t, result, "preserveCaughtError")
+		rule_testing.ExpectFindings(t, result, "preserveCaughtError")
 	}
 
 	// And the arrow's cause still resolves against the OUTER catch binding, which is what makes
 	// descending into it coherent rather than merely permissive.
 	clean := `try { a(); } catch (err) { const f = () => { throw new Error("m", { cause: err }); }; f(); }`
-	if result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", clean); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", clean); len(result.Diagnostics) != 0 {
 		t.Errorf("an arrow attaching the outer caught error must be clean, got %d findings", len(result.Diagnostics))
 	}
 }
@@ -444,7 +444,7 @@ func TestPreserveCaughtErrorDoesDescendIntoAnArrowFunction(t *testing.T) {
 // parameter. Without this guard, the first case would report: `errorB` is not `errorA`.
 func TestPreserveCaughtErrorDoesNotDescendIntoANestedCatch(t *testing.T) {
 	inner := `try { a(); } catch (errorA) { try { b(); } catch (errorB) { throw new Error("m", { cause: errorB }); } }`
-	if result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", inner); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", inner); len(result.Diagnostics) != 0 {
 		t.Errorf("a nested catch attaching its own error must be clean, got %d findings", len(result.Diagnostics))
 	}
 
@@ -452,8 +452,8 @@ func TestPreserveCaughtErrorDoesNotDescendIntoANestedCatch(t *testing.T) {
 	// inner clause's own analysis compares against `errorB`. One finding, not two, which is what
 	// says the outer walk stopped at the nested catch rather than also reporting there.
 	outer := `try { a(); } catch (errorA) { try { b(); } catch (errorB) { throw new Error("m", { cause: errorA }); } }`
-	result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", outer)
-	ruletest.ExpectFindings(t, result, "preserveCaughtError")
+	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", outer)
+	rule_testing.ExpectFindings(t, result, "preserveCaughtError")
 }
 
 // TestPreserveCaughtErrorRecognizesOnlyThreeConstructors records the divergence from ESLint.
@@ -471,7 +471,7 @@ func TestPreserveCaughtErrorRecognizesOnlyThreeConstructors(t *testing.T) {
 		`try { a(); } catch (err) { throw new URIError("m"); }`,
 	}
 	for _, source := range silent {
-		if result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source); len(result.Diagnostics) != 0 {
+		if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source); len(result.Diagnostics) != 0 {
 			t.Errorf("only Error, TypeError and AggregateError are recognized, but this reported:\n%s", source)
 		}
 	}
@@ -482,8 +482,8 @@ func TestPreserveCaughtErrorRecognizesOnlyThreeConstructors(t *testing.T) {
 		`try { a(); } catch (err) { throw new AggregateError([], "m"); }`,
 	}
 	for _, source := range reporting {
-		result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source)
-		ruletest.ExpectFindings(t, result, "preserveCaughtError")
+		result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
+		rule_testing.ExpectFindings(t, result, "preserveCaughtError")
 	}
 }
 
@@ -499,7 +499,7 @@ func TestPreserveCaughtErrorRequiresTheGlobalBinding(t *testing.T) {
 		"function TypeError() {}\ntry { a(); } catch (err) { throw new TypeError(\"m\"); }",
 	}
 	for _, source := range shadowed {
-		if result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source); len(result.Diagnostics) != 0 {
+		if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source); len(result.Diagnostics) != 0 {
 			t.Errorf("a locally-declared Error shadows the global and must be silent:\n%s", source)
 		}
 	}
@@ -513,21 +513,21 @@ func TestPreserveCaughtErrorRequiresTheGlobalBinding(t *testing.T) {
 // for the same reason at the value position. Adding a paren skip at either site flips a real
 // verdict, and the corpus writes neither form.
 func TestPreserveCaughtErrorSkipsNoParentheses(t *testing.T) {
-	if result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts",
+	if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (err) { throw new (Error)("m"); }`); len(result.Diagnostics) != 0 {
 		t.Errorf("a parenthesized callee is silent upstream, got %d findings", len(result.Diagnostics))
 	}
 
 	parenthesizedCause := `try { a(); } catch (err) { throw new Error("m", { cause: (err) }); }`
-	ruletest.ExpectFindings(t, ruletest.RunTyped(t, PreserveCaughtError, "input.ts", parenthesizedCause),
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", parenthesizedCause),
 		"preserveCaughtError")
 
 	// A non-null assertion falls the same way and for the same reason, and this one DOES carry a
 	// repair upstream: `{ cause: err! }` becomes `{ cause: err }`.
 	assertedCause := `try { a(); } catch (err) { throw new Error("m", { cause: err! }); }`
-	assertedResult := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", assertedCause)
-	ruletest.ExpectFindings(t, assertedResult, "preserveCaughtError")
-	ruletest.ExpectFixedSource(t, assertedResult,
+	assertedResult := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", assertedCause)
+	rule_testing.ExpectFindings(t, assertedResult, "preserveCaughtError")
+	rule_testing.ExpectFixedSource(t, assertedResult,
 		"try { a(); } catch (err) { throw new Error(\"m\", { cause: err }); }\n")
 }
 
@@ -538,13 +538,13 @@ func TestPreserveCaughtErrorSkipsNoParentheses(t *testing.T) {
 // last too. Measured on the release binary: the first input is silent, the second reports.
 func TestPreserveCaughtErrorReadsTheFirstCauseKey(t *testing.T) {
 	firstIsCorrect := `try { a(); } catch (err) { throw new Error("m", { cause: err, cause: other }); }`
-	if result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", firstIsCorrect); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", firstIsCorrect); len(result.Diagnostics) != 0 {
 		t.Errorf("upstream reads the first cause key and stops, so this is silent, got %d findings",
 			len(result.Diagnostics))
 	}
 
 	lastIsCorrect := `try { a(); } catch (err) { throw new Error("m", { cause: other, cause: err }); }`
-	ruletest.ExpectFindings(t, ruletest.RunTyped(t, PreserveCaughtError, "input.ts", lastIsCorrect),
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", lastIsCorrect),
 		"preserveCaughtError")
 }
 
@@ -556,8 +556,8 @@ func TestPreserveCaughtErrorReadsTheFirstCauseKey(t *testing.T) {
 // `{ "cause": err, cause: err }`, a duplicate key, which this port refuses to write.
 func TestPreserveCaughtErrorDoesNotReadAStringLiteralCauseKey(t *testing.T) {
 	source := `try { a(); } catch (err) { throw new Error("m", { "cause": err }); }`
-	result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source)
-	ruletest.ExpectFindings(t, result, "preserveCaughtError")
+	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
+	rule_testing.ExpectFindings(t, result, "preserveCaughtError")
 
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
@@ -573,8 +573,8 @@ func TestPreserveCaughtErrorDoesNotReadAStringLiteralCauseKey(t *testing.T) {
 // and proposes nothing rather than writing a duplicate key into a real tree.
 func TestPreserveCaughtErrorWithholdsAFixThatWouldDuplicateTheKey(t *testing.T) {
 	source := `try { a(); } catch (err) { throw new Error("m", { cause: other, cause: err }); }`
-	result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source)
-	ruletest.ExpectFindings(t, result, "preserveCaughtError")
+	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
+	rule_testing.ExpectFindings(t, result, "preserveCaughtError")
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
 			t.Errorf("a repair here would leave two `cause` keys in one object literal")
@@ -596,8 +596,8 @@ func TestPreserveCaughtErrorReportsWithoutAFixWhereUpstreamDoes(t *testing.T) {
 		`try { a(); } catch (err) { throw new AggregateError([err], "m", "x"); }`,
 	}
 	for index, source := range sources {
-		result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source)
-		ruletest.ExpectFindings(t, result, "preserveCaughtError")
+		result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
+		rule_testing.ExpectFindings(t, result, "preserveCaughtError")
 		for _, diagnostic := range result.Diagnostics {
 			if len(diagnostic.Fixes) != 0 {
 				t.Errorf("case %d proposes a repair upstream does not:\n%s", index, source)
@@ -620,7 +620,7 @@ func TestPreserveCaughtErrorOptionDefaultsToOff(t *testing.T) {
 
 	// A rule configured as bare "error" is handed nil, which is what our own VerifySettings.json
 	// does for this rule. That path has to reach the same verdict as an explicit false.
-	if result := ruletest.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, nil); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, nil); len(result.Diagnostics) != 0 {
 		t.Errorf("nil options must behave as the documented default, got %d findings", len(result.Diagnostics))
 	}
 
@@ -631,7 +631,7 @@ func TestPreserveCaughtErrorOptionDefaultsToOff(t *testing.T) {
 	if decoded, ok := explicitFalse.(PreserveCaughtErrorOptions); !ok || decoded.RequireCatchParameter {
 		t.Errorf("an explicit false must decode to false, got %#v", explicitFalse)
 	}
-	if result := ruletest.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, explicitFalse); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, explicitFalse); len(result.Diagnostics) != 0 {
 		t.Errorf("an explicit false must be silent, got %d findings", len(result.Diagnostics))
 	}
 
@@ -642,8 +642,8 @@ func TestPreserveCaughtErrorOptionDefaultsToOff(t *testing.T) {
 	if decoded, ok := explicitTrue.(PreserveCaughtErrorOptions); !ok || !decoded.RequireCatchParameter {
 		t.Fatalf("an explicit true must decode to true, got %#v", explicitTrue)
 	}
-	result := ruletest.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, explicitTrue)
-	ruletest.ExpectFindings(t, result, "missingCatchParameter")
+	result := rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, explicitTrue)
+	rule_testing.ExpectFindings(t, result, "missingCatchParameter")
 }
 
 // TestPreserveCaughtErrorOptionSuppressesTheThrowFinding pins the shape of upstream's `else if`,
@@ -655,8 +655,8 @@ func TestPreserveCaughtErrorOptionDefaultsToOff(t *testing.T) {
 func TestPreserveCaughtErrorOptionSuppressesTheThrowFinding(t *testing.T) {
 	source := `try { a(); } catch { throw new Error("m"); throw new TypeError("n"); }`
 	options := PreserveCaughtErrorOptions{RequireCatchParameter: true}
-	result := ruletest.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", source, options)
-	ruletest.ExpectFindings(t, result, "missingCatchParameter")
+	result := rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", source, options)
+	rule_testing.ExpectFindings(t, result, "missingCatchParameter")
 }
 
 // TestPreserveCaughtErrorPointsAtTheWholeThrowStatement asserts WHERE the finding lands, which no
@@ -666,7 +666,7 @@ func TestPreserveCaughtErrorOptionSuppressesTheThrowFinding(t *testing.T) {
 // points at the catch clause instead, and asserting both is what keeps the two distinguishable.
 func TestPreserveCaughtErrorPointsAtTheWholeThrowStatement(t *testing.T) {
 	source := `try { a(); } catch (err) { throw new Error("m"); }`
-	result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source)
+	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
@@ -676,7 +676,7 @@ func TestPreserveCaughtErrorPointsAtTheWholeThrowStatement(t *testing.T) {
 	}
 
 	clause := `try { a(); } catch { throw new Error("m"); }`
-	clauseResult := ruletest.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", clause,
+	clauseResult := rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", clause,
 		PreserveCaughtErrorOptions{RequireCatchParameter: true})
 	if len(clauseResult.Diagnostics) != 1 {
 		t.Fatalf("expected one finding, got %d", len(clauseResult.Diagnostics))
@@ -720,7 +720,7 @@ func TestPreserveCaughtErrorRequiresTheTypedHarness(t *testing.T) {
 		t.Fatalf("this rule resolves symbols and must declare NeedsTypeChecker")
 	}
 	source := `try { a(); } catch (err) { throw new Error("m"); }`
-	if result := ruletest.Run(t, PreserveCaughtError, "input.ts", source); len(result.Diagnostics) != 0 {
+	if result := rule_testing.Run(t, PreserveCaughtError, "input.ts", source); len(result.Diagnostics) != 0 {
 		t.Errorf("the untyped harness hands the rule a nil checker, and it must decline rather than guess")
 	}
 
@@ -736,11 +736,11 @@ func TestPreserveCaughtErrorRequiresTheTypedHarness(t *testing.T) {
 	// clean file with one odd complaint rather than as a rule that could not run.
 	bareCatch := `try { a(); } catch { throw new Error("m"); }`
 	options := PreserveCaughtErrorOptions{RequireCatchParameter: true}
-	if result := ruletest.RunWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, options); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, options); len(result.Diagnostics) != 0 {
 		t.Errorf("the missing-parameter finding must also be withheld on a nil checker, got %d findings",
 			len(result.Diagnostics))
 	}
-	if result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source); len(result.Diagnostics) != 1 {
+	if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source); len(result.Diagnostics) != 1 {
 		t.Errorf("the typed harness must reach one finding, got %d", len(result.Diagnostics))
 	}
 }
@@ -755,8 +755,8 @@ func TestPreserveCaughtErrorRequiresTheTypedHarness(t *testing.T) {
 // name to write, so the finding carries no repair.
 func TestPreserveCaughtErrorHandlesADestructuredParameter(t *testing.T) {
 	source := "try { a(); } catch ({ message }) { throw new Error(message); }"
-	result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source)
-	ruletest.ExpectFindings(t, result, "preserveCaughtError")
+	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
+	rule_testing.ExpectFindings(t, result, "preserveCaughtError")
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
 			t.Errorf("there is no single name to write, so no repair can be proposed")
@@ -771,8 +771,8 @@ func TestPreserveCaughtErrorHandlesADestructuredParameter(t *testing.T) {
 // opening parenthesis and returns `noop` when it finds none, so the finding lands with no repair.
 func TestPreserveCaughtErrorHandlesACalleeWithNoArgumentList(t *testing.T) {
 	source := "try { a(); } catch (err) { throw new Error; }"
-	result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", source)
-	ruletest.ExpectFindings(t, result, "preserveCaughtError")
+	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
+	rule_testing.ExpectFindings(t, result, "preserveCaughtError")
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
 			t.Errorf("there is no argument list to insert into, so no repair can be proposed")
@@ -790,16 +790,16 @@ func TestPreserveCaughtErrorHandlesACalleeWithNoArgumentList(t *testing.T) {
 // parentheses rather than inside the comment.
 func TestPreserveCaughtErrorScanPastsACommentedParenthesis(t *testing.T) {
 	lineComment := "try { a(); } catch (err) {\n  throw new Error // (\n  ();\n}"
-	result := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", lineComment)
-	ruletest.ExpectFindings(t, result, "preserveCaughtError")
-	ruletest.ExpectFixedSource(t, result,
+	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", lineComment)
+	rule_testing.ExpectFindings(t, result, "preserveCaughtError")
+	rule_testing.ExpectFixedSource(t, result,
 		"try { a(); } catch (err) {\n  throw new Error // (\n  (\"\", { cause: err });\n}\n")
 
 	// A line comment with no parenthesis in it exercises the same arm and is the case that says the
 	// skip is about reaching the real parenthesis rather than about the character inside.
 	emptyLineComment := "try { a(); } catch (err) {\n  throw new Error //\n  ();\n}"
-	emptyResult := ruletest.RunTyped(t, PreserveCaughtError, "input.ts", emptyLineComment)
-	ruletest.ExpectFindings(t, emptyResult, "preserveCaughtError")
-	ruletest.ExpectFixedSource(t, emptyResult,
+	emptyResult := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", emptyLineComment)
+	rule_testing.ExpectFindings(t, emptyResult, "preserveCaughtError")
+	rule_testing.ExpectFixedSource(t, emptyResult,
 		"try { a(); } catch (err) {\n  throw new Error //\n  (\"\", { cause: err });\n}\n")
 }

@@ -3,7 +3,7 @@ package nexus
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const arrowFile = "/repository/source/Thing.tsx"
@@ -44,8 +44,8 @@ func TestConsistencyNoMultilineArrowFunctionFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -79,8 +79,8 @@ func TestConsistencyNoMultilineArrowFunctionStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -98,8 +98,8 @@ func TestConsistencyNoMultilineArrowFunctionReportsEachArrowOnce(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.wantId)
+			result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
 	}
 }
@@ -109,9 +109,9 @@ func TestConsistencyNoMultilineArrowFunctionReportsEachArrowOnce(t *testing.T) {
 // truncating the signature, a nested generic default confusing the type-parameter boundary, and the
 // prototype difference above. The conversion is worth doing and is not worth doing unattended.
 func TestConsistencyNoMultilineArrowFunctionProposesNoFix(t *testing.T) {
-	result := ruletest.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile,
+	result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile,
 		"const compute = (input) => {\n    return input * 2;\n};\n")
-	ruletest.ExpectFindings(t, result, "multilineArrow")
+	rule_testing.ExpectFindings(t, result, "multilineArrow")
 	if len(result.Diagnostics[0].Fixes) != 0 {
 		t.Fatalf("expected no fixes, got %d", len(result.Diagnostics[0].Fixes))
 	}

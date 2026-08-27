@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // multiStrFile is where the fixtures pretend to live.
@@ -38,8 +38,8 @@ func TestNoMultiStrFires(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoMultiStr, multiStrFile, sourceText), "multilineString")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoMultiStr, multiStrFile, sourceText), "multilineString")
 		})
 	}
 }
@@ -53,13 +53,13 @@ func TestNoMultiStrFires(t *testing.T) {
 // this case.
 func TestNoMultiStrStaysSilent(t *testing.T) {
 	t.Run("a string on one line", func(t *testing.T) {
-		ruletest.ExpectClean(t,
-			ruletest.Run(t, NoMultiStr, multiStrFile, "var a = 'Line 1 Line 2';"))
+		rule_testing.ExpectClean(t,
+			rule_testing.Run(t, NoMultiStr, multiStrFile, "var a = 'Line 1 Line 2';"))
 	})
 
 	t.Run("a JSX element whose text spans lines", func(t *testing.T) {
-		ruletest.ExpectClean(t,
-			ruletest.Run(t, NoMultiStr, multiStrJsxFile, "var a = <div>\n<h1>Wat</h1>\n</div>;"))
+		rule_testing.ExpectClean(t,
+			rule_testing.Run(t, NoMultiStr, multiStrJsxFile, "var a = <div>\n<h1>Wat</h1>\n</div>;"))
 	})
 }
 
@@ -105,11 +105,11 @@ func TestNoMultiStrJsxExemption(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoMultiStr, multiStrJsxFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoMultiStr, multiStrJsxFile, testCase.sourceText)
 			if testCase.wantFires {
-				ruletest.ExpectFindings(t, result, "multilineString")
+				rule_testing.ExpectFindings(t, result, "multilineString")
 			} else {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 			}
 		})
 	}
@@ -139,11 +139,11 @@ func TestNoMultiStrDistinguishesEscapesFromContinuations(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoMultiStr, multiStrFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoMultiStr, multiStrFile, testCase.sourceText)
 			if testCase.wantFires {
-				ruletest.ExpectFindings(t, result, "multilineString")
+				rule_testing.ExpectFindings(t, result, "multilineString")
 			} else {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 			}
 		})
 	}
@@ -168,7 +168,7 @@ func TestNoMultiStrDeclinesOtherLiteralKinds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoMultiStr, multiStrFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoMultiStr, multiStrFile, testCase.sourceText))
 		})
 	}
 }
@@ -197,7 +197,7 @@ func TestNoMultiStrReportsTheWholeLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoMultiStr, multiStrFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoMultiStr, multiStrFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
@@ -216,7 +216,7 @@ func TestNoMultiStrReportsTheWholeLiteral(t *testing.T) {
 // The id literal is typed here rather than read from the rule's own constant, so a rename cannot
 // move both sides at once and stay green.
 func TestNoMultiStrMessage(t *testing.T) {
-	result := ruletest.Run(t, NoMultiStr, multiStrFile, "var x = 'Line 1 \\\n Line 2'")
+	result := rule_testing.Run(t, NoMultiStr, multiStrFile, "var x = 'Line 1 \\\n Line 2'")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}

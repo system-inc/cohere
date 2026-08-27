@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // TestNoCompareNegZeroReportsComparisons is the fixture that must fire.
@@ -30,8 +30,8 @@ func TestNoCompareNegZeroReportsComparisons(t *testing.T) {
 		"x <= -0;",
 		"-0 <= x;",
 	} {
-		result := ruletest.Run(t, NoCompareNegZero, "compare.ts", source)
-		ruletest.ExpectFindings(t, result, "unexpected")
+		result := rule_testing.Run(t, NoCompareNegZero, "compare.ts", source)
+		rule_testing.ExpectFindings(t, result, "unexpected")
 	}
 }
 
@@ -48,8 +48,8 @@ func TestNoCompareNegZeroSeesThroughParentheses(t *testing.T) {
 		"x !== (((-(((0))))));",
 		"x === (/* before */ - /* after */ (0));",
 	} {
-		result := ruletest.Run(t, NoCompareNegZero, "parens.ts", source)
-		ruletest.ExpectFindings(t, result, "unexpected")
+		result := rule_testing.Run(t, NoCompareNegZero, "parens.ts", source)
+		rule_testing.ExpectFindings(t, result, "unexpected")
 	}
 }
 
@@ -68,8 +68,8 @@ func TestNoCompareNegZeroMatchesEveryZeroSpelling(t *testing.T) {
 		"x === -00;",
 		"x === -.0;",
 	} {
-		result := ruletest.Run(t, NoCompareNegZero, "spellings.ts", source)
-		ruletest.ExpectFindings(t, result, "unexpected")
+		result := rule_testing.Run(t, NoCompareNegZero, "spellings.ts", source)
+		rule_testing.ExpectFindings(t, result, "unexpected")
 	}
 }
 
@@ -79,11 +79,11 @@ func TestNoCompareNegZeroMatchesEveryZeroSpelling(t *testing.T) {
 // would report `-0 === -0` twice for one defect, which is the failure mode this test exists to
 // hold shut.
 func TestNoCompareNegZeroReportsOncePerComparison(t *testing.T) {
-	result := ruletest.Run(t, NoCompareNegZero, "both.ts", "-0 === -0;")
-	ruletest.ExpectFindings(t, result, "unexpected")
+	result := rule_testing.Run(t, NoCompareNegZero, "both.ts", "-0 === -0;")
+	rule_testing.ExpectFindings(t, result, "unexpected")
 
-	nested := ruletest.Run(t, NoCompareNegZero, "nested.ts", "x === -0 === -0;")
-	ruletest.ExpectFindings(t, nested, "unexpected", "unexpected")
+	nested := rule_testing.Run(t, NoCompareNegZero, "nested.ts", "x === -0 === -0;")
+	rule_testing.ExpectFindings(t, nested, "unexpected", "unexpected")
 }
 
 // TestNoCompareNegZeroStaysSilentOnCorrectCode is the half that catches a rule firing on code that
@@ -120,7 +120,7 @@ func TestNoCompareNegZeroStaysSilentOnCorrectCode(t *testing.T) {
 		"x = -0;",
 		"x instanceof -0;",
 	} {
-		result := ruletest.Run(t, NoCompareNegZero, "clean.ts", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, NoCompareNegZero, "clean.ts", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }

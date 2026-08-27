@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const deleteVarFile = "/repository/source/Thing.ts"
@@ -21,7 +21,7 @@ func TestNoDeleteVarFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoDeleteVar, deleteVarFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDeleteVar, deleteVarFile, testCase.sourceText),
 				"unexpectedDeleteVar")
 		})
 	}
@@ -45,7 +45,7 @@ func TestNoDeleteVarStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoDeleteVar, deleteVarFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDeleteVar, deleteVarFile, testCase.sourceText))
 		})
 	}
 }

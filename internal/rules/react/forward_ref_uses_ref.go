@@ -85,7 +85,7 @@ var messageForwardRefRemoveWrapper = rule.Message{
 //
 //	import { forwardRef as fr } from 'react'; fr(function (a) {})
 //
-// `internal/utils/react/IsNamespacedMember` is the helper whose name matches this question and it
+// `internal/utilities/react/IsNamespacedMember` is the helper whose name matches this question and it
 // is the wrong one twice over: it hardcodes its receiver to `React` alone, which would silence the
 // four receivers above, and it requires a property access, which would silence the bare
 // `forwardRef(...)` form that is most of the corpus. Its body was read rather than its name.

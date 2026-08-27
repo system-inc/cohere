@@ -3,7 +3,7 @@ package react
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // duplicatePropsFile is where the fixtures pretend to live.
@@ -37,8 +37,8 @@ func TestJsxNoDuplicatePropsFires(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, JsxNoDuplicateProps, duplicatePropsFile, sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, sourceText),
 				"jsxNoDuplicateProps")
 		})
 	}
@@ -75,8 +75,8 @@ func TestJsxNoDuplicatePropsStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, JsxNoDuplicateProps, duplicatePropsFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, sourceText))
 		})
 	}
 }
@@ -110,7 +110,7 @@ func TestJsxNoDuplicatePropsReportsEarlierOccurrence(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, JsxNoDuplicateProps, duplicatePropsFile, testCase.sourceText)
+			result := rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantOffsets) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantOffsets))
 			}
@@ -134,7 +134,7 @@ func TestJsxNoDuplicatePropsReportsEarlierOccurrence(t *testing.T) {
 // the text and our harness renders a fixed Description, so a later change that started
 // interpolating would need to update this assertion rather than sliding past it.
 func TestJsxNoDuplicatePropsMessageText(t *testing.T) {
-	result := ruletest.Run(t, JsxNoDuplicateProps, duplicatePropsFile, "<App a a />;")
+	result := rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, "<App a a />;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
@@ -223,7 +223,7 @@ func TestJsxNoDuplicatePropsBeyondUpstreamCorpus(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, JsxNoDuplicateProps, duplicatePropsFile, testCase.sourceText)
+			result := rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				for _, diagnostic := range result.Diagnostics {
 					t.Logf("  finding at %q",
@@ -244,7 +244,7 @@ func TestJsxNoDuplicatePropsBeyondUpstreamCorpus(t *testing.T) {
 // finding points at the second `a` rather than at the first again.
 func TestJsxNoDuplicatePropsThirdCopyComparesAgainstSecond(t *testing.T) {
 	const sourceText = "<App a a a />;"
-	result := ruletest.Run(t, JsxNoDuplicateProps, duplicatePropsFile, sourceText)
+	result := rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, sourceText)
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("got %d findings, want 2", len(result.Diagnostics))
 	}

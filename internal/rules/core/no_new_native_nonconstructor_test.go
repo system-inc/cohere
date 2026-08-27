@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // nonconstructorFile is where the fixtures pretend to live.
@@ -35,8 +35,8 @@ func TestNoNewNativeNonconstructorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTypedFiles(t, NoNewNativeNonconstructor,
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTypedFiles(t, NoNewNativeNonconstructor,
 					map[string]string{nonconstructorFile: testCase.sourceText}, nonconstructorFile),
 				"noNewNativeNonconstructor")
 		})
@@ -70,8 +70,8 @@ func TestNoNewNativeNonconstructorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTypedFiles(t, NoNewNativeNonconstructor,
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTypedFiles(t, NoNewNativeNonconstructor,
 					map[string]string{nonconstructorFile: testCase.sourceText}, nonconstructorFile))
 		})
 	}
@@ -89,6 +89,6 @@ func TestNoNewNativeNonconstructorDeclinesAnImportedShadow(t *testing.T) {
 		helperFile:         "export class Symbol { constructor(_name: string) {} }\n",
 		nonconstructorFile: "import { Symbol } from './Helper';\nexport const a = new Symbol('x');\n",
 	}
-	ruletest.ExpectClean(t,
-		ruletest.RunTypedFiles(t, NoNewNativeNonconstructor, files, nonconstructorFile))
+	rule_testing.ExpectClean(t,
+		rule_testing.RunTypedFiles(t, NoNewNativeNonconstructor, files, nonconstructorFile))
 }

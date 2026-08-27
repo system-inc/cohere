@@ -3,7 +3,7 @@ package next
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/nextjs"
+	"github.com/system-inc/verify/internal/utilities/nextjs"
 )
 
 var messageNoDocumentImportInPage = rule.Message{
@@ -74,7 +74,7 @@ var messageNoDocumentImportInPage = rule.Message{
 // corpora never vote on the difference. This rule's corpus votes: its fourth failing case is
 // `src/pages/user/_document.tsx`, a file named exactly `_document.tsx` that upstream deliberately
 // reports because it is not the immediate child of a `pages` directory, and IsDocumentFile exempts
-// it. Both predicates and their disagreement are documented at `internal/utils/nextjs/paths.go`.
+// it. Both predicates and their disagreement are documented at `internal/utilities/nextjs/paths.go`.
 //
 // Fidelity is to what a rule decides, and here the decision is pinned by a test upstream wrote.
 //

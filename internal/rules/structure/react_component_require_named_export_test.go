@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const requireNamedExportFile = "/repository/source/components/Button.tsx"
@@ -92,8 +92,8 @@ func TestReactComponentRequireNamedExportFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, ReactComponentRequireNamedExport, testCase.fileName, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, ReactComponentRequireNamedExport, testCase.fileName, testCase.sourceText),
 				"componentRequiresNamedExport")
 		})
 	}
@@ -232,8 +232,8 @@ func TestReactComponentRequireNamedExportStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, ReactComponentRequireNamedExport, testCase.fileName, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, ReactComponentRequireNamedExport, testCase.fileName, testCase.sourceText))
 		})
 	}
 }

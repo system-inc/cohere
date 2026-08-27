@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // constructorSuperFile is where the fixtures pretend to live.
@@ -148,8 +148,8 @@ func TestConstructorSuperFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				testCase.messageId)
 		})
 	}
@@ -275,8 +275,8 @@ func TestConstructorSuperStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
 		})
 	}
 }
@@ -325,7 +325,7 @@ func TestConstructorSuperPointsAtTheRightNode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
+			result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("expected %d findings, got %d: %v",
 					len(testCase.wantSpans), len(result.Diagnostics), result.MessageIds())
@@ -351,7 +351,7 @@ func TestConstructorSuperPointsAtTheRightNode(t *testing.T) {
 // reporting the first would be green under the test above and wrong.
 func TestConstructorSuperReportsTheSecondCallNotTheFirst(t *testing.T) {
 	sourceText := "class A extends B { constructor() { super(); super(); } }"
-	result := ruletest.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
+	result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected 1 finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
 	}
@@ -371,7 +371,7 @@ func TestConstructorSuperReportsTheSecondCallNotTheFirst(t *testing.T) {
 // deleting it would be the wrong repair, and upstream's snapshot pins column 48 rather than 37.
 func TestConstructorSuperReportsTheRightOperandOfALogicalOr(t *testing.T) {
 	sourceText := "class A extends B { constructor() { super() || super(); } }"
-	result := ruletest.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
+	result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected 1 finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
 	}
@@ -427,7 +427,7 @@ func TestConstructorSuperRendersItsMessages(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
+			result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected 1 finding, got %d: %v",
 					len(result.Diagnostics), result.MessageIds())
@@ -470,8 +470,8 @@ func TestConstructorSuperClassifiesUnconstructableExtends(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"badSuper")
 		})
 	}
@@ -501,8 +501,8 @@ func TestConstructorSuperAcceptsConstructableExtendsOurCodeWrites(t *testing.T) 
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
 		})
 	}
 }
@@ -515,8 +515,8 @@ func TestConstructorSuperAcceptsConstructableExtendsOurCodeWrites(t *testing.T) 
 // once per constructor would be green across the whole imported corpus, because every duplicate
 // case in it holds exactly two calls.
 func TestConstructorSuperCountsOneFindingPerExtraCall(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, ConstructorSuper, constructorSuperFile,
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, ConstructorSuper, constructorSuperFile,
 			"class A extends B { constructor() { super(); super(); super(); } }"),
 		"duplicate", "duplicate")
 }
@@ -555,8 +555,8 @@ func TestConstructorSuperIgnoresCallsInNestedEvaluationContexts(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"missingAll")
 		})
 	}
@@ -596,12 +596,12 @@ func TestConstructorSuperHandlesBaseAndNullExtendsSeparately(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
+			result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -613,7 +613,7 @@ func TestConstructorSuperHandlesBaseAndNullExtendsSeparately(t *testing.T) {
 // would be a false positive on every overloaded constructor in the tree, and the implementation
 // right below it is the declaration that actually has to call `super()`.
 func TestConstructorSuperDeclinesAConstructorOverloadSignature(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, ConstructorSuper, constructorSuperFile, `
+	rule_testing.ExpectClean(t, rule_testing.Run(t, ConstructorSuper, constructorSuperFile, `
 		class A extends B {
 			constructor(value: string);
 			constructor(value: number);
@@ -639,8 +639,8 @@ func TestConstructorSuperDeclinesAConstructorOverloadSignature(t *testing.T) {
 // constructor.
 func TestConstructorSuperDoesNotBlameANestedClassForAnUnconstructableExtends(t *testing.T) {
 	sourceText := "class A extends null { constructor() { class C extends D { constructor() { super(); } } } }"
-	result := ruletest.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
-	ruletest.ExpectFindings(t, result, "missingAll")
+	result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "missingAll")
 
 	// The span matters as much as the id here, since the whole failure mode is the finding landing
 	// on the inner class's correct call. Asserting the outer constructor is what makes this test
@@ -686,8 +686,8 @@ func TestConstructorSuperAcceptsAMixedShortCircuit(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText))
 		})
 	}
 }
@@ -736,8 +736,8 @@ func TestConstructorSuperTreatsLoopBodiesAsOneIteration(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -752,8 +752,8 @@ func TestConstructorSuperTreatsLoopBodiesAsOneIteration(t *testing.T) {
 // finding for code that never executes. The corpus has the one-call version of this and it cannot
 // see the difference, because one call is never a duplicate however it is counted.
 func TestConstructorSuperFindsNoDuplicateAmongUnreachableCalls(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, ConstructorSuper, constructorSuperFile,
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, ConstructorSuper, constructorSuperFile,
 			"class A extends B { constructor() { return; super(); super(); } }"),
 		"missingAll")
 }
@@ -781,8 +781,8 @@ func TestConstructorSuperReportsEveryBadCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"badSuper", "badSuper")
 		})
 	}
@@ -813,8 +813,8 @@ func TestConstructorSuperRequiresARealValueFromAnExtendsNullConstructor(t *testi
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, ConstructorSuper, constructorSuperFile, testCase.sourceText),
 				"missingAll")
 		})
 	}

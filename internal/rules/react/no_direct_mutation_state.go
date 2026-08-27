@@ -3,7 +3,7 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	utilsreact "github.com/system-inc/verify/internal/utils/react"
+	utilsreact "github.com/system-inc/verify/internal/utilities/react"
 )
 
 var messageNoDirectMutationState = rule.Message{
@@ -137,7 +137,7 @@ var messageNoDirectMutationState = rule.Message{
 //
 // # The ES5 factory name set is narrower than the shelf
 //
-// `internal/utils/react.IsEs5ComponentCall` accepts `createClass` and `React.createClass` as well
+// `internal/utilities/react.IsEs5ComponentCall` accepts `createClass` and `React.createClass` as well
 // as the `createReactClass` spellings. oxc keys both arms of `is_es5_component` on one constant,
 // `CREATE_CLASS = "createReactClass"`. Measured: `createClass({...})` and `React.createClass({...})`
 // containing a state write are both clean on the release binary, while `createReactClass` and

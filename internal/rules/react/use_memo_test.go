@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // A `.tsx` name, because most cases here write JSX in a component body the way React's own probe
@@ -335,7 +335,7 @@ func TestUseMemoFires(t *testing.T) {
 			// `use-memo` one.
 			//
 			// Pinned as REPORTING rather than as silent, which is the port brief's rule for a case
-			// decided above the rule. `ruletest` runs one rule against one file and consults no
+			// decided above the rule. `rule_testing` runs one rule against one file and consults no
 			// other, so no layer here could reproduce the upstream silence, and bending this rule to
 			// go quiet on a `const` target would break the ordinary `let` case it shares a code path
 			// with. verify surfaces the same conflict through the type checker rather than through a
@@ -355,8 +355,8 @@ func TestUseMemoFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, UseMemo, useMemoFile, testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.ids...)
+			result := rule_testing.RunTyped(t, UseMemo, useMemoFile, testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.ids...)
 			if len(result.Diagnostics) == 0 {
 				return
 			}
@@ -527,8 +527,8 @@ func TestUseMemoStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, UseMemo, useMemoFile, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, UseMemo, useMemoFile, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -544,11 +544,11 @@ func TestUseMemoStaysSilent(t *testing.T) {
 func TestUseMemoRequiresTheTypedHarness(t *testing.T) {
 	source := "function Component(props) {\n  const x = useMemo(props.fn, [props.a]);\n  return <div>{x}</div>;\n}\n"
 
-	typed := ruletest.RunTyped(t, UseMemo, useMemoFile, source)
-	ruletest.ExpectFindings(t, typed, "useMemoCallbackNotInline")
+	typed := rule_testing.RunTyped(t, UseMemo, useMemoFile, source)
+	rule_testing.ExpectFindings(t, typed, "useMemoCallbackNotInline")
 
-	untyped := ruletest.Run(t, UseMemo, useMemoFile, source)
-	ruletest.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(t, UseMemo, useMemoFile, source)
+	rule_testing.ExpectClean(t, untyped)
 }
 
 // TestUseMemoMessages asserts the message identifiers and descriptions against literals typed here.

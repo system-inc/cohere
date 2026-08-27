@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const resultNamingFile = "/repository/source/components/Panel.tsx"
@@ -54,7 +54,7 @@ func TestReactHookRequireResultNamingFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, ReactHookRequireResultNaming, resultNamingFile,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactHookRequireResultNaming, resultNamingFile,
 				resultNamingDeclarations+testCase.sourceText), testCase.wantId)
 		})
 	}
@@ -141,7 +141,7 @@ func TestReactHookRequireResultNamingStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ReactHookRequireResultNaming, testCase.fileName,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactHookRequireResultNaming, testCase.fileName,
 				resultNamingDeclarations+testCase.sourceText))
 		})
 	}
@@ -154,7 +154,7 @@ func TestReactHookRequireResultNamingStaysSilent(t *testing.T) {
 // decision rather than an accident of how the conditions were written.
 func TestReactHookRequireResultNamingPicksOneComplaint(t *testing.T) {
 	// `dataResult` is generic-adjacent and badly suffixed. The suffix wins.
-	ruletest.ExpectFindings(t, ruletest.Run(t, ReactHookRequireResultNaming, resultNamingFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactHookRequireResultNaming, resultNamingFile,
 		resultNamingDeclarations+
 			"export function Panel() {\n    const dataResult = useAccountQuery();\n    return dataResult;\n}\n"),
 		"hookResultNamingBadSuffix")

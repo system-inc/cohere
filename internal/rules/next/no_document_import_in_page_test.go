@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The seven passing cases from oxc's corpus, copied byte for byte and pinned by file name. Every
@@ -54,8 +54,8 @@ func TestNoDocumentImportInPageIsSilentOnUpstreamPassCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -94,8 +94,8 @@ func TestNoDocumentImportInPageReportsOnUpstreamFailCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, messageNoDocumentImportInPage.Id)
+			result := rule_testing.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, messageNoDocumentImportInPage.Id)
 		})
 	}
 }
@@ -168,8 +168,8 @@ func TestNoDocumentImportInPageReportsOnShapesTheCorpusNeverPins(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, messageNoDocumentImportInPage.Id)
+			result := rule_testing.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, messageNoDocumentImportInPage.Id)
 		})
 	}
 }
@@ -179,8 +179,8 @@ func TestNoDocumentImportInPageReportsOnShapesTheCorpusNeverPins(t *testing.T) {
 func TestNoDocumentImportInPageReportsOncePerDeclaration(t *testing.T) {
 	source := "import Document from \"next/document\";\n" +
 		"import { Html } from \"next/document\";\n"
-	result := ruletest.Run(t, NoDocumentImportInPage, "components/Thing.tsx", source)
-	ruletest.ExpectFindings(t, result,
+	result := rule_testing.Run(t, NoDocumentImportInPage, "components/Thing.tsx", source)
+	rule_testing.ExpectFindings(t, result,
 		messageNoDocumentImportInPage.Id, messageNoDocumentImportInPage.Id)
 }
 
@@ -277,8 +277,8 @@ func TestNoDocumentImportInPageIsSilentOnShapesTheCorpusNeverPins(t *testing.T) 
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoDocumentImportInPage, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -294,8 +294,8 @@ func TestNoDocumentImportInPagePointsAtTheWholeDeclaration(t *testing.T) {
 		"\n" +
 		"export const Test = 1;\n"
 
-	result := ruletest.Run(t, NoDocumentImportInPage, "components/Thing.tsx", source)
-	ruletest.ExpectFindings(t, result, messageNoDocumentImportInPage.Id)
+	result := rule_testing.Run(t, NoDocumentImportInPage, "components/Thing.tsx", source)
+	rule_testing.ExpectFindings(t, result, messageNoDocumentImportInPage.Id)
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if want := "import Document from \"next/document\";"; reported != want {
@@ -309,9 +309,9 @@ func TestNoDocumentImportInPagePointsAtTheWholeDeclaration(t *testing.T) {
 // there is to assert: it pins that the finding carries THIS message rather than a sibling rule's,
 // which the id alone would also satisfy if two rules shared one.
 func TestNoDocumentImportInPageCarriesItsOwnMessage(t *testing.T) {
-	result := ruletest.Run(t, NoDocumentImportInPage, "components/Thing.tsx",
+	result := rule_testing.Run(t, NoDocumentImportInPage, "components/Thing.tsx",
 		"import Document from \"next/document\";\n")
-	ruletest.ExpectFindings(t, result, messageNoDocumentImportInPage.Id)
+	rule_testing.ExpectFindings(t, result, messageNoDocumentImportInPage.Id)
 
 	if got := result.Diagnostics[0].Message; got != messageNoDocumentImportInPage {
 		t.Fatalf("message is %+v, want %+v", got, messageNoDocumentImportInPage)

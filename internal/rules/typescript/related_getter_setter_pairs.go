@@ -5,7 +5,7 @@ import (
 	shimcore "github.com/microsoft/TypeScript/tsc/shim/core"
 	shimscanner "github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 )
@@ -105,7 +105,7 @@ var messageRelatedGetterSetterPairs = rule.Message{
 //
 // # Name keying, which is upstream's `getNameFromMember` and does NOT match the property shelf
 //
-// `internal/utils/ecmascript/property.Name` is the obvious shelf function here and it is wrong for
+// `internal/utilities/ecmascript/property.Name` is the obvious shelf function here and it is wrong for
 // this rule in two directions, both measured. It DECLINES a bare identifier inside brackets, on the
 // stated reasoning that `[a]` names whatever the variable holds; upstream keys that as the
 // identifier's own name, so `get [k]()` and `set [k]()` DO pair and report. And it reads THROUGH the
@@ -432,6 +432,6 @@ func relatedKeyName(ctx rule.Context, key *ast.Node) (string, bool) {
 	// `Pos()` includes leading trivia here, which upstream's `range` does not, so a key written
 	// after a newline would key with the whitespace attached and stop pairing with the same key
 	// written inline. `TrimNodeTextRange` is the same token-start walk `ReportNode` uses.
-	trimmed := typecheck.TrimNodeTextRange(ctx.SourceFile, key)
+	trimmed := type_checking.TrimNodeTextRange(ctx.SourceFile, key)
 	return ctx.SourceFile.Text()[trimmed.Pos():trimmed.End()], true
 }

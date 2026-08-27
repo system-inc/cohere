@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // uselessEscapeFile is where the fixtures pretend to live.
@@ -152,8 +152,8 @@ func TestNoUselessEscapeFires(t *testing.T) {
 			for index := range wantIds {
 				wantIds[index] = "noUselessEscape"
 			}
-			ruletest.ExpectFindings(t,
-				ruletest.RunWithOptions(t, NoUselessEscape, uselessEscapeFile,
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunWithOptions(t, NoUselessEscape, uselessEscapeFile,
 					testCase.sourceText, testCase.options), wantIds...)
 		})
 	}
@@ -388,8 +388,8 @@ func TestNoUselessEscapeStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunWithOptions(t, NoUselessEscape, uselessEscapeFile,
+			rule_testing.ExpectClean(t,
+				rule_testing.RunWithOptions(t, NoUselessEscape, uselessEscapeFile,
 					testCase.sourceText, testCase.options))
 		})
 	}
@@ -476,8 +476,8 @@ func TestNoUselessEscapeRepairsSource(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.Run(t, NoUselessEscape, uselessEscapeFile, testCase.sourceText),
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.Run(t, NoUselessEscape, uselessEscapeFile, testCase.sourceText),
 				testCase.wantSource)
 		})
 	}

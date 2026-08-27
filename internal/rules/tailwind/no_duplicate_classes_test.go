@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The violation half. Each case is a class written twice, on one of the three surfaces the
@@ -89,8 +89,8 @@ func TestNoDuplicateClassesReportsRepeats(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDuplicateClasses, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.Run(t, NoDuplicateClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -173,8 +173,8 @@ func TestNoDuplicateClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDuplicateClasses, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoDuplicateClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -215,7 +215,7 @@ func TestNoDuplicateClassesFixIsCorrect(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
+			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("expected a finding, got none")
 			}
@@ -290,13 +290,13 @@ func TestAttributeOnlyReadingLosesFindings(t *testing.T) {
 	lost := 0
 	for _, source := range sourcesOnlyNonAttributeSurfacesCatch {
 		// The real rule must find it.
-		result := ruletest.Run(t, NoDuplicateClasses, "Component.tsx", source)
+		result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", source)
 		if len(result.Diagnostics) == 0 {
 			t.Fatalf("the real rule missed %q, which this control depends on it catching", source)
 		}
 
 		// The narrowed reader must not, which is what makes it dangerous.
-		narrowed := ruletest.Run(t, rule.Rule{
+		narrowed := rule_testing.Run(t, rule.Rule{
 			Name: "attribute-only-control",
 			Run: func(ctx rule.Context, _ any) rule.Listeners {
 				listeners := rule.Listeners{}

@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const typeSuffixFile = "/repository/source/components/Button.tsx"
@@ -53,7 +53,7 @@ func TestReactComponentRequirePropertiesTypeSuffixFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix,
 				typeSuffixFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -132,7 +132,7 @@ func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix,
 				testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -161,8 +161,8 @@ func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
 //
 // The fix derives the corrected name rather than appending to the wrong one.
 func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T) {
-	ruletest.ExpectFixedSource(t,
-		ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
 			"import type { ButtonProps } from './Types';\n"+
 				"export function Button(properties: ButtonProps) {\n    return <button />;\n}\n"),
 		"import type { ButtonProps } from './Types';\n"+
@@ -170,16 +170,16 @@ func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T
 
 	// An Interface suffix is replaced rather than appended to, which is the case that separates a
 	// derived rename from a blind one: appending gives ButtonInterfaceProperties.
-	ruletest.ExpectFixedSource(t,
-		ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
 			"import type { ButtonInterface } from './Types';\n"+
 				"export function Button(properties: ButtonInterface) {\n    return <button />;\n}\n"),
 		"import type { ButtonInterface } from './Types';\n"+
 			"export function Button(properties: ButtonProperties) {\n    return <button />;\n}\n")
 
 	// A name with no known suffix gets one appended.
-	ruletest.ExpectFixedSource(t,
-		ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
 			"import type { ButtonBag } from './Types';\n"+
 				"export function Button(properties: ButtonBag) {\n    return <button />;\n}\n"),
 		"import type { ButtonBag } from './Types';\n"+
@@ -220,7 +220,7 @@ func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix,
+			result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix,
 				componentFile, testCase.sourceText)
 
 			// Both halves have to be renamed or the file stops compiling, so the count is the
@@ -266,7 +266,7 @@ func TestReactComponentRequirePropertiesTypeSuffixRefusesATakenName(t *testing.T
 		"export type MenuItemInterface = MenuItemProperties;\n" +
 		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
 
-	result := ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix, componentFile, source)
+	result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, componentFile, source)
 	if len(result.Diagnostics) == 0 {
 		t.Fatal("wanted the convention violation still reported, got no findings")
 	}
@@ -286,7 +286,7 @@ func TestReactComponentRequirePropertiesTypeSuffixStillFixesWhenTheNameIsFree(t 
 	source := "export interface MenuItemInterface { a: string }\n" +
 		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
 
-	result := ruletest.Run(t, ReactComponentRequirePropertiesTypeSuffix, componentFile, source)
+	result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, componentFile, source)
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("wanted two findings, got %d", len(result.Diagnostics))
 	}

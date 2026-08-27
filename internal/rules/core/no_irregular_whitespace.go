@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/comments"
+	"github.com/system-inc/verify/internal/utilities/comments"
 )
 
 // byteOrderMark is U+FEFF, which opens a file legitimately and is a stray character anywhere else.
@@ -143,7 +143,7 @@ type skippedRegion struct {
 var NoIrregularWhitespace = rule.Rule{
 	Name: "no-irregular-whitespace",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		// ESLint's defaults, which are also this tree's resolved config. Only SkipStrings defaults
+		// ESLint's defaults, which are also this tree's resolved configuration. Only SkipStrings defaults
 		// to on: irregular whitespace inside a string is usually data rather than a typo, and
 		// reporting it would flag every file that holds a no-break space on purpose.
 		skipComments, skipStrings, skipTemplates := false, true, false

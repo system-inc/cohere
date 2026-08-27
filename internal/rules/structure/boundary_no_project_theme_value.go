@@ -7,8 +7,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/module"
-	"github.com/system-inc/verify/internal/utils/jsx"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
+	"github.com/system-inc/verify/internal/utilities/jsx"
 )
 
 // messageForbiddenThemeValue names the value, the component, and what is allowed instead.

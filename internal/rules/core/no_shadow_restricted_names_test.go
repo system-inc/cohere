@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // shadowRestrictedNamesFile is where the fixtures pretend to live.
@@ -88,8 +88,8 @@ func TestNoShadowRestrictedNamesFires(t *testing.T) {
 			for index := range wantIds {
 				wantIds[index] = "shadowingRestrictedName"
 			}
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText),
 				wantIds...)
 		})
 	}
@@ -132,8 +132,8 @@ func TestNoShadowRestrictedNamesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText))
 		})
 	}
 }
@@ -155,7 +155,7 @@ func TestNoShadowRestrictedNamesRespectsAllowGlobalThis(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoShadowRestrictedNames,
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoShadowRestrictedNames,
 				shadowRestrictedNamesFile, testCase.sourceText,
 				NoShadowRestrictedNamesOptions{AllowGlobalThis: true}))
 		})
@@ -199,7 +199,7 @@ func TestNoShadowRestrictedNamesPointsAtTheName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoShadowRestrictedNames,
+			result := rule_testing.RunTyped(t, NoShadowRestrictedNames,
 				shadowRestrictedNamesFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
@@ -265,8 +265,8 @@ func TestNoShadowRestrictedNamesCarveOutBoundary(t *testing.T) {
 			for index := range wantIds {
 				wantIds[index] = "shadowingRestrictedName"
 			}
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText),
 				wantIds...)
 		})
 	}
@@ -307,25 +307,25 @@ func TestNoShadowRestrictedNamesCarveOutBoundary(t *testing.T) {
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText))
 		})
 	}
 }
 
 // The typed harness is required, and this fails loudly if someone later swaps it for the plain one.
 //
-// `ruletest.Run` hands the rule a nil checker. This rule's carve-out declines on a nil checker and
+// `rule_testing.Run` hands the rule a nil checker. This rule's carve-out declines on a nil checker and
 // reports, so a revert to the plain harness would not go silent the way most type-aware rules do;
 // it would go *loud*, turning upstream's clean `var undefined;` into a finding. Either direction is
 // a defect, and asserting the difference here names which one it is.
 func TestNoShadowRestrictedNamesNeedsTheTypedHarness(t *testing.T) {
 	const sourceText = "var undefined; doSomething(undefined);"
 
-	ruletest.ExpectClean(t,
-		ruletest.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText))
+	rule_testing.ExpectClean(t,
+		rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText))
 
-	withoutChecker := ruletest.Run(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText)
+	withoutChecker := rule_testing.Run(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText)
 	if len(withoutChecker.Diagnostics) != 1 {
 		t.Fatalf("the untyped harness produced %d findings, want 1; the carve-out is supposed to "+
 			"decline without a checker rather than guess", len(withoutChecker.Diagnostics))
@@ -351,7 +351,7 @@ func TestNoShadowRestrictedNamesReportsTheWrittenBindingNotItsNamesake(t *testin
 	// Byte 34 is the inner declaration's name; byte 4 is the outer one's, 30 bytes earlier.
 	const innerNamePosition = 34
 
-	result := ruletest.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText)
+	result := rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1; two would mean the carve-out matched on declaration "+
 			"kind rather than on node identity", len(result.Diagnostics))

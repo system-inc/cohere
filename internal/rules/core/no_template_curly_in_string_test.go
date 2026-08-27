@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // templateCurlyInStringFile is where the fixtures pretend to live.
@@ -36,8 +36,8 @@ func TestNoTemplateCurlyInStringFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText),
 				"unexpectedTemplateExpression")
 		})
 	}
@@ -79,8 +79,8 @@ func TestNoTemplateCurlyInStringStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText))
 		})
 	}
 }
@@ -115,7 +115,7 @@ func TestNoTemplateCurlyInStringReportsTheWholeLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
@@ -154,7 +154,7 @@ func TestNoTemplateCurlyInStringReportsOncePerLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantFindings {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantFindings)
 			}
@@ -192,8 +192,8 @@ func TestNoTemplateCurlyInStringMatchesTheCookedValue(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText),
 				"unexpectedTemplateExpression")
 		})
 	}
@@ -231,11 +231,11 @@ func TestNoTemplateCurlyInStringPatternEdges(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText)
 			if testCase.wantFires {
-				ruletest.ExpectFindings(t, result, "unexpectedTemplateExpression")
+				rule_testing.ExpectFindings(t, result, "unexpectedTemplateExpression")
 			} else {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 			}
 		})
 	}
@@ -265,8 +265,8 @@ func TestNoTemplateCurlyInStringDeclinesOtherLiteralKinds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, testCase.sourceText))
 		})
 	}
 }
@@ -280,7 +280,7 @@ func TestNoTemplateCurlyInStringDeclinesOtherLiteralKinds(t *testing.T) {
 // The literal below is typed here rather than read from the rule's own constant, so both sides
 // cannot move together.
 func TestNoTemplateCurlyInStringMessage(t *testing.T) {
-	result := ruletest.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, "'${a}'")
+	result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, "'${a}'")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}

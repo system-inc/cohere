@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestNoCaseDeclarationsReportsLexicalDeclarations(t *testing.T) {
@@ -27,12 +27,12 @@ func TestNoCaseDeclarationsReportsLexicalDeclarations(t *testing.T) {
 		{"multiple declarators in one statement is one statement", `switch (a) { case 1: let x = 1, y = 2; break; }`, 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoCaseDeclarations, "file.ts", testCase.source)
+			result := rule_testing.Run(t, NoCaseDeclarations, "file.ts", testCase.source)
 			wantIds := make([]string, testCase.want)
 			for index := range wantIds {
 				wantIds[index] = "unexpected"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 		})
 	}
 }
@@ -60,7 +60,7 @@ func TestNoCaseDeclarationsAcceptsScopedAndHoistedDeclarations(t *testing.T) {
 		{"declaration outside the switch", `const outside = 1; switch (a) { case 1: break; }`},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoCaseDeclarations, "file.ts", testCase.source))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoCaseDeclarations, "file.ts", testCase.source))
 		})
 	}
 }
@@ -75,8 +75,8 @@ func TestNoCaseDeclarationsReportsTheDeclarationWithoutTrivia(t *testing.T) {
     const reported = 2;
     break;
 }`
-	result := ruletest.Run(t, NoCaseDeclarations, "file.ts", source)
-	ruletest.ExpectFindings(t, result, "unexpected")
+	result := rule_testing.Run(t, NoCaseDeclarations, "file.ts", source)
+	rule_testing.ExpectFindings(t, result, "unexpected")
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "const reported = 2;" {
@@ -94,8 +94,8 @@ func TestNoCaseDeclarationsSuggestsWrappingTheWholeClause(t *testing.T) {
     const second = 2;
     break;
 }`
-	result := ruletest.Run(t, NoCaseDeclarations, "file.ts", source)
-	ruletest.ExpectFindings(t, result, "unexpected", "unexpected")
+	result := rule_testing.Run(t, NoCaseDeclarations, "file.ts", source)
+	rule_testing.ExpectFindings(t, result, "unexpected", "unexpected")
 
 	for index, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Suggestions) != 1 {

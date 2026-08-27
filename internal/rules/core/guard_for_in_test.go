@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // guardForInFile is where the fixtures pretend to live.
@@ -34,7 +34,7 @@ func TestGuardForInStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, GuardForIn, guardForInFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, GuardForIn, guardForInFile, sourceText))
 		})
 	}
 }
@@ -57,8 +57,8 @@ func TestGuardForInFires(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, GuardForIn, guardForInFile, sourceText), "wrap")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, GuardForIn, guardForInFile, sourceText), "wrap")
 		})
 	}
 }
@@ -71,12 +71,12 @@ func TestGuardForInFires(t *testing.T) {
 func TestGuardForInReportsOnTheWholeLoop(t *testing.T) {
 	const sourceText = "for (var x in o) foo();"
 
-	result := ruletest.Run(t, GuardForIn, guardForInFile, sourceText)
+	result := rule_testing.Run(t, GuardForIn, guardForInFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 
-	// `ruletest.Run` does not trim, so the literal above and the file on disk agree and slicing the
+	// `rule_testing.Run` does not trim, so the literal above and the file on disk agree and slicing the
 	// literal is safe here. `RunTyped` would trim and this slice would be off by one.
 	reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != sourceText {
@@ -97,11 +97,11 @@ func TestGuardForInReportsOnTheWholeLoop(t *testing.T) {
 // of these, which upstream accepts. A port collapsing them the other way would accept the second.
 func TestGuardForInSeparatesTheTwoBlockArms(t *testing.T) {
 	// One statement, a non-skipping consequent: clean, because the `if` is the whole body.
-	ruletest.ExpectClean(t, ruletest.Run(t, GuardForIn, guardForInFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, GuardForIn, guardForInFile,
 		"for (var x in o) { if (x) { f(); } }"))
 
 	// Two statements, the same non-skipping consequent: reports, because `g()` runs unfiltered.
-	ruletest.ExpectFindings(t, ruletest.Run(t, GuardForIn, guardForInFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, GuardForIn, guardForInFile,
 		"for (var x in o) { if (x) { f(); } g(); }"), "wrap")
 }
 
@@ -113,11 +113,11 @@ func TestGuardForInSeparatesTheTwoBlockArms(t *testing.T) {
 // imported fixture can see it: upstream's corpus writes no `for-of` at all, because its parser
 // gives the two different node types and the mistake is not available there.
 func TestGuardForInDeclinesForOf(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, GuardForIn, guardForInFile, "for (var x of o) foo();"))
+	rule_testing.ExpectClean(t, rule_testing.Run(t, GuardForIn, guardForInFile, "for (var x of o) foo();"))
 
 	// The control: the same body under `for-in` does report, so the silence above is about the
 	// loop kind rather than about the fixture failing to reach the rule.
-	ruletest.ExpectFindings(t, ruletest.Run(t, GuardForIn, guardForInFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, GuardForIn, guardForInFile,
 		"for (var x in o) foo();"), "wrap")
 }
 
@@ -168,7 +168,7 @@ func TestGuardForInMatchesTheInstalledBuild(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, GuardForIn, guardForInFile, testCase.sourceText)
+			result := rule_testing.Run(t, GuardForIn, guardForInFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantFindings {
 				t.Fatalf("got %d findings, wanted %d (measured on eslint 10.8.1)",
 					len(result.Diagnostics), testCase.wantFindings)

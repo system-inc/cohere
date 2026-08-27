@@ -3,8 +3,8 @@ package next
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/jsx"
-	"github.com/system-inc/verify/internal/utils/nextjs"
+	"github.com/system-inc/verify/internal/utilities/jsx"
+	"github.com/system-inc/verify/internal/utilities/nextjs"
 )
 
 var messageNoStyledJsxInDocument = rule.Message{
@@ -53,7 +53,7 @@ var messageNoStyledJsxInDocument = rule.Message{
 // # The document gate, and where it diverges from this rule's own upstream spelling
 //
 // This is the one place the port knowingly disagrees with the rule it was ported from, and it is a
-// disagreement inherited on purpose from `internal/utils/nextjs`.
+// disagreement inherited on purpose from `internal/utilities/nextjs`.
 //
 // oxc spells the gate inside this rule as a basename test: `file_name.starts_with("_document.")`,
 // with no directory component at all. The word `pages` appears in this rule's diagnostic text, its

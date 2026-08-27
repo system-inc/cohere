@@ -3,7 +3,7 @@ package react
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // jsxNoTargetBlankFile is where the fixtures pretend to live.
@@ -198,11 +198,11 @@ func TestJsxNoTargetBlankFires(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			options := decodeTargetBlankOptionsForTest(t, testCase.rawOptions)
-			result := ruletest.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
+			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
 				testCase.sourceText, options)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if testCase.wantFixed != "" {
-				ruletest.ExpectFixedSource(t, result, testCase.wantFixed)
+				rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
 				return
 			}
 			// An empty fix column is an assertion, not a skip.
@@ -344,9 +344,9 @@ func TestJsxNoTargetBlankStaysSilent(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			options := decodeTargetBlankOptionsForTest(t, testCase.rawOptions)
-			result := ruletest.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
+			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
 				testCase.sourceText, options)
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -393,12 +393,12 @@ func TestJsxNoTargetBlankSpans(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			options := decodeTargetBlankOptionsForTest(t, testCase.rawOptions)
-			result := ruletest.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
+			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
 				testCase.sourceText, options)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
-			// `ruletest.RunWithOptions` does not trim, so the source on disk is this literal and
+			// `rule_testing.RunWithOptions` does not trim, so the source on disk is this literal and
 			// slicing it directly is sound. The typed harness would need the trim applied first.
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
@@ -467,15 +467,15 @@ func TestDecodeJsxNoTargetBlankOptions(t *testing.T) {
 // a verdict; the test exists because the rule restores the default explicitly and a later reader
 // deleting that restoration should fail here rather than ship a silent change.
 func TestJsxNoTargetBlankHandlesNilOptions(t *testing.T) {
-	result := ruletest.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
+	result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
 		"<a target=\"_blank\" href=\"http://x.com\"></a>", nil)
-	ruletest.ExpectFindings(t, result, "noTargetBlankWithoutNoreferrer")
+	rule_testing.ExpectFindings(t, result, "noTargetBlankWithoutNoreferrer")
 
 	// And the dynamic-href arm, which is the one the absent enum turns ON. A nil-options rule that
 	// read the enum as "never" would be silent here.
-	dynamic := ruletest.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
+	dynamic := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
 		"<a target=\"_blank\" href={dynamicLink}></a>", nil)
-	ruletest.ExpectFindings(t, dynamic, "noTargetBlankWithoutNoreferrer")
+	rule_testing.ExpectFindings(t, dynamic, "noTargetBlankWithoutNoreferrer")
 }
 
 // TestJsxNoTargetBlankHasNoFileGate pins that the extension decides nothing.
@@ -491,8 +491,8 @@ func TestJsxNoTargetBlankHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, JsxNoTargetBlank, fileName, source, nil)
-			ruletest.ExpectFindings(t, result, "noTargetBlankWithoutNoreferrer")
+			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, fileName, source, nil)
+			rule_testing.ExpectFindings(t, result, "noTargetBlankWithoutNoreferrer")
 		})
 	}
 }

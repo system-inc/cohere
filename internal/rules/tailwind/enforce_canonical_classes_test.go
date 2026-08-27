@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The fixture corpus is the one the migration earned, and every entry in it was a real finding at
@@ -16,7 +16,7 @@ import (
 //
 // Same reason `enforce_consistent_class_order_test.go` and `no_unknown_classes_test.go` give. The
 // rule now reads the live design system to split a class into root and value, so it declares
-// `ReadsProgram` and returns nil listeners when the Program is nil. `ruletest.Run` hands it exactly
+// `ReadsProgram` and returns nil listeners when the Program is nil. `rule_testing.Run` hands it exactly
 // that, so a fixture left on it would exercise the nil-Program branch: the reporting half fails
 // loudly and the silent half passes while proving nothing.
 //
@@ -29,7 +29,7 @@ import (
 // The fixture stylesheet declares no tokens of its own. Unlike `no-unknown-classes`, whose whole
 // subject is what a repository adds, this rule's subject is the collapse families, and those are
 // framework facts: 44 on ahra and 44 on www-connected-app, with none on either side alone.
-func runCanonicalFixture(t *testing.T, fileName string, source string) ruletest.Result {
+func runCanonicalFixture(t *testing.T, fileName string, source string) rule_testing.Result {
 	t.Helper()
 	return runCanonicalFixtureWithOptions(t, fileName, source, nil)
 }
@@ -40,7 +40,7 @@ func runCanonicalFixtureWithOptions(
 	fileName string,
 	source string,
 	options any,
-) ruletest.Result {
+) rule_testing.Result {
 	t.Helper()
 
 	packageRoot := unknownFixturePackageRoot()
@@ -64,9 +64,9 @@ func runCanonicalFixtureWithOptions(
 	}
 
 	if options == nil {
-		return ruletest.RunTypedFilesWithSetup(t, EnforceCanonicalClasses, files, fileName, plantPackage)
+		return rule_testing.RunTypedFilesWithSetup(t, EnforceCanonicalClasses, files, fileName, plantPackage)
 	}
-	return ruletest.RunTypedFilesWithSetupAndOptions(
+	return rule_testing.RunTypedFilesWithSetupAndOptions(
 		t, EnforceCanonicalClasses, files, fileName, options, plantPackage)
 }
 
@@ -167,7 +167,7 @@ func TestEnforceCanonicalClassesReportsCollapses(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runCanonicalFixture(t, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -240,7 +240,7 @@ func TestEnforceCanonicalClassesStaysSilent(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runCanonicalFixture(t, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -489,7 +489,7 @@ func TestCanonicalFixturesActuallyRan(t *testing.T) {
 
 	result := runCanonicalFixture(t, "Component.tsx",
 		`const element = <div className="px-4 py-4" />;`)
-	ruletest.ExpectFindings(t, result, "canonicalCollapse")
+	rule_testing.ExpectFindings(t, result, "canonicalCollapse")
 }
 
 // TestIgnoredClassesAreExempt covers the option the oxlint configuration actually supplies.

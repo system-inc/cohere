@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Every case below is upstream's, copied byte for byte from oxc's tester block and verified
@@ -73,12 +73,12 @@ func TestNoTyposReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoTypos, testCase.fileName, testCase.source)
+			result := rule_testing.Run(t, NoTypos, testCase.fileName, testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = messageNoTypos.Id
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -183,8 +183,8 @@ func TestNoTyposIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoTypos, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoTypos, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -226,7 +226,7 @@ func TestNoTyposPointsAtTheIdentifier(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoTypos, "pages/test.tsx", testCase.source)
+			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
 			}
@@ -265,7 +265,7 @@ func TestNoTyposNamesBothTheTypoAndTheCorrection(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.want, func(t *testing.T) {
-			result := ruletest.Run(t, NoTypos, "pages/test.tsx", testCase.source)
+			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
@@ -310,8 +310,8 @@ func TestNoTyposOnlyReadsNamedExportsOfTwoShapes(t *testing.T) {
 	}
 	for _, testCase := range reports {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoTypos, "pages/test.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, messageNoTypos.Id)
+			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, messageNoTypos.Id)
 		})
 	}
 
@@ -368,8 +368,8 @@ func TestNoTyposOnlyReadsNamedExportsOfTwoShapes(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoTypos, "pages/test.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -394,8 +394,8 @@ func TestNoTyposAppliesThresholdOne(t *testing.T) {
 	}
 	for _, testCase := range reports {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoTypos, "pages/test.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, messageNoTypos.Id)
+			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, messageNoTypos.Id)
 		})
 	}
 
@@ -433,8 +433,8 @@ func TestNoTyposAppliesThresholdOne(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoTypos, "pages/test.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoTypos, "pages/test.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -466,8 +466,8 @@ func TestNoTyposGatesOnThePagesDirectory(t *testing.T) {
 	}
 	for _, testCase := range reports {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoTypos, testCase.fileName, typo)
-			ruletest.ExpectFindings(t, result, messageNoTypos.Id)
+			result := rule_testing.Run(t, NoTypos, testCase.fileName, typo)
+			rule_testing.ExpectFindings(t, result, messageNoTypos.Id)
 		})
 	}
 
@@ -493,8 +493,8 @@ func TestNoTyposGatesOnThePagesDirectory(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoTypos, testCase.fileName, typo)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoTypos, testCase.fileName, typo)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

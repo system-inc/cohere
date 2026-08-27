@@ -3,7 +3,7 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/property"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/property"
 )
 
 var messageNoRenderReturnValue = rule.Message{
@@ -102,7 +102,7 @@ var messageNoRenderReturnValue = rule.Message{
 // fails loudly. Needing no checker and the checker being unhelpful are separate findings, and this
 // rule happens to have both.
 //
-// `internal/utils/react.IsNamespacedMember` is the shelf function whose name fits this shape and it
+// `internal/utilities/react.IsNamespacedMember` is the shelf function whose name fits this shape and it
 // cannot serve here: it hardcodes its receiver to `React` alone, by documented design and confirmed
 // in its body, so it declines every input this rule exists to catch. Its parenthesis-skipping is
 // also a divergence here, since oxc matches `Expression::Identifier` against the object directly

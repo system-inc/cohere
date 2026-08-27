@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const dupeElseIfFile = "/repository/source/Branch.ts"
@@ -89,7 +89,7 @@ func TestNoDupeElseIfFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoDupeElseIf, dupeElseIfFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDupeElseIf, dupeElseIfFile, testCase.sourceText),
 				"unexpected")
 		})
 	}
@@ -142,7 +142,7 @@ func TestNoDupeElseIfStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoDupeElseIf, dupeElseIfFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDupeElseIf, dupeElseIfFile, testCase.sourceText))
 		})
 	}
 }
@@ -153,7 +153,7 @@ func TestNoDupeElseIfStaysSilent(t *testing.T) {
 // because the walk continues up the chain after a match unless it returns, and a missing return
 // would produce a finding per ancestor.
 func TestNoDupeElseIfReportsOncePerBranch(t *testing.T) {
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoDupeElseIf, dupeElseIfFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDupeElseIf, dupeElseIfFile,
 		"declare const a: boolean;\nexport function run() { if(a) {} else if(a) {} else if(a) {} }\n"),
 		"unexpected", "unexpected")
 }

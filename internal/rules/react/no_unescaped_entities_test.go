@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // TestNoUnescapedEntitiesStaysSilent runs every passing case in upstream's corpus.
@@ -41,8 +41,8 @@ func TestNoUnescapedEntitiesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnescapedEntities, "component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -154,9 +154,9 @@ func TestNoUnescapedEntitiesFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(
+			result := rule_testing.RunWithOptions(
 				t, NoUnescapedEntities, "component.tsx", testCase.source, testCase.options)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -186,8 +186,8 @@ func decodeNoUnescapedEntitiesOptionsForTest(t *testing.T, raw string) any {
 func TestNoUnescapedEntitiesPointsAtTheCharacter(t *testing.T) {
 	const source = "const a = <div>x\"y</div>;"
 
-	result := ruletest.Run(t, NoUnescapedEntities, "component.tsx", source)
-	ruletest.ExpectFindings(t, result, "unescapedEntityAlts")
+	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)
+	rule_testing.ExpectFindings(t, result, "unescapedEntityAlts")
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != `"` {
@@ -207,8 +207,8 @@ func TestNoUnescapedEntitiesPointsAtTheCharacter(t *testing.T) {
 // constants: comparing a diagnostic against the constant the rule reported with is equality that
 // moves on both sides under mutation.
 func TestNoUnescapedEntitiesRendersUpstreamsMessageText(t *testing.T) {
-	result := ruletest.Run(t, NoUnescapedEntities, "component.tsx", "const a = <div>'</div>;")
-	ruletest.ExpectFindings(t, result, "unescapedEntityAlts")
+	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", "const a = <div>'</div>;")
+	rule_testing.ExpectFindings(t, result, "unescapedEntityAlts")
 
 	const want = "`'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`."
 	if got := result.Diagnostics[0].Message.Description; got != want {
@@ -226,9 +226,9 @@ func TestNoUnescapedEntitiesRendersUpstreamsMessageText(t *testing.T) {
 func TestNoUnescapedEntitiesRendersTheBareStringMessage(t *testing.T) {
 	options := decodeNoUnescapedEntitiesOptionsForTest(t, `{"forbid":["&"]}`)
 
-	result := ruletest.RunWithOptions(
+	result := rule_testing.RunWithOptions(
 		t, NoUnescapedEntities, "component.tsx", "const a = <div>foo & bar</div>;", options)
-	ruletest.ExpectFindings(t, result, "unescapedEntity")
+	rule_testing.ExpectFindings(t, result, "unescapedEntity")
 
 	const want = "HTML entity `&` is written raw in JSX text and must be escaped."
 	if got := result.Diagnostics[0].Message.Description; got != want {
@@ -241,15 +241,15 @@ func TestNoUnescapedEntitiesRendersTheBareStringMessage(t *testing.T) {
 
 // TestNoUnescapedEntitiesOffersEveryAlternativeAsASuggestion asserts the repairs, not just the ids.
 //
-// `ruletest` can apply a fix but not a suggestion, so the applier is hand-rolled here. The expected
+// `rule_testing` can apply a fix but not a suggestion, so the applier is hand-rolled here. The expected
 // output for each of the four is upstream's own, read off the installed rule's `suggestions[].fix`.
 // A suggestion writing the right string over the wrong span passes any text comparison, so the
 // assertion is on the rewritten whole file.
 func TestNoUnescapedEntitiesOffersEveryAlternativeAsASuggestion(t *testing.T) {
 	const source = "const a = <div>x\"y</div>;"
 
-	result := ruletest.Run(t, NoUnescapedEntities, "component.tsx", source)
-	ruletest.ExpectFindings(t, result, "unescapedEntityAlts")
+	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)
+	rule_testing.ExpectFindings(t, result, "unescapedEntityAlts")
 
 	wantDescriptions := []string{
 		"Replace with `&quot;`.",
@@ -291,8 +291,8 @@ func TestNoUnescapedEntitiesOffersEveryAlternativeAsASuggestion(t *testing.T) {
 func TestNoUnescapedEntitiesRepairsTheRightLineOfAMultiLineNode(t *testing.T) {
 	const source = "const a = <div>ok\n  bad: \"q\"\n  more</div>;"
 
-	result := ruletest.Run(t, NoUnescapedEntities, "component.tsx", source)
-	ruletest.ExpectFindings(t, result, "unescapedEntityAlts", "unescapedEntityAlts")
+	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)
+	rule_testing.ExpectFindings(t, result, "unescapedEntityAlts", "unescapedEntityAlts")
 
 	const wantFirst = "const a = <div>ok\n  bad: &quot;q\"\n  more</div>;"
 	if got := applyOneSuggestion(t, source, result.Diagnostics[0].Suggestions[0]); got != wantFirst {
@@ -318,8 +318,8 @@ func TestNoUnescapedEntitiesRepairsTheRightLineOfAMultiLineNode(t *testing.T) {
 func TestNoUnescapedEntitiesReportsInSourceOrder(t *testing.T) {
 	const source = "const a = <div>Multiple errors: '>> default parser</div>;"
 
-	result := ruletest.Run(t, NoUnescapedEntities, "component.tsx", source)
-	ruletest.ExpectFindings(t, result,
+	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)
+	rule_testing.ExpectFindings(t, result,
 		"unescapedEntityAlts", "unescapedEntityAlts", "unescapedEntityAlts")
 
 	// Upstream's corpus lists this case's errors in exactly this order.
@@ -341,15 +341,15 @@ func TestNoUnescapedEntitiesReportsInSourceOrder(t *testing.T) {
 // TestNoUnescapedEntitiesUsesTheDefaultsWhenHandedNilOptions is the fixture that bypasses the
 // decoder.
 //
-// A rule configured as a bare "error" is handed nil, because `config.OptionsRegistry.Decode` turns
+// A rule configured as a bare "error" is handed nil, because `configuration.OptionsRegistry.Decode` turns
 // a decode of empty input into nil for a rule whose options are not required. That is the path the
 // entire real tree takes, and a rule reaching the scan with an empty entity list there registers on
 // every file and finds nothing, which looks exactly like a clean tree. Every other fixture in this
 // file reaches the rule through options, so nothing else can see it.
 func TestNoUnescapedEntitiesUsesTheDefaultsWhenHandedNilOptions(t *testing.T) {
-	result := ruletest.RunWithOptions(
+	result := rule_testing.RunWithOptions(
 		t, NoUnescapedEntities, "component.tsx", "const a = <div>'</div>;", nil)
-	ruletest.ExpectFindings(t, result, "unescapedEntityAlts")
+	rule_testing.ExpectFindings(t, result, "unescapedEntityAlts")
 }
 
 // TestNoUnescapedEntitiesSeparatesAnAbsentForbidFromAnEmptyOne is the decoder's load-bearing case.
@@ -362,13 +362,13 @@ func TestNoUnescapedEntitiesSeparatesAnAbsentForbidFromAnEmptyOne(t *testing.T) 
 	const source = "const a = <div>a'b\"c</div>;"
 
 	absent := decodeNoUnescapedEntitiesOptionsForTest(t, `{}`)
-	ruletest.ExpectFindings(t,
-		ruletest.RunWithOptions(t, NoUnescapedEntities, "component.tsx", source, absent),
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunWithOptions(t, NoUnescapedEntities, "component.tsx", source, absent),
 		"unescapedEntityAlts", "unescapedEntityAlts")
 
 	empty := decodeNoUnescapedEntitiesOptionsForTest(t, `{"forbid":[]}`)
-	ruletest.ExpectClean(t,
-		ruletest.RunWithOptions(t, NoUnescapedEntities, "component.tsx", source, empty))
+	rule_testing.ExpectClean(t,
+		rule_testing.RunWithOptions(t, NoUnescapedEntities, "component.tsx", source, empty))
 }
 
 // TestNoUnescapedEntitiesDeclinesTheForbidEntriesUpstreamCannotUse pins three decoder declines.
@@ -393,8 +393,8 @@ func TestNoUnescapedEntitiesDeclinesTheForbidEntriesUpstreamCannotUse(t *testing
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			options := decodeNoUnescapedEntitiesOptionsForTest(t, testCase.options)
-			ruletest.ExpectClean(t,
-				ruletest.RunWithOptions(t, NoUnescapedEntities, "component.tsx", testCase.source, options))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunWithOptions(t, NoUnescapedEntities, "component.tsx", testCase.source, options))
 		})
 	}
 }
@@ -408,9 +408,9 @@ func TestNoUnescapedEntitiesDeclinesTheForbidEntriesUpstreamCannotUse(t *testing
 func TestNoUnescapedEntitiesReportsAnObjectEntryWithNoAlternatives(t *testing.T) {
 	options := decodeNoUnescapedEntitiesOptionsForTest(t, `{"forbid":[{"char":"&","alternatives":[]}]}`)
 
-	result := ruletest.RunWithOptions(
+	result := rule_testing.RunWithOptions(
 		t, NoUnescapedEntities, "component.tsx", "const a = <div>a&b</div>;", options)
-	ruletest.ExpectFindings(t, result, "unescapedEntityAlts")
+	rule_testing.ExpectFindings(t, result, "unescapedEntityAlts")
 
 	const want = "`&` can be escaped with ."
 	if got := result.Diagnostics[0].Message.Description; got != want {
@@ -441,8 +441,8 @@ func TestNoUnescapedEntitiesIgnoresTextThatIsNotJsxText(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUnescapedEntities, "component.tsx", testCase.source))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUnescapedEntities, "component.tsx", testCase.source))
 		})
 	}
 }
@@ -456,8 +456,8 @@ func TestNoUnescapedEntitiesIgnoresTextThatIsNotJsxText(t *testing.T) {
 func TestNoUnescapedEntitiesScansBytesWithoutMisreadingMultiByteText(t *testing.T) {
 	const source = "const a = <div>café \"q\" \U0001F600 'y'</div>;"
 
-	result := ruletest.Run(t, NoUnescapedEntities, "component.tsx", source)
-	ruletest.ExpectFindings(t, result,
+	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)
+	rule_testing.ExpectFindings(t, result,
 		"unescapedEntityAlts", "unescapedEntityAlts", "unescapedEntityAlts", "unescapedEntityAlts")
 
 	wantSpans := []string{`"`, `"`, "'", "'"}
@@ -477,13 +477,13 @@ func TestNoUnescapedEntitiesScansBytesWithoutMisreadingMultiByteText(t *testing.
 // is `&`, which is not forbidden by default, so a decoded scan reports on the `&gt;` and not on
 // this. Both are here for that reason.
 func TestNoUnescapedEntitiesLeavesEscapedEntitiesAlone(t *testing.T) {
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoUnescapedEntities, "component.tsx", "const a = <div>&gt;&amp;&quot;&apos;&#125;</div>;"))
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoUnescapedEntities, "component.tsx", "const a = <div>&gt;&amp;&quot;&apos;&#125;</div>;"))
 }
 
 // applyOneSuggestion rewrites the source with one suggestion's fixes and returns the result.
 //
-// `ruletest` applies fixes and has no equivalent for suggestions, so this exists rather than being
+// `rule_testing` applies fixes and has no equivalent for suggestions, so this exists rather than being
 // imported. Back to front, the same order the fix engine uses, so an earlier edit cannot move the
 // offsets a later one was computed against.
 func applyOneSuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
@@ -520,8 +520,8 @@ func applyOneSuggestion(t *testing.T, source string, suggestion rule.Suggestion)
 func TestNoUnescapedEntitiesRepairsCoverTheWholeNode(t *testing.T) {
 	const source = "const a = <div>a'b\"c</div>;"
 
-	result := ruletest.Run(t, NoUnescapedEntities, "component.tsx", source)
-	ruletest.ExpectFindings(t, result, "unescapedEntityAlts", "unescapedEntityAlts")
+	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)
+	rule_testing.ExpectFindings(t, result, "unescapedEntityAlts", "unescapedEntityAlts")
 
 	// The JsxText node is `a'b"c`, which the parser places at offsets 15..20.
 	const wantPos, wantEnd = 15, 20

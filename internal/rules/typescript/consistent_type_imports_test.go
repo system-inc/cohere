@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // consistentTypeImportsCase is one imported corpus entry: the source verbatim, the option
@@ -545,10 +545,10 @@ var consistentTypeImportsReportingCases = []consistentTypeImportsCase{
 func TestConsistentTypeImportsStaysSilent(t *testing.T) {
 	for index, testCase := range consistentTypeImportsCleanCases {
 		t.Run(fmt.Sprintf("case%02d", index), func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, ConsistentTypeImports,
+			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
 				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -558,10 +558,10 @@ func TestConsistentTypeImportsStaysSilent(t *testing.T) {
 func TestConsistentTypeImportsFires(t *testing.T) {
 	for index, testCase := range consistentTypeImportsReportingCases {
 		t.Run(fmt.Sprintf("case%02d", index), func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, ConsistentTypeImports,
+			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
 				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
-			ruletest.ExpectFindings(t, result, testCase.ids...)
+			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})
 	}
 }
@@ -775,14 +775,14 @@ var consistentTypeImportsMeasuredCases = []struct {
 func TestConsistentTypeImportsMeasuredCases(t *testing.T) {
 	for _, testCase := range consistentTypeImportsMeasuredCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, ConsistentTypeImports,
+			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
 				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
 			if len(testCase.ids) == 0 {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
-			ruletest.ExpectFindings(t, result, testCase.ids...)
+			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})
 	}
 }
@@ -832,7 +832,7 @@ func TestConsistentTypeImportsPointsAtTheRightNode(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, ConsistentTypeImports,
+			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
 				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
 			if len(result.Diagnostics) != len(testCase.spans) {
@@ -881,7 +881,7 @@ func TestConsistentTypeImportsRendersTheNameList(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, ConsistentTypeImports,
+			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
 				DefaultConsistentTypeImportsOptions())
 			if len(result.Diagnostics) != 1 {
@@ -945,13 +945,13 @@ func TestConsistentTypeImportsRequiresTheTypedHarness(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			typed := ruletest.RunTypedWithOptions(t, ConsistentTypeImports,
+			typed := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source, testCase.options)
-			ruletest.ExpectFindings(t, typed, testCase.typed...)
+			rule_testing.ExpectFindings(t, typed, testCase.typed...)
 
-			untyped := ruletest.RunWithOptions(t, ConsistentTypeImports,
+			untyped := rule_testing.RunWithOptions(t, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source, testCase.options)
-			ruletest.ExpectClean(t, untyped)
+			rule_testing.ExpectClean(t, untyped)
 		})
 	}
 }
@@ -1036,7 +1036,7 @@ func TestConsistentTypeImportsDecoderDefaults(t *testing.T) {
 // is what makes that a choice somebody made rather than something that happened.
 func TestConsistentTypeImportsProposesNoRepair(t *testing.T) {
 	for _, source := range []string{"import Foo from 'foo';\nlet foo: Foo;\n", "import { A, B } from 'foo';\nconst foo: A = B();\n", "type T = import('foo');\n"} {
-		result := ruletest.RunTypedWithOptions(t, ConsistentTypeImports,
+		result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 			"consistent_type_imports.tsx", source, DefaultConsistentTypeImportsOptions())
 		if len(result.Diagnostics) == 0 {
 			t.Fatalf("expected a finding on %q", source)
@@ -1064,15 +1064,15 @@ func TestConsistentTypeImportsProposesNoRepair(t *testing.T) {
 // nil. The `import()` case below is the input that separates the two versions, and the import case
 // beside it is the control proving the harness is passing nil rather than failing to run.
 func TestConsistentTypeImportsWithNilOptions(t *testing.T) {
-	annotations := ruletest.RunTypedWithOptions(t, ConsistentTypeImports,
+	annotations := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 		"consistent_type_imports.tsx", "type T = import('foo');\n", nil)
-	ruletest.ExpectFindings(t, annotations, "noImportTypeAnnotations")
+	rule_testing.ExpectFindings(t, annotations, "noImportTypeAnnotations")
 
-	imported := ruletest.RunTypedWithOptions(t, ConsistentTypeImports,
+	imported := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 		"consistent_type_imports.tsx", "import Foo from 'foo';\nlet foo: Foo;\n", nil)
-	ruletest.ExpectFindings(t, imported, "typeOverValue")
+	rule_testing.ExpectFindings(t, imported, "typeOverValue")
 
-	clean := ruletest.RunTypedWithOptions(t, ConsistentTypeImports,
+	clean := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 		"consistent_type_imports.tsx", "import type { Foo } from 'foo';\nlet foo: Foo;\n", nil)
-	ruletest.ExpectClean(t, clean)
+	rule_testing.ExpectClean(t, clean)
 }

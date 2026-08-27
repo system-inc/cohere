@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const misusedNewFile = "/repository/source/Thing.ts"
@@ -87,8 +87,8 @@ func TestNoMisusedNewFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.messageIds...)
+			result := rule_testing.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
 		})
 	}
 }
@@ -196,7 +196,7 @@ func TestNoMisusedNewStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText))
 		})
 	}
 }
@@ -228,7 +228,7 @@ func TestNoMisusedNewPointsAtTheRightToken(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoMisusedNew, misusedNewFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
@@ -247,7 +247,7 @@ func TestNoMisusedNewPointsAtTheRightToken(t *testing.T) {
 // here rather than against the rule's own constants, so that a mutation moving a constant moves
 // only one side of the comparison.
 func TestNoMisusedNewMessagesReadAsWritten(t *testing.T) {
-	result := ruletest.Run(t, NoMisusedNew, misusedNewFile,
+	result := rule_testing.Run(t, NoMisusedNew, misusedNewFile,
 		"interface I { new (): I; constructor(): void;}")
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("got %d findings, want 2", len(result.Diagnostics))
@@ -259,7 +259,7 @@ func TestNoMisusedNewMessagesReadAsWritten(t *testing.T) {
 		t.Errorf("second finding id is %q, want %q", got, "interfaceConstructor")
 	}
 
-	classResult := ruletest.Run(t, NoMisusedNew, misusedNewFile, "class C { new(): C;}")
+	classResult := rule_testing.Run(t, NoMisusedNew, misusedNewFile, "class C { new(): C;}")
 	if len(classResult.Diagnostics) != 1 {
 		t.Fatalf("got %d class findings, want 1", len(classResult.Diagnostics))
 	}

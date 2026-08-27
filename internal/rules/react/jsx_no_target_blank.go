@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/jsx"
+	"github.com/system-inc/verify/internal/utilities/jsx"
 )
 
 var (
@@ -99,7 +99,7 @@ type jsxNoTargetBlankWireOptions struct {
 //	enforceDynamicLinks absent  -> `always`, so a dynamic href DOES count
 //	links absent                -> true, though nothing reads it either way
 //
-// A rule configured as a bare `"error"` is handed nil options, and `config.OptionsRegistry.Decode`
+// A rule configured as a bare `"error"` is handed nil options, and `configuration.OptionsRegistry.Decode`
 // turns an empty body into nil for a non-required rule, so the nil path has to produce upstream's
 // defaults rather than the zero struct. It does, and a fixture bypasses the decoder to pin it.
 func DecodeJsxNoTargetBlankOptions(raw []byte) (any, error) {

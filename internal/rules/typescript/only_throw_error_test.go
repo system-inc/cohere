@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 // onlyThrowErrorFile is the fixture name every case in this file runs under.
@@ -43,16 +43,16 @@ var onlyThrowErrorSupportingFiles = map[string]string{
 // Adding `class.ts` to every program rather than only to the two cases that import it costs
 // nothing and removes a per-case branch. It declares a module, so it cannot leak a global into the
 // other cases.
-func runOnlyThrowError(t *testing.T, sourceText string, options any) ruletest.Result {
+func runOnlyThrowError(t *testing.T, sourceText string, options any) rule_testing.Result {
 	t.Helper()
 	files := map[string]string{onlyThrowErrorFile: sourceText}
 	for name, contents := range onlyThrowErrorSupportingFiles {
 		files[name] = contents
 	}
 	if options == nil {
-		return ruletest.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, nil)
+		return rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, nil)
 	}
-	return ruletest.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, options)
+	return rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, options)
 }
 
 // TestOnlyThrowErrorStaysSilent replays every clean case in upstream's corpus.
@@ -103,23 +103,23 @@ func TestOnlyThrowErrorStaysSilent(t *testing.T) {
 		{"upstream valid case 29", "\nfunction fun(value: any) {\n  throw value;\n}\n    ", nil},
 		{"upstream valid case 30", "\nfunction fun(value: unknown) {\n  throw value;\n}\n    ", nil},
 		{"upstream valid case 31", "\nfunction fun<T extends Error>(t: T): void {\n  throw t;\n}\n    ", nil},
-		{"upstream valid case 32", "\nthrow undefined;\n      ", OnlyThrowErrorOptions{Allow: []typecheck.TypeOrValueSpecifier{{From: typecheck.TypeOrValueSpecifierFromLib, Name: []string{"undefined"}}}, AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}},
-		{"upstream valid case 33", "\nclass CustomError implements Error {}\nthrow new CustomError();\n      ", OnlyThrowErrorOptions{Allow: []typecheck.TypeOrValueSpecifier{{From: typecheck.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}}}, AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}},
-		{"upstream valid case 34", "\nthrow new Map();\n      ", OnlyThrowErrorOptions{Allow: []typecheck.TypeOrValueSpecifier{{From: typecheck.TypeOrValueSpecifierFromLib, Name: []string{"Map"}}}, AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}},
+		{"upstream valid case 32", "\nthrow undefined;\n      ", OnlyThrowErrorOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"undefined"}}}, AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
+		{"upstream valid case 33", "\nclass CustomError implements Error {}\nthrow new CustomError();\n      ", OnlyThrowErrorOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}}}, AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
+		{"upstream valid case 34", "\nthrow new Map();\n      ", OnlyThrowErrorOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}}}, AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
 		// upstream valid case 35 is not here. It is pinned by
 		// TestOnlyThrowErrorAmbientPackageIsAHarnessLimit instead, because our fixture tsconfig
 		// cannot express the program shape it needs. See that test for the measurement.
 		{"upstream valid case 36", "\nfunction func<T1, T2>() {\n  let err: Promise<T1> | Promise<T2>;\n  throw err;\n}\n      ", OnlyThrowErrorOptions{AllowInline: []string{"Promise"}}},
-		{"upstream valid case 37", "\ntry {\n} catch (e) {\n  throw e;\n}\n      ", OnlyThrowErrorOptions{AllowRethrowing: typecheck.Ref(true), AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}},
-		{"upstream valid case 38", "\ntry {\n} catch (eOuter) {\n  try {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    }\n  } catch (eInner) {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    } else {\n      throw eInner;\n    }\n  }\n}\n      ", OnlyThrowErrorOptions{AllowRethrowing: typecheck.Ref(true), AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}},
-		{"upstream valid case 39", "\nPromise.reject('foo').catch(e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: typecheck.Ref(true), AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}},
-		{"upstream valid case 40", "\nasync function foo() {\n  throw await Promise.resolve(new Error('error'));\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: typecheck.Ref(false)}},
-		{"upstream valid case 41", "\nfunction* foo(): Generator<number, void, Error> {\n  throw yield 303;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: typecheck.Ref(false)}},
+		{"upstream valid case 37", "\ntry {\n} catch (e) {\n  throw e;\n}\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
+		{"upstream valid case 38", "\ntry {\n} catch (eOuter) {\n  try {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    }\n  } catch (eInner) {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    } else {\n      throw eInner;\n    }\n  }\n}\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
+		{"upstream valid case 39", "\nPromise.reject('foo').catch(e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
+		{"upstream valid case 40", "\nasync function foo() {\n  throw await Promise.resolve(new Error('error'));\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}},
+		{"upstream valid case 41", "\nfunction* foo(): Generator<number, void, Error> {\n  throw yield 303;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, runOnlyThrowError(t, testCase.sourceText, testCase.options))
+			rule_testing.ExpectClean(t, runOnlyThrowError(t, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -171,25 +171,25 @@ func TestOnlyThrowErrorFires(t *testing.T) {
 		{"upstream invalid case 30", "\nfunction foo() {\n  throw Object.assign({ foo: 'foo' }, { bar: 'bar' });\n}\n      ", nil, []string{"object"}},
 		{"upstream invalid case 31", "\nconst foo: Error | { bar: string } = bar();\nfunction bar() {\n  throw foo;\n}\n      ", nil, []string{"object"}},
 		{"upstream invalid case 32", "\ndeclare const foo: Error | string;\nthrow foo as string;\n      ", nil, []string{"object"}},
-		{"upstream invalid case 33", "\nfunction fun(value: any) {\n  throw value;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: typecheck.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 34", "\nfunction fun(value: unknown) {\n  throw value;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingUnknown: typecheck.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 33", "\nfunction fun(value: any) {\n  throw value;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 34", "\nfunction fun(value: unknown) {\n  throw value;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
 		{"upstream invalid case 35", "\nfunction fun<T extends number>(t: T): void {\n  throw t;\n}\n      ", nil, []string{"object"}},
 		{"upstream invalid case 36", "\nfunction func<T1, T2>() {\n  let err: Promise<T1> | Promise<T2> | void;\n  throw err;\n}\n      ", OnlyThrowErrorOptions{AllowInline: []string{"Promise"}}, []string{"object"}},
-		{"upstream invalid case 37", "\nclass UnknownError implements Error {}\nthrow new UnknownError();\n      ", OnlyThrowErrorOptions{Allow: []typecheck.TypeOrValueSpecifier{{From: typecheck.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}}}, AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 38", "\nlet x = 1;\nPromise.reject('foo').catch(e => {\n  throw x;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: typecheck.Ref(true), AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 39", "\nPromise.reject('foo').catch((...e) => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: typecheck.Ref(true), AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 40", "\ndeclare const x: any[];\nPromise.reject('foo').catch(...x, e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: typecheck.Ref(true), AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 41", "\ndeclare const x: any[];\nPromise.reject('foo').then(...x, e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: typecheck.Ref(true), AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 42", "\ndeclare const onFulfilled: any;\ndeclare const x: any[];\nPromise.reject('foo').then(onFulfilled, ...x, e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: typecheck.Ref(true), AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 43", "\nPromise.reject('foo').then((...e) => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: typecheck.Ref(true), AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 44", "\nPromise.reject('foo').then(e => {\n  throw globalThis;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: typecheck.Ref(true), AllowThrowingAny: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 45", "\nasync function foo() {\n  throw await bar;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: typecheck.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 46", "\nasync function foo() {\n  throw await Promise.resolve<number>(303);\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: typecheck.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 37", "\nclass UnknownError implements Error {}\nthrow new UnknownError();\n      ", OnlyThrowErrorOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}}}, AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 38", "\nlet x = 1;\nPromise.reject('foo').catch(e => {\n  throw x;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 39", "\nPromise.reject('foo').catch((...e) => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 40", "\ndeclare const x: any[];\nPromise.reject('foo').catch(...x, e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 41", "\ndeclare const x: any[];\nPromise.reject('foo').then(...x, e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 42", "\ndeclare const onFulfilled: any;\ndeclare const x: any[];\nPromise.reject('foo').then(onFulfilled, ...x, e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 43", "\nPromise.reject('foo').then((...e) => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 44", "\nPromise.reject('foo').then(e => {\n  throw globalThis;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 45", "\nasync function foo() {\n  throw await bar;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}, []string{"object"}},
+		{"upstream invalid case 46", "\nasync function foo() {\n  throw await Promise.resolve<number>(303);\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}, []string{"object"}},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, runOnlyThrowError(t, testCase.sourceText, testCase.options), testCase.wantIds...)
+			rule_testing.ExpectFindings(t, runOnlyThrowError(t, testCase.sourceText, testCase.options), testCase.wantIds...)
 		})
 	}
 }
@@ -205,7 +205,7 @@ func TestOnlyThrowErrorFires(t *testing.T) {
 //
 // # The harness trims, and a span sliced from the Go literal would be off by one
 //
-// `ruletest` writes each fixture as `strings.TrimSpace(contents)+"\n"`, so a source string written
+// `rule_testing` writes each fixture as `strings.TrimSpace(contents)+"\n"`, so a source string written
 // with a leading newline is one byte shorter on disk than in the literal here. Every source in
 // this test is therefore written WITHOUT leading whitespace, so the literal and the file agree and
 // a slice taken against the literal is the slice the rule saw.
@@ -221,7 +221,7 @@ func TestOnlyThrowErrorSpans(t *testing.T) {
 		{"a new expression points at the whole construction", "throw new String('');", nil, []string{"new String('')"}},
 		{"a conditional points at the whole conditional", "declare const foo: boolean;\nthrow foo ? 'not an Error' : 'literal';", nil, []string{"foo ? 'not an Error' : 'literal'"}},
 		{"a member access points at the access", "const foo = {\n  msg: 'error',\n};\nthrow foo.msg;", nil, []string{"foo.msg"}},
-		{"an await points at the await expression", "declare const bar: number;\nasync function foo() {\n  throw await bar;\n}", OnlyThrowErrorOptions{AllowThrowingAny: typecheck.Ref(false)}, []string{"await bar"}},
+		{"an await points at the await expression", "declare const bar: number;\nasync function foo() {\n  throw await bar;\n}", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}, []string{"await bar"}},
 
 		// Parentheses are skipped, matching upstream's span exactly. Measured on the installed
 		// rule: `throw ('error');` reports at columns 8..15, which excludes both parens.
@@ -299,12 +299,12 @@ func TestOnlyThrowErrorMessages(t *testing.T) {
 func TestOnlyThrowErrorParenthesizedRethrow(t *testing.T) {
 	source := "try {\n} catch (e) {\n  throw (e);\n}"
 
-	ruletest.ExpectClean(t, runOnlyThrowError(t, source, nil))
+	rule_testing.ExpectClean(t, runOnlyThrowError(t, source, nil))
 
-	ruletest.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
-		AllowRethrowing:      typecheck.Ref(false),
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
+		AllowRethrowing:      type_checking.Ref(false),
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}), "object")
 }
 
@@ -321,9 +321,9 @@ func TestOnlyThrowErrorParenthesizedRethrow(t *testing.T) {
 // before the fixtures were written rather than after.
 func TestOnlyThrowErrorRethrowShape(t *testing.T) {
 	strict := OnlyThrowErrorOptions{
-		AllowRethrowing:      typecheck.Ref(true),
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+		AllowRethrowing:      type_checking.Ref(true),
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}
 
 	cases := []struct {
@@ -365,10 +365,10 @@ func TestOnlyThrowErrorRethrowShape(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runOnlyThrowError(t, testCase.sourceText, strict)
 			if testCase.wantIds == nil {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -390,10 +390,10 @@ func TestOnlyThrowErrorRethrowShape(t *testing.T) {
 // fails here loudly instead of quietly agreeing.
 func TestOnlyThrowErrorConstFoldedKeyDiverges(t *testing.T) {
 	source := "const k = 'catch';\nPromise.reject('x')[k](e => {\n  throw e;\n});"
-	ruletest.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
-		AllowRethrowing:      typecheck.Ref(true),
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
+		AllowRethrowing:      type_checking.Ref(true),
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}), "object")
 }
 
@@ -412,27 +412,27 @@ func TestOnlyThrowErrorDefaultsArePermissive(t *testing.T) {
 		{
 			"any is thrown freely by default",
 			"function fun(value: any) {\n  throw value;\n}",
-			OnlyThrowErrorOptions{AllowThrowingAny: typecheck.Ref(false)},
+			OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)},
 		},
 		{
 			"unknown is thrown freely by default",
 			"function fun(value: unknown) {\n  throw value;\n}",
-			OnlyThrowErrorOptions{AllowThrowingUnknown: typecheck.Ref(false)},
+			OnlyThrowErrorOptions{AllowThrowingUnknown: type_checking.Ref(false)},
 		},
 		{
 			"a caught value is rethrown freely by default",
 			"try {\n} catch (e) {\n  throw e;\n}",
-			OnlyThrowErrorOptions{AllowRethrowing: typecheck.Ref(false), AllowThrowingUnknown: typecheck.Ref(false)},
+			OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)},
 		},
 	}
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			// nil options is what a rule configured as bare "error" is handed.
-			ruletest.ExpectClean(t, runOnlyThrowError(t, testCase.sourceText, nil))
+			rule_testing.ExpectClean(t, runOnlyThrowError(t, testCase.sourceText, nil))
 			// And the same source under the option turned off, which shows the default is what
 			// made the first assertion pass rather than something else about the input.
-			ruletest.ExpectFindings(t, runOnlyThrowError(t, testCase.sourceText, testCase.strictValue), "object")
+			rule_testing.ExpectFindings(t, runOnlyThrowError(t, testCase.sourceText, testCase.strictValue), "object")
 		})
 	}
 }
@@ -449,14 +449,14 @@ func TestOnlyThrowErrorDefaultsArePermissive(t *testing.T) {
 // on a member rather than on the whole. Reading upstream's `isTypeFlagSet` alone would suggest the
 // opposite, so this is measured against the installed rule and pinned here.
 func TestOnlyThrowErrorUndefBeatsTheEscapes(t *testing.T) {
-	ruletest.ExpectFindings(t, runOnlyThrowError(t, "throw undefined;", nil), "undef")
+	rule_testing.ExpectFindings(t, runOnlyThrowError(t, "throw undefined;", nil), "undef")
 
-	ruletest.ExpectFindings(t, runOnlyThrowError(t, "throw undefined;", OnlyThrowErrorOptions{
-		AllowThrowingAny:     typecheck.Ref(true),
-		AllowThrowingUnknown: typecheck.Ref(true),
+	rule_testing.ExpectFindings(t, runOnlyThrowError(t, "throw undefined;", OnlyThrowErrorOptions{
+		AllowThrowingAny:     type_checking.Ref(true),
+		AllowThrowingUnknown: type_checking.Ref(true),
 	}), "undef")
 
-	ruletest.ExpectFindings(t, runOnlyThrowError(t,
+	rule_testing.ExpectFindings(t, runOnlyThrowError(t,
 		"declare const nullishError: Error | undefined;\nthrow nullishError;", nil), "object")
 }
 
@@ -472,7 +472,7 @@ func TestOnlyThrowErrorNeedsTheTypedHarness(t *testing.T) {
 
 	// The untyped harness hands the rule a nil checker, and the guard turns that into silence.
 	// Asserting the silence is what pins the guard: without it this call panics.
-	ruletest.ExpectClean(t, ruletest.Run(t, OnlyThrowError, onlyThrowErrorFile, "throw 'error';"))
+	rule_testing.ExpectClean(t, rule_testing.Run(t, OnlyThrowError, onlyThrowErrorFile, "throw 'error';"))
 }
 
 // TestDecodeOnlyThrowErrorOptions puts the decoder itself under test.
@@ -523,7 +523,7 @@ func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
 		if len(options.Allow) != 1 {
 			t.Fatalf("Allow holds %d specifiers, want 1", len(options.Allow))
 		}
-		if options.Allow[0].From != typecheck.TypeOrValueSpecifierFromLib {
+		if options.Allow[0].From != type_checking.TypeOrValueSpecifierFromLib {
 			t.Errorf("from decoded to %v, want the lib enum", options.Allow[0].From)
 		}
 		if len(options.Allow[0].Name) != 1 || options.Allow[0].Name[0] != "undefined" {
@@ -573,7 +573,7 @@ func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
 		if len(options.Allow) != 1 {
 			t.Fatalf("Allow decoded to %+v", options.Allow)
 		}
-		if options.Allow[0].From != typecheck.TypeOrValueSpecifierFromPackage {
+		if options.Allow[0].From != type_checking.TypeOrValueSpecifierFromPackage {
 			t.Errorf("from decoded to %v, want the package enum", options.Allow[0].From)
 		}
 		if options.Allow[0].Package != "errors" {
@@ -595,7 +595,7 @@ func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
 //	  export function createError(): ErrorLike;
 //	}
 //
-// `ruletest`'s tsconfig pins `moduleDetection: "force"`, which makes every file a module. A
+// `rule_testing`'s tsconfig pins `moduleDetection: "force"`, which makes every file a module. A
 // `declare module 'errors'` inside a module is a module AUGMENTATION of an existing module rather
 // than an ambient declaration of a new one, so `errors` never resolves, `createError()` has the
 // error type, and the throw reports.
@@ -627,25 +627,25 @@ func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(t *testing.T) {
 		"errors.ts":        "// @ts-ignore\ndeclare module 'errors' {\n  class ErrorLike {}\n\n  export function createError(): ErrorLike;\n}\n",
 	}
 	options := OnlyThrowErrorOptions{
-		Allow: []typecheck.TypeOrValueSpecifier{
-			{From: typecheck.TypeOrValueSpecifierFromPackage, Name: []string{"ErrorLike"}, Package: "errors"},
+		Allow: []type_checking.TypeOrValueSpecifier{
+			{From: type_checking.TypeOrValueSpecifierFromPackage, Name: []string{"ErrorLike"}, Package: "errors"},
 		},
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}
 
 	// Upstream is silent; we report, because the module does not resolve under this tsconfig.
-	ruletest.ExpectFindings(t,
-		ruletest.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, options), "object")
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, options), "object")
 
 	// The control: the bare inline name needs no file or package comparison, so a type that had
 	// resolved to ErrorLike would go clean here. It reports, which locates the failure in module
 	// resolution rather than in the specifier matcher.
-	ruletest.ExpectFindings(t,
-		ruletest.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, OnlyThrowErrorOptions{
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, OnlyThrowErrorOptions{
 			AllowInline:          []string{"ErrorLike"},
-			AllowThrowingAny:     typecheck.Ref(false),
-			AllowThrowingUnknown: typecheck.Ref(false),
+			AllowThrowingAny:     type_checking.Ref(false),
+			AllowThrowingUnknown: type_checking.Ref(false),
 		}), "object")
 }
 
@@ -669,21 +669,21 @@ func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(t *testing.T) {
 // category is measured rather than argued. Neither input appears anywhere in upstream's corpus.
 func TestOnlyThrowErrorSurvivesMalformedShapes(t *testing.T) {
 	strict := OnlyThrowErrorOptions{
-		AllowRethrowing:      typecheck.Ref(true),
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+		AllowRethrowing:      type_checking.Ref(true),
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}
 
 	t.Run("a one-argument then does not index past its arguments", func(t *testing.T) {
 		// `.then` puts the rejection handler second, so this arrow is the FULFILLMENT handler and
 		// the throw is not a rethrow. Upstream reports it; the point here is that we get a verdict
 		// at all rather than a panic.
-		ruletest.ExpectFindings(t, runOnlyThrowError(t,
+		rule_testing.ExpectFindings(t, runOnlyThrowError(t,
 			"Promise.reject('x').then(e => {\n  throw e;\n});", strict), "object")
 	})
 
 	t.Run("a computed key that is not a literal does not read text off it", func(t *testing.T) {
-		ruletest.ExpectFindings(t, runOnlyThrowError(t,
+		rule_testing.ExpectFindings(t, runOnlyThrowError(t,
 			"declare const o: any;\ndeclare function k(): string;\no[k()](e => {\n  throw e;\n});", strict), "object")
 	})
 }
@@ -703,12 +703,12 @@ func TestOnlyThrowErrorSurvivesMalformedShapes(t *testing.T) {
 // as coverage while proving nothing.
 func TestOnlyThrowErrorPrivateMethodName(t *testing.T) {
 	strict := OnlyThrowErrorOptions{
-		AllowRethrowing:      typecheck.Ref(true),
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+		AllowRethrowing:      type_checking.Ref(true),
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}
 
-	ruletest.ExpectClean(t, runOnlyThrowError(t,
+	rule_testing.ExpectClean(t, runOnlyThrowError(t,
 		"class C {\n"+
 			"  then(cb: (v: number) => void, r?: (e: any) => void): C {\n"+
 			"    return this;\n"+
@@ -723,7 +723,7 @@ func TestOnlyThrowErrorPrivateMethodName(t *testing.T) {
 
 	// The control: the same shape on a receiver that is NOT thenable reports, which shows the case
 	// above is clean because the rethrow arm fired rather than because private names are skipped.
-	ruletest.ExpectFindings(t, runOnlyThrowError(t,
+	rule_testing.ExpectFindings(t, runOnlyThrowError(t,
 		"class C {\n"+
 			"  #catch(cb: (e: any) => void) {}\n"+
 			"  m() {\n"+
@@ -737,7 +737,7 @@ func TestOnlyThrowErrorPrivateMethodName(t *testing.T) {
 // TestOnlyThrowErrorSpecifierComposites pins the union and intersection semantics of `allow`.
 //
 // These live in the shelf's `TypeMatchesSomeSpecifier`, and neither recursion was there before this
-// port: `internal/utils/typecheck/specifier.go` was written against a tsgolint revision that
+// port: `internal/utilities/typecheck/specifier.go` was written against a tsgolint revision that
 // predates them, so a composite type was tested against its own symbol, which is nil, and answered
 // false. Upstream's `typeMatchesSpecifier` recurses both ways and the two directions are OPPOSITE,
 // which is the asymmetry a reader would most likely collapse into one.
@@ -754,21 +754,21 @@ func TestOnlyThrowErrorPrivateMethodName(t *testing.T) {
 // The middle row is the one that separates `every` from `some`; without it the flip is invisible.
 func TestOnlyThrowErrorSpecifierComposites(t *testing.T) {
 	allowMap := OnlyThrowErrorOptions{
-		Allow:                []typecheck.TypeOrValueSpecifier{{From: typecheck.TypeOrValueSpecifierFromLib, Name: []string{"Map"}}},
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+		Allow:                []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}}},
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}
 
 	t.Run("a union matches only when every member matches", func(t *testing.T) {
-		ruletest.ExpectClean(t, runOnlyThrowError(t,
+		rule_testing.ExpectClean(t, runOnlyThrowError(t,
 			"declare const m: Map<string, string> | Map<number, number>;\nthrow m;", allowMap))
 
-		ruletest.ExpectFindings(t, runOnlyThrowError(t,
+		rule_testing.ExpectFindings(t, runOnlyThrowError(t,
 			"declare const m: Map<string, string> | Set<number>;\nthrow m;", allowMap), "object")
 	})
 
 	t.Run("an intersection matches when any member matches", func(t *testing.T) {
-		ruletest.ExpectClean(t, runOnlyThrowError(t,
+		rule_testing.ExpectClean(t, runOnlyThrowError(t,
 			"declare const m: Map<string, string> & { a: 1 };\nthrow m;", allowMap))
 	})
 }
@@ -796,21 +796,21 @@ func TestOnlyThrowErrorSpecifierComposites(t *testing.T) {
 func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(t *testing.T) {
 	source := "import { thing } from './nonexistent-module-xyz';\nthrow thing;"
 
-	ruletest.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
-		Allow:                []typecheck.TypeOrValueSpecifier{{From: typecheck.TypeOrValueSpecifierFromLib, Name: []string{"error"}}},
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
+		Allow:                []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"error"}}},
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}), "object")
 
-	ruletest.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
+	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
 		AllowInline:          []string{"error"},
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}), "object")
 
-	ruletest.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}), "object")
 }
 
@@ -832,14 +832,14 @@ func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(t *testing.T) {
 // Neither input is in any corpus, on either side, because neither parses upstream.
 func TestOnlyThrowErrorDeclinesSynthesizedNodes(t *testing.T) {
 	strict := OnlyThrowErrorOptions{
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}
 
 	for _, source := range []string{"throw;", "throw ();", "throw (());"} {
 		t.Run(source, func(t *testing.T) {
-			ruletest.ExpectClean(t, runOnlyThrowError(t, source, strict))
-			ruletest.ExpectClean(t, runOnlyThrowError(t, source, nil))
+			rule_testing.ExpectClean(t, runOnlyThrowError(t, source, strict))
+			rule_testing.ExpectClean(t, runOnlyThrowError(t, source, nil))
 		})
 	}
 }
@@ -868,14 +868,14 @@ func TestOnlyThrowErrorDeclinesSynthesizedNodes(t *testing.T) {
 // the nil guard under test.
 func TestOnlyThrowErrorUndeclaredIdentifier(t *testing.T) {
 	strict := OnlyThrowErrorOptions{
-		AllowRethrowing:      typecheck.Ref(true),
-		AllowThrowingAny:     typecheck.Ref(false),
-		AllowThrowingUnknown: typecheck.Ref(false),
+		AllowRethrowing:      type_checking.Ref(true),
+		AllowThrowingAny:     type_checking.Ref(false),
+		AllowThrowingUnknown: type_checking.Ref(false),
 	}
-	ruletest.ExpectFindings(t, runOnlyThrowError(t, "throw notDeclaredAnywhere;", strict), "object")
+	rule_testing.ExpectFindings(t, runOnlyThrowError(t, "throw notDeclaredAnywhere;", strict), "object")
 
 	// Silent at the defaults: the error type reports the `any` flag.
-	ruletest.ExpectClean(t, runOnlyThrowError(t, "throw notDeclaredAnywhere;", nil))
+	rule_testing.ExpectClean(t, runOnlyThrowError(t, "throw notDeclaredAnywhere;", nil))
 }
 
 // TestOnlyThrowErrorReadsProgram pins the ReadsProgram declaration, and proves the claim behind it.
@@ -897,13 +897,13 @@ func TestOnlyThrowErrorReadsProgram(t *testing.T) {
 	subject := "import { Wrapped } from './other';\nthrow new Wrapped();"
 
 	// The other file's class extends Error, so the throw is fine.
-	ruletest.ExpectClean(t, ruletest.RunTypedFilesWithOptions(t, OnlyThrowError, map[string]string{
+	rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, map[string]string{
 		onlyThrowErrorFile: subject,
 		"other.ts":         "export class Wrapped extends Error {}\n",
 	}, onlyThrowErrorFile, nil))
 
 	// Byte-for-byte the same subject file, and the verdict moves because the OTHER file changed.
-	ruletest.ExpectFindings(t, ruletest.RunTypedFilesWithOptions(t, OnlyThrowError, map[string]string{
+	rule_testing.ExpectFindings(t, rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, map[string]string{
 		onlyThrowErrorFile: subject,
 		"other.ts":         "export class Wrapped {}\n",
 	}, onlyThrowErrorFile, nil), "object")

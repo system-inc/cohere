@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // newFile is where the fixtures pretend to live.
@@ -27,8 +27,8 @@ func TestNoNewFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoNew, newFile, testCase.sourceText), "noNewStatement")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoNew, newFile, testCase.sourceText), "noNewStatement")
 		})
 	}
 }
@@ -44,7 +44,7 @@ func TestNoNewStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoNew, newFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoNew, newFile, testCase.sourceText))
 		})
 	}
 }
@@ -82,8 +82,8 @@ func TestNoNewFiresOnShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoNew, newFile, testCase.sourceText), "noNewStatement")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoNew, newFile, testCase.sourceText), "noNewStatement")
 		})
 	}
 }
@@ -109,7 +109,7 @@ func TestNoNewDeclinesShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoNew, newFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoNew, newFile, testCase.sourceText))
 		})
 	}
 }
@@ -138,7 +138,7 @@ func TestNoNewReportsTheWholeStatement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoNew, newFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoNew, newFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -156,7 +156,7 @@ func TestNoNewReportsTheWholeStatement(t *testing.T) {
 
 // The message, asserted against literals typed here rather than the rule's own constants.
 func TestNoNewReportsWhyItMatters(t *testing.T) {
-	result := ruletest.Run(t, NoNew, newFile, "new Date()")
+	result := rule_testing.Run(t, NoNew, newFile, "new Date()")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}

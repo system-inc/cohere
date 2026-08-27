@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The eight passing cases from oxc's corpus, copied byte for byte out of the extractor's dump
@@ -52,8 +52,8 @@ func TestInlineScriptIdIsSilentOnUpstreamPassCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -86,8 +86,8 @@ func TestInlineScriptIdFiresOnUpstreamFailCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, "inlineScriptId")
+			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, "inlineScriptId")
 		})
 	}
 }
@@ -153,8 +153,8 @@ func TestInlineScriptIdIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -204,8 +204,8 @@ func TestInlineScriptIdFiresOnCasesUpstreamDoesNotWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, "inlineScriptId")
+			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, "inlineScriptId")
 		})
 	}
 }
@@ -249,8 +249,8 @@ func TestInlineScriptIdPointsAtTheTagName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, "inlineScriptId")
+			result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, "inlineScriptId")
 
 			diagnostic := result.Diagnostics[0]
 			reported := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
@@ -266,8 +266,8 @@ func TestInlineScriptIdPointsAtTheTagName(t *testing.T) {
 // any needle short enough to look right.
 func TestInlineScriptIdRendersItsMessageExactly(t *testing.T) {
 	source := "import Script from 'next/script';\nexport default function TestPage() {\n  return (<Script>{`console.log('x');`}</Script>)\n}\n"
-	result := ruletest.Run(t, InlineScriptId, "pages/index.tsx", source)
-	ruletest.ExpectFindings(t, result, "inlineScriptId")
+	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(t, result, "inlineScriptId")
 
 	wantMessage := "This renders a next/script component with inline content but no id attribute. " +
 		"The framework deduplicates inline scripts by that id, so without one the same script is " +
@@ -286,8 +286,8 @@ func TestInlineScriptIdRendersItsMessageExactly(t *testing.T) {
 // implementation passes every other fixture in this file while getting wrong.
 func TestInlineScriptIdArmsOnEveryDefaultImportRatherThanTheLastOne(t *testing.T) {
 	source := "import Script from 'next/script';\nimport Other from 'next/script';\nexport default function TestPage() {\n  return (<div><Script>{`a`}</Script><Other>{`b`}</Other></div>)\n}\n"
-	result := ruletest.Run(t, InlineScriptId, "pages/index.tsx", source)
-	ruletest.ExpectFindings(t, result, "inlineScriptId", "inlineScriptId")
+	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(t, result, "inlineScriptId", "inlineScriptId")
 
 	firstReported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	secondReported := source[result.Diagnostics[1].Range.Pos():result.Diagnostics[1].Range.End()]
@@ -302,8 +302,8 @@ func TestInlineScriptIdArmsOnEveryDefaultImportRatherThanTheLastOne(t *testing.T
 // This fixture is what fails if the scan is ever moved out of Run into a listener.
 func TestInlineScriptIdSeesAnImportWrittenAfterTheJsx(t *testing.T) {
 	source := "export default function TestPage() {\n  return (<Script>{`console.log('x');`}</Script>)\n}\nimport Script from 'next/script';\n"
-	result := ruletest.Run(t, InlineScriptId, "pages/index.tsx", source)
-	ruletest.ExpectFindings(t, result, "inlineScriptId")
+	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(t, result, "inlineScriptId")
 }
 
 // A parenthesized object spread that does NOT supply an id, which is the only shape that separates
@@ -320,6 +320,6 @@ func TestInlineScriptIdSeesAnImportWrittenAfterTheJsx(t *testing.T) {
 // does not make obvious.
 func TestInlineScriptIdReadsThroughParenthesesRatherThanAbandoningTheElement(t *testing.T) {
 	source := "import Script from 'next/script';\nexport default function TestPage() {\n  return (<Script {...({ strategy: \"lazyOnload\" })}>{`console.log('x');`}</Script>)\n}\n"
-	result := ruletest.Run(t, InlineScriptId, "pages/index.tsx", source)
-	ruletest.ExpectFindings(t, result, "inlineScriptId")
+	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(t, result, "inlineScriptId")
 }

@@ -111,7 +111,7 @@ func TestParityAgainstInventory(t *testing.T) {
 // actually sees and found the count could not distinguish the two spellings at all.
 //
 // The rule is bare, and the reason is not taste. `verify --rules` prints names with no namespace,
-// every rule in the catalog registers bare, and `config.settingFor` performs the same split on the
+// every rule in the catalog registers bare, and `configuration.settingFor` performs the same split on the
 // `/` boundary when it resolves an inventory entry against a registration. A namespaced name is
 // therefore inconsistent with its siblings in output a user reads, and the only signal that would
 // have caught it is a number that cannot.
@@ -210,7 +210,7 @@ func registeredRuleNames() []string {
 // matchRegistered reports which registered rule an inventory entry names, if any.
 //
 // The inventory writes `nextjs/no-img-element` and the registry writes `no-img-element`, the same
-// split `config.settingFor` resolves. The suffix must fall on a `/` boundary for the same reason it
+// split `configuration.settingFor` resolves. The suffix must fall on a `/` boundary for the same reason it
 // does there: plain suffix matching would let `no-enum` claim `consistency-no-enum`, which is a rule
 // nobody named, and the count would read one higher than the truth.
 func matchRegistered(entry string, registered []string) (string, bool) {

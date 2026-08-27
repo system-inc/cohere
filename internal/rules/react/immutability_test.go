@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // TestImmutabilityFires covers every input measured to report under React's own rule.
@@ -282,8 +282,8 @@ function Component(props) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, Immutability, "component.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.messages...)
+			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.messages...)
 		})
 	}
 }
@@ -309,7 +309,7 @@ func TestImmutabilityStaysSilent(t *testing.T) {
 			// green, because nothing in the imported set declares a variable inside a callback and writes
 			// it from a deeper one. It was 30 findings on Kirk's tree.
 			// A ref reached by NAME rather than by type, which is the half of the ref exemption a
-			// fixture can actually see. `ruletest`'s tsconfig sets `types: []` and resolves no
+			// fixture can actually see. `rule_testing`'s tsconfig sets `types: []` and resolves no
 			// `node_modules`, so `@types/react` never resolves here and the CHECKER half of that
 			// exemption is unreachable through this harness at all; it is pinned by the dry run instead,
 			// where it removed 211 findings. Measured CLEAN under React against
@@ -493,8 +493,8 @@ function Component(props) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, Immutability, "component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -555,7 +555,7 @@ func TestImmutabilitySpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, Immutability, "component.tsx", testCase.source)
+			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
 			if len(result.Diagnostics) != len(testCase.expected) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.expected), len(result.Diagnostics))
 			}
@@ -581,7 +581,7 @@ func TestImmutabilitySpans(t *testing.T) {
 // written the other way, because equality against the constant moves with the constant.
 func TestImmutabilityMessagesAreDistinct(t *testing.T) {
 	source := "function Component(props) {\n  props.a = 1;\n  return <div />;\n}\n"
-	result := ruletest.RunTyped(t, Immutability, "component.tsx", source)
+	result := rule_testing.RunTyped(t, Immutability, "component.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 	}
@@ -618,7 +618,7 @@ func TestImmutabilityReasonSelectsTheMessage(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, Immutability, "component.tsx", testCase.source)
+			result := rule_testing.RunTyped(t, Immutability, "component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 			}
@@ -653,7 +653,7 @@ func TestImmutabilityConvergenceEqualityIgnoresReasons(t *testing.T) {
 
 // TestImmutabilityJoinIsNotAnOrdering pins the third element.
 //
-// `internal/utils/hir/hir.go` carries a warning addressed to this rule: a dataflow pass whose join
+// `internal/utilities/hir/high_level_intermediate_representation.go` carries a warning addressed to this rule: a dataflow pass whose join
 // is "take the larger constant" is self-consistent, passes its own tests, and is wrong, because
 // `Frozen` joined with `Mutable` is `MaybeFrozen`, an element that is NEITHER operand. Every row
 // here was measured against React's executable with the compilation gate held constant.
@@ -702,10 +702,10 @@ func TestImmutabilityJoinIsNotAnOrdering(t *testing.T) {
 // would pass vacuously.
 func TestImmutabilityRequiresTheTypedHarness(t *testing.T) {
 	source := "function Component(props) {\n  props.a = 1;\n  return <div />;\n}\n"
-	if result := ruletest.RunTyped(t, Immutability, "component.tsx", source); len(result.Diagnostics) == 0 {
+	if result := rule_testing.RunTyped(t, Immutability, "component.tsx", source); len(result.Diagnostics) == 0 {
 		t.Fatal("the typed harness reported nothing, so this test cannot see a regression")
 	}
-	if result := ruletest.Run(t, Immutability, "component.tsx", source); len(result.Diagnostics) != 0 {
+	if result := rule_testing.Run(t, Immutability, "component.tsx", source); len(result.Diagnostics) != 0 {
 		t.Errorf("expected silence without a checker, got %d findings", len(result.Diagnostics))
 	}
 }

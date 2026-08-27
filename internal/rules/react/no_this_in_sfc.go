@@ -3,7 +3,7 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	utilsreact "github.com/system-inc/verify/internal/utils/react"
+	utilsreact "github.com/system-inc/verify/internal/utilities/react"
 )
 
 var messageNoThisInSfc = rule.Message{
@@ -76,7 +76,7 @@ var messageNoThisInSfc = rule.Message{
 //
 // # The name test is ASCII, and the shelf helper is not
 //
-// `internal/utils/react.IsLikelyComponentName` is exactly the shape this reaches for and is wrong
+// `internal/utilities/react.IsLikelyComponentName` is exactly the shape this reaches for and is wrong
 // for it. Its body is `unicode.IsUpper(runes[0])`, which is Unicode-wide; oxc's
 // `is_react_component_name` is `c.is_ascii_uppercase()`. Measured on the release binary, all three
 // of `function Фoo`, `function Λoo` and `function Éoo` reading `this.props.a` are SILENT upstream,
@@ -132,7 +132,7 @@ var messageNoThisInSfc = rule.Message{
 // exempt, and `Foo.Component`, `Base` and a class with no extends clause do not.
 //
 // The ES5 half is where the shelf is wrong in the other direction.
-// `internal/utils/react.IsEs5ComponentCall` accepts `createClass` and `React.createClass` as well
+// `internal/utilities/react.IsEs5ComponentCall` accepts `createClass` and `React.createClass` as well
 // as `createReactClass`, while oxc keys both arms of `is_es5_component` on the single constant
 // `CREATE_CLASS = "createReactClass"`. Measured on the release binary, an arrow component holding a
 // `this` read inside `createReactClass({...})` is SILENT while the same thing inside
@@ -320,7 +320,7 @@ func functionNameOf(function *ast.Node) (string, bool) {
 
 // isAsciiComponentName is oxc's `is_react_component_name`, which is ASCII-uppercase specifically.
 //
-// Deliberately not `internal/utils/react.IsLikelyComponentName`, whose body is `unicode.IsUpper`
+// Deliberately not `internal/utilities/react.IsLikelyComponentName`, whose body is `unicode.IsUpper`
 // and answers true for `Фoo`, `Λoo` and `Éoo`. All three are silent on the release binary. See the
 // rule doc.
 func isAsciiComponentName(name string) bool {

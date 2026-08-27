@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const emptyCharacterClassFile = "/repository/source/Thing.ts"
@@ -33,7 +33,7 @@ func TestNoEmptyCharacterClassFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
 				"unexpectedEmptyCharacterClass")
 		})
 	}
@@ -58,7 +58,7 @@ func TestNoEmptyCharacterClassFiresInsideNestedClasses(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
 				"unexpectedEmptyCharacterClass")
 		})
 	}
@@ -95,7 +95,7 @@ func TestNoEmptyCharacterClassStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText))
 		})
 	}
 }
@@ -121,7 +121,7 @@ func TestNoEmptyCharacterClassStaysSilentInsideNestedClasses(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText))
 		})
 	}
 }
@@ -136,7 +136,7 @@ func TestNoEmptyCharacterClassStaysSilentInsideNestedClasses(t *testing.T) {
 // report from the one the gate we are matching produces.
 func TestNoEmptyCharacterClassReportsTheClassAndNotTheLiteral(t *testing.T) {
 	sourceText := "export const Pattern = /foo[]bar/;\n"
-	result := ruletest.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
+	result := rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
@@ -152,7 +152,7 @@ func TestNoEmptyCharacterClassReportsTheClassAndNotTheLiteral(t *testing.T) {
 // derived from it lands on the comment's line instead of the code's.
 func TestNoEmptyCharacterClassReportsPastLeadingTrivia(t *testing.T) {
 	sourceText := "// a comment that must not be swallowed\nexport const Pattern = /foo[]bar/;\n"
-	result := ruletest.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
+	result := rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
@@ -165,7 +165,7 @@ func TestNoEmptyCharacterClassReportsPastLeadingTrivia(t *testing.T) {
 // Each empty class is its own finding. A rule that reports once per literal agrees with a
 // single-class corpus on every case above and undercounts the moment a pattern holds two.
 func TestNoEmptyCharacterClassReportsEachClassSeparately(t *testing.T) {
-	result := ruletest.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile,
+	result := rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile,
 		"export const Pattern = /[[][]]/v;\n")
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("want two findings, got %d: %v", len(result.Diagnostics), result.MessageIds())
@@ -178,7 +178,7 @@ func TestNoEmptyCharacterClassReportsEachClassSeparately(t *testing.T) {
 // smallest statement that the pattern is taken per-literal at all.
 func TestNoEmptyCharacterClassScansEachLiteralSeparately(t *testing.T) {
 	sourceText := "export const First = /[a]/g;\nexport const Second = /x[]/;\n"
-	result := ruletest.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
+	result := rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
 	}
@@ -197,6 +197,6 @@ func TestNoEmptyCharacterClassScansEachLiteralSeparately(t *testing.T) {
 // matters: the scanner returns false mid-walk, and a callback that had already fired must not leave
 // a finding behind on a pattern nobody can read.
 func TestNoEmptyCharacterClassSkipsAnUnterminatedClass(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile,
 		"export const Pattern = new RegExp('[abc');\n"))
 }

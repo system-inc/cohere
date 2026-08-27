@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The imported corpus is four pass cases and five fail cases carrying five diagnostics, one per
@@ -56,8 +56,8 @@ func TestNextScriptForGaReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, "nextScriptForGa")
+			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, "nextScriptForGa")
 		})
 	}
 }
@@ -93,8 +93,8 @@ func TestNextScriptForGaIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -161,8 +161,8 @@ func TestNextScriptForGaReportsTheMeasuredEdgeCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, "nextScriptForGa")
+			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, "nextScriptForGa")
 		})
 	}
 }
@@ -267,8 +267,8 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -278,8 +278,8 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(t *testing.T) {
 // because every other case carries at most one matching arm.
 func TestNextScriptForGaReportsOnceWhenBothArmsMatch(t *testing.T) {
 	source := "export const A = <script src=\"https://www.google-analytics.com/analytics.js\" dangerouslySetInnerHTML={{__html: `www.googletagmanager.com/gtm.js`}} />;\n"
-	result := ruletest.Run(t, NextScriptForGa, "pages/index.tsx", source)
-	ruletest.ExpectFindings(t, result, "nextScriptForGa")
+	result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(t, result, "nextScriptForGa")
 }
 
 // The first `__html` wins and the search stops, matching upstream's find_map. A rule that kept
@@ -287,8 +287,8 @@ func TestNextScriptForGaReportsOnceWhenBothArmsMatch(t *testing.T) {
 // against a duplicated key.
 func TestNextScriptForGaReadsOnlyTheFirstHtmlKey(t *testing.T) {
 	source := "export const A = <script dangerouslySetInnerHTML={{__html: `harmless`, __html: `www.google-analytics.com/analytics.js`}} />;\n"
-	result := ruletest.Run(t, NextScriptForGa, "pages/index.tsx", source)
-	ruletest.ExpectClean(t, result)
+	result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", source)
+	rule_testing.ExpectClean(t, result)
 }
 
 // The finding points at the tag name rather than the whole element or the attribute, taken from the
@@ -311,8 +311,8 @@ func TestNextScriptForGaPointsAtTheTagName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, "nextScriptForGa")
+			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, "nextScriptForGa")
 
 			diagnostic := result.Diagnostics[0]
 			reported := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
@@ -329,8 +329,8 @@ func TestNextScriptForGaPointsAtTheTagName(t *testing.T) {
 // is the right predicate.
 func TestNextScriptForGaMessage(t *testing.T) {
 	source := "export const A = <script src=\"https://www.google-analytics.com/analytics.js\" />;\n"
-	result := ruletest.Run(t, NextScriptForGa, "pages/index.tsx", source)
-	ruletest.ExpectFindings(t, result, "nextScriptForGa")
+	result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", source)
+	rule_testing.ExpectFindings(t, result, "nextScriptForGa")
 
 	wantDescription := "This loads Google Analytics through a plain <script> tag, which the " +
 		"framework cannot schedule: it has no loading strategy, so it competes with hydration for " +
@@ -387,13 +387,13 @@ func TestNextScriptForGaSurvivesPropertyShapesItCannotConvert(t *testing.T) {
 			// front of it. That last pair was measured after this fixture failed on a wrong
 			// prediction of mine: I expected a leading shorthand to end the search, and both
 			// upstream and this port keep looking, because find_map skips rather than stops.
-			result := ruletest.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
+			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
 			if testCase.name == "a spread beside the real key" ||
 				testCase.name == "a shorthand beside the real key" {
-				ruletest.ExpectFindings(t, result, "nextScriptForGa")
+				rule_testing.ExpectFindings(t, result, "nextScriptForGa")
 				return
 			}
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -428,8 +428,8 @@ func TestNextScriptForGaAnswersFromTheFirstDangerouslySetInnerHtml(t *testing.T)
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

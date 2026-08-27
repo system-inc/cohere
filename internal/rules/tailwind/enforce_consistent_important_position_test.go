@@ -4,20 +4,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Every expectation here was measured against eslint-plugin-better-tailwindcss 4.7.0 on the ahra
 // tree rather than read off its source.
 //
-// These fixtures use `ruletest.Run` rather than the class-order suite's program harness, and that
+// These fixtures use `rule_testing.Run` rather than the class-order suite's program harness, and that
 // is a claim about the rule rather than a shortcut: the marker's position is a property of the
 // string, so this rule asks nothing of the design system and declares no ReadsProgram. The proof it
 // needs none is `unknown class carries the marker` below, which reports on a class no theme
 // defines.
-func runImportantPositionFixture(t *testing.T, source string) ruletest.Result {
+func runImportantPositionFixture(t *testing.T, source string) rule_testing.Result {
 	t.Helper()
-	return ruletest.Run(t, EnforceConsistentImportantPosition, "Component.tsx", source)
+	return rule_testing.Run(t, EnforceConsistentImportantPosition, "Component.tsx", source)
 }
 
 // TestEnforceConsistentImportantPositionReports covers what upstream reports.
@@ -72,7 +72,7 @@ func TestEnforceConsistentImportantPositionReports(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, runImportantPositionFixture(t, testCase.source), "importantPosition")
+			rule_testing.ExpectFindings(t, runImportantPositionFixture(t, testCase.source), "importantPosition")
 		})
 	}
 }
@@ -121,7 +121,7 @@ func TestEnforceConsistentImportantPositionStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, runImportantPositionFixture(t, testCase.source))
+			rule_testing.ExpectClean(t, runImportantPositionFixture(t, testCase.source))
 		})
 	}
 }
@@ -133,19 +133,19 @@ func TestEnforceConsistentImportantPositionStaysSilent(t *testing.T) {
 func TestEnforceConsistentImportantPositionLegacy(t *testing.T) {
 	legacy := EnforceConsistentImportantPositionOptions{Position: importantPositionLegacy}
 
-	reported := ruletest.RunWithOptions(t, EnforceConsistentImportantPosition, "Component.tsx",
+	reported := rule_testing.RunWithOptions(t, EnforceConsistentImportantPosition, "Component.tsx",
 		`const element = <div className="text-red-500!" />;`, legacy)
-	ruletest.ExpectFindings(t, reported, "importantPosition")
+	rule_testing.ExpectFindings(t, reported, "importantPosition")
 
-	silent := ruletest.RunWithOptions(t, EnforceConsistentImportantPosition, "Component.tsx",
+	silent := rule_testing.RunWithOptions(t, EnforceConsistentImportantPosition, "Component.tsx",
 		`const element = <div className="!text-red-500" />;`, legacy)
-	ruletest.ExpectClean(t, silent)
+	rule_testing.ExpectClean(t, silent)
 }
 
 // TestEnforceConsistentImportantPositionNamesBothSpellings pins the message content.
 func TestEnforceConsistentImportantPositionNamesBothSpellings(t *testing.T) {
 	result := runImportantPositionFixture(t, `const element = <div className="hover:!flex" />;`)
-	ruletest.ExpectFindings(t, result, "importantPosition")
+	rule_testing.ExpectFindings(t, result, "importantPosition")
 
 	if len(result.Diagnostics) == 0 {
 		t.Fatal("expected a finding")

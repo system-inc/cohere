@@ -6,7 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/comments"
+	"github.com/system-inc/verify/internal/utilities/comments"
 )
 
 // buildNoUndefInitMessage renders the finding, which names the binding.
@@ -129,7 +129,7 @@ var NoUndefInit = rule.Rule{
 // A thin naming of `identifierIsShadowed` for the one caller that reads better with the name in it.
 // The shared form exists because `no-alert` asks the identical question of three different names,
 // and two spellings of one decision is how the four-implementation census in
-// `internal/utils/ecmascript/reference` started.
+// `internal/utilities/ecmascript/reference` started.
 func undefinedIsShadowed(ctx rule.Context, identifier *ast.Node) bool {
 	return identifierIsShadowed(ctx, identifier)
 }

@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Upstream ships one tester block: two passing cases and five failing ones, and the extractor
@@ -143,8 +143,8 @@ func TestNoHeadImportInDocumentReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoHeadImportInDocument, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, messageNoHeadImportInDocument.Id)
+			result := rule_testing.Run(t, NoHeadImportInDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, messageNoHeadImportInDocument.Id)
 		})
 	}
 }
@@ -169,12 +169,12 @@ func TestNoHeadImportInDocumentReportsOncePerImport(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoHeadImportInDocument, testCase.fileName, testCase.source)
+			result := rule_testing.Run(t, NoHeadImportInDocument, testCase.fileName, testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = messageNoHeadImportInDocument.Id
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -315,8 +315,8 @@ func TestNoHeadImportInDocumentIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoHeadImportInDocument, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoHeadImportInDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -336,8 +336,8 @@ func TestNoHeadImportInDocumentIsSilent(t *testing.T) {
 func TestNoHeadImportInDocumentPointsAtTheImportDeclaration(t *testing.T) {
 	source := "// a comment\n// another\nimport Head from 'next/head';\n"
 
-	result := ruletest.Run(t, NoHeadImportInDocument, "pages/_document.tsx", source)
-	ruletest.ExpectFindings(t, result, messageNoHeadImportInDocument.Id)
+	result := rule_testing.Run(t, NoHeadImportInDocument, "pages/_document.tsx", source)
+	rule_testing.ExpectFindings(t, result, messageNoHeadImportInDocument.Id)
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if want := "import Head from 'next/head';"; reported != want {
@@ -351,8 +351,8 @@ func TestNoHeadImportInDocumentPointsAtTheImportDeclaration(t *testing.T) {
 func TestNoHeadImportInDocumentPointsAtEachImportSeparately(t *testing.T) {
 	source := "import Head from 'next/head';\nimport Other from 'next/head';\n"
 
-	result := ruletest.Run(t, NoHeadImportInDocument, "pages/_document.tsx", source)
-	ruletest.ExpectFindings(t, result, messageNoHeadImportInDocument.Id, messageNoHeadImportInDocument.Id)
+	result := rule_testing.Run(t, NoHeadImportInDocument, "pages/_document.tsx", source)
+	rule_testing.ExpectFindings(t, result, messageNoHeadImportInDocument.Id, messageNoHeadImportInDocument.Id)
 
 	want := []string{"import Head from 'next/head';", "import Other from 'next/head';"}
 	for index, expected := range want {
@@ -372,9 +372,9 @@ func TestNoHeadImportInDocumentPointsAtEachImportSeparately(t *testing.T) {
 // Equality rather than containment, because a predicate weaker than the property it guards is not a
 // guard.
 func TestNoHeadImportInDocumentMessage(t *testing.T) {
-	result := ruletest.Run(t, NoHeadImportInDocument, "pages/_document.tsx",
+	result := rule_testing.Run(t, NoHeadImportInDocument, "pages/_document.tsx",
 		"import Head from 'next/head';\n")
-	ruletest.ExpectFindings(t, result, messageNoHeadImportInDocument.Id)
+	rule_testing.ExpectFindings(t, result, messageNoHeadImportInDocument.Id)
 
 	if got := result.Diagnostics[0].Message.Id; got != "noHeadImportInDocument" {
 		t.Fatalf("reported under the id %q", got)

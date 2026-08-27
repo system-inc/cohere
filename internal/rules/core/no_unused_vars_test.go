@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // TestNoUnusedVarsReportsAtTheBindingName asserts WHERE the finding points, which no message-id
@@ -26,7 +26,7 @@ func TestNoUnusedVarsReportsAtTheBindingName(t *testing.T) {
 		{"destructured element", "const { plucked } = source;", "plucked"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
+			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly 1 finding, got %d", len(result.Diagnostics))
 			}
@@ -44,7 +44,7 @@ func TestNoUnusedVarsReportsAtTheBindingName(t *testing.T) {
 // equality that cannot fail: both sides move together under mutation, so a message-text mutant
 // survives a test written that way.
 func TestNoUnusedVarsMessageIdAndDescription(t *testing.T) {
-	result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", "const forgotten = 1;")
+	result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const forgotten = 1;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 	}
@@ -65,10 +65,10 @@ func TestNoUnusedVarsMessageIdAndDescription(t *testing.T) {
 // from a green suite, so it gets its own assertion with a control on the other side.
 func TestNoUnusedVarsRequiresTheTypedHarness(t *testing.T) {
 	const source = "const forgotten = 1;"
-	if result := ruletest.Run(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 0 {
+	if result := rule_testing.Run(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 0 {
 		t.Errorf("untyped harness: want silence, got %d findings", len(result.Diagnostics))
 	}
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 1 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 1 {
 		t.Errorf("typed harness control: want 1 finding, got %d", len(result.Diagnostics))
 	}
 }
@@ -118,23 +118,23 @@ func TestDecodeNoUnusedVarsOptions(t *testing.T) {
 func TestNoUnusedVarsIgnorePatternDefaults(t *testing.T) {
 	// Routed through the shared harness assertions rather than through a length comparison, so the
 	// fixture-pair guard can see that this rule is shown both to fire and to stay quiet.
-	ruletest.ExpectClean(t, ruletest.RunTyped(t, NoUnusedVars, "a.ts", "const _ignored = 1;"))
-	ruletest.ExpectFindings(t,
-		ruletest.RunTyped(t, NoUnusedVars, "a.ts", "const reported = 1;"), "noUnusedVars")
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const _ignored = 1;"))
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const reported = 1;"), "noUnusedVars")
 
 	// oxc ignores a leading underscore by default. ESLint reports it. oxc wins.
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", "const _deliberate = 1;"); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const _deliberate = 1;"); len(result.Diagnostics) != 0 {
 		t.Errorf("a leading underscore is ignored by default upstream; got %d findings",
 			len(result.Diagnostics))
 	}
 	// The control, so the case above cannot pass because the rule sees nothing.
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", "const deliberate = 1;"); len(result.Diagnostics) != 1 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const deliberate = 1;"); len(result.Diagnostics) != 1 {
 		t.Errorf("control: want 1 finding on the same shape without the underscore, got %d",
 			len(result.Diagnostics))
 	}
 	// A parameter named exactly `_` is NOT ignored, while a variable named `_` is. Upstream's
 	// asymmetry at `ignored.rs:424`, reproduced.
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", "const _ = 1;"); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const _ = 1;"); len(result.Diagnostics) != 0 {
 		t.Errorf("a variable named `_` is ignored; got %d findings", len(result.Diagnostics))
 	}
 }
@@ -143,12 +143,12 @@ func TestNoUnusedVarsIgnorePatternDefaults(t *testing.T) {
 // tree. `import React` in a `.tsx` looks untouched and is used by the JSX transform.
 func TestNoUnusedVarsJsxFactoryImport(t *testing.T) {
 	const source = "import React from 'react';\nexport const A = 1;\n"
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.tsx", source); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", source); len(result.Diagnostics) != 0 {
 		t.Errorf("a React import in a .tsx file is exempt; got %d findings", len(result.Diagnostics))
 	}
 	// The control that makes the case above mean something: the same import in a `.ts` file, where
 	// no JSX transform can reach it, still reports.
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 1 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 1 {
 		t.Errorf("control: the same import in a .ts file should report; got %d",
 			len(result.Diagnostics))
 	}
@@ -161,7 +161,7 @@ func TestNoUnusedVarsJsxFactoryImport(t *testing.T) {
 // can carry more than one declaration and the ordering is not something to assume.
 func TestNoUnusedVarsSeparatesShadowedBindingsBySymbol(t *testing.T) {
 	// The inner binding is read; the outer one is not. A name-matching rule reports neither.
-	result := ruletest.RunTyped(t, NoUnusedVars, "a.ts",
+	result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts",
 		"const outer = 1; { const outer = 2; console.log(outer); }")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want exactly 1 finding for the unread outer binding, got %d", len(result.Diagnostics))
@@ -185,7 +185,7 @@ func TestNoUnusedVarsDeclarationMergingExportsFromEitherSide(t *testing.T) {
 		"interface Merged {\n  bar: string;\n}\nexport const Merged = 'bar';\n",
 		"export const Merged = 'bar';\ninterface Merged {\n  bar: string;\n}\n",
 	} {
-		if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 0 {
+		if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 0 {
 			t.Errorf("a merged symbol exported from either side is exempt; got %d findings for %q",
 				len(result.Diagnostics), source)
 		}
@@ -205,11 +205,11 @@ func TestNoUnusedVarsDeclarationMergingExportsFromEitherSide(t *testing.T) {
 // than no fixture: it stops the next reader from checking.
 func TestNoUnusedVarsSkipsDeclarationFiles(t *testing.T) {
 	const source = "interface Unreferenced {}\ntype AlsoUnreferenced = {};\n"
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.d.ts", source); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.d.ts", source); len(result.Diagnostics) != 0 {
 		t.Errorf("a .d.ts declares rather than defines and is skipped whole; got %d findings",
 			len(result.Diagnostics))
 	}
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 2 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 2 {
 		t.Errorf("control: the same source as .ts must report both; got %d",
 			len(result.Diagnostics))
 	}
@@ -229,7 +229,7 @@ func TestNoUnusedVarsExemptsMappedTypeKeys(t *testing.T) {
 	// mutated rule, this input reports `K` and the exported one does not.
 	const source = "type Slots<T extends string> = { [K in T]?: string };\n" +
 		"const value: Slots<'a'> = {};\nconsole.log(value);\n"
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 0 {
 		t.Errorf("a mapped type key is always used by the type it builds; got %d findings",
 			len(result.Diagnostics))
 	}
@@ -237,7 +237,7 @@ func TestNoUnusedVarsExemptsMappedTypeKeys(t *testing.T) {
 	// case above cannot be passing because type parameters are exempt as a class. Not exported,
 	// because an exported declaration is exempt for a different reason and would mask this.
 	const control = "type Ignores<T extends string> = { a: string };\nconst v: Ignores<'x'> = { a: '' };\nconsole.log(v);\n"
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", control); len(result.Diagnostics) != 1 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", control); len(result.Diagnostics) != 1 {
 		t.Errorf("control: an unused type parameter outside a mapped type reports; got %d",
 			len(result.Diagnostics))
 	}
@@ -272,7 +272,7 @@ func TestNoUnusedVarsExportedContainerDoesNotExemptItsContents(t *testing.T) {
 		{"control, exported const", "export const value = 1;", 0},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
+			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
 			if len(result.Diagnostics) != testCase.want {
 				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
 			}
@@ -309,7 +309,7 @@ func TestNoUnusedVarsDiscardedReads(t *testing.T) {
 			"let a; a = function(a = a) {}; a();", 0},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
+			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
 			if len(result.Diagnostics) != testCase.want {
 				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
 			}
@@ -339,7 +339,7 @@ func TestNoUnusedVarsTypePositionsThatNameWithoutReading(t *testing.T) {
 			"export function f(a: unknown): a is string { return typeof a === 'string'; }", 0},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
+			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
 			if len(result.Diagnostics) != testCase.want {
 				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
 			}
@@ -368,7 +368,7 @@ func TestNoUnusedVarsAmbientModuleExplicitExports(t *testing.T) {
 			"declare module 'bun:test' { type Matchers2<T> = {} }", 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
+			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
 			if len(result.Diagnostics) != testCase.want {
 				t.Errorf("want %d findings, got %d", testCase.want, len(result.Diagnostics))
 			}
@@ -379,14 +379,14 @@ func TestNoUnusedVarsAmbientModuleExplicitExports(t *testing.T) {
 // TestNoUnusedVarsReExportFromModuleIsNotALocalRead pins the one-word difference between a specifier
 // that reads a local binding and one that names something in another module.
 func TestNoUnusedVarsReExportFromModuleIsNotALocalRead(t *testing.T) {
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts",
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts",
 		"import { resolve } from \"path\";\nexport { resolve } from \"path\";"); len(result.Diagnostics) != 1 {
 		t.Errorf("`export { x } from './m'` names the other module, so the import is unused; got %d",
 			len(result.Diagnostics))
 	}
 	// The control is the same file with the `from` clause removed, where the specifier really does
 	// read the local binding.
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts",
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts",
 		"import { resolve } from \"path\";\nexport { resolve };"); len(result.Diagnostics) != 0 {
 		t.Errorf("control: `export { x }` without a module specifier reads the local binding; got %d",
 			len(result.Diagnostics))
@@ -397,12 +397,12 @@ func TestNoUnusedVarsReExportFromModuleIsNotALocalRead(t *testing.T) {
 // patterns: a variable or parameter named with a leading underscore is ignored by default, a caught
 // error is not.
 func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(t *testing.T) {
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", "try {} catch(_) { }"); len(result.Diagnostics) != 1 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "try {} catch(_) { }"); len(result.Diagnostics) != 1 {
 		t.Errorf("caughtErrorsIgnorePattern has no default, so `catch(_)` reports; got %d",
 			len(result.Diagnostics))
 	}
 	// The control on the other side of the asymmetry: a VARIABLE named `_` is ignored.
-	if result := ruletest.RunTyped(t, NoUnusedVars, "a.ts", "const _ = 1;"); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const _ = 1;"); len(result.Diagnostics) != 0 {
 		t.Errorf("control: a variable named `_` is ignored by default; got %d", len(result.Diagnostics))
 	}
 	// And configuring a pattern turns it back off.
@@ -410,7 +410,7 @@ func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decoding failed: %v", err)
 	}
-	if result := ruletest.RunTypedWithOptions(t, NoUnusedVars, "a.ts", "try {} catch(_) { }", options); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTypedWithOptions(t, NoUnusedVars, "a.ts", "try {} catch(_) { }", options); len(result.Diagnostics) != 0 {
 		t.Errorf("an explicit caughtErrorsIgnorePattern ignores it; got %d", len(result.Diagnostics))
 	}
 }

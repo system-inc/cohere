@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const mixedEnumsFile = "/repository/source/Enums.ts"
@@ -53,7 +53,7 @@ func TestNoMixedEnumsStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(fmt.Sprintf("upstream valid %d", index), func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText))
 		})
 	}
 }
@@ -86,12 +86,12 @@ func TestNoMixedEnumsFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(fmt.Sprintf("upstream invalid %d", index), func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -116,12 +116,12 @@ func TestNoMixedEnumsAcrossFiles(t *testing.T) {
 				"/repository/source/Enums.ts":            testCase.sourceText,
 				"/repository/source/mixed-enums-decl.ts": mixedEnumsDeclarationSource,
 			}
-			result := ruletest.RunTypedFiles(t, NoMixedEnums, files, "/repository/source/Enums.ts")
+			result := rule_testing.RunTypedFiles(t, NoMixedEnums, files, "/repository/source/Enums.ts")
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -129,7 +129,7 @@ func TestNoMixedEnumsAcrossFiles(t *testing.T) {
 // TestNoMixedEnumsSpans pins WHERE the finding points, which ExpectFindings cannot see.
 //
 // The expected text is derived from upstream's own line and column numbers, and the source is
-// trimmed the same way ruletest.RunTyped trims it before writing the fixture to disk. Without
+// trimmed the same way rule_testing.RunTyped trims it before writing the fixture to disk. Without
 // that trim the leading newline every corpus case carries would shift every column by one and
 // the failure would read exactly like an off-by-one in the rule.
 func TestNoMixedEnumsSpans(t *testing.T) {
@@ -149,7 +149,7 @@ func TestNoMixedEnumsSpans(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(fmt.Sprintf("span %d", index), func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
@@ -185,11 +185,11 @@ func TestNoMixedEnumsRequiresTheTypedHarness(t *testing.T) {
 		t.Fatal("rule must declare NeedsTypeChecker")
 	}
 	mixed := "enum E {\n  A = 1,\n  B = 'b',\n}\n"
-	typed := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, mixed)
+	typed := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, mixed)
 	if len(typed.Diagnostics) != 1 {
 		t.Fatalf("typed harness: want 1 finding, got %d", len(typed.Diagnostics))
 	}
-	untyped := ruletest.Run(t, NoMixedEnums, mixedEnumsFile, mixed)
+	untyped := rule_testing.Run(t, NoMixedEnums, mixedEnumsFile, mixed)
 	if len(untyped.Diagnostics) != 0 {
 		t.Fatalf("untyped harness: want 0 findings from the nil-checker guard, got %d", len(untyped.Diagnostics))
 	}
@@ -228,12 +228,12 @@ func TestNoMixedEnumsParentheses(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -243,7 +243,7 @@ func TestNoMixedEnumsParentheses(t *testing.T) {
 // while pointing at text upstream never highlights.
 func TestNoMixedEnumsParenthesizedSpanExcludesTheWrapper(t *testing.T) {
 	sourceText := "enum E {\n  A = 'a',\n  B = (1),\n}\n"
-	result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
+	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 	}
@@ -271,12 +271,12 @@ func TestNoMixedEnumsUnknownAborts(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -287,8 +287,8 @@ func TestNoMixedEnumsUnknownAborts(t *testing.T) {
 // goes silent. Measured reporting upstream.
 func TestNoMixedEnumsAdoptsNumberIntoAnUnsetDesiredType(t *testing.T) {
 	sourceText := "declare const f: () => any;\nenum E {\n  A = f(),\n  B = 1,\n  C = 'c',\n}\n"
-	result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
-	ruletest.ExpectFindings(t, result, "mixed")
+	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "mixed")
 }
 
 // TestNoMixedEnumsMemberWithoutInitializerIsTheAnchor pins where the finding lands when the
@@ -297,7 +297,7 @@ func TestNoMixedEnumsAdoptsNumberIntoAnUnsetDesiredType(t *testing.T) {
 // initializer on the reported member.
 func TestNoMixedEnumsMemberWithoutInitializerIsTheAnchor(t *testing.T) {
 	sourceText := "enum E {\n  A = 'a',\n  B,\n}\n"
-	result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
+	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 	}
@@ -315,10 +315,10 @@ func TestNoMixedEnumsMemberWithoutInitializerIsTheAnchor(t *testing.T) {
 // predict from the rule's description.
 func TestNoMixedEnumsMergeOrdering(t *testing.T) {
 	sourceText := "enum E {\n  A = 1,\n}\nenum E {\n  B = 'b',\n}\nenum E {\n  C = 2,\n}\n"
-	result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
+	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
 	// Only the middle declaration reports. The third agrees with the FIRST, so if it were judged
 	// against the second there would be two findings here.
-	ruletest.ExpectFindings(t, result, "mixed")
+	rule_testing.ExpectFindings(t, result, "mixed")
 }
 
 // TestNoMixedEnumsNamespaceMerging covers the exported/non-exported split. An exported enum inside a
@@ -344,12 +344,12 @@ func TestNoMixedEnumsNamespaceMerging(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -359,8 +359,8 @@ func TestNoMixedEnumsNamespaceMerging(t *testing.T) {
 // declaration with no members, which has no kind at all.
 func TestNoMixedEnumsEmptyDeclarationIsNotAReference(t *testing.T) {
 	sourceText := "enum E {}\nenum E {\n  A = 1,\n  B = 'b',\n}\n"
-	result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
-	ruletest.ExpectFindings(t, result, "mixed")
+	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "mixed")
 }
 
 // TestNoMixedEnumsConstAndAmbientEnums pins that the rule reaches const and declared enums, which the
@@ -375,8 +375,8 @@ func TestNoMixedEnumsConstAndAmbientEnums(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "mixed")
+			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "mixed")
 		})
 	}
 }
@@ -403,12 +403,12 @@ func TestNoMixedEnumsTemplateLiteralsAreStrings(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -428,12 +428,12 @@ func TestNoMixedEnumsCheckerArm(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -453,12 +453,12 @@ func TestNoMixedEnumsNullAborts(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -486,12 +486,12 @@ func TestNoMixedEnumsUnknownFirstMemberSilencesEverything(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "mixed"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }

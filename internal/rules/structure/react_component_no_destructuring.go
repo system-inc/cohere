@@ -5,8 +5,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/scope"
-	"github.com/system-inc/verify/internal/utils/react"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/scope"
+	"github.com/system-inc/verify/internal/utilities/react"
 )
 
 const destructuringReasoning = "Reading properties.name at each use keeps the origin of a value " +

@@ -26,7 +26,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
-	"github.com/system-inc/verify/internal/config"
+	"github.com/system-inc/verify/internal/configuration"
 )
 
 // Graph is a built type graph: the program, and the checkers that answer questions about it.
@@ -63,11 +63,11 @@ type Graph struct {
 	// Nil means every rule applies to every file, which is what the tests and any caller predating
 	// this layer expect. The command always loads a real one and fails loudly if it cannot, so the
 	// permissive default is reachable only from a caller that chose it deliberately.
-	LintConfig *config.Config
+	LintConfig *configuration.Config
 
 	// RuleOptions says how to decode each rule's configuration, and which rules cannot run without
 	// it. Empty means no rule takes options, which is what a test that did not set one expects.
-	RuleOptions config.OptionsRegistry
+	RuleOptions configuration.OptionsRegistry
 
 	// CollectTimings turns on per-rule cost measurement for the next Walk.
 	//

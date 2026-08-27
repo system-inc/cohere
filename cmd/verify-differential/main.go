@@ -26,7 +26,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/system-inc/verify/internal/config"
+	"github.com/system-inc/verify/internal/configuration"
 	"github.com/system-inc/verify/internal/differential"
 )
 
@@ -43,7 +43,7 @@ func run() error {
 		return err
 	}
 
-	lintConfig, err := config.Load(filepath.Join(options.root, ".oxlintrc.json"))
+	lintConfig, err := configuration.Load(filepath.Join(options.root, ".oxlintrc.json"))
 	if err != nil {
 		return fmt.Errorf("loading the lint config: %w", err)
 	}
@@ -111,7 +111,7 @@ const ruleListProbeFile = "modules/mcp/McpApi.ts"
 // Rules set to off are excluded rather than counted, because a rule the config turned off ran over
 // no files, which is exactly what not-configured means.
 //
-// **The rules block is not the whole config.** Forty rules are enforced by the `plugins` declarations
+// **The rules block is not the whole configuration.** Forty rules are enforced by the `plugins` declarations
 // and named in no rules block, proven with planted violations rather than read from a file. Reading
 // only `lintConfig.Rules` therefore reported a denominator of 159 when the real one is 214, and it
 // did so in the summary line a reader uses to decide whether verify is safe to trust yet.
@@ -124,14 +124,14 @@ const ruleListProbeFile = "modules/mcp/McpApi.ts"
 // the answer. `TestParityAgainstInventory` derives its denominator from the same file, which is the
 // point rather than a convenience: two instruments disagreeing about how many rules exist is how one
 // of them ends up quietly wrong.
-func configuredRuleNames(lintConfig *config.Config, inventoryRules []string) map[string]bool {
+func configuredRuleNames(lintConfig *configuration.Config, inventoryRules []string) map[string]bool {
 	names := map[string]bool{}
 	for _, name := range inventoryRules {
 		names[differential.NormalizeRuleName(name)] = true
 	}
 	for name, setting := range lintConfig.Rules {
 		normalized := differential.NormalizeRuleName(name)
-		if setting.Severity == config.SeverityOff {
+		if setting.Severity == configuration.SeverityOff {
 			// An explicit off wins over the inventory's record of the rule existing. The inventory
 			// says what the two tools can enforce; the config says what this tree asked for, and a
 			// rule turned off here ran over no files no matter what any catalog knows about it.
@@ -416,7 +416,7 @@ var defaultInventoryPath = filepath.Join(os.Getenv("HOME"), "Projects", "system"
 //
 // The check runs before either gate is launched, so a misplaced control costs a second rather than
 // two full lint runs and a misleading verdict.
-func checkControlsAreLintable(lintConfig *config.Config, controls []differential.Control, extraVerifyRules map[string]any) error {
+func checkControlsAreLintable(lintConfig *configuration.Config, controls []differential.Control, extraVerifyRules map[string]any) error {
 	// The rules supplied to verify alone, reduced to bare names. A control naming one of these is
 	// enabled for verify's run even though the tree's own config says nothing about it, so the
 	// check below has to know about them or it rejects exactly the directional control it should
@@ -468,7 +468,7 @@ func checkControlsAreLintable(lintConfig *config.Config, controls []differential
 // Returning the bare name when nothing matches is deliberate. It makes Enabled report unconfigured,
 // which is the correct answer for a rule the config genuinely does not mention, and it keeps this
 // helper from being the thing that decides a control is valid.
-func pluginQualified(lintConfig *config.Config, bareRuleName string) string {
+func pluginQualified(lintConfig *configuration.Config, bareRuleName string) string {
 	for name := range lintConfig.Rules {
 		if differential.NormalizeRuleName(name) == bareRuleName {
 			return name

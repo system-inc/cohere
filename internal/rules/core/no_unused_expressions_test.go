@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // unusedExpressionsFile is where the fixtures pretend to live.
@@ -112,8 +112,8 @@ func TestNoUnusedExpressionsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText),
 				"unusedExpression")
 		})
 	}
@@ -187,8 +187,8 @@ func TestNoUnusedExpressionsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText))
 		})
 	}
 }
@@ -273,13 +273,13 @@ func TestNoUnusedExpressionsUnderOptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+			result := rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 				testCase.sourceText, testCase.options)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unusedExpression"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -292,8 +292,8 @@ func TestNoUnusedExpressionsUnderOptions(t *testing.T) {
 // neither. A port whose directive carve-out asked only "is this a string statement" would report
 // zero here and pass every other fail case in the corpus.
 func TestNoUnusedExpressionsReportsTwiceInAClassStaticBlock(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile,
 			"class C { static {\n            'foo'\n            'bar'\n             } }"),
 		"unusedExpression", "unusedExpression")
 }
@@ -351,7 +351,7 @@ func TestNoUnusedExpressionsPointsAtTheStatement(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.reported), len(result.Diagnostics))
 			}
@@ -392,8 +392,8 @@ func TestNoUnusedExpressionsSeparatesBinaryOperators(t *testing.T) {
 	}
 	for _, sourceText := range silent {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})
 	}
 
@@ -406,8 +406,8 @@ func TestNoUnusedExpressionsSeparatesBinaryOperators(t *testing.T) {
 	}
 	for _, sourceText := range fires {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
 				"unusedExpression")
 		})
 	}
@@ -421,9 +421,9 @@ func TestNoUnusedExpressionsSeparatesBinaryOperators(t *testing.T) {
 // tested, and a port using a helper that answered only for `&&` and `||` would differ here with
 // nothing to say so.
 func TestNoUnusedExpressionsTreatsNullishAsShortCircuit(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 		"a ?? b();", NoUnusedExpressionsOptions{AllowShortCircuit: true}))
-	ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 		"a ?? b;", NoUnusedExpressionsOptions{AllowShortCircuit: true}), "unusedExpression")
 }
 
@@ -437,17 +437,17 @@ func TestNoUnusedExpressionsTreatsNullishAsShortCircuit(t *testing.T) {
 func TestNoUnusedExpressionsRecursesThroughAllowedForms(t *testing.T) {
 	both := NoUnusedExpressionsOptions{AllowShortCircuit: true, AllowTernary: true}
 
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 		"a && b && c();", NoUnusedExpressionsOptions{AllowShortCircuit: true}))
-	ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 		"a && b && c;", NoUnusedExpressionsOptions{AllowShortCircuit: true}), "unusedExpression")
 
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 		"a ? b ? c() : d() : e();", NoUnusedExpressionsOptions{AllowTernary: true}))
-	ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 		"a ? b ? c() : d : e();", NoUnusedExpressionsOptions{AllowTernary: true}), "unusedExpression")
 
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 		"a ? b && c() : d();", both))
 }
 
@@ -462,8 +462,8 @@ func TestNoUnusedExpressionsChecksBothTernaryBranches(t *testing.T) {
 	options := NoUnusedExpressionsOptions{AllowTernary: true}
 	for _, sourceText := range []string{"a ? b() : c;", "a ? b : c();"} {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile, sourceText, options),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile, sourceText, options),
 				"unusedExpression")
 		})
 	}
@@ -487,8 +487,8 @@ func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(t *testing.T) {
 	}
 	for _, sourceText := range silent {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})
 	}
 
@@ -500,8 +500,8 @@ func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(t *testing.T) {
 	}
 	for _, sourceText := range fires {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
 				"unusedExpression")
 		})
 	}
@@ -519,8 +519,8 @@ func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(t *testing.T) {
 // under a recursing port and passes under both upstreams. Pinned here so a later reader changing
 // this to recurse finds out immediately.
 func TestNoUnusedExpressionsDivergesFromOxcOnSatisfies(t *testing.T) {
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, "0 satisfies number;"))
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, "0 satisfies number;"))
 }
 
 // TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues is the carve-out, stated directly.
@@ -556,8 +556,8 @@ func TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues(t *testing.T) {
 	}
 	for _, sourceText := range silent {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})
 	}
 
@@ -581,7 +581,7 @@ func TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues(t *testing.T) {
 	}
 	for _, sourceText := range fires {
 		t.Run(sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText)
+			result := rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("wanted at least one diagnostic for %q, got none", sourceText)
 			}
@@ -616,9 +616,9 @@ func TestNoUnusedExpressionsIgnoreDirectivesIsInertHere(t *testing.T) {
 	}
 	for _, sourceText := range sources {
 		t.Run(sourceText, func(t *testing.T) {
-			off := ruletest.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+			off := rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 				sourceText, NoUnusedExpressionsOptions{IgnoreDirectives: false})
-			on := ruletest.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
+			on := rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 				sourceText, NoUnusedExpressionsOptions{IgnoreDirectives: true})
 			if len(off.Diagnostics) != len(on.Diagnostics) {
 				t.Errorf("ignoreDirectives changed the verdict on %q: %d without, %d with",
@@ -644,8 +644,8 @@ func TestNoUnusedExpressionsSeparatesUnaryFormsByKind(t *testing.T) {
 	fires := []string{"typeof a;", "!a;", "+a;", "-a;", "~a;"}
 	for _, sourceText := range fires {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText),
 				"unusedExpression")
 		})
 	}
@@ -653,8 +653,8 @@ func TestNoUnusedExpressionsSeparatesUnaryFormsByKind(t *testing.T) {
 	silent := []string{"void 0;", "delete a.b;", "++a;", "--a;", "a++;", "a--;"}
 	for _, sourceText := range silent {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, sourceText))
 		})
 	}
 }
@@ -673,8 +673,8 @@ func TestNoUnusedExpressionsSeparatesUnaryFormsByKind(t *testing.T) {
 // mutation flipping the default to `return true` survives the entire corpus, which is how it was
 // found: the mutant compiled, changed bytes, and nothing noticed.
 func TestNoUnusedExpressionsLeavesUnrecognisedFormsAlone(t *testing.T) {
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoUnusedExpressions, unusedExpressionsFile, "#x;"))
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, "#x;"))
 }
 
 // TestNoUnusedExpressionsReadsOptionsFromJSON pins the wire names.

@@ -3,8 +3,8 @@ package next
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/nextjs"
-	"github.com/system-inc/verify/internal/utils/react"
+	"github.com/system-inc/verify/internal/utilities/nextjs"
+	"github.com/system-inc/verify/internal/utilities/react"
 )
 
 var messageNoAsyncClientComponent = rule.Message{
@@ -38,7 +38,7 @@ var messageNoAsyncClientComponent = rule.Message{
 // # What the gate is
 //
 // A directive, not a path. Several rules in this package gate on which Next.js file a path is, and
-// `internal/utils/nextjs/paths.go` holds two deliberately disagreeing predicates for that question.
+// `internal/utilities/nextjs/paths.go` holds two deliberately disagreeing predicates for that question.
 // Neither applies here: oxc's `run_once` reads `program.directives` and never consults the path, so
 // this rule runs on every file and decides from the prologue alone. Recorded because the shape of
 // the neighbours invites the wrong assumption.

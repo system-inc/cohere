@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const outcomeFile = "/repository/source/Thing.ts"
@@ -22,8 +22,8 @@ func TestConsistencyNoBooleanOutcomeFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoBooleanOutcome, outcomeFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "booleanOutcome")
+			result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, outcomeFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "booleanOutcome")
 		})
 	}
 }
@@ -51,8 +51,8 @@ func TestConsistencyNoBooleanOutcomeStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoBooleanOutcome, testCase.fileName, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -62,19 +62,19 @@ func TestConsistencyNoBooleanOutcomeRespectsTheAllowedTypeNamesOption(t *testing
 	// Splitting those into a union puts the cost in the success arm and loses it where it is needed.
 	sourceText := "export interface ClaudeCallResultInterface {\n    success: boolean;\n    error: string;\n}\n"
 
-	withoutOption := ruletest.Run(t, ConsistencyNoBooleanOutcome, outcomeFile, sourceText)
-	ruletest.ExpectFindings(t, withoutOption, "booleanOutcome")
+	withoutOption := rule_testing.Run(t, ConsistencyNoBooleanOutcome, outcomeFile, sourceText)
+	rule_testing.ExpectFindings(t, withoutOption, "booleanOutcome")
 
-	withOption := ruletest.RunWithOptions(t, ConsistencyNoBooleanOutcome, outcomeFile, sourceText,
+	withOption := rule_testing.RunWithOptions(t, ConsistencyNoBooleanOutcome, outcomeFile, sourceText,
 		ConsistencyNoBooleanOutcomeOptions{AllowedTypeNames: []string{"ClaudeCallResultInterface"}})
-	ruletest.ExpectClean(t, withOption)
+	rule_testing.ExpectClean(t, withOption)
 }
 
 // The suggestion strips role suffixes so the name it offers is one someone would actually write.
 func TestConsistencyNoBooleanOutcomeSuggestsAStrippedName(t *testing.T) {
-	result := ruletest.Run(t, ConsistencyNoBooleanOutcome, outcomeFile,
+	result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, outcomeFile,
 		"export interface ClaudeCallResultInterface {\n    success: boolean;\n    error: string;\n}\n")
-	ruletest.ExpectFindings(t, result, "booleanOutcome")
+	rule_testing.ExpectFindings(t, result, "booleanOutcome")
 
 	description := result.Diagnostics[0].Message.Description
 	if !strings.Contains(description, "ClaudeCallOutcomeType") {

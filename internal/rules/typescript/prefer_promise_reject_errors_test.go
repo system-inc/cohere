@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const preferPromiseRejectErrorsFile = "/repository/source/Rejections.ts"
@@ -89,7 +89,7 @@ func TestPreferPromiseRejectErrorsStaysSilent(t *testing.T) {
 	}
 	for index, sourceText := range cases {
 		t.Run(fmt.Sprintf("upstream valid %d", index), func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, sourceText))
 		})
 	}
 }
@@ -183,12 +183,12 @@ func TestPreferPromiseRejectErrorsFires(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(fmt.Sprintf("upstream invalid %d", index), func(t *testing.T) {
-			result := ruletest.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -224,12 +224,12 @@ func TestPreferPromiseRejectErrorsWithOptions(t *testing.T) {
 			if err != nil {
 				t.Fatalf("decoding %s: %v", testCase.optionsJson, err)
 			}
-			result := ruletest.RunTypedWithOptions(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText, decoded)
+			result := rule_testing.RunTypedWithOptions(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText, decoded)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -243,7 +243,7 @@ const preferPromiseRejectErrorsErrorsModule = "// @ts-ignore\ndeclare module 'er
 // That is a fact about this harness rather than about the rule, and weakening the rule to
 // make them green would turn a harness limitation into a rule limitation.
 //
-// ruletest pins `moduleDetection: "force"` (internal/ruletest/program.go:27), which makes an
+// ruletest pins `moduleDetection: "force"` (internal/rule_testing/program.go:27), which makes an
 // ambient `declare module 'errors'` unresolvable. Measured with two controls: the same input
 // with no options reports (so the rule sees the call), and the same input with
 // `allowThrowingAny: true` goes CLEAN, which is only possible if the imported type resolved to
@@ -275,12 +275,12 @@ func TestPreferPromiseRejectErrorsAcrossFiles(t *testing.T) {
 				}
 				decoded = value
 			}
-			result := ruletest.RunTypedFilesWithOptions(t, PreferPromiseRejectErrors, files, "/repository/source/Rejections.ts", decoded)
+			result := rule_testing.RunTypedFilesWithOptions(t, PreferPromiseRejectErrors, files, "/repository/source/Rejections.ts", decoded)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -338,7 +338,7 @@ func TestPreferPromiseRejectErrorsSpans(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(fmt.Sprintf("span %d", index), func(t *testing.T) {
-			result := ruletest.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
@@ -390,12 +390,12 @@ func TestPreferPromiseRejectErrorsExecutorReferenceScan(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -417,12 +417,12 @@ func TestPreferPromiseRejectErrorsExecutorShape(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -444,12 +444,12 @@ func TestPreferPromiseRejectErrorsStaticReceiver(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -474,8 +474,8 @@ func TestPreferPromiseRejectErrorsDefaultsAreOff(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			// nil options, exactly as a rule configured as bare "error" receives.
-			result := ruletest.RunTypedWithOptions(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText, nil)
-			ruletest.ExpectFindings(t, result, "rejectAnError")
+			result := rule_testing.RunTypedWithOptions(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(t, result, "rejectAnError")
 		})
 	}
 }
@@ -484,9 +484,9 @@ func TestPreferPromiseRejectErrorsDefaultsAreOff(t *testing.T) {
 // other argument rather than skipped. Upstream reads arguments.at(0) with no kind test, so this
 // reports; a port that guarded on the kind would go silent and no imported case would notice.
 func TestPreferPromiseRejectErrorsSpreadArgumentReports(t *testing.T) {
-	result := ruletest.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile,
+	result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile,
 		"declare const args: [unknown];\nPromise.reject(...args);\n")
-	ruletest.ExpectFindings(t, result, "rejectAnError")
+	rule_testing.ExpectFindings(t, result, "rejectAnError")
 }
 
 // TestPreferPromiseRejectErrorsDuplicateParameterNamesIsADivergence pins a case upstream REPORTS and
@@ -499,15 +499,15 @@ func TestPreferPromiseRejectErrorsSpreadArgumentReports(t *testing.T) {
 //
 // If the checker ever starts merging them, this test fails and the divergence can be removed.
 func TestPreferPromiseRejectErrorsDuplicateParameterNamesIsADivergence(t *testing.T) {
-	result := ruletest.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile,
+	result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile,
 		"new Promise(function (reject, reject) {\n  reject(5);\n});\n")
-	ruletest.ExpectClean(t, result)
+	rule_testing.ExpectClean(t, result)
 
 	// The control: distinct names, same shape, reports. Without it the silence above could be
 	// explained by the function-expression executor not being handled at all.
-	control := ruletest.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile,
+	control := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile,
 		"new Promise(function (resolve, reject) {\n  reject(5);\n});\n")
-	ruletest.ExpectFindings(t, control, "rejectAnError")
+	rule_testing.ExpectFindings(t, control, "rejectAnError")
 }
 
 // TestPreferPromiseRejectErrorsMessage asserts the reported id and description against literals
@@ -530,11 +530,11 @@ func TestPreferPromiseRejectErrorsRequiresTheTypedHarness(t *testing.T) {
 		t.Fatal("rule must declare NeedsTypeChecker")
 	}
 	for _, source := range []string{"Promise.reject(5);\n", "new Promise((resolve, reject) => reject(5));\n"} {
-		typed := ruletest.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, source)
+		typed := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, source)
 		if len(typed.Diagnostics) != 1 {
 			t.Fatalf("typed harness on %q: want 1 finding, got %d", source, len(typed.Diagnostics))
 		}
-		untyped := ruletest.Run(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, source)
+		untyped := rule_testing.Run(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, source)
 		if len(untyped.Diagnostics) != 0 {
 			t.Fatalf("untyped harness on %q: want 0 from the nil-checker guard, got %d", source, len(untyped.Diagnostics))
 		}

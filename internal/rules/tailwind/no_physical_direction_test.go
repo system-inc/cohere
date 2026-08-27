@@ -3,7 +3,7 @@ package tailwind
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const physicalDirectionFile = "/repository/source/components/Thing.tsx"
@@ -60,12 +60,12 @@ func TestNoPhysicalDirectionFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoPhysicalDirection, physicalDirectionFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoPhysicalDirection, physicalDirectionFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "useLogicalClass"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -117,8 +117,8 @@ func TestNoPhysicalDirectionStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoPhysicalDirection, testCase.fileName, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoPhysicalDirection, testCase.fileName, testCase.sourceText))
 		})
 	}
 }

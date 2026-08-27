@@ -11,7 +11,7 @@
 // `typescript-no-unsafe-function-type`. The config writes `typescript/no-unsafe-function-type` and
 // the matcher strips the namespace on a `/` boundary, so a family prefix in the rule's own name
 // means the config entry cannot match it. The rule then runs on zero files while every one of its
-// tests passes, because a fixture exercises the rule directly and never reads the config.
+// tests passes, because a fixture exercises the rule directly and never reads the configuration.
 //
 // The first rule in the `next` package shipped with that defect and was inert until a planted
 // violation failed to fire. `TestEveryRegisteredRuleIsReachableFromTheLiveConfig` catches it now,
@@ -21,7 +21,7 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/module"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
 )
 
 var messageBannedFunctionType = rule.Message{

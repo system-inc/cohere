@@ -18,7 +18,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/config"
+	"github.com/system-inc/verify/internal/configuration"
 	"github.com/system-inc/verify/internal/fix"
 	"github.com/system-inc/verify/internal/program"
 	"github.com/system-inc/verify/internal/registry"
@@ -190,7 +190,7 @@ func run() error {
 	//
 	// The lint config is loaded here because fixing needs to know which rules apply to which files,
 	// and loading it once serves both this phase and lint below.
-	var lintConfig *config.Config
+	var lintConfig *configuration.Config
 
 	// The fix phase's walk, kept when it is still valid for the lint phase to reuse.
 	//
@@ -203,7 +203,7 @@ func run() error {
 		// A config that cannot be read is a hard failure and never a permissive default. Linting
 		// everything with nothing configured produces output indistinguishable from a clean run, and
 		// that exact confusion is what this tool exists to make impossible.
-		loaded, err := config.Load(resolveLintConfigPath(*lintConfigFileName, *directory))
+		loaded, err := configuration.Load(resolveLintConfigPath(*lintConfigFileName, *directory))
 		if err != nil {
 			return fmt.Errorf("loading the lint config: %w", err)
 		}
@@ -541,7 +541,7 @@ func rebuildGraph(
 	configFileName string,
 	directory string,
 	singleThreaded bool,
-	lintConfig *config.Config,
+	lintConfig *configuration.Config,
 ) (*program.Graph, time.Duration, error) {
 	start := time.Now()
 	rebuilt, err := program.Build(program.Options{
@@ -878,8 +878,8 @@ func round(duration time.Duration) time.Duration {
 // and reported 166. Forty rules are enforced by the `plugins` declarations and named in no rules
 // block, so a denominator taken from the block alone understates by exactly the rules nobody wrote
 // down. That is the same defect twice in one hour, in two different instruments, which is why the
-// count comes from the registry's own view rather than from a second reading of the config.
-func printParityCoverage(rules []rule.Rule, lintConfig *config.Config) {
+// count comes from the registry's own view rather than from a second reading of the configuration.
+func printParityCoverage(rules []rule.Rule, lintConfig *configuration.Config) {
 	if lintConfig == nil {
 		return
 	}
@@ -894,7 +894,7 @@ func printParityCoverage(rules []rule.Rule, lintConfig *config.Config) {
 		wanted[name] = true
 	}
 	for name, setting := range lintConfig.Rules {
-		if setting.Severity == config.SeverityOff {
+		if setting.Severity == configuration.SeverityOff {
 			// An explicit off wins: the catalog says what the two tools can enforce, the config says
 			// what this tree asked for, and a rule turned off here ran over no files regardless.
 			delete(wanted, name)

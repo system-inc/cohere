@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const isNaNFile = "/repository/source/Thing.ts"
@@ -37,7 +37,7 @@ func TestUseIsNaNFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, UseIsNaN, isNaNFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, UseIsNaN, isNaNFile, testCase.sourceText),
 				"comparisonWithNaN")
 		})
 	}
@@ -76,7 +76,7 @@ func TestUseIsNaNFiresOnSwitches(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, UseIsNaN, isNaNFile, testCase.sourceText), testCase.wantId)
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, UseIsNaN, isNaNFile, testCase.sourceText), testCase.wantId)
 		})
 	}
 }
@@ -86,14 +86,14 @@ func TestUseIsNaNSwitchOption(t *testing.T) {
 	source := "declare const value: number;\nexport function run() {\n    switch(value) {\n        case NaN: return 1;\n    }\n    return 0;\n}\n"
 
 	// Default is on, so a config that says nothing gets the rule rather than half of it.
-	ruletest.ExpectFindings(t, ruletest.Run(t, UseIsNaN, isNaNFile, source), "caseWithNaN")
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, UseIsNaN, isNaNFile, source), "caseWithNaN")
 
 	disabled := false
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, UseIsNaN, isNaNFile, source,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, UseIsNaN, isNaNFile, source,
 		UseIsNaNOptions{EnforceForSwitchCase: &disabled}))
 
 	enabled := true
-	ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, UseIsNaN, isNaNFile, source,
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, UseIsNaN, isNaNFile, source,
 		UseIsNaNOptions{EnforceForSwitchCase: &enabled}), "caseWithNaN")
 }
 
@@ -119,7 +119,7 @@ func TestUseIsNaNStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, UseIsNaN, isNaNFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, UseIsNaN, isNaNFile, testCase.sourceText))
 		})
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // unmodifiedLoopFile is where the fixtures pretend to live.
@@ -26,13 +26,13 @@ const unmodifiedLoopFile = "/repository/source/LoopConditions.ts"
 func TestNoUnmodifiedLoopConditionFires(t *testing.T) {
 	for _, testCase := range unmodifiedLoopFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 
 			wantIds := make([]string, len(testCase.variables))
 			for index := range wantIds {
 				wantIds[index] = "loopConditionNotModified"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 
 			for index, wantVariable := range testCase.variables {
 				want := "The variable is '" + wantVariable + "'."
@@ -53,8 +53,8 @@ func TestNoUnmodifiedLoopConditionFires(t *testing.T) {
 func TestNoUnmodifiedLoopConditionStaysSilent(t *testing.T) {
 	for _, source := range unmodifiedLoopCleanCases {
 		t.Run(source, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
 		})
 	}
 }
@@ -79,7 +79,7 @@ func TestNoUnmodifiedLoopConditionOptionOnlyCasesAreRecordedNotAsserted(t *testi
 		t.Run(testCase.source, func(t *testing.T) {
 			// Runs the rule for its own sake: these are real sources and a crash on one is a
 			// defect whatever the option question is.
-			ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+			rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 		})
 	}
 }
@@ -118,7 +118,7 @@ func TestNoUnmodifiedLoopConditionSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if len(result.Diagnostics) != len(testCase.reports) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.reports), len(result.Diagnostics))
 			}
@@ -144,9 +144,9 @@ func TestNoUnmodifiedLoopConditionSpans(t *testing.T) {
 // constant, because comparing a diagnostic to the constant it was built from is an equality both
 // sides of which move together under mutation.
 func TestNoUnmodifiedLoopConditionMessage(t *testing.T) {
-	result := ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile,
+	result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile,
 		"var foo = 0; while (foo) { } foo = 1;")
-	ruletest.ExpectFindings(t, result, "loopConditionNotModified")
+	rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
 	message := result.Diagnostics[0].Message
 
 	if message.Id != "loopConditionNotModified" {
@@ -175,12 +175,12 @@ func TestNoUnmodifiedLoopConditionMessage(t *testing.T) {
 func TestNoUnmodifiedLoopConditionRequiresTheTypedHarness(t *testing.T) {
 	const source = "var foo = 0; while (foo) { } foo = 1;"
 
-	ruletest.ExpectFindings(t,
-		ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source),
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source),
 		"loopConditionNotModified")
 
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
 
 	if !NoUnmodifiedLoopCondition.NeedsTypeChecker {
 		t.Error("the rule must declare NeedsTypeChecker, or the live run hands it a nil checker")
@@ -201,8 +201,8 @@ func TestNoUnmodifiedLoopConditionForInAndForOfAreNeverJudged(t *testing.T) {
 		"var foo = []; for (var item of foo) { } foo = 1;",
 	} {
 		t.Run(source, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, source))
 		})
 	}
 }
@@ -244,11 +244,11 @@ func TestNoUnmodifiedLoopConditionUnnamedFunctionDeclarationHasNoNameToReach(t *
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
-				ruletest.ExpectFindings(t, result, "loopConditionNotModified")
+				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
 			} else {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 			}
 		})
 	}
@@ -295,11 +295,11 @@ func TestNoUnmodifiedLoopConditionClimbStopsAtTheNearestFunctionDeclaration(t *t
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
-				ruletest.ExpectFindings(t, result, "loopConditionNotModified")
+				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
 			} else {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 			}
 		})
 	}
@@ -349,12 +349,12 @@ func TestNoUnmodifiedLoopConditionDynamicCheckDoesNotDescendIntoFunctions(t *tes
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			wantIds := make([]string, testCase.reports)
 			for index := range wantIds {
 				wantIds[index] = "loopConditionNotModified"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 		})
 	}
 }
@@ -401,11 +401,11 @@ func TestNoUnmodifiedLoopConditionVarInitializerCountsAsAWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
-				ruletest.ExpectFindings(t, result, "loopConditionNotModified")
+				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
 			} else {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 			}
 		})
 	}
@@ -445,11 +445,11 @@ func TestNoUnmodifiedLoopConditionModifierReachedThroughACall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
+			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
 			if testCase.fires {
-				ruletest.ExpectFindings(t, result, "loopConditionNotModified")
+				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
 			} else {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 			}
 		})
 	}

@@ -3,7 +3,7 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/imports"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/imports"
 )
 
 var messageIncompatibleLibrary = rule.Message{
@@ -33,7 +33,7 @@ var messageIncompatibleLibrary = rule.Message{
 // correct and the conclusion drawn from them is not, which matters because it decides whether this
 // rule can ever fire on this tree.
 //
-// The distinction is against `config.go`, which really is the shape that measurement describes.
+// The distinction is against `configuration.go`, which really is the shape that measurement describes.
 // That rule's default table is *self-consistent at every entry*, so it is structurally unable to
 // report without a user-supplied provider verify has no channel for. This one is the opposite:
 // every one of the three default entries carries a live `knownIncompatible` message, and the
@@ -151,7 +151,7 @@ type incompatibleLibraryEntry struct {
 
 // incompatibleLibraryTable is the module table, and the seam a test can substitute at.
 //
-// A variable rather than a direct call for the same reason `config.go` has one, though the reason
+// A variable rather than a direct call for the same reason `configuration.go` has one, though the reason
 // is weaker here and the difference is worth stating so a reader does not copy the wrong lesson.
 // There, the seam is the *only* way to make the rule report at all. Here the shipped table fires on
 // its own, and the seam exists so upstream's three fixtures — which import a module registered by a
@@ -168,7 +168,7 @@ var incompatibleLibraryTable = defaultIncompatibleLibraryTable
 // per-finding text, so a reworded copy is a visible divergence.
 //
 // The module name is compared **exactly**, and that is measured rather than assumed. Unlike
-// `isKnownReactModule` in `config.go`, which lowercases before comparing, this comparison is
+// `isKnownReactModule` in `configuration.go`, which lowercases before comparing, this comparison is
 // case-sensitive and does not accept subpaths: `@TanStack/React-Table` and
 // `@tanstack/react-table/core` are both silent at React 7.1.1. A lowercasing or prefix-matching
 // version of this function would report where upstream does not.

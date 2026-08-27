@@ -8,7 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/regexsyntax"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/regexsyntax"
 )
 
 // NoUselessEscapeOptions relaxes the regex half of the rule for named characters.
@@ -107,7 +107,7 @@ var NoUselessEscape = rule.Rule{
 		if configured, isConfigured := options.(NoUselessEscapeOptions); isConfigured {
 			for _, entry := range configured.AllowRegexCharacters {
 				// One character per entry. A longer string can never equal a single escaped
-				// character, so admitting it would widen nothing and hide a typo in the config.
+				// character, so admitting it would widen nothing and hide a typo in the configuration.
 				if character, size := utf8.DecodeRuneInString(entry); size == len(entry) {
 					allowed[character] = true
 				}

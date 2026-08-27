@@ -7,7 +7,7 @@
 // judgments this codebase made for itself and has no upstream to check against. Merging them would
 // lose the ability to say which findings a differential run is allowed to disagree about.
 //
-// Distinct from `internal/utils/react/` despite the name, which holds the shared predicates these
+// Distinct from `internal/utilities/react/` despite the name, which holds the shared predicates these
 // rules ask (`IsCreateElementCall`, `EnclosingComponent`) and is imported by rule packages rather
 // than being one.
 package react

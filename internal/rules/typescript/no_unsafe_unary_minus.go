@@ -6,7 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 // NoUnsafeUnaryMinus flags unary negation applied to a value that is not a number or a bigint.
@@ -157,10 +157,10 @@ var NoUnsafeUnaryMinus = rule.Rule{
 					return
 				}
 
-				argType := typecheck.GetConstrainedTypeAtLocation(ctx.TypeChecker, expr.Operand)
+				argType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, expr.Operand)
 
-				for _, t := range typecheck.UnionTypeParts(argType) {
-					if !typecheck.IsTypeFlagSet(t, checker.TypeFlagsAny|checker.TypeFlagsNever|checker.TypeFlagsBigIntLike|checker.TypeFlagsNumberLike) {
+				for _, t := range type_checking.UnionTypeParts(argType) {
+					if !type_checking.IsTypeFlagSet(t, checker.TypeFlagsAny|checker.TypeFlagsNever|checker.TypeFlagsBigIntLike|checker.TypeFlagsNumberLike) {
 						ctx.ReportNode(node, buildUnaryMinusMessage(ctx.TypeChecker.TypeToString(t)))
 						break
 					}

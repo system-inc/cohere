@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // constAssignFile is where the fixtures pretend to live.
@@ -126,8 +126,8 @@ func TestNoConstAssignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -208,8 +208,8 @@ func TestNoConstAssignStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -261,7 +261,7 @@ func TestNoConstAssignPointsAtTheWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoConstAssign, constAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.want),
 					len(result.Diagnostics))
@@ -283,7 +283,7 @@ func TestNoConstAssignPointsAtTheWrite(t *testing.T) {
 // reported twice from two writes reported once each. A rule looping over the wrong collection
 // produces exactly that: the right count, the right ids, and the same span twice.
 func TestNoConstAssignReportsDistinctWrites(t *testing.T) {
-	result := ruletest.RunTyped(t, NoConstAssign, constAssignFile, "const x = 0; x = 1; x = 2;")
+	result := rule_testing.RunTyped(t, NoConstAssign, constAssignFile, "const x = 0; x = 1; x = 2;")
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("expected 2 findings, got %d", len(result.Diagnostics))
 	}
@@ -293,14 +293,14 @@ func TestNoConstAssignReportsDistinctWrites(t *testing.T) {
 	}
 }
 
-// The typed harness is required, and a revert to `ruletest.Run` must fail loudly here.
+// The typed harness is required, and a revert to `rule_testing.Run` must fail loudly here.
 //
 // This rule declares `NeedsTypeChecker`, and the plain harness hands it a nil checker. The rule
 // returns early in that case, so every StaysSilent fixture would pass vacuously and the whole clean
 // table would stop measuring anything. Asserting the silence directly is what makes that visible.
 func TestNoConstAssignNeedsTheTypedHarness(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoConstAssign, constAssignFile, "const x = 0; x = 1;"))
-	ruletest.ExpectFindings(t,
-		ruletest.RunTyped(t, NoConstAssign, constAssignFile, "const x = 0; x = 1;"),
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoConstAssign, constAssignFile, "const x = 0; x = 1;"))
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTyped(t, NoConstAssign, constAssignFile, "const x = 0; x = 1;"),
 		"noConstAssign")
 }

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const longCommentFile = "/repository/source/Thing.ts"
@@ -41,8 +41,8 @@ func TestConsistencyNoLongLineCommentFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoLongLineComment, longCommentFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "longLineComment")
+			result := rule_testing.Run(t, ConsistencyNoLongLineComment, longCommentFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "longLineComment")
 		})
 	}
 }
@@ -102,8 +102,8 @@ func TestConsistencyNoLongLineCommentStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoLongLineComment, testCase.fileName, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyNoLongLineComment, testCase.fileName, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -112,8 +112,8 @@ func TestConsistencyNoLongLineCommentStaysSilent(t *testing.T) {
 // the comment it was repairing and the finding disappears with it.
 func TestConsistencyNoLongLineCommentFixes(t *testing.T) {
 	sourceText := "// one\n// two\n// three\n// four\n// five\nexport const value = 1;\n"
-	result := ruletest.Run(t, ConsistencyNoLongLineComment, longCommentFile, sourceText)
-	ruletest.ExpectFindings(t, result, "longLineComment")
+	result := rule_testing.Run(t, ConsistencyNoLongLineComment, longCommentFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "longLineComment")
 
 	fixes := result.Diagnostics[0].Fixes
 	if len(fixes) != 1 {
@@ -139,8 +139,8 @@ func TestConsistencyNoLongLineCommentFixPreservesIndentation(t *testing.T) {
 	sourceText := "export function thing() {\n" +
 		"    // one\n    // two\n    // three\n    // four\n    // five\n" +
 		"    return 1;\n}\n"
-	result := ruletest.Run(t, ConsistencyNoLongLineComment, longCommentFile, sourceText)
-	ruletest.ExpectFindings(t, result, "longLineComment")
+	result := rule_testing.Run(t, ConsistencyNoLongLineComment, longCommentFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "longLineComment")
 
 	wantText := "/*\n     * one\n     * two\n     * three\n     * four\n     * five\n     */"
 	if result.Diagnostics[0].Fixes[0].Text != wantText {
@@ -152,8 +152,8 @@ func TestConsistencyNoLongLineCommentFixPreservesIndentation(t *testing.T) {
 // star-slash in the text would close the block early and change what the rest of the run means.
 func TestConsistencyNoLongLineCommentWithholdsUnsafeFix(t *testing.T) {
 	sourceText := "// one\n// two\n// a */ sequence\n// four\n// five\nexport const value = 1;\n"
-	result := ruletest.Run(t, ConsistencyNoLongLineComment, longCommentFile, sourceText)
-	ruletest.ExpectFindings(t, result, "longLineComment")
+	result := rule_testing.Run(t, ConsistencyNoLongLineComment, longCommentFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "longLineComment")
 
 	if len(result.Diagnostics[0].Fixes) != 0 {
 		t.Fatalf("expected no fix, got %d", len(result.Diagnostics[0].Fixes))

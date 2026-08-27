@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The corpus writes no file name, so one is chosen here. It must not end in `.d.ts`, which is
@@ -33,8 +33,8 @@ func TestNoUselessEmptyExportFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "uselessEmptyExport")
+			result := rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "uselessEmptyExport")
 		})
 	}
 }
@@ -77,8 +77,8 @@ func TestNoUselessEmptyExportStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText))
 		})
 	}
 }
@@ -105,8 +105,8 @@ func TestNoUselessEmptyExportFiresOnFormsTheCorpusOmits(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText),
 				"uselessEmptyExport")
 		})
 	}
@@ -115,9 +115,9 @@ func TestNoUselessEmptyExportFiresOnFormsTheCorpusOmits(t *testing.T) {
 // TestNoUselessEmptyExportReportsEachEmptyExportSeparately pins that the gather-then-report shape
 // reports per statement rather than once per file. Measured: two diagnostics upstream.
 func TestNoUselessEmptyExportReportsEachEmptyExportSeparately(t *testing.T) {
-	result := ruletest.Run(t, NoUselessEmptyExport, uselessEmptyExportFile,
+	result := rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile,
 		"export const _ = {};\nexport {};\nexport {};\n")
-	ruletest.ExpectFindings(t, result, "uselessEmptyExport", "uselessEmptyExport")
+	rule_testing.ExpectFindings(t, result, "uselessEmptyExport", "uselessEmptyExport")
 }
 
 // TestNoUselessEmptyExportFixesWriteWhatTheyClaim carries all eleven of oxc's fix vectors.
@@ -147,8 +147,8 @@ func TestNoUselessEmptyExportFixesWriteWhatTheyClaim(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText),
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText),
 				testCase.wantSource)
 		})
 	}
@@ -171,7 +171,7 @@ func TestNoUselessEmptyExportPointsAtTheEmptyExport(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
@@ -187,7 +187,7 @@ func TestNoUselessEmptyExportPointsAtTheEmptyExport(t *testing.T) {
 // than against the rule's own message constant. Comparing to the constant is equality that looks
 // correct and cannot fail, because a mutation moves both sides together.
 func TestNoUselessEmptyExportReportsTheMessageItClaims(t *testing.T) {
-	result := ruletest.Run(t, NoUselessEmptyExport, uselessEmptyExportFile,
+	result := rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile,
 		"export const _ = {};\nexport {};\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -221,9 +221,9 @@ func TestNoUselessEmptyExportExemptsDeclarationFiles(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoUselessEmptyExport,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessEmptyExport,
 				"/repository/source/Thing.d.ts", testCase.sourceText))
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoUselessEmptyExport,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUselessEmptyExport,
 				uselessEmptyExportFile, testCase.sourceText), "uselessEmptyExport")
 		})
 	}

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestNoScriptComponentInHeadReports(t *testing.T) {
@@ -85,12 +85,12 @@ func TestNoScriptComponentInHeadReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoScriptComponentInHead, "Component.tsx", testCase.source)
+			result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", testCase.source)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = messageNoScriptComponentInHead.Id
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -189,8 +189,8 @@ func TestNoScriptComponentInHeadIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoScriptComponentInHead, "Component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -202,7 +202,7 @@ func TestNoScriptComponentInHeadIsSilent(t *testing.T) {
 // the finding, and a port pointing at any of the three satisfies every id assertion above.
 func TestNoScriptComponentInHeadPointsAtTheHeadName(t *testing.T) {
 	source := "import Head from \"next/head\";\nimport Script from \"next/script\";\nexport default function Index() { return (<Head><Script></Script></Head>); }\n"
-	result := ruletest.RunTyped(t, NoScriptComponentInHead, "Component.tsx", source)
+	result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
@@ -239,7 +239,7 @@ func TestNoScriptComponentInHeadPointsAtTheHeadName(t *testing.T) {
 // inner `Head`; the outer sits at forty four.
 func TestNoScriptComponentInHeadBlamesTheInnerHead(t *testing.T) {
 	source := "import Head from \"next/head\";\nimport Script from \"next/script\";\nexport default function Index() { return (<Head><Head><Script></Script></Head></Head>); }\n"
-	result := ruletest.RunTyped(t, NoScriptComponentInHead, "Component.tsx", source)
+	result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
@@ -267,7 +267,7 @@ func TestNoScriptComponentInHeadRequiresTheTypedHarness(t *testing.T) {
 	}
 
 	source := "import Head from \"next/head\";\nimport Script from \"next/script\";\nexport default function Index() { return (<Head><Script></Script></Head>); }\n"
-	result := ruletest.Run(t, NoScriptComponentInHead, "Component.tsx", source)
+	result := rule_testing.Run(t, NoScriptComponentInHead, "Component.tsx", source)
 	if len(result.Diagnostics) != 0 {
 		t.Fatalf("untyped harness produced %d findings, so the rule is no longer resolving", len(result.Diagnostics))
 	}

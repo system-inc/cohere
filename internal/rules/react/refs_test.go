@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The corpus for this rule is React's own conformance fixtures, not oxc's tester block.
@@ -12,9 +12,9 @@ import (
 // oxc's `rules/react/refs.rs` carries 1 pass and 3 fail cases and no snapshot at all, because the
 // rule file is a four-line dispatcher and the real corpus lives with the compiler. React ships 42
 // fixtures whose headline is `Cannot access refs during render`, vendored at
-// `internal/reactconformance/testdata/fixtures`. Twelve of those are Flow (`//@flow` plus
+// `internal/react_conformance/testdata/fixtures`. Twelve of those are Flow (`//@flow` plus
 // `component C()` syntax, which our parser cannot accept), leaving 30 that are scorable here. That
-// 30 is the same number `internal/reactconformance/verdict_test.go` independently asserts for this
+// 30 is the same number `internal/react_conformance/verdict_test.go` independently asserts for this
 // rule, which is the cross-check that the set below is the right set.
 //
 // Every source string is copied byte-for-byte from the fixture on disk, emitted through
@@ -24,7 +24,7 @@ import (
 //
 // # Why every fixture gets a React import prepended
 //
-// `ruletest`'s tsconfig sets `types: []` and resolves no `node_modules`, deliberately, so
+// `rule_testing`'s tsconfig sets `types: []` and resolves no `node_modules`, deliberately, so
 // `@types/react` can never resolve in a fixture. Most of these fixtures also call a bare `useRef`
 // with no import at all, because the compiler harness seeds a global table naming it. This port
 // asks the type checker instead, so an unimported `useRef` is an undeclared global and the file is
@@ -238,10 +238,10 @@ var refsCorpus = []refsFixture{
 // each file as `strings.TrimSpace(contents)+"\n"`, so the bytes on disk are one newline short of
 // the literal where a fixture began with one; every span assertion below slices the source the
 // harness actually wrote rather than the Go literal, which is the documented way this bites.
-func runRefsFixture(t *testing.T, fixture refsFixture) ruletest.Result {
+func runRefsFixture(t *testing.T, fixture refsFixture) rule_testing.Result {
 	t.Helper()
 	name := "component.tsx"
-	return ruletest.RunTypedFiles(t, Refs, map[string]string{
+	return rule_testing.RunTypedFiles(t, Refs, map[string]string{
 		name:         refsImport + fixture.Source,
 		"react.d.ts": refsReactDeclarations,
 	}, name)
@@ -264,7 +264,7 @@ func TestRefsMatchesTheImportedCorpus(t *testing.T) {
 			// ids AND the count in the order the rule produced them, which is the same assertion
 			// this made itself, and `TestEveryRuleShipsAFixturePair` in the registry reads for this
 			// call textually to prove the rule can be shown to fire at all.
-			ruletest.ExpectFindings(t, result, fixture.Want...)
+			rule_testing.ExpectFindings(t, result, fixture.Want...)
 		})
 	}
 }
@@ -357,7 +357,7 @@ func TestRefsStaysSilent(t *testing.T) {
 			if len(result.Diagnostics) != 0 {
 				t.Logf("this case exists because: %s", testCase.Why)
 			}
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -561,7 +561,7 @@ func TestRefsRequiresTheTypedHarness(t *testing.T) {
 // checker was sufficient, the imported corpus would still score 27 of 30 and only this would fail.
 func TestRefsNameSignalWorksWithoutTheChecker(t *testing.T) {
 	source := "function Component(props) {\n  const value = props.ref.current;\n  return <div>{value}</div>;\n}\n"
-	result := ruletest.RunTypedFiles(t, Refs, map[string]string{"c.tsx": source}, "c.tsx")
+	result := rule_testing.RunTypedFiles(t, Refs, map[string]string{"c.tsx": source}, "c.tsx")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("reported %d findings with no React types available, want 1 from the name signal", len(result.Diagnostics))
 	}
@@ -649,7 +649,7 @@ func TestRefsExemptsTheMergeRefsShape(t *testing.T) {
 		"  return <input ref={setInputReference} />;\n" +
 		"}\n"
 
-	result := ruletest.RunTypedFiles(t, Refs, map[string]string{"c.tsx": source, "react.d.ts": declarations}, "c.tsx")
+	result := rule_testing.RunTypedFiles(t, Refs, map[string]string{"c.tsx": source, "react.d.ts": declarations}, "c.tsx")
 	if len(result.Diagnostics) != 0 {
 		ids := []string{}
 		for _, diagnostic := range result.Diagnostics {
@@ -681,7 +681,7 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(t *testing.T) {
 		"  return <div style={{width}} data-guide={guide} />;\n" +
 		"}\n"
 
-	result := ruletest.RunTypedFiles(t, Refs, map[string]string{"c.tsx": source, "react.d.ts": declarations}, "c.tsx")
+	result := rule_testing.RunTypedFiles(t, Refs, map[string]string{"c.tsx": source, "react.d.ts": declarations}, "c.tsx")
 	if len(result.Diagnostics) != 0 {
 		ids := []string{}
 		for _, diagnostic := range result.Diagnostics {
@@ -698,7 +698,7 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(t *testing.T) {
 		"  const value = properties.guideElementReference.current;\n" +
 		"  return <div>{value}</div>;\n" +
 		"}\n"
-	readingResult := ruletest.RunTypedFiles(t, Refs, map[string]string{"c.tsx": reading, "react.d.ts": declarations}, "c.tsx")
+	readingResult := rule_testing.RunTypedFiles(t, Refs, map[string]string{"c.tsx": reading, "react.d.ts": declarations}, "c.tsx")
 	if len(readingResult.Diagnostics) != 1 {
 		t.Errorf("reading the ref field's current gave %d findings, want 1 — the rule has gone blind to refs on props", len(readingResult.Diagnostics))
 	}
@@ -727,7 +727,7 @@ func TestRefsAdmitsNamespacedHookCalls(t *testing.T) {
 			"  return reference.current;\n" +
 			"}\n",
 	})
-	ruletest.ExpectFindings(t, namespaced, "refValueAccess")
+	rule_testing.ExpectFindings(t, namespaced, "refValueAccess")
 
 	// The control that gives it meaning: a namespaced call to something that is not a hook must not
 	// admit the function, or the gate stops gating.
@@ -738,5 +738,5 @@ func TestRefsAdmitsNamespacedHookCalls(t *testing.T) {
 			"  return value;\n" +
 			"}\n",
 	})
-	ruletest.ExpectClean(t, notAHook)
+	rule_testing.ExpectClean(t, notAHook)
 }

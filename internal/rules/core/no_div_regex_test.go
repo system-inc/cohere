@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // divRegexFile is where the fixtures pretend to live.
@@ -21,8 +21,8 @@ const divRegexFile = "/repository/source/DivRegex.ts"
 // that lands inside the literal produces different source but there is only one input to notice it
 // on.
 func TestNoDivRegexFires(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoDivRegex, divRegexFile, "var f = function() { return /=foo/; };"),
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoDivRegex, divRegexFile, "var f = function() { return /=foo/; };"),
 		"unexpected")
 }
 
@@ -39,7 +39,7 @@ func TestNoDivRegexStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoDivRegex, divRegexFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDivRegex, divRegexFile, sourceText))
 		})
 	}
 }
@@ -51,8 +51,8 @@ func TestNoDivRegexStaysSilent(t *testing.T) {
 // wrong byte produces a different file and an identical fix text, so a text comparison cannot tell
 // the two apart. The cases below this one are where that gets exercised properly.
 func TestNoDivRegexFixes(t *testing.T) {
-	ruletest.ExpectFixedSource(t,
-		ruletest.Run(t, NoDivRegex, divRegexFile, "var f = function() { return /=foo/; };"),
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.Run(t, NoDivRegex, divRegexFile, "var f = function() { return /=foo/; };"),
 		"var f = function() { return /[=]foo/; };")
 }
 
@@ -90,11 +90,11 @@ func TestNoDivRegexIsPositionalNotSemantic(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDivRegex, divRegexFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoDivRegex, divRegexFile, testCase.sourceText)
 			if testCase.wantFires {
-				ruletest.ExpectFindings(t, result, "unexpected")
+				rule_testing.ExpectFindings(t, result, "unexpected")
 			} else {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 			}
 		})
 	}
@@ -120,7 +120,7 @@ func TestNoDivRegexDeclinesTheConstructor(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoDivRegex, divRegexFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDivRegex, divRegexFile, testCase.sourceText))
 		})
 	}
 }
@@ -153,7 +153,7 @@ func TestNoDivRegexReportsTheWholeLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoDivRegex, divRegexFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoDivRegex, divRegexFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
@@ -197,8 +197,8 @@ func TestNoDivRegexRepairsExactlyTheEqualsSign(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.Run(t, NoDivRegex, divRegexFile, testCase.sourceText), testCase.wantSource)
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.Run(t, NoDivRegex, divRegexFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }
@@ -211,7 +211,7 @@ func TestNoDivRegexRepairsExactlyTheEqualsSign(t *testing.T) {
 // pattern parse fails loudly instead of producing a rule that never settles.
 func TestNoDivRegexRepairIsIdempotent(t *testing.T) {
 	repaired := "var a = /[=]foo/;"
-	ruletest.ExpectClean(t, ruletest.Run(t, NoDivRegex, divRegexFile, repaired))
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoDivRegex, divRegexFile, repaired))
 }
 
 // TestNoDivRegexMessage asserts the reported id and that a description is present.
@@ -219,7 +219,7 @@ func TestNoDivRegexRepairIsIdempotent(t *testing.T) {
 // The id literal is typed here rather than read from the rule's own constant, so a rename cannot
 // move both sides at once and stay green.
 func TestNoDivRegexMessage(t *testing.T) {
-	result := ruletest.Run(t, NoDivRegex, divRegexFile, "var a = /=foo/;")
+	result := rule_testing.Run(t, NoDivRegex, divRegexFile, "var a = /=foo/;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
@@ -266,7 +266,7 @@ func TestNoDivRegexSurvivesATruncatedLiteral(t *testing.T) {
 			// A panic here is the defect under test, so it is allowed to fail the test rather than
 			// being recovered: an unrecovered panic in a rule takes the whole run down in
 			// production, and the test should say so in the same voice.
-			ruletest.ExpectClean(t, ruletest.Run(t, NoDivRegex, divRegexFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDivRegex, divRegexFile, testCase.sourceText))
 		})
 	}
 }
@@ -290,6 +290,6 @@ func TestNoDivRegexSurvivesATruncatedLiteral(t *testing.T) {
 // rule's, because the file already carries a syntax error from the compiler and a second complaint
 // pointing at the same two characters is what the sibling regex rules also decline to suppress.
 func TestNoDivRegexOnAnUnterminatedLiteralIsOurs(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoDivRegex, divRegexFile, "var a = /="), "unexpected")
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoDivRegex, divRegexFile, "var a = /="), "unexpected")
 }

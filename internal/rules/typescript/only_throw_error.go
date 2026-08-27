@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 // OnlyThrowErrorOptions is upstream's option struct, field-for-field, plus the one split our wire
@@ -22,7 +22,7 @@ import (
 // been explicitly turned off, which is the loudest possible failure: `throw someAny` would start
 // reporting on every file in the tree. Absent has to stay distinguishable from false.
 type OnlyThrowErrorOptions struct {
-	Allow                []typecheck.TypeOrValueSpecifier
+	Allow                []type_checking.TypeOrValueSpecifier
 	AllowInline          []string
 	AllowRethrowing      *bool
 	AllowThrowingAny     *bool
@@ -269,27 +269,27 @@ var OnlyThrowError = rule.Rule{
 					return
 				}
 
-				if typecheck.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ctx.Program) {
+				if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ctx.Program) {
 					return
 				}
 
 				// A FLAG test rather than an equality, matching upstream's `isTypeFlagSet`, and it
 				// sits above the any/unknown escapes on purpose: `throw undefined` reports even
 				// with every default still permissive.
-				if typecheck.IsTypeFlagSet(argumentType, checker.TypeFlagsUndefined) {
+				if type_checking.IsTypeFlagSet(argumentType, checker.TypeFlagsUndefined) {
 					ctx.ReportNode(subject, buildOnlyThrowErrorUndefMessage())
 					return
 				}
 
-				if allowThrowingAny && typecheck.IsTypeFlagSet(argumentType, checker.TypeFlagsAny) {
+				if allowThrowingAny && type_checking.IsTypeFlagSet(argumentType, checker.TypeFlagsAny) {
 					return
 				}
 
-				if allowThrowingUnknown && typecheck.IsTypeFlagSet(argumentType, checker.TypeFlagsUnknown) {
+				if allowThrowingUnknown && type_checking.IsTypeFlagSet(argumentType, checker.TypeFlagsUnknown) {
 					return
 				}
 
-				if typecheck.IsErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
+				if type_checking.IsErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
 					return
 				}
 
@@ -364,7 +364,7 @@ func onlyThrowErrorIsRethrown(ctx rule.Context, node *ast.Node) bool {
 
 	// The name alone is not enough: any object can have a method called `catch`. Upstream tests the
 	// receiver's type, and a plain `{ catch(cb) {} }` object reports.
-	return typecheck.IsThenableType(ctx.TypeChecker, receiver, nil)
+	return type_checking.IsThenableType(ctx.TypeChecker, receiver, nil)
 }
 
 // onlyThrowErrorParsePromiseHandlingCall reads a syntactically possible `.catch`/`.then` call,
@@ -555,14 +555,14 @@ func DecodeOnlyThrowErrorOptions(raw []byte) (any, error) {
 			continue
 		}
 
-		specifier := typecheck.TypeOrValueSpecifier{Name: entry.Name, Path: entry.Path, Package: entry.Package}
+		specifier := type_checking.TypeOrValueSpecifier{Name: entry.Name, Path: entry.Path, Package: entry.Package}
 		switch entry.From {
 		case "file":
-			specifier.From = typecheck.TypeOrValueSpecifierFromFile
+			specifier.From = type_checking.TypeOrValueSpecifierFromFile
 		case "lib":
-			specifier.From = typecheck.TypeOrValueSpecifierFromLib
+			specifier.From = type_checking.TypeOrValueSpecifierFromLib
 		case "package":
-			specifier.From = typecheck.TypeOrValueSpecifierFromPackage
+			specifier.From = type_checking.TypeOrValueSpecifierFromPackage
 		default:
 			continue
 		}

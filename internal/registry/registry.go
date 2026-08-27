@@ -21,7 +21,7 @@ package registry
 import (
 	"encoding/json"
 
-	"github.com/system-inc/verify/internal/config"
+	"github.com/system-inc/verify/internal/configuration"
 	"github.com/system-inc/verify/internal/rule"
 
 	_ "github.com/system-inc/verify/internal/rules/core"
@@ -65,14 +65,14 @@ func Count() int {
 // caught it. Marking it required turns that silence into a failure.
 //
 // A rule that registers no decoder takes no options, which is the common case.
-func Options() config.OptionsRegistry {
-	options := config.OptionsRegistry{}
+func Options() configuration.OptionsRegistry {
+	options := configuration.OptionsRegistry{}
 	for _, registration := range rule.Registered() {
 		if registration.Decode == nil {
 			continue
 		}
 		decode := registration.Decode
-		options[registration.Rule.Name] = config.RuleOptions{
+		options[registration.Rule.Name] = configuration.RuleOptions{
 			Decode:   func(raw json.RawMessage) (any, error) { return decode(raw) },
 			Required: registration.RequiresOptions,
 		}

@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const preferNamespaceKeywordFile = "/repository/source/Namespaces.ts"
@@ -28,12 +28,12 @@ func TestPreferNamespaceKeywordFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
+			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "preferNamespaceKeyword"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -81,8 +81,8 @@ func TestPreferNamespaceKeywordStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -126,8 +126,8 @@ func TestPreferNamespaceKeywordFixesWriteWhatTheyClaim(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
-			ruletest.ExpectFixedSource(t, result, testCase.wantSource)
+			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
+			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
 		})
 	}
 }
@@ -160,7 +160,7 @@ func TestPreferNamespaceKeywordReportsTheRightSpanAndText(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
+			result := rule_testing.Run(t, PreferNamespaceKeyword, preferNamespaceKeywordFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantSpans))
 			}

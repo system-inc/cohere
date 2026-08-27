@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // crashShapes are source snippets whose optional nodes are absent.
@@ -90,7 +90,7 @@ func TestNoRegisteredRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 				// rule concludes about these shapes belongs in its own fixture pair, and asserting
 				// it here would make this guard fail for reasons that are not crashes.
 				for _, fileName := range fileNames {
-					ruletest.Run(t, subject, fileName, source)
+					rule_testing.Run(t, subject, fileName, source)
 				}
 			})
 		}

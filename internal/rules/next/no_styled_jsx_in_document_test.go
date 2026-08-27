@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The four upstream cases are copied verbatim from oxc's tester block and their bytes are verified
@@ -70,8 +70,8 @@ func TestNoStyledJsxInDocumentReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoStyledJsxInDocument, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
+			result := rule_testing.Run(t, NoStyledJsxInDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
 		})
 	}
 }
@@ -166,8 +166,8 @@ func TestNoStyledJsxInDocumentIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoStyledJsxInDocument, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoStyledJsxInDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -178,8 +178,8 @@ func TestNoStyledJsxInDocumentIsSilent(t *testing.T) {
 // </style>;`, which is exactly `<style jsx>`.
 func TestNoStyledJsxInDocumentPointsAtTheOpeningElement(t *testing.T) {
 	source := "export const a = <style jsx>{\"x\"}</style>;\n"
-	result := ruletest.Run(t, NoStyledJsxInDocument, "pages/_document.tsx", source)
-	ruletest.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
+	result := rule_testing.Run(t, NoStyledJsxInDocument, "pages/_document.tsx", source)
+	rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "<style jsx>" {
@@ -190,8 +190,8 @@ func TestNoStyledJsxInDocumentPointsAtTheOpeningElement(t *testing.T) {
 // A self-closing element reports over its whole self, since it has no separate opening node.
 func TestNoStyledJsxInDocumentPointsAtASelfClosingElement(t *testing.T) {
 	source := "export const a = <style jsx />;\n"
-	result := ruletest.Run(t, NoStyledJsxInDocument, "pages/_document.tsx", source)
-	ruletest.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
+	result := rule_testing.Run(t, NoStyledJsxInDocument, "pages/_document.tsx", source)
+	rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "<style jsx />" {
@@ -202,9 +202,9 @@ func TestNoStyledJsxInDocumentPointsAtASelfClosingElement(t *testing.T) {
 // The rendered text is asserted rather than a substring of it, because a predicate weaker than the
 // property it guards is not a guard.
 func TestNoStyledJsxInDocumentRendersItsMessage(t *testing.T) {
-	result := ruletest.Run(t, NoStyledJsxInDocument, "pages/_document.tsx",
+	result := rule_testing.Run(t, NoStyledJsxInDocument, "pages/_document.tsx",
 		"export const a = <style jsx>{\"x\"}</style>;\n")
-	ruletest.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
+	rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
 
 	if got := result.Diagnostics[0].Message.Description; got != messageNoStyledJsxInDocument.Description {
 		t.Fatalf("expected the message description verbatim, got %q", got)

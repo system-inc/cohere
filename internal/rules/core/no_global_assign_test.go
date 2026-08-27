@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // globalAssignFile is where the fixtures pretend to live.
@@ -80,8 +80,8 @@ func TestNoGlobalAssignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -140,8 +140,8 @@ func TestNoGlobalAssignStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -154,7 +154,7 @@ func TestNoGlobalAssignStaysSilent(t *testing.T) {
 func TestNoGlobalAssignExceptions(t *testing.T) {
 	t.Run("a listed name is not reported", func(t *testing.T) {
 		// Upstream pass case 3, verbatim source and options.
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
 			"Object = 0;", NoGlobalAssignOptions{Exceptions: []string{"Object"}}))
 	})
 
@@ -162,17 +162,17 @@ func TestNoGlobalAssignExceptions(t *testing.T) {
 		// The other half of the option, which upstream does not test: an exceptions list must
 		// exempt the names in it and nothing else. Without this, an option handler that exempts
 		// everything once any name is listed passes upstream's only case.
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
 			"String = 0;", NoGlobalAssignOptions{Exceptions: []string{"Object"}}), "noGlobalAssign")
 	})
 
 	t.Run("an empty exceptions list exempts nothing", func(t *testing.T) {
-		ruletest.ExpectFindings(t, ruletest.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
 			"Object = 0;", NoGlobalAssignOptions{Exceptions: []string{}}), "noGlobalAssign")
 	})
 
 	t.Run("several listed names are all exempt", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
 			"({Object = 0, String = 0} = {});",
 			NoGlobalAssignOptions{Exceptions: []string{"Object", "String"}}))
 	})
@@ -207,7 +207,7 @@ func TestNoGlobalAssignPointsAtTheWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
@@ -229,7 +229,7 @@ func TestNoGlobalAssignPointsAtTheWrite(t *testing.T) {
 // points both findings at the same place. `no-class-assign` carries the same guard for the same
 // reason.
 func TestNoGlobalAssignShorthandFindingsHaveDistinctSpans(t *testing.T) {
-	result := ruletest.RunTyped(t, NoGlobalAssign, globalAssignFile, "({Object = 0, String = 0} = {});")
+	result := rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, "({Object = 0, String = 0} = {});")
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
 	}
@@ -242,20 +242,20 @@ func TestNoGlobalAssignShorthandFindingsHaveDistinctSpans(t *testing.T) {
 // The typed harness is required, and a revert to the untyped one must fail loudly.
 //
 // The engine hands a rule a nil checker unless it declares NeedsTypeChecker. This rule answers
-// nothing without one, so under `ruletest.Run` it goes completely silent: every clean case above
+// nothing without one, so under `rule_testing.Run` it goes completely silent: every clean case above
 // would pass vacuously and the whole suite would look green over a rule that reports nothing.
 func TestNoGlobalAssignRequiresTheTypedHarness(t *testing.T) {
 	if !NoGlobalAssign.NeedsTypeChecker {
 		t.Fatal("NoGlobalAssign must declare NeedsTypeChecker; without it the checker is nil and " +
 			"the rule reports nothing while every StaysSilent fixture passes vacuously")
 	}
-	untyped := ruletest.Run(t, NoGlobalAssign, globalAssignFile, "String = 'hello world';")
+	untyped := rule_testing.Run(t, NoGlobalAssign, globalAssignFile, "String = 'hello world';")
 	if len(untyped.Diagnostics) != 0 {
 		t.Fatalf("expected the untyped harness to produce nothing, got %d findings; if this "+
 			"changed, the fixtures above may no longer be measuring what they claim",
 			len(untyped.Diagnostics))
 	}
-	typed := ruletest.RunTyped(t, NoGlobalAssign, globalAssignFile, "String = 'hello world';")
+	typed := rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, "String = 'hello world';")
 	if len(typed.Diagnostics) != 1 {
 		t.Fatalf("expected the typed harness to report once, got %d", len(typed.Diagnostics))
 	}
@@ -295,8 +295,8 @@ func TestNoGlobalAssignBoundary(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, testCase.sourceText))
 		})
 	}
 }

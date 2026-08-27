@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // extraBindFile is where the fixtures pretend to live.
@@ -114,8 +114,8 @@ func TestNoExtraBindFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoExtraBind, extraBindFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "unexpected")
+			result := rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "unexpected")
 
 			reported := result.Diagnostics[0].Range
 			if reported.Pos() != testCase.spanStart || reported.End() != testCase.spanEnd {
@@ -132,7 +132,7 @@ func TestNoExtraBindFires(t *testing.T) {
 					t.Errorf("proposed %d fixes on a case upstream declines to repair", len(fixes))
 				}
 			case string:
-				ruletest.ExpectFixedSource(t, result, want)
+				rule_testing.ExpectFixedSource(t, result, want)
 			}
 		})
 	}
@@ -211,7 +211,7 @@ func TestNoExtraBindStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoExtraBind, extraBindFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText))
 		})
 	}
 }
@@ -235,9 +235,9 @@ func TestNoExtraBindRepairKeepsWhatSitsBetweenTheTwoSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoExtraBind, extraBindFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "unexpected")
-			ruletest.ExpectFixedSource(t, result, testCase.fixedSource)
+			result := rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "unexpected")
+			rule_testing.ExpectFixedSource(t, result, testCase.fixedSource)
 		})
 	}
 }

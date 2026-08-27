@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 // noMisusedPromisesFile is the fixture name most cases in this file run under.
@@ -66,7 +66,7 @@ if (true) {
 if (Promise.resolve()) {
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksConditionals: typecheck.Ref(false)},
+			options: NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)},
 		},
 		{
 			name:     "upstream valid 2",
@@ -88,7 +88,7 @@ if (Promise.resolve()) {
 } else {
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksConditionals: typecheck.Ref(false)},
+			options: NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)},
 		},
 		{
 			name:       "upstream valid 4",
@@ -106,7 +106,7 @@ if (Promise.resolve()) {
 			name:       "upstream valid 6 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `for (let i; Promise.resolve(); i++) {}`,
-			options:    NoMisusedPromisesOptions{ChecksConditionals: typecheck.Ref(false)},
+			options:    NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)},
 		},
 		{
 			name:       "upstream valid 7",
@@ -118,7 +118,7 @@ if (Promise.resolve()) {
 			name:       "upstream valid 8 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `do {} while (Promise.resolve());`,
-			options:    NoMisusedPromisesOptions{ChecksConditionals: typecheck.Ref(false)},
+			options:    NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)},
 		},
 		{
 			name:       "upstream valid 9",
@@ -130,7 +130,7 @@ if (Promise.resolve()) {
 			name:       "upstream valid 10 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `while (Promise.resolve()) {}`,
-			options:    NoMisusedPromisesOptions{ChecksConditionals: typecheck.Ref(false)},
+			options:    NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)},
 		},
 		{
 			name:       "upstream valid 11",
@@ -142,7 +142,7 @@ if (Promise.resolve()) {
 			name:       "upstream valid 12 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `Promise.resolve() ? 123 : 456;`,
-			options:    NoMisusedPromisesOptions{ChecksConditionals: typecheck.Ref(false)},
+			options:    NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)},
 		},
 		{
 			name:     "upstream valid 13",
@@ -160,7 +160,7 @@ if (!true) {
 if (!Promise.resolve()) {
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksConditionals: typecheck.Ref(false)},
+			options: NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)},
 		},
 		{
 			name:       "upstream valid 15",
@@ -172,7 +172,7 @@ if (!Promise.resolve()) {
 			name:       "upstream valid 16 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `Promise.resolve() || false;`,
-			options:    NoMisusedPromisesOptions{ChecksConditionals: typecheck.Ref(false)},
+			options:    NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)},
 		},
 		{
 			name:       "upstream valid 17",
@@ -184,7 +184,7 @@ if (!Promise.resolve()) {
 			name:       "upstream valid 18 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `(true && Promise.resolve()) || false;`,
-			options:    NoMisusedPromisesOptions{ChecksConditionals: typecheck.Ref(false)},
+			options:    NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(false)},
 		},
 		{
 			name:       "upstream valid 19",
@@ -255,7 +255,7 @@ if (value) {
 			name:       "upstream valid 26 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `[1, 2, 3].forEach(async val => {});`,
-			options:    NoMisusedPromisesOptions{ChecksVoidReturn: typecheck.Ref(false)},
+			options:    NoMisusedPromisesOptions{ChecksVoidReturn: type_checking.Ref(false)},
 		},
 		{
 			name:       "upstream valid 27",
@@ -267,7 +267,7 @@ if (value) {
 			name:       "upstream valid 28 [options]",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `new Promise(async (resolve, reject) => resolve());`,
-			options:    NoMisusedPromisesOptions{ChecksVoidReturn: typecheck.Ref(false)},
+			options:    NoMisusedPromisesOptions{ChecksVoidReturn: type_checking.Ref(false)},
 		},
 		{
 			name:     "upstream valid 29",
@@ -637,7 +637,7 @@ console.log([...(await Promise.resolve(42))]);
 			sourceText: `
 console.log({ ...Promise.resolve({ key: 42 }) });
       `,
-			options: NoMisusedPromisesOptions{ChecksSpreads: typecheck.Ref(false)},
+			options: NoMisusedPromisesOptions{ChecksSpreads: type_checking.Ref(false)},
 		},
 		{
 			name:     "upstream valid 61 [options]",
@@ -650,7 +650,7 @@ console.log({
   ...getData(),
 });
       `,
-			options: NoMisusedPromisesOptions{ChecksSpreads: typecheck.Ref(false)},
+			options: NoMisusedPromisesOptions{ChecksSpreads: type_checking.Ref(false)},
 		},
 		{
 			name:     "upstream valid 62 [options]",
@@ -663,7 +663,7 @@ console.log({ ...(condition || Promise.resolve({ key: 42 })) });
 console.log({ ...(condition ? {} : Promise.resolve({ key: 42 })) });
 console.log({ ...(condition ? Promise.resolve({ key: 42 }) : {}) });
       `,
-			options: NoMisusedPromisesOptions{ChecksSpreads: typecheck.Ref(false)},
+			options: NoMisusedPromisesOptions{ChecksSpreads: type_checking.Ref(false)},
 		},
 		{
 			name:     "upstream valid 63 [options]",
@@ -672,7 +672,7 @@ console.log({ ...(condition ? Promise.resolve({ key: 42 }) : {}) });
 // This is invalid Typescript, but it shouldn't trigger this linter specifically
 console.log([...Promise.resolve(42)]);
       `,
-			options: NoMisusedPromisesOptions{ChecksSpreads: typecheck.Ref(false)},
+			options: NoMisusedPromisesOptions{ChecksSpreads: type_checking.Ref(false)},
 		},
 		{
 			name:     "upstream valid 64",
@@ -820,7 +820,7 @@ class Bar extends Foo {
   [key: string]: Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 74",
@@ -913,7 +913,7 @@ foo(bar);
 
         <ASTViewer onSelectNode={onSelectFn} />;
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{Attributes: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{Attributes: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 81 [options]",
@@ -931,7 +931,7 @@ class MySubclassExtendsMyClass extends MyClass {
   }
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 82 [options]",
@@ -949,7 +949,7 @@ class MySubclassExtendsMyClass extends MyClass {
   }
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 83 [options]",
@@ -967,7 +967,7 @@ class MySubclassExtendsMyClass extends MyClass {
   }
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(false)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)})},
 		},
 		{
 			name:     "upstream valid 84 [options]",
@@ -983,7 +983,7 @@ abstract class MyAbstractClassExtendsMyClass extends MyClass {
   abstract setThing(): void;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 85 [options]",
@@ -999,7 +999,7 @@ abstract class MyAbstractClassExtendsMyClass extends MyClass {
   abstract setThing(): Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(false)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)})},
 		},
 		{
 			name:     "upstream valid 86 [options]",
@@ -1015,7 +1015,7 @@ interface MyInterfaceExtendsMyClass extends MyClass {
   setThing(): void;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 87 [options]",
@@ -1031,7 +1031,7 @@ interface MyInterfaceExtendsMyClass extends MyClass {
   setThing(): Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(false)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)})},
 		},
 		{
 			name:     "upstream valid 88 [options]",
@@ -1047,7 +1047,7 @@ class MySubclassExtendsMyAbstractClass extends MyAbstractClass {
   }
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 89 [options]",
@@ -1063,7 +1063,7 @@ class MySubclassExtendsMyAbstractClass extends MyAbstractClass {
   }
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(false)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)})},
 		},
 		{
 			name:     "upstream valid 90 [options]",
@@ -1077,7 +1077,7 @@ abstract class MyAbstractSubclassExtendsMyAbstractClass extends MyAbstractClass 
   abstract setThing(): void;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 91 [options]",
@@ -1091,7 +1091,7 @@ abstract class MyAbstractSubclassExtendsMyAbstractClass extends MyAbstractClass 
   abstract setThing(): Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(false)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)})},
 		},
 		{
 			name:     "upstream valid 92 [options]",
@@ -1105,7 +1105,7 @@ interface MyInterfaceExtendsMyAbstractClass extends MyAbstractClass {
   setThing(): void;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 93 [options]",
@@ -1119,7 +1119,7 @@ interface MyInterfaceExtendsMyAbstractClass extends MyAbstractClass {
   setThing(): Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(false)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)})},
 		},
 		{
 			name:     "upstream valid 94 [options]",
@@ -1133,7 +1133,7 @@ interface MySubInterfaceExtendsMyInterface extends MyInterface {
   setThing(): void;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 95 [options]",
@@ -1147,7 +1147,7 @@ interface MySubInterfaceExtendsMyInterface extends MyInterface {
   setThing(): Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(false)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)})},
 		},
 		{
 			name:     "upstream valid 96 [options]",
@@ -1163,7 +1163,7 @@ class MyClassImplementsMyInterface implements MyInterface {
   }
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 97 [options]",
@@ -1179,7 +1179,7 @@ class MyClassImplementsMyInterface implements MyInterface {
   }
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(false)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)})},
 		},
 		{
 			name:     "upstream valid 98 [options]",
@@ -1193,7 +1193,7 @@ abstract class MyAbstractClassImplementsMyInterface implements MyInterface {
   abstract setThing(): void;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 99 [options]",
@@ -1207,7 +1207,7 @@ abstract class MyAbstractClassImplementsMyInterface implements MyInterface {
   abstract setThing(): Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(false)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)})},
 		},
 		{
 			name:     "upstream valid 100 [options]",
@@ -1222,7 +1222,7 @@ class MyClass implements MyTypeLiteralsIntersection {
   }
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 101 [options]",
@@ -1237,7 +1237,7 @@ class MyClass implements MyTypeLiteralsIntersection {
   }
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(false)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)})},
 		},
 		{
 			name:     "upstream valid 102 [options]",
@@ -1251,7 +1251,7 @@ interface MyAsyncInterface extends MyGenericType {
   setThing(): Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 103 [options]",
@@ -1265,7 +1265,7 @@ interface MyAsyncInterface extends MyGenericType<false> {
   setThing(): Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(false)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(false)})},
 		},
 		{
 			name:     "upstream valid 104 [options]",
@@ -1283,7 +1283,7 @@ interface MyThirdInterface extends MyInterface, MyOtherInterface {
   setThing(): void;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 105 [options]",
@@ -1305,7 +1305,7 @@ interface MyInterface extends MyClass, MyOtherClass {
   setThing(): void;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 106 [options]",
@@ -1331,7 +1331,7 @@ class MySubclass extends MyClass implements MyInterface, MyOtherInterface {
   }
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 107 [options]",
@@ -1349,7 +1349,7 @@ const MyClassExpressionExtendsMyClass = class extends MyClass {
   }
 };
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 108 [options]",
@@ -1367,7 +1367,7 @@ class MyClassExtendsMyClassExpression extends MyClassExpression {
   }
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 109 [options]",
@@ -1384,7 +1384,7 @@ interface MyInterfaceExtendsMyClassExpression extends MyClassExpressionType {
   setThing(): void;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 110 [options]",
@@ -1399,7 +1399,7 @@ interface MyAsyncInterface extends MySyncCallSignatures {
   (arg: string): Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 111 [options]",
@@ -1414,7 +1414,7 @@ interface ThisIsADifferentIssue extends MySyncConstructSignatures {
   new (arg: string): Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 112 [options]",
@@ -1429,7 +1429,7 @@ interface ThisIsADifferentIssue extends MySyncIndexSignatures {
   [key: number]: Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 113 [options]",
@@ -1450,7 +1450,7 @@ interface MyAsyncInterface extends MySyncInterfaceSignatures {
   [key: number]: () => Promise<void>;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:     "upstream valid 114 [options]",
@@ -1488,7 +1488,7 @@ interface MyInterface extends MyCall, MyIndex, MyConstruct, MyMethods {
   syncMethodProperty: () => void;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{InheritedMethods: type_checking.Ref(true)})},
 		},
 		{
 			name:       "upstream valid 115",
@@ -1558,8 +1558,8 @@ useCallback<ReturnsVoid | ReturnsPromiseVoid>(async () => {});
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, testCase.options)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -1825,7 +1825,7 @@ f = async () => {
   return 3;
 };
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{Variables: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{Variables: type_checking.Ref(true)})},
 			wantIds: []string{"voidReturnVariable"},
 		},
 		{
@@ -1876,7 +1876,7 @@ const obj: O = {
   f: async () => 'foo',
 };
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{Properties: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{Properties: type_checking.Ref(true)})},
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -1944,7 +1944,7 @@ function f(): () => void {
   return async () => 0;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: typecheck.Ref(NoMisusedPromisesChecksVoidReturnOptions{Returns: typecheck.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{Returns: type_checking.Ref(true)})},
 			wantIds: []string{"voidReturnReturnValue"},
 		},
 		{
@@ -2700,7 +2700,7 @@ array.every(() => Promise.resolve(true));
 const tuple: [number, number, number] = [1, 2, 3];
 tuple.find(() => Promise.resolve(false));
       `,
-			options: NoMisusedPromisesOptions{ChecksConditionals: typecheck.Ref(true)},
+			options: NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(true)},
 			wantIds: []string{"predicate"},
 		},
 		{
@@ -2872,8 +2872,8 @@ const obj: O = {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, testCase.options)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -2903,13 +2903,13 @@ if (p) {
 		t.Fatal("the rule reads ctx.TypeChecker in every listener, so it must declare NeedsTypeChecker")
 	}
 
-	untyped := ruletest.Run(t, NoMisusedPromises, noMisusedPromisesFile, source)
+	untyped := rule_testing.Run(t, NoMisusedPromises, noMisusedPromisesFile, source)
 	if len(untyped.Diagnostics) != 0 {
 		t.Fatalf("the untyped harness hands the rule a nil checker, so the guard should decline it; got %d findings", len(untyped.Diagnostics))
 	}
 
-	typed := ruletest.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, source)
-	ruletest.ExpectFindings(t, typed, "conditional")
+	typed := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, source)
+	rule_testing.ExpectFindings(t, typed, "conditional")
 }
 
 // TestNoMisusedPromisesDoesNotReadTheProgram pins ReadsProgram as a per-rule measurement.
@@ -2939,7 +2939,7 @@ func TestNoMisusedPromisesDoesNotReadTheProgram(t *testing.T) {
 // string is typed here as a literal rather than compared against the rule's own message constant,
 // because a comparison against the constant moves with the constant and asserts nothing.
 func TestNoMisusedPromisesRendersTheSpreadTypoUpstreamShips(t *testing.T) {
-	result := ruletest.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, `
+	result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, `
 const promise = Promise.resolve({ a: 1 });
 const obj = { ...promise };
 `)
@@ -3064,7 +3064,7 @@ class Derived implements Base {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMisusedPromises, testCase.fileName, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoMisusedPromises, testCase.fileName, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted exactly one finding to slice, got %d", len(result.Diagnostics))
 			}
@@ -3182,8 +3182,8 @@ func TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, nil)
-			ruletest.ExpectFindings(t, result, testCase.wantId)
+			result := rule_testing.RunTypedWithOptions(t, NoMisusedPromises, testCase.fileName, testCase.sourceText, nil)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
 	}
 }
@@ -3352,8 +3352,8 @@ f([async () => {}, async () => {}, async () => {}]);
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 
 			source := result.SourceFile.Text()
 			for index, wantSpan := range testCase.wantSpans {
@@ -3420,14 +3420,14 @@ export {};
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			bare := ruletest.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, bare, testCase.wantWithoutTheGlobals...)
+			bare := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, bare, testCase.wantWithoutTheGlobals...)
 
-			withGlobals := ruletest.RunTypedFiles(t, NoMisusedPromises, map[string]string{
+			withGlobals := rule_testing.RunTypedFiles(t, NoMisusedPromises, map[string]string{
 				noMisusedPromisesFile: testCase.sourceText,
 				"globals.ts":          globals,
 			}, noMisusedPromisesFile)
-			ruletest.ExpectFindings(t, withGlobals, testCase.wantWithTheGlobals...)
+			rule_testing.ExpectFindings(t, withGlobals, testCase.wantWithTheGlobals...)
 		})
 	}
 }
@@ -3479,8 +3479,8 @@ f(async () => {}, async () => {});
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "voidReturnArgument")
+			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "voidReturnArgument")
 		})
 	}
 }
@@ -3557,8 +3557,8 @@ const obj: O = {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "voidReturnProperty")
+			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "voidReturnProperty")
 
 			source := result.SourceFile.Text()
 			diagnostic := result.Diagnostics[0]
@@ -3585,30 +3585,30 @@ const obj: O = {
 // a suite of three clean assertions would pass just as well against a rule that had stopped running.
 func TestNoMisusedPromisesSurvivesAttributeValuesThatAreNotExpressionContainers(t *testing.T) {
 	t.Run("a string-valued attribute beside a reporting one does not crash the rule", func(t *testing.T) {
-		result := ruletest.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
+		result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
 type Props = { onEvent: () => void; label: string };
 declare function Component(props: Props): null;
 const element = <Component onEvent={async () => {}} label="hello" />;
 `)
-		ruletest.ExpectFindings(t, result, "voidReturnAttribute")
+		rule_testing.ExpectFindings(t, result, "voidReturnAttribute")
 	})
 
 	t.Run("a string-valued attribute on a void-function prop is silent rather than fatal", func(t *testing.T) {
-		result := ruletest.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
+		result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
 type Props = { onEvent: () => void };
 declare function Component(props: Props): null;
 const element = <Component onEvent="hello" />;
 `)
-		ruletest.ExpectClean(t, result)
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("a shorthand attribute with no initializer at all is silent rather than fatal", func(t *testing.T) {
-		result := ruletest.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
+		result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
 type Props = { onEvent?: () => void };
 declare function Component(props: Props): null;
 const element = <Component onEvent />;
 `)
-		ruletest.ExpectClean(t, result)
+		rule_testing.ExpectClean(t, result)
 	})
 }
 
@@ -3661,8 +3661,8 @@ interface Child extends Parent {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "voidReturnInheritedMethod")
+			result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "voidReturnInheritedMethod")
 
 			if got := result.Diagnostics[0].Message.Description; got != testCase.wantMessage {
 				t.Fatalf("rendered message:\n got  %q\n want %q", got, testCase.wantMessage)

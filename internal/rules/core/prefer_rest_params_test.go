@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // preferRestParamsFile is where the fixtures pretend to live.
@@ -14,7 +14,7 @@ const preferRestParamsFile = "/repository/source/PreferRestParams.ts"
 // input is measured rather than assumed. Copied rather than rewritten, because a fixture a porter
 // invents encodes the same belief as the port and passes for exactly the reason the code is wrong.
 //
-// The rule declares NeedsTypeChecker, so every case here runs through ruletest.RunTyped. With the
+// The rule declares NeedsTypeChecker, so every case here runs through rule_testing.RunTyped. With the
 // plain harness the rule receives a nil checker, goes completely silent, and every StaysSilent case
 // below would pass while proving nothing. TestPreferRestParamsRequiresTheTypedHarness pins that.
 func TestPreferRestParamsFires(t *testing.T) {
@@ -32,8 +32,8 @@ func TestPreferRestParamsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText),
 				"preferRestParams")
 		})
 	}
@@ -63,8 +63,8 @@ func TestPreferRestParamsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText))
 		})
 	}
 }
@@ -94,7 +94,7 @@ func TestPreferRestParamsPointsAtTheIdentifier(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted exactly one finding to check the span of, got %d", len(result.Diagnostics))
 			}
@@ -112,8 +112,8 @@ func TestPreferRestParamsPointsAtTheIdentifier(t *testing.T) {
 func TestPreferRestParamsReportsTheArrowsOwnReference(t *testing.T) {
 	const sourceText = "function outer() { arguments; var bar = () => arguments; }"
 
-	result := ruletest.RunTyped(t, PreferRestParams, preferRestParamsFile, sourceText)
-	ruletest.ExpectFindings(t, result, "preferRestParams", "preferRestParams")
+	result := rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "preferRestParams", "preferRestParams")
 
 	// Both references are to the same inherited binding, and each is reported where it is written.
 	wantPositions := []int{19, 46}
@@ -129,7 +129,7 @@ func TestPreferRestParamsReportsTheArrowsOwnReference(t *testing.T) {
 // single-span edit and has to invent a parameter name. Under this tree's rule that is not even a
 // suggestion. A later commit adding a fix should have to delete this test on purpose.
 func TestPreferRestParamsProposesNoRepair(t *testing.T) {
-	result := ruletest.RunTyped(t, PreferRestParams, preferRestParamsFile, "function foo() { arguments; }")
+	result := rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, "function foo() { arguments; }")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
@@ -141,16 +141,16 @@ func TestPreferRestParamsProposesNoRepair(t *testing.T) {
 // The rule declares NeedsTypeChecker, so the plain harness hands it a nil checker and it goes
 // completely silent. Every StaysSilent case above would then pass vacuously and the Fires cases
 // would fail in a way that reads like a rule bug. This pins the distinction so a revert to
-// ruletest.Run fails here, loudly, saying what it actually is.
+// rule_testing.Run fails here, loudly, saying what it actually is.
 func TestPreferRestParamsRequiresTheTypedHarness(t *testing.T) {
 	const sourceText = "function foo() { arguments; }"
 
 	if !PreferRestParams.NeedsTypeChecker {
 		t.Fatal("the rule no longer declares NeedsTypeChecker, so this guard is measuring nothing")
 	}
-	ruletest.ExpectFindings(t,
-		ruletest.RunTyped(t, PreferRestParams, preferRestParamsFile, sourceText), "preferRestParams")
-	ruletest.ExpectClean(t, ruletest.Run(t, PreferRestParams, preferRestParamsFile, sourceText))
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, sourceText), "preferRestParams")
+	rule_testing.ExpectClean(t, rule_testing.Run(t, PreferRestParams, preferRestParamsFile, sourceText))
 }
 
 // Cases upstream does not cover, from reading our own code and from probing the checker.
@@ -176,8 +176,8 @@ func TestPreferRestParamsResolvesShadowsWherverTheyAreDeclared(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText))
 		})
 	}
 
@@ -196,8 +196,8 @@ func TestPreferRestParamsResolvesShadowsWherverTheyAreDeclared(t *testing.T) {
 	}
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, testCase.sourceText),
 				"preferRestParams")
 		})
 	}

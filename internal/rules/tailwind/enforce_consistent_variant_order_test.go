@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Every expectation in this file was measured against eslint-plugin-better-tailwindcss 4.7.0 rather
@@ -15,8 +15,8 @@ import (
 //
 // The fixtures share the class-order suite's harness for the reason that file states at length: the
 // rule declares `ReadsProgram` and reaches for a real stylesheet, so a fixture running through
-// `ruletest.Run` would exercise the nil-Program decline path and pass while proving nothing.
-func runVariantOrderFixture(t *testing.T, fileName string, source string) ruletest.Result {
+// `rule_testing.Run` would exercise the nil-Program decline path and pass while proving nothing.
+func runVariantOrderFixture(t *testing.T, fileName string, source string) rule_testing.Result {
 	t.Helper()
 
 	packageRoot := classOrderFixturePackageRoot()
@@ -25,7 +25,7 @@ func runVariantOrderFixture(t *testing.T, fileName string, source string) rulete
 			"built and these fixtures would measure a decline rather than an order")
 	}
 
-	return ruletest.RunTypedFilesWithSetup(t, EnforceConsistentVariantOrder, map[string]string{
+	return rule_testing.RunTypedFilesWithSetup(t, EnforceConsistentVariantOrder, map[string]string{
 		fileName:                        source,
 		classOrderFixtureStylesheetPath: classOrderFixtureStylesheet,
 	}, fileName, func(root string) {
@@ -96,7 +96,7 @@ func TestEnforceConsistentVariantOrderReports(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, runVariantOrderFixture(t, "Component.tsx", testCase.source), "variantOrder")
+			rule_testing.ExpectFindings(t, runVariantOrderFixture(t, "Component.tsx", testCase.source), "variantOrder")
 		})
 	}
 }
@@ -158,7 +158,7 @@ func TestEnforceConsistentVariantOrderStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, runVariantOrderFixture(t, "Component.tsx", testCase.source))
+			rule_testing.ExpectClean(t, runVariantOrderFixture(t, "Component.tsx", testCase.source))
 		})
 	}
 }
@@ -169,7 +169,7 @@ func TestEnforceConsistentVariantOrderStaysSilent(t *testing.T) {
 // has to work out the permutation themselves, and the permutation is what the rule computed.
 func TestEnforceConsistentVariantOrderNamesBothSpellings(t *testing.T) {
 	result := runVariantOrderFixture(t, "Component.tsx", `const element = <div className="dark:md:flex" />;`)
-	ruletest.ExpectFindings(t, result, "variantOrder")
+	rule_testing.ExpectFindings(t, result, "variantOrder")
 
 	if len(result.Diagnostics) == 0 {
 		t.Fatal("expected a finding")

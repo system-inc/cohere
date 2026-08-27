@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The three cases upstream ships, byte for byte out of the extractor's dump so no escape is retyped
@@ -84,12 +84,12 @@ func TestNoTitleInDocumentHeadReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
+			result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
 			ids := make([]string, testCase.want)
 			for index := range ids {
 				ids[index] = messageNoTitleInDocumentHead.Id
 			}
-			ruletest.ExpectFindings(t, result, ids...)
+			rule_testing.ExpectFindings(t, result, ids...)
 		})
 	}
 }
@@ -210,8 +210,8 @@ func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -223,8 +223,8 @@ func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
 func TestNoTitleInDocumentHeadPointsAtTheTagName(t *testing.T) {
 	source := "import { Head as PageHead } from \"next/document\";\nexport const C = () => <PageHead><title>x</title></PageHead>;"
 
-	result := ruletest.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", source)
-	ruletest.ExpectFindings(t, result, messageNoTitleInDocumentHead.Id)
+	result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", source)
+	rule_testing.ExpectFindings(t, result, messageNoTitleInDocumentHead.Id)
 
 	diagnostic := result.Diagnostics[0]
 	reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
@@ -236,8 +236,8 @@ func TestNoTitleInDocumentHeadPointsAtTheTagName(t *testing.T) {
 // The message is asserted whole rather than by substring, because a substring predicate is weaker
 // than the property it guards and has gone green over a wrong message in this tree before.
 func TestNoTitleInDocumentHeadMessageText(t *testing.T) {
-	result := ruletest.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", upstreamFail)
-	ruletest.ExpectFindings(t, result, messageNoTitleInDocumentHead.Id)
+	result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", upstreamFail)
+	rule_testing.ExpectFindings(t, result, messageNoTitleInDocumentHead.Id)
 
 	if !strings.HasPrefix(messageNoTitleInDocumentHead.Description, "A <title> here is emitted") {
 		t.Fatalf("message description changed shape: %q", messageNoTitleInDocumentHead.Description)

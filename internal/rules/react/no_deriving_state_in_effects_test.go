@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The corpus is 22 fixtures and every verdict below was MEASURED before it was written down.
@@ -56,9 +56,9 @@ type derivedEffectCase struct {
 // `reactStub` and `otherModuleStub` are `set_state_in_effect_test.go`'s, shared rather than copied:
 // the two rules ask the checker the same two questions through the same two helpers, so a stub that
 // drifted between them would make one rule's fixtures stop testing the other's predicate.
-func runNoDerivingStateInEffects(t *testing.T, source string) ruletest.Result {
+func runNoDerivingStateInEffects(t *testing.T, source string) rule_testing.Result {
 	t.Helper()
-	return ruletest.RunTypedFiles(t, NoDerivingStateInEffects, map[string]string{
+	return rule_testing.RunTypedFiles(t, NoDerivingStateInEffects, map[string]string{
 		"react.d.ts": reactStub,
 		"other.d.ts": otherModuleStub,
 		"a.tsx":      source,
@@ -104,7 +104,7 @@ func TestNoDerivingStateInEffectsFires(t *testing.T) {
 			for index := range wantIds {
 				wantIds[index] = noDerivingStateInEffects
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 		})
 	}
 }
@@ -218,7 +218,7 @@ func TestNoDerivingStateInEffectsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, runNoDerivingStateInEffects(t, testCase.source))
+			rule_testing.ExpectClean(t, runNoDerivingStateInEffects(t, testCase.source))
 		})
 	}
 }
@@ -322,7 +322,7 @@ func TestNoDerivingStateInEffectsMeasuredCases(t *testing.T) {
 			for index := range wantIds {
 				wantIds[index] = noDerivingStateInEffects
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 		})
 	}
 }
@@ -336,7 +336,7 @@ func TestNoDerivingStateInEffectsMeasuredCases(t *testing.T) {
 // own caret span on that input.
 //
 // The expectation is sliced from the source the HARNESS wrote rather than from the Go literal.
-// `ruletest.RunTypedFiles` writes `strings.TrimSpace(contents)+"\n"`, so a fixture carrying a
+// `rule_testing.RunTypedFiles` writes `strings.TrimSpace(contents)+"\n"`, so a fixture carrying a
 // leading newline sits one byte off from its literal and an assertion built from the literal reports
 // a span shifted by one while the rule is correct.
 func TestNoDerivingStateInEffectsPointsAtTheSetterCall(t *testing.T) {
@@ -429,6 +429,6 @@ func TestNoDerivingStateInEffectsRequiresTheTypedHarness(t *testing.T) {
 
 	// The untyped harness hands the rule a nil checker. The guard makes that silence rather than a
 	// panic, and this asserts the silence so the guard's own mutant has something to fail.
-	untyped := ruletest.Run(t, NoDerivingStateInEffects, "a.tsx", source)
-	ruletest.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(t, NoDerivingStateInEffects, "a.tsx", source)
+	rule_testing.ExpectClean(t, untyped)
 }

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const ambiguousFile = "/repository/source/Thing.tsx"
@@ -25,8 +25,8 @@ func TestConsistencyNoAmbiguousIdentifierFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -63,8 +63,8 @@ func TestConsistencyNoAmbiguousIdentifierStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -85,7 +85,7 @@ func TestConsistencyNoAmbiguousIdentifierInfersContext(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile, testCase.sourceText)
+			result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected a finding, got none")
 			}
@@ -103,7 +103,7 @@ func TestConsistencyNoAmbiguousIdentifierInfersContext(t *testing.T) {
 // No fix, deliberately. Renaming a binding without following its references through scope would
 // leave every other use pointing at a name that no longer exists.
 func TestConsistencyNoAmbiguousIdentifierProposesNoFix(t *testing.T) {
-	result := ruletest.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile,
+	result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile,
 		"try {\n    run();\n} catch (e) {\n    report(e);\n}\n")
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
@@ -141,7 +141,7 @@ func TestConsistencyNoAmbiguousIdentifierForeignNames(t *testing.T) {
 		{"an object literal key", "({ e: 1 });"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoAmbiguousIdentifier, "p.ts", testCase.sourceText)
+			result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, "p.ts", testCase.sourceText)
 			for _, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported == "e" {
@@ -163,7 +163,7 @@ func TestConsistencyNoAmbiguousIdentifierForeignNames(t *testing.T) {
 // reading `this.maximumBackoff`. This rule exempted it, and now does not.
 func TestConsistencyNoAmbiguousIdentifierJudgesThisProperty(t *testing.T) {
 	const sourceText = "class C { e = 1; m() { return this.e; } }"
-	result := ruletest.Run(t, ConsistencyNoAmbiguousIdentifier, "p.ts", sourceText)
+	result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, "p.ts", sourceText)
 	reads := 0
 	for _, diagnostic := range result.Diagnostics {
 		if sourceText[diagnostic.Range.Pos():diagnostic.Range.End()] == "e" {

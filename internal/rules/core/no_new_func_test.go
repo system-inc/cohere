@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // newFuncFile is where the fixtures pretend to live.
@@ -17,7 +17,7 @@ const newFuncFile = "/repository/source/NewFunc.ts"
 // RuleTester and rendered through a serializer, so no escape was typed on the way here. All 23 were
 // additionally driven through the installed build and agreed with the file, spans included.
 //
-// This rule reads the checker, so the fixtures run through `ruletest.RunTyped`. The plain harness
+// This rule reads the checker, so the fixtures run through `rule_testing.RunTyped`. The plain harness
 // hands the rule a nil checker, and because this rule guards on that it would go completely silent:
 // every silent case would pass vacuously and every reporting case would fail in a way that reads
 // like a rule defect. `TestNoNewFuncNeedsTheTypedHarness` at the bottom pins that.
@@ -40,8 +40,8 @@ func TestNoNewFuncFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
 				"noFunctionConstructor")
 		})
 	}
@@ -75,8 +75,8 @@ func TestNoNewFuncStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
 	}
 }
@@ -106,7 +106,7 @@ func TestNoNewFuncReportsTheInvokingExpression(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -140,8 +140,8 @@ func TestNoNewFuncFiresOnShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
 				"noFunctionConstructor")
 		})
 	}
@@ -163,24 +163,24 @@ func TestNoNewFuncDeclinesShapesTheCorpusOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
 	}
 }
 
 // The typed harness is required, and a revert to the plain one must fail loudly.
 //
-// This rule guards on a nil checker, so under `ruletest.Run` it goes completely silent rather than
+// This rule guards on a nil checker, so under `rule_testing.Run` it goes completely silent rather than
 // panicking. Silence is the more dangerous failure: every StaysSilent case above would pass
 // vacuously. This asserts the difference directly on an input the rule certainly reports.
 func TestNoNewFuncNeedsTheTypedHarness(t *testing.T) {
 	const source = "var a = new Function(\"b\", \"c\", \"return b+c\");"
 
-	ruletest.ExpectFindings(t,
-		ruletest.RunTyped(t, NoNewFunc, newFuncFile, source), "noFunctionConstructor")
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTyped(t, NoNewFunc, newFuncFile, source), "noFunctionConstructor")
 
-	if got := len(ruletest.Run(t, NoNewFunc, newFuncFile, source).Diagnostics); got != 0 {
+	if got := len(rule_testing.Run(t, NoNewFunc, newFuncFile, source).Diagnostics); got != 0 {
 		t.Fatalf("the untyped harness produced %d diagnostics, so the nil-checker guard has moved "+
 			"and this test no longer measures what it claims", got)
 	}
@@ -188,7 +188,7 @@ func TestNoNewFuncNeedsTheTypedHarness(t *testing.T) {
 
 // The message, asserted against literals typed here rather than the rule's own constants.
 func TestNoNewFuncReportsWhyItMatters(t *testing.T) {
-	result := ruletest.RunTyped(t, NoNewFunc, newFuncFile,
+	result := rule_testing.RunTyped(t, NoNewFunc, newFuncFile,
 		"var a = new Function(\"b\", \"c\", \"return b+c\");")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -223,8 +223,8 @@ func TestNoNewFuncDeclinesAShadowReachedThroughAMethod(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
 	}
 }
@@ -249,8 +249,8 @@ func TestNoNewFuncReadsATemplateMethodName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText),
 				"noFunctionConstructor")
 		})
 	}
@@ -266,8 +266,8 @@ func TestNoNewFuncDeclinesANumericMethodSubscript(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
 	}
 }
@@ -298,8 +298,8 @@ func TestNoNewFuncSurvivesANonIdentifierReceiver(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Reaching this assertion at all is most of the test: without the guard the call above
 			// panics inside the walk and the failure is a stack trace rather than a diagnostic count.
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoNewFunc, newFuncFile, testCase.sourceText))
 		})
 	}
 }

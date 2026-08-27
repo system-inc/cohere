@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const explicitAnyFile = "/repository/source/Thing.ts"
@@ -82,12 +82,12 @@ func TestNoExplicitAnyFires(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "unexpectedAny"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 		})
 	}
 }
@@ -137,7 +137,7 @@ func TestNoExplicitAnyStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText))
 		})
 	}
 }
@@ -203,7 +203,7 @@ func TestNoExplicitAnyIgnoreRestArgsStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoExplicitAny, explicitAnyFile,
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile,
 				testCase.sourceText, NoExplicitAnyOptions{IgnoreRestArgs: true}))
 		})
 	}
@@ -267,7 +267,7 @@ func TestNoExplicitAnyIgnoreRestArgsIsWhatSilencesThem(t *testing.T) {
 
 	for _, sourceText := range testCases {
 		t.Run(sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoExplicitAny, explicitAnyFile, sourceText)
+			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("expected the rest-parameter `any` to report with ignoreRestArgs off, got silence for %q", sourceText)
 			}
@@ -305,7 +305,7 @@ func TestNoExplicitAnyPointsAtTheKeywordItself(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
@@ -329,7 +329,7 @@ func TestNoExplicitAnyPointsAtTheKeywordItself(t *testing.T) {
 // measures nothing, because both sides move together under any mutation of the constant. These are
 // literals, so a renamed identifier or a rewritten description fails here.
 func TestNoExplicitAnyReportsOneMessage(t *testing.T) {
-	result := ruletest.Run(t, NoExplicitAny, explicitAnyFile, "const number: any = 1")
+	result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, "const number: any = 1")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
@@ -353,7 +353,7 @@ func TestNoExplicitAnyReportsOneMessage(t *testing.T) {
 // pass every message-id fixture in this file while silently rewriting Kirk's tree, which is the
 // exact failure mode an unattended fix has and a suggestion does not.
 func TestNoExplicitAnyOffersNoRepairByDefault(t *testing.T) {
-	result := ruletest.Run(t, NoExplicitAny, explicitAnyFile, "let x: any = 1")
+	result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, "let x: any = 1")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
@@ -391,9 +391,9 @@ func TestNoExplicitAnyFixToUnknownRewritesTheKeyword(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoExplicitAny, explicitAnyFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile, testCase.sourceText,
 				NoExplicitAnyOptions{FixToUnknown: true})
-			ruletest.ExpectFixedSource(t, result, testCase.wantSource)
+			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
 		})
 	}
 }
@@ -405,11 +405,11 @@ func TestNoExplicitAnyFixToUnknownRewritesTheKeyword(t *testing.T) {
 // limitation, so the case upstream could not write is written here: an exempt `any` must produce no
 // finding and therefore no repair, while a reportable one in the same file is still rewritten.
 func TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArgs(t *testing.T) {
-	result := ruletest.RunWithOptions(t, NoExplicitAny, explicitAnyFile,
+	result := rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile,
 		"function foo(a: any, ...rest: any[]): void {}",
 		NoExplicitAnyOptions{FixToUnknown: true, IgnoreRestArgs: true})
-	ruletest.ExpectFindings(t, result, "unexpectedAny")
-	ruletest.ExpectFixedSource(t, result, "function foo(a: unknown, ...rest: any[]): void {}")
+	rule_testing.ExpectFindings(t, result, "unexpectedAny")
+	rule_testing.ExpectFixedSource(t, result, "function foo(a: unknown, ...rest: any[]): void {}")
 }
 
 // TestNoExplicitAnyDeclinesJavaScriptFiles is the file gate, and it is the fixture this port would
@@ -436,7 +436,7 @@ func TestNoExplicitAnyDeclinesJavaScriptFiles(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.fileName+" "+testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoExplicitAny, testCase.fileName, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExplicitAny, testCase.fileName, testCase.sourceText))
 		})
 	}
 }
@@ -456,7 +456,7 @@ func TestNoExplicitAnyCoversEveryTypeScriptExtension(t *testing.T) {
 		"/repository/source/Thing.d.ts",
 	} {
 		t.Run(fileName, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoExplicitAny, fileName, "declare const x: any;"),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoExplicitAny, fileName, "declare const x: any;"),
 				"unexpectedAny")
 		})
 	}
@@ -492,13 +492,13 @@ func TestNoExplicitAnyIgnoreRestArgsExemptsByContainmentNotByShape(t *testing.T)
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoExplicitAny, explicitAnyFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile, testCase.sourceText,
 				NoExplicitAnyOptions{IgnoreRestArgs: true})
 			if len(testCase.wantIds) == 0 {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 				return
 			}
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -534,12 +534,12 @@ func TestNoExplicitAnyReportsPositionsOurTreeActuallyWrites(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, testCase.sourceText)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "unexpectedAny"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 		})
 	}
 }
@@ -561,7 +561,7 @@ func TestNoExplicitAnyIgnoresIdentifiersNamedAny(t *testing.T) {
 		"import { any } from \"./m\";",
 	} {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoExplicitAny, explicitAnyFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExplicitAny, explicitAnyFile, sourceText))
 		})
 	}
 }

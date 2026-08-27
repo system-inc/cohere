@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const shoutingFile = "/repository/source/Thing.ts"
@@ -25,8 +25,8 @@ func TestConsistencyNoShoutingFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "shoutingInComment")
+			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "shoutingInComment")
 		})
 	}
 }
@@ -56,8 +56,8 @@ func TestConsistencyNoShoutingStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -65,20 +65,20 @@ func TestConsistencyNoShoutingStaysSilent(t *testing.T) {
 func TestConsistencyNoShoutingRespectsTheAllowOption(t *testing.T) {
 	sourceText := "// the WIDGET subsystem owns this\nexport const Value = 1;\n"
 
-	withoutOption := ruletest.Run(t, ConsistencyNoShouting, shoutingFile, sourceText)
-	ruletest.ExpectFindings(t, withoutOption, "shoutingInComment")
+	withoutOption := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, sourceText)
+	rule_testing.ExpectFindings(t, withoutOption, "shoutingInComment")
 
-	withOption := ruletest.RunWithOptions(t, ConsistencyNoShouting, shoutingFile, sourceText,
+	withOption := rule_testing.RunWithOptions(t, ConsistencyNoShouting, shoutingFile, sourceText,
 		ConsistencyNoShoutingOptions{Allow: []string{"WIDGET"}})
-	ruletest.ExpectClean(t, withOption)
+	rule_testing.ExpectClean(t, withOption)
 }
 
 // The message has to name what it saw. A finding that says only "this comment shouts" makes the
 // reader rescan a paragraph to find the word that tripped it.
 func TestConsistencyNoShoutingNamesTheTokens(t *testing.T) {
-	result := ruletest.Run(t, ConsistencyNoShouting, shoutingFile,
+	result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile,
 		"// NEVER cache this, it is REALLY bad\nexport const Value = 1;\n")
-	ruletest.ExpectFindings(t, result, "shoutingInComment")
+	rule_testing.ExpectFindings(t, result, "shoutingInComment")
 
 	description := result.Diagnostics[0].Message.Description
 	for _, want := range []string{`"NEVER"`, `"REALLY"`} {

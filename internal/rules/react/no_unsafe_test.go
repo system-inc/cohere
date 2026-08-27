@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // unsafeFile is where the fixtures pretend to live.
@@ -105,9 +105,9 @@ func TestNoUnsafeFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoUnsafe, unsafeFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoUnsafe, unsafeFile, testCase.sourceText,
 				NoUnsafeOptions{CheckAliases: testCase.checkAliases})
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -200,9 +200,9 @@ func TestNoUnsafeStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoUnsafe, unsafeFile, testCase.sourceText,
+			result := rule_testing.RunWithOptions(t, NoUnsafe, unsafeFile, testCase.sourceText,
 				NoUnsafeOptions{CheckAliases: testCase.checkAliases})
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -264,7 +264,7 @@ func TestNoUnsafeReportsAtTheKey(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnsafe, unsafeFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoUnsafe, unsafeFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
@@ -296,8 +296,8 @@ func TestNoUnsafeNamesTheRightReplacement(t *testing.T) {
 		"  UNSAFE_componentWillUpdate() {}\n" +
 		"}\n"
 
-	result := ruletest.Run(t, NoUnsafe, unsafeFile, sourceText)
-	ruletest.ExpectFindings(t, result,
+	result := rule_testing.Run(t, NoUnsafe, unsafeFile, sourceText)
+	rule_testing.ExpectFindings(t, result,
 		messageUnsafeComponentWillMount.Id,
 		messageUnsafeComponentWillReceiveProps.Id,
 		messageUnsafeComponentWillUpdate.Id)
@@ -332,7 +332,7 @@ func TestNoUnsafeDeclinesTheUntypedHarnessNothing(t *testing.T) {
 	if NoUnsafe.NeedsTypeChecker {
 		t.Fatal("the rule declares a type checker it does not use")
 	}
-	result := ruletest.Run(t, NoUnsafe, unsafeFile,
+	result := rule_testing.Run(t, NoUnsafe, unsafeFile,
 		"class Foo extends Component {\n  UNSAFE_componentWillMount() {}\n}\n")
-	ruletest.ExpectFindings(t, result, messageUnsafeComponentWillMount.Id)
+	rule_testing.ExpectFindings(t, result, messageUnsafeComponentWillMount.Id)
 }

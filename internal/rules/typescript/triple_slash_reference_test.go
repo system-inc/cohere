@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const tripleSlashFile = "/repository/source/Thing.ts"
@@ -53,7 +53,7 @@ func TestTripleSlashReferenceStaysSilentOnUpstreamPassCases(t *testing.T) {
 	for index, testCase := range cases {
 		t.Run(testCase.configuration, func(t *testing.T) {
 			_ = index
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, TripleSlashReference,
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, TripleSlashReference,
 				tripleSlashFile, testCase.sourceText,
 				decodeTripleSlashOptions(t, testCase.configuration)))
 		})
@@ -78,13 +78,13 @@ func TestTripleSlashReferenceFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.configuration, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "tripleSlashReference"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -118,13 +118,13 @@ func TestTripleSlashReferenceFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "tripleSlashReference"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -169,7 +169,7 @@ func TestTripleSlashReferenceStaysSilentOnCasesUpstreamDoesNotCover(t *testing.T
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, TripleSlashReference,
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, TripleSlashReference,
 				tripleSlashFile, testCase.sourceText,
 				decodeTripleSlashOptions(t, testCase.configuration)))
 		})
@@ -196,7 +196,7 @@ func TestTripleSlashReferencePointsAtTheDirective(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -234,7 +234,7 @@ func TestTripleSlashReferenceNamesTheModuleInItsMessage(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 				testCase.sourceText, decodeTripleSlashOptions(t, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -283,7 +283,7 @@ func TestTripleSlashReferenceKeepsTheLastOfTwoIdenticalDirectives(t *testing.T) 
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 				testCase.sourceText, decodeTripleSlashOptions(t, "{}"))
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -303,9 +303,9 @@ func TestTripleSlashReferenceKeepsTheLastOfTwoIdenticalDirectives(t *testing.T) 
 func TestTripleSlashReferenceReportsTwoDirectivesInSourceOrder(t *testing.T) {
 	const source = "/// <reference types=\"a\" />\n/// <reference types=\"b\" />\nimport * as y from 'b';\nimport * as x from 'a';\n"
 
-	result := ruletest.RunWithOptions(t, TripleSlashReference, tripleSlashFile, source,
+	result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile, source,
 		decodeTripleSlashOptions(t, "{}"))
-	ruletest.ExpectFindings(t, result, "tripleSlashReference", "tripleSlashReference")
+	rule_testing.ExpectFindings(t, result, "tripleSlashReference", "tripleSlashReference")
 
 	// The findings arrive in the order the import loop produces them rather than in source order,
 	// because the second pass walks statements. The import of `b` is written first, so `b`'s
@@ -325,22 +325,22 @@ func TestTripleSlashReferenceReportsTwoDirectivesInSourceOrder(t *testing.T) {
 func TestTripleSlashReferenceDeclinesJavaScript(t *testing.T) {
 	const source = "/// <reference path=\"foo\" />\n"
 
-	ruletest.ExpectFindings(t,
-		ruletest.RunWithOptions(t, TripleSlashReference, "/repository/source/Thing.ts", source,
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunWithOptions(t, TripleSlashReference, "/repository/source/Thing.ts", source,
 			decodeTripleSlashOptions(t, "{}")),
 		"tripleSlashReference")
 
 	for _, fileName := range []string{"/repository/source/Thing.js", "/repository/source/Thing.jsx", "/repository/source/Thing.mjs"} {
-		ruletest.ExpectClean(t,
-			ruletest.RunWithOptions(t, TripleSlashReference, fileName, source,
+		rule_testing.ExpectClean(t,
+			rule_testing.RunWithOptions(t, TripleSlashReference, fileName, source,
 				decodeTripleSlashOptions(t, "{}")))
 	}
 
 	// The TypeScript extensions the gate does admit, including the definition file where a
 	// directive is most likely to be written deliberately.
 	for _, fileName := range []string{"/repository/source/Thing.tsx", "/repository/source/Thing.mts", "/repository/source/Thing.d.ts"} {
-		ruletest.ExpectFindings(t,
-			ruletest.RunWithOptions(t, TripleSlashReference, fileName, source,
+		rule_testing.ExpectFindings(t,
+			rule_testing.RunWithOptions(t, TripleSlashReference, fileName, source,
 				decodeTripleSlashOptions(t, "{}")),
 			"tripleSlashReference")
 	}
@@ -416,7 +416,7 @@ func TestDecodeTripleSlashReferenceOptions(t *testing.T) {
 // Every other fixture calls `DecodeTripleSlashReferenceOptions`, which is exactly why none of them
 // could see this. A rule configured as a bare `"error"` is handed a nil `options` by the config
 // layer: `rule.DecodeOptionsInto` reports an error on empty input, and
-// `config.OptionsRegistry.Decode` turns that into nil for a rule whose options only tune it. A bare
+// `configuration.OptionsRegistry.Decode` turns that into nil for a rule whose options only tune it. A bare
 // type assertion on nil yields the Go zero value, which for this rule is three empty settings
 // matching no arm, so the rule declines every file.
 //
@@ -438,23 +438,23 @@ func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(t *testing.
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			// path defaults to never, so this must report.
-			ruletest.ExpectFindings(t,
-				ruletest.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 					"/// <reference path=\"foo\" />\n", testCase.options),
 				"tripleSlashReference")
 
 			// lib defaults to always, so this must not. Both halves are needed: a fallback that
 			// set every key to never would pass the first assertion alone.
-			ruletest.ExpectClean(t,
-				ruletest.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			rule_testing.ExpectClean(t,
+				rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 					"/// <reference lib=\"foo\" />\n", testCase.options))
 
 			// types defaults to prefer-import, which is neither of the other two settings.
-			ruletest.ExpectClean(t,
-				ruletest.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			rule_testing.ExpectClean(t,
+				rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 					"/// <reference types=\"foo\" />\n", testCase.options))
-			ruletest.ExpectFindings(t,
-				ruletest.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile,
 					"/// <reference types=\"foo\" />\nimport * as foo from 'foo';\n", testCase.options),
 				"tripleSlashReference")
 		})
@@ -479,9 +479,9 @@ func TestTripleSlashReferenceScansEveryDirectiveBeforeTheCutoff(t *testing.T) {
 		"export const value = 1;\n" +
 		"/// <reference path=\"e\" />\n"
 
-	result := ruletest.RunWithOptions(t, TripleSlashReference, tripleSlashFile, source,
+	result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile, source,
 		decodeTripleSlashOptions(t, "{}"))
-	ruletest.ExpectFindings(t, result, "tripleSlashReference", "tripleSlashReference",
+	rule_testing.ExpectFindings(t, result, "tripleSlashReference", "tripleSlashReference",
 		"tripleSlashReference", "tripleSlashReference")
 
 	// The four that report are the four above the statement, in source order, and `e` is absent.

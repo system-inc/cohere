@@ -3,7 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/controlflow"
+	"github.com/system-inc/verify/internal/utilities/control_flow_graph"
 )
 
 // occurrenceKind separates the three things an identifier occurrence can be to the liveness pass.
@@ -63,7 +63,7 @@ type deadStoreEvent struct {
 // question, and a function body starts a fresh flow graph with no antecedent path to the enclosing
 // writes at all.
 //
-// `internal/utils/controlflow` supplies forward `Successors`, so the question is asked in the
+// `internal/utilities/controlflow` supplies forward `Successors`, so the question is asked in the
 // direction it is posed. Measured against the same imported corpus, that recovers the update
 // expressions, the destructuring targets, and the try-block kills the inversion had to decline.
 func analyzeDeadStoresByLiveness(ctx rule.Context, sourceFile *ast.Node) {
@@ -173,7 +173,7 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) map[*ast.Symbol]
 		// So a cross-root read silences every write to the binding, and a cross-root write silences
 		// only itself. A first attempt used one flag for both, which fixed the second shape and
 		// silently gave up the first.
-		captured := controlflow.RootOf(identifier) != controlflow.RootOf(symbol.Declarations[0])
+		captured := control_flow_graph.RootOf(identifier) != control_flow_graph.RootOf(symbol.Declarations[0])
 		if occurrenceKindOf(identifier) != occurrenceWrite {
 			entry.hasRead = true
 			if captured {
@@ -188,7 +188,7 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) map[*ast.Symbol]
 //
 // Shaped after `unused.codePathRoots`, deliberately rather than incidentally: two consumers of one
 // graph inventing two root sets would drift, and the set is a property of the graph rather than of
-// either rule. `controlflow.IsRoot` is the graph's own answer, so it is asked rather than restated —
+// either rule. `control_flow_graph.IsRoot` is the graph's own answer, so it is asked rather than restated —
 // which additionally picks up property initializers, a root `unused` enumerates by hand.
 func deadStoreRoots(sourceFile *ast.Node) []*ast.Node {
 	roots := []*ast.Node{sourceFile}
@@ -198,7 +198,7 @@ func deadStoreRoots(sourceFile *ast.Node) []*ast.Node {
 		if node == nil {
 			return false
 		}
-		if controlflow.IsRoot(node) {
+		if control_flow_graph.IsRoot(node) {
 			roots = append(roots, node)
 		}
 		node.ForEachChild(visit)
@@ -226,8 +226,8 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 		return
 	}
 
-	graph := controlflow.Build(root, controlflow.Hooks[deadStoreEvent]{
-		Read: func(builder *controlflow.Builder[deadStoreEvent], node *ast.Node) {
+	graph := control_flow_graph.Build(root, control_flow_graph.Hooks[deadStoreEvent]{
+		Read: func(builder *control_flow_graph.Builder[deadStoreEvent], node *ast.Node) {
 			// The Read hook fires for plain write targets too, so what this occurrence is comes
 			// from the AST. A plain write emits nothing here; its store is recorded by the Write
 			// hook, which is where it belongs in evaluation order.
@@ -235,7 +235,7 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 				recordDeadStoreEvent(builder, ctx, node, occurrenceRead, symbols)
 			}
 		},
-		Write: func(builder *controlflow.Builder[deadStoreEvent], node *ast.Node) {
+		Write: func(builder *control_flow_graph.Builder[deadStoreEvent], node *ast.Node) {
 			recordDeadStoreEvent(builder, ctx, node, occurrenceWrite, symbols)
 		},
 	})
@@ -272,7 +272,7 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 		}
 	}
 
-	// The backward liveness dataflow, run to a fixed point by `controlflow.Solve`.
+	// The backward liveness dataflow, run to a fixed point by `control_flow_graph.Solve`.
 	//
 	// # What moved out of this file, and what did not
 	//
@@ -291,9 +291,9 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 	// The verdicts are unchanged and that is checked rather than asserted: a fixed point does not
 	// depend on the order it is reached in, and the imported corpus plus the fixtures pin the
 	// answers.
-	solution := controlflow.Solve[map[*ast.Symbol]bool, deadStoreEvent](
+	solution := control_flow_graph.Solve[map[*ast.Symbol]bool, deadStoreEvent](
 		graph,
-		controlflow.Backward,
+		control_flow_graph.Backward,
 		deadStoreLiveness{reachable: reachable},
 	)
 
@@ -404,7 +404,7 @@ func (deadStoreLiveness) Meet(left, right map[*ast.Symbol]bool) map[*ast.Symbol]
 }
 
 func (l deadStoreLiveness) Transfer(
-	block *controlflow.Block[deadStoreEvent],
+	block *control_flow_graph.Block[deadStoreEvent],
 	incoming map[*ast.Symbol]bool,
 ) map[*ast.Symbol]bool {
 	outgoing := make(map[*ast.Symbol]bool, len(incoming))
@@ -431,7 +431,7 @@ func (deadStoreLiveness) Equal(left, right map[*ast.Symbol]bool) bool {
 // pushing a synthetic Read op before a deferred write and carries a `pending_assignment_lhs`
 // state machine to do it; here the graph's own evaluation order supplies it.
 func applyBlockTransfer(
-	block *controlflow.Block[deadStoreEvent],
+	block *control_flow_graph.Block[deadStoreEvent],
 	current map[*ast.Symbol]bool,
 	reachable map[int]bool,
 	observe func(event deadStoreEvent, dead bool),
@@ -493,7 +493,7 @@ func sameSymbolSet(left map[*ast.Symbol]bool, right map[*ast.Symbol]bool) bool {
 
 // recordDeadStoreEvent files one identifier occurrence into the block the walk is currently in.
 func recordDeadStoreEvent(
-	builder *controlflow.Builder[deadStoreEvent],
+	builder *control_flow_graph.Builder[deadStoreEvent],
 	ctx rule.Context,
 	node *ast.Node,
 	hookKind occurrenceKind,
@@ -679,7 +679,7 @@ func isReportableWrite(node *ast.Node, declaration *ast.Node) bool {
 	if isInsideTryBlock(node) {
 		return false
 	}
-	if controlflow.RootOf(node) != controlflow.RootOf(declaration) {
+	if control_flow_graph.RootOf(node) != control_flow_graph.RootOf(declaration) {
 		return false
 	}
 	return !isWriteNestedInOwnDestructuring(node, declaration)

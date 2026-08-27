@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The corpus ran every case as `.tsx`; the snapshot header names
@@ -47,12 +47,12 @@ func TestNoUnnecessaryTypeConstraintFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "noUnnecessaryTypeConstraint"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -93,7 +93,7 @@ func TestNoUnnecessaryTypeConstraintStaysSilent(t *testing.T) {
 	}
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, sourceText))
 		})
 	}
 }
@@ -124,7 +124,7 @@ func TestNoUnnecessaryTypeConstraintStaysSilent(t *testing.T) {
 // because deleting the constraint can change how the file *parses*. A repair whose correctness
 // depends on the filename is one a human should look at.
 //
-// `ruletest.ExpectFixedSource` applies fixes and this rule proposes none, so the repair is applied
+// `rule_testing.ExpectFixedSource` applies fixes and this rule proposes none, so the repair is applied
 // here by hand. The application is deliberately trivial: one suggestion carrying one fix, sliced
 // into the source. Anything cleverer would be testing the applier rather than the rule.
 func TestNoUnnecessaryTypeConstraintSuggestionsWriteWhatTheyClaim(t *testing.T) {
@@ -161,7 +161,7 @@ func TestNoUnnecessaryTypeConstraintSuggestionsWriteWhatTheyClaim(t *testing.T) 
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText+" in "+testCase.fileName, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnnecessaryTypeConstraint, testCase.fileName, testCase.sourceText)
+			result := rule_testing.Run(t, NoUnnecessaryTypeConstraint, testCase.fileName, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
 				t.Fatalf("wanted at least one diagnostic to carry a suggestion, got none")
 			}
@@ -212,7 +212,7 @@ func TestNoUnnecessaryTypeConstraintPointsAtTheParameterName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantTexts), len(result.Diagnostics))
 			}

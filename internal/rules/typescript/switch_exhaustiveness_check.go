@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 // SwitchExhaustivenessCheck flags a switch over a union of literal types that does not handle every
@@ -120,7 +120,7 @@ import (
 // `TODO(port): add support for suggestions`, and `checkSwitchNoUnionDefaultCase` carries its own
 // `// TODO(port): missing suggestion` at the site, which is carried across below.
 //
-// So `addMissingCases` is not a message id this rule can emit, and there is nothing for `ruletest`
+// So `addMissingCases` is not a message id this rule can emit, and there is nothing for `rule_testing`
 // to apply and nothing needing a hand-rolled suggestion applier. That is a real behavioral gap
 // against `@typescript-eslint`, and it is upstream's gap, reproduced rather than improved on.
 //
@@ -212,17 +212,17 @@ var SwitchExhaustivenessCheck = rule.Rule{
 			opts = SwitchExhaustivenessCheckOptions{}
 		}
 		if opts.AllowDefaultCaseForExhaustiveSwitch == nil {
-			opts.AllowDefaultCaseForExhaustiveSwitch = typecheck.Ref(true)
+			opts.AllowDefaultCaseForExhaustiveSwitch = type_checking.Ref(true)
 		}
 		if opts.ConsiderDefaultExhaustiveForUnions == nil {
-			opts.ConsiderDefaultExhaustiveForUnions = typecheck.Ref(false)
+			opts.ConsiderDefaultExhaustiveForUnions = type_checking.Ref(false)
 		}
 		if opts.RequireDefaultForNonUnion == nil {
-			opts.RequireDefaultForNonUnion = typecheck.Ref(false)
+			opts.RequireDefaultForNonUnion = type_checking.Ref(false)
 		}
 
 		isLiteralLikeType := func(t *checker.Type) bool {
-			return typecheck.IsTypeFlagSet(
+			return type_checking.IsTypeFlagSet(
 				t,
 				checker.TypeFlagsLiteral|checker.TypeFlagsUndefined|checker.TypeFlagsNull|checker.TypeFlagsUniqueESSymbol,
 			)
@@ -238,11 +238,11 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		 * Default cases are never superfluous in switches with non-literal types.
 		 */
 		doesTypeContainNonLiteralType := func(t *checker.Type) bool {
-			return typecheck.Some(
-				typecheck.UnionTypeParts(t),
+			return type_checking.Some(
+				type_checking.UnionTypeParts(t),
 				func(t *checker.Type) bool {
-					return typecheck.Every(
-						typecheck.IntersectionTypeParts(t),
+					return type_checking.Every(
+						type_checking.IntersectionTypeParts(t),
 						func(t *checker.Type) bool {
 							return !isLiteralLikeType(t)
 						},
@@ -261,7 +261,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				defaultCase = cases[defaultCaseIndex].AsCaseOrDefaultClause()
 			}
 
-			discriminantType := typecheck.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.Expression)
+			discriminantType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.Expression)
 
 			caseTypes := make([]*checker.Type, 0, len(cases))
 			for _, c := range cases {
@@ -269,13 +269,13 @@ var SwitchExhaustivenessCheck = rule.Rule{
 					continue
 				}
 
-				caseTypes = append(caseTypes, typecheck.GetConstrainedTypeAtLocation(ctx.TypeChecker, c.AsCaseOrDefaultClause().Expression))
+				caseTypes = append(caseTypes, type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, c.AsCaseOrDefaultClause().Expression))
 			}
 
 			containsNonLiteralType := doesTypeContainNonLiteralType(discriminantType)
 
 			missingLiteralBranchTypes := make([]*checker.Type, 0, 10)
-			typecheck.TypeRecurser(discriminantType, func(t *checker.Type) bool {
+			type_checking.TypeRecurser(discriminantType, func(t *checker.Type) bool {
 				if slices.Contains(caseTypes, t) || !isLiteralLikeType(t) {
 					return false
 				}
@@ -283,8 +283,8 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				// "missing", "optional" and "undefined" types are different runtime objects,
 				// but all of them have TypeFlags.Undefined type flag
 				if slices.ContainsFunc(caseTypes, func(t *checker.Type) bool {
-					return typecheck.IsTypeFlagSet(t, checker.TypeFlagsUndefined)
-				}) && typecheck.IsTypeFlagSet(t, checker.TypeFlagsUndefined) {
+					return type_checking.IsTypeFlagSet(t, checker.TypeFlagsUndefined)
+				}) && type_checking.IsTypeFlagSet(t, checker.TypeFlagsUndefined) {
 					return false
 				}
 

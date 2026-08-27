@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestGoogleFontDisplayReportsMissing(t *testing.T) {
@@ -31,8 +31,8 @@ func TestGoogleFontDisplayReportsMissing(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, GoogleFontDisplay, "Component.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, messageGoogleFontDisplayMissing.Id)
+			result := rule_testing.Run(t, GoogleFontDisplay, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, messageGoogleFontDisplayMissing.Id)
 		})
 	}
 }
@@ -60,8 +60,8 @@ func TestGoogleFontDisplayReportsNotRecommended(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, GoogleFontDisplay, "Component.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, messageGoogleFontDisplayNotRecommended.Id)
+			result := rule_testing.Run(t, GoogleFontDisplay, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, messageGoogleFontDisplayNotRecommended.Id)
 		})
 	}
 }
@@ -110,8 +110,8 @@ func TestGoogleFontDisplayIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, GoogleFontDisplay, "Component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, GoogleFontDisplay, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

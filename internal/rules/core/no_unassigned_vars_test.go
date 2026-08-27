@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // unassignedVarsFile is where the fixtures pretend to live.
@@ -62,8 +62,8 @@ func TestNoUnassignedVarsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -112,8 +112,8 @@ func TestNoUnassignedVarsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
 		})
 	}
 }
@@ -142,7 +142,7 @@ func TestNoUnassignedVarsPointsAtTheDeclaredName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
@@ -163,7 +163,7 @@ func TestNoUnassignedVarsPointsAtTheDeclaredName(t *testing.T) {
 // `[]string{"x", "b"}` would also be satisfied by a rule that happened to order them that way while
 // reporting one of them at the other's offset. This pins that they are distinct.
 func TestNoUnassignedVarsReportsEachDeclarationAtItsOwnOffset(t *testing.T) {
-	result := ruletest.RunTyped(t, NoUnassignedVars, unassignedVarsFile,
+	result := rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile,
 		"let x; let a = x, b; log(x, a, b);")
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
@@ -174,7 +174,7 @@ func TestNoUnassignedVarsReportsEachDeclarationAtItsOwnOffset(t *testing.T) {
 	}
 }
 
-// The typed harness is load-bearing, and a revert to `ruletest.Run` must fail loudly.
+// The typed harness is load-bearing, and a revert to `rule_testing.Run` must fail loudly.
 //
 // This rule declares NeedsTypeChecker, so the plain harness hands it a nil checker and it goes
 // completely silent. Every StaysSilent case above would then pass for the wrong reason, and the
@@ -185,7 +185,7 @@ func TestNoUnassignedVarsNeedsTheTypedHarness(t *testing.T) {
 	if !NoUnassignedVars.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
 	}
-	ruletest.ExpectClean(t, ruletest.Run(t, NoUnassignedVars, unassignedVarsFile, "let user; greet(user);"))
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnassignedVars, unassignedVarsFile, "let user; greet(user);"))
 }
 
 // Every write shape, each one a way this rule could report a variable that is in fact assigned.
@@ -234,8 +234,8 @@ func TestNoUnassignedVarsFindsEveryWriteShape(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
 		})
 	}
 }
@@ -266,8 +266,8 @@ func TestNoUnassignedVarsDoesNotMistakeReadsForWrites(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
 				"noUnassignedVars")
 		})
 	}
@@ -310,8 +310,8 @@ func TestNoUnassignedVarsSeparatesShadowedBindings(t *testing.T) {
 
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -325,7 +325,7 @@ func TestNoUnassignedVarsSeparatesShadowedBindings(t *testing.T) {
 // the count assertion alone would ship the kind comparison.
 func TestNoUnassignedVarsNamesTheOuterBindingWhenOnlyTheInnerIsWritten(t *testing.T) {
 	const sourceText = "let x; log(x); { let x; x = 1; log(x); }"
-	result := ruletest.RunTyped(t, NoUnassignedVars, unassignedVarsFile, sourceText)
+	result := rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted 1 finding, got %d", len(result.Diagnostics))
 	}
@@ -382,8 +382,8 @@ func TestNoUnassignedVarsExemptions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
 		})
 	}
 }
@@ -407,7 +407,7 @@ func TestNoUnassignedVarsRequiresARead(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, testCase.sourceText)
 			// The third case has one genuine finding; the first two have none. Asserting the count
 			// against the number of readable declarations keeps this one table.
 			wanted := strings.Count(testCase.sourceText, "log(x)")

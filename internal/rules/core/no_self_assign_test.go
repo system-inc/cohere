@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const selfAssignFile = "/repository/source/Assign.ts"
@@ -61,7 +61,7 @@ func TestNoSelfAssignFires(t *testing.T) {
 			for index := range expected {
 				expected[index] = "selfAssignment"
 			}
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoSelfAssign, selfAssignFile,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoSelfAssign, selfAssignFile,
 				selfAssignDeclarations+testCase.sourceText), expected...)
 		})
 	}
@@ -124,7 +124,7 @@ func TestNoSelfAssignStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoSelfAssign, selfAssignFile,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSelfAssign, selfAssignFile,
 				selfAssignDeclarations+testCase.sourceText))
 		})
 	}

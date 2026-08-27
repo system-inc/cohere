@@ -3,8 +3,8 @@ package next
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/jsx"
-	"github.com/system-inc/verify/internal/utils/nextjs"
+	"github.com/system-inc/verify/internal/utilities/jsx"
+	"github.com/system-inc/verify/internal/utilities/nextjs"
 )
 
 var messageNoBeforeInteractiveScriptOutsideDocument = rule.Message{
@@ -34,7 +34,7 @@ var messageNoBeforeInteractiveScriptOutsideDocument = rule.Message{
 //
 // # Which document predicate, and why this rule is the one that differs
 //
-// `internal/utils/nextjs` carries two document predicates on purpose. `IsDocumentFile` is the union
+// `internal/utilities/nextjs` carries two document predicates on purpose. `IsDocumentFile` is the union
 // of every spelling the eight `@next/next` gating rules use, for the rules whose own upstreams
 // disagree and whose corpora never vote. `IsDocumentPage` is oxc's single shared `is_document_page`
 // reproduced byte for byte.

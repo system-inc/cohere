@@ -17,7 +17,7 @@ var messageUnexpectedConstantCondition = rule.Message{
 type NoConstantConditionOptions struct {
 	// CheckLoops is "all", "allExceptWhileTrue", or "none".
 	//
-	// The default matches ESLint's and this tree's config. `while(true)` is a deliberate idiom
+	// The default matches ESLint's and this tree's configuration. `while(true)` is a deliberate idiom
 	// rather than a mistake, so the default exempts it while still catching `while(1)` and
 	// `while(a || true)`, which are not idioms and are usually accidents.
 	CheckLoops string `json:"checkLoops"`

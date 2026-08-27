@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The analysis is shared infrastructure rather than a rule, so it is tested directly. Three rules
@@ -70,7 +70,7 @@ func TestNetworkFileAnalysisFindsHooks(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText)
+			result := rule_testing.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				t.Fatalf("want %d hooks, got %d", testCase.wantCount, len(result.Diagnostics))
 			}
@@ -126,7 +126,7 @@ func TestNetworkFileAnalysisStaysEmpty(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText))
 		})
 	}
 }
@@ -158,7 +158,7 @@ func TestNetworkFileAnalysisRecordsShape(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText)
+			result := rule_testing.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one hook, got %d", len(result.Diagnostics))
 			}

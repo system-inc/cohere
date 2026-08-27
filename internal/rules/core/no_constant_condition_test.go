@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const constantConditionFile = "/repository/source/Condition.ts"
@@ -71,7 +71,7 @@ func TestNoConstantConditionFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoConstantCondition, constantConditionFile,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoConstantCondition, constantConditionFile,
 				constantConditionDeclarations+testCase.sourceText), "unexpected")
 		})
 	}
@@ -137,7 +137,7 @@ func TestNoConstantConditionStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoConstantCondition, constantConditionFile,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoConstantCondition, constantConditionFile,
 				constantConditionDeclarations+testCase.sourceText))
 		})
 	}

@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestNoHeadElementReports(t *testing.T) {
@@ -34,8 +34,8 @@ func TestNoHeadElementReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoHeadElement, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, messageNoHeadElement.Id)
+			result := rule_testing.Run(t, NoHeadElement, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, messageNoHeadElement.Id)
 		})
 	}
 }
@@ -80,8 +80,8 @@ export const C = () => <Head><title>x</title></Head>;`,
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoHeadElement, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoHeadElement, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // importTypeSideEffectsFile is where the fixtures pretend to live.
@@ -30,9 +30,9 @@ func TestNoImportTypeSideEffectsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoImportTypeSideEffects, importTypeSideEffectsFile, testCase.source)
-			ruletest.ExpectFindings(t, result, "useTopLevelQualifier")
-			ruletest.ExpectFixedSource(t, result, testCase.fixed)
+			result := rule_testing.Run(t, NoImportTypeSideEffects, importTypeSideEffectsFile, testCase.source)
+			rule_testing.ExpectFindings(t, result, "useTopLevelQualifier")
+			rule_testing.ExpectFixedSource(t, result, testCase.fixed)
 		})
 	}
 }
@@ -57,8 +57,8 @@ func TestNoImportTypeSideEffectsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoImportTypeSideEffects, importTypeSideEffectsFile, testCase.source))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoImportTypeSideEffects, importTypeSideEffectsFile, testCase.source))
 		})
 	}
 }
@@ -71,7 +71,7 @@ func TestNoImportTypeSideEffectsBeyondTheCorpus(t *testing.T) {
 	// universal quantifier over an empty list is vacuously true, so a port that drops the guard
 	// reports this and offers `import type {} from 'mod';` as the repair.
 	t.Run("an empty specifier list stays silent", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.Run(t, NoImportTypeSideEffects,
+		rule_testing.ExpectClean(t, rule_testing.Run(t, NoImportTypeSideEffects,
 			importTypeSideEffectsFile, "import {} from 'mod';"))
 	})
 
@@ -83,7 +83,7 @@ func TestNoImportTypeSideEffectsBeyondTheCorpus(t *testing.T) {
 	// input is silent, without it the rule reports and offers `import type type { A } from 'mod';`,
 	// which does not parse. Upstream is silent on it, measured at 8.67.0.
 	t.Run("a nested type qualifier under a top-level one stays silent", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.Run(t, NoImportTypeSideEffects,
+		rule_testing.ExpectClean(t, rule_testing.Run(t, NoImportTypeSideEffects,
 			importTypeSideEffectsFile, "import type { type A } from 'mod';"))
 	})
 
@@ -141,10 +141,10 @@ func TestNoImportTypeSideEffectsBeyondTheCorpus(t *testing.T) {
 
 	for _, testCase := range fixCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoImportTypeSideEffects,
+			result := rule_testing.Run(t, NoImportTypeSideEffects,
 				importTypeSideEffectsFile, testCase.source)
-			ruletest.ExpectFindings(t, result, "useTopLevelQualifier")
-			ruletest.ExpectFixedSource(t, result, testCase.fixed)
+			rule_testing.ExpectFindings(t, result, "useTopLevelQualifier")
+			rule_testing.ExpectFixedSource(t, result, testCase.fixed)
 		})
 	}
 }
@@ -154,8 +154,8 @@ func TestNoImportTypeSideEffectsBeyondTheCorpus(t *testing.T) {
 // against the rule's own constant, because a constant compared to itself moves under mutation.
 func TestNoImportTypeSideEffectsSpansTheDeclaration(t *testing.T) {
 	const source = "const before = 1;\nimport { type A, type B } from 'mod';\n"
-	result := ruletest.Run(t, NoImportTypeSideEffects, importTypeSideEffectsFile, source)
-	ruletest.ExpectFindings(t, result, "useTopLevelQualifier")
+	result := rule_testing.Run(t, NoImportTypeSideEffects, importTypeSideEffectsFile, source)
+	rule_testing.ExpectFindings(t, result, "useTopLevelQualifier")
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "import { type A, type B } from 'mod';" {
@@ -178,9 +178,9 @@ func TestNoImportTypeSideEffectsMessage(t *testing.T) {
 // The rule takes no options, so it must survive being handed nil the way a bare "error" configuration
 // hands it. Bypasses the decoder entirely, which every fixture above reaches the rule through.
 func TestNoImportTypeSideEffectsTakesNoOptions(t *testing.T) {
-	result := ruletest.RunWithOptions(t, NoImportTypeSideEffects,
+	result := rule_testing.RunWithOptions(t, NoImportTypeSideEffects,
 		importTypeSideEffectsFile, "import { type A } from 'mod';", nil)
-	ruletest.ExpectFindings(t, result, "useTopLevelQualifier")
+	rule_testing.ExpectFindings(t, result, "useTopLevelQualifier")
 
 	if NoImportTypeSideEffects.NeedsTypeChecker {
 		t.Fatal("the rule declares the type checker and decides nothing that needs it")

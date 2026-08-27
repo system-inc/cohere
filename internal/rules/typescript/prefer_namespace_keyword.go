@@ -96,7 +96,7 @@ var PreferNamespaceKeyword = rule.Rule{
 	Name: "prefer-namespace-keyword",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Defensive at the boundary, and deliberately untested. Mutating this guard away survives
-		// the whole fixture set, and no fixture can change that: ruletest.Run always builds a real
+		// the whole fixture set, and no fixture can change that: rule_testing.Run always builds a real
 		// program, so no input reachable through the harness produces a nil SourceFile. That makes
 		// it unreachable through the harness rather than a fixture blind spot, and a test written
 		// for it would assert nothing. Kept because everything below reads the source text, and

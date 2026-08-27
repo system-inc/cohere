@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const forwardRefFile = "/repository/source/components/Field.tsx"
@@ -62,7 +62,7 @@ func TestReactComponentNoForwardRefFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, ReactComponentNoForwardRef, forwardRefFile,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentNoForwardRef, forwardRefFile,
 				testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -122,7 +122,7 @@ func TestReactComponentNoForwardRefStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ReactComponentNoForwardRef, forwardRefFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoForwardRef, forwardRefFile, testCase.sourceText))
 		})
 	}
 }

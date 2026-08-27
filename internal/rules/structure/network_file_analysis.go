@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/module"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
 )
 
 // Per-file analysis of the NetworkService hooks a file declares.

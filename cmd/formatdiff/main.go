@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/verify/internal/formatdiff"
+	"github.com/system-inc/verify/internal/formatter_comparison"
 )
 
 func main() {
@@ -62,7 +62,7 @@ func main() {
 		}
 		text := string(raw)
 
-		formatted, ok, crashed, why := formatdiff.FormatFile(file, text)
+		formatted, ok, crashed, why := formatter_comparison.FormatFile(file, text)
 		if crashed {
 			panicked = append(panicked, fmt.Sprintf("%s: %s", rel(*root, file), why))
 			continue

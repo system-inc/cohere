@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The four cases oxc ships, copied verbatim through the extractor's own dump and re-quoted by
@@ -115,8 +115,8 @@ func TestNoDuplicateHeadReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoDuplicateHead, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, messageNoDuplicateHead.Id)
+			result := rule_testing.RunTyped(t, NoDuplicateHead, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, messageNoDuplicateHead.Id)
 		})
 	}
 }
@@ -217,8 +217,8 @@ func TestNoDuplicateHeadIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoDuplicateHead, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, NoDuplicateHead, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -257,7 +257,7 @@ func TestNoDuplicateHeadReportsOncePerFile(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", testCase.source)
+			result := rule_testing.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected exactly one finding however many copies, got %d", len(result.Diagnostics))
 			}
@@ -296,7 +296,7 @@ func TestNoDuplicateHeadPointsAtTheFirstOccurrence(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", testCase.source)
+			result := rule_testing.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
@@ -319,7 +319,7 @@ func TestNoDuplicateHeadPointsAtTheFirstOccurrence(t *testing.T) {
 // pinning: a later edit adding a name into it would need this assertion updated deliberately.
 func TestNoDuplicateHeadMessageText(t *testing.T) {
 	source := "import { Head } from 'next/document'\nconst a = <div><Head/><Head/></div>\n"
-	result := ruletest.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", source)
+	result := rule_testing.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}

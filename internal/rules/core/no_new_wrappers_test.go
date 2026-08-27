@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // newWrappersFile is where the fixtures pretend to live.
@@ -34,8 +34,8 @@ func TestNoNewWrappersFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTypedFiles(t, NoNewWrappers,
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTypedFiles(t, NoNewWrappers,
 					map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile),
 				"noNewWrappers")
 		})
@@ -65,8 +65,8 @@ func TestNoNewWrappersStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTypedFiles(t, NoNewWrappers,
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTypedFiles(t, NoNewWrappers,
 					map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile))
 		})
 	}
@@ -86,7 +86,7 @@ func TestNoNewWrappersDeclinesAnImportedShadow(t *testing.T) {
 		stringModule:    "export default class Str { constructor(_value: number) {} }\n",
 		newWrappersFile: "\n            import String from \"./string\";\n            const str = new String(42);\n            ",
 	}
-	ruletest.ExpectClean(t, ruletest.RunTypedFiles(t, NoNewWrappers, files, newWrappersFile))
+	rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, NoNewWrappers, files, newWrappersFile))
 }
 
 // Upstream's remaining two valid cases, which report here, and the reasoning for why that is right.
@@ -111,8 +111,8 @@ func TestNoNewWrappersReportsWhereUpstreamsGlobalsConfigWouldNot(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTypedFiles(t, NoNewWrappers,
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTypedFiles(t, NoNewWrappers,
 					map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile),
 				"noNewWrappers")
 		})
@@ -144,7 +144,7 @@ func TestNoNewWrappersReportsTheWholeNewExpression(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			sourceOnDisk := strings.TrimSpace(testCase.sourceText) + "\n"
-			result := ruletest.RunTypedFiles(t, NoNewWrappers,
+			result := rule_testing.RunTypedFiles(t, NoNewWrappers,
 				map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
@@ -164,7 +164,7 @@ func TestNoNewWrappersReportsTheWholeNewExpression(t *testing.T) {
 // format string does. Comparing against the rule's own constant would be equality that moves on
 // both sides under mutation, so the expected text is written out rather than referenced.
 func TestNoNewWrappersRendersTheName(t *testing.T) {
-	result := ruletest.RunTypedFiles(t, NoNewWrappers,
+	result := rule_testing.RunTypedFiles(t, NoNewWrappers,
 		map[string]string{newWrappersFile: "var a = new Boolean(false);"}, newWrappersFile)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
@@ -208,13 +208,13 @@ func TestNoNewWrappersOnFormsUpstreamDoesNotWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedFiles(t, NoNewWrappers,
+			result := rule_testing.RunTypedFiles(t, NoNewWrappers,
 				map[string]string{newWrappersFile: testCase.sourceText}, newWrappersFile)
 			if testCase.wantReport {
-				ruletest.ExpectFindings(t, result, "noNewWrappers")
+				rule_testing.ExpectFindings(t, result, "noNewWrappers")
 				return
 			}
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -224,8 +224,8 @@ func TestNoNewWrappersOnFormsUpstreamDoesNotWrite(t *testing.T) {
 // `ExpectFindings` asserts the count as well as the ids, so a rule reporting once on a file with
 // two violations fails here and passes every single-finding fixture above.
 func TestNoNewWrappersReportsEachViolation(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.RunTypedFiles(t, NoNewWrappers,
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunTypedFiles(t, NoNewWrappers,
 			map[string]string{newWrappersFile: "var a = new Number(1); var b = new Boolean(0);"},
 			newWrappersFile),
 		"noNewWrappers", "noNewWrappers")
@@ -238,6 +238,6 @@ func TestNoNewWrappersReportsEachViolation(t *testing.T) {
 // which is the more dangerous failure of the two the brief names, so it is pinned rather than left
 // to be rediscovered.
 func TestNoNewWrappersIsSilentWithoutAChecker(t *testing.T) {
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoNewWrappers, newWrappersFile, "var a = new String('hello');"))
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoNewWrappers, newWrappersFile, "var a = new String('hello');"))
 }

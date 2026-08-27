@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const returnAssignFile = "/repository/source/Thing.ts"
@@ -52,8 +52,8 @@ func TestNoReturnAssignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile, testCase.sourceText, testCase.options)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -87,8 +87,8 @@ func TestNoReturnAssignStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile, testCase.sourceText, testCase.options)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -166,7 +166,7 @@ func TestNoReturnAssignReportsTheEnclosingNode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -219,19 +219,19 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 		// `defaultOptions` turns into "except-parens" before the rule sees it; ours has no such
 		// layer, so the fallback lives in the rule and this is what pins it. Without it, enabling
 		// the rule the ordinary way would silently run the strict mode.
-		result := ruletest.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return (a = b); }")
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return (a = b); }")
+		rule_testing.ExpectClean(t, result)
 
-		result = ruletest.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return a = b; }")
-		ruletest.ExpectFindings(t, result, "returnAssignment")
+		result = rule_testing.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return a = b; }")
+		rule_testing.ExpectFindings(t, result, "returnAssignment")
 	})
 
 	t.Run("an unrecognized mode string is treated as the default", func(t *testing.T) {
 		// A typo in the config must not silently escalate to the strict mode. It relaxes to the
 		// documented default instead.
-		result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile,
+		result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile,
 			"function f(){ return (a = b); }", NoReturnAssignOptions("alwyas"))
-		ruletest.ExpectClean(t, result)
+		rule_testing.ExpectClean(t, result)
 	})
 
 	// The positional parenthesis test. These are the rows where a structural port over our
@@ -241,20 +241,20 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 		// SILENT upstream under the default. The assignment has no wrapper of its own; the token
 		// before it is the call's `(` and the token after is the call's `)`, which is all
 		// `isParenthesised` asks. A structural port reports this.
-		result := ruletest.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return foo(a = b); }")
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return foo(a = b); }")
+		rule_testing.ExpectClean(t, result)
 
 		// And the same input under `always`, where the predicate is not consulted at all, reports.
 		// That pairing is what proves the silence above comes from the parenthesis test rather than
 		// from the walk failing to reach the return.
-		result = ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile,
+		result = rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile,
 			"function f(){ return foo(a = b); }", alwaysReturnOptions)
-		ruletest.ExpectFindings(t, result, "returnAssignment")
+		rule_testing.ExpectFindings(t, result, "returnAssignment")
 	})
 
 	t.Run("a new expression's parentheses read the same way", func(t *testing.T) {
-		result := ruletest.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return new Foo(a = b); }")
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return new Foo(a = b); }")
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("brackets and braces are not parentheses", func(t *testing.T) {
@@ -266,8 +266,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"function f(){ return a[b = c]; }",
 			"function f(){ return {k: a = b}; }",
 		} {
-			result := ruletest.Run(t, NoReturnAssign, returnAssignFile, source)
-			ruletest.ExpectFindings(t, result, "returnAssignment")
+			result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, source)
+			rule_testing.ExpectFindings(t, result, "returnAssignment")
 		}
 	})
 
@@ -275,8 +275,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 		// `(a, b = c)` has a real wrapper, but not around the assignment: the token immediately
 		// before `b = c` is the comma. Reports upstream. This is the row that separates the
 		// positional test from any notion of an enclosing wrapper.
-		result := ruletest.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return (a, b = c); }")
-		ruletest.ExpectFindings(t, result, "returnAssignment")
+		result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return (a, b = c); }")
+		rule_testing.ExpectFindings(t, result, "returnAssignment")
 	})
 
 	t.Run("an assignment leading a parenthesized sequence is not wrapped", func(t *testing.T) {
@@ -288,15 +288,15 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 		//
 		// Found by a surviving mutant. Weakening `after < len(text) && text[after] == ')'` to an
 		// `||` silences this input and nothing else in the suite.
-		result := ruletest.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return (a = b, c); }")
-		ruletest.ExpectFindings(t, result, "returnAssignment")
+		result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return (a = b, c); }")
+		rule_testing.ExpectFindings(t, result, "returnAssignment")
 	})
 
 	t.Run("a parenthesized left operand is not a parenthesized assignment", func(t *testing.T) {
 		// `(a) = b` opens with `(` but the token after the assignment is `;`. Reports upstream, and
 		// upstream's own corpus carries the sibling shape `(result) = (a * b)`.
-		result := ruletest.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return (a) = b; }")
-		ruletest.ExpectFindings(t, result, "returnAssignment")
+		result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return (a) = b; }")
+		rule_testing.ExpectFindings(t, result, "returnAssignment")
 	})
 
 	t.Run("a wrapper around only part of the returned expression still counts", func(t *testing.T) {
@@ -307,8 +307,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"function f(){ return (a = b) + 1; }",
 			"function f(){ return (a = b).c; }",
 		} {
-			result := ruletest.Run(t, NoReturnAssign, returnAssignFile, source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, source)
+			rule_testing.ExpectClean(t, result)
 		}
 	})
 
@@ -316,8 +316,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 		// The byte comparison in `isPositionallyParenthesized` is only faithful because a `(` inside
 		// a literal is never at a token boundary next to the assignment. Here the adjacent token is
 		// the comma, and upstream reports.
-		result := ruletest.Run(t, NoReturnAssign, returnAssignFile, `function f(){ return "(" , a = b; }`)
-		ruletest.ExpectFindings(t, result, "returnAssignment")
+		result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, `function f(){ return "(" , a = b; }`)
+		rule_testing.ExpectFindings(t, result, "returnAssignment")
 	})
 
 	t.Run("comments between the parentheses and the assignment are skipped", func(t *testing.T) {
@@ -329,8 +329,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"function f(){ return foo /*(*/ (a = b); }",
 			"function f(){ return ( /*c*/ a = b ); }",
 		} {
-			result := ruletest.Run(t, NoReturnAssign, returnAssignFile, source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, source)
+			rule_testing.ExpectClean(t, result)
 		}
 	})
 
@@ -339,16 +339,16 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 	t.Run("a class expression stops the walk", func(t *testing.T) {
 		// `ClassExpression` is one of the three expression forms named by hand in the regex. The
 		// assignment is in a heritage clause, which is inside a return, and upstream is SILENT.
-		result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile,
+		result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile,
 			"function f(){ return class extends (a = b) {}; }", alwaysReturnOptions)
-		ruletest.ExpectClean(t, result)
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("a class property initializer stops the walk", func(t *testing.T) {
 		// Same sentinel, reached through a field rather than a heritage clause.
-		result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile,
+		result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile,
 			"function f(){ return class { p = (a = b); }; }", alwaysReturnOptions)
-		ruletest.ExpectClean(t, result)
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("a function expression stops the walk from a parameter default", func(t *testing.T) {
@@ -364,8 +364,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"function f(){ return function(p = (a = b)){}; }",
 			"function f(){ return [function(p = (a = b)){}]; }",
 		} {
-			result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
+			rule_testing.ExpectClean(t, result)
 		}
 	})
 
@@ -380,17 +380,17 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"function f(){ return () => { switch (a = b) {} }; }",
 			"function f(){ return (() => { switch (a = b) {} })(); }",
 		} {
-			result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
+			rule_testing.ExpectClean(t, result)
 		}
 	})
 
 	t.Run("a switch statement stops the walk", func(t *testing.T) {
 		// `SwitchStatement` matches the statement half of the regex. There is no block below it in
 		// the discriminant position, so the SwitchStatement itself is what stops this.
-		result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile,
+		result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile,
 			"function f(){ switch (a = b) { } }", alwaysReturnOptions)
-		ruletest.ExpectClean(t, result)
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("an arrow parameter default is not an arrow body", func(t *testing.T) {
@@ -401,8 +401,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"const f = (a = b) => c",
 			"const f = (a = (b = c)) => d",
 		} {
-			result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
+			rule_testing.ExpectClean(t, result)
 		}
 	})
 
@@ -421,17 +421,17 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"() => (result = a * b)",
 			"const foo = (a,b,c) => ((a = b), c)",
 		} {
-			result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
-			ruletest.ExpectFindings(t, result, "arrowAssignment")
+			result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
+			rule_testing.ExpectFindings(t, result, "arrowAssignment")
 		}
 	})
 
 	t.Run("an arrow block body is not an arrow body assignment", func(t *testing.T) {
 		// The block is a sentinel, so the walk stops there and never reaches the arrow. Reporting
 		// `arrowAssignment` here would be wrong twice over: the id and the span.
-		result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile,
+		result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile,
 			"const f = () => { a = b };", alwaysReturnOptions)
-		ruletest.ExpectClean(t, result)
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("an assignment in a statement head inside an arrow block body", func(t *testing.T) {
@@ -464,8 +464,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			// on the strength of bodies alone, which was wrong.
 			"const f = () => { try { } catch({p = (a = b)}) {} };",
 		} {
-			result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
+			rule_testing.ExpectClean(t, result)
 		}
 	})
 
@@ -487,8 +487,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"const f = () => { var z = a = b; };",
 			"function f(){ return () => { var z = a = b; }; }",
 		} {
-			result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
+			rule_testing.ExpectClean(t, result)
 		}
 	})
 
@@ -500,8 +500,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"function f(){ label: a = b; }",
 			"function f(){ for (a = b;;) {} }",
 		} {
-			result := ruletest.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunWithOptions(t, NoReturnAssign, returnAssignFile, source, alwaysReturnOptions)
+			rule_testing.ExpectClean(t, result)
 		}
 	})
 
@@ -515,8 +515,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"function f(){ return a ??= b; }",
 			"function f(){ return a &&= b; }",
 		} {
-			result := ruletest.Run(t, NoReturnAssign, returnAssignFile, source)
-			ruletest.ExpectFindings(t, result, "returnAssignment")
+			result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, source)
+			rule_testing.ExpectFindings(t, result, "returnAssignment")
 		}
 	})
 
@@ -524,18 +524,18 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 		// An array pattern target is still an assignment and reports; the object form is silent only
 		// because it must be wrapped in parentheses to parse at all, which the predicate then reads
 		// as deliberate.
-		result := ruletest.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return [a] = b; }")
-		ruletest.ExpectFindings(t, result, "returnAssignment")
+		result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return [a] = b; }")
+		rule_testing.ExpectFindings(t, result, "returnAssignment")
 
-		result = ruletest.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return ({a} = b); }")
-		ruletest.ExpectClean(t, result)
+		result = rule_testing.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return ({a} = b); }")
+		rule_testing.ExpectClean(t, result)
 	})
 
 	t.Run("an assignment inside a template substitution", func(t *testing.T) {
 		// A template span is not a sentinel and its braces are not parentheses, so the walk reaches
 		// the return and the predicate declines. Reports upstream.
-		result := ruletest.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return `${a = b}`; }")
-		ruletest.ExpectFindings(t, result, "returnAssignment")
+		result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, "function f(){ return `${a = b}`; }")
+		rule_testing.ExpectFindings(t, result, "returnAssignment")
 	})
 
 	t.Run("returns from every function form", func(t *testing.T) {
@@ -549,8 +549,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"function f(){ if (x) return a = b; }",
 			"function f(){ try { return a = b; } catch (e) {} }",
 		} {
-			result := ruletest.Run(t, NoReturnAssign, returnAssignFile, source)
-			ruletest.ExpectFindings(t, result, "returnAssignment")
+			result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, source)
+			rule_testing.ExpectFindings(t, result, "returnAssignment")
 		}
 	})
 
@@ -563,8 +563,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 			"function f(){ return a = b, c = d; }",
 			"function f(){ return a = b = c; }",
 		} {
-			result := ruletest.Run(t, NoReturnAssign, returnAssignFile, source)
-			ruletest.ExpectFindings(t, result, "returnAssignment", "returnAssignment")
+			result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, source)
+			rule_testing.ExpectFindings(t, result, "returnAssignment", "returnAssignment")
 		}
 	})
 
@@ -572,8 +572,8 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
 		// A returned arrow with a block body holding its own return. The finding belongs to the
 		// inner return, and the outer one is not a finding at all.
 		const source = "function f(){ return () => { return a = b; }; }"
-		result := ruletest.Run(t, NoReturnAssign, returnAssignFile, source)
-		ruletest.ExpectFindings(t, result, "returnAssignment")
+		result := rule_testing.Run(t, NoReturnAssign, returnAssignFile, source)
+		rule_testing.ExpectFindings(t, result, "returnAssignment")
 		reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if want := "return a = b;"; reported != want {
 			t.Fatalf("the finding covers %q, wanted the inner statement %q", reported, want)

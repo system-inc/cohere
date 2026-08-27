@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const screamingFile = "/repository/source/Thing.ts"
@@ -30,8 +30,8 @@ func TestConsistencyNoScreamingSnakeCaseFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.wantId)
+			result := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
 	}
 }
@@ -61,8 +61,8 @@ func TestConsistencyNoScreamingSnakeCaseStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -70,30 +70,30 @@ func TestConsistencyNoScreamingSnakeCaseStaysSilent(t *testing.T) {
 func TestConsistencyNoScreamingSnakeCaseRespectsTheAllowOption(t *testing.T) {
 	sourceText := "const STRIPE_WEBHOOK_SECRET = readSecret();\n"
 
-	withoutOption := ruletest.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, sourceText)
-	ruletest.ExpectFindings(t, withoutOption, "noScreamingSnakeCaseLocal")
+	withoutOption := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, sourceText)
+	rule_testing.ExpectFindings(t, withoutOption, "noScreamingSnakeCaseLocal")
 
-	withOption := ruletest.RunWithOptions(t, ConsistencyNoScreamingSnakeCase, screamingFile, sourceText,
+	withOption := rule_testing.RunWithOptions(t, ConsistencyNoScreamingSnakeCase, screamingFile, sourceText,
 		ConsistencyNoScreamingSnakeCaseOptions{Allow: []string{"STRIPE_WEBHOOK_SECRET"}})
-	ruletest.ExpectClean(t, withOption)
+	rule_testing.ExpectClean(t, withOption)
 
 	// Exact match only. An allowlist that matched by prefix would admit names nobody approved.
-	nearMiss := ruletest.RunWithOptions(t, ConsistencyNoScreamingSnakeCase, screamingFile,
+	nearMiss := rule_testing.RunWithOptions(t, ConsistencyNoScreamingSnakeCase, screamingFile,
 		"const STRIPE_WEBHOOK_SECRET_OLD = readSecret();\n",
 		ConsistencyNoScreamingSnakeCaseOptions{Allow: []string{"STRIPE_WEBHOOK_SECRET"}})
-	ruletest.ExpectFindings(t, nearMiss, "noScreamingSnakeCaseLocal")
+	rule_testing.ExpectFindings(t, nearMiss, "noScreamingSnakeCaseLocal")
 }
 
 // The message has to carry a name the author can actually use, and the two forms differ by export.
 func TestConsistencyNoScreamingSnakeCaseSuggestsTheRightCasing(t *testing.T) {
-	local := ruletest.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, "const MAX_RETRY_COUNT = 3;\n")
-	ruletest.ExpectFindings(t, local, "noScreamingSnakeCaseLocal")
+	local := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, "const MAX_RETRY_COUNT = 3;\n")
+	rule_testing.ExpectFindings(t, local, "noScreamingSnakeCaseLocal")
 	if !strings.Contains(local.Diagnostics[0].Message.Description, `"maxRetryCount"`) {
 		t.Fatalf("expected a camelCase suggestion, got: %s", local.Diagnostics[0].Message.Description)
 	}
 
-	exported := ruletest.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, "export const MAX_RETRY_COUNT = 3;\n")
-	ruletest.ExpectFindings(t, exported, "noScreamingSnakeCaseExported")
+	exported := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, "export const MAX_RETRY_COUNT = 3;\n")
+	rule_testing.ExpectFindings(t, exported, "noScreamingSnakeCaseExported")
 	if !strings.Contains(exported.Diagnostics[0].Message.Description, `"MaxRetryCount"`) {
 		t.Fatalf("expected a PascalCase suggestion, got: %s", exported.Diagnostics[0].Message.Description)
 	}

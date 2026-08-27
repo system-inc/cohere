@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The corpus for this rule is unusually large and unusually misleading, and both facts are recorded
@@ -12,7 +12,7 @@ import (
 //
 // # Where the cases came from
 //
-// React vendors 325 error goldens under `internal/reactconformance/testdata/fixtures/`. Eleven of
+// React vendors 325 error goldens under `internal/react_conformance/testdata/fixtures/`. Eleven of
 // them carry this rule's exact message, `Cannot reassign variables declared outside of the
 // component/hook`, for fifteen diagnostics in total. Two of those eleven are the `new-mutability/`
 // copies of two others, identical inputs shifted one line by a pragma, so there are nine distinct
@@ -66,7 +66,7 @@ type globalsCase struct {
 func TestGlobalsFires(t *testing.T) {
 	for _, testCase := range globalsFiresCases() {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, Globals, "Subject.tsx", testCase.source)
+			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				// A literal rather than the rule's own message constant. Comparing against the
@@ -75,7 +75,7 @@ func TestGlobalsFires(t *testing.T) {
 				// suite.
 				expected[index] = "globalReassignment"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -83,8 +83,8 @@ func TestGlobalsFires(t *testing.T) {
 func TestGlobalsStaysSilent(t *testing.T) {
 	for _, testCase := range globalsSilentCases() {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, Globals, "Subject.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -315,7 +315,7 @@ func TestGlobalsSpans(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, Globals, "Subject.tsx", testCase.source)
+			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
 			}
@@ -334,7 +334,7 @@ func TestGlobalsSpans(t *testing.T) {
 // and id both correct while the per-finding text moved. Equality rather than `strings.Contains`,
 // because a weaker predicate than the property it guards is not a guard.
 func TestGlobalsMessageNamesTheBinding(t *testing.T) {
-	result := ruletest.RunTyped(t, Globals, "Subject.tsx",
+	result := rule_testing.RunTyped(t, Globals, "Subject.tsx",
 		"let renderCount = 0;\nfunction Component() {\n  renderCount = 1;\n  return <div />;\n}\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
@@ -359,12 +359,12 @@ func TestGlobalsMessageNamesTheBinding(t *testing.T) {
 func TestGlobalsRequiresTheTypedHarness(t *testing.T) {
 	source := "let g = 0;\nfunction Component() {\n  g = 1;\n  return <div />;\n}\n"
 
-	typed := ruletest.RunTyped(t, Globals, "Subject.tsx", source)
+	typed := rule_testing.RunTyped(t, Globals, "Subject.tsx", source)
 	if len(typed.Diagnostics) != 1 {
 		t.Fatalf("the typed harness should report once, got %d", len(typed.Diagnostics))
 	}
 
-	untyped := ruletest.Run(t, Globals, "Subject.tsx", source)
+	untyped := rule_testing.Run(t, Globals, "Subject.tsx", source)
 	if len(untyped.Diagnostics) != 0 {
 		t.Errorf("the untyped harness should be silent, got %d findings", len(untyped.Diagnostics))
 	}
@@ -412,8 +412,8 @@ func TestGlobalsBoundary(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, Globals, "Subject.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/system-inc/verify/internal/rule"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const awaitThenableFile = "/repository/source/Await.ts"
@@ -76,7 +76,7 @@ func TestAwaitThenableFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunTyped(t, AwaitThenable,
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, AwaitThenable,
 				awaitThenableFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -126,7 +126,7 @@ func TestAwaitThenableStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, AwaitThenable,
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, AwaitThenable,
 				awaitThenableFile, testCase.sourceText))
 		})
 	}
@@ -154,11 +154,11 @@ func TestAwaitThenableDisposable(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedFiles(t, AwaitThenable, map[string]string{
+			result := rule_testing.RunTypedFiles(t, AwaitThenable, map[string]string{
 				"Globals.ts": disposeGlobals,
 				"Await.ts":   testCase.sourceText,
 			}, "Await.ts")
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -178,7 +178,7 @@ func TestAwaitThenableDisposable(t *testing.T) {
 func TestAwaitThenableSpans(t *testing.T) {
 	t.Run("the await arm spans the whole await expression", func(t *testing.T) {
 		source := "async function f() {\n  await 0;\n}"
-		result := ruletest.RunTyped(t, AwaitThenable, awaitThenableFile, source)
+		result := rule_testing.RunTyped(t, AwaitThenable, awaitThenableFile, source)
 		if len(result.Diagnostics) != 1 {
 			t.Fatalf("want one finding, got %d", len(result.Diagnostics))
 		}
@@ -197,7 +197,7 @@ func TestAwaitThenableSpans(t *testing.T) {
 
 	t.Run("the for await arm spans the loop head", func(t *testing.T) {
 		source := "function* g() {\n  yield 1;\n}\nasync function f() {\n  for await (const value of g()) {\n    console.log(value);\n  }\n}"
-		result := ruletest.RunTyped(t, AwaitThenable, awaitThenableFile, source)
+		result := rule_testing.RunTyped(t, AwaitThenable, awaitThenableFile, source)
 		if len(result.Diagnostics) != 1 {
 			t.Fatalf("want one finding, got %d", len(result.Diagnostics))
 		}
@@ -218,7 +218,7 @@ func TestAwaitThenableSpans(t *testing.T) {
 
 	t.Run("the await using arm points at each initializer", func(t *testing.T) {
 		source := "declare const disposable: Disposable;\ndeclare const asyncDisposable: AsyncDisposable;\nasync function foo() {\n  await using a = disposable,\n    b = asyncDisposable,\n    c = disposable;\n}"
-		result := ruletest.RunTypedFiles(t, AwaitThenable, map[string]string{
+		result := rule_testing.RunTypedFiles(t, AwaitThenable, map[string]string{
 			"Globals.ts": disposeGlobals,
 			"Await.ts":   source,
 		}, "Await.ts")
@@ -279,7 +279,7 @@ func TestAwaitThenableSuggestions(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, AwaitThenable, awaitThenableFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, AwaitThenable, awaitThenableFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
@@ -322,10 +322,10 @@ func applySuggestion(t *testing.T, source string, suggestion rule.Suggestion) st
 }
 
 // TestAwaitThenableRequiresTheTypedHarness asserts the rule declares the checker and that the plain
-// harness cannot prove it, so a later revert to ruletest.Run fails loudly instead of going green.
+// harness cannot prove it, so a later revert to rule_testing.Run fails loudly instead of going green.
 //
 // This rule is the silent kind rather than the panicking kind, which is the more dangerous of the
-// two. Every listener dereferences ctx.TypeChecker, and under ruletest.Run that field is nil, so a
+// two. Every listener dereferences ctx.TypeChecker, and under rule_testing.Run that field is nil, so a
 // fixture set moved to the untyped harness would see every Fires case fail and every StaysSilent
 // case pass VACUOUSLY, having proven nothing at all. The count below is what makes that visible.
 //
@@ -345,7 +345,7 @@ func TestAwaitThenableRequiresTheTypedHarness(t *testing.T) {
 
 	// A finding the typed harness produces and the untyped one cannot.
 	source := "async function f() {\n  await 0;\n}"
-	typed := ruletest.RunTyped(t, AwaitThenable, awaitThenableFile, source)
+	typed := rule_testing.RunTyped(t, AwaitThenable, awaitThenableFile, source)
 	if len(typed.Diagnostics) != 1 {
 		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
 	}

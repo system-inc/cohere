@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const banTsCommentFile = "/repository/source/Thing.ts"
@@ -95,7 +95,7 @@ func TestBanTsCommentStaysSilentOnUpstreamPassCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, BanTsComment,
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, BanTsComment,
 				banTsCommentFile, testCase.sourceText,
 				decodeBanTsCommentOptions(t, testCase.configuration)))
 		})
@@ -169,9 +169,9 @@ func TestBanTsCommentFiresOnUpstreamFailCases(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, decodeBanTsCommentOptions(t, testCase.configuration))
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -243,7 +243,7 @@ func TestBanTsCommentPointsAtTheCommentInterior(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, decodeBanTsCommentOptions(t, testCase.configuration))
 			if len(result.Diagnostics) != len(testCase.wantReported) {
 				t.Fatalf("expected %d findings, got %d", len(testCase.wantReported), len(result.Diagnostics))
@@ -291,9 +291,9 @@ func TestBanTsCommentRewritesEveryIgnoreInTheComment(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, nil)
-			ruletest.ExpectFixedSource(t, result, testCase.wantSource)
+			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
 		})
 	}
 }
@@ -318,7 +318,7 @@ func TestBanTsCommentOnlyIgnoreCarriesAFix(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, decodeBanTsCommentOptions(t, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -362,9 +362,9 @@ func TestBanTsCommentReadsTheDirectivePrefixAlphabet(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, nil)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -390,9 +390,9 @@ func TestBanTsCommentExemptsPragmasForCheckAndNoCheckOnly(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, decodeBanTsCommentOptions(t, testCase.configuration))
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -413,9 +413,9 @@ func TestBanTsCommentMeasuresTheDescriptionInBytes(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, nil)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -430,9 +430,9 @@ func TestBanTsCommentReportsLengthAndFormatIndependently(t *testing.T) {
 	const configuration = "{\"ts-ignore\":{\"descriptionFormat\":\"^: TS\\\\d+ because .+$\"}," +
 		"\"minimumDescriptionLength\":25}"
 
-	result := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+	result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 		"// @ts-ignore: TS1\n", decodeBanTsCommentOptions(t, configuration))
-	ruletest.ExpectFindings(t, result,
+	rule_testing.ExpectFindings(t, result,
 		"banTsCommentRequiresDescription", "banTsCommentDescriptionFormat")
 }
 
@@ -445,13 +445,13 @@ func TestBanTsCommentReportsLengthAndFormatIndependently(t *testing.T) {
 func TestBanTsCommentMatchesTheFormatAgainstTheUntrimmedDescription(t *testing.T) {
 	const configuration = "{\"ts-ignore\":{\"descriptionFormat\":\"^: TS\\\\d+ because .+$\"}}"
 
-	padded := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+	padded := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 		"// @ts-ignore    : TS1234 because xyz\n", decodeBanTsCommentOptions(t, configuration))
-	ruletest.ExpectFindings(t, padded, "banTsCommentDescriptionFormat")
+	rule_testing.ExpectFindings(t, padded, "banTsCommentDescriptionFormat")
 
-	unpadded := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+	unpadded := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 		"// @ts-ignore: TS1234 because xyz\n", decodeBanTsCommentOptions(t, configuration))
-	ruletest.ExpectClean(t, unpadded)
+	rule_testing.ExpectClean(t, unpadded)
 }
 
 // TestBanTsCommentDefaultsBindWithNoConfiguration is the fixture that bypasses the decoder.
@@ -481,9 +481,9 @@ func TestBanTsCommentDefaultsBindWithNoConfiguration(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, nil)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -582,7 +582,7 @@ func TestBanTsCommentDeclinesJavaScriptFiles(t *testing.T) {
 		"/repository/source/Thing.mjs",
 	} {
 		t.Run(fileName, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, BanTsComment, fileName, source, nil))
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, BanTsComment, fileName, source, nil))
 		})
 	}
 
@@ -593,8 +593,8 @@ func TestBanTsCommentDeclinesJavaScriptFiles(t *testing.T) {
 		"/repository/source/Thing.cts",
 	} {
 		t.Run(fileName, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BanTsComment, fileName, source, nil)
-			ruletest.ExpectFindings(t, result, "banTsCommentPreferExpectError")
+			result := rule_testing.RunWithOptions(t, BanTsComment, fileName, source, nil)
+			rule_testing.ExpectFindings(t, result, "banTsCommentPreferExpectError")
 		})
 	}
 }
@@ -653,7 +653,7 @@ func TestBanTsCommentMessageTextNamesTheDirective(t *testing.T) {
 	}
 	for index, testCase := range cases {
 		t.Run(banTsCommentCaseName(index), func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile,
+			result := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
 				testCase.sourceText, decodeBanTsCommentOptions(t, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected one finding, got %d: %v", len(result.Diagnostics),
@@ -691,7 +691,7 @@ func TestBanTsCommentSurvivesAnUnterminatedBlockComment(t *testing.T) {
 		t.Run(sourceText, func(t *testing.T) {
 			// The assertion is that this returns at all. A finding would also be acceptable for
 			// some of these; a panic is not, and a panic is what the guards prevent.
-			_ = ruletest.RunWithOptions(t, BanTsComment, banTsCommentFile, sourceText, nil)
+			_ = rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile, sourceText, nil)
 		})
 	}
 }

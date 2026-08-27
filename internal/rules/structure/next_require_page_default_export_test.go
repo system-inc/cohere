@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const pageFile = "/repository/app/account/settings/page.tsx"
@@ -70,7 +70,7 @@ func TestNextRequirePageDefaultExportFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NextRequirePageDefaultExport, pageFile,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NextRequirePageDefaultExport, pageFile,
 				testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -128,7 +128,7 @@ func TestNextRequirePageDefaultExportStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NextRequirePageDefaultExport, testCase.fileName,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NextRequirePageDefaultExport, testCase.fileName,
 				testCase.sourceText))
 		})
 	}

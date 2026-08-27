@@ -3,7 +3,7 @@ package nexus
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestImportRequireNodeNamespaceFires(t *testing.T) {
@@ -53,8 +53,8 @@ func TestImportRequireNodeNamespaceFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ImportRequireNodeNamespace, "probe.ts", testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.Run(t, ImportRequireNodeNamespace, "probe.ts", testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -99,8 +99,8 @@ func TestImportRequireNodeNamespaceStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ImportRequireNodeNamespace, "probe.ts", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ImportRequireNodeNamespace, "probe.ts", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -131,10 +131,10 @@ func TestExpectedAlias(t *testing.T) {
 // to the tests. A fix is the one part of a rule that changes source, so it is the one part where an
 // id assertion proves the least.
 func TestTheNodePrefixFixWritesTheSpecifierItPromises(t *testing.T) {
-	result := ruletest.Run(t, ImportRequireNodeNamespace, "app/Probe.ts",
+	result := rule_testing.Run(t, ImportRequireNodeNamespace, "app/Probe.ts",
 		"import * as NodeFileSystem from 'fs';\n")
 
-	ruletest.ExpectFindings(t, result, "requireNodePrefix")
-	ruletest.ExpectFixedSource(t, result,
+	rule_testing.ExpectFindings(t, result, "requireNodePrefix")
+	rule_testing.ExpectFixedSource(t, result,
 		"import * as NodeFileSystem from 'node:fs';\n")
 }

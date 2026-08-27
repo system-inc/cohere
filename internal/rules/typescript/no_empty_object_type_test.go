@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const emptyObjectFile = "/repository/source/Thing.ts"
@@ -26,7 +26,7 @@ func TestNoEmptyObjectTypeFiresOnInterfaces(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
 				"noEmptyInterface")
 		})
 	}
@@ -44,7 +44,7 @@ func TestNoEmptyObjectTypeFiresOnObjectTypes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
 				"noEmptyObjectType")
 		})
 	}
@@ -56,7 +56,7 @@ func TestNoEmptyObjectTypeFiresOnObjectTypes(t *testing.T) {
 // that applied one unattended would be changing the type rather than repairing a spelling. Asserting
 // the count is what keeps a later change from quietly collapsing them into one automatic fix.
 func TestNoEmptyObjectTypeOffersTwoSuggestions(t *testing.T) {
-	result := ruletest.Run(t, NoEmptyObjectType, emptyObjectFile, "export let value: {};\n")
+	result := rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, "export let value: {};\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
@@ -117,7 +117,7 @@ func TestNoEmptyObjectTypeStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, testCase.sourceText))
 		})
 	}
 }

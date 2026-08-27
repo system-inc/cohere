@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // unusedPrivateClassMembersFile is where the fixtures pretend to live.
@@ -248,8 +248,8 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 			for index := range expected {
 				expected[index] = "noUnusedPrivateClassMember"
 			}
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoUnusedPrivateClassMembers, unusedPrivateClassMembersFile,
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoUnusedPrivateClassMembers, unusedPrivateClassMembersFile,
 					testCase.sourceText), expected...)
 		})
 	}
@@ -568,7 +568,7 @@ func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoUnusedPrivateClassMembers,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText))
 		})
 	}
@@ -601,7 +601,7 @@ func TestNoUnusedPrivateClassMembersDivergesFromOxcOnDiscardedConditionals(t *te
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoUnusedPrivateClassMembers,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText))
 		})
 	}
@@ -641,7 +641,7 @@ func TestNoUnusedPrivateClassMembersPointsAtThePrivateName(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnusedPrivateClassMembers,
+			result := rule_testing.Run(t, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
@@ -667,7 +667,7 @@ func TestNoUnusedPrivateClassMembersPointsAtThePrivateName(t *testing.T) {
 // rule silently deleting code while nobody is looking, and it would pass every other test in this
 // file.
 func TestNoUnusedPrivateClassMembersProposesNoRepair(t *testing.T) {
-	result := ruletest.Run(t, NoUnusedPrivateClassMembers, unusedPrivateClassMembersFile,
+	result := rule_testing.Run(t, NoUnusedPrivateClassMembers, unusedPrivateClassMembersFile,
 		`class A { #unused = 1; }`)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -706,7 +706,7 @@ func TestNoUnusedPrivateClassMembersNamesTheMember(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoUnusedPrivateClassMembers,
+			result := rule_testing.Run(t, NoUnusedPrivateClassMembers,
 				unusedPrivateClassMembersFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))

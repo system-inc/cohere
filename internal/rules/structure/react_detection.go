@@ -2,7 +2,7 @@ package structure
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/utils/react"
+	"github.com/system-inc/verify/internal/utilities/react"
 )
 
 // React detection: does this function hold JSX or call a hook?

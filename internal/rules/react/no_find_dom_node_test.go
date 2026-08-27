@@ -3,7 +3,7 @@ package react
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // findDOMNodeFile is where the fixtures pretend to live.
@@ -96,8 +96,8 @@ func TestNoFindDOMNodeFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText), "noFindDOMNode")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText), "noFindDOMNode")
 		})
 	}
 }
@@ -157,8 +157,8 @@ func TestNoFindDOMNodeStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText))
 		})
 	}
 }
@@ -214,8 +214,8 @@ func TestNoFindDOMNodeFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText), "noFindDOMNode")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText), "noFindDOMNode")
 		})
 	}
 }
@@ -258,8 +258,8 @@ func TestNoFindDOMNodeStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText))
 		})
 	}
 }
@@ -290,8 +290,8 @@ func TestNoFindDOMNodeReportsTheNameNode(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "noFindDOMNode")
+			result := rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "noFindDOMNode")
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -314,8 +314,8 @@ func TestNoFindDOMNodeReportsEachCallSeparately(t *testing.T) {
                 c() { React.findDOMNode(this); }
             }`
 
-	result := ruletest.Run(t, NoFindDOMNode, findDOMNodeFile, sourceText)
-	ruletest.ExpectFindings(t, result, "noFindDOMNode", "noFindDOMNode", "noFindDOMNode")
+	result := rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "noFindDOMNode", "noFindDOMNode", "noFindDOMNode")
 	for index, diagnostic := range result.Diagnostics {
 		reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != "findDOMNode" {
@@ -328,14 +328,14 @@ func TestNoFindDOMNodeReportsEachCallSeparately(t *testing.T) {
 func TestNoFindDOMNodeReportsANestedCall(t *testing.T) {
 	const sourceText = `findDOMNode(ReactDOM.findDOMNode(this));`
 
-	result := ruletest.Run(t, NoFindDOMNode, findDOMNodeFile, sourceText)
-	ruletest.ExpectFindings(t, result, "noFindDOMNode", "noFindDOMNode")
+	result := rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "noFindDOMNode", "noFindDOMNode")
 }
 
 // The rendered message is asserted exactly rather than by substring, because a fixture whose
 // predicate is weaker than the property it guards is not a guard.
 func TestNoFindDOMNodeMessageText(t *testing.T) {
-	result := ruletest.Run(t, NoFindDOMNode, findDOMNodeFile, `findDOMNode(this);`)
+	result := rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, `findDOMNode(this);`)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
@@ -350,7 +350,7 @@ func TestNoFindDOMNodeMessageText(t *testing.T) {
 // The rule declines the type checker, and this pins that the plain harness is the right one.
 //
 // A later revert adding `NeedsTypeChecker` would make every silent case above pass vacuously under
-// `ruletest.Run`, since the plain harness hands a checker-declaring rule a nil checker and the rule
+// `rule_testing.Run`, since the plain harness hands a checker-declaring rule a nil checker and the rule
 // goes completely quiet. Asserting the flag directly fails loudly instead. The rule genuinely does
 // not need it: oxc's `run` reads only the callee's syntax, and the measured behavior on a shadowing
 // parameter and on an aliased import proves no resolution happens.

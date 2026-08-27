@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const exAssignFile = "/repository/source/Thing.ts"
@@ -23,7 +23,7 @@ func TestNoExAssignFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoExAssign, exAssignFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoExAssign, exAssignFile, testCase.sourceText),
 				"unexpectedExceptionAssignment")
 		})
 	}
@@ -49,7 +49,7 @@ func TestNoExAssignStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoExAssign, exAssignFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExAssign, exAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -76,8 +76,8 @@ func TestNoExAssignSeesUpdateExpressions(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoExAssign, exAssignFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoExAssign, exAssignFile, testCase.sourceText),
 				"unexpectedExceptionAssignment")
 		})
 	}
@@ -91,6 +91,6 @@ func TestNoExAssignIgnoresReadingUnaryOperators(t *testing.T) {
 		"try {} catch (error) { const a = !error; }",
 		"try {} catch (error) { const a = typeof error; }",
 	} {
-		ruletest.ExpectClean(t, ruletest.Run(t, NoExAssign, exAssignFile, sourceText))
+		rule_testing.ExpectClean(t, rule_testing.Run(t, NoExAssign, exAssignFile, sourceText))
 	}
 }

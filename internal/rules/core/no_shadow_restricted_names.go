@@ -3,7 +3,7 @@ package core
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/reference"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/reference"
 )
 
 // NoShadowRestrictedNamesOptions configures which names count as restricted.

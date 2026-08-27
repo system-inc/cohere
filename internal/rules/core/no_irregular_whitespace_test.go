@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // irregularWhitespaceFile is where the fixtures pretend to live. A .tsx name because the corpus
@@ -105,14 +105,14 @@ func TestNoIrregularWhitespaceFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, NoIrregularWhitespace,
+			result := rule_testing.RunWithOptions(t, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText, testCase.options)
 
 			wanted := make([]string, testCase.findings)
 			for index := range wanted {
 				wanted[index] = "noIrregularWhitespace"
 			}
-			ruletest.ExpectFindings(t, result, wanted...)
+			rule_testing.ExpectFindings(t, result, wanted...)
 		})
 	}
 }
@@ -289,7 +289,7 @@ func TestNoIrregularWhitespaceStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoIrregularWhitespace,
+			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -314,7 +314,7 @@ func TestNoIrregularWhitespaceCoversTheUnsnapshottedBlock(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, NoIrregularWhitespace,
+			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText,
 				NoIrregularWhitespaceOptions{SkipComments: boolOf(false)}),
 				"noIrregularWhitespace")
@@ -373,7 +373,7 @@ func TestNoIrregularWhitespaceReportsTheCharacterItself(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoIrregularWhitespace,
+			result := rule_testing.Run(t, NoIrregularWhitespace,
 				irregularWhitespaceFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("wanted %d findings, got %d",
@@ -414,8 +414,8 @@ func TestNoIrregularWhitespaceCoversCharactersUpstreamNeverFails(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoIrregularWhitespace, irregularWhitespaceFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile, testCase.sourceText),
 				"noIrregularWhitespace")
 		})
 	}
@@ -429,7 +429,7 @@ func TestNoIrregularWhitespaceCoversCharactersUpstreamNeverFails(t *testing.T) {
 // never wrote a case for code containing an ordinary space; every clean case it does have would go
 // red, but only once somebody ran them.
 func TestNoIrregularWhitespaceAllowsOrdinaryWhitespace(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"const first = 1;\n\tconst second = 2;\r\nconst third = 3;\n"))
 }
 
@@ -440,10 +440,10 @@ func TestNoIrregularWhitespaceAllowsOrdinaryWhitespace(t *testing.T) {
 // U+FEFF at offset zero" passes the imported case and then silently stops reporting the character
 // everywhere else in the file.
 func TestNoIrregularWhitespaceExcusesOnlyTheLeadingByteOrderMark(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"\ufeffconsole.log('hello BOM');"))
 
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"console.log('hello');\ufeff"), "noIrregularWhitespace")
 }
 
@@ -455,7 +455,7 @@ func TestNoIrregularWhitespaceExcusesOnlyTheLeadingByteOrderMark(t *testing.T) {
 // reach backwards over it. Upstream has no case for this because oxc never computes a skip region at
 // all, so nothing on that side could have caught it.
 func TestNoIrregularWhitespaceDoesNotExcuseTriviaBeforeASkippedLiteral(t *testing.T) {
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"const value =\u3000'text';"), "noIrregularWhitespace")
 }
 
@@ -468,11 +468,11 @@ func TestNoIrregularWhitespaceDoesNotExcuseTriviaBeforeASkippedLiteral(t *testin
 func TestNoIrregularWhitespaceReportsInsideASkippedTemplatesInterpolation(t *testing.T) {
 	skipTemplates := NoIrregularWhitespaceOptions{SkipTemplates: boolOf(true)}
 
-	ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, NoIrregularWhitespace,
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
 		irregularWhitespaceFile, "`before ${\u3000 value} after`", skipTemplates),
 		"noIrregularWhitespace")
 
-	ruletest.ExpectClean(t, ruletest.RunWithOptions(t, NoIrregularWhitespace,
+	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
 		irregularWhitespaceFile, "`before\u3000 ${value} after`", skipTemplates))
 }
 
@@ -484,7 +484,7 @@ func TestNoIrregularWhitespaceReportsInsideASkippedTemplatesInterpolation(t *tes
 // said false" and "the config said nothing" mean opposite things.
 func TestNoIrregularWhitespaceDefaults(t *testing.T) {
 	// skipStrings defaults to on, so a string stays quiet.
-	ruletest.ExpectClean(t, ruletest.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"var any = '\u3000';"))
 
 	// The other four default to off, so each of these reports.
@@ -494,7 +494,7 @@ func TestNoIrregularWhitespaceDefaults(t *testing.T) {
 		"var any = /\u3000/;",
 		"var any = <div>\u3000</div>;",
 	} {
-		ruletest.ExpectFindings(t, ruletest.Run(t, NoIrregularWhitespace,
+		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace,
 			irregularWhitespaceFile, sourceText), "noIrregularWhitespace")
 	}
 }
@@ -506,7 +506,7 @@ func TestNoIrregularWhitespaceDefaults(t *testing.T) {
 // ideographic space here is inside a string and nothing else. Under skipComments with skipStrings
 // off it must still report, which a rule finding its comments by scanning text would get wrong.
 func TestNoIrregularWhitespaceDoesNotTreatACommentOpenerInAStringAsAComment(t *testing.T) {
-	ruletest.ExpectFindings(t, ruletest.RunWithOptions(t, NoIrregularWhitespace,
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
 		irregularWhitespaceFile, "var s = '// not a comment \u3000';",
 		NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(false)}),
 		"noIrregularWhitespace")
@@ -526,11 +526,11 @@ func TestNoIrregularWhitespaceDoesNotTreatACommentOpenerInAStringAsAComment(t *t
 // exactly at the byte an off-by-one guard skips. Every other case in this file puts ASCII in front
 // of its irregular character, where a mis-stepped index happens to land correctly.
 func TestNoIrregularWhitespaceFindsAnIrregularCharacterAbuttingAMultiByteOne(t *testing.T) {
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"const \u00e9\u3000x = 1;"), "noIrregularWhitespace")
 
 	// A three-byte character abutting a three-byte one, so a guard mis-stepping by a different
 	// amount is caught too.
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"const \u4e2d\u3000x = 1;"), "noIrregularWhitespace")
 }

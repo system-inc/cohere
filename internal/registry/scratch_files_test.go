@@ -39,7 +39,7 @@ var scratchFileExemptions = []string{"internal/astprobe"}
 // This is the file-shaped sibling of TestNoScratchPackagesRemain, and it exists because that guard
 // cannot see this violation. It globs directories under `internal/rules`, so it is blind twice over:
 // to a stray file inside an otherwise real package, which is the more common shape by far, and to
-// every tree outside `internal/rules` -- `internal/utils/hir` held five scratch files in one night
+// every tree outside `internal/rules` -- `internal/utilities/hir` held five scratch files in one night
 // and no guard could have named them.
 //
 // A directory-shaped check cannot see a file-shaped violation. That sentence is the whole reason
@@ -58,7 +58,7 @@ func TestNoScratchFilesRemain(t *testing.T) {
 	// Skipped unless asked for, and that is a deliberate weakening rather than an oversight.
 	//
 	// The first version ran always, and within a minute of being written it went red on two live
-	// probes belonging to an agent that was mid-measurement in `internal/utils/hir`. Those files
+	// probes belonging to an agent that was mid-measurement in `internal/utilities/hir`. Those files
 	// genuinely should not ship, so the finding was true -- and a guard that is true and fires
 	// during ordinary work is a guard people learn to scroll past. The package-shaped sibling avoids
 	// this only by accident: scratch packages are rare, scratch files are the common shape, so the

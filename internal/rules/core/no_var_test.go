@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const varFile = "/repository/source/Thing.ts"
@@ -25,7 +25,7 @@ func TestNoVarFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoVar, varFile, testCase.sourceText), "unexpectedVar")
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoVar, varFile, testCase.sourceText), "unexpectedVar")
 		})
 	}
 }
@@ -56,7 +56,7 @@ func TestNoVarStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoVar, varFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoVar, varFile, testCase.sourceText))
 		})
 	}
 }

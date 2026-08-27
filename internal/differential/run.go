@@ -61,7 +61,7 @@ type RunOptions struct {
 	Controls []Control
 	// ExtraVerifyRuleSettings are rules to enable for verify's run only, merged over the tree's own
 	// lint config and handed to verify with `-lint-config`. The gate always runs against the
-	// unmodified config.
+	// unmodified configuration.
 	//
 	// This exists for one narrow purpose and it is worth stating so nobody widens it casually.
 	// A directional control needs a rule verify can report and the gate structurally cannot, and

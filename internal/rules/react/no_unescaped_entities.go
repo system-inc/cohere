@@ -211,7 +211,7 @@ var NoUnescapedEntities = rule.Rule{
 // watching the reported order not move, twice.
 //
 // So upstream's emission order is an artifact rather than a decision, and reproducing it here would
-// be reproducing a workaround for a constraint we do not have. `ruletest.ExpectFindings` asserts
+// be reproducing a workaround for a constraint we do not have. `rule_testing.ExpectFindings` asserts
 // emission order directly, and the fix engine reasons over proposals in the order they arrive, so
 // out-of-order emission is a real difference here where it was none there. Upstream's corpus agrees
 // with source order too: its three-finding case `Multiple errors: '>> default parser` lists its

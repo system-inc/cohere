@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const unsafeDeclarationMergingFile = "/repository/source/Merged.ts"
@@ -26,7 +26,7 @@ func TestNoUnsafeDeclarationMergingFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoUnsafeDeclarationMerging,
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText), "unsafeMerging")
 		})
 	}
@@ -56,7 +56,7 @@ func TestNoUnsafeDeclarationMergingStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoUnsafeDeclarationMerging,
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText))
 		})
 	}
@@ -89,7 +89,7 @@ func TestNoUnsafeDeclarationMergingCountsFindingsPerDeclaration(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoUnsafeDeclarationMerging,
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText), testCase.want...)
 		})
 	}
@@ -116,7 +116,7 @@ func TestNoUnsafeDeclarationMergingGoesSilentWhenAThirdKindIsFirst(t *testing.T)
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoUnsafeDeclarationMerging,
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText))
 		})
 	}
@@ -145,7 +145,7 @@ func TestNoUnsafeDeclarationMergingStaysSilentOnUnpairedKinds(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoUnsafeDeclarationMerging,
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText))
 		})
 	}
@@ -172,7 +172,7 @@ func TestNoUnsafeDeclarationMergingPointsAtTheName(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantReported) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantReported))
 			}
@@ -217,7 +217,7 @@ func TestNoUnsafeDeclarationMergingPointsAtTheFirstDeclaration(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
@@ -241,10 +241,10 @@ func TestNoUnsafeDeclarationMergingNeedsTheTypedHarness(t *testing.T) {
 		t.Fatal("the rule resolves through the checker and must declare NeedsTypeChecker")
 	}
 	const sourceText = "interface Foo {}\nclass Foo {}\nexport { Foo };\n"
-	if result := ruletest.Run(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText); len(result.Diagnostics) != 0 {
+	if result := rule_testing.Run(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText); len(result.Diagnostics) != 0 {
 		t.Fatalf("the untyped harness produced %d findings, so the nil-checker guard is not being taken", len(result.Diagnostics))
 	}
-	if result := ruletest.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText); len(result.Diagnostics) != 1 {
+	if result := rule_testing.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText); len(result.Diagnostics) != 1 {
 		t.Fatalf("the typed harness produced %d findings, want 1", len(result.Diagnostics))
 	}
 }
@@ -260,7 +260,7 @@ func TestNoUnsafeDeclarationMergingDescriptionExplainsTheHazard(t *testing.T) {
 		"not check them, so reading one compiles and returns undefined at runtime. Give the " +
 		"interface a different name, or declare the members on the class."
 	const sourceText = "interface Foo {}\nclass Foo {}\nexport { Foo };\n"
-	result := ruletest.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText)
+	result := rule_testing.RunTyped(t, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
@@ -283,15 +283,15 @@ func TestNoUnsafeDeclarationMergingDescriptionExplainsTheHazard(t *testing.T) {
 // exports as a family.
 func TestNoUnsafeDeclarationMergingHandlesAnAnonymousClass(t *testing.T) {
 	t.Run("an anonymous default export beside an interface", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTyped(t, NoUnsafeDeclarationMerging,
+		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 			unsafeDeclarationMergingFile, "interface Foo {}\nexport default class {}\n"))
 	})
 	t.Run("an anonymous default export alone", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTyped(t, NoUnsafeDeclarationMerging,
+		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 			unsafeDeclarationMergingFile, "export default class {}\n"))
 	})
 	t.Run("a named default export beside an interface", func(t *testing.T) {
-		ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoUnsafeDeclarationMerging,
+		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 			unsafeDeclarationMergingFile, "interface Foo {}\nexport default class Foo {}\n"), "unsafeMerging")
 	})
 }
@@ -326,7 +326,7 @@ func TestNoUnsafeDeclarationMergingSeesThroughAnExport(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoUnsafeDeclarationMerging,
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 				unsafeDeclarationMergingFile, testCase.sourceText), "unsafeMerging")
 		})
 	}

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 var pathAliasOptions = ImportRequirePathAliasOptions{
@@ -36,8 +36,8 @@ func TestImportRequirePathAliasFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, ImportRequirePathAlias, testCase.fileName, testCase.sourceText, pathAliasOptions)
-			ruletest.ExpectFindings(t, result, testCase.wantId)
+			result := rule_testing.RunWithOptions(t, ImportRequirePathAlias, testCase.fileName, testCase.sourceText, pathAliasOptions)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
 	}
 }
@@ -74,8 +74,8 @@ func TestImportRequirePathAliasStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, ImportRequirePathAlias, testCase.fileName, testCase.sourceText, testCase.options)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunWithOptions(t, ImportRequirePathAlias, testCase.fileName, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -94,7 +94,7 @@ func TestImportRequirePathAliasPrefersTheLongestRoot(t *testing.T) {
 			{Directory: "libraries/base/source", Alias: "@basesource"},
 		},
 	}
-	result := ruletest.RunWithOptions(t, ImportRequirePathAlias,
+	result := rule_testing.RunWithOptions(t, ImportRequirePathAlias,
 		"/repository/libraries/base/deep/nested/Thing.ts",
 		"import { Thing } from '../../source/foundation/Thing';\n", options)
 	if len(result.Diagnostics) == 0 {
@@ -108,9 +108,9 @@ func TestImportRequirePathAliasPrefersTheLongestRoot(t *testing.T) {
 
 // The suggestion has to be a path someone can paste, so it is asserted rather than assumed.
 func TestImportRequirePathAliasSuggestsTheAliasedPath(t *testing.T) {
-	result := ruletest.RunWithOptions(t, ImportRequirePathAlias, aliasImporter,
+	result := rule_testing.RunWithOptions(t, ImportRequirePathAlias, aliasImporter,
 		"import { Thing } from '../../foundation/Thing';\n", pathAliasOptions)
-	ruletest.ExpectFindings(t, result, "useAlias")
+	rule_testing.ExpectFindings(t, result, "useAlias")
 
 	description := result.Diagnostics[0].Message.Description
 	if !strings.Contains(description, "@project/source/foundation/Thing") {
@@ -140,9 +140,9 @@ func TestImportRequirePathAliasAcceptsTheRepositoryRoot(t *testing.T) {
 		},
 	}
 
-	result := ruletest.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
+	result := rule_testing.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
 		"import { Helper } from '../../shared/Helper';\n", rootOptions)
-	ruletest.ExpectFindings(t, result, "useAlias")
+	rule_testing.ExpectFindings(t, result, "useAlias")
 
 	description := result.Diagnostics[0].Message.Description
 	if !strings.Contains(description, "@project/app/shared/Helper") {
@@ -162,9 +162,9 @@ func TestImportRequirePathAliasNormalizesConfiguredDirectories(t *testing.T) {
 				RepositoryRoot: "/repository",
 				Aliases:        []PathAlias{{Directory: spelling, Alias: "@app"}},
 			}
-			result := ruletest.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
+			result := rule_testing.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
 				"import { Helper } from '../../shared/Helper';\n", options)
-			ruletest.ExpectFindings(t, result, "useAlias")
+			rule_testing.ExpectFindings(t, result, "useAlias")
 
 			description := result.Diagnostics[0].Message.Description
 			if !strings.Contains(description, "@app/shared/Helper") {
@@ -188,9 +188,9 @@ func TestImportRequirePathAliasRootDoesNotShadowASubdirectory(t *testing.T) {
 		},
 	}
 
-	result := ruletest.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
+	result := rule_testing.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
 		"import { Thing } from '../../../libraries/base/source/Thing';\n", rootOptions)
-	ruletest.ExpectFindings(t, result, "useAlias")
+	rule_testing.ExpectFindings(t, result, "useAlias")
 
 	description := result.Diagnostics[0].Message.Description
 	if !strings.Contains(description, "@base/source/Thing") {
@@ -205,14 +205,14 @@ func TestImportRequirePathAliasRootDoesNotShadowASubdirectory(t *testing.T) {
 // single quotes and Prettier would restore them either way, but a fixer that silently changed a byte
 // nobody asked about is a fixer people stop trusting.
 func TestImportRequirePathAliasFixesTheSpecifier(t *testing.T) {
-	ruletest.ExpectFixedSource(t,
-		ruletest.RunWithOptions(t, ImportRequirePathAlias, aliasImporter,
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.RunWithOptions(t, ImportRequirePathAlias, aliasImporter,
 			"import { Thing } from '../../foundation/Thing';\n", pathAliasOptions),
 		"import { Thing } from '@project/source/foundation/Thing';\n")
 
 	// A double-quoted specifier keeps its quotes.
-	ruletest.ExpectFixedSource(t,
-		ruletest.RunWithOptions(t, ImportRequirePathAlias, aliasImporter,
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.RunWithOptions(t, ImportRequirePathAlias, aliasImporter,
 			"import { Thing } from \"../../foundation/Thing\";\n", pathAliasOptions),
 		"import { Thing } from \"@project/source/foundation/Thing\";\n")
 
@@ -221,8 +221,8 @@ func TestImportRequirePathAliasFixesTheSpecifier(t *testing.T) {
 		RepositoryRoot: "/repository",
 		Aliases:        []PathAlias{{Directory: ".", Alias: "@project"}},
 	}
-	ruletest.ExpectFixedSource(t,
-		ruletest.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
+	rule_testing.ExpectFixedSource(t,
+		rule_testing.RunWithOptions(t, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
 			"import { Helper } from '../../shared/Helper';\n", rootOptions),
 		"import { Helper } from '@project/app/shared/Helper';\n")
 }

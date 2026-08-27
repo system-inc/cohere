@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 	tailwindengine "github.com/system-inc/verify/internal/tailwind"
 )
 
@@ -13,7 +13,7 @@ import (
 //
 // Same reason the other three migrated rules' fixtures give. The rule now reads the live design
 // system to resolve a class to its declared properties, so it declares `ReadsProgram` and returns
-// nil listeners when the Program is nil. `ruletest.Run` hands it exactly that, so a fixture left on
+// nil listeners when the Program is nil. `rule_testing.Run` hands it exactly that, so a fixture left on
 // it would exercise the nil-Program branch: the reporting half fails loudly and the silent half —
 // which this rule's own header calls the load-bearing one — passes while proving nothing.
 //
@@ -27,7 +27,7 @@ import (
 // and the classes these fixtures use are the framework's, so a fixture theme adding tokens would test
 // the fixture. The repository half is measured against the real corpus in live_placement_test.go,
 // where 913 class occurrences are answered by compiling an `@utility` block.
-func runConflictFixture(t *testing.T, fileName string, source string) ruletest.Result {
+func runConflictFixture(t *testing.T, fileName string, source string) rule_testing.Result {
 	t.Helper()
 	return runConflictFixtureWithOptions(t, fileName, source, nil)
 }
@@ -38,7 +38,7 @@ func runConflictFixtureWithOptions(
 	fileName string,
 	source string,
 	options any,
-) ruletest.Result {
+) rule_testing.Result {
 	t.Helper()
 
 	packageRoot := unknownFixturePackageRoot()
@@ -62,9 +62,9 @@ func runConflictFixtureWithOptions(
 	}
 
 	if options == nil {
-		return ruletest.RunTypedFilesWithSetup(t, NoConflictingClasses, files, fileName, plantPackage)
+		return rule_testing.RunTypedFilesWithSetup(t, NoConflictingClasses, files, fileName, plantPackage)
 	}
-	return ruletest.RunTypedFilesWithSetupAndOptions(
+	return rule_testing.RunTypedFilesWithSetupAndOptions(
 		t, NoConflictingClasses, files, fileName, options, plantPackage)
 }
 
@@ -140,7 +140,7 @@ func TestNoConflictingClassesReportsSymmetrically(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runConflictFixture(t, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -247,7 +247,7 @@ func TestNoConflictingClassesStaysSilent(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runConflictFixture(t, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -348,7 +348,7 @@ func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(t *testing.T) {
 	// Two classes under one design system: one the repository declares, one the framework does.
 	result := runConflictFixture(t, "Component.tsx",
 		`const element = <div className="flex block" />;`)
-	ruletest.ExpectFindings(t, result, "conflictingClasses", "conflictingClasses")
+	rule_testing.ExpectFindings(t, result, "conflictingClasses", "conflictingClasses")
 
 	// And the repository half, against a class the corpus repository declares and no framework
 	// contains. `background--0` is a functional `@utility` block in ahra's own stylesheet, compiled
@@ -450,7 +450,7 @@ func TestConflictFixturesActuallyRan(t *testing.T) {
 
 	result := runConflictFixture(t, "Component.tsx",
 		`const element = <div className="flex block" />;`)
-	ruletest.ExpectFindings(t, result, "conflictingClasses", "conflictingClasses")
+	rule_testing.ExpectFindings(t, result, "conflictingClasses", "conflictingClasses")
 }
 
 // TestVariantsAreComparedNotStripped pins the distinction that decides false positives.

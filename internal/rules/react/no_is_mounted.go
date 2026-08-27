@@ -37,7 +37,7 @@ var messageNoIsMounted = rule.Message{
 // So `class Whatever { m() { this.isMounted(); } }`, with no heritage clause and no relation to
 // React at all, reports. Measured on oxlint rather than reasoned: that source produces a finding at
 // offset 23. A plain object literal, `var o = { m: function() { this.isMounted(); } }`, reports
-// too. `internal/utils/react/EnclosingComponent` answers false for both, so a port reaching for it
+// too. `internal/utilities/react/EnclosingComponent` answers false for both, so a port reaching for it
 // is silent on real upstream findings.
 //
 // The imported corpus cannot catch that mistake. All three fail cases are written inside

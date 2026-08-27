@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // lossOfPrecisionFile is where the fixtures pretend to live.
@@ -79,8 +79,8 @@ func TestNoLossOfPrecisionFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
 				"noLossOfPrecision")
 		})
 	}
@@ -194,8 +194,8 @@ func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
 		})
 	}
 }
@@ -219,8 +219,8 @@ func TestNoLossOfPrecisionReadsRawSourceText(t *testing.T) {
 	}
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText),
 				"noLossOfPrecision")
 		})
 	}
@@ -253,8 +253,8 @@ func TestNoLossOfPrecisionReadsRawSourceText(t *testing.T) {
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoLossOfPrecision, lossOfPrecisionFile, testCase.sourceText))
 		})
 	}
 }

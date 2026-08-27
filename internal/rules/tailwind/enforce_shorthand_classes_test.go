@@ -4,16 +4,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Every expectation was measured against eslint-plugin-better-tailwindcss 4.7.0, and the table this
 // rule matches on was extracted mechanically from its source rather than retyped: it is 48 rules,
 // and a transcription slip would be a silent miss on one utility family rather than a failure
 // anywhere a suite would notice.
-func runShorthandFixture(t *testing.T, source string) ruletest.Result {
+func runShorthandFixture(t *testing.T, source string) rule_testing.Result {
 	t.Helper()
-	return ruletest.Run(t, EnforceShorthandClasses, "Component.tsx", source)
+	return rule_testing.Run(t, EnforceShorthandClasses, "Component.tsx", source)
 }
 
 // TestEnforceShorthandClassesReports covers what upstream reports.
@@ -90,7 +90,7 @@ func TestEnforceShorthandClassesReports(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runShorthandFixture(t, testCase.source)
-			ruletest.ExpectFindings(t, result, "shorthandClasses")
+			rule_testing.ExpectFindings(t, result, "shorthandClasses")
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("expected a finding")
 			}
@@ -146,7 +146,7 @@ func TestEnforceShorthandClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, runShorthandFixture(t, testCase.source))
+			rule_testing.ExpectClean(t, runShorthandFixture(t, testCase.source))
 		})
 	}
 }

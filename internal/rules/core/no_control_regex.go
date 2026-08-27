@@ -7,8 +7,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/regexpattern"
-	"github.com/system-inc/verify/internal/utils/ecmascript/regexsyntax"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/regexpattern"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/regexsyntax"
 )
 
 // NoControlRegex flags a control character spelled out inside a regular expression.

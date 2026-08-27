@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // scriptUrlFile is where the fixtures pretend to live.
@@ -30,8 +30,8 @@ func TestNoScriptUrlFires(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoScriptUrl, scriptUrlFile, sourceText), "unexpectedScriptURL")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoScriptUrl, scriptUrlFile, sourceText), "unexpectedScriptURL")
 		})
 	}
 }
@@ -54,7 +54,7 @@ func TestNoScriptUrlStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoScriptUrl, scriptUrlFile, sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoScriptUrl, scriptUrlFile, sourceText))
 		})
 	}
 }
@@ -92,11 +92,11 @@ func TestNoScriptUrlTaggedTemplateExemptionIsTheDirectParent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
 			if testCase.wantFires {
-				ruletest.ExpectFindings(t, result, "unexpectedScriptURL")
+				rule_testing.ExpectFindings(t, result, "unexpectedScriptURL")
 			} else {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 			}
 		})
 	}
@@ -137,11 +137,11 @@ func TestNoScriptUrlComparisonIsAnchoredAndAsciiFolded(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
 			if testCase.wantFires {
-				ruletest.ExpectFindings(t, result, "unexpectedScriptURL")
+				rule_testing.ExpectFindings(t, result, "unexpectedScriptURL")
 			} else {
-				ruletest.ExpectClean(t, result)
+				rule_testing.ExpectClean(t, result)
 			}
 		})
 	}
@@ -166,7 +166,7 @@ func TestNoScriptUrlDeclinesOtherLiteralKinds(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText))
 		})
 	}
 }
@@ -193,7 +193,7 @@ func TestNoScriptUrlReportsTheWholeLiteral(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
@@ -212,7 +212,7 @@ func TestNoScriptUrlReportsTheWholeLiteral(t *testing.T) {
 // The id literal is typed here rather than read from the rule's own constant, so a rename cannot
 // move both sides at once and stay green.
 func TestNoScriptUrlMessage(t *testing.T) {
-	result := ruletest.Run(t, NoScriptUrl, scriptUrlFile, "var a = 'javascript:void(0);';")
+	result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, "var a = 'javascript:void(0);';")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}

@@ -8,7 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/config"
+	"github.com/system-inc/verify/internal/configuration"
 	"github.com/system-inc/verify/internal/rule"
 	"github.com/system-inc/verify/internal/suppression"
 )
@@ -86,7 +86,7 @@ func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules [
 
 	explanation := &Explanation{FileName: sourceFile.FileName()}
 
-	var resolution config.Resolved
+	var resolution configuration.Resolved
 	if g.LintConfig != nil {
 		resolution = g.LintConfig.Resolve(sourceFile.FileName())
 		if resolution.Ignored {
@@ -188,11 +188,11 @@ func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules [
 // Each phrasing says who decided, because "somebody turned this off here" and "nobody has said
 // whether this should run" are different facts. Collapsing them describes a brand-new rule as
 // though it had been deliberately excluded.
-func declineReason(status config.Status) string {
+func declineReason(status configuration.Status) string {
 	switch status {
-	case config.StatusScopedOff:
+	case configuration.StatusScopedOff:
 		return "the config turns it off for this file"
-	case config.StatusUnconfigured:
+	case configuration.StatusUnconfigured:
 		return "it is not in the config, so nobody has said whether it should run"
 	}
 	return ""

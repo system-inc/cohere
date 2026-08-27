@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // importAssignFile is where the fixtures pretend to live.
@@ -94,13 +94,13 @@ func TestNoImportAssignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
 			for index := range wantIds {
 				wantIds[index] = "noImportAssign"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				return
@@ -185,8 +185,8 @@ func TestNoImportAssignStaysSilent(t *testing.T) {
 
 	for _, sourceText := range cases {
 		t.Run(sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoImportAssign, importAssignFile, sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoImportAssign, importAssignFile, sourceText))
 		})
 	}
 }
@@ -289,13 +289,13 @@ func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
 			for index := range wantIds {
 				wantIds[index] = "noImportAssign"
 			}
-			ruletest.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(t, result, wantIds...)
 
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				return
@@ -370,8 +370,8 @@ func TestNoImportAssignStaysSilentOnCasesUpstreamOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoImportAssign, importAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -385,7 +385,7 @@ func TestNoImportAssignNeedsTheTypedHarness(t *testing.T) {
 	if !NoImportAssign.NeedsTypeChecker {
 		t.Fatal("the rule no longer declares NeedsTypeChecker, so the fixtures above may be running against a nil checker")
 	}
-	result := ruletest.Run(t, NoImportAssign, importAssignFile, "import mod from 'mod'; mod = 0")
+	result := rule_testing.Run(t, NoImportAssign, importAssignFile, "import mod from 'mod'; mod = 0")
 	if len(result.Diagnostics) != 0 {
 		t.Fatalf("the untyped harness produced %d findings, so this test no longer proves what it claims", len(result.Diagnostics))
 	}

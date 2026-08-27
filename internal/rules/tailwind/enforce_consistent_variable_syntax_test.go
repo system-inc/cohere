@@ -4,18 +4,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Every expectation was measured against eslint-plugin-better-tailwindcss 4.7.0, and the
 // corrections were checked against its own autofix output rather than only against which classes it
 // reports: a rule that reports the right set and rewrites it wrongly passes a set comparison.
 //
-// `ruletest.Run` rather than the class-order program harness, because the question is entirely about
+// `rule_testing.Run` rather than the class-order program harness, because the question is entirely about
 // how a class is spelled and this rule declares no ReadsProgram.
-func runVariableSyntaxFixture(t *testing.T, source string) ruletest.Result {
+func runVariableSyntaxFixture(t *testing.T, source string) rule_testing.Result {
 	t.Helper()
-	return ruletest.Run(t, EnforceConsistentVariableSyntax, "Component.tsx", source)
+	return rule_testing.Run(t, EnforceConsistentVariableSyntax, "Component.tsx", source)
 }
 
 // TestEnforceConsistentVariableSyntaxReports covers what upstream reports.
@@ -72,7 +72,7 @@ func TestEnforceConsistentVariableSyntaxReports(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runVariableSyntaxFixture(t, testCase.source)
-			ruletest.ExpectFindings(t, result, "variableSyntax")
+			rule_testing.ExpectFindings(t, result, "variableSyntax")
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("expected a finding")
 			}
@@ -124,7 +124,7 @@ func TestEnforceConsistentVariableSyntaxStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, runVariableSyntaxFixture(t, testCase.source))
+			rule_testing.ExpectClean(t, runVariableSyntaxFixture(t, testCase.source))
 		})
 	}
 }
@@ -133,15 +133,15 @@ func TestEnforceConsistentVariableSyntaxStaysSilent(t *testing.T) {
 func TestEnforceConsistentVariableSyntaxVariableForm(t *testing.T) {
 	variableForm := EnforceConsistentVariableSyntaxOptions{Syntax: variableSyntaxVariable}
 
-	reported := ruletest.RunWithOptions(t, EnforceConsistentVariableSyntax, "Component.tsx",
+	reported := rule_testing.RunWithOptions(t, EnforceConsistentVariableSyntax, "Component.tsx",
 		`const element = <div className="text-(--my-var)" />;`, variableForm)
-	ruletest.ExpectFindings(t, reported, "variableSyntax")
+	rule_testing.ExpectFindings(t, reported, "variableSyntax")
 	if len(reported.Diagnostics) > 0 &&
 		!strings.Contains(reported.Diagnostics[0].Message.Description, "text-[var(--my-var)]") {
 		t.Errorf("expected the bracketed call form: %s", reported.Diagnostics[0].Message.Description)
 	}
 
-	silent := ruletest.RunWithOptions(t, EnforceConsistentVariableSyntax, "Component.tsx",
+	silent := rule_testing.RunWithOptions(t, EnforceConsistentVariableSyntax, "Component.tsx",
 		`const element = <div className="text-[var(--my-var)]" />;`, variableForm)
-	ruletest.ExpectClean(t, silent)
+	rule_testing.ExpectClean(t, silent)
 }

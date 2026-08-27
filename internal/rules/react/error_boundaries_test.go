@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // The upstream corpus is four fixtures and only two of them reach this rule.
@@ -225,12 +225,12 @@ func TestErrorBoundariesFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ErrorBoundaries, "component.tsx", testCase.source)
+			result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", testCase.source)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "jsxInTryStatement"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -448,8 +448,8 @@ func TestErrorBoundariesStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ErrorBoundaries, "component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -463,7 +463,7 @@ func TestErrorBoundariesStaysSilent(t *testing.T) {
 // reported text does not, and the text is what this asserts.
 func TestErrorBoundariesSpan(t *testing.T) {
 	source := "function Component(props) {\n  let el;\n  try {\n    el = <div />;\n  } catch {\n    return null;\n  }\n  return el;\n}\n"
-	result := ruletest.Run(t, ErrorBoundaries, "component.tsx", source)
+	result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 	}
@@ -482,7 +482,7 @@ func TestErrorBoundariesSpan(t *testing.T) {
 // the whole outer element and one spanning the inner.
 func TestErrorBoundariesSpanOnNestedElements(t *testing.T) {
 	source := "function Component() {\n  let el;\n  try {\n    el = <div><span /></div>;\n  } catch {\n    return null;\n  }\n  return el;\n}\n"
-	result := ruletest.Run(t, ErrorBoundaries, "component.tsx", source)
+	result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", source)
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("expected two findings, got %d", len(result.Diagnostics))
 	}
@@ -525,6 +525,6 @@ func TestErrorBoundariesRunsWithoutTheTypeChecker(t *testing.T) {
 		t.Error("the rule declares a type checker it never asks anything")
 	}
 	source := "function Component() {\n  let el;\n  try {\n    el = <div />;\n  } catch {\n    return null;\n  }\n  return el;\n}\n"
-	result := ruletest.Run(t, ErrorBoundaries, "component.tsx", source)
-	ruletest.ExpectFindings(t, result, "jsxInTryStatement")
+	result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", source)
+	rule_testing.ExpectFindings(t, result, "jsxInTryStatement")
 }

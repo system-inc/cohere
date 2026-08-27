@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // documentFile is the path upstream gives every case but one, and the path is load-bearing data
@@ -137,8 +137,8 @@ func TestNoPageCustomFontFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoPageCustomFont, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.want...)
+			result := rule_testing.Run(t, NoPageCustomFont, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.want...)
 		})
 	}
 }
@@ -302,8 +302,8 @@ func TestNoPageCustomFontStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoPageCustomFont, testCase.fileName, testCase.source))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoPageCustomFont, testCase.fileName, testCase.source))
 		})
 	}
 }
@@ -320,7 +320,7 @@ func TestNoPageCustomFontStaysSilent(t *testing.T) {
 // comparison against the constant moves with the constant under mutation and passes either way.
 func TestNoPageCustomFontPointsAtTheWholeElement(t *testing.T) {
 	source := "export default function D() {\n  return <div><link href=\"https://fonts.googleapis.com/css2?family=Inter\" rel=\"stylesheet\" /></div>\n}\n"
-	result := ruletest.Run(t, NoPageCustomFont, "pages/index.tsx", source)
+	result := rule_testing.Run(t, NoPageCustomFont, "pages/index.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted 1 finding, got %d", len(result.Diagnostics))
 	}
@@ -351,7 +351,7 @@ func TestNoPageCustomFontPointsAtTheWholeElement(t *testing.T) {
 // decides, with the difference stated rather than left for a reader to find.
 func TestNoPageCustomFontPointsAtTheOpeningTagOfAPairedElement(t *testing.T) {
 	source := "export default function D() {\n  return <div><link href=\"https://fonts.googleapis.com/css2?family=Inter\"></link></div>\n}\n"
-	result := ruletest.Run(t, NoPageCustomFont, "pages/index.tsx", source)
+	result := rule_testing.Run(t, NoPageCustomFont, "pages/index.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted 1 finding, got %d", len(result.Diagnostics))
 	}
@@ -365,7 +365,7 @@ func TestNoPageCustomFontPointsAtTheOpeningTagOfAPairedElement(t *testing.T) {
 // The second finding's span and message, so both message constants are pinned rather than one.
 func TestNoPageCustomFontOutsideDefaultExportMessage(t *testing.T) {
 	source := "function Links() {\n  return <link href=\"https://fonts.googleapis.com/css2?family=Inter\" />\n}\nexport default function D() { return <div><Links /></div> }\n"
-	result := ruletest.Run(t, NoPageCustomFont, "pages/_document.tsx", source)
+	result := rule_testing.Run(t, NoPageCustomFont, "pages/_document.tsx", source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted 1 finding, got %d", len(result.Diagnostics))
 	}

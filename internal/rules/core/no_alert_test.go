@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // alertFile is where the fixtures pretend to live.
@@ -46,7 +46,7 @@ func TestNoAlertStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoAlert, alertFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText))
 		})
 	}
 }
@@ -80,8 +80,8 @@ func TestNoAlertFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoAlert, alertFile, testCase.sourceText), "unexpected")
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText), "unexpected")
 		})
 	}
 }
@@ -89,7 +89,7 @@ func TestNoAlertFires(t *testing.T) {
 // The two upstream reporting cases that are clean here, and the reason is not this rule.
 //
 // Upstream reports `this.alert(foo)` at the top level of a SCRIPT, where `this` is the global
-// object. Our harness pins `moduleDetection: "force"` in `internal/ruletest/program.go` and our tree
+// object. Our harness pins `moduleDetection: "force"` in `internal/rule_testing/program.go` and our tree
 // is modules throughout, and in a module top-level `this` is `undefined` rather than the global.
 //
 // Measured on the installed rule rather than reasoned about: with `sourceType: "module"` both of
@@ -111,11 +111,11 @@ func TestNoAlertLeavesGlobalThisToScriptFiles(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoAlert, alertFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText))
 		})
 	}
 
-	ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoAlert, alertFile,
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAlert, alertFile,
 		"window.alert(foo)"), "unexpected")
 }
 
@@ -135,7 +135,7 @@ func TestNoAlertLeavesGlobalThisToScriptFiles(t *testing.T) {
 //	ecmaVersion=6     globalThis["alert"]();    CLEAN
 //	ecmaVersion=2022  globalThis["alert"]();    unexpected
 //
-// `internal/ruletest/program.go` pins `target: "ES2022"` and our tree compiles to the same, so
+// `internal/rule_testing/program.go` pins `target: "ES2022"` and our tree compiles to the same, so
 // `globalThis` is always in the standard library the checker reads and the pre-2020 verdict is not
 // reachable here. Reporting these is therefore agreement with upstream AT OUR TARGET rather than a
 // divergence from it, and a port reproducing them as clean would be silent on the modern spelling of
@@ -152,12 +152,12 @@ func TestNoAlertReportsGlobalThisAtOurTarget(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoAlert, alertFile, testCase.sourceText), "unexpected")
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText), "unexpected")
 		})
 	}
 
-	ruletest.ExpectClean(t, ruletest.RunTyped(t, NoAlert, alertFile,
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile,
 		"var globalThis = foo; globalThis.alert();"))
 }
 
@@ -179,7 +179,7 @@ func TestNoAlertNamesTheFunction(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoAlert, alertFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -206,7 +206,7 @@ func TestNoAlertReportsTheWholeCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoAlert, alertFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoAlert, alertFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -231,30 +231,30 @@ func TestNoAlertReportsTheWholeCall(t *testing.T) {
 // receiver and reports.
 func TestNoAlertHandlesShapesTheCorpusOmits(t *testing.T) {
 	t.Run("globalThis with an optional chain reports", func(t *testing.T) {
-		ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoAlert, alertFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAlert, alertFile,
 			"globalThis?.alert(foo)"), "unexpected")
 	})
 
 	t.Run("a computed access through a variable stays clean", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTyped(t, NoAlert, alertFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile,
 			"declare const confirm: string;\nglobalThis[confirm]();\n"))
 	})
 
 	t.Run("a receiver that is not the global object stays clean", func(t *testing.T) {
-		ruletest.ExpectClean(t, ruletest.RunTyped(t, NoAlert, alertFile,
+		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAlert, alertFile,
 			"declare const foo: any;\nfoo.alert(foo);\n"))
 		// The control changes only the receiver.
-		ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoAlert, alertFile,
+		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAlert, alertFile,
 			"declare const foo: any;\nwindow.alert(foo);\n"), "unexpected")
 	})
 }
 
-// The typed harness is required, so a later revert to `ruletest.Run` fails loudly.
+// The typed harness is required, so a later revert to `rule_testing.Run` fails loudly.
 func TestNoAlertNeedsTheTypedHarness(t *testing.T) {
 	if !NoAlert.NeedsTypeChecker {
 		t.Fatal("this rule resolves shadowing through the checker and must declare it")
 	}
-	ruletest.ExpectClean(t, ruletest.Run(t, NoAlert, alertFile, "alert(foo)"))
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoAlert, alertFile, "alert(foo)"))
 }
 
 // A callee that is neither an identifier nor a member access must not crash the file.
@@ -289,8 +289,8 @@ func TestNoAlertSurvivesACalleeThatIsNotAMemberAccess(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoAlert, alertFile, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoAlert, alertFile, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

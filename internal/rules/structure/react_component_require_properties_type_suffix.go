@@ -5,8 +5,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/module"
-	"github.com/system-inc/verify/internal/utils/react"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
+	"github.com/system-inc/verify/internal/utilities/react"
 )
 
 const propertiesTypeSuffixReasoning = "A component's property type is the one type a reader looks " +

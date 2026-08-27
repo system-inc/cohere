@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/hir"
+	"github.com/system-inc/verify/internal/utilities/high_level_intermediate_representation"
 )
 
 // Immutability flags mutating a value React requires to stay frozen.
@@ -55,8 +55,8 @@ import (
 //
 // # The lattice, and why its join cannot be an ordering
 //
-// Six elements: Mutable, Frozen, Primitive, MaybeFrozen, Global, Context. `internal/utils/hir/
-// hir.go` carries a warning written for this rule, and it is correct: the `Effect` constants
+// Six elements: Mutable, Frozen, Primitive, MaybeFrozen, Global, Context. `internal/utilities/hir/
+// high_level_intermediate_representation.go` carries a warning written for this rule, and it is correct: the `Effect` constants
 // declared beside it look like a lattice and are not one, and a pass whose join is "take the larger
 // Effect" would be self-consistent, pass its own tests, and be wrong.
 //
@@ -95,11 +95,11 @@ import (
 // The reason set is a bitset rather than a slice for the same reason: two sets that merged the same
 // bits in a different order must compare equal, and a slice would not.
 //
-// # Why a bounded whole-function sweep rather than `controlflow.Solve`
+// # Why a bounded whole-function sweep rather than `control_flow_graph.Solve`
 //
-// `controlflow.Solve[V,E]` is mechanically unreachable from this representation: `controlflow.
-// Block`'s `index`, `final` and `thrown` fields are unexported and set only by `controlflow.Build`,
-// so a caller holding a `hir.Function` cannot construct one. `ssa.go`, `postdominator.go` and
+// `control_flow_graph.Solve[V,E]` is mechanically unreachable from this representation: `control_flow_graph.
+// Block`'s `index`, `final` and `thrown` fields are unexported and set only by `control_flow_graph.Build`,
+// so a caller holding a `high_level_intermediate_representation.Function` cannot construct one. `ssa.go`, `postdominator.go` and
 // `refs.go` all already record this. That is a mechanical fact and it is not the reason this rule
 // does not use it.
 //
@@ -113,7 +113,7 @@ import (
 //
 // # Phi operands are a Go map, and nothing here may depend on their order
 //
-// `hir.Phi.Operands` is `map[BlockId]Place`, so ranging it yields a nondeterministic order. A
+// `high_level_intermediate_representation.Phi.Operands` is `map[BlockId]Place`, so ranging it yields a nondeterministic order. A
 // sibling rule shipped a message that named a different builtin between runs for exactly this
 // reason. The join used here is commutative and associative, so the resulting KIND is
 // order-independent by construction; the reason set is a bitset union, which is likewise. The
@@ -157,7 +157,7 @@ var Immutability = rule.Rule{
 					return
 				}
 				immutabilityForEachCompiledFunction(node, func(functionNode *ast.Node) {
-					lowered := hir.ForFunction(ctx, functionNode)
+					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
 					if lowered == nil {
 						return
 					}
@@ -194,7 +194,7 @@ func immutabilityForEachCompiledFunction(root *ast.Node, visit func(*ast.Node)) 
 //
 // A function that is not a compilation unit is walked past into the functions it contains, because
 // one of those may be a unit even when its wrapper is not.
-func immutabilityAnalyzeCompilationUnit(ctx rule.Context, function *hir.Function, node *ast.Node) {
+func immutabilityAnalyzeCompilationUnit(ctx rule.Context, function *high_level_intermediate_representation.Function, node *ast.Node) {
 	if function == nil {
 		return
 	}
@@ -217,11 +217,11 @@ func immutabilityAnalyzeCompilationUnit(ctx rule.Context, function *hir.Function
 // create JSX or call a hook, and a COMPONENT additionally has to have component-shaped parameters.
 // The parameter half is what makes a two-parameter component silent, measured above.
 //
-// `hir.Function.Kind` is deliberately NOT the gate here even though refs.go uses it. That field is a
+// `high_level_intermediate_representation.Function.Kind` is deliberately NOT the gate here even though refs.go uses it. That field is a
 // name-only guess recorded at lowering time and it does not ask the parameter question, so a
 // two-parameter component passes it. Measured: keying on the field alone reports four inputs React
 // is silent on.
-func immutabilityIsCompilationUnit(function *hir.Function, node *ast.Node) bool {
+func immutabilityIsCompilationUnit(function *high_level_intermediate_representation.Function, node *ast.Node) bool {
 	if function == nil || node == nil {
 		return false
 	}
@@ -229,7 +229,7 @@ func immutabilityIsCompilationUnit(function *hir.Function, node *ast.Node) bool 
 }
 
 // immutabilityInstructionAt returns one instruction by id, or nil when the id is out of range.
-func immutabilityInstructionAt(function *hir.Function, id hir.InstructionId) *hir.Instruction {
+func immutabilityInstructionAt(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.InstructionId) *high_level_intermediate_representation.Instruction {
 	if function == nil || int(id) >= len(function.Instructions) {
 		return nil
 	}
@@ -237,7 +237,7 @@ func immutabilityInstructionAt(function *hir.Function, id hir.InstructionId) *hi
 }
 
 // immutabilityIdentifierNode returns the syntax a value came from, or nil for a pure temporary.
-func immutabilityIdentifierNode(function *hir.Function, id hir.IdentifierId) *ast.Node {
+func immutabilityIdentifierNode(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -249,7 +249,7 @@ func immutabilityIdentifierNode(function *hir.Function, id hir.IdentifierId) *as
 }
 
 // immutabilityIdentifierName returns a value's source binding name, empty for a temporary.
-func immutabilityIdentifierName(function *hir.Function, id hir.IdentifierId) string {
+func immutabilityIdentifierName(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) string {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return ""
 	}
@@ -276,7 +276,7 @@ func immutabilityIsHookName(name string) bool {
 // immutabilityValueKind is one of the six abstract values a value can hold.
 //
 // These are upstream's `ValueKind`, and the declaration order carries no meaning: the join below is
-// not a max over it. `internal/utils/hir/hir.go` documents why that distinction matters, in a
+// not a max over it. `internal/utilities/hir/high_level_intermediate_representation.go` documents why that distinction matters, in a
 // comment addressed to this rule.
 type immutabilityValueKind uint8
 
@@ -464,32 +464,32 @@ type immutabilityFinding struct {
 type immutabilityState struct {
 	// values holds each value's abstract kind and reasons, keyed by the identifier that introduced
 	// it. A binding reaches its value through `aliases`.
-	values map[hir.IdentifierId]immutabilityAbstractValue
+	values map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue
 	// aliases maps a binding onto the value it ultimately names.
-	aliases map[hir.IdentifierId]hir.IdentifierId
+	aliases map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId
 	// declarationValues recovers a value whose single-assignment numbering did not unify, keyed by
 	// the source binding. refs.go documents the same representation gap and works around it the
 	// same way.
-	declarations  map[hir.IdentifierId]hir.DeclarationId
-	byDeclaration map[hir.DeclarationId]hir.IdentifierId
+	declarations  map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.DeclarationId
+	byDeclaration map[high_level_intermediate_representation.DeclarationId]high_level_intermediate_representation.IdentifierId
 	// names carries a source binding name onto the temporary that loaded it.
-	names map[hir.IdentifierId]string
+	names map[high_level_intermediate_representation.IdentifierId]string
 	// functionsReassigning records, per value, which locals calling it would reassign. A function
 	// value carrying a non-empty set is a "known mutable function".
-	functionsReassigning map[hir.IdentifierId][]immutabilityReassignment
+	functionsReassigning map[high_level_intermediate_representation.IdentifierId][]immutabilityReassignment
 	// functionCaptures records what a closure closes over, so freezing the closure freezes them.
-	functionCaptures map[hir.IdentifierId][]hir.IdentifierId
+	functionCaptures map[high_level_intermediate_representation.IdentifierId][]high_level_intermediate_representation.IdentifierId
 	// aggregateElements records what an object or array literal holds, so freezing the aggregate
 	// freezes its contents. Kept separate from functionCaptures because an object holding a value
 	// and a closure capturing one are different relations that happen to propagate the same way.
-	aggregateElements map[hir.IdentifierId][]hir.IdentifierId
+	aggregateElements map[high_level_intermediate_representation.IdentifierId][]high_level_intermediate_representation.IdentifierId
 	// changed is the fixpoint's only termination signal.
 	changed bool
 	// insideLoop is true while the sweep is walking a block that a back edge can re-enter.
 	insideLoop bool
 	// frozenInsideLoop records values frozen at such a point, which are the only ones a back edge
 	// may carry into the next round. See the sweep.
-	frozenInsideLoop map[hir.IdentifierId]bool
+	frozenInsideLoop map[high_level_intermediate_representation.IdentifierId]bool
 }
 
 // immutabilityReassignment is one local a nested function reassigns.
@@ -500,7 +500,7 @@ type immutabilityReassignment struct {
 	// Target is the DECLARATION written. Compared by declaration rather than by identifier because
 	// the capture edge and the store name the same binding under two different single-assignment
 	// numberings; see the caller.
-	Target hir.DeclarationId
+	Target high_level_intermediate_representation.DeclarationId
 	// Direct is true when the write happened in the immediate closure rather than in one nested
 	// inside it. Only a direct write can be matched against the capture edge, because a deeper
 	// closure's identifier space is a third one again.
@@ -514,7 +514,7 @@ type immutabilityReassignment struct {
 // translating them would need the capture edge chained through every level. That is a real
 // narrowing and it is stated rather than hidden: a two-level closure reassigning a render local is
 // silent here and reports upstream. See the report.
-func immutabilityFilterOwned(reassignments []immutabilityReassignment, owned map[hir.DeclarationId]bool) []immutabilityReassignment {
+func immutabilityFilterOwned(reassignments []immutabilityReassignment, owned map[high_level_intermediate_representation.DeclarationId]bool) []immutabilityReassignment {
 	kept := reassignments[:0]
 	for _, reassignment := range reassignments {
 		if reassignment.Direct && owned[reassignment.Target] {
@@ -526,15 +526,15 @@ func immutabilityFilterOwned(reassignments []immutabilityReassignment, owned map
 
 func newImmutabilityState() *immutabilityState {
 	return &immutabilityState{
-		values:               map[hir.IdentifierId]immutabilityAbstractValue{},
-		aliases:              map[hir.IdentifierId]hir.IdentifierId{},
-		declarations:         map[hir.IdentifierId]hir.DeclarationId{},
-		byDeclaration:        map[hir.DeclarationId]hir.IdentifierId{},
-		names:                map[hir.IdentifierId]string{},
-		functionsReassigning: map[hir.IdentifierId][]immutabilityReassignment{},
-		functionCaptures:     map[hir.IdentifierId][]hir.IdentifierId{},
-		aggregateElements:    map[hir.IdentifierId][]hir.IdentifierId{},
-		frozenInsideLoop:     map[hir.IdentifierId]bool{},
+		values:               map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue{},
+		aliases:              map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId{},
+		declarations:         map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.DeclarationId{},
+		byDeclaration:        map[high_level_intermediate_representation.DeclarationId]high_level_intermediate_representation.IdentifierId{},
+		names:                map[high_level_intermediate_representation.IdentifierId]string{},
+		functionsReassigning: map[high_level_intermediate_representation.IdentifierId][]immutabilityReassignment{},
+		functionCaptures:     map[high_level_intermediate_representation.IdentifierId][]high_level_intermediate_representation.IdentifierId{},
+		aggregateElements:    map[high_level_intermediate_representation.IdentifierId][]high_level_intermediate_representation.IdentifierId{},
+		frozenInsideLoop:     map[high_level_intermediate_representation.IdentifierId]bool{},
 	}
 }
 
@@ -543,7 +543,7 @@ func newImmutabilityState() *immutabilityState {
 // Bounded rather than a bare loop: an alias chain is acyclic by construction in single-assignment
 // form, but this pass also seeds aliases from a declaration fallback, and a defensive bound costs
 // nothing next to a hang in a linter.
-func (state *immutabilityState) resolve(id hir.IdentifierId) hir.IdentifierId {
+func (state *immutabilityState) resolve(id high_level_intermediate_representation.IdentifierId) high_level_intermediate_representation.IdentifierId {
 	current := id
 	for round := 0; round < 32; round++ {
 		next, found := state.aliases[current]
@@ -556,7 +556,7 @@ func (state *immutabilityState) resolve(id hir.IdentifierId) hir.IdentifierId {
 }
 
 // alias records that one binding names the same value as another.
-func (state *immutabilityState) alias(from hir.IdentifierId, to hir.IdentifierId) {
+func (state *immutabilityState) alias(from high_level_intermediate_representation.IdentifierId, to high_level_intermediate_representation.IdentifierId) {
 	resolved := state.resolve(to)
 	if resolved == from {
 		return
@@ -573,7 +573,7 @@ func (state *immutabilityState) alias(from hir.IdentifierId, to hir.IdentifierId
 // Mutable is the default rather than a bottom element because an unseen value is one this code has
 // not been shown to have frozen, and the rule reports only on freezing. Defaulting to anything
 // else would report values nothing had frozen.
-func (state *immutabilityState) kindOf(id hir.IdentifierId) immutabilityAbstractValue {
+func (state *immutabilityState) kindOf(id high_level_intermediate_representation.IdentifierId) immutabilityAbstractValue {
 	resolved := state.resolve(id)
 	if found, ok := state.values[resolved]; ok {
 		return found
@@ -596,7 +596,7 @@ func (state *immutabilityState) kindOf(id hir.IdentifierId) immutabilityAbstract
 // This is the convergence test and it deliberately ignores the reason set. See the rule comment:
 // reasons only ever grow, so counting a reason arrival as movement makes any function with a loop
 // burn the whole bound.
-func (state *immutabilityState) setKind(id hir.IdentifierId, value immutabilityAbstractValue) {
+func (state *immutabilityState) setKind(id high_level_intermediate_representation.IdentifierId, value immutabilityAbstractValue) {
 	resolved := state.resolve(id)
 	previous, existed := state.values[resolved]
 	merged := value
@@ -616,7 +616,7 @@ func (state *immutabilityState) setKind(id hir.IdentifierId, value immutabilityA
 //
 // A value that is already Frozen, Global or Primitive is left alone, matching upstream's `freeze`:
 // re-freezing an already-frozen value must not count as movement or the fixpoint never settles.
-func (state *immutabilityState) freeze(id hir.IdentifierId, reason immutabilityReason) {
+func (state *immutabilityState) freeze(id high_level_intermediate_representation.IdentifierId, reason immutabilityReason) {
 	current := state.kindOf(id)
 	switch current.Kind {
 	case immutabilityFrozen, immutabilityGlobal, immutabilityPrimitive:
@@ -644,7 +644,7 @@ func (state *immutabilityState) freeze(id hir.IdentifierId, reason immutabilityR
 // elements. Both maps are removed for the duration of the descent rather than guarded by a visited
 // set, so a structure that contains itself cannot recurse forever, and are restored afterwards so a
 // second freeze for a different reason still reaches inside.
-func (state *immutabilityState) freezeInward(id hir.IdentifierId, reason immutabilityReason) {
+func (state *immutabilityState) freezeInward(id high_level_intermediate_representation.IdentifierId, reason immutabilityReason) {
 	resolved := state.resolve(id)
 	captures, hasCaptures := state.functionCaptures[resolved]
 	elements, hasElements := state.aggregateElements[resolved]
@@ -668,7 +668,7 @@ func (state *immutabilityState) freezeInward(id hir.IdentifierId, reason immutab
 }
 
 // noteDeclaration records which source binding a value belongs to.
-func (state *immutabilityState) noteDeclaration(function *hir.Function, id hir.IdentifierId) {
+func (state *immutabilityState) noteDeclaration(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return
 	}
@@ -681,7 +681,7 @@ func (state *immutabilityState) noteDeclaration(function *hir.Function, id hir.I
 }
 
 // nameOf is the value's own binding name, or the one a load carried onto it.
-func (state *immutabilityState) nameOf(function *hir.Function, id hir.IdentifierId) string {
+func (state *immutabilityState) nameOf(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.IdentifierId) string {
 	// `function` is nil at one call site, where only the side maps are wanted. `immutability
 	// IdentifierName` already declines a nil function rather than panicking, so this is safe and is
 	// stated here because a nil receiver in a name lookup reads like an oversight.
@@ -709,7 +709,7 @@ func (state *immutabilityState) nameOf(function *hir.Function, id hir.Identifier
 // early return, which is sound there because its diagnostics are per-function. Here upstream keeps
 // analysing and reports every distinct mutation, and the imported corpus contains functions with
 // two and three findings, so returning early would drop them.
-func immutabilitySweepFunction(ctx rule.Context, function *hir.Function) []immutabilityFinding {
+func immutabilitySweepFunction(ctx rule.Context, function *high_level_intermediate_representation.Function) []immutabilityFinding {
 	state := newImmutabilityState()
 	immutabilityCollectAliases(function, state)
 
@@ -731,7 +731,7 @@ func immutabilitySweepFunction(ctx rule.Context, function *hir.Function) []immut
 	// before the first instruction ran. That is the whole seeding bug: every props fixture went
 	// silent at once and every ordering fixture kept passing, which reads as a props-specific defect
 	// and is really a lifetime one.
-	entry := map[hir.IdentifierId]immutabilityAbstractValue{}
+	entry := map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue{}
 	immutabilitySeedParameters(function, entry)
 	// A function with no back edge settles in ONE round: `Function.Blocks` is in reverse postorder,
 	// so a single forward pass already visits every definition before every use. Iterating such a
@@ -745,7 +745,7 @@ func immutabilitySweepFunction(ctx rule.Context, function *hir.Function) []immut
 	}
 	var findings []immutabilityFinding
 	for iteration := 0; iteration < rounds; iteration++ {
-		state.values = map[hir.IdentifierId]immutabilityAbstractValue{}
+		state.values = map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue{}
 		for id, value := range entry {
 			state.values[id] = value
 		}
@@ -795,7 +795,7 @@ func immutabilitySweepFunction(ctx rule.Context, function *hir.Function) []immut
 // Destructuring is handled by the ordinary instruction arms rather than here: a destructured
 // parameter lowers to a temporary in `Params` plus destructuring instructions in the entry block,
 // so freezing the temporary reaches every bound name through `Destructure`.
-func immutabilitySeedParameters(function *hir.Function, entry map[hir.IdentifierId]immutabilityAbstractValue) {
+func immutabilitySeedParameters(function *high_level_intermediate_representation.Function, entry map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue) {
 	for _, param := range function.Params {
 		entry[param.Identifier] = immutabilityAbstractValue{
 			Kind:    immutabilityFrozen,
@@ -808,7 +808,7 @@ func immutabilitySeedParameters(function *hir.Function, entry map[hir.Identifier
 //
 // Gathered once rather than per round because aliasing is a syntactic fact that does not depend on
 // the abstract state, and because a use can precede its definition across a back edge.
-func immutabilityCollectAliases(function *hir.Function, state *immutabilityState) {
+func immutabilityCollectAliases(function *high_level_intermediate_representation.Function, state *immutabilityState) {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := immutabilityInstructionAt(function, instructionId)
@@ -816,30 +816,30 @@ func immutabilityCollectAliases(function *hir.Function, state *immutabilityState
 				continue
 			}
 			state.noteDeclaration(function, instruction.LValue.Identifier)
-			hir.EachInstructionPlace(instruction, func(place hir.Place, role hir.PlaceRole) {
+			high_level_intermediate_representation.EachInstructionPlace(instruction, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 				state.noteDeclaration(function, place.Identifier)
 			})
 			switch value := instruction.Value.(type) {
-			case *hir.LoadLocal:
+			case *high_level_intermediate_representation.LoadLocal:
 				state.alias(instruction.LValue.Identifier, value.Place.Identifier)
 				if name := immutabilityIdentifierName(function, value.Place.Identifier); name != "" {
 					state.names[instruction.LValue.Identifier] = name
 				}
-			case *hir.LoadContext:
+			case *high_level_intermediate_representation.LoadContext:
 				state.alias(instruction.LValue.Identifier, value.Place.Identifier)
 				if name := immutabilityIdentifierName(function, value.Place.Identifier); name != "" {
 					state.names[instruction.LValue.Identifier] = name
 				}
-			case *hir.StoreLocal:
+			case *high_level_intermediate_representation.StoreLocal:
 				state.alias(instruction.LValue.Identifier, value.Value.Identifier)
 				state.alias(value.LValue.Identifier, value.Value.Identifier)
-			case *hir.StoreContext:
+			case *high_level_intermediate_representation.StoreContext:
 				state.alias(value.LValue.Identifier, value.Value.Identifier)
 				state.alias(instruction.LValue.Identifier, value.Value.Identifier)
-			case *hir.TypeCastExpression:
+			case *high_level_intermediate_representation.TypeCastExpression:
 				// A cast is a no-op at runtime, so the cast value and its operand are one value.
 				state.alias(instruction.LValue.Identifier, value.Value.Identifier)
-			case *hir.LoadGlobal:
+			case *high_level_intermediate_representation.LoadGlobal:
 				state.names[instruction.LValue.Identifier] = value.Name
 			}
 		}
@@ -863,7 +863,7 @@ func immutabilityCollectAliases(function *hir.Function, state *immutabilityState
 // control that reports. A hook building a value and returning it is what hooks are for; the freeze
 // that matters is the one the CALLER applies when it receives the value, and that is already
 // modelled at the call site by `immutabilityHookResultKind`.
-func immutabilityRunOneRound(ctx rule.Context, function *hir.Function, state *immutabilityState) []immutabilityFinding {
+func immutabilityRunOneRound(ctx rule.Context, function *high_level_intermediate_representation.Function, state *immutabilityState) []immutabilityFinding {
 	var findings []immutabilityFinding
 	order := 0
 
@@ -888,7 +888,7 @@ func immutabilityRunOneRound(ctx rule.Context, function *hir.Function, state *im
 	// operands are defined by instructions and resolving every phi first would read them before they
 	// held anything. Keyed by the block's first instruction so the resolution lands in source order
 	// with everything else.
-	phiAt := map[hir.InstructionId][]*hir.Phi{}
+	phiAt := map[high_level_intermediate_representation.InstructionId][]*high_level_intermediate_representation.Phi{}
 	for _, block := range function.Blocks {
 		if len(block.Phis) == 0 || len(block.Instructions) == 0 {
 			continue
@@ -896,24 +896,24 @@ func immutabilityRunOneRound(ctx rule.Context, function *hir.Function, state *im
 		phiAt[block.Instructions[0]] = block.Phis
 	}
 	// Which block each instruction belongs to, so the loop flag still follows the instruction.
-	blockOfInstruction := make(map[hir.InstructionId]hir.BlockId, len(function.Instructions))
+	blockOfInstruction := make(map[high_level_intermediate_representation.InstructionId]high_level_intermediate_representation.BlockId, len(function.Instructions))
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			blockOfInstruction[instructionId] = block.Id
 		}
 	}
 	for instructionId := 0; instructionId < len(function.Instructions); instructionId++ {
-		instruction := immutabilityInstructionAt(function, hir.InstructionId(instructionId))
+		instruction := immutabilityInstructionAt(function, high_level_intermediate_representation.InstructionId(instructionId))
 		if instruction == nil {
 			continue
 		}
-		blockId, reachable := blockOfInstruction[hir.InstructionId(instructionId)]
+		blockId, reachable := blockOfInstruction[high_level_intermediate_representation.InstructionId(instructionId)]
 		if !reachable {
 			// An instruction in no block is unreachable code that lowering left in the table.
 			continue
 		}
 		state.insideLoop = loopBlocks[blockId]
-		for _, phi := range phiAt[hir.InstructionId(instructionId)] {
+		for _, phi := range phiAt[high_level_intermediate_representation.InstructionId(instructionId)] {
 			// `Phi.Operands` is a Go map, so this ranges in a nondeterministic order. The join is
 			// commutative and associative and the reason set is a bitset union, so the merged
 			// result is order-independent by construction. Nothing here may read "the first
@@ -986,9 +986,9 @@ func immutabilityDeduplicate(findings []immutabilityFinding) []immutabilityFindi
 // an access rule, which is why the two neighbours differ.
 func immutabilityTransfer(
 	ctx rule.Context,
-	function *hir.Function,
+	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
-	instruction *hir.Instruction,
+	instruction *high_level_intermediate_representation.Instruction,
 	findings []immutabilityFinding,
 	order *int,
 ) []immutabilityFinding {
@@ -1001,7 +1001,7 @@ func immutabilityTransfer(
 	// JSX freezes every value it interpolates: React has read it to render, so a later write
 	// changes what the program sees and not what React saw. Measured: the same mutation BEFORE the
 	// JSX is clean and after it reports.
-	case *hir.JsxExpression:
+	case *high_level_intermediate_representation.JsxExpression:
 		for _, attribute := range value.Props {
 			// A callback handed to JSX is held by React past the end of this render, exactly as one
 			// handed to a hook is, so the known-mutable-function check belongs here too. Measured:
@@ -1018,7 +1018,7 @@ func immutabilityTransfer(
 		}
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityFrozen, Reasons: immutabilityReasonJsxCaptured})
 
-	case *hir.JsxFragment:
+	case *high_level_intermediate_representation.JsxFragment:
 		for _, child := range value.Children {
 			state.freeze(child.Identifier, immutabilityReasonJsxCaptured)
 		}
@@ -1026,16 +1026,16 @@ func immutabilityTransfer(
 
 	// --- Writing ----------------------------------------------------------
 
-	case *hir.PropertyStore:
+	case *high_level_intermediate_representation.PropertyStore:
 		findings = immutabilityCheckWrite(ctx, function, state, value.Object.Identifier, instruction.Node, findings, order)
 
-	case *hir.ComputedStore:
+	case *high_level_intermediate_representation.ComputedStore:
 		findings = immutabilityCheckWrite(ctx, function, state, value.Object.Identifier, instruction.Node, findings, order)
 
-	case *hir.PropertyDelete:
+	case *high_level_intermediate_representation.PropertyDelete:
 		findings = immutabilityCheckWrite(ctx, function, state, value.Object.Identifier, instruction.Node, findings, order)
 
-	case *hir.ComputedDelete:
+	case *high_level_intermediate_representation.ComputedDelete:
 		findings = immutabilityCheckWrite(ctx, function, state, value.Object.Identifier, instruction.Node, findings, order)
 
 	// `props.count++` and `props.count += 1` are deliberately NOT handled here, and the reason is a
@@ -1052,19 +1052,19 @@ func immutabilityTransfer(
 	// A write to a global binding is upstream's `global_reassignment`, which carries the Globals
 	// category rather than this one, so it is deliberately not reported here. The GLOBAL VALUE's
 	// kind is still recorded, because a property store THROUGH a global does belong to this rule.
-	case *hir.StoreGlobal:
+	case *high_level_intermediate_representation.StoreGlobal:
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityGlobal, Reasons: immutabilityReasonGlobal})
 
 	// --- Propagating ------------------------------------------------------
 
 	// A global read is a value declared outside the component. Writing through one reports with the
 	// "defined outside a component or hook" reason.
-	case *hir.LoadGlobal:
+	case *high_level_intermediate_representation.LoadGlobal:
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityGlobal, Reasons: immutabilityReasonGlobal})
 
 	// A property load off a frozen value is itself frozen, which is what makes `props.a.q = 1`
 	// report: the intermediate `props.a` inherits the freeze from `props`.
-	case *hir.PropertyLoad:
+	case *high_level_intermediate_representation.PropertyLoad:
 		state.setKind(target, immutabilityPropagate(state, value.Object.Identifier))
 		if name := immutabilityIdentifierName(function, value.Object.Identifier); name != "" {
 			state.names[target] = name
@@ -1072,15 +1072,15 @@ func immutabilityTransfer(
 			state.names[target] = carried
 		}
 
-	case *hir.ComputedLoad:
+	case *high_level_intermediate_representation.ComputedLoad:
 		state.setKind(target, immutabilityPropagate(state, value.Object.Identifier))
 
 	// Destructuring distributes the source's kind to every bound name, which is how a destructured
 	// parameter's members become frozen without a per-member rule.
-	case *hir.Destructure:
+	case *high_level_intermediate_representation.Destructure:
 		carried := immutabilityPropagate(state, value.Value.Identifier)
-		hir.EachPlace(instruction.Value, func(place hir.Place, role hir.PlaceRole) {
-			if role == hir.PlaceRoleDefine {
+		high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
+			if role == high_level_intermediate_representation.PlaceRoleDefine {
 				state.setKind(place.Identifier, carried)
 			}
 		})
@@ -1091,27 +1091,27 @@ func immutabilityTransfer(
 	// makes `useMemo(() => 1, [o]); o.a = 1;` report: the freeze lands on the dependency array and
 	// has to travel one hop inward to reach `o`. Without that hop the array froze and the value it
 	// named did not, and the fixture read as a missing hook rather than as a missing edge.
-	case *hir.ObjectExpression, *hir.ArrayExpression:
-		elements := []hir.IdentifierId{}
-		hir.EachPlace(instruction.Value, func(place hir.Place, role hir.PlaceRole) {
+	case *high_level_intermediate_representation.ObjectExpression, *high_level_intermediate_representation.ArrayExpression:
+		elements := []high_level_intermediate_representation.IdentifierId{}
+		high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 			elements = append(elements, place.Identifier)
 		})
 		state.aggregateElements[state.resolve(target)] = elements
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityMutable})
 
-	case *hir.Primitive, *hir.BinaryExpression, *hir.TemplateLiteral:
+	case *high_level_intermediate_representation.Primitive, *high_level_intermediate_representation.BinaryExpression, *high_level_intermediate_representation.TemplateLiteral:
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityPrimitive})
 
 	// A nested function is analysed as an inner subject: which locals it reassigns is recorded on
 	// the VALUE, so the finding lands where the function is handed to React rather than at the
 	// reassignment. That is what makes the two reassignment diagnostics point where they do.
-	case *hir.FunctionExpression:
+	case *high_level_intermediate_representation.FunctionExpression:
 		findings = immutabilityNestedFunctionTransfer(ctx, function, state, value, target, findings, order)
 
-	case *hir.CallExpression:
+	case *high_level_intermediate_representation.CallExpression:
 		findings = immutabilityCallTransfer(ctx, function, state, instruction, value.Callee.Identifier, value.Args, target, findings, order)
 
-	case *hir.MethodCall:
+	case *high_level_intermediate_representation.MethodCall:
 		findings = immutabilityMethodCallTransfer(ctx, function, state, instruction, value, target, findings, order)
 
 	default:
@@ -1130,7 +1130,7 @@ func immutabilityTransfer(
 // A member of a PRIMITIVE is treated as mutable rather than primitive: reading a property off a
 // number yields undefined, not another primitive, and carrying `Primitive` forward would make a
 // later write silent for the wrong reason.
-func immutabilityPropagate(state *immutabilityState, object hir.IdentifierId) immutabilityAbstractValue {
+func immutabilityPropagate(state *immutabilityState, object high_level_intermediate_representation.IdentifierId) immutabilityAbstractValue {
 	current := state.kindOf(object)
 	if current.Kind == immutabilityPrimitive {
 		return immutabilityAbstractValue{Kind: immutabilityMutable}
@@ -1141,9 +1141,9 @@ func immutabilityPropagate(state *immutabilityState, object hir.IdentifierId) im
 // immutabilityCheckWrite asks the lattice what writing to a value does and reports when it must.
 func immutabilityCheckWrite(
 	ctx rule.Context,
-	function *hir.Function,
+	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
-	object hir.IdentifierId,
+	object high_level_intermediate_representation.IdentifierId,
 	node *ast.Node,
 	findings []immutabilityFinding,
 	order *int,
@@ -1198,7 +1198,7 @@ func immutabilityCheckWrite(
 // So the node wanted is the LEFT-HAND side of the member expression being written, which is the
 // instruction node's own object. Falling back to the instruction node keeps a finding rather than
 // dropping one when the shape is not a member expression.
-func immutabilityMutatedObjectNode(node *ast.Node, object hir.IdentifierId, function *hir.Function) *ast.Node {
+func immutabilityMutatedObjectNode(node *ast.Node, object high_level_intermediate_representation.IdentifierId, function *high_level_intermediate_representation.Function) *ast.Node {
 	if node == nil {
 		return immutabilityIdentifierNode(function, object)
 	}
@@ -1239,12 +1239,12 @@ func immutabilityMutatedObjectNode(node *ast.Node, object hir.IdentifierId, func
 // only freezes at boundaries it controls.
 func immutabilityCallTransfer(
 	ctx rule.Context,
-	function *hir.Function,
+	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
-	instruction *hir.Instruction,
-	callee hir.IdentifierId,
-	args []hir.Argument,
-	target hir.IdentifierId,
+	instruction *high_level_intermediate_representation.Instruction,
+	callee high_level_intermediate_representation.IdentifierId,
+	args []high_level_intermediate_representation.Argument,
+	target high_level_intermediate_representation.IdentifierId,
 	findings []immutabilityFinding,
 	order *int,
 ) []immutabilityFinding {
@@ -1319,7 +1319,7 @@ func immutabilityDependencyArrayIsExempt(name string) bool {
 // Note this is a lookup on the DEFINING instruction rather than on syntax: a value whose defining
 // instruction is an array literal is the exemption, and a value that merely happens to hold an
 // array is not.
-func immutabilityIsDependencyArray(function *hir.Function, state *immutabilityState, id hir.IdentifierId) bool {
+func immutabilityIsDependencyArray(function *high_level_intermediate_representation.Function, state *immutabilityState, id high_level_intermediate_representation.IdentifierId) bool {
 	resolved := state.resolve(id)
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
@@ -1330,7 +1330,7 @@ func immutabilityIsDependencyArray(function *hir.Function, state *immutabilitySt
 			if state.resolve(instruction.LValue.Identifier) != resolved {
 				continue
 			}
-			if _, isArray := instruction.Value.(*hir.ArrayExpression); isArray {
+			if _, isArray := instruction.Value.(*high_level_intermediate_representation.ArrayExpression); isArray {
 				return true
 			}
 		}
@@ -1376,11 +1376,11 @@ func immutabilityHookResultKind(name string) immutabilityAbstractValue {
 // would disagree with React on ordinary code.
 func immutabilityMethodCallTransfer(
 	ctx rule.Context,
-	function *hir.Function,
+	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
-	instruction *hir.Instruction,
-	value *hir.MethodCall,
-	target hir.IdentifierId,
+	instruction *high_level_intermediate_representation.Instruction,
+	value *high_level_intermediate_representation.MethodCall,
+	target high_level_intermediate_representation.IdentifierId,
 	findings []immutabilityFinding,
 	order *int,
 ) []immutabilityFinding {
@@ -1405,7 +1405,7 @@ func immutabilityMethodCallTransfer(
 // The representation gives a method call a Place for the property, but the property's NAME lives on
 // the syntax rather than on the value, so it is read back from the node. Identical in shape to
 // refs.go's helper and kept separate for the naming reason given at the top of this file.
-func immutabilityMethodName(instruction *hir.Instruction) string {
+func immutabilityMethodName(instruction *high_level_intermediate_representation.Instruction) string {
 	if instruction == nil || instruction.Node == nil {
 		return ""
 	}
@@ -1437,10 +1437,10 @@ func immutabilityMethodName(instruction *hir.Instruction) string {
 // inner walk here reads only names and syntax and never indexes the outer state by an inner id.
 func immutabilityNestedFunctionTransfer(
 	ctx rule.Context,
-	function *hir.Function,
+	function *high_level_intermediate_representation.Function,
 	state *immutabilityState,
-	value *hir.FunctionExpression,
-	target hir.IdentifierId,
+	value *high_level_intermediate_representation.FunctionExpression,
+	target high_level_intermediate_representation.IdentifierId,
 	findings []immutabilityFinding,
 	order *int,
 ) []immutabilityFinding {
@@ -1475,8 +1475,8 @@ func immutabilityNestedFunctionTransfer(
 	// carry different ids: measured on `let local = 0; const cb = () => { local = 1; };`, the
 	// capture arrives as context id 2 while the store writes id 6. An identifier comparison answers
 	// false for every real case and silences the rule completely, which is what it did on the first
-	// run of this check. `hir.Identifier.Declaration` is the identity that survives the renumbering.
-	owned := map[hir.DeclarationId]bool{}
+	// run of this check. `high_level_intermediate_representation.Identifier.Declaration` is the identity that survives the renumbering.
+	owned := map[high_level_intermediate_representation.DeclarationId]bool{}
 	for index := range value.Captures {
 		if index >= len(inner.Context) {
 			continue
@@ -1498,7 +1498,7 @@ func immutabilityNestedFunctionTransfer(
 	// `const o = {}; useEffect(() => { read(o); }, []); o.a = 1;` report while the same value named
 	// only in the dependency array stays clean. Both were measured; the pair is the fixture
 	// `f_useEffect_callback_captures` against `s_useEffect_dependency_array`.
-	captured := make([]hir.IdentifierId, 0, len(value.Captures))
+	captured := make([]high_level_intermediate_representation.IdentifierId, 0, len(value.Captures))
 	for _, capture := range value.Captures {
 		captured = append(captured, capture.Identifier)
 	}
@@ -1511,7 +1511,7 @@ func immutabilityNestedFunctionTransfer(
 //
 // Asked through the WRITE'S OWN SYNTAX rather than through the value's identifier, and that is the
 // whole trick. A property store's object is a temporary produced by a load, so
-// `hir.Identifier.Node` is nil for it and every type question asked that way answers nothing. The
+// `high_level_intermediate_representation.Identifier.Node` is nil for it and every type question asked that way answers nothing. The
 // member expression on the left of the assignment still names the object in source, and handing
 // THAT to the checker resolves.
 //
@@ -1522,7 +1522,7 @@ func immutabilityNestedFunctionTransfer(
 // One phrasing of the same question is blind and the other is not.
 //
 // A hand-written `react.d.ts` stub cannot reproduce this either way, which is why it was measured on
-// the real tree rather than in a fixture: `ruletest`'s tsconfig sets `types: []` and resolves no
+// the real tree rather than in a fixture: `rule_testing`'s tsconfig sets `types: []` and resolves no
 // `node_modules`, so `@types/react` never resolves there and every symbol is nil. The fixtures
 // therefore cannot see this exemption at all, and the two ref fixtures below pin the NAME half only.
 func immutabilityWriteTargetIsRef(ctx rule.Context, node *ast.Node) bool {
@@ -1592,14 +1592,14 @@ func immutabilityWriteTargetIsRef(ctx rule.Context, node *ast.Node) bool {
 func immutabilityCapturedWrites(
 	ctx rule.Context,
 	state *immutabilityState,
-	inner *hir.Function,
-	value *hir.FunctionExpression,
+	inner *high_level_intermediate_representation.Function,
+	value *high_level_intermediate_representation.FunctionExpression,
 	findings []immutabilityFinding,
 	order *int,
 ) []immutabilityFinding {
 	// Translate the outer kinds into the inner function's identifier space through the capture edge.
-	innerKinds := map[hir.IdentifierId]immutabilityAbstractValue{}
-	innerNames := map[hir.IdentifierId]string{}
+	innerKinds := map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue{}
+	innerNames := map[high_level_intermediate_representation.IdentifierId]string{}
 	for index, capture := range value.Captures {
 		if index >= len(inner.Context) {
 			continue
@@ -1609,8 +1609,8 @@ func immutabilityCapturedWrites(
 		innerNames[contextId] = state.nameOf(nil, capture.Identifier)
 	}
 	// An alias built inside the closure carries the captured value's kind along with it.
-	aliases := map[hir.IdentifierId]hir.IdentifierId{}
-	resolve := func(id hir.IdentifierId) hir.IdentifierId {
+	aliases := map[high_level_intermediate_representation.IdentifierId]high_level_intermediate_representation.IdentifierId{}
+	resolve := func(id high_level_intermediate_representation.IdentifierId) high_level_intermediate_representation.IdentifierId {
 		for round := 0; round < 32; round++ {
 			next, found := aliases[id]
 			if !found || next == id {
@@ -1627,23 +1627,23 @@ func immutabilityCapturedWrites(
 				continue
 			}
 			switch instructionValue := instruction.Value.(type) {
-			case *hir.LoadContext:
+			case *high_level_intermediate_representation.LoadContext:
 				aliases[instruction.LValue.Identifier] = instructionValue.Place.Identifier
-			case *hir.LoadLocal:
+			case *high_level_intermediate_representation.LoadLocal:
 				aliases[instruction.LValue.Identifier] = instructionValue.Place.Identifier
-			case *hir.PropertyLoad:
+			case *high_level_intermediate_representation.PropertyLoad:
 				// A member of a captured frozen value is frozen too, which is what reaches
 				// `props.a.q = 1` written inside a callback.
 				if carried, known := innerKinds[resolve(instructionValue.Object.Identifier)]; known {
 					innerKinds[instruction.LValue.Identifier] = carried
 				}
-			case *hir.PropertyStore:
+			case *high_level_intermediate_representation.PropertyStore:
 				findings = immutabilityCapturedWriteFinding(ctx, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
-			case *hir.ComputedStore:
+			case *high_level_intermediate_representation.ComputedStore:
 				findings = immutabilityCapturedWriteFinding(ctx, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
-			case *hir.PropertyDelete:
+			case *high_level_intermediate_representation.PropertyDelete:
 				findings = immutabilityCapturedWriteFinding(ctx, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
-			case *hir.ComputedDelete:
+			case *high_level_intermediate_representation.ComputedDelete:
 				findings = immutabilityCapturedWriteFinding(ctx, inner, innerKinds, innerNames, resolve(instructionValue.Object.Identifier), instruction, findings, order)
 			}
 		}
@@ -1654,11 +1654,11 @@ func immutabilityCapturedWrites(
 // immutabilityCapturedWriteFinding reports one write through a captured value when it is frozen.
 func immutabilityCapturedWriteFinding(
 	ctx rule.Context,
-	inner *hir.Function,
-	kinds map[hir.IdentifierId]immutabilityAbstractValue,
-	names map[hir.IdentifierId]string,
-	object hir.IdentifierId,
-	instruction *hir.Instruction,
+	inner *high_level_intermediate_representation.Function,
+	kinds map[high_level_intermediate_representation.IdentifierId]immutabilityAbstractValue,
+	names map[high_level_intermediate_representation.IdentifierId]string,
+	object high_level_intermediate_representation.IdentifierId,
+	instruction *high_level_intermediate_representation.Instruction,
 	findings []immutabilityFinding,
 	order *int,
 ) []immutabilityFinding {
@@ -1690,7 +1690,7 @@ func immutabilityCapturedWriteFinding(
 }
 
 // immutabilityNestedFunction resolves a function id within its parent.
-func immutabilityNestedFunction(function *hir.Function, id hir.FunctionId) *hir.Function {
+func immutabilityNestedFunction(function *high_level_intermediate_representation.Function, id high_level_intermediate_representation.FunctionId) *high_level_intermediate_representation.Function {
 	if function == nil || int(id) >= len(function.Functions) {
 		return nil
 	}
@@ -1707,12 +1707,12 @@ func immutabilityNestedFunction(function *hir.Function, id hir.FunctionId) *hir.
 // Recurses into further nested functions, because a callback inside a callback that reassigns an
 // outer local is the same finding. `error.invalid-nested-function-reassign-local-variable-in-effect`
 // is that shape.
-func immutabilityReassignmentsIn(function *hir.Function, isAsync bool) []immutabilityReassignment {
+func immutabilityReassignmentsIn(function *high_level_intermediate_representation.Function, isAsync bool) []immutabilityReassignment {
 	return immutabilityReassignmentsInner(function, isAsync, true)
 }
 
 // immutabilityReassignmentsInner carries whether this level is the immediate closure.
-func immutabilityReassignmentsInner(function *hir.Function, isAsync bool, direct bool) []immutabilityReassignment {
+func immutabilityReassignmentsInner(function *high_level_intermediate_representation.Function, isAsync bool, direct bool) []immutabilityReassignment {
 	if function == nil {
 		return nil
 	}
@@ -1724,7 +1724,7 @@ func immutabilityReassignmentsInner(function *hir.Function, isAsync bool, direct
 			if instruction == nil {
 				continue
 			}
-			store, isStore := instruction.Value.(*hir.StoreContext)
+			store, isStore := instruction.Value.(*high_level_intermediate_representation.StoreContext)
 			if !isStore {
 				continue
 			}
@@ -1732,7 +1732,7 @@ func immutabilityReassignmentsInner(function *hir.Function, isAsync bool, direct
 			if name == "" || seen[name] {
 				continue
 			}
-			declarationOf := hir.DeclarationId(0)
+			declarationOf := high_level_intermediate_representation.DeclarationId(0)
 			if int(store.LValue.Identifier) < len(function.Identifiers) {
 				if identifier := function.Identifiers[store.LValue.Identifier]; identifier != nil {
 					declarationOf = identifier.Declaration
@@ -1768,7 +1768,7 @@ func immutabilityReassignmentsInner(function *hir.Function, isAsync bool, direct
 // function is handed over, which is why React emits two diagnostics for a single such callback.
 func immutabilityCheckFrozenFunction(
 	state *immutabilityState,
-	id hir.IdentifierId,
+	id high_level_intermediate_representation.IdentifierId,
 	node *ast.Node,
 	findings []immutabilityFinding,
 	order *int,
@@ -1904,7 +1904,7 @@ func immutabilityMessageFor(finding immutabilityFinding) rule.Message {
 // Through `ctx.ReportNode` rather than a Place's range, because a Place's range is the range of the
 // node that produced the INSTRUCTION, and reporting through the node routes via `rule.TokenRange`,
 // which trims leading trivia at the harness.
-func immutabilityReport(ctx rule.Context, function *hir.Function, finding immutabilityFinding) {
+func immutabilityReport(ctx rule.Context, function *high_level_intermediate_representation.Function, finding immutabilityFinding) {
 	message := immutabilityMessageFor(finding)
 	if finding.Node != nil {
 		ctx.ReportNode(finding.Node, message)
@@ -1921,8 +1921,8 @@ func immutabilityReport(ctx rule.Context, function *hir.Function, finding immuta
 // that ordering is a back edge and the function contains a loop. Asked by position rather than by
 // walking terminals, because every terminal shape would otherwise have to be enumerated and a new
 // one would silently answer false.
-func immutabilityHasBackEdge(function *hir.Function) bool {
-	position := make(map[hir.BlockId]int, len(function.Blocks))
+func immutabilityHasBackEdge(function *high_level_intermediate_representation.Function) bool {
+	position := make(map[high_level_intermediate_representation.BlockId]int, len(function.Blocks))
 	for index, block := range function.Blocks {
 		position[block.Id] = index
 	}
@@ -1952,11 +1952,11 @@ func immutabilityHasBackEdge(function *hir.Function) bool {
 //
 // The property name is checked too, because the exemption is for writing a ref's `current` and not
 // for writing arbitrary properties onto a ref object.
-func immutabilityIsRefValue(ctx rule.Context, function *hir.Function, state *immutabilityState, id hir.IdentifierId) bool {
+func immutabilityIsRefValue(ctx rule.Context, function *high_level_intermediate_representation.Function, state *immutabilityState, id high_level_intermediate_representation.IdentifierId) bool {
 	if ctx.TypeChecker == nil || function == nil {
 		return false
 	}
-	for _, candidate := range [2]hir.IdentifierId{id, state.resolve(id)} {
+	for _, candidate := range [2]high_level_intermediate_representation.IdentifierId{id, state.resolve(id)} {
 		node := immutabilityIdentifierNode(function, candidate)
 		if node == nil {
 			continue
@@ -1993,14 +1993,14 @@ func immutabilityIsRefValue(ctx rule.Context, function *hir.Function, state *imm
 // swept b5 in, so the `useThing` freeze counted as happening inside the loop and travelled back into
 // the body on the next round, reporting the writes that built the accumulator. The predecessor walk
 // gets b5 right because b5 cannot reach the latch.
-func immutabilityLoopBlocks(function *hir.Function) map[hir.BlockId]bool {
-	position := make(map[hir.BlockId]int, len(function.Blocks))
-	byId := make(map[hir.BlockId]*hir.BasicBlock, len(function.Blocks))
+func immutabilityLoopBlocks(function *high_level_intermediate_representation.Function) map[high_level_intermediate_representation.BlockId]bool {
+	position := make(map[high_level_intermediate_representation.BlockId]int, len(function.Blocks))
+	byId := make(map[high_level_intermediate_representation.BlockId]*high_level_intermediate_representation.BasicBlock, len(function.Blocks))
 	for index, block := range function.Blocks {
 		position[block.Id] = index
 		byId[block.Id] = block
 	}
-	inside := map[hir.BlockId]bool{}
+	inside := map[high_level_intermediate_representation.BlockId]bool{}
 	for index, header := range function.Blocks {
 		for _, predecessor := range header.Predecessors {
 			at, known := position[predecessor]
@@ -2010,7 +2010,7 @@ func immutabilityLoopBlocks(function *hir.Function) map[hir.BlockId]bool {
 			// `predecessor` is a latch and `header` is the loop header. Walk backwards from the
 			// latch through predecessors, stopping at the header, to collect the loop body.
 			inside[header.Id] = true
-			pending := []hir.BlockId{predecessor}
+			pending := []high_level_intermediate_representation.BlockId{predecessor}
 			for len(pending) > 0 {
 				current := pending[len(pending)-1]
 				pending = pending[:len(pending)-1]

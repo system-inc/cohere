@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // objectConstructorFile is where the fixtures pretend to live.
@@ -87,7 +87,7 @@ func TestNoObjectConstructorFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(strings.Join(strings.Fields(testCase.sourceText), " "), func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoObjectConstructor, objectConstructorFile,
+			result := rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -144,7 +144,7 @@ func TestNoObjectConstructorStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoObjectConstructor,
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjectConstructor,
 				objectConstructorFile, testCase.sourceText))
 		})
 	}
@@ -157,7 +157,7 @@ func TestNoObjectConstructorStaysSilent(t *testing.T) {
 // reports nothing. Every other rule in this batch skips parentheses, so this is written down rather
 // than left for the next reader to "fix".
 func TestNoObjectConstructorDeclinesAParenthesizedCallee(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.RunTyped(t, NoObjectConstructor, objectConstructorFile,
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
 		"(Object)();"))
 }
 
@@ -165,10 +165,10 @@ func TestNoObjectConstructorDeclinesAParenthesizedCallee(t *testing.T) {
 func TestNoObjectConstructorNeedsTheTypedHarness(t *testing.T) {
 	const source = "Object();"
 
-	ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoObjectConstructor, objectConstructorFile,
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
 		source), "preferLiteral")
 
-	if got := len(ruletest.Run(t, NoObjectConstructor, objectConstructorFile,
+	if got := len(rule_testing.Run(t, NoObjectConstructor, objectConstructorFile,
 		source).Diagnostics); got != 0 {
 		t.Fatalf("the untyped harness produced %d diagnostics, so the nil-checker guard has moved "+
 			"and this test no longer measures what it claims", got)
@@ -177,7 +177,7 @@ func TestNoObjectConstructorNeedsTheTypedHarness(t *testing.T) {
 
 // The message, asserted against literals typed here rather than the rule's own constants.
 func TestNoObjectConstructorReportsWhyItMatters(t *testing.T) {
-	result := ruletest.RunTyped(t, NoObjectConstructor, objectConstructorFile, "Object();")
+	result := rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile, "Object();")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
@@ -197,7 +197,7 @@ func TestNoObjectConstructorReportsWhyItMatters(t *testing.T) {
 // Asserted as silence so that a later change making it report fails loudly and gets re-argued,
 // rather than sliding in as an improvement nobody measured.
 func TestNoObjectConstructorDeclinesInsideAWithBlock(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.RunTyped(t, NoObjectConstructor, objectConstructorFile,
+	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
 		"with (obj) Object();"))
 }
 
@@ -226,7 +226,7 @@ func TestNoObjectConstructorReportsTheWholeCall(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoObjectConstructor, objectConstructorFile,
+			result := rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

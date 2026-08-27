@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // thisBeforeSuperFile is where the fixtures pretend to live.
@@ -102,8 +102,8 @@ func TestNoThisBeforeSuperFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText),
 				"thisBeforeSuper")
 		})
 	}
@@ -214,8 +214,8 @@ func TestNoThisBeforeSuperStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText))
 		})
 	}
 }
@@ -255,7 +255,7 @@ func TestNoThisBeforeSuperReportsAtTheConstructor(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 			}
@@ -275,7 +275,7 @@ func TestNoThisBeforeSuperReportsAtTheConstructor(t *testing.T) {
 // breaks `-next-line` suppressions written above the constructor.
 func TestNoThisBeforeSuperSkipsLeadingTrivia(t *testing.T) {
 	source := "class A extends B {\n  // build it\n  constructor() { this.c = 0; }\n}"
-	result := ruletest.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, source)
+	result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 	}
@@ -293,7 +293,7 @@ func TestNoThisBeforeSuperSkipsLeadingTrivia(t *testing.T) {
 // exactly one, so counting cannot see this and only the span can.
 func TestNoThisBeforeSuperPicksTheOffendingNestedConstructor(t *testing.T) {
 	outerOffends := "class A extends B { constructor() { class C extends D { constructor() { super(); this.e(); } } this.f(); super(); } }"
-	result := ruletest.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, outerOffends)
+	result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, outerOffends)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("outer case: expected one finding, got %d", len(result.Diagnostics))
 	}
@@ -303,7 +303,7 @@ func TestNoThisBeforeSuperPicksTheOffendingNestedConstructor(t *testing.T) {
 	}
 
 	innerOffends := "class A extends B { constructor() { class C extends D { constructor() { this.e(); super(); } } super(); this.f(); } }"
-	result = ruletest.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, innerOffends)
+	result = rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, innerOffends)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("inner case: expected one finding, got %d", len(result.Diagnostics))
 	}
@@ -318,7 +318,7 @@ func TestNoThisBeforeSuperPicksTheOffendingNestedConstructor(t *testing.T) {
 // `ExpectFindings` matches the id, so a rule reporting the right id with a description that says
 // the wrong thing, or renders a placeholder unsubstituted, passes everything else here.
 func TestNoThisBeforeSuperMessage(t *testing.T) {
-	result := ruletest.Run(t, NoThisBeforeSuper, thisBeforeSuperFile,
+	result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile,
 		"class A extends B { constructor() { this.c = 0; } }")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
@@ -423,8 +423,8 @@ func TestNoThisBeforeSuperFiresOnCasesUpstreamOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText),
 				"thisBeforeSuper")
 		})
 	}
@@ -523,8 +523,8 @@ func TestNoThisBeforeSuperStaysSilentOnCasesUpstreamOmits(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText))
 		})
 	}
 }

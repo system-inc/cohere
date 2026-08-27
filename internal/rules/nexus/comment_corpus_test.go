@@ -8,7 +8,7 @@ import (
 )
 
 // The corpus is text scanning with no dependency on the comment scanner, which is why it stays here
-// while `comments.go` moved to `internal/utils/comments/`. `shouting_mask_gate_test.go` needs real
+// while `comments.go` moved to `internal/utilities/comments/`. `shouting_mask_gate_test.go` needs real
 // comment text to mask; it does not need the parser's view of where comments are.
 
 // realCommentCorpus collects comment lines from the tree, so a gate over comments is measured

@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // withFile is where the fixtures pretend to live.
@@ -18,8 +18,8 @@ const withFile = "/repository/source/With.ts"
 // This is the smallest corpus in the lane, so it protects least, and the cases written from reading
 // our own code below carry most of the weight.
 func TestNoWithFires(t *testing.T) {
-	ruletest.ExpectFindings(t,
-		ruletest.Run(t, NoWith, withFile, "with(foo) { bar() }"), "noWith")
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoWith, withFile, "with(foo) { bar() }"), "noWith")
 }
 
 // The clean cases are all the ways the four letters `with` reach a file without being the statement.
@@ -49,7 +49,7 @@ func TestNoWithStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoWith, withFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoWith, withFile, testCase.sourceText))
 		})
 	}
 }
@@ -65,8 +65,8 @@ func TestNoWithStaysSilent(t *testing.T) {
 // exists to catch. The rule carries no fix, so nothing else would have surfaced it either.
 func TestNoWithReportsTheKeywordAlone(t *testing.T) {
 	const sourceText = "with(foo) { bar() }"
-	result := ruletest.Run(t, NoWith, withFile, sourceText)
-	ruletest.ExpectFindings(t, result, "noWith")
+	result := rule_testing.Run(t, NoWith, withFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "noWith")
 
 	reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "with" {
@@ -83,8 +83,8 @@ func TestNoWithReportsTheKeywordAlone(t *testing.T) {
 // case here and this is the common one.
 func TestNoWithSkipsLeadingTrivia(t *testing.T) {
 	const sourceText = "function f() {\n  /* note */ with (foo) { bar() }\n}"
-	result := ruletest.Run(t, NoWith, withFile, sourceText)
-	ruletest.ExpectFindings(t, result, "noWith")
+	result := rule_testing.Run(t, NoWith, withFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "noWith")
 
 	reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "with" {
@@ -100,8 +100,8 @@ func TestNoWithSkipsLeadingTrivia(t *testing.T) {
 // inner span pins that the second finding is the inner keyword rather than a repeat of the outer.
 func TestNoWithReportsEveryStatementIncludingNested(t *testing.T) {
 	const sourceText = "with (a) { with (b) { c() } }"
-	result := ruletest.Run(t, NoWith, withFile, sourceText)
-	ruletest.ExpectFindings(t, result, "noWith", "noWith")
+	result := rule_testing.Run(t, NoWith, withFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "noWith", "noWith")
 
 	first := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	second := sourceText[result.Diagnostics[1].Range.Pos():result.Diagnostics[1].Range.End()]
@@ -138,8 +138,8 @@ func TestNoWithFiresInsideAModuleAndUnderUseStrict(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoWith, withFile, testCase.sourceText), "noWith")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoWith, withFile, testCase.sourceText), "noWith")
 		})
 	}
 }

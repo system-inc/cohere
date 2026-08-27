@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const optionsDeclarations = "import { networkService } from './NetworkService.ts';\n" +
@@ -112,7 +112,7 @@ func TestNetworkRequireHookOptionsParameterFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NetworkRequireHookOptionsParameter, optionsFile,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkRequireHookOptionsParameter, optionsFile,
 				optionsDeclarations+testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -181,7 +181,7 @@ func TestNetworkRequireHookOptionsParameterStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NetworkRequireHookOptionsParameter, optionsFile,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkRequireHookOptionsParameter, optionsFile,
 				optionsDeclarations+testCase.sourceText))
 		})
 	}

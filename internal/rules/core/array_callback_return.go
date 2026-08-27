@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/controlflow"
+	"github.com/system-inc/verify/internal/utilities/control_flow_graph"
 )
 
 // ArrayCallbackReturnOptions configures the three independent decisions this rule can make.
@@ -114,7 +114,7 @@ var messageArrayCallbackPrependVoid = rule.Message{
 // return true; })` reports and `foo.every(function() { if (a) return true; else return false; })`
 // does not, and the difference is whether any path reaches the closing brace. Upstream asks
 // `isAnySegmentReachable(funcInfo.currentSegments)` at the function's exit, which is code path
-// analysis. `internal/utils/controlflow` answers exactly that question with `Graph.EndReachable`,
+// analysis. `internal/utilities/controlflow` answers exactly that question with `Graph.EndReachable`,
 // whose doc comment names this as the question it exists for, so this rule is a caller rather than
 // a reimplementation.
 //
@@ -396,10 +396,10 @@ func isVoidExpression(node *ast.Node) bool {
 // arrayCallbackCanRunOffEnd reports whether control can reach the end of a callback's body.
 //
 // This is upstream's `isAnySegmentReachable(funcInfo.currentSegments)` at the function's exit, and
-// `controlflow.Graph.EndReachable` is documented as answering that exact question. A body whose
+// `control_flow_graph.Graph.EndReachable` is documented as answering that exact question. A body whose
 // every path returns or throws cannot fall through, so nothing is missing at the end of it.
 func arrayCallbackCanRunOffEnd(node *ast.Node) bool {
-	graph := controlflow.Build(node, controlflow.Hooks[struct{}]{})
+	graph := control_flow_graph.Build(node, control_flow_graph.Hooks[struct{}]{})
 	if graph == nil {
 		return true
 	}

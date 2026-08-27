@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const forbiddenImportFile = "/repository/source/components/Thing.tsx"
@@ -52,7 +52,7 @@ func TestNetworkNoForbiddenImportFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NetworkNoForbiddenImport, testCase.fileName,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoForbiddenImport, testCase.fileName,
 				testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -103,7 +103,7 @@ func TestNetworkNoForbiddenImportStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NetworkNoForbiddenImport, testCase.fileName,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkNoForbiddenImport, testCase.fileName,
 				testCase.sourceText))
 		})
 	}

@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/controlflow"
+	"github.com/system-inc/verify/internal/utilities/control_flow_graph"
 )
 
 var messageRequireAtomicUpdatesVariable = rule.Message{
@@ -250,7 +250,7 @@ var RequireAtomicUpdates = rule.Rule{
 	// identifier text and opposite verdicts.
 	//
 	// A mutant flipping this to false survives every fixture, and that is a property of the HARNESS
-	// rather than a gap in the fixtures: `ruletest.RunTyped` supplies a checker whatever the rule
+	// rather than a gap in the fixtures: `rule_testing.RunTyped` supplies a checker whatever the rule
 	// declares, so no rule test can observe the declaration. What the field actually controls is
 	// whether a real run acquires the checker for this file at all, so under-declaring it makes the
 	// rule go silent in production while staying green here. Recorded rather than left as an
@@ -352,7 +352,7 @@ func atomicUpdateRoots(sourceFile *ast.Node) []*ast.Node {
 		if node == nil {
 			return false
 		}
-		if controlflow.IsRoot(node) && canSuspend(node) {
+		if control_flow_graph.IsRoot(node) && canSuspend(node) {
 			roots = append(roots, node)
 		}
 		node.ForEachChild(visit)
@@ -399,8 +399,8 @@ func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings Requ
 	// would otherwise pay for it once per write.
 	escapes := map[*ast.Symbol]bool{}
 
-	graph := controlflow.Build(root, controlflow.Hooks[atomicEvent]{
-		Read: func(builder *controlflow.Builder[atomicEvent], node *ast.Node) {
+	graph := control_flow_graph.Build(root, control_flow_graph.Hooks[atomicEvent]{
+		Read: func(builder *control_flow_graph.Builder[atomicEvent], node *ast.Node) {
 			// The Read hook fires for a plain assignment target too, which `no-useless-assignment`
 			// measured and documented: `patternReads` reads a `KindIdentifier` target before the
 			// assigned expression. So what the occurrence IS comes from the AST, and the hook only
@@ -446,7 +446,7 @@ func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings Requ
 				builder.Emit(atomicEvent{kind: atomicStoreAnchor, symbol: symbol, target: node})
 			}
 		},
-		Expression: func(builder *controlflow.Builder[atomicEvent], node *ast.Node) {
+		Expression: func(builder *control_flow_graph.Builder[atomicEvent], node *ast.Node) {
 			// A suspension is recorded as a marker HERE, before its operand, and moved to its real
 			// position by `placeDeferredEvents`. The Expression hook is the only one the graph
 			// offers for an await or a yield, and it is pre-order, which is the wrong end.
@@ -462,7 +462,7 @@ func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings Requ
 				builder.Emit(atomicEvent{kind: atomicSuspend, target: node})
 			}
 		},
-		Write: func(builder *controlflow.Builder[atomicEvent], node *ast.Node) {
+		Write: func(builder *control_flow_graph.Builder[atomicEvent], node *ast.Node) {
 			recordAtomicWrite(builder, ctx, node, escapes, root)
 		},
 	})
@@ -474,9 +474,9 @@ func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings Requ
 	// reasoning for each is at `placeDeferredEvents`.
 	placeDeferredEvents(ctx, graph, escapes, root)
 
-	solution := controlflow.Solve[atomicReadState, atomicEvent](
+	solution := control_flow_graph.Solve[atomicReadState, atomicEvent](
 		graph,
-		controlflow.Forward,
+		control_flow_graph.Forward,
 		outdatedReadLattice{},
 	)
 
@@ -607,7 +607,7 @@ func (outdatedReadLattice) Meet(left, right atomicReadState) atomicReadState {
 }
 
 func (outdatedReadLattice) Transfer(
-	block *controlflow.Block[atomicEvent],
+	block *control_flow_graph.Block[atomicEvent],
 	incoming atomicReadState,
 ) atomicReadState {
 	state := incoming.clone()
@@ -639,7 +639,7 @@ func sameAtomicSymbolSet(left, right map[*ast.Symbol]bool) bool {
 // reporting walk that disagreed with the transfer would report against a state the fixed point never
 // produced. `no-useless-assignment` uses the same arrangement for the same reason.
 func applyAtomicTransfer(
-	block *controlflow.Block[atomicEvent],
+	block *control_flow_graph.Block[atomicEvent],
 	state atomicReadState,
 	onWrite func(atomicEvent),
 ) {
@@ -736,7 +736,7 @@ func assignmentLeftHandSide(assignment *ast.Node) *ast.Node {
 // been evaluated. That is what upstream achieves by deferring verification to the `:expression:exit`
 // of the assigned expression rather than checking at the identifier.
 func recordAtomicWrite(
-	builder *controlflow.Builder[atomicEvent],
+	builder *control_flow_graph.Builder[atomicEvent],
 	ctx rule.Context,
 	node *ast.Node,
 	escapes map[*ast.Symbol]bool,

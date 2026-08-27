@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Every rule in this package is run over shapes where a node it reaches for is legitimately absent.
@@ -110,7 +110,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 					"/repository/source/components/ThingRequest.tsx",
 					"/repository/app/thing/page.tsx",
 				} {
-					ruletest.Run(t, currentRule, fileName, source)
+					rule_testing.Run(t, currentRule, fileName, source)
 				}
 			})
 		}

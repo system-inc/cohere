@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // funcAssignFile is where the fixtures pretend to live.
@@ -49,8 +49,8 @@ func TestNoFuncAssignFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -84,8 +84,8 @@ func TestNoFuncAssignStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -126,7 +126,7 @@ func TestNoFuncAssignPointsAtTheWrite(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText)
+			result := rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
@@ -147,7 +147,7 @@ func TestNoFuncAssignPointsAtTheWrite(t *testing.T) {
 // `[]string{"foo", "foo"}` is satisfied by a rule reporting the same identifier twice, and a rule
 // looping over the wrong collection does exactly that. This pins that they are distinct offsets.
 func TestNoFuncAssignReportsEachWriteAtItsOwnOffset(t *testing.T) {
-	result := ruletest.RunTyped(t, NoFuncAssign, funcAssignFile, "function foo() {} foo = 0; foo = 1;")
+	result := rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, "function foo() {} foo = 0; foo = 1;")
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
 	}
@@ -157,7 +157,7 @@ func TestNoFuncAssignReportsEachWriteAtItsOwnOffset(t *testing.T) {
 	}
 }
 
-// The typed harness is load-bearing, and a revert to `ruletest.Run` must fail loudly.
+// The typed harness is load-bearing, and a revert to `rule_testing.Run` must fail loudly.
 //
 // This rule declares NeedsTypeChecker, so the plain harness hands it a nil checker and it goes
 // completely silent. Every StaysSilent case above would then pass for the wrong reason, and the
@@ -168,8 +168,8 @@ func TestNoFuncAssignNeedsTheTypedHarness(t *testing.T) {
 	if !NoFuncAssign.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
 	}
-	ruletest.ExpectClean(t,
-		ruletest.Run(t, NoFuncAssign, funcAssignFile, "function foo() {}; foo = bar;"))
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, NoFuncAssign, funcAssignFile, "function foo() {}; foo = bar;"))
 }
 
 // Cases written from reading our code rather than upstream's, each covering a write shape the
@@ -237,8 +237,8 @@ func TestNoFuncAssignCoversWriteShapesUpstreamNeverExercises(t *testing.T) {
 
 	for _, testCase := range fires {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -283,8 +283,8 @@ func TestNoFuncAssignCoversWriteShapesUpstreamNeverExercises(t *testing.T) {
 
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, testCase.sourceText))
 		})
 	}
 }

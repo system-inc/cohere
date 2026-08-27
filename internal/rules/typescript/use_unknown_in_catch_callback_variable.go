@@ -5,7 +5,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 // UseUnknownInCatchCallbackVariable flags a rejection callback whose error parameter is typed as
@@ -158,8 +158,8 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 			if handlerType == nil {
 				return false
 			}
-			for _, unionPart := range typecheck.UnionTypeParts(handlerType) {
-				for _, callSignature := range typecheck.GetCallSignatures(ctx.TypeChecker, unionPart) {
+			for _, unionPart := range type_checking.UnionTypeParts(handlerType) {
+				for _, callSignature := range type_checking.GetCallSignatures(ctx.TypeChecker, unionPart) {
 					parameters := checker.Signature_parameters(callSignature)
 					if len(parameters) == 0 {
 						continue
@@ -175,7 +175,7 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 					// array nor a tuple cannot be spread from a well-typed call at all, and
 					// upstream flags it outright rather than trying to look inside.
 					if declaration := firstParameter.ValueDeclaration; declaration != nil &&
-						typecheck.IsRestParameterDeclaration(declaration) {
+						type_checking.IsRestParameterDeclaration(declaration) {
 						switch {
 						case checker.Checker_isArrayType(ctx.TypeChecker, firstParameterType),
 							checker.IsTupleType(firstParameterType):
@@ -194,7 +194,7 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 						}
 					}
 
-					if !typecheck.IsTypeUnknownType(firstParameterType) {
+					if !type_checking.IsTypeUnknownType(firstParameterType) {
 						return true
 					}
 				}
@@ -297,7 +297,7 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 				// The receiver has to be thenable. Without this, any object with a `catch` method
 				// reports, and the corpus writes that object deliberately.
 				receiverType := ctx.TypeChecker.GetTypeAtLocation(receiver)
-				if !typecheck.IsThenableType(ctx.TypeChecker, callee, receiverType) {
+				if !type_checking.IsThenableType(ctx.TypeChecker, callee, receiverType) {
 					return
 				}
 
@@ -450,7 +450,7 @@ func useUnknownReport(ctx rule.Context, callback *ast.Node, methodName string, m
 		// A parenless arrow has nowhere to put an annotation, so the repair has to add the
 		// parentheses too. `err => {}` becomes `(err: unknown) => {}` rather than `err: unknown => {}`,
 		// which does not parse.
-		if ast.IsArrowFunction(callback) && typecheck.IsParenlessArrowFunction(callback) {
+		if ast.IsArrowFunction(callback) && type_checking.IsParenlessArrowFunction(callback) {
 			ctx.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
 				Message: buildAddUnknownTypeAnnotationMessage(),
 				Fixes: []rule.Fix{

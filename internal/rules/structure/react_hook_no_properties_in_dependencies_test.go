@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const propertiesInDependenciesFile = "/repository/source/components/Thing.tsx"
@@ -89,12 +89,12 @@ func TestReactHookNoPropertiesInDependenciesFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ReactHookNoPropertiesInDependencies, propertiesInDependenciesFile, testCase.sourceText)
+			result := rule_testing.Run(t, ReactHookNoPropertiesInDependencies, propertiesInDependenciesFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "extractPropertiesFirst"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -208,8 +208,8 @@ func TestReactHookNoPropertiesInDependenciesStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, ReactHookNoPropertiesInDependencies, testCase.fileName, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, ReactHookNoPropertiesInDependencies, testCase.fileName, testCase.sourceText))
 		})
 	}
 }
@@ -224,7 +224,7 @@ func TestReactHookNoPropertiesInDependenciesSkipsParenthesizedReceiver(t *testin
 	const sourceText = "function Thing(properties: { id: string }) {\n" +
 		"    (React).useEffect(() => { run(properties.id); }, [properties]);\n" +
 		"    return <div />;\n}\n"
-	result := ruletest.Run(t, ReactHookNoPropertiesInDependencies, propertiesInDependenciesFile, sourceText)
+	result := rule_testing.Run(t, ReactHookNoPropertiesInDependencies, propertiesInDependenciesFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Errorf("a parenthesized React receiver produced %d findings, want 1",
 			len(result.Diagnostics))

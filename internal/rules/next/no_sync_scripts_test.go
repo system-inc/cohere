@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestNoSyncScriptsReports(t *testing.T) {
@@ -36,8 +36,8 @@ func TestNoSyncScriptsReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoSyncScripts, "Component.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, messageNoSyncScripts.Id)
+			result := rule_testing.Run(t, NoSyncScripts, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, messageNoSyncScripts.Id)
 		})
 	}
 }
@@ -86,8 +86,8 @@ export const C = () => <Script src="/a.js" />;`,
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoSyncScripts, "Component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoSyncScripts, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

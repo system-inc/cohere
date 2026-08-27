@@ -3,7 +3,7 @@ package react
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // noDeprecatedFile is where the fixtures pretend to live.
@@ -174,7 +174,7 @@ func TestNoDeprecatedFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.descriptions) {
 				t.Fatalf("want %d findings, got %d: %v", len(testCase.descriptions),
 					len(result.Diagnostics), result.MessageIds())
@@ -271,8 +271,8 @@ func TestNoDeprecatedStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -322,11 +322,11 @@ func TestNoDeprecatedSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoDeprecated, noDeprecatedFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("want %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
-			// The harness does not trim for `ruletest.Run`, so the source on disk is the literal
+			// The harness does not trim for `rule_testing.Run`, so the source on disk is the literal
 			// above and slicing it directly is sound here. `RunTyped` would need the trim applied
 			// to the expectation first; this rule declares no checker and uses the untrimmed path.
 			source := testCase.sourceText
@@ -355,8 +355,8 @@ func TestNoDeprecatedHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.jsx",
 	} {
 		t.Run(fileName, func(t *testing.T) {
-			result := ruletest.Run(t, NoDeprecated, fileName, source)
-			ruletest.ExpectFindings(t, result, "deprecated")
+			result := rule_testing.Run(t, NoDeprecated, fileName, source)
+			rule_testing.ExpectFindings(t, result, "deprecated")
 		})
 	}
 }

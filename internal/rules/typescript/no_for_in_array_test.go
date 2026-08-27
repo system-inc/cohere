@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const noForInArrayFile = "/repository/source/ForIn.ts"
@@ -75,7 +75,7 @@ func TestNoForInArrayFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.RunTyped(t, NoForInArray,
+			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoForInArray,
 				noForInArrayFile, testCase.sourceText), "forInViolation")
 		})
 	}
@@ -99,7 +99,7 @@ func TestNoForInArrayStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoForInArray,
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoForInArray,
 				noForInArrayFile, testCase.sourceText))
 		})
 	}
@@ -140,7 +140,7 @@ func TestNoForInArrayNeedsBothHalvesOfThePredicate(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTyped(t, NoForInArray,
+			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoForInArray,
 				noForInArrayFile, testCase.sourceText))
 		})
 	}
@@ -162,11 +162,11 @@ func TestNoForInArrayDomCollections(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedFiles(t, NoForInArray, map[string]string{
+			result := rule_testing.RunTypedFiles(t, NoForInArray, map[string]string{
 				"ForIn.ts":      testCase.sourceText,
 				"DomGlobals.ts": domGlobals,
 			}, "ForIn.ts")
-			ruletest.ExpectFindings(t, result, "forInViolation")
+			rule_testing.ExpectFindings(t, result, "forInViolation")
 		})
 	}
 }
@@ -214,7 +214,7 @@ func TestNoForInArrayReportsTheLoopHead(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			// The harness trims the source, so offsets are against the trimmed text.
 			sourceText := strings.TrimSpace(testCase.sourceText)
-			result := ruletest.RunTyped(t, NoForInArray, noForInArrayFile, sourceText)
+			result := rule_testing.RunTyped(t, NoForInArray, noForInArrayFile, sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want exactly one finding to assert a span against, got %d", len(result.Diagnostics))
 			}
@@ -264,7 +264,7 @@ func lineAndColumnOf(sourceText string, offset int) (int, int) {
 // repair would be a real behavior change against oxlint, and without this it would go unnoticed:
 // every assertion above is satisfied by a finding that also carries a fix.
 func TestNoForInArrayCarriesNoRepair(t *testing.T) {
-	result := ruletest.RunTyped(t, NoForInArray, noForInArrayFile,
+	result := rule_testing.RunTyped(t, NoForInArray, noForInArrayFile,
 		"for (const x in [3, 4, 5]) {\n  console.log(x);\n}")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -283,7 +283,7 @@ func TestNoForInArrayCarriesNoRepair(t *testing.T) {
 // constant, because comparing a finding to the constant it was built from is an equality that moves
 // on both sides under mutation and therefore guards nothing.
 func TestNoForInArrayMessageText(t *testing.T) {
-	result := ruletest.RunTyped(t, NoForInArray, noForInArrayFile,
+	result := rule_testing.RunTyped(t, NoForInArray, noForInArrayFile,
 		"for (const x in [3, 4, 5]) {\n  console.log(x);\n}")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -327,7 +327,7 @@ func TestNoForInArrayRequiresTheTypedHarness(t *testing.T) {
 
 	// Drive the listener with a checker-less Context. It must return rather than reach the checker,
 	// and this is the only path that reaches that branch, since registration always supplies one.
-	typed := ruletest.RunTyped(t, NoForInArray, noForInArrayFile, "declare const arr: number[];\nfor (const key in arr) {\n}\n")
+	typed := rule_testing.RunTyped(t, NoForInArray, noForInArrayFile, "declare const arr: number[];\nfor (const key in arr) {\n}\n")
 	if len(typed.Diagnostics) != 1 {
 		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
 	}

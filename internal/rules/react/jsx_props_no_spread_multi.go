@@ -3,8 +3,8 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/property"
-	"github.com/system-inc/verify/internal/utils/jsx"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/property"
+	"github.com/system-inc/verify/internal/utilities/jsx"
 )
 
 var messageJsxPropsNoSpreadMultiIdentifier = rule.Message{
@@ -484,7 +484,7 @@ func isSameExpression(left *ast.Node, right *ast.Node) bool {
 // It lives here rather than on the shelf because exactly one caller wants it. `NameTagged`'s own doc
 // makes that argument for the key version, saying one caller needs it and the rest must not have it,
 // and the same holds one level up. If a second rule ever needs this, it should move to
-// `internal/utils/ecmascript/property/` rather than be copied, since two helpers doing almost the
+// `internal/utilities/ecmascript/property/` rather than be copied, since two helpers doing almost the
 // same thing is worse than one slightly wrong shape.
 //
 // The identifier-subscript decline is `AccessedName`'s and is kept deliberately: `o[k]` answers

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // upstreamPasses is oxc's pass list, copied byte for byte and verified against the Rust source
@@ -43,8 +43,8 @@ var upstreamFails = []string{
 // diagnostic per input, so each asserts exactly one id.
 func TestForwardRefUsesRefFiresOnUpstreamCorpus(t *testing.T) {
 	for _, source := range upstreamFails {
-		result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", source)
-		ruletest.ExpectFindings(t, result, "forwardRefUsesRef")
+		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", source)
+		rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
 	}
 }
 
@@ -57,8 +57,8 @@ func TestForwardRefUsesRefFiresOnUpstreamCorpus(t *testing.T) {
 // first and a port written as "not exactly two" fails the second.
 func TestForwardRefUsesRefStaysSilentOnUpstreamCorpus(t *testing.T) {
 	for _, source := range upstreamPasses {
-		result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -75,8 +75,8 @@ func TestForwardRefUsesRefPointsAtTheFunction(t *testing.T) {
 			"function (props) { return null; }"},
 		{"forwardRef(props => null);", "props => null"},
 	} {
-		result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", testCase.source)
-		ruletest.ExpectFindings(t, result, "forwardRefUsesRef")
+		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", testCase.source)
+		rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
 		reported := testCase.source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != testCase.want {
 			t.Errorf("reported %q, want %q", reported, testCase.want)
@@ -87,8 +87,8 @@ func TestForwardRefUsesRefPointsAtTheFunction(t *testing.T) {
 // TestForwardRefUsesRefRendersItsMessage asserts the rendered description exactly rather than by
 // substring, because a weaker predicate than the property it guards is not a guard.
 func TestForwardRefUsesRefRendersItsMessage(t *testing.T) {
-	result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef((props) => null);")
-	ruletest.ExpectFindings(t, result, "forwardRefUsesRef")
+	result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef((props) => null);")
+	rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
 	if result.Diagnostics[0].Message.Description != messageForwardRefUsesRef.Description {
 		t.Errorf("description was %q", result.Diagnostics[0].Message.Description)
 	}
@@ -141,8 +141,8 @@ func TestForwardRefUsesRefOffersUpstreamRepairs(t *testing.T) {
 		{"forwardRef(function(a, ) {})", "", "forwardRef(function(a, ref) {})"},
 		{"React.forwardRef(function(a) {})", "", "React.forwardRef(function(a, ref) {})"},
 	} {
-		result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", testCase.source)
-		ruletest.ExpectFindings(t, result, "forwardRefUsesRef")
+		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", testCase.source)
+		rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
 		suggestions := result.Diagnostics[0].Suggestions
 
 		wantCount := 1
@@ -195,8 +195,8 @@ func TestForwardRefUsesRefMatchesTheCalleeNameOnly(t *testing.T) {
 		"(React).forwardRef(function (c) {});",
 		"forwardRef(function (h) {}, extra);",
 	} {
-		result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", source)
-		ruletest.ExpectFindings(t, result, "forwardRefUsesRef")
+		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", source)
+		rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
 	}
 
 	for _, source := range []string{
@@ -212,8 +212,8 @@ func TestForwardRefUsesRefMatchesTheCalleeNameOnly(t *testing.T) {
 		"React[forwardRef](function (a) {});",
 		"React[key](function (a) {});",
 	} {
-		result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -230,8 +230,8 @@ func TestForwardRefUsesRefDeclinesParenthesesAtTheCalleeAndArgument(t *testing.T
 		"forwardRef((function (g) {}));",
 		"forwardRef(((a) => {}));",
 	} {
-		result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -243,8 +243,8 @@ func TestForwardRefUsesRefDeclinesParenthesesAtTheCalleeAndArgument(t *testing.T
 // removal suggestion. Measured by running oxlint with suggestions applied: the source came back as
 // `(forwardRef(function (a, ref) {}));`, the add-ref repair, rather than unwrapped.
 func TestForwardRefUsesRefSkipsParenthesesWalkingToTheStatement(t *testing.T) {
-	result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", "(forwardRef(function (a) {}));")
-	ruletest.ExpectFindings(t, result, "forwardRefUsesRef")
+	result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", "(forwardRef(function (a) {}));")
+	rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
 	if len(result.Diagnostics[0].Suggestions) != 1 {
 		t.Fatalf("offered %d suggestions, want only the add-ref one",
 			len(result.Diagnostics[0].Suggestions))
@@ -266,13 +266,13 @@ func TestForwardRefUsesRefCountsParametersTheWayOxcDoes(t *testing.T) {
 		"forwardRef((a, ...b) => {});",
 		"forwardRef((...a) => {});",
 	} {
-		result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", source)
+		rule_testing.ExpectClean(t, result)
 	}
 
 	// A `this` parameter is not counted, so `a` is the only real one and this reports.
-	result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef(function (this: any, a) {});")
-	ruletest.ExpectFindings(t, result, "forwardRefUsesRef")
+	result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef(function (this: any, a) {});")
+	rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
 
 	// One parameter is the whole reportable band. A destructured or defaulted parameter is still
 	// one parameter, so these report rather than being treated as a props-plus-ref shape.
@@ -284,8 +284,8 @@ func TestForwardRefUsesRefCountsParametersTheWayOxcDoes(t *testing.T) {
 		"forwardRef(async (a) => {});",
 		"forwardRef(function* (a) {});",
 	} {
-		result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", source)
-		ruletest.ExpectFindings(t, result, "forwardRefUsesRef")
+		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", source)
+		rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
 	}
 }
 
@@ -298,8 +298,8 @@ func TestForwardRefUsesRefDeclinesNonFunctionArguments(t *testing.T) {
 		"forwardRef({a: 1});",
 		"forwardRef(forwardRef);",
 	} {
-		result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", source)
-		ruletest.ExpectClean(t, result)
+		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", source)
+		rule_testing.ExpectClean(t, result)
 	}
 }
 
@@ -313,15 +313,15 @@ func TestForwardRefUsesRefDeclinesNonFunctionArguments(t *testing.T) {
 // suggestion is read by a human before it is applied. Measured by running oxlint with suggestions
 // applied, which rewrote the named case to `function Named(a) {};`.
 func TestForwardRefUsesRefWithholdsRemovalOnlyForAnonymousStatements(t *testing.T) {
-	anonymousStatement := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef(function (a) {});")
-	ruletest.ExpectFindings(t, anonymousStatement, "forwardRefUsesRef")
+	anonymousStatement := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef(function (a) {});")
+	rule_testing.ExpectFindings(t, anonymousStatement, "forwardRefUsesRef")
 	if len(anonymousStatement.Diagnostics[0].Suggestions) != 1 {
 		t.Errorf("anonymous statement offered %d suggestions, want 1",
 			len(anonymousStatement.Diagnostics[0].Suggestions))
 	}
 
-	namedStatement := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef(function Named(a) {});")
-	ruletest.ExpectFindings(t, namedStatement, "forwardRefUsesRef")
+	namedStatement := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef(function Named(a) {});")
+	rule_testing.ExpectFindings(t, namedStatement, "forwardRefUsesRef")
 	if len(namedStatement.Diagnostics[0].Suggestions) != 2 {
 		t.Fatalf("named statement offered %d suggestions, want 2",
 			len(namedStatement.Diagnostics[0].Suggestions))
@@ -331,8 +331,8 @@ func TestForwardRefUsesRefWithholdsRemovalOnlyForAnonymousStatements(t *testing.
 	}
 
 	// An arrow is never guarded: unwrapping leaves a valid expression statement.
-	arrowStatement := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef((a) => {});")
-	ruletest.ExpectFindings(t, arrowStatement, "forwardRefUsesRef")
+	arrowStatement := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef((a) => {});")
+	rule_testing.ExpectFindings(t, arrowStatement, "forwardRefUsesRef")
 	if len(arrowStatement.Diagnostics[0].Suggestions) != 2 {
 		t.Errorf("arrow statement offered %d suggestions, want 2",
 			len(arrowStatement.Diagnostics[0].Suggestions))
@@ -367,8 +367,8 @@ func TestForwardRefUsesRefRewritesAwkwardParameterLists(t *testing.T) {
 		{"const x = forwardRef( a => {})", "const x = forwardRef( (a, ref) => {})"},
 		{"const y = forwardRef(  b => {})", "const y = forwardRef(  (b, ref) => {})"},
 	} {
-		result := ruletest.Run(t, ForwardRefUsesRef, "input.tsx", testCase.source)
-		ruletest.ExpectFindings(t, result, "forwardRefUsesRef")
+		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", testCase.source)
+		rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
 		suggestions := result.Diagnostics[0].Suggestions
 		addRef := suggestions[len(suggestions)-1]
 		got := applySuggestion(testCase.source, addRef)

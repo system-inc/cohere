@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/hir"
+	"github.com/system-inc/verify/internal/utilities/high_level_intermediate_representation"
 )
 
 // messagePurityImpureCallId is the finding's id, and messagePurityImpureCallReason is everything
@@ -122,7 +122,7 @@ var purityGlobalContainers = map[string]bool{"globalThis": true, "global": true}
 // `r`, and no reading of the syntax at the call site can produce either. What upstream is doing is
 // following the VALUE: the impure signature is attached to the value loaded out of the global, and
 // it travels through assignment, reassignment and control flow to whatever eventually gets called.
-// That is single-assignment form with phi nodes, which is exactly what `internal/utils/hir` is.
+// That is single-assignment form with phi nodes, which is exactly what `internal/utilities/hir` is.
 //
 // So this rule uses the intermediate representation, and the decision was made by measuring the
 // alternative rather than by preferring the machinery. Three rules shipped the same day
@@ -150,7 +150,7 @@ var purityGlobalContainers = map[string]bool{"globalThis": true, "global": true}
 // # Why the type checker is declared when nothing here reads a type
 //
 // This rule asks no type question. It declares `NeedsTypeChecker` because LOWERING does: without a
-// checker, `internal/utils/hir` resolves every free identifier to `LoadGlobal` carrying a name, and
+// checker, `internal/utilities/hir` resolves every free identifier to `LoadGlobal` carrying a name, and
 // a shadowed binding becomes indistinguishable from the real global. Measured directly, with a nil
 // checker `function Component() { const Math = {random: () => 1}; return Math.random(); }` lowers
 // to `LoadGlobal Math` and this rule would report it; React is SILENT on that input, and so is this
@@ -236,8 +236,8 @@ var Purity = rule.Rule{
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
-					// Shared with the other rules that lower this same function; see hir.ForFunction.
-					lowered := hir.ForFunction(ctx, functionNode)
+					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
+					lowered := high_level_intermediate_representation.ForFunction(ctx, functionNode)
 					if lowered == nil {
 						return
 					}
@@ -253,7 +253,7 @@ var Purity = rule.Rule{
 // A declined function is descended into rather than skipped, because a component nested inside a
 // plain wrapper is still a unit. That is the same shape `set_state_in_render.go` uses and it is
 // upstream's traversal rather than a convenience.
-func purityAnalyzeSubject(ctx rule.Context, function *hir.Function) {
+func purityAnalyzeSubject(ctx rule.Context, function *high_level_intermediate_representation.Function) {
 	if function == nil {
 		return
 	}
@@ -290,7 +290,7 @@ type purityValue struct {
 	CanonicalName string
 	Node          *ast.Node
 	// Function is the nested function this value holds, set only for purityValueCallsImpure.
-	Function *hir.Function
+	Function *high_level_intermediate_representation.Function
 }
 
 // purityFindings is what one lowered function does when called, for the caller to re-raise.
@@ -314,14 +314,14 @@ type purityFinding struct {
 // declaration lowering did not give a local slot, so the wrapper in `const g = () => Math.random();
 // const f = () => g(); f();` sees `g` only if the enclosing values are visible to it. Measured on
 // React, that input REPORTS, and with per-function state it did not.
-func purityReportImpureCalls(ctx rule.Context, function *hir.Function, emit bool) []purityFinding {
+func purityReportImpureCalls(ctx rule.Context, function *high_level_intermediate_representation.Function, emit bool) []purityFinding {
 	unit := &purityUnit{
 		ctx:       ctx,
-		values:    map[hir.IdentifierId]purityValue{},
+		values:    map[high_level_intermediate_representation.IdentifierId]purityValue{},
 		byName:    map[string]purityValue{},
-		nested:    map[*hir.Function][]purityFinding{},
+		nested:    map[*high_level_intermediate_representation.Function][]purityFinding{},
 		reported:  map[*ast.Node]bool{},
-		analysing: map[*hir.Function]bool{},
+		analysing: map[*high_level_intermediate_representation.Function]bool{},
 	}
 	return unit.walk(function, emit)
 }
@@ -332,7 +332,7 @@ type purityUnit struct {
 	// values is the abstract state keyed by value. Single-assignment form makes one entry per
 	// value rather than per binding, which is what lets a forward walk be correct without a
 	// fixpoint.
-	values map[hir.IdentifierId]purityValue
+	values map[high_level_intermediate_representation.IdentifierId]purityValue
 	// byName is the same state keyed by SOURCE NAME, which is how a nested function reaches a
 	// binding declared in its parent. Lowering gives such a reference a `LoadGlobal` carrying the
 	// name rather than a local place, so the identifier in the child is not the identifier in the
@@ -340,10 +340,10 @@ type purityUnit struct {
 	byName map[string]purityValue
 	// nested is what each nested function does when called, computed on first call so an uncalled
 	// one costs nothing.
-	nested map[*hir.Function][]purityFinding
+	nested map[*high_level_intermediate_representation.Function][]purityFinding
 	// analysing guards recursion. Reachable through callbackArguments: a function passed as a
 	// callback to something it calls re-enters its own frame. See findingsOf.
-	analysing map[*hir.Function]bool
+	analysing map[*high_level_intermediate_representation.Function]bool
 	// reported is the set of nodes already reported in this unit. A wrapper called twice raises
 	// the same inner finding twice and React reports it ONCE, because the finding belongs to the
 	// site that raised it rather than to each caller.
@@ -351,7 +351,7 @@ type purityUnit struct {
 }
 
 // walk runs the forward pass over one function and returns what calling it does.
-func (unit *purityUnit) walk(function *hir.Function, emit bool) []purityFinding {
+func (unit *purityUnit) walk(function *high_level_intermediate_representation.Function, emit bool) []purityFinding {
 	if function == nil {
 		return nil
 	}
@@ -393,7 +393,7 @@ func (unit *purityUnit) walk(function *hir.Function, emit bool) []purityFinding 
 			// the operand from the latest-numbered predecessor. Blocks are in reverse postorder, so
 			// that is the write that appears last in the source, which is what React prints.
 			var merged purityValue
-			var mergedFrom hir.BlockId
+			var mergedFrom high_level_intermediate_representation.BlockId
 			for predecessor, operand := range phi.Operands {
 				incoming, ok := values[operand.Identifier]
 				if !ok || incoming.Kind == purityValueNothing {
@@ -425,13 +425,13 @@ func (unit *purityUnit) walk(function *hir.Function, emit bool) []purityFinding 
 // Split out of the block walk so the type switch reads as the transfer function it is, one arm per
 // instruction shape that moves a value.
 func (unit *purityUnit) step(
-	function *hir.Function,
-	instruction *hir.Instruction,
+	function *high_level_intermediate_representation.Function,
+	instruction *high_level_intermediate_representation.Instruction,
 	report func(purityFinding),
 ) {
 	values := unit.values
 	switch value := instruction.Value.(type) {
-	case *hir.LoadGlobal:
+	case *high_level_intermediate_representation.LoadGlobal:
 		// Only a TRUE global can be one of these. An import or a module-scope binding of the same
 		// name is a different thing and upstream models neither, which is what makes
 		// `import Math from './m'` silent.
@@ -455,23 +455,23 @@ func (unit *purityUnit) step(
 			values[instruction.LValue.Identifier] = known
 		}
 
-	case *hir.PropertyLoad:
+	case *high_level_intermediate_representation.PropertyLoad:
 		purityLoadProperty(function, instruction, values, value.Object, value.Property)
 
-	case *hir.Destructure:
+	case *high_level_intermediate_representation.Destructure:
 		// `const {random} = Math;` reports upstream, so destructuring has to carry the signature
 		// the same way a property load does. The pattern names the properties taken.
 		purityDestructure(function, instruction, values, value)
 
-	case *hir.MethodCall:
+	case *high_level_intermediate_representation.MethodCall:
 		purityMethodCall(function, instruction, values, value, report)
 		unit.callbackArguments(function, value.Args, purityCalleeName(function, value.Property), report)
 
-	case *hir.CallExpression:
+	case *high_level_intermediate_representation.CallExpression:
 		unit.callExpression(function, instruction, value, report)
 		unit.callbackArguments(function, value.Args, purityCalleeIdentifierName(function, value.Callee), report)
 
-	case *hir.FunctionExpression:
+	case *high_level_intermediate_representation.FunctionExpression:
 		// Recorded but NOT analysed here. Analysis happens on first CALL, which is what keeps an
 		// uncalled arrow silent.
 		if int(value.Function) < len(function.Functions) {
@@ -481,18 +481,18 @@ func (unit *purityUnit) step(
 			}
 		}
 
-	case *hir.StoreLocal:
+	case *high_level_intermediate_representation.StoreLocal:
 		purityCopy(values, value.Value.Identifier, value.LValue.Identifier, instruction.LValue.Identifier)
 		unit.recordByName(function, value.LValue, value.Value)
 
-	case *hir.LoadLocal:
+	case *high_level_intermediate_representation.LoadLocal:
 		purityCopy(values, value.Place.Identifier, instruction.LValue.Identifier)
 
-	case *hir.StoreContext:
+	case *high_level_intermediate_representation.StoreContext:
 		purityCopy(values, value.Value.Identifier, value.LValue.Identifier, instruction.LValue.Identifier)
 		unit.recordByName(function, value.LValue, value.Value)
 
-	case *hir.LoadContext:
+	case *high_level_intermediate_representation.LoadContext:
 		// A read of a binding captured from an enclosing function. The identifier is the ENCLOSING
 		// function's, because `Context` places are the parent's values threaded in, so the ordinary
 		// copy already crosses the boundary when the parent recorded that value. The name-keyed
@@ -501,7 +501,7 @@ func (unit *purityUnit) step(
 			unit.loadByName(function, value.Place, instruction)
 		}
 
-	case *hir.StoreGlobal:
+	case *high_level_intermediate_representation.StoreGlobal:
 		// A reassignment through a global binding, which is how `let r = Math.random; r = Date.now`
 		// lowers when the checker cannot give the binding a local identity. The value still has to
 		// travel, and this is the instruction carrying it.
@@ -525,7 +525,7 @@ func (unit *purityUnit) step(
 // of the enum IS `purityValueNothing`, so a future arm that stores a partly-built value would break
 // silently without it. Recorded as measured-equivalent rather than as a live guard, so the next
 // reader does not go looking for the input that separates them.
-func purityCopy(values map[hir.IdentifierId]purityValue, from hir.IdentifierId, to ...hir.IdentifierId) bool {
+func purityCopy(values map[high_level_intermediate_representation.IdentifierId]purityValue, from high_level_intermediate_representation.IdentifierId, to ...high_level_intermediate_representation.IdentifierId) bool {
 	source, ok := values[from]
 	if !ok || source.Kind == purityValueNothing {
 		return false
@@ -581,7 +581,7 @@ func (unit *purityUnit) namesATrueGlobal(node *ast.Node) bool {
 // minted in the child, so `const g = () => Math.random(); const f = () => g(); f();` gives the `g`
 // inside `f` an identifier the parent never wrote state against, and only the name connects them.
 // Measured on React, that input REPORTS.
-func (unit *purityUnit) loadByName(function *hir.Function, place hir.Place, instruction *hir.Instruction) {
+func (unit *purityUnit) loadByName(function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place, instruction *high_level_intermediate_representation.Instruction) {
 	if int(place.Identifier) >= len(function.Identifiers) {
 		return
 	}
@@ -600,10 +600,10 @@ func (unit *purityUnit) loadByName(function *hir.Function, place hir.Place, inst
 // function itself. `globalThis.Date` off a transparent container is another container, which is
 // what makes `globalThis.Date.now()` report while `window.Date.now()` does not.
 func purityLoadProperty(
-	function *hir.Function,
-	instruction *hir.Instruction,
-	values map[hir.IdentifierId]purityValue,
-	object hir.Place,
+	function *high_level_intermediate_representation.Function,
+	instruction *high_level_intermediate_representation.Instruction,
+	values map[high_level_intermediate_representation.IdentifierId]purityValue,
+	object high_level_intermediate_representation.Place,
 	property string,
 ) {
 	container, ok := values[object.Identifier]
@@ -624,10 +624,10 @@ func purityLoadProperty(
 
 // purityDestructure carries the signature through `const {random} = Math`.
 func purityDestructure(
-	function *hir.Function,
-	instruction *hir.Instruction,
-	values map[hir.IdentifierId]purityValue,
-	value *hir.Destructure,
+	function *high_level_intermediate_representation.Function,
+	instruction *high_level_intermediate_representation.Instruction,
+	values map[high_level_intermediate_representation.IdentifierId]purityValue,
+	value *high_level_intermediate_representation.Destructure,
 ) {
 	container, ok := values[value.Value.Identifier]
 	if !ok || container.Kind != purityValueContainer || container.CanonicalName == "" {
@@ -637,7 +637,7 @@ func purityDestructure(
 	if properties == nil {
 		return
 	}
-	object, isObject := value.Pattern.(*hir.ObjectPattern)
+	object, isObject := value.Pattern.(*high_level_intermediate_representation.ObjectPattern)
 	if !isObject {
 		return
 	}
@@ -660,7 +660,7 @@ func purityDestructure(
 		if !isImpure {
 			continue
 		}
-		place, isPlace := property.Value.(*hir.PlacePattern)
+		place, isPlace := property.Value.(*high_level_intermediate_representation.PlacePattern)
 		if !isPlace {
 			continue
 		}
@@ -675,10 +675,10 @@ func purityDestructure(
 // both corpus fixtures exercise. The property is a `Primitive` holding the name, which is how a
 // computed `Math['random']()` reaches the same place: measured on React, that input REPORTS.
 func purityMethodCall(
-	function *hir.Function,
-	instruction *hir.Instruction,
-	values map[hir.IdentifierId]purityValue,
-	value *hir.MethodCall,
+	function *high_level_intermediate_representation.Function,
+	instruction *high_level_intermediate_representation.Instruction,
+	values map[high_level_intermediate_representation.IdentifierId]purityValue,
+	value *high_level_intermediate_representation.MethodCall,
 	report func(purityFinding),
 ) {
 	container, ok := values[value.Receiver.Identifier]
@@ -705,9 +705,9 @@ func purityMethodCall(
 // into the declaring function's own arena and a wrapper can be reached from a sibling scope where
 // that index means something else. The pointer is stable wherever the value travels.
 func (unit *purityUnit) callExpression(
-	function *hir.Function,
-	instruction *hir.Instruction,
-	value *hir.CallExpression,
+	function *high_level_intermediate_representation.Function,
+	instruction *high_level_intermediate_representation.Instruction,
+	value *high_level_intermediate_representation.CallExpression,
 	report func(purityFinding),
 ) {
 	callee, ok := unit.values[value.Callee.Identifier]
@@ -756,8 +756,8 @@ func (unit *purityUnit) callExpression(
 //
 // So the test is: a hook-named callee exempts its callback arguments, unless it is `useMemo`.
 func (unit *purityUnit) callbackArguments(
-	function *hir.Function,
-	args []hir.Argument,
+	function *high_level_intermediate_representation.Function,
+	args []high_level_intermediate_representation.Argument,
 	calleeName string,
 	report func(purityFinding),
 ) {
@@ -791,7 +791,7 @@ func (unit *purityUnit) callbackArguments(
 }
 
 // purityCalleeName reads a method call's property name, for the hook test.
-func purityCalleeName(function *hir.Function, property hir.Place) string {
+func purityCalleeName(function *high_level_intermediate_representation.Function, property high_level_intermediate_representation.Place) string {
 	name, _ := purityPropertyName(function, property)
 	return name
 }
@@ -801,14 +801,14 @@ func purityCalleeName(function *hir.Function, property hir.Place) string {
 // A hook is normally called through a bare identifier, which lowering gives a `LoadGlobal` carrying
 // the name whether it is imported or global, so this reads that instruction rather than asking the
 // checker.
-func purityCalleeIdentifierName(function *hir.Function, callee hir.Place) string {
+func purityCalleeIdentifierName(function *high_level_intermediate_representation.Function, callee high_level_intermediate_representation.Place) string {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
 			if instruction == nil || instruction.LValue.Identifier != callee.Identifier {
 				continue
 			}
-			if global, isGlobal := instruction.Value.(*hir.LoadGlobal); isGlobal {
+			if global, isGlobal := instruction.Value.(*high_level_intermediate_representation.LoadGlobal); isGlobal {
 				return global.Name
 			}
 			return ""
@@ -828,7 +828,7 @@ func purityCalleeIdentifierName(function *hir.Function, callee hir.Place) string
 //
 // It was wrong, and the real tree found it: a dry run over Kirk's 3,407 files died with
 // `fatal error: stack overflow`, and the cycle in the trace is
-// `findingsOf -> walk -> step -> callbackArguments -> findingsOf` on one `*hir.Function` pointer.
+// `findingsOf -> walk -> step -> callbackArguments -> findingsOf` on one `*high_level_intermediate_representation.Function` pointer.
 //
 // Two things made the earlier verdict false. The probes predated `callbackArguments`, so the only
 // path into `findingsOf` was a direct call, and a self-reference on that path resolves through
@@ -840,7 +840,7 @@ func purityCalleeIdentifierName(function *hir.Function, callee hir.Place) string
 // verdict is only as good as the paths that existed when it was measured, and adding a caller
 // invalidates it silently. No fixture went red when the guard was removed, and none went red when
 // the caller was added; only real code found it.
-func (unit *purityUnit) findingsOf(function *hir.Function) []purityFinding {
+func (unit *purityUnit) findingsOf(function *high_level_intermediate_representation.Function) []purityFinding {
 	if function == nil {
 		return nil
 	}
@@ -862,7 +862,7 @@ func (unit *purityUnit) findingsOf(function *hir.Function) []purityFinding {
 // Only a place carrying a source name is recorded, because the link this restores is exactly the
 // one lowering drops: a reference from a child function to a parent's binding arrives as a
 // `LoadGlobal` carrying that name and nothing else.
-func (unit *purityUnit) recordByName(function *hir.Function, target hir.Place, source hir.Place) {
+func (unit *purityUnit) recordByName(function *high_level_intermediate_representation.Function, target high_level_intermediate_representation.Place, source high_level_intermediate_representation.Place) {
 	if int(target.Identifier) >= len(function.Identifiers) {
 		return
 	}
@@ -891,14 +891,14 @@ func (unit *purityUnit) recordByName(function *hir.Function, target hir.Place, s
 // the only consumers of this name are those two lookups. So a numeric or boolean key reaches
 // silence either way. Confirmed on `(Math as any)[0]()` and `(Math as any)[true]()`, both silent
 // with the flag and without it.
-func purityPropertyName(function *hir.Function, property hir.Place) (string, bool) {
+func purityPropertyName(function *high_level_intermediate_representation.Function, property high_level_intermediate_representation.Place) (string, bool) {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
 			if instruction == nil || instruction.LValue.Identifier != property.Identifier {
 				continue
 			}
-			primitive, isPrimitive := instruction.Value.(*hir.Primitive)
+			primitive, isPrimitive := instruction.Value.(*high_level_intermediate_representation.Primitive)
 			if !isPrimitive {
 				return "", false
 			}

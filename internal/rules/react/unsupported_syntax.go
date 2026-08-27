@@ -3,7 +3,7 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/typecheck"
+	"github.com/system-inc/verify/internal/utilities/type_checking"
 )
 
 var messageUnsupportedEval = rule.Message{
@@ -142,7 +142,7 @@ var messageUnsupportedInlineClass = rule.Message{
 // not it is being invoked. Both were measured, and a rule keyed on `KindCallExpression` with a
 // callee named `eval` would have been wrong on both.
 //
-// So this rule declares the type checker and asks `typecheck.IsSymbolFromDefaultLibrary`. Probed
+// So this rule declares the type checker and asks `type_checking.IsSymbolFromDefaultLibrary`. Probed
 // against this rule's own inputs rather than trusted: global `eval` resolves to a symbol declared
 // in `lib.es5.d.ts`, a declaration file, while a shadowing parameter or local resolves to a
 // declaration in the source file. The shelf helper and a hand-rolled `IsDeclarationFile` loop agree
@@ -212,7 +212,7 @@ var UnsupportedSyntax = rule.Rule{
 	// for a shadowing parameter, and nothing in the abstract syntax tree distinguishes them.
 	NeedsTypeChecker: true,
 
-	// `typecheck.IsSymbolFromDefaultLibrary` takes the compiled unit, so the handle is genuinely
+	// `type_checking.IsSymbolFromDefaultLibrary` takes the compiled unit, so the handle is genuinely
 	// read here rather than only named in prose.
 	ReadsProgram: true,
 
@@ -232,7 +232,7 @@ var UnsupportedSyntax = rule.Rule{
 					return
 				}
 				symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
-				if !typecheck.IsSymbolFromDefaultLibrary(ctx.Program, symbol) {
+				if !type_checking.IsSymbolFromDefaultLibrary(ctx.Program, symbol) {
 					return
 				}
 				ctx.ReportNode(node, messageUnsupportedEval)

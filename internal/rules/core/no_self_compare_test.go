@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // selfCompareFile is where the fixtures pretend to live.
@@ -34,8 +34,8 @@ func TestNoSelfCompareStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoSelfCompare, selfCompareFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoSelfCompare, selfCompareFile, testCase.sourceText))
 		})
 	}
 }
@@ -69,8 +69,8 @@ func TestNoSelfCompareFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoSelfCompare, selfCompareFile, testCase.sourceText), "comparingToSelf")
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoSelfCompare, selfCompareFile, testCase.sourceText), "comparingToSelf")
 		})
 	}
 }
@@ -95,13 +95,13 @@ func TestNoSelfCompareDeclinesInAndInstanceof(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoSelfCompare, selfCompareFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSelfCompare, selfCompareFile, testCase.sourceText))
 		})
 	}
 
 	// The control, so the silence above is a measurement about the operator rather than about the
 	// declare-heavy shape of the inputs.
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoSelfCompare, selfCompareFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoSelfCompare, selfCompareFile,
 		"declare const x: any; export const a = x === x;"), "comparingToSelf")
 }
 
@@ -112,7 +112,7 @@ func TestNoSelfCompareDeclinesInAndInstanceof(t *testing.T) {
 // characters in the middle of an expression.
 func TestNoSelfCompareReportsTheWholeComparison(t *testing.T) {
 	const sourceText = "if (foo.bar >= foo.bar) { }"
-	result := ruletest.Run(t, NoSelfCompare, selfCompareFile, sourceText)
+	result := rule_testing.Run(t, NoSelfCompare, selfCompareFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}

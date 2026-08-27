@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // A `.tsx` name, because every case here writes JSX in a component body exactly as React's own
@@ -63,7 +63,7 @@ const (
 // decides whether compilation aborts, not whether the finding exists.
 //
 // That is the same shape as the port brief's warning about a case decided above the rule, arriving
-// in the opposite direction. `ruletest.Run` has no panic-threshold layer, so the honest recording
+// in the opposite direction. `rule_testing.Run` has no panic-threshold layer, so the honest recording
 // is the finding, with the reason at the line.
 func TestGatingFiresOnUpstreamCorpus(t *testing.T) {
 	testCases := []struct {
@@ -88,8 +88,8 @@ func TestGatingFiresOnUpstreamCorpus(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, Gating, gatingFile, testCase.sourceText), testCase.wantIds...)
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, Gating, gatingFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -108,7 +108,7 @@ func TestGatingStaysSilentOnUpstreamCorpus(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, Gating, gatingFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, Gating, gatingFile, testCase.sourceText))
 		})
 	}
 }
@@ -232,8 +232,8 @@ func TestGatingFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, Gating, gatingFile, testCase.sourceText), testCase.wantIds...)
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, Gating, gatingFile, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -373,7 +373,7 @@ func TestGatingStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, Gating, gatingFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, Gating, gatingFile, testCase.sourceText))
 		})
 	}
 }
@@ -414,7 +414,7 @@ func TestGatingReportsTheWholeDirectiveIncludingTheSemicolon(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, Gating, gatingFile, testCase.sourceText)
+			result := rule_testing.Run(t, Gating, gatingFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -431,8 +431,8 @@ func TestGatingReportsTheWholeDirectiveIncludingTheSemicolon(t *testing.T) {
 func TestGatingPointsEachInvalidFindingAtItsOwnDirective(t *testing.T) {
 	const sourceText = "function Foo() {\n  'use memo if(true)';\n  'use memo if(false)';\n  return 1;\n}\n"
 
-	result := ruletest.Run(t, Gating, gatingFile, sourceText)
-	ruletest.ExpectFindings(t, result, "invalidGatingDirective", "invalidGatingDirective")
+	result := rule_testing.Run(t, Gating, gatingFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "invalidGatingDirective", "invalidGatingDirective")
 
 	want := []string{"'use memo if(true)';", "'use memo if(false)';"}
 	for index, diagnostic := range result.Diagnostics {
@@ -447,7 +447,7 @@ func TestGatingPointsEachInvalidFindingAtItsOwnDirective(t *testing.T) {
 // own message constants. Comparing to the constants is equality, it looks correct, and both sides
 // move together under mutation, so it guards nothing.
 func TestGatingMessageText(t *testing.T) {
-	invalid := ruletest.Run(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier)
+	invalid := rule_testing.Run(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier)
 	if len(invalid.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(invalid.Diagnostics))
 	}
@@ -464,7 +464,7 @@ func TestGatingMessageText(t *testing.T) {
 		t.Fatalf("invalid description = %q", invalid.Diagnostics[0].Message.Description)
 	}
 
-	multiple := ruletest.Run(t, Gating, gatingFile, gatingUpstreamMultiple)
+	multiple := rule_testing.Run(t, Gating, gatingFile, gatingUpstreamMultiple)
 	if len(multiple.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(multiple.Diagnostics))
 	}
@@ -489,8 +489,8 @@ func TestGatingOptionDecodesAndDefaultsToChecking(t *testing.T) {
 
 	// A bare severity hands the rule nil options, which is how it is configured in practice. The
 	// zero value must be the checking one, or the rule is inert everywhere it is actually used.
-	ruletest.ExpectFindings(t,
-		ruletest.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, nil),
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, nil),
 		"invalidGatingDirective")
 
 	// An empty object is the same default arriving through the decoder rather than past it.
@@ -498,8 +498,8 @@ func TestGatingOptionDecodesAndDefaultsToChecking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decoding an empty object: %v", err)
 	}
-	ruletest.ExpectFindings(t,
-		ruletest.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, empty),
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, empty),
 		"invalidGatingDirective")
 
 	// Set explicitly false, which must not be read as unset.
@@ -507,8 +507,8 @@ func TestGatingOptionDecodesAndDefaultsToChecking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decoding an explicit false: %v", err)
 	}
-	ruletest.ExpectFindings(t,
-		ruletest.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, off),
+	rule_testing.ExpectFindings(t,
+		rule_testing.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, off),
 		"invalidGatingDirective")
 
 	// Set true, restoring upstream's silence. This is the only configuration under which React and
@@ -517,10 +517,10 @@ func TestGatingOptionDecodesAndDefaultsToChecking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decoding an explicit true: %v", err)
 	}
-	ruletest.ExpectClean(t,
-		ruletest.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, on))
-	ruletest.ExpectClean(t,
-		ruletest.RunWithOptions(t, Gating, gatingFile, gatingUpstreamMultiple, on))
+	rule_testing.ExpectClean(t,
+		rule_testing.RunWithOptions(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier, on))
+	rule_testing.ExpectClean(t,
+		rule_testing.RunWithOptions(t, Gating, gatingFile, gatingUpstreamMultiple, on))
 }
 
 // The transcribed fixture bodies are guarded against escape cooking, which is the failure this

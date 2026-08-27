@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // Every expectation in this file was measured by running `better-tailwindcss/no-concatenated-classes`
@@ -80,8 +80,8 @@ func TestNoConcatenatedClassesReportsGluedFragments(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoConcatenatedClasses, testCase.fileName, testCase.source)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.Run(t, NoConcatenatedClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -186,8 +186,8 @@ func TestNoConcatenatedClassesStaysSilent(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoConcatenatedClasses, testCase.fileName, testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoConcatenatedClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -222,7 +222,7 @@ func TestNoConcatenatedClassesNamesTheFragment(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoConcatenatedClasses, "Component.tsx", testCase.source)
+			result := rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("expected a finding, got none")
 			}
@@ -241,7 +241,7 @@ func TestNoConcatenatedClassesNamesTheFragment(t *testing.T) {
 // change what the markup renders. Asserting the absence keeps a later well-meaning change from
 // adding one without arguing for it.
 func TestNoConcatenatedClassesProposesNoFix(t *testing.T) {
-	result := ruletest.Run(t, NoConcatenatedClasses, "Component.tsx",
+	result := rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx",
 		"const element = <div className={`px-${size}`} />;")
 
 	if len(result.Diagnostics) != 1 {
@@ -275,14 +275,14 @@ func TestBoundaryReadingIsWhitespaceAware(t *testing.T) {
 	}
 
 	for _, source := range silentButInterpolated {
-		result := ruletest.Run(t, NoConcatenatedClasses, "Component.tsx", source)
+		result := rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx", source)
 		if len(result.Diagnostics) != 0 {
 			t.Errorf("a whitespace-aware rule must stay silent on %q, it reported %d", source, len(result.Diagnostics))
 		}
 	}
 
 	// And the discrimination has to be real: the same reader must fire when the whitespace is gone.
-	glued := ruletest.Run(t, NoConcatenatedClasses, "Component.tsx",
+	glued := rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx",
 		"const element = <div className={`flex ${a} gap-${b}`} />;")
 	if len(glued.Diagnostics) == 0 {
 		t.Fatal("the rule stayed silent on a genuinely glued seam, so the silence above proves nothing")

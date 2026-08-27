@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // requireImportsFile is where the fixtures pretend to live. The extension matters: upstream runs
@@ -77,13 +77,13 @@ func TestNoRequireImportsFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
+			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
 				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "noRequireImports"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -125,7 +125,7 @@ func TestNoRequireImportsStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.sourceText, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.RunTypedWithOptions(t, NoRequireImports,
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRequireImports,
 				requireImportsFile, testCase.sourceText,
 				decodeRequireImportsOptions(t, testCase.options)))
 		})
@@ -180,7 +180,7 @@ func TestNoRequireImportsSpans(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
+			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
 				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
 			if len(result.Diagnostics) != len(testCase.reported) {
 				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
@@ -199,7 +199,7 @@ func TestNoRequireImportsSpans(t *testing.T) {
 // than against the rule's own constant. Comparing to the constant is equality that looks correct and
 // moves with the rule under mutation, so it proves nothing.
 func TestNoRequireImportsMessage(t *testing.T) {
-	result := ruletest.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
+	result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
 		"var lib = require('lib');", nil)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -343,7 +343,7 @@ func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
+			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
 				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
 			if len(result.Diagnostics) != testCase.findings {
 				t.Fatalf("got %d findings, want %d (%s)",
@@ -360,7 +360,7 @@ func TestNoRequireImportsRequiresTheTypedHarness(t *testing.T) {
 	if !NoRequireImports.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker; the shadow test cannot work without it")
 	}
-	result := ruletest.RunWithOptions(t, NoRequireImports, requireImportsFile,
+	result := rule_testing.RunWithOptions(t, NoRequireImports, requireImportsFile,
 		"var lib = require('lib');", nil)
 	if len(result.Diagnostics) != 0 {
 		t.Errorf("the untyped harness produced %d findings; the nil-checker guard is missing",
@@ -460,7 +460,7 @@ func TestNoRequireImportsSurvivesMalformedImportEquals(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			// The assertion is that this returns at all. A panic here fails the test by crashing it,
 			// which is the only signal available for this class of guard.
-			ruletest.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
+			rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
 				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
 		})
 	}
@@ -560,7 +560,7 @@ func TestNoRequireImportsAcrossDeclarationOrderings(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.RunTypedFiles(t, NoRequireImports, testCase.files, "Subject.ts")
+			result := rule_testing.RunTypedFiles(t, NoRequireImports, testCase.files, "Subject.ts")
 			if len(result.Diagnostics) != testCase.findings {
 				t.Fatalf("got %d findings, want %d (%s)",
 					len(result.Diagnostics), testCase.findings, testCase.reasoning)

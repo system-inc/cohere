@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const propertiesParameterFile = "/repository/source/components/Button.tsx"
@@ -44,7 +44,7 @@ func TestReactComponentRequirePropertiesParameterFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, ReactComponentRequirePropertiesParameter,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactComponentRequirePropertiesParameter,
 				propertiesParameterFile, testCase.sourceText), "usePropertiesNotProps")
 		})
 	}
@@ -118,7 +118,7 @@ func TestReactComponentRequirePropertiesParameterStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, ReactComponentRequirePropertiesParameter,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentRequirePropertiesParameter,
 				testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -144,7 +144,7 @@ func TestReactComponentRequirePropertiesParameterSuggestsRenamingTheDeclaration(
 	const wanted = "export function Button(properties: { label: string }) {\n" +
 		"    return <button>{props.label}</button>;\n}\n"
 
-	result := ruletest.Run(t, ReactComponentRequirePropertiesParameter, propertiesParameterFile, source)
+	result := rule_testing.Run(t, ReactComponentRequirePropertiesParameter, propertiesParameterFile, source)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}

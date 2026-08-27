@@ -3,7 +3,7 @@ package react
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // jsxKeyFile is where the fixtures pretend to live.
@@ -155,8 +155,8 @@ func TestJsxKeyFires(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			options := decodeJsxKeyOptionsForTest(t, testCase.rawOptions)
-			result := ruletest.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
-			ruletest.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
 }
@@ -267,8 +267,8 @@ func TestJsxKeyStaysSilent(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			options := decodeJsxKeyOptionsForTest(t, testCase.rawOptions)
-			result := ruletest.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
@@ -341,12 +341,12 @@ func TestJsxKeySpans(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			options := decodeJsxKeyOptionsForTest(t, testCase.rawOptions)
-			result := ruletest.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
+			result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("want %d findings, got %d: %v", len(testCase.want),
 					len(result.Diagnostics), result.MessageIds())
 			}
-			// `ruletest.RunWithOptions` does not trim, so the source on disk is this literal.
+			// `rule_testing.RunWithOptions` does not trim, so the source on disk is this literal.
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.want[index] {
@@ -381,7 +381,7 @@ func TestJsxKeyDuplicateOrderIsStable(t *testing.T) {
 	// insertion order about one time in six.
 	for attempt := 0; attempt < 12; attempt++ {
 		options := decodeJsxKeyOptionsForTest(t, "{\"warnOnDuplicates\":true}")
-		result := ruletest.RunWithOptions(t, JsxKey, jsxKeyFile, source, options)
+		result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, source, options)
 		if len(result.Diagnostics) != len(want) {
 			t.Fatalf("want %d findings, got %d", len(want), len(result.Diagnostics))
 		}
@@ -401,8 +401,8 @@ func TestJsxKeyDuplicateOrderIsStable(t *testing.T) {
 // coincidence is not obvious from the code and a later option with a true default would break it
 // silently.
 func TestJsxKeyHandlesNilOptions(t *testing.T) {
-	result := ruletest.RunWithOptions(t, JsxKey, jsxKeyFile, "[<App />];", nil)
-	ruletest.ExpectFindings(t, result, "missingArrayKey")
+	result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, "[<App />];", nil)
+	rule_testing.ExpectFindings(t, result, "missingArrayKey")
 
 	// And the three option-gated judgments stay OFF, which is the half a nil-options bug would
 	// turn on rather than off.
@@ -411,7 +411,7 @@ func TestJsxKeyHandlesNilOptions(t *testing.T) {
 		"[<App {...obj} key=\"k\" />];",
 		"[<span key=\"a\"/>, <span key=\"a\"/>];",
 	} {
-		ruletest.ExpectClean(t, ruletest.RunWithOptions(t, JsxKey, jsxKeyFile, source, nil))
+		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, source, nil))
 	}
 }
 
@@ -428,8 +428,8 @@ func TestJsxKeyHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.js",
 	} {
 		t.Run(fileName, func(t *testing.T) {
-			result := ruletest.RunWithOptions(t, JsxKey, fileName, source, nil)
-			ruletest.ExpectFindings(t, result, "missingArrayKey")
+			result := rule_testing.RunWithOptions(t, JsxKey, fileName, source, nil)
+			rule_testing.ExpectFindings(t, result, "missingArrayKey")
 		})
 	}
 }

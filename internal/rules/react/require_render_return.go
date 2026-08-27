@@ -3,7 +3,7 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	utilsreact "github.com/system-inc/verify/internal/utils/react"
+	utilsreact "github.com/system-inc/verify/internal/utilities/react"
 )
 
 var messageNoRenderReturn = rule.Message{
@@ -108,7 +108,7 @@ var messageNoRenderReturn = rule.Message{
 // reach a finding, and none of that machinery needs porting. Confirmed by measuring: a `memo`-wrapped
 // object literal carrying an empty `render` is clean, as is a plain function component.
 //
-// The ES5 factory name is `createReactClass` alone, not the wider set `internal/utils/react`
+// The ES5 factory name is `createReactClass` alone, not the wider set `internal/utilities/react`
 // accepts. `getCreateClassFromContext` defaults to the literal string `createReactClass` and only a
 // `settings.react.createClass` entry changes it, which our config has no surface for. Measured on
 // the installed build: `createClass({ render: function() {} })` and its `React.createClass` twin are

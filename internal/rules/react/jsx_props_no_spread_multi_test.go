@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // jsxPropsNoSpreadMultiFile is where the fixtures pretend to live. A .tsx extension, because the
@@ -184,8 +184,8 @@ func TestJsxPropsNoSpreadMultiFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText),
 				testCase.findings...)
 		})
 	}
@@ -286,8 +286,8 @@ func TestJsxPropsNoSpreadMultiStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText))
 		})
 	}
 }
@@ -340,7 +340,7 @@ func TestJsxPropsNoSpreadMultiReportsTheEarlierSpread(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText)
+			result := rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				t.Fatalf("want %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
@@ -363,7 +363,7 @@ func TestJsxPropsNoSpreadMultiReportsTheEarlierSpread(t *testing.T) {
 // or reporting the same node three times, passes every other assertion in this file.
 func TestJsxPropsNoSpreadMultiPairsByPosition(t *testing.T) {
 	sourceText := "const a = <App {...props.a} {...props.a} {...props.a} />;\n"
-	result := ruletest.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, sourceText)
+	result := rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, sourceText)
 	if len(result.Diagnostics) != 3 {
 		t.Fatalf("want 3 findings, got %d", len(result.Diagnostics))
 	}
@@ -385,7 +385,7 @@ func TestJsxPropsNoSpreadMultiPairsByPosition(t *testing.T) {
 // messages here are near-identical prose differing only in their opening noun, so a containment
 // check would pass against either one. Equality is what separates them.
 func TestJsxPropsNoSpreadMultiRendersBothMessages(t *testing.T) {
-	identifierResult := ruletest.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile,
+	identifierResult := rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile,
 		"const a = <App {...props} {...props} />;\n")
 	if len(identifierResult.Diagnostics) != 1 {
 		t.Fatalf("want 1 finding, got %d", len(identifierResult.Diagnostics))
@@ -394,7 +394,7 @@ func TestJsxPropsNoSpreadMultiRendersBothMessages(t *testing.T) {
 		t.Fatalf("want the identifier message, got %q", got)
 	}
 
-	memberResult := ruletest.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile,
+	memberResult := rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile,
 		"const a = <App {...props.foo} {...props.foo} />;\n")
 	if len(memberResult.Diagnostics) != 1 {
 		t.Fatalf("want 1 finding, got %d", len(memberResult.Diagnostics))

@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const extraNonNullFile = "/repository/source/Thing.ts"
@@ -32,12 +32,12 @@ func TestNoExtraNonNullAssertionFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "noExtraNonNullAssertion"
 			}
-			ruletest.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(t, result, expected...)
 		})
 	}
 }
@@ -69,8 +69,8 @@ func TestNoExtraNonNullAssertionFixesWriteWhatTheyClaim(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.Run(t, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText),
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.Run(t, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText),
 				testCase.wantSource)
 		})
 	}
@@ -108,7 +108,7 @@ func TestNoExtraNonNullAssertionStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText))
 		})
 	}
 }

@@ -3,7 +3,7 @@ package next
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 func TestNoCssTagsReports(t *testing.T) {
@@ -39,8 +39,8 @@ func TestNoCssTagsReports(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoCssTags, "Component.tsx", testCase.source)
-			ruletest.ExpectFindings(t, result, messageNoCssTags.Id)
+			result := rule_testing.Run(t, NoCssTags, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, messageNoCssTags.Id)
 		})
 	}
 }
@@ -92,8 +92,8 @@ func TestNoCssTagsIsSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoCssTags, "Component.tsx", testCase.source)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, NoCssTags, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

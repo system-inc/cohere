@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const nonoctalDecimalEscapeFile = "/repository/source/Thing.ts"
@@ -31,7 +31,7 @@ func TestNoNonoctalDecimalEscapeFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText),
 				"nonoctalDecimalEscape")
 		})
 	}
@@ -65,7 +65,7 @@ func TestNoNonoctalDecimalEscapeStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText))
 		})
 	}
 }
@@ -85,7 +85,7 @@ func TestNoNonoctalDecimalEscapeReportsEachEscape(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.want {
 				t.Fatalf("want %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
 			}
@@ -101,7 +101,7 @@ func TestNoNonoctalDecimalEscapeReportsEachEscape(t *testing.T) {
 // rather than fixes. An engine picking one unattended would silently change the string every time
 // the other was intended.
 func TestNoNonoctalDecimalEscapeOffersBothReadings(t *testing.T) {
-	result := ruletest.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
+	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = 'foo\\8bar';\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -127,7 +127,7 @@ func TestNoNonoctalDecimalEscapeOffersBothReadings(t *testing.T) {
 // above, and the engine applies Fixes unattended. That would turn a repair only the author can
 // choose into a silent rewrite of their string.
 func TestNoNonoctalDecimalEscapeProposesNoAutomaticFix(t *testing.T) {
-	result := ruletest.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
+	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = '\\8';\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -141,7 +141,7 @@ func TestNoNonoctalDecimalEscapeProposesNoAutomaticFix(t *testing.T) {
 // is a legacy octal escape, so fixing one legacy escape would produce another. The suggestion set
 // changes shape here rather than the rule declining to help.
 func TestNoNonoctalDecimalEscapeAvoidsCreatingAnOctalEscape(t *testing.T) {
-	result := ruletest.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
+	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = '\\0\\8';\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -162,7 +162,7 @@ func TestNoNonoctalDecimalEscapeAvoidsCreatingAnOctalEscape(t *testing.T) {
 // escape of a different kind. Getting this wrong is invisible: the finding still fires and only the
 // suggested repair is wrong.
 func TestNoNonoctalDecimalEscapeTreatsOctalZeroAsOrdinary(t *testing.T) {
-	result := ruletest.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
+	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = '\\01\\8';\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -194,7 +194,7 @@ func TestNoNonoctalDecimalEscapeOffersTheNullShapeOnlyAfterNull(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText)
+			result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}

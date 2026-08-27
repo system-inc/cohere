@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const cacheKeyDeclarations = "declare const networkService: { cache: { invalidate(key: unknown): void } };\n" +
@@ -61,7 +61,7 @@ func TestNetworkNoInvalidateCacheLiteralKeyFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t, ruletest.Run(t, NetworkNoInvalidateCacheLiteralKey, cacheFile,
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoInvalidateCacheLiteralKey, cacheFile,
 				cacheKeyDeclarations+testCase.sourceText), testCase.wantIds...)
 		})
 	}
@@ -95,7 +95,7 @@ func TestNetworkNoInvalidateCacheLiteralKeyStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, NetworkNoInvalidateCacheLiteralKey, cacheFile,
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkNoInvalidateCacheLiteralKey, cacheFile,
 				cacheKeyDeclarations+testCase.sourceText))
 		})
 	}

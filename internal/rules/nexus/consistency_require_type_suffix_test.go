@@ -3,7 +3,7 @@ package nexus
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const suffixFile = "/repository/source/Thing.ts"
@@ -26,8 +26,8 @@ func TestConsistencyRequireTypeSuffixFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyRequireTypeSuffix, suffixFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, testCase.wantId)
+			result := rule_testing.Run(t, ConsistencyRequireTypeSuffix, suffixFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
 		})
 	}
 }
@@ -62,8 +62,8 @@ func TestConsistencyRequireTypeSuffixStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, ConsistencyRequireTypeSuffix, suffixFile, testCase.sourceText)
-			ruletest.ExpectClean(t, result)
+			result := rule_testing.Run(t, ConsistencyRequireTypeSuffix, suffixFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }

@@ -3,7 +3,7 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 const preferAsConstFile = "/repository/source/Thing.ts"
@@ -40,8 +40,8 @@ func TestPreferAsConstFires(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "preferAsConst")
+			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "preferAsConst")
 		})
 	}
 }
@@ -86,8 +86,8 @@ func TestPreferAsConstFixesWriteWhatTheyClaim(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFixedSource(t,
-				ruletest.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText),
+			rule_testing.ExpectFixedSource(t,
+				rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText),
 				testCase.wantSource)
 		})
 	}
@@ -115,8 +115,8 @@ func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "preferAsConst")
+			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "preferAsConst")
 			if len(result.Diagnostics[0].Fixes) != 0 {
 				t.Fatalf("expected no fix on a binding pattern, got %d", len(result.Diagnostics[0].Fixes))
 			}
@@ -153,8 +153,8 @@ func TestPreferAsConstPointsAtTheLiteralType(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := ruletest.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
-			ruletest.ExpectFindings(t, result, "preferAsConst")
+			result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "preferAsConst")
 			finding := result.Diagnostics[0]
 			if got := testCase.sourceText[finding.Range.Pos():finding.Range.End()]; got != testCase.wantText {
 				t.Fatalf("finding points at %q, want %q", got, testCase.wantText)
@@ -240,7 +240,7 @@ func TestPreferAsConstStaysSilent(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t, ruletest.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText))
+			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText))
 		})
 	}
 }
@@ -266,8 +266,8 @@ func TestPreferAsConstMatchesNumericValuesNotSpellings(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, PreferAsConst, preferAsConstFile, testCase.sourceText),
 				"preferAsConst")
 		})
 	}
@@ -287,8 +287,8 @@ func TestPreferAsConstMatchesNumericValuesNotSpellings(t *testing.T) {
 // compete with this rule's own other repair for the same bytes.
 func TestPreferAsConstReportsOnceWhenBothArmsCouldApply(t *testing.T) {
 	sourceText := "let foo: 'bar' = 'bar' as 'bar';"
-	result := ruletest.Run(t, PreferAsConst, preferAsConstFile, sourceText)
-	ruletest.ExpectFindings(t, result, "preferAsConst")
+	result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, sourceText)
+	rule_testing.ExpectFindings(t, result, "preferAsConst")
 	finding := result.Diagnostics[0]
 	if got := sourceText[finding.Range.Pos():finding.Range.End()]; got != "'bar'" {
 		t.Fatalf("finding points at %q, want the assertion type", got)

@@ -38,7 +38,7 @@ var comparisonOperators = map[ast.Kind]bool{
 //
 // EnforceForIndexOf is present because the config sets it and a decoded option that silently
 // vanishes is worse than one that is read: `list.indexOf(NaN)` always returns -1, since indexOf uses
-// strict equality. It is false here, matching the config.
+// strict equality. It is false here, matching the configuration.
 type UseIsNaNOptions struct {
 	EnforceForSwitchCase *bool
 	EnforceForIndexOf    bool
@@ -81,7 +81,7 @@ var messageSwitchOnNaN = rule.Message{
 var UseIsNaN = rule.Rule{
 	Name: "use-isnan",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		// Defaults to on, matching ESLint 9 and this tree's config. An option that only relaxes the
+		// Defaults to on, matching ESLint 9 and this tree's configuration. An option that only relaxes the
 		// rule gets the strict reading when the config says nothing, so a misconfiguration cannot
 		// quietly disable half the rule.
 		enforceForSwitchCase := true

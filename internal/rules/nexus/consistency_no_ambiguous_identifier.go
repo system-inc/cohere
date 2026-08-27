@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utils/ecmascript/binding"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/binding"
 )
 
 // alwaysAllowedSingleLetters are the coordinate and math names, where the single letter is the

@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/ruletest"
+	"github.com/system-inc/verify/internal/rule_testing"
 )
 
 // dupeClassMembersFile is where the fixtures pretend to live.
@@ -39,8 +39,8 @@ func TestNoDupeClassMembersFires(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText),
 				"noDupeClassMembers")
 		})
 	}
@@ -81,8 +81,8 @@ func TestNoDupeClassMembersStaysSilent(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText))
 		})
 	}
 }
@@ -94,10 +94,10 @@ func TestNoDupeClassMembersStaysSilent(t *testing.T) {
 // which is exactly the shape a port drops silently: the flag looks like defensive copying until a
 // file declares both.
 func TestNoDupeClassMembersSeparatesPrivateNames(t *testing.T) {
-	ruletest.ExpectClean(t, ruletest.Run(t, NoDupeClassMembers, dupeClassMembersFile,
+	rule_testing.ExpectClean(t, rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile,
 		"class A { #foo() {} foo() {} }"))
 
-	ruletest.ExpectFindings(t, ruletest.Run(t, NoDupeClassMembers, dupeClassMembersFile,
+	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile,
 		"class A { #foo() {} #foo() {} }"), "noDupeClassMembers")
 }
 
@@ -128,8 +128,8 @@ func TestNoDupeClassMembersAllowsOverloadSignatures(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectClean(t,
-				ruletest.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText))
+			rule_testing.ExpectClean(t,
+				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText))
 		})
 	}
 }
@@ -152,8 +152,8 @@ func TestNoDupeClassMembersStillReportsDuplicatesBesideOverloads(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ruletest.ExpectFindings(t,
-				ruletest.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText),
+			rule_testing.ExpectFindings(t,
+				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText),
 				"noDupeClassMembers")
 		})
 	}
