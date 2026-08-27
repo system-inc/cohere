@@ -600,6 +600,26 @@ var rulesOutsideTheInventory = map[string]string{
 	"unicode-bom": "ported from eslint core, which marks it recommended:false; registered but left " +
 		"off because osvfs strips the leading byte order mark before any rule runs, so the rule " +
 		"cannot see its own subject; not enforced by either tool when the inventory was captured",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// This one turns on with real cleanup attached rather than as a guardrail, and the number is
+	// the decision rather than a footnote: 20 files in this tree hold more than one class, ranging
+	// from two up to seven, and the rule ships no fixer because the repair is a human judgment
+	// about which class moves to which new file under what name. The audit rated it Maybe on
+	// exactly that basis and measured 18; the two extra are drift since that snapshot rather than a
+	// disagreement.
+	//
+	// The count was cross-checked rather than trusted: the same 20 files were run through the
+	// installed eslint with this rule alone, and it reports every one of them. An earlier run of
+	// that check said zero on all 20, which was a missing `files` pattern in the probe rather than
+	// a divergence, and it is recorded here because a zero from a broken instrument reads exactly
+	// like agreement.
+	"max-classes-per-file": "ported from eslint core, which marks it recommended:false; not " +
+		"enforced by either tool when the inventory was captured, and the audit measured 18 " +
+		"violations while this port measures 20, each needing a file split by hand",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
