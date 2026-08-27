@@ -374,3 +374,21 @@ func TestMaxNestedCallbacksDirectCalleeIsNotACallback(t *testing.T) {
 		}
 	})
 }
+
+// The message id, asserted through the harness helper the fixture-pair guard looks for.
+//
+// The corpus tests above assert the finding count, every span, and the rendered text, which is
+// strictly more than a message-id assertion proves. This exists because none of that names the id
+// through rule_testing.ExpectFindings, and the guard that checks a rule can be shown to fire reads
+// the test file textually. It is a real assertion rather than a formality: an id typo would render
+// a correct sentence and every span assertion above would still pass.
+func TestMaxNestedCallbacksReportsTheExceedId(t *testing.T) {
+	source := "foo(function() { bar(thing, function(data) { baz(function() {}); }); });"
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts",
+		source, decodeMaxNestedCallbacksForTest(t, "2")), "exceed")
+
+	// Two findings from one input, so the helper is exercised on a count other than one.
+	nested := "foo(function() { bar(function() { baz(function() { qux(function() {}); }); }); });"
+	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts",
+		nested, decodeMaxNestedCallbacksForTest(t, "2")), "exceed", "exceed")
+}
