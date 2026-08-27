@@ -1,9 +1,11 @@
 package typescript
 
 import (
+	"fmt"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rules/core"
+	"github.com/system-inc/verify/internal/utilities/ecmascript/classmembers"
 )
 
 // NoDupeClassMembers is typescript-eslint's extension of the core rule of the same name.
@@ -57,7 +59,30 @@ var NoDupeClassMembers = rule.Rule{
 		// The core rule's own listeners, which is where every finding comes from. Wrapping rather
 		// than reimplementing is the point of an extension rule: re-deriving the collision logic
 		// would give the two rules two chances to disagree about the same question.
-		coreListeners := core.NoDupeClassMembers.Run(ctx, options)
+		// The collision judgment, shared with the bare `no-dupe-class-members` rather than
+		// re-derived. It used to reach for `core.NoDupeClassMembers.Run` directly, which broke the
+		// leaf property a rule package is held to; the judgment now lives in `classmembers` and both
+		// rules call it. Behaviour is unchanged: the same members collide, this file still carries
+		// only the difference.
+		coreCheck := func(members *ast.NodeList) {
+			classmembers.ForEachDuplicate(members, func(name *ast.Node, key classmembers.Key) {
+				ctx.ReportNode(name, rule.Message{
+					Id: "noDupeClassMembers",
+					Description: fmt.Sprintf(
+						"This class already declares a member named %s. The later declaration wins "+
+							"silently, so the earlier one is dead code that reads as live, and "+
+							"nothing in the language or at runtime tells the two apart.", key.Name),
+				})
+			})
+		}
+		coreListeners := rule.Listeners{
+			ast.KindClassDeclaration: func(node *ast.Node) {
+				coreCheck(node.AsClassDeclaration().Members)
+			},
+			ast.KindClassExpression: func(node *ast.Node) {
+				coreCheck(node.AsClassExpression().Members)
+			},
+		}
 
 		// A class carrying a computed member is handed to the core with those members REMOVED from
 		// its list, rather than having the core's findings filtered afterwards.
