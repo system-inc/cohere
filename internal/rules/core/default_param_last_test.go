@@ -351,6 +351,21 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 			"\n    class Foo {\n      constructor(\n        a: number,\n        b?: number,\n        private c = 0,\n      ) {}\n    }\n        "},
 		{"class Foo { constructor( a: number, private b?: number, c = 0, ) {} }",
 			"\n    class Foo {\n      constructor(\n        a: number,\n        private b?: number,\n        c = 0,\n      ) {}\n    }\n        "},
+		// An all-required parameter list, written here rather than taken from the corpus. Upstream
+		// has valid cases of this shape, but a rule whose predicate answered "carries a default"
+		// for a plain parameter would light up every function in the tree, and that failure is
+		// worth a case somebody wrote deliberately. My first draft of this rule had exactly that
+		// defect: it kept upstream's loop bound and dropped its skip over a required parameter, so
+		// every parameter in a list like these reported. Inverting the predicate turns all four
+		// red.
+		{"two plain required parameters",
+			"function componentPrefixFromInterfaceName(interfaceName: string, suffix: string): string | null {\n\treturn null;\n}"},
+		{"three plain required parameters",
+			"function f(a: string, b: number, c: boolean) { return [a, b, c]; }"},
+		{"a required parameter followed by a destructured one carrying no default",
+			"function f(a: string, { b }: { b: number }) { return [a, b]; }"},
+		{"a method whose second parameter is an array binding pattern carrying no default",
+			"const o = {\n\tcreate(context, [options]) {\n\t\treturn [context, options];\n\t},\n};"},
 		// Cases the corpus does not write. Every one is a shape our parser gives an ordinary
 		// function kind while the TypeScript ESTree gives it a node type outside upstream's three
 		// listeners, so without the nil-body guard each would report. Measured clean against the
