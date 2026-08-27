@@ -1088,11 +1088,22 @@ var rulesOutsideTheInventory = map[string]string{
 	// one overload pair per message id makes this rule report all four and makes ESLint report the
 	// three its version supports, and the same ESLint harness that returned zero over the tree
 	// returns a finding when handed that file.
+	//
+	// The zero is also not an absence of subject matter. Parsing all 3,505 files and grouping
+	// bodiless signatures by name within each scope finds 11 overload sets across 10 files, one of
+	// them 96 signatures deep (`GraphQlTag.ts`), so the rule had real input and judged none of it
+	// unifiable. Spot-checked: `Array.ts` declares `getRandom<T>(array): T` against
+	// `getRandom<T>(array, strict): T | undefined`, which differ in RETURN type and so fail the
+	// unification gate before parameters are even compared; `BaseSchema.is` differs in type
+	// parameters. A grep cannot do this count, because `condition ? a : b;` matches the same shape
+	// as a bodiless signature; the count is from the parser and was controlled against a seeded
+	// file.
 	"@typescript-eslint/unified-signatures": "ported from typescript-eslint and enabled; upstream " +
 		"marks it recommended:'strict' and too opinionated to recommend, so the gate being " +
 		"replaced does not enforce it; measured at zero findings on the ahra tree against 3,516 " +
 		"registrations, matching ESLint's zero over all 3,505 TypeScript files, with a seeded probe " +
-		"confirming all four message ids fire",
+		"confirming all four message ids fire and a parser-driven count finding 11 real overload " +
+		"sets across 10 files that the rule examined and correctly declined",
 
 	"@typescript-eslint/no-unsafe-assignment": "ported from typescript-eslint and enabled; not " +
 		"enforced by the gate being replaced when the inventory was captured, though its three " +
@@ -1196,6 +1207,21 @@ var rulesOutsideTheInventory = map[string]string{
 	// and is a guardrail against drift. A seeded tree confirmed the rule can fire, because an audit
 	// pairing a strong recommendation with a zero is the shape that has hidden an inert rule before.
 	"@typescript-eslint/consistent-type-assertions": "ported from typescript-eslint, whose stylistic preset carries it; not enforced by either tool when the inventory was captured, and both the audit and this port measure zero violations",
+
+	// Ported from typescript-eslint, registered and left unenabled pending a decision.
+	//
+	// Not in the inventory because neither tool being replaced ran it: upstream carries it in the
+	// STRICT preset. The audit measured 54 violations, which is the number to weigh before turning
+	// it on, and the port was measured against upstream's own 264-case corpus replayed through the
+	// installed 8.67.0 build with a real type checker, one program per case.
+	//
+	// 259 of those cases run here and pass. Seven are skipped and each names why in the test file:
+	// five depend on which @types packages this machine has installed rather than on the rule, and
+	// two need an ambient declaration the fixture harness cannot supply, since it writes its own
+	// tsconfig with "types": [] after any setup hook runs. The arm those two cover, a deprecated
+	// attribute on an intrinsic JSX element, is proven separately with the namespace declared in
+	// the fixture, together with the negative control that catches a rule reporting unconditionally.
+	"@typescript-eslint/no-deprecated": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured; the audit measured 54 violations, so enabling is a decision with cleanup attached",
 
 	// The same shape, and its port is likewise checked against the source repository rather than an
 	// imported corpus. The original rule was driven over all 2,556 TypeScript files of
