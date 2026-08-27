@@ -343,9 +343,17 @@ func valueMatchesSpecifier(
 	if subject == nil {
 		return false
 	}
-	// Upstream is `type.getSymbol() ?? type.aliasSymbol`. The two lines above in this file read the
-	// alias the other way round, alias first; the order matters only for an aliased type that also
-	// carries its own symbol, and upstream's order is the one this reproduces.
+	// Upstream is `type.getSymbol() ?? type.aliasSymbol`, so the type's own symbol wins and the
+	// alias is the fallback. The two functions above this one ask alias FIRST, because each needs a
+	// different value in the else branch; the order only matters for an aliased type that also
+	// carries its own symbol, and this reproduces upstream's.
+	//
+	// No nil check between the two calls, and that is deliberate rather than an omission: the
+	// accessors above guard `alias == nil` explicitly, so a reader comparing this to them will
+	// look for the missing guard. `TypeAlias.Symbol()` opens with `if a == nil { return nil }`
+	// (types.go:664), and a Go method with a nil-receiver guard is safe to call through a nil
+	// pointer, so `Alias()` returning nil for a non-alias type, which is most types, resolves to a
+	// nil symbol and falls through to the return below.
 	symbol := subject.Symbol()
 	if symbol == nil {
 		symbol = subject.Alias().Symbol()
