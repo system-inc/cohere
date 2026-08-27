@@ -1,22 +1,22 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 225,
+  "total": 239,
   "byNamespace": {
-    "(core)": 69,
+    "(core)": 78,
     "better-tailwindcss": 12,
     "nextjs": 22,
     "nexus": 20,
-    "react": 36,
+    "react": 38,
     "structure": 32,
-    "typescript": 34
+    "typescript": 37
   },
   "bySeverity": {
-    "error": 183,
+    "error": 197,
     "warn": 42
   },
   "byEnabledBy": {
-    "rulesBlock": 184,
+    "rulesBlock": 198,
     "pluginDefault": 41
   },
   "rules": [
@@ -163,6 +163,42 @@
       "options": "no",
       "severity": "warn",
       "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "default-case-last",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-self-compare",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-undef-init",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "guard-for-in",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
     },
     {
       "rule": "nextjs/google-font-display",
@@ -866,6 +902,24 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "no-proto",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-labels",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "no-iterator",
       "sources": [
         "oxlint"
@@ -889,6 +943,24 @@
       "sources": [
         "eslint",
         "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-new",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "no-new-func",
+      "sources": [
+        "eslint"
       ],
       "options": "no",
       "severity": "error",
@@ -930,6 +1002,15 @@
       "options": "no",
       "severity": "warn",
       "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "no-return-assign",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
     },
     {
       "rule": "no-octal",
@@ -1331,6 +1412,24 @@
       "options": "no",
       "severity": "warn",
       "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "react/no-deriving-state-in-effects",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react/no-deprecated",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
     },
     {
       "rule": "react/no-find-dom-node",
@@ -1968,6 +2067,15 @@
       "enabledBy": "pluginDefault"
     },
     {
+      "rule": "typescript/no-import-type-side-effects",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "typescript/no-implied-eval",
       "sources": [
         "oxlint"
@@ -1975,6 +2083,24 @@
       "options": "no",
       "severity": "warn",
       "enabledBy": "pluginDefault"
+    },
+    {
+      "rule": "typescript/no-invalid-this",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "typescript/no-mixed-enums",
+      "sources": [
+        "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
     },
     {
       "rule": "typescript/no-misused-new",
