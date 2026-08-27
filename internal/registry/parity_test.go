@@ -686,6 +686,22 @@ var rulesOutsideTheInventory = map[string]string{
 	"no-label-var": "ported from eslint core, which marks it recommended:false; not enforced by " +
 		"either tool when the inventory was captured, and the audit measured zero violations",
 
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// The audit measured zero violations, so this is a guardrail against drift rather than a
+	// cleanup, and the audit rated it Yes on exactly that basis. The tree writes almost no labels.
+	//
+	// The port carries upstream's fixer including the four cases it refuses, where a comment sits
+	// inside the span the removal would delete. One divergence is recorded and it comes from the
+	// parser rather than from the rule: our parser recovers from a `continue` naming a switch and
+	// from a duplicate label, both of which eslint rejects as syntax errors, so the rule judges
+	// inputs upstream never reaches. Sixteen well formed inputs were measured against the installed
+	// rule and all sixteen agree.
+	"no-extra-label": "ported from eslint core, which marks it recommended:false; not enforced by " +
+		"either tool when the inventory was captured, and the audit measured zero violations",
+
 	// Ported from eslint core and registered by this port, but enabled in neither engine. Outside
 	// the inventory for the usual reason: upstream marks it `recommended: false`, so a project on
 	// the recommended set never had it, and there is no oxlint config in the tree to have carried
