@@ -464,6 +464,49 @@ func TestNoImplicitCoercionMultiplyByOneOperandShapes(t *testing.T) {
 	}
 }
 
+// TestNoImplicitCoercionMultilineOperand pins the shape whose RECOMMENDATION spans lines.
+//
+// Upstream writes every case on one line, so no imported fixture produces a recommendation
+// containing a newline. That matters beyond the rule: the message embeds the operand's own source
+// text, so a `!!(` whose operand closes several lines later renders a multi-line message, and any
+// instrument that reads verify's output line by line loses the finding.
+//
+// This was reported as a missing finding at DialogRoot.tsx:175:25 and it was not one. The rule
+// reports it, the live run prints it, and two extraction scripts on opposite sides of the
+// comparison each dropped it: one because a wrapped continuation carried the rule tag and inflated
+// the count, one because the first line did not. The two errors happened to cancel, which is why an
+// earlier measurement read as exact agreement at the wrong number.
+//
+// The fixtures below are the rule's half of that. Nothing here can catch an extraction bug, which
+// is the point worth remembering: the defect was never in the rule.
+func TestNoImplicitCoercionMultilineOperand(t *testing.T) {
+	for _, testCase := range []struct {
+		name           string
+		sourceText     string
+		wantRecommends string
+	}{
+		{"an operand closing on a later line", "var x = !!(\n\ta &&\n\tb\n);", "Boolean(a &&\n\tb)"},
+		{"a newline after the opening parenthesis only", "var x = !!(\n\ta && b);", "Boolean(a && b)"},
+		{"a newline before the closing parenthesis only", "var x = !!(a && b\n);", "Boolean(a && b)"},
+		{"the shape reported from the tree", "var x = a ?? !!(\n\tb === undefined &&\n\tc === undefined &&\n\t!d\n);", "Boolean(b === undefined &&\n\tc === undefined &&\n\t!d)"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
+				testCase.sourceText, nil)
+			rule_testing.ExpectFindings(t, result, "implicitCoercion")
+			want := noImplicitCoercionMessage(testCase.wantRecommends).Description
+			if got := result.Diagnostics[0].Message.Description; got != want {
+				t.Fatalf("message:\n got %q\nwant %q", got, want)
+			}
+			// Note which rows carry a newline in the recommendation and which do not: a break
+			// INSIDE the operand survives into the message because the text is sliced from source,
+			// while a break between the parenthesis and the operand is trivia and does not. Both
+			// are asserted by the equality above rather than by a separate predicate, which is
+			// what an earlier version of this test got wrong.
+		})
+	}
+}
+
 // TestNoImplicitCoercionTypeScriptShapes covers syntax upstream's corpus structurally cannot carry.
 //
 // Its tests are JavaScript, so no imported case puts a type assertion, a non-null operator or a
