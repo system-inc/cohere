@@ -502,22 +502,25 @@ class Outer extends React.Component {
 	}
 }
 
-// TestNoDirectMutationStateDeclinesNonJsxFiles pins the source-type gate.
+// TestNoDirectMutationStateReportsInNonJsxFiles pins the ABSENCE of a source-type gate.
 //
-// Upstream's `should_run` returns false for a file the parser does not read as JSX, so a rule that
-// dropped the gate would report here and nothing else in this file would notice. The same source
-// reports in the `.tsx` fixture above, which is what makes this a measurement of the gate rather
-// than of the rule going silent for some other reason.
-func TestNoDirectMutationStateDeclinesNonJsxFiles(t *testing.T) {
+// oxc's `should_run` returns false for a file the parser does not read as JSX, and that gate came
+// along with the port from oxc. eslint-plugin-react, the authority this rule is ported against,
+// has no such gate, and a React class in a `.ts` file is ordinary and legal. This case previously
+// expected silence, which locked the gate in rather than catching it.
+//
+// The `.tsx` control below is kept: it is what makes this a measurement of the suffix rather than
+// of the rule going silent for some other reason.
+func TestNoDirectMutationStateReportsInNonJsxFiles(t *testing.T) {
 	const source = `
 class A extends React.Component {
   m() { this.state.x = 1; }
 }`
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoDirectMutationState, "/repository/source/Plain.ts", source))
+	rule_testing.ExpectFindings(t,
+		rule_testing.Run(t, NoDirectMutationState, "/repository/source/Plain.ts", source),
+		"noDirectMutationState")
 
-	// The control: the identical source in a JSX file does report, so the silence above is the
-	// suffix and not the source.
+	// The control: the identical source in a JSX file also reports, so both suffixes agree.
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, source), "noDirectMutationState")
 }

@@ -168,22 +168,10 @@ var NoDirectMutationState = rule.Rule{
 	// inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/no-direct-mutation-state",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
-		// oxc gates the whole rule on `source_type().is_jsx()` through `should_run`, so a file the
-		// parser does not read as JSX registers nothing rather than declining node by node. Spelled
-		// as the file suffix the way `no-string-refs` and `no-did-mount-set-state` in this package
-		// spell it, because the suffix is what decides the script kind in the harness and in a real
-		// run alike.
-		//
-		// One measured divergence, stated rather than closed: oxlint reads a bare `.js` file as JSX
-		// and reports there, while `isJsxFileName` answers only for `.tsx` and `.jsx`. Checked by
-		// copying a reporting fixture to four suffixes and running the release binary: `.jsx`,
-		// `.js` and `.tsx` all produced 5 findings, `.ts` produced 0. The package convention is
-		// followed rather than diverged from for one rule, because the tree this lints is
-		// TypeScript and a split here would make two rules in one package answer differently for
-		// the same file.
-		if !isJsxFileName(ctx.SourceFile.FileName()) {
-			return nil
-		}
+		// No file gate. oxc gated this on `source_type().is_jsx()` and that gate came along with the
+		// port from oxc, but the authority here is eslint-plugin-react, which does not gate on the
+		// file name at all. React code in a `.ts` file is ordinary and legal, and the gate made this
+		// rule silent across more `.ts` files than the `.tsx` files it could see.
 
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
