@@ -716,6 +716,26 @@ var rulesOutsideTheInventory = map[string]string{
 	"no-extra-label": "ported from eslint core, which marks it recommended:false; not enforced by " +
 		"either tool when the inventory was captured, and the audit measured zero violations",
 
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// The audit measured zero violations, so this is a guardrail against drift rather than a
+	// cleanup, and the audit rated it Yes on exactly that basis.
+	//
+	// It replaces eslint-scope with the tree, and what upstream's `reference.from === scope` MEANS
+	// was measured against the installed rule rather than read off its source. It is the innermost
+	// eslint scope, which eslint opens for a block, a switch, a loop body, a catch and a `with` but
+	// not for an unbraced if consequent, a labeled statement or any expression nesting, so several
+	// shapes report on code where the alias does end up holding `this`. Reproduced rather than
+	// corrected, with the measurement at the line.
+	//
+	// Three behaviours the imported corpus could not show, each found by measuring: a function
+	// expression is a scope of its own, an arrow is neither a scope nor transparent, and a
+	// function's own body block is that function's scope rather than a nested one.
+	"consistent-this": "ported from eslint core, which marks it recommended:false; not enforced by " +
+		"either tool when the inventory was captured, and the audit measured zero violations",
+
 	// Ported from eslint core and registered by this port, but enabled in neither engine. Outside
 	// the inventory for the usual reason: upstream marks it `recommended: false`, so a project on
 	// the recommended set never had it, and there is no oxlint config in the tree to have carried
