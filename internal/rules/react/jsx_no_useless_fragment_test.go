@@ -574,3 +574,78 @@ func TestJsxNoUselessFragmentPragmaIsFixedAtReact(t *testing.T) {
 	const control = "declare const React: any;\ndeclare const foo: any;\nconst a = <React.Fragment>{foo}</React.Fragment>;\n"
 	rule_testing.ExpectFindings(t, runJsxNoUselessFragment(t, control, ""), "NeedsMoreChildren")
 }
+
+// TestJsxNoUselessFragmentReadsBothFragmentSpellings pins why this file does not call jsx.ElementParts.
+//
+// `TestRulePackagesDoNotReachPastWrappedAccessors` flags three `AsJsxOpeningElement().TagName`
+// reaches here, on the correct general principle that a self-closing element never produces a
+// JsxOpeningElement and a rule reading only one form goes silent on the common case. All three carry
+// a written reason, and this is the fixture behind those reasons so the next reader meets a
+// measurement rather than a claim.
+//
+// The helper answers a JsxOpeningElement or a JsxSelfClosingElement. All three sites hold a
+// JsxElement, which it answers nil for, so substituting it would make the rule stop recognizing
+// `<Fragment>` rather than start recognizing more. Verified by making that substitution at the
+// listener: seven subtests fail.
+//
+// What the guard is really protecting is covered, and covered by a different mechanism: the
+// self-closing spelling has its own listener, and the rows below run every spelling of a fragment
+// through the rule so a regression that dropped one is visible here rather than only in the guard.
+func TestJsxNoUselessFragmentReadsBothFragmentSpellings(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+		wantIds    []string
+	}{
+		{
+			"a bare fragment with a paired tag",
+			"declare const x: any;\nconst a = <div><>{x}</></div>;\n",
+			[]string{"NeedsMoreChildren", "ChildOfHtmlElement"},
+		},
+		{
+			"a Fragment element with a paired tag",
+			"declare const Fragment: any;\ndeclare const x: any;\nconst a = <div><Fragment>{x}</Fragment></div>;\n",
+			[]string{"NeedsMoreChildren", "ChildOfHtmlElement"},
+		},
+		{
+			"a SELF-CLOSING Fragment element",
+			"declare const Fragment: any;\nconst a = <div><Fragment /></div>;\n",
+			[]string{"NeedsMoreChildren", "ChildOfHtmlElement"},
+		},
+		{
+			"a self-closing namespaced Fragment",
+			"declare const React: any;\nconst a = <div><React.Fragment /></div>;\n",
+			[]string{"NeedsMoreChildren", "ChildOfHtmlElement"},
+		},
+		{
+			"a self-closing element that is NOT a fragment is ignored",
+			"declare const Foo: any;\nconst a = <div><Foo /></div>;\n",
+			nil,
+		},
+		// The parent side of the same question. A fragment's parent is never a
+		// JsxSelfClosingElement, because such an element has no children to nest into, so the two
+		// parent-inspecting helpers testing only KindJsxElement is complete rather than narrow.
+		// These rows exercise the parent test through every parent a fragment can actually have.
+		{
+			"a fragment whose parent is a component element",
+			"declare const Foo: any;\ndeclare const x: any;\nconst a = <Foo><>{x}</></Foo>;\n",
+			[]string{"NeedsMoreChildren"},
+		},
+		{
+			"a fragment whose parent is another fragment",
+			"declare const x: any;\nconst a = <><>{x}</><span /></>;\n",
+			[]string{"NeedsMoreChildren"},
+		},
+		{
+			"a fragment whose parent is an expression container",
+			"declare const Foo: any;\ndeclare const x: any;\nconst a = <Foo attribute={<>{x}</>} />;\n",
+			[]string{"NeedsMoreChildren"},
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectFindings(t, runJsxNoUselessFragment(t, testCase.sourceText, ""), testCase.wantIds...)
+		})
+	}
+}

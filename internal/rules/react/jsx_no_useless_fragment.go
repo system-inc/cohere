@@ -135,6 +135,12 @@ var JsxNoUselessFragment = rule.Rule{
 				if opening == nil {
 					return
 				}
+				// Not `jsx.ElementParts`, and the reason is measured rather than stylistic: that
+				// helper answers a JsxOpeningElement or a JsxSelfClosingElement, and this holds a
+				// JsxElement. Handed one, it returns a nil tag name, so calling it here would make
+				// the rule silently stop recognizing `<Fragment>` entirely. The self-closing form
+				// this file must also handle has its own listener below, which is the shape
+				// `ElementParts` exists to prevent a rule from missing.
 				if jsxNoUselessFragmentIsFragmentName(opening.AsJsxOpeningElement().TagName) {
 					check(node)
 				}
@@ -346,6 +352,13 @@ func jsxNoUselessFragmentIsChildOfHtmlElement(node *ast.Node) bool {
 	if opening == nil {
 		return false
 	}
+	// Not `jsx.ElementParts`: the subject here is the PARENT, which the test above has already
+	// narrowed to a JsxElement, and that helper answers nil for a JsxElement. The self-closing case
+	// it guards against cannot arise on this line either, measured rather than argued: a
+	// self-closing element has no children, so nothing nests inside one. Probed over five nesting
+	// shapes and a fragment's parent came back JsxElement, JsxFragment, JsxExpression or a
+	// declaration, never JsxSelfClosingElement. Upstream tests `parent.type === 'JSXElement'` the
+	// same way.
 	tagName := opening.AsJsxOpeningElement().TagName
 	if tagName == nil || tagName.Kind != ast.KindIdentifier {
 		return false
@@ -395,6 +408,9 @@ func jsxNoUselessFragmentIsChildOfComponentElement(node *ast.Node) bool {
 	if opening == nil {
 		return false
 	}
+	// Not `jsx.ElementParts`, for the same measured reason as `IsChildOfHtmlElement` above: the
+	// subject is the parent, already narrowed to a JsxElement, and a fragment's parent is never a
+	// JsxSelfClosingElement because such an element has no children to nest into.
 	return !jsxNoUselessFragmentIsFragmentName(opening.AsJsxOpeningElement().TagName)
 }
 
