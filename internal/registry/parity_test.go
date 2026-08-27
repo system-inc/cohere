@@ -299,6 +299,18 @@ func namespacesOf(remaining []string) []namespaceCount {
 // A reason is required. An entry here says "we looked", and an entry with no reason says only that
 // somebody wanted the test to pass.
 var rulesOutsideTheInventory = map[string]string{
+	// Ported from eslint-plugin-react and enabled in both engines by this port. Unlike the
+	// state-in-constructor entry below, upstream marks THIS one `recommended: true`, so its absence
+	// from the inventory says something about the configuration being replaced rather than about
+	// the rule: neither tool named it when the inventory was captured. A rule the gate never had
+	// rather than a parity gap.
+	//
+	// It is a judgment about JSX children, so it was enabled on the frontend layer. The audit
+	// measured zero violations in ahra, which makes it a guardrail against drift. That zero is
+	// worth more here than on a stylistic rule: the failure this catches is silent, since a comment
+	// left outside braces renders to the page and nothing warns.
+	"react/jsx-no-comment-textnodes": "ported from eslint-plugin-react, which recommends it; not enforced by either tool when the inventory was captured, and the audit measured zero violations in ahra",
+
 	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory
 	// records what the two tools enforced when it was captured, and neither enforced this one:
 	// upstream marks it `recommended: false`, so it is off in the plugin's own recommended config,
