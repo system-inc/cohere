@@ -186,6 +186,20 @@ func noUselessReturnWalk(from *control_flow_graph.Block[noUselessReturnEvent],
 		// An unreachable successor is entered only from a block that ended in a return, which is
 		// upstream's `isReturned` filter. Once inside the tail, with `from` unreachable too, keep
 		// going, because the tail can pass through blocks that do not end in a return.
+		//
+		// Both halves were found by a corpus case rather than derived, and neither is obvious from
+		// the graph alone.
+		//
+		// The first: in `case 1: if (a) { doSomething(); return; } break;` the break's block has an
+		// unreachable successor leading into the NEXT case. That successor is the fall-through that
+		// would exist if the break were not written, so it is not this return's continuation.
+		// Following it finds the next case's code, rescues the return, and goes silent on an input
+		// upstream reports.
+		//
+		// The second: in `try { bar(); return; } finally { baz(); } qux();` the tail runs return,
+		// then the finally's copy, then `qux()`. That copy ends in an expression statement rather
+		// than a return, so re-asking "did this block end in a return" at every hop stops one block
+		// short of the `qux()` that makes the return legitimate, and reports a clean input.
 		if !successor.Reachable && from.Reachable && !noUselessReturnEndsInReturn(from) {
 			continue
 		}
@@ -320,9 +334,22 @@ func noUselessReturnEnclosingTryBlock(node *ast.Node, root *ast.Node) *ast.Node 
 //
 // **A comment inside the statement.** `return/**/;` and `return//\n;` are the other two, and this
 // is the guard that matters most in this file: without it the repair silently deletes a comment
-// somebody wrote, and the deletion is applied unattended. Note the boundary is comments INSIDE the
-// return, not near it. Measured against the installed build, `bar(); /*keep*/ return;` is fixed
-// and the comment survives, because it belongs to no part of the return statement.
+// somebody wrote, and the deletion is applied unattended.
+//
+// The boundary is narrower than "the statement has a comment near it", and that narrowness is the
+// part nothing upstream pins. `getCommentsInside` asks only about comments the statement's own span
+// covers, so a comment beside the return is untouched by the guard and the repair still runs.
+// Measured against the installed build at 10.8.1, both directions:
+//
+//	function foo() { bar(); return/**/; }        reports, NO repair
+//	function foo() { bar(); /*keep*/ return; }   reports, repair runs, comment survives
+//	function foo() { bar(); return; /*keep*/ }   reports, repair runs, comment survives
+//
+// Both halves are load-bearing and they fail in opposite directions. Losing the first eats a
+// comment unattended. Losing the second stops the rule repairing ordinary code because a comment
+// happens to sit next to it, which is the quieter failure and the one a reader would not report as
+// a bug. Upstream's corpus covers the first two rows and writes nothing for the adjacency, so the
+// fixtures for it here are hand-written rather than imported.
 //
 // The span is the statement's own text via `RemoveNode`, which trims to the token and so leaves the
 // surrounding whitespace alone. That matters for a deletion fixer in this tree specifically: a span
