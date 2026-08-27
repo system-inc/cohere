@@ -577,11 +577,11 @@ func TestCheckedRequiresHandlesNilOptions(t *testing.T) {
 
 // TestCheckedRequiresHasNoFileGate reports on a `.ts` file, not only on `.tsx`.
 //
-// Three shipped rules in this package gate on `.tsx`/`.jsx` through `isJsxFileName`, which is oxc
-// residue rather than upstream behavior: real ESLint reports on `.ts` too, measured by probing
-// eslint-plugin-react with the same source under four suffixes, all four of which reported. Filed
-// as task 2abaqvt. This rule has no such gate and this pins it, so nobody adds one by analogy with
-// its neighbours.
+// Three shipped rules in this package USED to gate on `.tsx`/`.jsx` through `isJsxFileName`, which
+// was oxc residue rather than upstream behavior: real ESLint reports on `.ts` too, measured by
+// probing eslint-plugin-react with the same source under four suffixes, all four of which reported.
+// Filed as task 2abaqvt and removed in 4cff5fe, 206b628 and 9dbd234, so no rule in this package
+// gates on the suffix any more. This case still pins the absence, so nobody reintroduces one.
 //
 // `.ts` is the extension that matters and it is also the only one available. The typed harness
 // writes a tsconfig including `**/*.ts` and `**/*.tsx` (`internal/rule_testing/program.go:30`), so a

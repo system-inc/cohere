@@ -11,8 +11,9 @@ import (
 // is JSX and the harness picks its script kind off the suffix.
 //
 // NO file-suffix gate exists in this rule and none should be added. Three shipped react rules here
-// gate on .tsx or .jsx through an isJsxFileName helper, which is residue from an oxc-era port and
-// not upstream behavior: eslint-plugin-react reports on a .ts file exactly as it does on a .tsx one.
+// gated on .tsx or .jsx through an isJsxFileName helper, residue from an oxc-era port and not
+// upstream behavior: eslint-plugin-react reports on a .ts file exactly as it does on a .tsx one.
+// Those three gates were removed in 4cff5fe, 206b628 and 9dbd234; none remains in this package.
 // See TestNoNamespaceHasNoFileSuffixGate below, which pins that.
 const noNamespaceFile = "/repository/source/Namespace.tsx"
 

@@ -630,8 +630,9 @@ func TestButtonHasTypeNeedsTheTypedHarness(t *testing.T) {
 
 // TestButtonHasTypeHasNoFileGate reports on a `.ts` file, not only on `.tsx`.
 //
-// Three shipped rules in this package gate on `.tsx`/`.jsx` through `isJsxFileName`, which is oxc
-// residue rather than upstream behavior (task 2abaqvt). This rule has no such gate. The
+// Three shipped rules in this package used to gate on `.tsx`/`.jsx` through `isJsxFileName`, oxc
+// residue rather than upstream behavior (task 2abaqvt); all three gates are gone as of 4cff5fe,
+// 206b628 and 9dbd234. This rule never had one and this pins that. The
 // `createElement` arm is used because JSX in a `.ts` file is a syntax error, so it is the arm that
 // can actually distinguish the two extensions, and `.jsx` is unavailable because the typed harness
 // writes a tsconfig including only `**/*.ts` and `**/*.tsx`.

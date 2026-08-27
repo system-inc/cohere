@@ -292,7 +292,8 @@ func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(t *testing.T) {
 // and `.ts` reports nothing. That zero is the PARSER rather than a rule gate: in a `.ts` file
 // `<div>` is a type assertion and no JSX node is produced at all, so there is nothing for any JSX
 // rule to see. The `.js` row is what proves the absence of a gate, since an oxc-style
-// `isJsxFileName` check would decline it while the parser happily produces JSX there.
+// `isJsxFileName` check would decline it while the parser happily produces JSX there. Three other
+// rules in this package carried exactly that check until 4cff5fe, 206b628 and 9dbd234 removed it.
 //
 // This distinction matters because the two zeros look identical from a findings assertion, and
 // asserting a finding on `.ts` would be asserting something false about the parser.
