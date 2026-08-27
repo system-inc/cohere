@@ -972,6 +972,12 @@ var rulesOutsideTheInventory = map[string]string{
 		"spelling, which cannot resolve against the full name; not enforced by either tool when " +
 		"the inventory was captured",
 
+	// Ported from typescript-eslint and enabled in both engines by this port. Unlike the entry above
+	// it carries no prior decision in the config to override, so enabling is the ordinary path: the
+	// audit measures zero violations, which makes it a guardrail against drift rather than cleanup.
+	// Outside the inventory for the usual reason, that neither tool enforced it at capture time.
+	"@typescript-eslint/prefer-find": "ported from typescript-eslint, whose stylistic preset carries it; not enforced by either tool when the inventory was captured",
+
 	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
 	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
 	// never had it, and there is no oxlint config in the tree to have carried it either.
@@ -1069,6 +1075,21 @@ var rulesOutsideTheInventory = map[string]string{
 	"no-promise-executor-return": "ported from eslint core, which marks it recommended:false; not " +
 		"enforced by either tool when the inventory was captured, and the audit measured 61 " +
 		"violations it will now require somebody to work through by hand",
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either.
+	//
+	// The audit measured zero violations, so this is a guardrail against drift rather than a
+	// cleanup, and the audit rated it Yes on exactly that basis.
+	//
+	// One option is deliberately not ported and the decline is recorded here as well as at the line,
+	// because this is where a coverage audit looks. `enforceForTSTypes` extends the same judgment to
+	// accessor signatures in a TypeScript type literal or interface body. It defaults to FALSE, so
+	// declining it is what an unset project already gets, and the live config names it nowhere.
+	// Upstream's 14 cases for it are imported and pinned as clean rather than dropped.
+	"grouped-accessor-pairs": "ported from eslint core, which marks it recommended:false; not " +
+		"enforced by either tool when the inventory was captured, and the audit measured zero " +
+		"violations; upstream's enforceForTSTypes option is declined, see the comment above",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
