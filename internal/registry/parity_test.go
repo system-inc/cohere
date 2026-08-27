@@ -359,6 +359,20 @@ var rulesOutsideTheInventory = map[string]string{
 	// the tree is what an empty list produces rather than evidence about the code.
 	"react/forbid-elements": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and it enforces nothing until a forbid list is configured, so the audit's zero and the dry run's zero both reflect an empty list",
 
+	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory records
+	// what the two tools enforced when it was captured, and neither enforced this one: upstream marks
+	// it `recommended: false`, so it is off in the plugin's own recommended config and nothing turned
+	// it on here, which is why it is outside the inventory rather than a parity gap.
+	//
+	// It is a judgment about JSX children, so it was enabled on the frontend layer. The audit measured
+	// zero violations in ahra and a dry run over the tree reproduced that zero.
+	//
+	// This port diverges from upstream in one place and the divergence is a refusal to crash. Upstream
+	// indexes the first argument of any call among the children without checking there is one, so an
+	// ordinary call in that position takes the linter down, measured on the installed build. Here that
+	// is guarded, reaching the verdict upstream would have reached had it not thrown.
+	"react/no-adjacent-inline-elements": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and the audit measured zero violations in ahra, which a dry run over the tree reproduced",
+
 	// Ported from eslint-plugin-react and enabled in both engines by this port. The inventory
 	// records what the two tools enforced when it was captured, and neither enforced this one:
 	// upstream marks it `recommended: false`, so it is off in the plugin's own recommended config,
@@ -718,6 +732,16 @@ var rulesOutsideTheInventory = map[string]string{
 	"unicode-bom": "ported from eslint core, which marks it recommended:false; registered but left " +
 		"off because osvfs strips the leading byte order mark before any rule runs, so the rule " +
 		"cannot see its own subject; not enforced by either tool when the inventory was captured",
+
+	// Ported from typescript-eslint and registered, but NOT enabled and therefore NOT given an
+	// inventory entry, because an entry says the gate being replaced enforces it and nothing does.
+	// The reason it is off is volume: 2,846 findings across 672 files measured on the ahra tree
+	// against the installed 8.67.0 build, no fixer, and every site a judgment about what the code
+	// really guarantees. That is a decision with an owner, not a porting question.
+	"@typescript-eslint/no-unsafe-type-assertion": "ported from typescript-eslint; registered but " +
+		"left off pending a decision about volume, measured at 2,846 findings across 672 files on " +
+		"the ahra tree with no fixer and a human judgment at every site; not enforced by either " +
+		"tool when the inventory was captured",
 
 	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
 	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set

@@ -105,6 +105,18 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// `osvfs` and does not, so the two phases disagree by three bytes about where everything in
 		// a marked file lives.
 		"unicode-bom": "the leading byte order mark is stripped by osvfs before any rule runs, so the rule cannot see its own subject; measured against osvfs.FS().ReadFile with an unmarked control and a mid-file control",
+
+		// Registered but deliberately not enabled, and the reason is volume rather than
+		// correctness. Measured against the ahra tree with the installed @typescript-eslint 8.67.0
+		// build: 2,846 findings across 672 files, with 324 of them in one file. The rule ships no
+		// fixer, and every site is a judgment about what the code actually guarantees rather than a
+		// mechanical rewrite, so adopting it is a project with an owner rather than a config line a
+		// porter adds.
+		//
+		// The port itself is complete and agrees with upstream on all twenty two of its corpus
+		// cases plus eight more measured shapes. Nothing here needs fixing before it can be turned
+		// on; somebody has to decide to spend the 2,846 decisions.
+		"@typescript-eslint/no-unsafe-type-assertion": "registered but left off pending a decision about volume: measured at 2,846 findings across 672 files on the ahra tree with the installed 8.67.0 build, no fixer, every site a human judgment",
 	}
 
 	rules := All()
