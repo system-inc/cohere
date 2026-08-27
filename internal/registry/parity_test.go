@@ -472,6 +472,21 @@ var rulesOutsideTheInventory = map[string]string{
 	// replaced has no equivalent because it has no such rules to protect.
 	"structure/react-hook-any-type": "a house tripwire over verify's own type-based React rules; the gate " +
 		"being replaced has no rule it could correspond to",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and there is no oxlint config in the tree to have carried it either. A rule the
+	// gate never had rather than a parity gap.
+	//
+	// This one needs stating carefully because it is a CLEANUP rather than a guardrail, and the
+	// audit rated it Maybe rather than Yes. The rule audit measured 57 sites in the ahra tree and
+	// the rule is not auto-fixable, so every one of them is a human decision about whether the
+	// author meant "null or undefined" or meant "null". Turning it on at error makes 57 files fail
+	// the gate until somebody works through them. That is a decision for Kirk rather than for this
+	// port, and it is recorded here so the number is not discovered by a red build.
+	"no-eq-null": "ported from eslint core, which marks it recommended:false; not enforced by either " +
+		"tool when the inventory was captured, and the audit measured 57 violations it will now " +
+		"require somebody to work through by hand",
 }
 
 // rulesDeclined names every inventory rule we have decided not to port, and why.
