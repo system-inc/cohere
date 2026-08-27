@@ -47,6 +47,20 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// off. Turning it on is a config change for whoever owns that block to make.
 		"react/jsx-key": "the live config turns react/jsx-key off deliberately, beside react-in-jsx-scope",
 
+		// The live config already turns this rule off, at VerifySettings.json:362, in the same
+		// block as react/jsx-key and react/react-in-jsx-scope. That decision was recorded BEFORE
+		// the rule was ported, which is how this migration is meant to work, and running
+		// EnableRule.ts would have reversed it through the porting process rather than because
+		// anybody changed their mind.
+		//
+		// Unlike the typescript/ case below, no spelling difference is involved: the key is the
+		// bare name and it resolves against the registered rule exactly. So the off applies, the
+		// rule is offered no files, and this exemption is what stops that reading as a wiring gap.
+		//
+		// The port is complete and proven either way. The audit measured 3 violations, all
+		// auto-fixable, so turning it on later is one config line plus a fix pass.
+		"no-useless-rename": "the live config turns no-useless-rename off deliberately, beside react/jsx-key",
+
 		// The live config already turns this rule off, at VerifySettings.json:370, under the
 		// spelling `typescript/require-array-sort-compare`. Somebody decided against it, and the
 		// port does not get to reverse that.

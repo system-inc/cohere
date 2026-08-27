@@ -837,6 +837,22 @@ var rulesOutsideTheInventory = map[string]string{
 	// the PROGRAM scope's parseInt, so a block-scoped shadow anywhere in the file exempts every
 	// call; this port resolves per call site, so `{ let parseInt; } parseInt("10")` reports here and
 	// is clean upstream. Both answers are stated in a fixture.
+	// Ported from eslint core and registered by this port, but enabled in neither engine. Outside
+	// the inventory for the usual reason: upstream marks it `recommended: false`, so a project on
+	// the recommended set never had it, and there is no oxlint config in the tree to have carried
+	// it either.
+	//
+	// Left off because the live config already says off, at VerifySettings.json:362, in the same
+	// block as react/jsx-key. That decision predates the port, and enabling it here would reverse
+	// somebody's standing decision through the porting process. The full reasoning is in
+	// `deliberatelyNotEnabled` in live_wiring_test.go.
+	//
+	// The audit measured 3 violations, all auto-fixable, so the cost of turning it on later is one
+	// config line and a reviewed fix pass.
+	"no-useless-rename": "ported and registered but left off, matching an explicit off in the live " +
+		"config; not enforced by either tool when the inventory was captured, and the audit " +
+		"measured 3 violations, all auto-fixable",
+
 	"radix": "ported from eslint core, which marks it recommended:false; not enforced by either " +
 		"tool when the inventory was captured, and the audit measured 172 violations while this " +
 		"port measures 168, each needing a per-site decision because upstream offers a suggestion " +
