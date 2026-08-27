@@ -52,7 +52,7 @@ var pageStateHookNames = map[string]bool{
 // behind its zero and this one does not. The fixtures and a planted control through the real binary
 // are the whole of the evidence for it.
 var NextNoPageState = rule.Rule{
-	Name: "next-no-page-state",
+	Name: "structure/next-no-page-state",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// IsReactFile is redundant here and kept for symmetry with the original, which tests both.
 		// IsPageFile already requires a .tsx or .jsx suffix, so no file can satisfy it and fail the

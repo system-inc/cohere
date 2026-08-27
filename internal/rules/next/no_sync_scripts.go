@@ -31,7 +31,7 @@ var NoSyncScripts = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-sync-scripts` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files while
 	// its own tests pass.
-	Name: "no-sync-scripts",
+	Name: "@next/next/no-sync-scripts",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)

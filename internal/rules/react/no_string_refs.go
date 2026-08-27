@@ -232,7 +232,7 @@ var NoStringRefs = rule.Rule{
 	// No namespace prefix. The config writes `react/no-string-refs` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-no-string-refs` would match no inventory entry and lint
 	// no files while passing every fixture in this package.
-	Name: "no-string-refs",
+	Name: "react/no-string-refs",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// An unconfigured rule is handed nil, and the zero value is upstream's answer under this
 		// repository's configuration: template refs unreported, and the `this.refs` half off

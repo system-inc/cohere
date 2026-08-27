@@ -75,7 +75,7 @@ type EnforceConsistentImportantPositionOptions struct {
 // Not fixable, for the reason its siblings are not: a class literal here wraps across lines with
 // indentation that carries intent, and a fixer would be the first thing to reflow it.
 var EnforceConsistentImportantPosition = rule.Rule{
-	Name: "enforce-consistent-important-position",
+	Name: "better-tailwindcss/enforce-consistent-important-position",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

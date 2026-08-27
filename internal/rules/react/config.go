@@ -109,7 +109,7 @@ var Config = rule.Rule{
 	// Bare name, no namespace prefix. The inventory writes `react/config` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-config` would match no entry while still
 	// passing every fixture in this file.
-	Name: "config",
+	Name: "react-hooks/config",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {

@@ -58,7 +58,7 @@ func messageNoConstEnumSuffix(name string) rule.Message {
 // No fix. The new name is a judgment about what the value represents, and the rule offers four
 // suffixes precisely because it cannot tell which one is right.
 var ConsistencyRequireTypeSuffix = rule.Rule{
-	Name: "consistency-require-type-suffix",
+	Name: "nexus/consistency-require-type-suffix",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindTypeAliasDeclaration: func(node *ast.Node) {

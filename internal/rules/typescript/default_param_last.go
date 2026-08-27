@@ -131,7 +131,7 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 // the arms being deleted, and the reasoning that would have justified deleting them was the wrong
 // half of a grammar-versus-parser distinction. Four fixtures pin it now.
 var DefaultParamLast = rule.Rule{
-	Name: "default-param-last",
+	Name: "@typescript-eslint/default-param-last",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		check := func(node *ast.Node) {
 			// A bodyless construct declares a shape rather than an implementation, and upstream

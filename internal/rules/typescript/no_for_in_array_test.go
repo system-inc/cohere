@@ -290,7 +290,7 @@ func TestNoForInArrayMessageText(t *testing.T) {
 	}
 
 	finding := result.Diagnostics[0]
-	if finding.RuleName != "no-for-in-array" {
+	if finding.RuleName != "@typescript-eslint/no-for-in-array" {
 		t.Fatalf("rule reported under %q, which no config entry enables and no suppression comment "+
 			"could silence; upstream's own spelling carries a stray -rule suffix", finding.RuleName)
 	}

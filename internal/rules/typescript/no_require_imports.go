@@ -149,7 +149,7 @@ var messageNoRequireImports = rule.Message{
 // evaluated, and has no correct answer when the call sits inside a function or a conditional. That
 // is a change of meaning at a site the rule does not own, so it is not even a suggestion here.
 var NoRequireImports = rule.Rule{
-	Name: "no-require-imports",
+	Name: "@typescript-eslint/no-require-imports",
 
 	// See the doc above: telling the CommonJS `require` from a local binding of that name is name
 	// resolution, and the four-way probe that established it is recorded there.

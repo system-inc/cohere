@@ -70,7 +70,7 @@ var messageNoAsyncClientComponent = rule.Message{
 // No fix. The repair is to remove `async` and rewrite whatever the body awaited, which the rule
 // cannot know how to do.
 var NoAsyncClientComponent = rule.Rule{
-	Name: "no-async-client-component",
+	Name: "@next/next/no-async-client-component",
 
 	// The indirect shapes resolve an exported identifier back to its declaration, which upstream
 	// does through `get_declaration_of_variable`. Measured: a block-scoped async `MyComponent`

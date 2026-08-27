@@ -235,7 +235,7 @@ var Globals = rule.Rule{
 	// No namespace prefix. The config writes `react/globals`, and the parity guard strips the
 	// namespace on a `/` boundary, so `react-globals` would match no inventory entry while still
 	// passing every fixture in this package. Measured in both spellings; see the test.
-	Name: "globals",
+	Name: "react-hooks/globals",
 
 	// The whole rule is "where is this name declared relative to the enclosing component", and
 	// nothing structural answers it. `g = 1` is the same three characters whether `g` is a module

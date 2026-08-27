@@ -118,7 +118,7 @@ var InlineScriptId = rule.Rule{
 	// No namespace prefix. The config writes `nextjs/inline-script-id` and the parity guard strips
 	// the namespace on a `/` boundary, so a prefixed name would match no inventory entry and lint no
 	// files while every fixture in this package stayed green.
-	Name: "inline-script-id",
+	Name: "@next/next/inline-script-id",
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		scriptNames := defaultImportNamesOf(ctx.SourceFile, "next/script")

@@ -200,7 +200,7 @@ const (
 var NoUnsafe = rule.Rule{
 	// No namespace prefix. The config writes `react/no-unsafe` and the parity guard strips the
 	// namespace on a `/` boundary.
-	Name: "no-unsafe",
+	Name: "react/no-unsafe",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's default of false. The
 		// comma-ok form matters: the plain harness and a bare severity in the config both hand this

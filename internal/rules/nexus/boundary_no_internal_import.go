@@ -42,7 +42,7 @@ var (
 // the linter ran from the repository root and silently stopped enforcing anything when it did not.
 // Resolving against the importing file has no such dependence.
 var BoundaryNoInternalImport = rule.Rule{
-	Name: "boundary-no-internal-import",
+	Name: "nexus/boundary-no-internal-import",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

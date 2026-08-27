@@ -97,7 +97,7 @@ var NoIsMounted = rule.Rule{
 	// No namespace prefix. The config writes `react/no-is-mounted` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-no-is-mounted` would match no inventory entry, lint no
 	// files, and still pass every fixture in this package.
-	Name: "no-is-mounted",
+	Name: "react/no-is-mounted",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

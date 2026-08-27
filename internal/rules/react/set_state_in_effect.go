@@ -234,7 +234,7 @@ var messageSetStateInEffect = rule.Message{
 // Recorded rather than smoothed over, and a differential run against a tool implementing upstream's
 // binding-kind switch or its control dominators will show differences here for those reasons.
 var SetStateInEffect = rule.Rule{
-	Name:             "set-state-in-effect",
+	Name:             "react-hooks/set-state-in-effect",
 	NeedsTypeChecker: true,
 	// Same predicate as `set-state-in-render`: the setter is the type's alias, so an `any` hook
 	// return takes every finding in the file with it. Declared so the tripwire can name it.

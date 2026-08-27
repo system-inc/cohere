@@ -52,7 +52,7 @@ var messageUseTypeAliasSuffix = rule.Message{
 // `ButtonInterface` becomes `ButtonProperties`, because appending would produce `ButtonPropsProperties`,
 // which nobody wants and which the author would have to fix by hand anyway.
 var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
-	Name: "react-component-require-properties-type-suffix",
+	Name: "structure/react-component-require-properties-type-suffix",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
 			return nil

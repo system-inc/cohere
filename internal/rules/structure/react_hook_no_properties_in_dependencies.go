@@ -59,7 +59,7 @@ var hooksWithDependencies = map[string]bool{
 // listing `properties` twice reports twice, which is what the original does, and anchoring on the
 // call would collapse them into one finding at a line the author has to search.
 var ReactHookNoPropertiesInDependencies = rule.Rule{
-	Name: "react-hook-no-properties-in-dependencies",
+	Name: "structure/react-hook-no-properties-in-dependencies",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
 			return nil

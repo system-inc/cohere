@@ -97,7 +97,7 @@ var suggestionNoUnnecessaryParameterPropertyAssignment = rule.Message{
 // as a suggestion, because a suggestion is the vehicle upstream chose and a human sees it before it
 // lands. Shipping this as a fix would let the engine apply those two rewrites unattended.
 var NoUnnecessaryParameterPropertyAssignment = rule.Rule{
-	Name: "no-unnecessary-parameter-property-assignment",
+	Name: "@typescript-eslint/no-unnecessary-parameter-property-assignment",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

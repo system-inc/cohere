@@ -160,7 +160,7 @@ func buildPreferPromiseRejectErrorsMessage() rule.Message {
 // resolving. The reference scan runs only for a `new Promise` whose executor has a named second
 // parameter.
 var PreferPromiseRejectErrors = rule.Rule{
-	Name: "prefer-promise-reject-errors",
+	Name: "@typescript-eslint/prefer-promise-reject-errors",
 
 	// Every arm reads a type: the receiver's, the callee's, or the rejection reason's.
 	NeedsTypeChecker: true,

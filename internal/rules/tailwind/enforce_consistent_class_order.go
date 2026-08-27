@@ -78,7 +78,7 @@ type EnforceConsistentClassOrderOptions struct {
 // would produce diffs larger than the defect it repaired, and reordering is the one defect where
 // the noise of the repair can exceed the cost of the problem.
 var EnforceConsistentClassOrder = rule.Rule{
-	Name: "enforce-consistent-class-order",
+	Name: "better-tailwindcss/enforce-consistent-class-order",
 	// Declared because the rule reaches ctx.Program to get the design system. The stylesheet graph
 	// reaches files the program does not contain at all, so a findings cache keyed on the linted
 	// file alone is stale whenever `theme.css` changes and the `.tsx` file does not: zero findings,

@@ -355,7 +355,7 @@ var (
 // none of them, and the first one only promotes the suggestion this rule deliberately does not
 // promote.
 var ExhaustiveDeps = rule.Rule{
-	Name:             "exhaustive-deps",
+	Name:             "react-hooks/exhaustive-deps",
 	NeedsTypeChecker: true,
 	Run:              runExhaustiveDeps,
 }

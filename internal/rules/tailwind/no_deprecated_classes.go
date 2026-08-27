@@ -121,7 +121,7 @@ var deprecations = []deprecation{
 // than assumed: the plugin dissects the class and matches the base, and a port that matched the raw
 // name would miss every prefixed use, which is most of them in real markup.
 var NoDeprecatedClasses = rule.Rule{
-	Name: "no-deprecated-classes",
+	Name: "better-tailwindcss/no-deprecated-classes",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

@@ -30,7 +30,7 @@ var messageUseSimpleComment = rule.Message{
 // source lines into one, which moves every position after it in the file. Neither is a repair a
 // rule should make unattended.
 var ConsistencyNoSingleLineJsDoc = rule.Rule{
-	Name: "consistency-no-single-line-jsdoc",
+	Name: "nexus/consistency-no-single-line-jsdoc",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

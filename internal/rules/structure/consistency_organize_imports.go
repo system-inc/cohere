@@ -80,7 +80,7 @@ var messageImportsNotOrganized = rule.Message{
 // including the `'use client'` cases where the thing that is wrong is the directive's comment. The
 // span is that declaration's own text.
 var ConsistencyOrganizeImports = rule.Rule{
-	Name: "consistency-organize-imports",
+	Name: "structure/consistency-organize-imports",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Generated output is regenerated from a template nobody edits, so a finding asks for a
 		// change the next generation undoes. The original declines the same files.

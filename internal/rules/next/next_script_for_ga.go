@@ -115,7 +115,7 @@ var NextScriptForGa = rule.Rule{
 	// No namespace prefix. The config writes `nextjs/next-script-for-ga` and the parity guard strips
 	// the namespace on a `/` boundary, so a prefixed name would match no inventory entry and lint no
 	// files while every fixture in this package stayed green.
-	Name: "next-script-for-ga",
+	Name: "@next/next/next-script-for-ga",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)

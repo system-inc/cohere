@@ -102,7 +102,7 @@ var messageUnsafeDeclarationMerging = rule.Message{
 // checker: a rule that dereferences a checker result without that guard panics rather than going
 // quiet.
 var NoUnsafeDeclarationMerging = rule.Rule{
-	Name:             "no-unsafe-declaration-merging",
+	Name:             "@typescript-eslint/no-unsafe-declaration-merging",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node, opposite ast.Kind) {

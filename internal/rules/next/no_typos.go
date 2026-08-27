@@ -108,7 +108,7 @@ var messageNoTypos = rule.Message{
 var NoTypos = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-typos` and matching strips the namespace on a
 	// `/` boundary, so a prefixed name matches nothing and runs on no files while every test passes.
-	Name: "no-typos",
+	Name: "@next/next/no-typos",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if !nextjs.IsInPagesDirectory(ctx.SourceFile.FileName()) {
 			return nil

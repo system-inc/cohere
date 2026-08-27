@@ -76,7 +76,7 @@ var messageNoStyledJsxInDocument = rule.Message{
 var NoStyledJsxInDocument = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-styled-jsx-in-document` and matching strips
 	// the namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
-	Name: "no-styled-jsx-in-document",
+	Name: "@next/next/no-styled-jsx-in-document",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Asked once rather than per element, because it is a property of the file. Upstream asks
 		// it per node only because its listener has nowhere earlier to stand.

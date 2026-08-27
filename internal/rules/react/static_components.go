@@ -96,7 +96,7 @@ import (
 // creation site moves into the message text. No information is dropped, but a reader comparing
 // against React's goldens should know the shape differs deliberately.
 var StaticComponents = rule.Rule{
-	Name:             "static-components",
+	Name:             "react-hooks/static-components",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

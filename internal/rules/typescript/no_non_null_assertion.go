@@ -56,7 +56,7 @@ var messageSuggestOptionalChain = rule.Message{
 // a listener keyed to this node kind cannot see it. Verified against the parser rather than assumed,
 // and pinned by a clean fixture, because the two constructs are one keystroke apart in source.
 var NoNonNullAssertion = rule.Rule{
-	Name: "no-non-null-assertion",
+	Name: "@typescript-eslint/no-non-null-assertion",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

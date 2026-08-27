@@ -30,21 +30,21 @@ import (
 //
 // `hooks` maps to verify's `rules-of-hooks`, which is the one place the two names differ.
 var ShippedRules = map[string]string{
-	"config":               "config",
-	"error-boundaries":     "error-boundaries",
-	"gating":               "gating",
-	"globals":              "globals",
-	"hooks":                "rules-of-hooks",
-	"immutability":         "immutability",
-	"incompatible-library": "incompatible-library",
-	"purity":               "purity",
-	"refs":                 "refs",
-	"set-state-in-effect":  "set-state-in-effect",
-	"set-state-in-render":  "set-state-in-render",
-	"static-components":    "static-components",
-	"unsupported-syntax":   "unsupported-syntax",
-	"use-memo":             "use-memo",
-	"void-use-memo":        "void-use-memo",
+	"config":               "react-hooks/config",
+	"error-boundaries":     "react-hooks/error-boundaries",
+	"gating":               "react-hooks/gating",
+	"globals":              "react-hooks/globals",
+	"hooks":                "react-hooks/rules-of-hooks",
+	"immutability":         "react-hooks/immutability",
+	"incompatible-library": "react-hooks/incompatible-library",
+	"purity":               "react-hooks/purity",
+	"refs":                 "react-hooks/refs",
+	"set-state-in-effect":  "react-hooks/set-state-in-effect",
+	"set-state-in-render":  "react-hooks/set-state-in-render",
+	"static-components":    "react-hooks/static-components",
+	"unsupported-syntax":   "react-hooks/unsupported-syntax",
+	"use-memo":             "react-hooks/use-memo",
+	"void-use-memo":        "react-hooks/void-use-memo",
 }
 
 // TypeAwareRules are the shipped rules whose DECISION depends on resolving React's own types.

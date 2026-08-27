@@ -175,7 +175,7 @@ var shorthandGroups = [][]shorthandRule{
 // reports two, and the difference is entirely that second class of finding, which describes the
 // state upstream's fix passes through rather than anything in the source a reader wrote.
 var EnforceShorthandClasses = rule.Rule{
-	Name: "enforce-shorthand-classes",
+	Name: "better-tailwindcss/enforce-shorthand-classes",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

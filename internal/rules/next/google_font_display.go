@@ -50,7 +50,7 @@ var messageGoogleFontDisplayNotRecommended = rule.Message{
 var GoogleFontDisplay = rule.Rule{
 	// No family prefix. The config writes `nextjs/google-font-display` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
-	Name: "google-font-display",
+	Name: "@next/next/google-font-display",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)

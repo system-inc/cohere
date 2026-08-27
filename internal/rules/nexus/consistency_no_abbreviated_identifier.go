@@ -357,7 +357,7 @@ func messageNoWordSegment(name string, word string, suggestion string) rule.Mess
 // affordable. The import specifier itself is still exempt, so the finding lands on the use rather
 // than on the declaration.
 var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
-	Name: "consistency-no-abbreviated-identifier",
+	Name: "nexus/consistency-no-abbreviated-identifier",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, _ := options.(ConsistencyNoAbbreviatedIdentifierOptions)
 

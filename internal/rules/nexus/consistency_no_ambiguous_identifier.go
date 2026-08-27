@@ -67,7 +67,7 @@ var messageNoUnderscore = rule.Message{
 // reason. The suggested name travels in the message instead, where a reader applies it with the
 // scope in front of them.
 var ConsistencyNoAmbiguousIdentifier = rule.Rule{
-	Name: "consistency-no-ambiguous-identifier",
+	Name: "nexus/consistency-no-ambiguous-identifier",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {

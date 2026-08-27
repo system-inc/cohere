@@ -78,7 +78,7 @@ var messageUseTopLevelQualifier = rule.Message{
 // otherwise, which is the opposite of the reflexive choice: `Name()` alone would remove `type A as `
 // and produce `import type { AA } from 'mod'`, silently changing which export is imported.
 var NoImportTypeSideEffects = rule.Rule{
-	Name: "no-import-type-side-effects",
+	Name: "@typescript-eslint/no-import-type-side-effects",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {

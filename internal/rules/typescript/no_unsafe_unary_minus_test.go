@@ -290,7 +290,7 @@ func TestNoUnsafeUnaryMinusRequiresTheTypedHarness(t *testing.T) {
 	if !NoUnsafeUnaryMinus.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
-	if NoUnsafeUnaryMinus.Name != "no-unsafe-unary-minus" {
+	if NoUnsafeUnaryMinus.Name != "@typescript-eslint/no-unsafe-unary-minus" {
 		t.Errorf("the registered name is %q, and the inventory writes typescript/no-unsafe-unary-minus", NoUnsafeUnaryMinus.Name)
 	}
 

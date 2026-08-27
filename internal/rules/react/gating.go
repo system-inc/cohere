@@ -175,7 +175,7 @@ type GatingOptions struct {
 var Gating = rule.Rule{
 	// No namespace prefix. The config writes `react/gating`; the parity guard strips the namespace
 	// on a `/` boundary, so `react-gating` would match no inventory entry and lint nothing.
-	Name: "gating",
+	Name: "react-hooks/gating",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		gatingOptions, _ := options.(GatingOptions)
 		if gatingOptions.RequireDynamicGatingOption {

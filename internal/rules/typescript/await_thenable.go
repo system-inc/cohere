@@ -108,7 +108,7 @@ import (
 // uncommon nodes, and `KindVariableDeclarationList` is common but exits on the first line for
 // anything that is not `await using`. Measured on the real tree, see the test file's note.
 var AwaitThenable = rule.Rule{
-	Name: "await-thenable",
+	Name: "@typescript-eslint/await-thenable",
 
 	// All three listeners read ctx.TypeChecker unconditionally, so the checker is required.
 	NeedsTypeChecker: true,

@@ -96,7 +96,7 @@ type NoMisusedSpreadOptions struct {
 // through `SkipParentheses`, and `{ ...(map, map) }` keeps them because a comma expression has weak
 // precedence and would otherwise change meaning.
 var NoMisusedSpread = rule.Rule{
-	Name: "no-misused-spread",
+	Name: "@typescript-eslint/no-misused-spread",
 
 	// Every arm asks the checker what the spread argument IS. None of it is answerable from syntax.
 	NeedsTypeChecker: true,

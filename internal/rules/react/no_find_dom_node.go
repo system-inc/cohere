@@ -103,7 +103,7 @@ var NoFindDOMNode = rule.Rule{
 	// No namespace prefix. The config writes `react/no-find-dom-node` and the parity guard strips
 	// the namespace on a `/` boundary, so `react-no-find-dom-node` would match no inventory entry,
 	// lint no files, and still pass every fixture in this package.
-	Name: "no-find-dom-node",
+	Name: "react/no-find-dom-node",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

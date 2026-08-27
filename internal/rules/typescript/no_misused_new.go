@@ -123,7 +123,7 @@ var messageNoMisusedNewClassNew = rule.Message{
 // oxc writes the first as `Span::sized(sig.span.start, 3)`, taking on faith that a construct
 // signature begins with `new`. It does: the parser only produces one when it sees that keyword.
 var NoMisusedNew = rule.Rule{
-	Name: "no-misused-new",
+	Name: "@typescript-eslint/no-misused-new",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

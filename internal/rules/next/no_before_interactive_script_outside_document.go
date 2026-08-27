@@ -148,7 +148,7 @@ var NoBeforeInteractiveScriptOutsideDocument = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-before-interactive-script-outside-document` and
 	// matching strips the namespace on a `/` boundary, so a prefixed name matches nothing and runs
 	// on no files while its own tests stay green.
-	Name: "no-before-interactive-script-outside-document",
+	Name: "@next/next/no-before-interactive-script-outside-document",
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		fileName := ctx.SourceFile.FileName()

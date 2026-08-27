@@ -49,7 +49,7 @@ type BoundaryNoProjectImportOptions struct {
 // how a rule registered without its required option fails closed rather than guarding the whole
 // tree by accident.
 var BoundaryNoProjectImport = rule.Rule{
-	Name: "boundary-no-project-import",
+	Name: "nexus/boundary-no-project-import",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

@@ -181,7 +181,7 @@ var VoidUseMemo = rule.Rule{
 	// No namespace prefix. The config writes `react/void-use-memo`, and the parity guard strips the
 	// namespace on a `/` boundary, so a self-namespaced `react-void-use-memo` would match no
 	// inventory entry and lint nothing.
-	Name: "void-use-memo",
+	Name: "react-hooks/void-use-memo",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

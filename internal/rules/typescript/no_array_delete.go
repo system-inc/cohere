@@ -152,7 +152,7 @@ import (
 // `KindDeleteExpression` is a rare anchor and the listener exits on the second line for anything
 // that is not an element access, so the checker is consulted only for a genuine `delete x[y]`.
 var NoArrayDelete = rule.Rule{
-	Name: "no-array-delete",
+	Name: "@typescript-eslint/no-array-delete",
 
 	// The listener resolves the receiver's type on every `delete x[y]`, so the checker is required.
 	NeedsTypeChecker: true,

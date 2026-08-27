@@ -87,7 +87,7 @@ var messageSuggestRemovingNonNull = rule.Message{
 // on all fourteen. That answer key is the only real evidence available for this rule: the tree it
 // gates contains zero non-null assertions of any kind, so a clean run over it proves nothing.
 var NoNonNullAssertedOptionalChain = rule.Rule{
-	Name: "no-non-null-asserted-optional-chain",
+	Name: "@typescript-eslint/no-non-null-asserted-optional-chain",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

@@ -55,7 +55,7 @@ var messageWindowLocalStorage = rule.Message{
 // the rule fires on them and the suppression layer withholds the findings, exactly as under the
 // gate.
 var StorageNoDirectLocalStorage = rule.Rule{
-	Name: "storage-no-direct-local-storage",
+	Name: "structure/storage-no-direct-local-storage",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if FileContextFor(ctx.SourceFile.FileName()).IsLocalStorageServiceFile {
 			// The service itself has to reach the real thing, or the rule forbids the thing it

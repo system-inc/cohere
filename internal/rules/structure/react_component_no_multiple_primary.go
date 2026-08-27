@@ -73,7 +73,7 @@ type trackedComponent struct {
 // No fix. Moving a component to its own file means creating that file, choosing its name, moving
 // the imports it needs, and updating every reference. That is a refactor, not an edit.
 var ReactComponentNoMultiplePrimary = rule.Rule{
-	Name: "react-component-no-multiple-primary",
+	Name: "structure/react-component-no-multiple-primary",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

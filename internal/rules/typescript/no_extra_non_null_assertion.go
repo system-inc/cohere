@@ -51,7 +51,7 @@ var messageNoExtraNonNullAssertion = rule.Message{
 // `IsOptionalChainRoot` is the faithful translation: it is the link that owns the `?.` token. The
 // clean fixture for `foo?.bar!.baz` is what pins this, and it is the fixture most worth keeping.
 var NoExtraNonNullAssertion = rule.Rule{
-	Name: "no-extra-non-null-assertion",
+	Name: "@typescript-eslint/no-extra-non-null-assertion",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

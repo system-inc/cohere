@@ -74,7 +74,7 @@ var NoChildrenProp = rule.Rule{
 	// the namespace on a `/` boundary, so a rule named `react-no-children-prop` would match no
 	// inventory entry, lint no files, and still pass every fixture in this file. The first rule in
 	// `internal/rules/next/` shipped that way and was inert, which is why this comment is here.
-	Name: "no-children-prop",
+	Name: "react/no-children-prop",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// A spread attribute (`<div {...props} />`) produces no JsxAttribute node at all, so it

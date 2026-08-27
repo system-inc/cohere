@@ -73,7 +73,7 @@ var messageNoTitleInDocumentHead = rule.Message{
 var NoTitleInDocumentHead = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-title-in-document-head` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
-	Name:             "no-title-in-document-head",
+	Name:             "@next/next/no-title-in-document-head",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The specifier nodes this file watches, at most one per `next/document` declaration.

@@ -175,7 +175,7 @@ var ErrorBoundaries = rule.Rule{
 	// No namespace prefix. The config writes `react/error-boundaries`, and the parity guard strips
 	// the namespace on a `/` boundary, so a self-namespaced `react-error-boundaries` would match no
 	// inventory entry.
-	Name: "error-boundaries",
+	Name: "react-hooks/error-boundaries",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			enclosing := enclosingFunctionOf(node)

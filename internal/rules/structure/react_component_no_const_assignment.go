@@ -71,7 +71,7 @@ func messageNoConstAssignment(identifierName string, isExported bool) rule.Messa
 // rule about component factories might want, silently makes this exemption load-bearing at a line
 // that change does not touch. A reader who found it deleted would have no way to learn that.
 var ReactComponentNoConstAssignment = rule.Rule{
-	Name: "react-component-no-const-assignment",
+	Name: "structure/react-component-no-const-assignment",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
 			return nil

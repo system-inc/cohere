@@ -113,7 +113,7 @@ var messageNoDuplicateEnumValues = rule.Message{
 var NoDuplicateEnumValues = rule.Rule{
 	// No namespace prefix. The config writes `typescript/no-duplicate-enum-values` and the parity
 	// guard strips the namespace on a `/` boundary.
-	Name: "no-duplicate-enum-values",
+	Name: "@typescript-eslint/no-duplicate-enum-values",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {

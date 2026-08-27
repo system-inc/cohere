@@ -193,7 +193,7 @@ import (
 // global-candidate access. That is a syntactic test with no checker involvement, so the
 // overwhelming majority of calls in a real file exit before the type graph is touched.
 var NoImpliedEval = rule.Rule{
-	Name: "no-implied-eval",
+	Name: "@typescript-eslint/no-implied-eval",
 
 	// Both listeners reach the checker for any call whose callee name matches, so the checker is
 	// required rather than opportunistic.

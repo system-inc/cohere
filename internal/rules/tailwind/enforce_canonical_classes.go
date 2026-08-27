@@ -84,7 +84,7 @@ type EnforceCanonicalClassesOptions struct {
 // rewrite that also reordered would fight it. Reporting the shorter spelling is enough for an
 // author to act on.
 var EnforceCanonicalClasses = rule.Rule{
-	Name: "enforce-canonical-classes",
+	Name: "better-tailwindcss/enforce-canonical-classes",
 	// Declared because the rule reaches ctx.Program for the design system. The stylesheet graph
 	// reaches files the program does not contain, so a findings cache keyed on the linted file alone
 	// is stale whenever a `@utility` block changes which roots exist and the `.tsx` file does not.

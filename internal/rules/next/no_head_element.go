@@ -40,7 +40,7 @@ var messageNoHeadElement = rule.Message{
 var NoHeadElement = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-head-element` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
-	Name: "no-head-element",
+	Name: "@next/next/no-head-element",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Answering here rather than inside the listener means a file under an app directory
 		// registers no listener at all, which is also how upstream spells it: `should_run` is asked

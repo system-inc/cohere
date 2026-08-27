@@ -166,7 +166,7 @@ var NoDirectMutationState = rule.Rule{
 	// No namespace prefix. The config writes `react/no-direct-mutation-state` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-no-direct-mutation-state` would match no
 	// inventory entry, lint no files, and still pass every fixture in this package.
-	Name: "no-direct-mutation-state",
+	Name: "react/no-direct-mutation-state",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// oxc gates the whole rule on `source_type().is_jsx()` through `should_run`, so a file the
 		// parser does not read as JSX registers nothing rather than declining node by node. Spelled

@@ -111,7 +111,7 @@ var NoRenderReturnValue = rule.Rule{
 	// No namespace prefix. The config writes `react/no-render-return-value` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-no-render-return-value` would match no
 	// inventory entry, lint no files, and still pass every fixture in this package.
-	Name: "no-render-return-value",
+	Name: "react/no-render-return-value",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

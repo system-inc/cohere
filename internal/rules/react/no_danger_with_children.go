@@ -96,7 +96,7 @@ var NoDangerWithChildren = rule.Rule{
 	// No namespace prefix. The config writes `react/no-danger-with-children` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-no-danger-with-children`
 	// would match no inventory entry and lint no files while passing every fixture in this file.
-	Name:             "no-danger-with-children",
+	Name:             "react/no-danger-with-children",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

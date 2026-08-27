@@ -91,7 +91,7 @@ var JsxNoDuplicateProps = rule.Rule{
 	// No namespace prefix. The config writes `react/jsx-no-duplicate-props` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-no-duplicate-props` would
 	// match no inventory entry, lint no files, and still pass every fixture in this package.
-	Name: "jsx-no-duplicate-props",
+	Name: "react/jsx-no-duplicate-props",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			_, attributes := jsx.ElementParts(node)

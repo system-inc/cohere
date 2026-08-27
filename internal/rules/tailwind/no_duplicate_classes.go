@@ -59,7 +59,7 @@ type NoDuplicateClassesOptions struct {
 // reports zero findings, which reads exactly like a clean tree. That was the first thing this rule
 // did, and only the coverage line's "listened to no files" note caught it.
 var NoDuplicateClasses = rule.Rule{
-	Name: "no-duplicate-classes",
+	Name: "better-tailwindcss/no-duplicate-classes",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

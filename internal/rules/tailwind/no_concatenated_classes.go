@@ -59,7 +59,7 @@ type NoConcatenatedClassesOptions struct {
 // which means knowing which ones those are. A rule cannot know that, and a fix that guessed would
 // produce a class list the author never intended.
 var NoConcatenatedClasses = rule.Rule{
-	Name: "no-concatenated-classes",
+	Name: "better-tailwindcss/no-concatenated-classes",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

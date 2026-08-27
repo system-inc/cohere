@@ -77,7 +77,7 @@ func messageUseAliasInStrictRoot(importPath string, root string, suggestion stri
 // No fix. The alias is derivable, but rewriting an import is only safe when the alias actually
 // resolves in that project's config, which this rule cannot see.
 var ImportRequirePathAlias = rule.Rule{
-	Name: "import-require-path-alias",
+	Name: "nexus/import-require-path-alias",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

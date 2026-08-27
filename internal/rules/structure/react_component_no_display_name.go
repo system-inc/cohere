@@ -42,7 +42,7 @@ var anonymousComponentWrapperNames = map[string]bool{
 // temporal dead zone error at runtime anyway. A rule that exempted it would be excusing code that
 // cannot run.
 var ReactComponentNoDisplayName = rule.Rule{
-	Name: "react-component-no-display-name",
+	Name: "structure/react-component-no-display-name",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Scoped to this file's walk, which is the whole lifetime that matters: the original keys
 		// the same set on one `create` call per file.

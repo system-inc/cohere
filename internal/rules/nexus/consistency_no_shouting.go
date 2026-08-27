@@ -49,7 +49,7 @@ type ConsistencyNoShoutingOptions struct {
 // No fix, deliberately. Lowercasing the word leaves the sentence that needed shouting still weak,
 // and the repair is usually to state the reason instead, which a rule cannot write.
 var ConsistencyNoShouting = rule.Rule{
-	Name: "consistency-no-shouting",
+	Name: "nexus/consistency-no-shouting",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

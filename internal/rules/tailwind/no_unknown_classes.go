@@ -67,7 +67,7 @@ type NoUnknownClassesOptions struct {
 // someone to find later; over-reporting on correct code is how a rule gets turned off, and this rule
 // in particular gets turned off the first time it flags a working class.
 var NoUnknownClasses = rule.Rule{
-	Name: "no-unknown-classes",
+	Name: "better-tailwindcss/no-unknown-classes",
 	// Declared because the rule reaches ctx.Program for the design system. The stylesheet graph
 	// reaches files the program does not contain, so a findings cache keyed on the linted file alone
 	// is stale whenever a `@utility` block is added and the `.tsx` file does not change: the new

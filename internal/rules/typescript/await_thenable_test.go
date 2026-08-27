@@ -339,7 +339,7 @@ func TestAwaitThenableRequiresTheTypedHarness(t *testing.T) {
 	if !AwaitThenable.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
-	if AwaitThenable.Name != "await-thenable" {
+	if AwaitThenable.Name != "@typescript-eslint/await-thenable" {
 		t.Errorf("the registered name is %q, and the inventory writes typescript/await-thenable", AwaitThenable.Name)
 	}
 

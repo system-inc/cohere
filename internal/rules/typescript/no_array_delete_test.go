@@ -348,7 +348,7 @@ func TestNoArrayDeleteSpans(t *testing.T) {
 			if finding.Message.Description != "Using the `delete` operator with an array expression is unsafe." {
 				t.Errorf("the message reads %q", finding.Message.Description)
 			}
-			if finding.RuleName != "no-array-delete" {
+			if finding.RuleName != "@typescript-eslint/no-array-delete" {
 				t.Errorf("the finding reports under %q, and a name that is not the registered one is unsuppressable by the comment its author wrote", finding.RuleName)
 			}
 			if len(finding.Suggestions) != 1 {
@@ -384,7 +384,7 @@ func TestNoArrayDeleteRequiresTheTypedHarness(t *testing.T) {
 	if !NoArrayDelete.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
-	if NoArrayDelete.Name != "no-array-delete" {
+	if NoArrayDelete.Name != "@typescript-eslint/no-array-delete" {
 		t.Errorf("the registered name is %q, and the inventory writes typescript/no-array-delete", NoArrayDelete.Name)
 	}
 

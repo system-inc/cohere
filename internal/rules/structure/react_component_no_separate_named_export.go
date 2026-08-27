@@ -34,7 +34,7 @@ var messageNoSeparateNamedExport = rule.Message{
 // declared in this file: removing the list without adding `export` to the declarations would break
 // the build loudly rather than silently, and the fixer's own convergence check catches that.
 var ReactComponentNoSeparateNamedExport = rule.Rule{
-	Name: "react-component-no-separate-named-export",
+	Name: "structure/react-component-no-separate-named-export",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
 			return nil

@@ -73,7 +73,7 @@ type NoConflictingClassesOptions struct {
 // suggestions, so this is the difference between a repair a human chooses and one that silently
 // picks for them.
 var NoConflictingClasses = rule.Rule{
-	Name: "no-conflicting-classes",
+	Name: "better-tailwindcss/no-conflicting-classes",
 	// Declared because the rule reaches ctx.Program for the design system. The stylesheet graph
 	// reaches files the program does not contain, so a findings cache keyed on the linted file alone
 	// is stale whenever an `@utility` block changes what a class declares and the `.tsx` file does

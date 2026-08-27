@@ -117,7 +117,7 @@ var messageNoDuplicateHead = rule.Message{
 var NoDuplicateHead = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-duplicate-head` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
-	Name: "no-duplicate-head",
+	Name: "@next/next/no-duplicate-head",
 	// Symbol identity is what oxc's reference walk answers, and nothing syntactic reproduces it:
 	// the shadow cases and the member-tag case both turn on which binding a tag resolves to rather
 	// than on how it is spelled. Two siblings in this package resolve JSX tags the same way.

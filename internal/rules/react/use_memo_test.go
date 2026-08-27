@@ -601,7 +601,7 @@ func TestUseMemoMessages(t *testing.T) {
 // strips the namespace. So the parity guard reports the same count either way and cannot see the
 // mistake. This is the assertion that can.
 func TestUseMemoRuleName(t *testing.T) {
-	if UseMemo.Name != "use-memo" {
+	if UseMemo.Name != "react-hooks/use-memo" {
 		t.Errorf("rule name is %q, want %q", UseMemo.Name, "use-memo")
 	}
 	if !UseMemo.NeedsTypeChecker {

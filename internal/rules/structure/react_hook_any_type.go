@@ -115,7 +115,7 @@ var reactHookAnyTypeMessageId = "reactHookAnyType"
 // new checker-based rule ships and it is confidently wrong: it keeps naming the old set while
 // reading as current. See `reactHookAnyTypeBlindedRules`.
 var ReactHookAnyType = rule.Rule{
-	Name:             "react-hook-any-type",
+	Name:             "structure/react-hook-any-type",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The typed-rule guard. A rule that reads a nil checker here would decline every file

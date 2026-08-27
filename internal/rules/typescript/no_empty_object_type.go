@@ -59,7 +59,7 @@ var messageEmptyObjectType = rule.Message{
 // That is named here rather than hidden, and the tree has none: verified by planting rather than by
 // reading, since a rule reporting zero and a rule that cannot report look identical.
 var NoEmptyObjectType = rule.Rule{
-	Name: "no-empty-object-type",
+	Name: "@typescript-eslint/no-empty-object-type",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindInterfaceDeclaration: func(node *ast.Node) {

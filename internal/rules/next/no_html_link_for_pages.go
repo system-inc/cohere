@@ -69,7 +69,7 @@ var messageNoHtmlLinkForPages = rule.Message{
 var NoHtmlLinkForPages = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-html-link-for-pages` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
-	Name: "no-html-link-for-pages",
+	Name: "@next/next/no-html-link-for-pages",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)

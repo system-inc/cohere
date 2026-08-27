@@ -196,7 +196,7 @@ var JsxKey = rule.Rule{
 	// No namespace prefix. The config writes `react/jsx-key` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-jsx-key` would match no inventory entry and lint no
 	// files while passing every fixture in this package.
-	Name: "jsx-key",
+	Name: "react/jsx-key",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, _ := options.(JsxKeyOptions)
 		pragma := reactPragmaFor(ctx)

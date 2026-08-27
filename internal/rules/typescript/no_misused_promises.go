@@ -226,7 +226,7 @@ type NoMisusedPromisesOptions struct {
 // on return statements and variable declarations, the `Arguments() == nil` early exit — exist for
 // exactly that reason and are carried across rather than being treated as optional.
 var NoMisusedPromises = rule.Rule{
-	Name: "no-misused-promises",
+	Name: "@typescript-eslint/no-misused-promises",
 
 	// Every listener consults the checker; see the note above on why the guard lives in Run.
 	NeedsTypeChecker: true,

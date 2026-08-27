@@ -69,7 +69,7 @@ func messageIdenticalToSource(key string, locale string, value string) rule.Mess
 //
 // No fix. The repair is a translation, which a rule cannot write.
 var LocalizationNoUntranslatedValue = rule.Rule{
-	Name: "localization-no-untranslated-value",
+	Name: "nexus/localization-no-untranslated-value",
 
 	// Reads the English translation table out of the program, so a findings cache keyed on the
 	// linted file alone would go stale when en.ts changes and this file does not.

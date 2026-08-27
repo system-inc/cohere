@@ -53,7 +53,7 @@ var messageBannedFunctionType = rule.Message{
 // global without declaring it locally. That is rare enough to be worth naming rather than worth
 // blocking the rule on, and the clean fixtures pin the behavior either way.
 var NoUnsafeFunctionType = rule.Rule{
-	Name: "no-unsafe-function-type",
+	Name: "@typescript-eslint/no-unsafe-function-type",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

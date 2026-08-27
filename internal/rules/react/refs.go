@@ -160,7 +160,7 @@ import (
 // upstream puts it and the origin is dropped rather than moved into the message, because unlike
 // `static_components` the origin here is usually the same identifier the span already names.
 var Refs = rule.Rule{
-	Name:             "refs",
+	Name:             "react-hooks/refs",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

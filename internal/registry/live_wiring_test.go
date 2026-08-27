@@ -45,7 +45,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// decision about this codebase rather than a wiring gap, and flipping it here would
 		// override it silently, so the rule is ported, registered and inventoried while staying
 		// off. Turning it on is a config change for whoever owns that block to make.
-		"jsx-key": "the live config turns react/jsx-key off deliberately, beside react-in-jsx-scope",
+		"react/jsx-key": "the live config turns react/jsx-key off deliberately, beside react-in-jsx-scope",
 	}
 
 	rules := All()

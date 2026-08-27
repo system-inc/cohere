@@ -138,7 +138,7 @@ import (
 // `!`, `~`, `++` and `--` exits before the checker is touched. Only `-` pays for a type query, and
 // a negated numeric literal is the overwhelmingly common case in real source.
 var NoUnsafeUnaryMinus = rule.Rule{
-	Name: "no-unsafe-unary-minus",
+	Name: "@typescript-eslint/no-unsafe-unary-minus",
 
 	// The listener reads ctx.TypeChecker on every `-` operand, so the checker is required rather
 	// than opportunistic.

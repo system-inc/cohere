@@ -133,7 +133,7 @@ var messageNoHeadImportInDocument = rule.Message{
 var NoHeadImportInDocument = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-head-import-in-document` and matching strips
 	// the namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
-	Name: "no-head-import-in-document",
+	Name: "@next/next/no-head-import-in-document",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Every file that is not the document registers no listener at all rather than testing the
 		// path at every import, which is how upstream spells it too.

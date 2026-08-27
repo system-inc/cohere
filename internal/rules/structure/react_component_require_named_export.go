@@ -53,7 +53,7 @@ var messageComponentRequiresNamedExport = rule.Message{
 // quieter than the gate on files the gate reports. So the flag is not ported, and the reason is
 // recorded here because a later reader comparing the two files will otherwise see a missing guard.
 var ReactComponentRequireNamedExport = rule.Rule{
-	Name: "react-component-require-named-export",
+	Name: "structure/react-component-require-named-export",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

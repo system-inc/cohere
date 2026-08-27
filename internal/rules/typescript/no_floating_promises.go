@@ -270,7 +270,7 @@ func buildFloatingVoidMessage() rule.Message {
 // apparent types, so a statement whose expression is not a promise still costs one type read. That
 // is upstream's ordering and it is kept.
 var NoFloatingPromises = rule.Rule{
-	Name: "no-floating-promises",
+	Name: "@typescript-eslint/no-floating-promises",
 
 	NeedsTypeChecker: true,
 

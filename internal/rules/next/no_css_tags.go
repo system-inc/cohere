@@ -37,7 +37,7 @@ var messageNoCssTags = rule.Message{
 var NoCssTags = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-css-tags` and matching strips the namespace on
 	// a `/` boundary, so a prefixed name matches nothing and runs on no files while its tests pass.
-	Name: "no-css-tags",
+	Name: "@next/next/no-css-tags",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)

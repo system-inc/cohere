@@ -44,7 +44,7 @@ var NoImgElement = rule.Rule{
 	// on a `/` boundary, so a rule named `next-no-img-element` matches nothing, runs on no files,
 	// and passes every one of its own tests. That is not hypothetical: the first rule in this
 	// package shipped that way and was inert.
-	Name: "no-img-element",
+	Name: "@next/next/no-img-element",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node, name *ast.Node) {
 			// An intrinsic element is a lowercase, unqualified identifier. A member-expression name

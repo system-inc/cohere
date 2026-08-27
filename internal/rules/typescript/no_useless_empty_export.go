@@ -88,7 +88,7 @@ var messageUselessEmptyExport = rule.Message{
 // silent as `.d.ts`. Those four are the only thing pinning the gate, so they are kept here twice,
 // once per extension.
 var NoUselessEmptyExport = rule.Rule{
-	Name: "no-useless-empty-export",
+	Name: "@typescript-eslint/no-useless-empty-export",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

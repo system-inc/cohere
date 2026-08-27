@@ -45,7 +45,7 @@ var messageNoPropertyAlias = rule.Message{
 // enclosing function, not only beside the declaration, because the array is usually several lines
 // below.
 var ConsistencyNoPropertyAlias = rule.Rule{
-	Name: "consistency-no-property-alias",
+	Name: "structure/consistency-no-property-alias",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {

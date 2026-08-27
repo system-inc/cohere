@@ -242,7 +242,7 @@ var JsxNoTargetBlank = rule.Rule{
 	// No namespace prefix. The config writes `react/jsx-no-target-blank` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-no-target-blank` would
 	// match no inventory entry and lint no files while passing every fixture in this package.
-	Name: "jsx-no-target-blank",
+	Name: "react/jsx-no-target-blank",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// An unconfigured rule reaches this with nil, and the comma-ok form yields the zero struct,
 		// whose `Links` is false rather than upstream's true. That difference decides nothing today

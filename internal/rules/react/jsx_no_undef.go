@@ -73,7 +73,7 @@ var messageJsxIdentifierNotDefined = rule.Message{
 // fail half is carried below. An ambient declaration is the equivalent our tree does have, and it
 // is covered by a case of our own rather than by pretending upstream's option exists.
 var JsxNoUndef = rule.Rule{
-	Name:             "jsx-no-undef",
+	Name:             "react/jsx-no-undef",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		check := func(node *ast.Node) {

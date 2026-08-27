@@ -143,7 +143,7 @@ const (
 // `KindEnumDeclaration` is a rare anchor. The checker is consulted once for the declaration's own
 // name, and once per member whose initializer is not a literal the switch already names.
 var NoMixedEnums = rule.Rule{
-	Name: "no-mixed-enums",
+	Name: "@typescript-eslint/no-mixed-enums",
 
 	// The classification of a non-literal initializer is a type question, and so is finding the
 	// merged declaration list.

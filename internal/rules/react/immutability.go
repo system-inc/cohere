@@ -144,7 +144,7 @@ import (
 // origin. Our `Diagnostic` carries a single `Range`, so the primary span is kept where upstream puts
 // it and the origin label is dropped rather than folded into the message.
 var Immutability = rule.Rule{
-	Name:             "immutability",
+	Name:             "react-hooks/immutability",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

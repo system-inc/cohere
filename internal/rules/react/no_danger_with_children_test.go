@@ -284,7 +284,7 @@ func TestNoDangerWithChildrenNeedsTheTypedHarness(t *testing.T) {
 // a `/` boundary, so a namespaced name here would lint zero files while every fixture above stayed
 // green. That failure has already shipped once in `internal/rules/next/`.
 func TestNoDangerWithChildrenIsRegisteredWithoutItsNamespace(t *testing.T) {
-	if NoDangerWithChildren.Name != "no-danger-with-children" {
+	if NoDangerWithChildren.Name != "react/no-danger-with-children" {
 		t.Fatalf("want the bare rule name, got %q", NoDangerWithChildren.Name)
 	}
 }

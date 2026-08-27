@@ -172,7 +172,7 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 // No fix. The repair is a rename or a deletion, and choosing which declaration is the dead one, and
 // what to call the survivor, is exactly what the rule cannot know.
 var NoRedeclare = rule.Rule{
-	Name: "no-redeclare",
+	Name: "@typescript-eslint/no-redeclare",
 
 	// See the doc above: the scope partition comes from the binder, which the program builds.
 	NeedsTypeChecker: true,

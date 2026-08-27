@@ -182,7 +182,7 @@ func buildOnlyThrowErrorUndefMessage() rule.Message {
 // arm short-circuits on anything that is not a bare identifier, so the thenable test runs only for
 // a `throw e` inside a callback.
 var OnlyThrowError = rule.Rule{
-	Name: "only-throw-error",
+	Name: "@typescript-eslint/only-throw-error",
 
 	// Every arm reads the argument's type, so the checker is required.
 	NeedsTypeChecker: true,

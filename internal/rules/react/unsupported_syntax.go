@@ -204,7 +204,7 @@ var UnsupportedSyntax = rule.Rule{
 	// No namespace prefix. The config writes `react/unsupported-syntax`, and the parity guard
 	// strips the namespace on a `/` boundary, so `react-unsupported-syntax` would match no
 	// inventory entry while still passing every fixture in this package.
-	Name: "unsupported-syntax",
+	Name: "react-hooks/unsupported-syntax",
 
 	// The `eval` arm asks which declaration a name binds to, which is the resolution half of the
 	// port brief's table rather than the scope-flag half. Established by probe: `GetSymbolAtLocation`

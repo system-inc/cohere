@@ -93,7 +93,7 @@ var messagePreferNamespaceKeyword = rule.Message{
 // span after an `export` modifier and before a `declare` one. The corpus contains no exported
 // declaration, so nothing upstream covers this and only the fixtures written here hold it.
 var PreferNamespaceKeyword = rule.Rule{
-	Name: "prefer-namespace-keyword",
+	Name: "@typescript-eslint/prefer-namespace-keyword",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Defensive at the boundary, and deliberately untested. Mutating this guard away survives
 		// the whole fixture set, and no fixture can change that: rule_testing.Run always builds a real

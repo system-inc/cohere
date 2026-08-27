@@ -48,7 +48,7 @@ type NoUnnecessaryWhitespaceOptions struct {
 // already says. Whitespace-only becomes empty, matching upstream, rather than being deleted: the
 // attribute is the author's and this rule has no opinion about whether it should exist.
 var NoUnnecessaryWhitespace = rule.Rule{
-	Name: "no-unnecessary-whitespace",
+	Name: "better-tailwindcss/no-unnecessary-whitespace",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

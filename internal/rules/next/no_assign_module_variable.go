@@ -50,7 +50,7 @@ var NoAssignModuleVariable = rule.Rule{
 	// so a rule named `next-no-assign-module-variable` matches nothing and runs on no files while its
 	// own tests pass. That is not hypothetical: this rule shipped that way and was inert until a
 	// planted violation failed to fire.
-	Name: "no-assign-module-variable",
+	Name: "@next/next/no-assign-module-variable",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableStatement: func(node *ast.Node) {

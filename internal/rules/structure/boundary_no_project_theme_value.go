@@ -92,7 +92,7 @@ const interfaceNameSuffix = "Interface"
 // A project using its own values is the system working. The boundary is one-directional: the
 // library may not reach into the project, and the project may extend the library freely.
 var BoundaryNoProjectThemeValue = rule.Rule{
-	Name: "boundary-no-project-theme-value",
+	Name: "structure/boundary-no-project-theme-value",
 
 	// Scans every theme file in the program, so a findings cache keyed on the linted file alone
 	// would go stale when a theme changes and this file does not.

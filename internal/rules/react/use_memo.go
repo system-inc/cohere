@@ -282,7 +282,7 @@ var UseMemo = rule.Rule{
 	// No namespace prefix. The config writes `react/use-memo`, and the parity guard strips the
 	// namespace on a `/` boundary, so a self-namespaced `react-use-memo` would match no inventory
 	// entry while still passing every fixture in this package.
-	Name: "use-memo",
+	Name: "react-hooks/use-memo",
 
 	// The callee test asks which declaration a name binds to, which is the resolution half of the
 	// port brief's scope table rather than the scope-flag half: a bare `useMemo` and a locally

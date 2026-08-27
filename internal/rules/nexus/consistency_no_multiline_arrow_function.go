@@ -57,7 +57,7 @@ var messageMultilineArrow = rule.Message{
 // A React hook or addEventListener argument reports through its own message and must not be reported
 // twice, so the general case skips what the call-expression case already claimed.
 var ConsistencyNoMultilineArrowFunction = rule.Rule{
-	Name: "consistency-no-multiline-arrow-function",
+	Name: "nexus/consistency-no-multiline-arrow-function",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

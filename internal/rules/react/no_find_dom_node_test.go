@@ -358,7 +358,7 @@ func TestNoFindDOMNodeDoesNotNeedTheTypeChecker(t *testing.T) {
 	if NoFindDOMNode.NeedsTypeChecker {
 		t.Fatal("no-find-dom-node declares the type checker; it decides on syntax alone")
 	}
-	if NoFindDOMNode.Name != "no-find-dom-node" {
+	if NoFindDOMNode.Name != "react/no-find-dom-node" {
 		t.Fatalf("rule name = %q, want %q", NoFindDOMNode.Name, "no-find-dom-node")
 	}
 }

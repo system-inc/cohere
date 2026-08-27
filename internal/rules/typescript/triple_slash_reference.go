@@ -110,7 +110,7 @@ func messageTripleSlashReference(referenceName string) rule.Message {
 var TripleSlashReference = rule.Rule{
 	// No namespace prefix. The config writes `typescript/triple-slash-reference` and the parity
 	// guard strips the namespace on a `/` boundary.
-	Name: "triple-slash-reference",
+	Name: "@typescript-eslint/triple-slash-reference",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

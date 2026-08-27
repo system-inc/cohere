@@ -55,7 +55,7 @@ func messageStutteringName(name string) rule.Message {
 //
 // No fix. The right noun is the judgment this rule exists to demand, and a rule cannot pick it.
 var ConsistencyNoStutteringName = rule.Rule{
-	Name: "consistency-no-stuttering-name",
+	Name: "nexus/consistency-no-stuttering-name",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		genericNames := map[string]bool{}
 		names := defaultGenericNames

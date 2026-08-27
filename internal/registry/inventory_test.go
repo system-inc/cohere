@@ -37,10 +37,10 @@ func TestEnforcedRuleNamesReadsTheWholeInventory(t *testing.T) {
 	// was proven enforced by planting a violation and watching the gate report it, and it appears in
 	// no rules block anywhere in the tree.
 	required := map[string]string{
-		"no-const-assign":           "a plugin default, enforced and named in no rules block",
-		"nexus/consistency-no-enum": "an explicitly enabled rule of ours",
-		"react/rules-of-hooks":      "an explicitly enabled rule from a third-party plugin",
-		"typescript/await-thenable": "a type-aware rule the config asks for",
+		"no-const-assign":                   "a plugin default, enforced and named in no rules block",
+		"nexus/consistency-no-enum":         "an explicitly enabled rule of ours",
+		"react-hooks/rules-of-hooks":        "an explicitly enabled rule from a third-party plugin",
+		"@typescript-eslint/await-thenable": "a type-aware rule the config asks for",
 	}
 
 	present := make(map[string]bool, len(names))

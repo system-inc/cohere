@@ -104,7 +104,7 @@ type NoDidUpdateSetStateOptions struct {
 var NoDidUpdateSetState = rule.Rule{
 	// No namespace prefix. The config writes `react/no-did-update-set-state` and the parity guard
 	// strips the namespace on a `/` boundary.
-	Name: "no-did-update-set-state",
+	Name: "react/no-did-update-set-state",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's permissive default.
 		settings, _ := options.(NoDidUpdateSetStateOptions)

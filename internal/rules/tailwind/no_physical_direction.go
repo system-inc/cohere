@@ -101,7 +101,7 @@ var physicalToLogical = []directionMapping{
 // class does, so the base is what gets tested; but `rtl:` and `ltr:` are the author saying the
 // physical side is the point, which is the one case where a physical class is correct.
 var NoPhysicalDirection = rule.Rule{
-	Name: "tailwind-no-physical-direction",
+	Name: "better-tailwindcss/tailwind-no-physical-direction",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

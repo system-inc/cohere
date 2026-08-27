@@ -92,7 +92,7 @@ func messageRequireCamelCaseInstance(name string, suggestion string) rule.Messag
 // reference, and an exported one crosses files the rule cannot see. It also cannot know whether the
 // new name collides with something already in scope. Report, and let the author rename.
 var ConsistencyRequireConstantCasing = rule.Rule{
-	Name: "consistency-require-constant-casing",
+	Name: "nexus/consistency-require-constant-casing",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		frameworkConstantNames := map[string]bool{}
 		if settings, hasSettings := options.(ConsistencyRequireConstantCasingOptions); hasSettings {

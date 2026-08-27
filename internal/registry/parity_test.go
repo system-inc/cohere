@@ -145,20 +145,50 @@ func TestParityAgainstInventory(t *testing.T) {
 // from a file that commit never touched. A wrong sha was confirmed that way in this repository: the
 // probe ran, reported honestly about the wrong object, and agreed with the story being checked.
 // For what a commit changed, `git show --stat <sha>` or `git log <sha> -- <path>`.
-func TestRegisteredNamesAreBare(t *testing.T) {
+// TestRegisteredNamesMatchTheirUpstreamSpelling replaces an earlier guard that required the
+// opposite.
+//
+// Rules used to register bare, and `bareRuleName` stripped any prefix before matching, so a config
+// key spelled `bogusplugin/no-alert` resolved exactly like the correct one -- measured, same six
+// findings, no warning. ESLint is not that forgiving: an unknown rule key is fatal there, so a
+// wrong prefix killed the whole run twice in one day while `s l --linter both` kept printing a
+// comparison against a linter that had linted nothing.
+//
+// Registering the real upstream name removes the translation step. One name is right everywhere,
+// and a wrong prefix now fails here rather than in ESLint.
+//
+// A plugin rule must carry its plugin's namespace; an ESLint core rule must carry none, because
+// upstream has none. Anything else is the inconsistency the old guard was really protecting.
+func TestRegisteredNamesMatchTheirUpstreamSpelling(t *testing.T) {
 	registered := registeredRuleNames()
 	if len(registered) == 0 {
 		t.Fatal("registry.All() returned no rules, so this test checked nothing")
 	}
 
+	// The namespaces a rule may carry. A rule with no slash is an ESLint core rule or one of this
+	// tree's own, both of which are correct bare.
+	knownNamespaces := map[string]bool{
+		"@typescript-eslint": true,
+		"react":              true,
+		"react-hooks":        true,
+		"@next/next":         true,
+		"better-tailwindcss": true,
+		"structure":          true,
+		"nexus":              true,
+	}
+
 	for _, name := range registered {
-		if !strings.Contains(name, "/") {
+		slash := strings.LastIndex(name, "/")
+		if slash < 0 {
 			continue
 		}
-		bare := name[strings.LastIndex(name, "/")+1:]
-		t.Errorf("rule %q is registered with a namespace; register it as %q instead. The parity "+
-			"guard counts both spellings the same, so this would have been credited as ported "+
-			"while `verify --rules` printed it inconsistently with every other rule", name, bare)
+		namespace := name[:slash]
+		if knownNamespaces[namespace] {
+			continue
+		}
+		t.Errorf("rule %q carries the namespace %q, which is not one this tree recognizes; a rule "+
+			"registers under its real upstream name, and an unrecognized prefix is the spelling "+
+			"that reaches ESLint and kills the run", name, namespace)
 	}
 }
 
@@ -275,7 +305,7 @@ var rulesOutsideTheInventory = map[string]string{
 	// than it started with. The inventory records what the two tools being replaced enforced at the
 	// moment it was captured, and at that moment this rule enforced nothing. A rule enabled after
 	// the capture is not a parity gap; it is a rule the gate never had.
-	"import-require-path-alias": "not enforced by either tool when the inventory was captured, and enabled after it",
+	"nexus/import-require-path-alias": "not enforced by either tool when the inventory was captured, and enabled after it",
 
 	// Ported from typescript-eslint and enabled in both engines by this port, the same shape as the
 	// no-redeclare entry below. The inventory records what the two tools enforced when it was
@@ -283,14 +313,14 @@ var rulesOutsideTheInventory = map[string]string{
 	// than its `recommended` one, so a project on the recommended set never had it, and there is no
 	// oxlint config in the tree to have carried it either. A rule the gate never had rather than a
 	// parity gap.
-	"use-unknown-in-catch-callback-variable": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured",
+	"@typescript-eslint/use-unknown-in-catch-callback-variable": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured",
 
 	// Ported from typescript-eslint and enabled in both engines by this port, the same shape as the
 	// entries around it. Unlike the one above, this rule IS in upstream's recommended preset, so its
 	// absence from the inventory says something about the configuration being replaced rather than
 	// about the rule: neither tool named it when the inventory was captured. A rule the gate never
 	// had rather than a parity gap.
-	"restrict-plus-operands": "ported from typescript-eslint, which recommends it; not enforced by either tool when the inventory was captured",
+	"@typescript-eslint/restrict-plus-operands": "ported from typescript-eslint, which recommends it; not enforced by either tool when the inventory was captured",
 
 	// Ported from typescript-eslint, whose strict preset carries it, and enabled in both engines by
 	// this port. It is outside the inventory for the usual reason, that neither tool enforced it when
@@ -307,7 +337,7 @@ var rulesOutsideTheInventory = map[string]string{
 	// The stale "off" is therefore inert rather than harmful, and it is left alone rather than
 	// removed, because it is somebody's recorded decision about the prefixed spelling and reversing
 	// it is not this port's call. The eslint side carries no such contradiction.
-	"no-misused-spread": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured",
+	"@typescript-eslint/no-misused-spread": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured",
 
 	// Ported from typescript-eslint and enabled in both engines by this port, so like the entry above
 	// it is a rule the gate never had rather than a parity gap. The inventory records what the two
@@ -338,7 +368,7 @@ var rulesOutsideTheInventory = map[string]string{
 	// covers upstream's `/*global b:false*/` case, which needs a directive-globals surface we also
 	// do not have. Reinstating either means building a configured-globals surface first, not
 	// changing this rule.
-	"no-redeclare": "ported from typescript-eslint and enabled by that port; not enforced by either " +
+	"@typescript-eslint/no-redeclare": "ported from typescript-eslint and enabled by that port; not enforced by either " +
 		"tool when the inventory was captured; upstream's builtinGlobals option is declined for want " +
 		"of a configured-globals surface, see the comment above",
 
@@ -347,7 +377,7 @@ var rulesOutsideTheInventory = map[string]string{
 	// than the source: in a file where a hook call resolves to `any`, `set-state-in-render` and
 	// `set-state-in-effect` report nothing and nothing says a check was skipped. The gate being
 	// replaced has no equivalent because it has no such rules to protect.
-	"react-hook-any-type": "a house tripwire over verify's own type-based React rules; the gate " +
+	"structure/react-hook-any-type": "a house tripwire over verify's own type-based React rules; the gate " +
 		"being replaced has no rule it could correspond to",
 }
 

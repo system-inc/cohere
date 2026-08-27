@@ -97,7 +97,7 @@ var NoLocationAssignRelativeDestination = rule.Rule{
 	// Bare, with no family prefix. The config writes `nextjs/no-location-assign-relative-destination`
 	// and the matcher strips the namespace on a `/` boundary, so a prefixed name here matches
 	// nothing and the rule runs on no files while every fixture passes.
-	Name: "no-location-assign-relative-destination",
+	Name: "@next/next/no-location-assign-relative-destination",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

@@ -136,7 +136,7 @@ var messageForwardRefRemoveWrapper = rule.Message{
 // and declaring it would not let the rule answer the aliased-import case anyway, because upstream
 // does not ask that question either.
 var ForwardRefUsesRef = rule.Rule{
-	Name: "forward-ref-uses-ref",
+	Name: "react/forward-ref-uses-ref",
 	Run: func(ctx rule.Context, _ any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

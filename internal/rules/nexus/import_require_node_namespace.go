@@ -118,7 +118,7 @@ var (
 // That needs scope analysis this rule does not have yet, so the finding is reported without a fix
 // rather than with one that breaks the build. Reporting honestly beats fixing wrongly.
 var ImportRequireNodeNamespace = rule.Rule{
-	Name: "import-require-node-namespace",
+	Name: "nexus/import-require-node-namespace",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {

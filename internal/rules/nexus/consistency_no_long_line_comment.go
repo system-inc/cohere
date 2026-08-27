@@ -38,7 +38,7 @@ var messageLongLineComment = rule.Message{
 // it safe to apply unattended. It is withheld when the run contains a star-slash sequence, since
 // that would close the block early and change what the rest of the run means.
 var ConsistencyNoLongLineComment = rule.Rule{
-	Name: "consistency-no-long-line-comment",
+	Name: "nexus/consistency-no-long-line-comment",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

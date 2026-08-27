@@ -27,7 +27,7 @@ var (
 // This rule reads only the path, so it is the cheapest kind of rule there is: it decides on a
 // string and declines the file before any node is visited.
 var ConsistencyNoUtilsFolder = rule.Rule{
-	Name: "consistency-no-utils-folder",
+	Name: "nexus/consistency-no-utils-folder",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

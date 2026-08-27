@@ -81,7 +81,7 @@ var messageUnexpectedThis = rule.Message{
 // tree. The corpus tests the option on eight cases and the decoder below is hand written for exactly
 // this reason.
 var NoInvalidThis = rule.Rule{
-	Name: "no-invalid-this",
+	Name: "@typescript-eslint/no-invalid-this",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := noInvalidThisSettingsFrom(options)
 

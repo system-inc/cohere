@@ -117,7 +117,7 @@ type NoExplicitAnyOptions struct {
 // fixtures asserting a finding, with the upstream behavior noted at the line, so the next reader
 // does not discover the mismatch by grepping the snapshot and quietly "fix" it.
 var NoExplicitAny = rule.Rule{
-	Name: "no-explicit-any",
+	Name: "@typescript-eslint/no-explicit-any",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

@@ -655,7 +655,7 @@ func TestSetStateInRenderRequiresTheTypedHarness(t *testing.T) {
 // TestSetStateInRenderIsRegistered checks the rule reached the catalog under the name the inventory
 // writes.
 func TestSetStateInRenderIsRegistered(t *testing.T) {
-	if SetStateInRender.Name != "set-state-in-render" {
+	if SetStateInRender.Name != "react-hooks/set-state-in-render" {
 		t.Errorf("rule name = %q, want %q", SetStateInRender.Name, "set-state-in-render")
 	}
 	found := false

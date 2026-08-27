@@ -88,7 +88,7 @@ var messageNoDocumentImportInPage = rule.Message{
 var NoDocumentImportInPage = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-document-import-in-page` and matching strips
 	// the namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
-	Name: "no-document-import-in-page",
+	Name: "@next/next/no-document-import-in-page",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The document file is allowed to import the module it exists to implement, so it registers
 		// no listener at all rather than being filtered per import. Upstream spells this the same

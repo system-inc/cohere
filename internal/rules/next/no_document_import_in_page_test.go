@@ -316,7 +316,7 @@ func TestNoDocumentImportInPageCarriesItsOwnMessage(t *testing.T) {
 	if got := result.Diagnostics[0].Message; got != messageNoDocumentImportInPage {
 		t.Fatalf("message is %+v, want %+v", got, messageNoDocumentImportInPage)
 	}
-	if got := result.Diagnostics[0].RuleName; got != "no-document-import-in-page" {
+	if got := result.Diagnostics[0].RuleName; got != "@next/next/no-document-import-in-page" {
 		t.Fatalf("rule name is %q", got)
 	}
 }

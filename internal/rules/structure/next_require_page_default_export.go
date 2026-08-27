@@ -47,7 +47,7 @@ var messagePageDefaultExportNameSuffix = rule.Message{
 // The rule applies to any page file, including one with a default export that is not a function at
 // all, which is why the missing-export check runs at the file rather than per export.
 var NextRequirePageDefaultExport = rule.Rule{
-	Name: "next-require-page-default-export",
+	Name: "structure/next-require-page-default-export",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		fileContext := FileContextFor(ctx.SourceFile.FileName())
 		if !fileContext.IsReactFile || !fileContext.IsPageFile {

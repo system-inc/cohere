@@ -142,7 +142,7 @@ var NoForInArray = rule.Rule{
 	//
 	// Both other references spell it without the suffix: oxc declares `NoForInArray(tsgolint)` and
 	// `@typescript-eslint` 8.67.0 declares `name: 'no-for-in-array'`.
-	Name: "no-for-in-array",
+	Name: "@typescript-eslint/no-for-in-array",
 
 	// The listener resolves the subject's type on every for-in statement, so the checker is required
 	// rather than opportunistic.

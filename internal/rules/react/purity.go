@@ -223,7 +223,7 @@ var purityGlobalContainers = map[string]bool{"globalThis": true, "global": true}
 // differential will show it: any file calling `Date.now()` in a component reports here and does not
 // under oxlint. The corpus is unaffected, since its two files set the pragma either way.
 var Purity = rule.Rule{
-	Name:             "purity",
+	Name:             "react-hooks/purity",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

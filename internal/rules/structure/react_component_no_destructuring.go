@@ -81,7 +81,7 @@ var propertiesSourceNames = map[string]bool{
 // was designed for, and React 19 makes `ref` an ordinary property that has to be taken out at the
 // boundary. Requiring a rest there would be asking for a shape that does not fit.
 var ReactComponentNoDestructuring = rule.Rule{
-	Name: "react-component-no-destructuring",
+	Name: "structure/react-component-no-destructuring",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if !FileContextFor(ctx.SourceFile.FileName()).IsReactFile {
 			return nil

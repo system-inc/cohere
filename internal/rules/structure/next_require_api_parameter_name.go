@@ -49,7 +49,7 @@ var nextApiFunctionNames = map[string]bool{
 //
 // Fixable, since the repair is exactly one identifier and there is only one right answer.
 var NextRequireApiParameterName = rule.Rule{
-	Name: "next-require-api-parameter-name",
+	Name: "structure/next-require-api-parameter-name",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		fileContext := FileContextFor(ctx.SourceFile.FileName())
 		if !fileContext.IsPageFile && !fileContext.IsLayoutFile {

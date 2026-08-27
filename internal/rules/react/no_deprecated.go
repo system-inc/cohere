@@ -124,7 +124,7 @@ var NoDeprecated = rule.Rule{
 	// No namespace prefix. The config writes `react/no-deprecated` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-no-deprecated` would match no inventory entry and lint
 	// no files while passing every fixture in this package.
-	Name: "no-deprecated",
+	Name: "react/no-deprecated",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The pragma is read once per file rather than per node, because it is a property of the
 		// file's comments and cannot change between two nodes in it. It also has to be read before

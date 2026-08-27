@@ -33,7 +33,7 @@ var messageNoDestructuringInHook = rule.Message{
 // two flags whose disjunction is always true, since a guard that cannot fail reads as a guard that
 // might.
 var ReactHookNoDestructuring = rule.Rule{
-	Name: "react-hook-no-destructuring",
+	Name: "structure/react-hook-no-destructuring",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {

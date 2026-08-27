@@ -118,7 +118,7 @@ var IncompatibleLibrary = rule.Rule{
 	// Bare name, no namespace prefix. The inventory writes `react/incompatible-library` and the
 	// parity guard tries an exact match before stripping the namespace, so the slash spelling would
 	// also match while being the wrong thing to write.
-	Name: "incompatible-library",
+	Name: "react-hooks/incompatible-library",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {

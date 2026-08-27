@@ -56,7 +56,7 @@ const screamingSnakeReasoning = "`const` already tells the reader and the compil
 // depends on whether the value is exported and may collide with a binding already in scope, and
 // because MAX_RETRY_COUNT to maximumRetryCount is a rename the casing conversion cannot do.
 var ConsistencyNoScreamingSnakeCase = rule.Rule{
-	Name: "consistency-no-screaming-snake-case",
+	Name: "nexus/consistency-no-screaming-snake-case",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		allowed := map[string]bool{}
 		if settings, hasSettings := options.(ConsistencyNoScreamingSnakeCaseOptions); hasSettings {

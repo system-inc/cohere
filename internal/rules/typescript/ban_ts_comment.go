@@ -172,7 +172,7 @@ func messageBanTsCommentDescriptionFormat(directive string, pattern string) rule
 var BanTsComment = rule.Rule{
 	// No namespace prefix. The config writes `typescript/ban-ts-comment` and the parity guard
 	// strips the namespace on a `/` boundary.
-	Name: "ban-ts-comment",
+	Name: "@typescript-eslint/ban-ts-comment",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

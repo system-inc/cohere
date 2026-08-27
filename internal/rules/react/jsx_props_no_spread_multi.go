@@ -185,7 +185,7 @@ var JsxPropsNoSpreadMulti = rule.Rule{
 	// No namespace prefix. The config writes `react/jsx-props-no-spread-multi` and the parity guard
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-props-no-spread-multi`
 	// would match no inventory entry, lint no files, and still pass every fixture in this package.
-	Name: "jsx-props-no-spread-multi",
+	Name: "react/jsx-props-no-spread-multi",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			_, attributes := jsx.ElementParts(node)

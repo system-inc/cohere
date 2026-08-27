@@ -27,7 +27,7 @@ var messageNoHorizontalRuleElement = rule.Message{
 //	valid:   an <a> inside components/navigation/Link.tsx
 //	invalid: <a href="/about">About</a>
 var ReactNoAnchorElement = rule.Rule{
-	Name: "react-no-anchor-element",
+	Name: "structure/react-no-anchor-element",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		fileContext := FileContextFor(ctx.SourceFile.FileName())
 		if fileContext.IsLinkComponentFile {
@@ -43,7 +43,7 @@ var ReactNoAnchorElement = rule.Rule{
 //	valid:   an <hr> inside components/layout/HorizontalRule.tsx
 //	invalid: <hr />
 var ReactNoHorizontalRuleElement = rule.Rule{
-	Name: "react-no-horizontal-rule-element",
+	Name: "structure/react-no-horizontal-rule-element",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		fileContext := FileContextFor(ctx.SourceFile.FileName())
 		if fileContext.IsHorizontalRuleComponentFile {

@@ -59,7 +59,7 @@ var messageNoTypeReferenceWithoutPrefix = rule.Message{
 // conservative direction, and reproducing the two spellings keeps our findings equal to the gate's
 // rather than adding one it does not have.
 var ReactImportNoDestructuring = rule.Rule{
-	Name: "react-import-no-destructuring",
+	Name: "structure/react-import-no-destructuring",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Local names brought in by a named import from react, which is what a later bare use has
 		// to be checked against.

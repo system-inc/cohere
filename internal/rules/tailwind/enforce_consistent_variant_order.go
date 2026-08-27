@@ -78,7 +78,7 @@ type EnforceConsistentVariantOrderOptions struct {
 // The name matches the upstream rule's, without a `tailwind-` prefix, so it answers to the
 // `better-tailwindcss/enforce-consistent-variant-order` line a project already has.
 var EnforceConsistentVariantOrder = rule.Rule{
-	Name: "enforce-consistent-variant-order",
+	Name: "better-tailwindcss/enforce-consistent-variant-order",
 	// Declared for the reason `enforce-consistent-class-order` declares it: the rule reaches
 	// ctx.Program for the design system, whose stylesheet graph reaches files the program does not
 	// contain, so a findings cache keyed on the linted file alone goes stale when theme.css changes.

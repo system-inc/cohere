@@ -131,7 +131,7 @@ var NoDidMountSetState = rule.Rule{
 	// No namespace prefix. The config writes `react/no-did-mount-set-state` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-no-did-mount-set-state` would match no
 	// inventory entry, lint no files, and still pass every fixture in this package.
-	Name: "no-did-mount-set-state",
+	Name: "react/no-did-mount-set-state",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// oxc gates the whole rule on `source_type().is_jsx()`, so a file the parser does not read
 		// as JSX registers nothing rather than declining node by node. Spelled as the file suffix

@@ -151,7 +151,7 @@ var setStateInUseMemoMessage = rule.Message{
 //     a second component beside it still reports, so this is a per-function decline rather than a
 //     whole-file bailout.
 var SetStateInRender = rule.Rule{
-	Name:             "set-state-in-render",
+	Name:             "react-hooks/set-state-in-render",
 	NeedsTypeChecker: true,
 	// The setter is identified by the type's alias, so a `useState` resolving to `any` carries
 	// no alias and this rule declines the whole file in silence. `structure/react-hook-any-type`

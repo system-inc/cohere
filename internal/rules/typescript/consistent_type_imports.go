@@ -202,7 +202,7 @@ func consistentTypeImportsSomeAreOnlyTypes(names []string) rule.Message {
 // So the finding ships and the repair does not. A wrong fix is applied unattended; a missing one is
 // visible in the report.
 var ConsistentTypeImports = rule.Rule{
-	Name: "consistent-type-imports",
+	Name: "@typescript-eslint/consistent-type-imports",
 
 	// Every part of the rule resolves a name to a declaration. There is no syntactic route to
 	// "which import does this identifier bind to", and the corpus turns on exactly that: several

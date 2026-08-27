@@ -182,7 +182,7 @@ var messageRelatedGetterSetterPairs = rule.Message{
 // which is the pair that pins the direction, since `never` is assignable to everything and nothing
 // but `never` is assignable to it. Both measured.
 var RelatedGetterSetterPairs = rule.Rule{
-	Name:             "related-getter-setter-pairs",
+	Name:             "@typescript-eslint/related-getter-setter-pairs",
 	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// A typed rule handed a nil checker goes silent rather than crashing, which is the more

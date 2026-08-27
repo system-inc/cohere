@@ -175,7 +175,7 @@ var messageReplaceWithAlt = rule.Message{
 // fatal. `{char: "&", alternatives: []}` is a different configuration and DOES report, with an
 // empty alternatives list, and that one is reproduced exactly.
 var NoUnescapedEntities = rule.Rule{
-	Name: "no-unescaped-entities",
+	Name: "react/no-unescaped-entities",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		entities := configuredEntities(options)
 		// An empty forbid list makes every input clean, and returning no listeners is how this rule

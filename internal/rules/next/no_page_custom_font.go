@@ -119,7 +119,7 @@ var messageNoPageCustomFontOutsideDefaultExport = rule.Message{
 var NoPageCustomFont = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-page-custom-font` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
-	Name: "no-page-custom-font",
+	Name: "@next/next/no-page-custom-font",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// A property of the file, so it is asked once rather than at every element. Upstream asks
 		// it per node only because its listener has nowhere earlier to stand.

@@ -81,7 +81,7 @@ var NoScriptComponentInHead = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-script-component-in-head` and matching strips
 	// the namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files while
 	// its own tests pass.
-	Name: "no-script-component-in-head",
+	Name: "@next/next/no-script-component-in-head",
 
 	// Shadowing is the whole reason. See the doc above: a local `Head` is textually identical to the
 	// imported one and is silent upstream, and only resolution separates them.

@@ -149,7 +149,7 @@ var RequireRenderReturn = rule.Rule{
 	// No namespace prefix. The config writes `react/require-render-return` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-require-render-return` would match no
 	// inventory entry and lint no files while passing every fixture in this package.
-	Name: "require-render-return",
+	Name: "react/require-render-return",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The judgment needs the whole file before it can be made: a return anywhere marks the
 		// component that encloses it, and only at the end is it known which components were never

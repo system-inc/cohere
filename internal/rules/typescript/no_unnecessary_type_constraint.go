@@ -61,7 +61,7 @@ var suggestionRemoveTheConstraint = rule.Message{
 // as a free correctness improvement and adding it here would ship a silent divergence upstream's
 // own corpus cannot see, since the corpus writes no parenthesized constraint at all.
 var NoUnnecessaryTypeConstraint = rule.Rule{
-	Name: "no-unnecessary-type-constraint",
+	Name: "@typescript-eslint/no-unnecessary-type-constraint",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

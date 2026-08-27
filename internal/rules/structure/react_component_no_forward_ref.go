@@ -51,7 +51,7 @@ var forwardRefTypeNames = map[string]bool{
 // the right direction here, since the alternative needs the binding resolved and would go quiet on
 // the aliased import (`import { forwardRef as fr }`) that the import arm exists to catch anyway.
 var ReactComponentNoForwardRef = rule.Rule{
-	Name: "react-component-no-forward-ref",
+	Name: "structure/react-component-no-forward-ref",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {

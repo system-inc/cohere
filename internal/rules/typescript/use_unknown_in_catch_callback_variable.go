@@ -113,7 +113,7 @@ import (
 // installed rule's own byte ranges: `(err?: string)` replaces [29,37] and `(err: any /* c1 */ = 2)`
 // replaces [28,33], and both are reproduced by that arithmetic.
 var UseUnknownInCatchCallbackVariable = rule.Rule{
-	Name: "use-unknown-in-catch-callback-variable",
+	Name: "@typescript-eslint/use-unknown-in-catch-callback-variable",
 
 	// Every verdict comes from the checker: whether the receiver is thenable, and whether the
 	// handler's first parameter is intrinsic `unknown`. Neither is answerable from syntax.

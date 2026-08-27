@@ -44,7 +44,7 @@ var messageNoStringLiteralGraphQlQuery = rule.Message{
 // rule has to work on a file that does not type-check, since a wrong document is exactly the kind of
 // mistake that arrives with other errors.
 var NetworkNoStringLiteralQuery = rule.Rule{
-	Name: "network-no-string-literal-query",
+	Name: "structure/network-no-string-literal-query",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {

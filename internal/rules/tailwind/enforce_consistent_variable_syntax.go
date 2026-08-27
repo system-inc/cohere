@@ -69,7 +69,7 @@ type EnforceConsistentVariableSyntaxOptions struct {
 // Not fixable, for the reason its siblings are not: a class literal here wraps across lines with
 // indentation that carries intent, and a fixer would be the first thing to reflow it.
 var EnforceConsistentVariableSyntax = rule.Rule{
-	Name: "enforce-consistent-variable-syntax",
+	Name: "better-tailwindcss/enforce-consistent-variable-syntax",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

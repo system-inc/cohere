@@ -50,7 +50,7 @@ var messageUnnecessaryVariablesDestructuring = rule.Message{
 // is a rename rather than a rebuild and is left alone, because collapsing it to the parameter would
 // change what the call sends.
 var NetworkRequireHookVariablesType = rule.Rule{
-	Name: "network-require-hook-variables-type",
+	Name: "structure/network-require-hook-variables-type",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		analysis := NetworkFileAnalysisFor(ctx)
 		if len(analysis.HookDeclarations) == 0 {

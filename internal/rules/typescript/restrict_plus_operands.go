@@ -189,7 +189,7 @@ func restrictPlusOperandsSettingsFrom(options any) restrictPlusOperandsSettings 
 // the fixtures assert the rendered string rather than the message id, because no id assertion can
 // see a format built this way.
 var RestrictPlusOperands = rule.Rule{
-	Name: "restrict-plus-operands",
+	Name: "@typescript-eslint/restrict-plus-operands",
 
 	// Every operand is judged by its type. Nothing here is answerable from syntax.
 	NeedsTypeChecker: true,

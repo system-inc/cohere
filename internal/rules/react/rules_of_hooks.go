@@ -228,7 +228,7 @@ var (
 // own parent. Stated rather than silently missing: a `useEffectEvent` result assigned to a variable
 // and then passed to a child is a finding this port gives up.
 var RulesOfHooks = rule.Rule{
-	Name: "rules-of-hooks",
+	Name: "react-hooks/rules-of-hooks",
 	Run:  runRulesOfHooks,
 }
 

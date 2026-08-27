@@ -128,7 +128,7 @@ var VoidDomElementsNoChildren = rule.Rule{
 	// guard strips the namespace on a `/` boundary, so a rule named
 	// `react-void-dom-elements-no-children` would match no inventory entry and lint no files while
 	// passing every fixture in this file.
-	Name: "void-dom-elements-no-children",
+	Name: "react/void-dom-elements-no-children",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// reportElement decides about one JSX element, given its own children list.
 		//

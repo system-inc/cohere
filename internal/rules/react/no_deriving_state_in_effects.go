@@ -113,7 +113,7 @@ var messageNoDerivingStateInEffects = rule.Message{
 // plugin switches to it this rule is a re-port rather than an adjustment, and the fixture file's
 // recorded per-case verdicts are what will make that visible.
 var NoDerivingStateInEffects = rule.Rule{
-	Name:             "no-deriving-state-in-effects",
+	Name:             "react-hooks/no-deriving-state-in-effects",
 	NeedsTypeChecker: true,
 	// Same predicate as `set-state-in-effect`: the setter is recognised by its type alias, so a hook
 	// returning `any` takes every finding in the file with it. Declared so the tripwire can name it.

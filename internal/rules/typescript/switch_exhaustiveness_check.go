@@ -191,7 +191,7 @@ import (
 // recursion over the discriminant's union. That is the honest price of the only question this rule
 // can ask.
 var SwitchExhaustivenessCheck = rule.Rule{
-	Name: "switch-exhaustiveness-check",
+	Name: "@typescript-eslint/switch-exhaustiveness-check",
 
 	// The listener consults the checker for the discriminant and for every case expression on every
 	// switch it sees, with no cheap syntactic exit, so the checker is required.

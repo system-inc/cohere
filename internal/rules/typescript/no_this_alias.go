@@ -127,7 +127,7 @@ type noThisAliasRawOptions struct {
 // looks: `this.self = this` is the single most common hand-written form of this exact defect, and
 // upstream declines it. Measured on the release binary in both shapes.
 var NoThisAlias = rule.Rule{
-	Name: "no-this-alias",
+	Name: "@typescript-eslint/no-this-alias",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

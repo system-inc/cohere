@@ -74,7 +74,7 @@ var forbiddenSources = []forbiddenSource{
 // that is always correct; if the bindings also need to change, the compiler says so immediately and
 // a human makes that call with the module in front of them.
 var ImportNoForbiddenSource = rule.Rule{
-	Name: "import-no-forbidden-source",
+	Name: "nexus/import-no-forbidden-source",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// The finding is anchored on the specifier, which is both the thing that gets rewritten and
 		// the thing a reader has to change.

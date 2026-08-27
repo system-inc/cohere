@@ -171,7 +171,7 @@ var NoThisInSfc = rule.Rule{
 	// No namespace prefix. The config writes `react/no-this-in-sfc` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-no-this-in-sfc` would match no inventory entry, lint
 	// no files, and still pass every fixture in this package.
-	Name: "no-this-in-sfc",
+	Name: "react/no-this-in-sfc",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// oxc gates the whole rule on `source_type().is_jsx()` through `should_run`, so a file the
 		// parser does not read as JSX registers nothing rather than declining node by node.

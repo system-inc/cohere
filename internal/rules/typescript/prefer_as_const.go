@@ -68,7 +68,7 @@ var messagePreferAsConst = rule.Message{
 // StringLiteral's Text is the cooked value rather than the source spelling. Both were probed on the
 // inputs above before this comparison was written.
 var PreferAsConst = rule.Rule{
-	Name: "prefer-as-const",
+	Name: "@typescript-eslint/prefer-as-const",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

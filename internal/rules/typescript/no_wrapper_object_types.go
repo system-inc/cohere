@@ -66,7 +66,7 @@ var messageBannedWrapperObjectType = rule.Message{
 // `Number` with `number` inside `implements` would produce code that does not compile, since a class
 // cannot implement a primitive.
 var NoWrapperObjectTypes = rule.Rule{
-	Name: "no-wrapper-object-types",
+	Name: "@typescript-eslint/no-wrapper-object-types",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil
