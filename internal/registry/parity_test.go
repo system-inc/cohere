@@ -343,6 +343,15 @@ var rulesOutsideTheInventory = map[string]string{
 	// so turning this on is a cleanup somebody has to do by hand rather than a command.
 	"@typescript-eslint/no-dynamic-delete": "ported from typescript-eslint, whose strict preset carries it; not enforced by either tool when the inventory was captured",
 
+	// Ported from typescript-eslint and enabled in both engines by this port, the same shape as the
+	// entries around it. Upstream ships it in no preset at all, recommended or strict, so neither
+	// tool being replaced could have carried it and its absence from the inventory says nothing
+	// about the rule. A rule the gate never had rather than a parity gap.
+	//
+	// The repair is three suggestions rather than a fix, deliberately: the correct enum value is not
+	// recoverable from the source, so nothing may rewrite one unattended.
+	"@typescript-eslint/prefer-enum-initializers": "ported from typescript-eslint, which ships it in no preset; not enforced by either tool when the inventory was captured",
+
 	// Ported from typescript-eslint, whose strict preset carries it, and enabled in both engines by
 	// this port. It is outside the inventory for the usual reason, that neither tool enforced it when
 	// the capture was taken, but this one has a wrinkle worth recording because the next reader will
