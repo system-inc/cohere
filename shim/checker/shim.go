@@ -89,8 +89,12 @@ const CheckModeSkipContextSensitive = checker.CheckModeSkipContextSensitive
 const CheckModeSkipGenericFunctions = checker.CheckModeSkipGenericFunctions
 const CheckModeTypeOnly = checker.CheckModeTypeOnly
 type Checker = checker.Checker
+//go:linkname Checker_getImmediateAliasedSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getImmediateAliasedSymbol
+func Checker_getImmediateAliasedSymbol(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 //go:linkname Checker_getResolvedSignature github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getResolvedSignature
 func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode) *checker.Signature
+//go:linkname Checker_resolveAlias github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).resolveAlias
+func Checker_resolveAlias(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfSymbol
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 //go:linkname Checker_getWidenedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedType

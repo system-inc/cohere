@@ -5,6 +5,8 @@
 	"ExtraMethods": {
 		"Checker": [
 			"getBaseConstraintOfType",
+			"getImmediateAliasedSymbol",
+			"resolveAlias",
 			"getDeclaredTypeOfSymbol",
 			"getBaseTypes",
 			"getSignaturesOfType",

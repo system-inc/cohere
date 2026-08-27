@@ -132,6 +132,15 @@ func TestNoGlobalContainer(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.Run(t, NoGlobalContainer, noGlobalContainerFile, testCase.sourceText)
+			// A row expecting nothing goes through ExpectClean rather than through ExpectFindings
+			// with an empty list. The two are the same assertion to a reader and not to the
+			// fixture-pair guard, which reads the call by name: a suite that only ever calls
+			// ExpectFindings proves the rule can detect and never that it can stay quiet, and a
+			// violation-only corpus is exactly what that guard exists to catch.
+			if len(testCase.wantIds) == 0 {
+				rule_testing.ExpectClean(t, result)
+				return
+			}
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
