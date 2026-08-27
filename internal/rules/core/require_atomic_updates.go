@@ -130,7 +130,15 @@ type RequireAtomicUpdatesOptions struct {
 // binding itself is not, so a plain reassignment of it is local. Two questions, one predicate,
 // opposite answers, and the corpus pins both.
 //
-// # The one divergence, stated with the command that established it
+// # Two divergences from ESLint, both measured on the whole tree and both kept
+//
+// Run end to end over `~/Projects/ahra` on 2026-08-26, verify reports 39 and ESLint 31, and the
+// difference is entirely one-way: verify is a strict SUPERSET, with 8 findings ESLint declines and
+// zero that ESLint reports and verify misses. Both classes are recorded below with the reduction
+// that isolates them, because each is a place a later reader would otherwise "fix" verify back to
+// ESLint's answer.
+//
+// # Divergence one, resolution: 7 of the 8
 //
 // Upstream skips a reference whose `resolved` is null, so an identifier naming nothing declared is
 // never judged. ESLint decides "declared" from its own scope analysis plus the configured globals
@@ -153,6 +161,57 @@ type RequireAtomicUpdatesOptions struct {
 // the reason upstream skips an unresolved name is that it cannot tell a global from a typo, not that
 // a global cannot race. A global is in fact the MOST racy thing in the file. `TestRequireAtomicUpdatesResolutionDivergence`
 // pins it so the next reader sees a measurement rather than inherits an argument.
+//
+// On the real tree this accounts for 7 of the 8 extras, all of them the same shape: a handler saved
+// into a local, replaced, and restored in a `finally` after an await.
+//
+//	const originalLog = console.log;
+//	console.log = function () { ... };
+//	try { return await callback(); }
+//	finally { console.log = originalLog; }
+//
+// `modules/art/ArtTerminal.ts:414-416` and `modules/phi/social/PhiSocialTerminal.ts:480-482` are
+// that pattern over `console.log`, `console.info` and `process.stdout.write`. Measured on the
+// installed rule, the SAME source reports when `console` is a declared global and is silent when it
+// is not, and this project's ESLint config declares no globals at all, which is why ESLint sees
+// nothing there. Checked rather than assumed: a seeded `alert()` in `ArtTerminal.ts` was reported by
+// the same ESLint run, so the file is linted and the silence is the rule declining rather than the
+// file being skipped.
+//
+// These are true positives. Two overlapping calls to such a wrapper restore in the wrong order and
+// the second restore installs a filter that was already torn down, which is the last-writer-wins
+// hazard this rule exists to name.
+//
+// # Divergence two, a refresh credited across a throwing edge: the 8th
+//
+// ESLint clears a variable's outdated mark at a read, and carries that clearing into the `catch` of
+// an enclosing `try`. So a read at the END of a try block silences a write in the catch, even though
+// the catch is reached precisely on the paths where that read did not run.
+//
+// Reduced to the pair that isolates it, measured on eslint 10.8.1:
+//
+//	async function f(e) { if (e.s !== 1) return;
+//	    try { await a(); e.p = await b(); } catch (x) { e.err = 1; } }
+//	  -> ESLint reports BOTH writes
+//
+//	async function f(e) { if (e.s !== 1) return;
+//	    try { await a(); e.p = await b(); use(e.p); } catch (x) { e.err = 1; } }
+//	  -> ESLint reports only `e.p`, and goes silent on `e.err`
+//
+// The two differ by the single read `use(e.p)`. Reading an UNRELATED variable there does not change
+// the verdict, and adding a further await after the read restores it, which together show the
+// mechanism is the refresh rather than statement count or position.
+//
+// The catch runs when `await b()` rejects. On that path `use(e.p)` never executes, so the refresh
+// ESLint credits did not happen and `e` is still built from a pre-suspension read. Verify reports
+// it; ESLint does not. This is `modules/kingdom/KingdomShadeController.ts:203`, and it is the only
+// one of the 8 where the two implementations disagree about a JUDGMENT rather than about what
+// resolves.
+//
+// Kept deliberately. A refresh that only happens on the non-throwing path cannot make the throwing
+// path safe, and our graph forks to the handler as a real successor edge, which is why we see it and
+// upstream's segment bookkeeping does not.
+// `TestRequireAtomicUpdatesCatchDoesNotInheritTryRefresh` pins both directions.
 //
 // # No fix and no suggestion, matching upstream
 //

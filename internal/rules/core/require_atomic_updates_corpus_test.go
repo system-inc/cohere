@@ -73,7 +73,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
             async function foo() {
                 if (1);
                 if (2);
@@ -100,7 +100,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
             async function foo() {
                 return [
                     1 ? a : b,
@@ -129,7 +129,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
             async function f() {
                 let records
                 records = await a.records
@@ -139,7 +139,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
             async function f() {
                 try {
                     this.foo = doSomething();
@@ -152,7 +152,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
             async function f(foo) {
                 let bar = await get(foo.id);
                 bar.prop = foo.prop;
@@ -161,7 +161,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
             async function f(foo) {
                 let bar = await get(foo.id);
                 foo = bar.prop;
@@ -170,7 +170,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
             async function f() {
                 let foo = {}
                 let bar = await get(foo.id);
@@ -180,7 +180,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
             let count = 0
             let queue = []
             async function A(...args) {
@@ -193,7 +193,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
             async function foo(e) {
             }
 
@@ -218,7 +218,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
             async function run() {
               {
                 let entry;
@@ -235,7 +235,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
             async function run() {
                 await a;
                 b = 1;
@@ -244,7 +244,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: nil,
 	},
 	{
-		source:  `
+		source: `
                 async function a(foo) {
                     if (foo.bar) {
                         foo.bar = await something;
@@ -254,7 +254,7 @@ var requireAtomicUpdatesCleanCases = []requireAtomicUpdatesCase{
 		options: RequireAtomicUpdatesOptions{AllowProperties: true},
 	},
 	{
-		source:  `
+		source: `
                 function* g(foo) {
                     baz = foo.bar;
                     yield something;
@@ -392,7 +392,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
-		source:  `
+		source: `
                 async function f(foo) {
                     let buz = await get(foo.id);
                     foo.bar = buz.bar;
@@ -402,7 +402,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
-		source:  `
+		source: `
                 async () => {
                     opts.spec = process.stdin;
                     try {
@@ -417,7 +417,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
 		wantIds: []string{"nonAtomicObjectUpdate", "nonAtomicObjectUpdate"},
 	},
 	{
-		source:  `
+		source: `
                 async function a(foo) {
                     if (foo.bar) {
                         foo.bar = await something;
@@ -428,7 +428,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
-		source:  `
+		source: `
                 function* g(foo) {
                     baz = foo.bar;
                     yield something;
@@ -439,7 +439,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
-		source:  `
+		source: `
                 async function a(foo) {
                     if (foo.bar) {
                         foo.bar = await something;
@@ -450,7 +450,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
-		source:  `
+		source: `
                 function* g(foo) {
                     baz = foo.bar;
                     yield something;
@@ -461,7 +461,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
-		source:  `
+		source: `
                 async function a(foo) {
                     if (foo.bar) {
                         foo.bar = await something;
@@ -472,7 +472,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
-		source:  `
+		source: `
                 function* g(foo) {
                     baz = foo.bar;
                     yield something;
@@ -483,7 +483,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
 		wantIds: []string{"nonAtomicObjectUpdate"},
 	},
 	{
-		source:  `
+		source: `
                 let foo;
                 async function a() {
                     if (foo) {
@@ -495,7 +495,7 @@ var requireAtomicUpdatesReportingCases = []requireAtomicUpdatesCase{
 		wantIds: []string{"nonAtomicUpdate"},
 	},
 	{
-		source:  `
+		source: `
                 let foo;
                 function* g() {
                     baz = foo;

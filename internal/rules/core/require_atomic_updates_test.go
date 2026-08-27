@@ -457,3 +457,68 @@ func TestRequireAtomicUpdatesFinallyReportsOnce(t *testing.T) {
 		})
 	}
 }
+
+// TestRequireAtomicUpdatesCatchDoesNotInheritTryRefresh pins the one place this rule reaches a
+// different JUDGMENT from ESLint, rather than a different set of resolvable names.
+//
+// ESLint clears a variable's outdated mark at a read and carries that clearing into the `catch` of
+// an enclosing `try`, so a read at the end of a try block silences a write in the catch. The catch
+// is reached precisely on the paths where that read did not run, so the refresh it credits never
+// happened.
+//
+// Measured on the installed eslint 10.8.1, and the pair below is the reduction that isolates it:
+// without the trailing `use(entry.position)` ESLint reports both writes, and with it ESLint reports
+// only the try-block one. Reading an unrelated variable in that position does not change ESLint's
+// verdict, and adding a further await after the read restores it, which together show the mechanism
+// is the refresh rather than statement count or position.
+//
+// Both directions are asserted. The second case is the divergence; the first is the control that
+// keeps it from passing on a rule that simply reports every catch-block write.
+//
+// This is `modules/kingdom/KingdomShadeController.ts:203` on the real tree, and it is one of the 8
+// findings verify reports there that ESLint does not. See the rule's doc comment.
+func TestRequireAtomicUpdatesCatchDoesNotInheritTryRefresh(t *testing.T) {
+	const declarations = `declare function a(): Promise<void>;
+declare function b(): Promise<number>;
+declare function use(value: unknown): void;
+`
+
+	t.Run("both linters report when the try block ends at the await", func(t *testing.T) {
+		result := ruletest.RunTyped(t, RequireAtomicUpdates, "catch.ts", declarations+
+			`async function f(entry: any) { if (entry.status !== 1) return;
+    try { await a(); entry.position = await b(); } catch (error) { entry.error = 1; } }`)
+		ruletest.ExpectFindings(t, result, "nonAtomicObjectUpdate", "nonAtomicObjectUpdate")
+	})
+
+	t.Run("a read at the end of the try does not refresh the catch", func(t *testing.T) {
+		// ESLint reports only `entry.position` here. Verify reports both, because the fork to the
+		// handler is a real successor edge and the read on the normal path is not on it.
+		result := ruletest.RunTyped(t, RequireAtomicUpdates, "catch.ts", declarations+
+			`async function f(entry: any) { if (entry.status !== 1) return;
+    try { await a(); entry.position = await b(); use(entry.position); } catch (error) { entry.error = 1; } }`)
+		ruletest.ExpectFindings(t, result, "nonAtomicObjectUpdate", "nonAtomicObjectUpdate")
+
+		// The span is asserted so the catch-block write is named specifically rather than the count
+		// being satisfied by two findings on the try-block one.
+		written := result.SourceFile.Text()
+		var sawCatchWrite bool
+		for _, diagnostic := range result.Diagnostics {
+			if written[diagnostic.Range.Pos():diagnostic.Range.End()] == "entry.error = 1" {
+				sawCatchWrite = true
+			}
+		}
+		if !sawCatchWrite {
+			t.Error("the catch-block write was not among the findings")
+		}
+	})
+
+	t.Run("a guard read is still what makes the object outdated", func(t *testing.T) {
+		// The control for the whole test. With no read before the suspension there is nothing stale,
+		// and both linters are silent, which is what keeps the two rows above from passing on a rule
+		// that reports every property write in a catch.
+		result := ruletest.RunTyped(t, RequireAtomicUpdates, "catch.ts", declarations+
+			`async function f(entry: any) {
+    try { await a(); } catch (error) { entry.error = 1; } }`)
+		ruletest.ExpectClean(t, result)
+	})
+}
