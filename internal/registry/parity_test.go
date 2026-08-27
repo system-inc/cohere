@@ -762,6 +762,37 @@ var rulesOutsideTheInventory = map[string]string{
 	// The audit recorded 33 violations and this rule finds 35. That is the audit being stale rather
 	// than a divergence: driven over the same twenty files, this rule and the installed build
 	// produce byte-identical finding sets with nothing on either side of the diff.
+	// Ported from typescript-eslint and enabled in both engines by this port. Outside the inventory
+	// for the usual reason: neither tool named it when the capture was taken.
+	//
+	// Half this rule's judgment is about a DIFFERENT file, which is why it declares that it reads
+	// the program: an exported name is type-only or not according to what the module it came from
+	// declares, and the star arm reads another module's exports outright. The star arm reproduces an
+	// upstream workaround rather than improving on it, because the thing it works around is the same
+	// here: a name reaching a module through a type-only star sits in a table the checker does not
+	// expose, and the only way to see it is that one lookup lists the name while another does not.
+	// Probed on a type-only module and a value-bearing one, the pair discriminates.
+	//
+	// The repair SPLITS a statement, which was flagged as the riskiest shape in this batch. It is
+	// safe because a specifier holds only names, so re-rendering one can lose nothing a copy would
+	// have kept; what it can lose is SPELLING, and that is pinned by rows covering an alias, a
+	// single-quoted export name, a double-quoted one and an emoji literal, all carried through as
+	// raw source rather than cooked values.
+	//
+	// Two defects the imported corpus caught. The star fixer scanned bytes for its asterisk and
+	// found the one inside a block comment, writing the keyword into the comment; upstream's own
+	// corpus is the only place that shape appears. And the rendered specifier order is BUCKET order
+	// rather than source order, so a statement mixing an inline type with a checker-found one comes
+	// back reversed, which is upstream's behavior and reads as a bug until measured.
+	//
+	// Zero findings on this tree, matching the audit. Separated from an inert rule with a seeded
+	// probe: two findings on two seeded exports, silent on an already-inline one and on an
+	// all-values one, and the repair byte-identical to the installed build on both.
+	"@typescript-eslint/consistent-type-exports": "ported from typescript-eslint; not enforced by " +
+		"either tool when the inventory was captured; its export-star arm reproduces upstream's " +
+		"two-lookup workaround for type-only star re-exports, which the checker does not expose " +
+		"directly",
+
 	"@typescript-eslint/no-unnecessary-boolean-literal-compare": "ported from typescript-eslint, " +
 		"whose strict preset carries it; not enforced by either tool when the inventory was " +
 		"captured; its strictNullChecks arm is unreachable through the test harness and is pinned " +
