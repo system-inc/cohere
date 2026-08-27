@@ -1121,6 +1121,14 @@ var rulesOutsideTheInventory = map[string]string{
 	// upstream that ships a corpus. This is one of ours: the source repository is the only oracle,
 	// and there is no inventory entry because the gate being replaced never enforced it here.
 	//
+	// Registered and not enabled, for the same reason as every other base/ rule here: ahra's config
+	// names no base/ keys, and the inventory was captured from ahra's own gate, which has no base
+	// surface to have enforced this. The judgment it ports is real and measured against the ESLint
+	// original in api-phi-health; where it runs is a decision nobody has made.
+	"base/graphql-operation-context-matches-return": "ported from api-phi-health's own base lint " +
+		"layer; registered but not enabled because ahra's config names no base/ rules at all, so " +
+		"where it is enforced is a pending decision rather than one this port should make",
+
 	// Registered and not enabled, because ahra's config names no base/ rules at all. See its entry in
 	// the live-wiring exemption map for why that is a pending decision rather than an oversight.
 	"base/no-global-container": "ported from api-phi-health's own base lint layer; registered but " +
@@ -1147,6 +1155,21 @@ var rulesOutsideTheInventory = map[string]string{
 	// other rules. So the check is a SEEDED file placed inside that project's tsconfig include,
 	// where the original and this port agree on seven reporting shapes and nine clean ones, line and
 	// column, including the two whose guards prevent a panic rather than a wrong verdict.
+	// The largest of the base rules, and the only one of them that is LIVE judgment in the source
+	// repository: it is one of four base rules actually enabled in `BaseLintConfiguration.ts`. It
+	// also carries no default configuration, so it enforces nothing until a project supplies the
+	// protected keys and the decorators that unlock them, which is a second reason it is registered
+	// and not enabled here.
+	//
+	// Its oracle is the source rule itself, loaded into the ESLint Linter with that live wiring and
+	// driven over forty-six inputs plus a sweep of all 2,293 TypeScript files of api-phi-health.
+	// That sweep reports ZERO, which is a real property rather than a broken instrument: a seeded
+	// violation placed in the same run reports, and this port agrees with the original on it to the
+	// line and column.
+	"base/context-requires-access": "ported from api-phi-health's own base lint layer; registered " +
+		"but not enabled because ahra's config names no base/ rules at all, so where it is " +
+		"enforced is a decision nobody has made yet; the gate being replaced never enforced it here",
+
 	"base/pagination-decorator": "ported from api-phi-health's own base lint layer; registered but " +
 		"not enabled because ahra's config names no base/ rules at all, so where it is enforced is " +
 		"a decision nobody has made yet; the gate being replaced never enforced it here",

@@ -223,9 +223,10 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// is nothing to reverse and nothing anybody has decided yet. The source repository runs this
 		// one at `warn` rather than `error`, which is a severity question for whoever enables it here
 		// and is recorded so the answer is not silently `error` by default.
-		"base/relation-must-be-optional": "registered but not enabled because ahra's config names no base/ rules at all; the source repository runs it at warn rather than error, which is part of the same pending decision",
-		"base/no-console":                "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
-		"base/pagination-decorator":      "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/relation-must-be-optional":                "registered but not enabled because ahra's config names no base/ rules at all; the source repository runs it at warn rather than error, which is part of the same pending decision",
+		"base/no-console":                               "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/graphql-operation-context-matches-return": "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/pagination-decorator":                     "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
 	}
 
 	rules := All()
