@@ -307,3 +307,52 @@ func TestNoNamespaceNeedsTheTypedHarness(t *testing.T) {
 	untyped := rule_testing.Run(t, NoNamespace, noNamespaceFile, sourceText)
 	rule_testing.ExpectClean(t, untyped)
 }
+
+// TestNoNamespaceDoesNotPanicOnNonLiteralArguments is crash protection, not a behavioral fixture.
+//
+// `ast.Node.Text` has no case for a CallExpression or a PropertyAccessExpression and reaches its
+// unhandled-case panic. The walk recovers per FILE rather than per rule, so one such node here would
+// cost every rule in this package every finding in that file, and the run would still print a
+// plausible summary line.
+//
+// **This is not a hypothetical, and it fired.** During a mid-edit window on this rule, a dry run
+// against the real tree reported six crashed files: two `*ast.PropertyAccessExpression` and four
+// `*ast.CallExpression`, in NavigationTrail.tsx, AssetGridCard.tsx, AssetRowName.tsx,
+// TranslationUtilities.ts, FinanceInventoryAccountGroup.tsx and AssetHero.tsx. The finished rule
+// crashes on none of them.
+//
+// The string-literal guard is what prevents the call half, measured rather than read: deleting
+// `if first.Kind != ast.KindStringLiteral` and re-running the first case below panics with exactly
+// `Unhandled case in Node.Text: *ast.CallExpression`, and restoring it clears it. So the kind check
+// MUST precede the `Text()` call, and a later reordering that looks harmless is the thing this test
+// exists to catch.
+//
+// No `ExpectFindings` fixture can see a panic, which is why this is its own test naming what it
+// prevents rather than another silent row in a boundary table. Reaching this test at all is the
+// assertion; the verdicts are pinned elsewhere.
+func TestNoNamespaceDoesNotPanicOnNonLiteralArguments(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+	}{
+		// The call half. Four of the six crashed files were this shape.
+		{"a call as the first argument", "declare function someCall(): string;\nReact.createElement(someCall());"},
+		{"a nested call", "declare const a: any;\nReact.createElement(a.b.c());"},
+		{"a conditional", "declare const x: boolean;\nReact.createElement(x ? 'a:b' : 'c');"},
+		{"a template literal", "React.createElement(`x:y`);"},
+		{"a spread argument, which has no first literal at all", "declare const args: any[];\nReact.createElement(...args);"},
+		{"a parenthesized literal, which is not a literal node", "React.createElement(('a:b'));"},
+
+		// The property-access half. Two of the six crashed files were this shape, reached through
+		// the JSX arm rather than this one; both are pinned so a future reader sees the pair.
+		{"a this-rooted tag name", "declare const x: any;\nconst a = <this.Foo />;"},
+		{"a deeply dotted tag name", "declare const a: any;\nconst b = <a.b.c.d />;"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Surviving the walk IS the assertion. The verdicts for shapes that have one are
+			// pinned in the boundary tables above.
+			rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, testCase.sourceText)
+		})
+	}
+}
