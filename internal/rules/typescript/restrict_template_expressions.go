@@ -177,6 +177,16 @@ var RestrictTemplateExpressions = rule.Rule{
 	// Every judgment is about the TYPE of an interpolated value.
 	NeedsTypeChecker: true,
 
+	// The allowlist asks whether a type's declaration lives in a default library file, which is a
+	// question about the program the file was compiled in rather than about the file alone. So its
+	// verdict for one file can change when another file does, and a findings cache keyed on this
+	// file's hash would keep serving the old answer.
+	//
+	// Missed on the first pass here and on consistent-generic-constructors, which a sibling caught
+	// and fixed a commit later. Two for two on type-aware rules in this batch: the field is easy to
+	// write last and easy to forget, and only the guard in internal/dispatch notices.
+	ReadsProgram: true,
+
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings, isSettings := options.(RestrictTemplateExpressionsOptions)
 		if !isSettings {
