@@ -304,6 +304,21 @@ var rulesOutsideTheInventory = map[string]string{
 	// oxlint config in the tree to have carried it either. A rule the gate never had rather than a
 	// parity gap.
 	//
+	// It is a judgment about React prop type declarations, so it was enabled on the frontend layer.
+	// The audit measured zero violations, which makes it a guardrail against drift.
+	//
+	// One arm is deliberately not reproduced and the reason is a missing substrate rather than a
+	// decision. Upstream also looks inside a prop wrapper call, and which functions count comes
+	// from `settings.propWrapperFunctions`, a setting shared by four rules in this plugin that
+	// `rule.Context` has no path to. Fourteen of upstream's 63 reporting corpus cases configure it
+	// and are not imported; the other 97 cases, including all 48 passing ones, are.
+	"react/forbid-prop-types": "ported from eslint-plugin-react, which marks it recommended:false; not enforced by either tool when the inventory was captured, and the audit measured zero violations in ahra; its prop-wrapper arm is declined for want of a settings surface, see the comment above",
+
+	// Ported from eslint-plugin-react and enabled in both engines by this port. Upstream marks it
+	// `recommended: false`, so it is off in the plugin's own recommended config, and there is no
+	// oxlint config in the tree to have carried it either. A rule the gate never had rather than a
+	// parity gap.
+	//
 	// It is a judgment about React keys, so it was enabled on the frontend layer. The audit
 	// measured eighty-four violations, the largest of this batch, so enabling it is a real cleanup
 	// rather than a guardrail. Each is a list whose keys are array positions, which React reuses
