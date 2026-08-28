@@ -1,24 +1,24 @@
 {
   "capturedAt": "2026-08-23",
   "note": "The superset of every rule enforced by eslint (2026-08-20 baseline) and oxlint (current .oxlintrc.json), including rules no rules block names. verify must enforce all of these. `enabledBy` says which surface turns a rule on: `rulesBlock` for a rule written down, `pluginDefault` for one contributed by an oxlint `plugins` declaration and invisible to any config read. `severity` is what the tool reports today, and it is recorded so that raising a warning to an error later is a config change rather than a porting project.",
-  "total": 323,
+  "total": 324,
   "byNamespace": {
-    "(core)": 122,
+    "(core)": 123,
     "@next": 22,
     "@typescript-eslint": 53,
     "better-tailwindcss": 13,
     "nexus": 20,
-    "react": 45,
-    "react-hooks": 17,
+    "react": 44,
+    "react-hooks": 18,
     "structure": 31
   },
   "bySeverity": {
-    "error": 281,
+    "error": 282,
     "warn": 42
   },
   "byEnabledBy": {
     "pluginDefault": 41,
-    "rulesBlock": 282
+    "rulesBlock": 283
   },
   "rules": [
     {
@@ -473,6 +473,15 @@
       "sources": [
         "eslint",
         "oxlint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "@typescript-eslint/no-shadow",
+      "sources": [
+        "eslint"
       ],
       "options": "no",
       "severity": "error",
@@ -2115,6 +2124,15 @@
       "enabledBy": "rulesBlock"
     },
     {
+      "rule": "prefer-regex-literals",
+      "sources": [
+        "eslint"
+      ],
+      "options": "yes",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
       "rule": "prefer-rest-params",
       "sources": [
         "eslint",
@@ -2216,6 +2234,16 @@
       "rule": "react-hooks/no-deriving-state-in-effects",
       "sources": [
         "eslint"
+      ],
+      "options": "no",
+      "severity": "error",
+      "enabledBy": "rulesBlock"
+    },
+    {
+      "rule": "react-hooks/preserve-manual-memoization",
+      "sources": [
+        "eslint",
+        "oxlint"
       ],
       "options": "no",
       "severity": "error",
@@ -2642,16 +2670,6 @@
       "options": "no",
       "severity": "warn",
       "enabledBy": "pluginDefault"
-    },
-    {
-      "rule": "react/preserve-manual-memoization",
-      "sources": [
-        "eslint",
-        "oxlint"
-      ],
-      "options": "no",
-      "severity": "error",
-      "enabledBy": "rulesBlock"
     },
     {
       "rule": "react/jsx-no-useless-fragment",
