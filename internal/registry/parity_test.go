@@ -1066,6 +1066,26 @@ var rulesOutsideTheInventory = map[string]string{
 
 	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
 	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
+	// never had it, and the ahra config named it under neither the bare spelling nor the
+	// `@typescript-eslint/` one, so there is no standing decision this enable reverses.
+	//
+	// Unlike most entries here it is NOT a guardrail against drift. A dry run measured 790 findings
+	// across 300 files, and those were differenced against the installed eslint rule driven over the
+	// same 214 reporting files through the Linter API: 789 of 790 agree on file and line. The single
+	// difference is upstream anchoring a finding on a preceding `eslint-disable` comment where this
+	// rule anchors on the identifier, which is the leading-trivia difference `ctx.ReportNode` already
+	// corrects for.
+	//
+	// Most of those findings are one shape: a function declaration called above its definition. That
+	// is legal, since a function declaration is fully hoisted, which is why upstream ships `nofunc`
+	// and why the count is large without the tree being broken.
+	"no-use-before-define": "ported from eslint core, which marks it recommended:false; the ahra " +
+		"config named it under neither spelling, so neither tool enforced it when the inventory was " +
+		"captured, and a dry run measured 790 findings across 300 files, differenced against the " +
+		"installed rule over the same files at 789 of 790 agreeing on file and line",
+
+	// Ported from eslint core and enabled in both engines by this port. Outside the inventory for
+	// the usual reason: upstream marks it `recommended: false`, so a project on the recommended set
 	// never had it, and there is no oxlint config in the tree to have carried it either.
 	//
 	// The audit measured zero violations, so this is a guardrail against drift rather than a
