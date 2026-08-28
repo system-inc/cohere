@@ -303,6 +303,25 @@ func namespacesOf(remaining []string) []namespaceCount {
 // A reason is required. An entry here says "we looked", and an entry with no reason says only that
 // somebody wanted the test to pass.
 var rulesOutsideTheInventory = map[string]string{
+	// Ported from eslint core and enabled on the universal layer by this port. The inventory
+	// captured what eslint and oxlint enforced on 2026-08-23, and neither configured this rule
+	// under any spelling, so it is a judgment the gate never made rather than a parity gap. No
+	// prior `off` exists for it anywhere in the fleet: the bare name was grepped in ahra,
+	// www-phi-health, www-connected-app and libraries/structure and appears in none of them, with a
+	// control confirming the grep works. Enabling is therefore a decision nobody had made rather
+	// than one being reversed.
+	//
+	// There is no `@typescript-eslint/logical-assignment-operators`, so the double-registration
+	// hazard that hit five rules in this wave does not apply here: the typescript-eslint rules
+	// directory has no file of that name, and the config carries no such key.
+	//
+	// It reports 8 findings over 3,516 files in the ahra tree, all genuine `x = x || y` shapes,
+	// with no crashed files and 3.9ms of total rule time. The fixer was exercised through the real
+	// fix phase rather than only through fixtures: a bare identifier is rewritten to `value ||= b`
+	// unattended, and a member access such as `target.name` is left untouched and offered as a
+	// suggestion instead, which is upstream's getter judgment landing on real code.
+	"logical-assignment-operators": "ported from eslint core; neither eslint nor oxlint configured it under any spelling when the inventory was captured, and no prior off exists in any config in the fleet, so enabling it is a decision nobody had made rather than one being reversed; there is no @typescript-eslint rule of this name, so it cannot double-report; measured at 8 genuine findings over 3,516 files with the fixer rewriting only bare identifiers and offering member accesses as suggestions",
+
 	// Ported from eslint core and enabled in both engines by this port. The inventory captured
 	// what the two gates enforced on 2026-08-23, and only the namespaced spelling was configured
 	// then, so the bare name is a rule the gate never had rather than a parity gap. No prior `off`
