@@ -377,7 +377,28 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 				}
 
 				// These are names somebody else chose, not bindings this file has to live with.
-				if binding.IsForeignName(node) {
+				//
+				// A type-literal or interface KEY is the one member of that set this rule still
+				// judges, so it is subtracted from the skip. `IsForeignName` is shared with
+				// `consistency-no-ambiguous-identifier`, which wants the whole family exempt, so
+				// the narrowing lives here rather than in the predicate.
+				//
+				// The original rule reports these; it only withholds the AUTOFIX. From
+				// `reportWithTypeKeyGuard` in ConsistencyNoAbbreviatedIdentifierRule.ts: "Report the
+				// issue so it shows up for triage, but strip the autofix — the author picks: rename
+				// the whole chain manually, or add `eslint-disable-next-line` if it's an external
+				// contract." The reasoning is that a blind rename touches the declaration and
+				// breaks every caller, because an object-literal key is separately skipped.
+				//
+				// This port ships no fixer at all, so the hazard the guard exists to prevent cannot
+				// occur here and the guard collapses to "report". Reading it as a skip turned "do
+				// not rename this for them" into "do not mention this", which is a different rule.
+				//
+				// Measured on the ahra tree: five findings, all in
+				// `modules/pensieve/PensieveBootstrap.ts` at lines 40, 41, 562, 662 and 663, on
+				// `maxAgentsBytes` and `maxBootBytes`. The original reports all five and this port
+				// reported none, which was the whole of that rule's parity gap.
+				if binding.IsForeignName(node) && !isTypeMemberKey(node) {
 					return
 				}
 
@@ -907,4 +928,30 @@ func enclosingTypeDeclarationName(node *ast.Node) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// isTypeMemberKey reports whether an identifier is the name of an interface or type-literal member.
+//
+// The original's `isTypePropertySignatureKeyIdentifier`. It exists to separate the two things
+// `IsForeignName` folds together: a name this file genuinely cannot rename (an import, a property
+// read off another object, a JSX intrinsic), and a name this file DECLARES that merely happens to
+// shape an external surface. The second is still this file's own spelling, so the rule speaks; only
+// the automatic rename is withheld, and this port has no rename to withhold.
+//
+// Method and property signatures are both members. A method signature carries the same key and the
+// original walks `Identifier` without distinguishing them, so both are judged here.
+func isTypeMemberKey(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindPropertySignature:
+		signature := parent.AsPropertySignatureDeclaration()
+		return signature != nil && signature.Name() == node
+	case ast.KindMethodSignature:
+		signature := parent.AsMethodSignatureDeclaration()
+		return signature != nil && signature.Name() == node
+	}
+	return false
 }

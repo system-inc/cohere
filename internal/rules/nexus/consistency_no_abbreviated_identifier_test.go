@@ -185,7 +185,18 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(t *testing.T) {
 		{"an import specifier", "import { config } from 'external';\n"},
 		{"a namespace import", "import * as config from 'external';\n"},
 		{"a default import", "import params from 'external';\n"},
-		{"a type property signature", "interface ThingInterface {\n    params: string;\n    config: number;\n}\n"},
+		// A type property signature is NOT here, and it used to be. The original reports one: its
+		// `reportWithTypeKeyGuard` withholds the AUTOFIX and calls `context.report` either way, on
+		// the reasoning that a blind rename touches the declaration while every caller keeps the old
+		// spelling through the object-literal-key skip. This port ships no fixer, so the guard has
+		// nothing to withhold and collapses to a plain report.
+		//
+		// Measured rather than argued: `modules/pensieve/PensieveBootstrap.ts` lines 40, 41, 562,
+		// 662 and 663 are `maxAgentsBytes` and `maxBootBytes` written as interface members, and a
+		// full eslint run over the ahra tree reports all five as `Identifier "max" should not be
+		// abbreviated`. This port reported none, which was that rule's entire parity gap.
+		//
+		// See `TestConsistencyNoAbbreviatedIdentifierJudgesTypeMemberKeys` for the positive case.
 		{"a qualified type name member", "type Alias = Namespace.Config;\n"},
 		{"a type reference", "let value: SomeConfig = load();\n"},
 
@@ -293,12 +304,15 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
 			nil,
 		},
 		{
-			// An interface key is exempt whatever the options say, since a type member shapes an
-			// external surface. Stated separately so the two reasons never get confused again.
-			"an interface key is exempt as a property signature",
+			// An interface key is JUDGED, and the framework options do not change that. A type
+			// member often shapes an external surface, which is why the original withholds its
+			// autofix there, but it still reports: the name is one this file declares and can
+			// choose. The framework exemptions above are about a name the framework MANDATES,
+			// which is a different question and the reason these two are stated separately.
+			"an interface key is judged as a property signature",
 			"/repository/source/Thing.tsx",
 			"interface ThingProperties {\n    params: string;\n}\n",
-			nil,
+			[]string{"noParams"},
 		},
 		{
 			"a non-framework function in the same file is still judged",
@@ -467,6 +481,72 @@ func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(t *testing.T) 
 				t.Fatalf("expected the finding at %d:%d, got %d:%d",
 					testCase.wantLine, testCase.wantColumn, line+1, column+1)
 			}
+		})
+	}
+}
+
+// TestConsistencyNoAbbreviatedIdentifierJudgesTypeMemberKeys pins the shape that was silently exempt.
+//
+// `IsForeignName` answers true for a property signature, and it is right to for
+// `consistency-no-ambiguous-identifier`, which shares it and wants the whole family skipped. This
+// rule subtracts type member keys back out, because the original only withholds the autofix there
+// rather than the finding, and this port has no autofix to withhold.
+//
+// The `maxAgentsBytes` case is the real one, reduced from `modules/pensieve/PensieveBootstrap.ts`
+// where a full eslint run reports five findings this port reported zero of. A method signature is
+// included because the original walks `Identifier` without distinguishing the two member kinds, and
+// a nested type literal because the skip was keyed on the parent node rather than on depth.
+func TestConsistencyNoAbbreviatedIdentifierJudgesTypeMemberKeys(t *testing.T) {
+	cases := []struct {
+		name       string
+		sourceText string
+		wantIds    []string
+	}{
+		{
+			"an interface member carrying a prefix abbreviation",
+			"interface BootstrapOptionsInterface {\n    maxAgentsBytes?: number;\n}\n",
+			[]string{"noMax"},
+		},
+		{
+			"two interface members, the shape measured on the real tree",
+			"interface BootstrapOptionsInterface {\n    maxAgentsBytes?: number;\n    maxBootBytes?: number;\n}\n",
+			[]string{"noMax", "noMax"},
+		},
+		{
+			"a type literal member",
+			"type BootstrapOptionsType = {\n    maxBootBytes?: number;\n};\n",
+			[]string{"noMax"},
+		},
+		{
+			"a method signature key",
+			"interface ReaderInterface {\n    maxDepth(): number;\n}\n",
+			[]string{"noMax"},
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
+}
+
+// TestConsistencyNoAbbreviatedIdentifierStillSkipsTheRestOfTheForeignFamily is the control.
+//
+// The narrowing above subtracts exactly one member from `IsForeignName`'s set. Without this test a
+// mutation widening it to "never skip a foreign name" would pass every assertion in the file, since
+// nothing else asserts the remaining exemptions survive.
+func TestConsistencyNoAbbreviatedIdentifierStillSkipsTheRestOfTheForeignFamily(t *testing.T) {
+	cases := []struct{ name, sourceText string }{
+		{"a property read", "const value = thing.maxAgentsBytes;\n"},
+		{"an object literal key", "const options = { maxAgentsBytes: 1 };\n"},
+		{"an import specifier", "import { maxAgentsBytes } from 'external';\n"},
+		{"a namespace import", "import * as maxAgentsBytes from 'external';\n"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
 		})
 	}
 }
