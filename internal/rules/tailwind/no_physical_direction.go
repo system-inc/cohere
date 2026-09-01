@@ -100,8 +100,31 @@ var physicalToLogical = []directionMapping{
 // `md:hover:ml-4` is a violation and `rtl:ml-4` is not. A variant prefix does not change what the
 // class does, so the base is what gets tested; but `rtl:` and `ltr:` are the author saying the
 // physical side is the point, which is the one case where a physical class is correct.
+// # The namespace is `structure`, not `better-tailwindcss`, and the difference is load-bearing
+//
+// This is a hand-written house rule. `TailwindNoPhysicalDirectionRule.ts` builds it with nexus's
+// `createLintRule` and Structure registers it in its own `structure` plugin, so the original's full
+// name is `structure/tailwind-no-physical-direction`. The `better-tailwindcss` package ships no such
+// rule; its nearest equivalent is `enforce-logical-properties`, which is a different rule and is not
+// enabled here. Only that package's `settings` block appears in the config, which is what made the
+// namespace look shared.
+//
+// Porting it under `better-tailwindcss/` cost the suppressions. A disable comment names a rule, so
+// `eslint-disable-next-line structure/tailwind-no-physical-direction` matched the original and
+// matched nothing here, and this rule reported three sites their authors had already decided about:
+//
+//	DialogTheme.ts:58, DialogTheme.ts:77, ScrollArea.tsx:76
+//
+// All three carry that comment, and the DialogTheme pair carries the reason with it: "left-[50%] is
+// physical centering, not directional, so it deliberately opts out of the logical-direction
+// convention rather than being an oversight." Those were the whole of this rule's parity gap, and
+// they were not findings the original missed. They were findings the original was told to skip.
+//
+// The lesson generalises past this rule: a ported name is not cosmetic, because the suppression
+// surface is keyed on it. A rule renamed in the port silently ignores every disable comment written
+// for it, and the symptom is extra findings rather than an error.
 var NoPhysicalDirection = rule.Rule{
-	Name: "better-tailwindcss/tailwind-no-physical-direction",
+	Name: "structure/tailwind-no-physical-direction",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil

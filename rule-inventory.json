@@ -6,11 +6,11 @@
     "(core)": 123,
     "@next": 22,
     "@typescript-eslint": 54,
-    "better-tailwindcss": 13,
+    "better-tailwindcss": 12,
     "nexus": 20,
     "react": 44,
     "react-hooks": 18,
-    "structure": 31
+    "structure": 32
   },
   "bySeverity": {
     "error": 283,
@@ -893,7 +893,7 @@
       "enabledBy": "rulesBlock"
     },
     {
-      "rule": "better-tailwindcss/tailwind-no-physical-direction",
+      "rule": "structure/tailwind-no-physical-direction",
       "sources": [
         "eslint",
         "oxlint"
