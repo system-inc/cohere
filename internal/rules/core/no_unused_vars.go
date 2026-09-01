@@ -408,7 +408,6 @@ func isDeclaringName(identifier *ast.Node) bool {
 		ast.KindModuleDeclaration,
 		ast.KindTypeParameter,
 		ast.KindImportClause,
-		ast.KindImportSpecifier,
 		ast.KindImportEqualsDeclaration,
 		ast.KindNamespaceImport,
 		ast.KindPropertyDeclaration,
@@ -418,6 +417,31 @@ func isDeclaringName(identifier *ast.Node) bool {
 		ast.KindGetAccessor,
 		ast.KindSetAccessor:
 		return parent.Name() == identifier
+
+	// An import specifier declares BOTH of its names, and the export specifier below declares
+	// neither of its own, which is why the two cannot share the simple `parent.Name()` test above.
+	//
+	// `import { a as b } from './m'` puts `a` in the `propertyName` slot and `b` in `name`. Neither
+	// is a reference to anything in THIS file: `b` is the binding being created, and `a` names an
+	// export of the other module. The plain `parent.Name() == identifier` test answered true only
+	// for `b`, so the source name `a` fell through and was walked as an ordinary reference.
+	//
+	// That is invisible until a module cycle makes the checker resolve it back into this file, and
+	// then it is a false positive with no obvious cause. Measured on the ahra tree:
+	//
+	//	useRouter.ts:11   import { useRouter as useNextRouter } from '.../router/Navigation'
+	//	Navigation.ts:31  export { useRouter } from '.../router/hooks/useRouter'
+	//	useRouter.ts:16   export function useRouter() { ... }
+	//
+	// The re-export sends the symbol straight back, so `useRouter` at line 11 resolved to the
+	// function declared at line 16 and `no-use-before-define` reported a temporal-dead-zone error
+	// on an import binding, which is hoisted and cannot have one. ESLint reports zero on that file
+	// because eslint-scope never creates a reference for either half of an import specifier.
+	//
+	// No imported fixture can see this: it needs a real module graph with a cycle, and upstream's
+	// corpus is single-file.
+	case ast.KindImportSpecifier:
+		return true
 
 	// An export specifier's local name is a genuine reference to the binding it exports, which is
 	// why `const y = 1; export { y };` is clean. Its `propertyName` slot, when present, is the
