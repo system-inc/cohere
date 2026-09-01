@@ -311,12 +311,77 @@ func jsxNoUselessFragmentHasLessThanTwoChildren(children []*ast.Node) bool {
 }
 
 // jsxNoUselessFragmentContainsCallExpression reports whether a child is `{someCall()}`.
+//
+// # An OPTIONAL call is not one, and the difference is in the two parsers rather than in the rule
+//
+// Upstream's `containsCallExpression` is `node.expression.type === 'CallExpression'`, and estree
+// wraps a whole optional chain in a `ChainExpression`. So for `{items?.map(...)}` upstream sees a
+// ChainExpression, answers false, and REPORTS the fragment. Our parser has no wrapper: `?.` is a
+// `QuestionDotToken` hanging off the call, and the kind is `KindCallExpression` either way, so a
+// bare kind test answers true and silently exempts the fragment.
+//
+// Measured against the installed 7.37.5 build, driving the same two sources through both:
+//
+//	<>{items.map(f)}</>    both silent      the exemption upstream intends
+//	<>{items?.map(f)}</>   upstream REPORTS, we were silent
+//
+// Found on the ahra tree, where it was the whole of a two-finding disagreement:
+// FinanceStatementPayeeGroupsBody.tsx:35 and FinanceStatementTransactionsBody.tsx:29 both wrap a
+// single `properties.x.data?.groups.map(...)` in a fragment.
+//
+// This is the same parser difference `logicalAssignmentIsOptionalChain` records in
+// `internal/rules/core/logical_assignment_operators.go`, reached from a different rule: any port
+// that compares an estree node TYPE against our node KIND has to ask about `QuestionDotToken`
+// separately, because the wrapper upstream tests for does not exist here.
 func jsxNoUselessFragmentContainsCallExpression(child *ast.Node) bool {
 	if child.Kind != ast.KindJsxExpression {
 		return false
 	}
 	expression := child.AsJsxExpression().Expression
-	return expression != nil && expression.Kind == ast.KindCallExpression
+	if expression == nil || expression.Kind != ast.KindCallExpression {
+		return false
+	}
+	// An optional call is upstream's ChainExpression, which its type test rejects. Only the
+	// call's OWN `?.` matters: `a?.b.c()` is a ChainExpression upstream too, so the whole spine
+	// is walked rather than just the outermost node.
+	return !jsxNoUselessFragmentIsOptionalChain(expression)
+}
+
+// jsxNoUselessFragmentIsOptionalChain reports whether any link in an access spine carries `?.`.
+//
+// The spine is walked rather than the outermost node tested, because estree's ChainExpression wraps
+// the ENTIRE chain: `a?.b.c()` and `a.b?.c()` are both a ChainExpression to upstream, so both must
+// answer true here for the two rules to agree.
+func jsxNoUselessFragmentIsOptionalChain(node *ast.Node) bool {
+	for current := node; current != nil; {
+		switch current.Kind {
+		case ast.KindCallExpression:
+			call := current.AsCallExpression()
+			if call.QuestionDotToken != nil {
+				return true
+			}
+			current = call.Expression
+		case ast.KindPropertyAccessExpression:
+			access := current.AsPropertyAccessExpression()
+			if access.QuestionDotToken != nil {
+				return true
+			}
+			current = access.Expression
+		case ast.KindElementAccessExpression:
+			access := current.AsElementAccessExpression()
+			if access.QuestionDotToken != nil {
+				return true
+			}
+			current = access.Expression
+		case ast.KindNonNullExpression:
+			current = current.AsNonNullExpression().Expression
+		case ast.KindParenthesizedExpression:
+			current = current.AsParenthesizedExpression().Expression
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 // jsxNoUselessFragmentIsOnlyTextAndNotChild answers upstream's exemption for a text-only fragment.
