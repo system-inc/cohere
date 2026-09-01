@@ -258,6 +258,31 @@ func TestRequireAtomicUpdatesSuspensionOrder(t *testing.T) {
 	rule_testing.ExpectClean(t, fresh)
 }
 
+// TestRequireAtomicUpdatesMessageSkipsLeadingComments pins the real-tree shape where a comment
+// belongs to the assignment target's leading trivia. The finding was emitted at the right line,
+// but the target interpolated the comment and newlines into its message. Line-oriented parity
+// checks then saw no rule name on the diagnostic's first line and counted a false negative.
+func TestRequireAtomicUpdatesMessageSkipsLeadingComments(t *testing.T) {
+	result := rule_testing.RunTyped(t, RequireAtomicUpdates, "property-floor.ts", `
+let state = { guard: false, first: 0 };
+declare function pause(): Promise<void>;
+async function run() {
+    if (state.guard) return;
+	await pause();
+	// Advance only after success.
+    state.first = Date.now();
+}`)
+
+	rule_testing.ExpectFindings(t, result, "nonAtomicObjectUpdate")
+	message := result.Diagnostics[0].Message.Description
+	if strings.Contains(message, "Advance only") || strings.Contains(message, "\n") {
+		t.Fatalf("message contains the assignment's leading trivia: %q", message)
+	}
+	if !strings.Contains(message, "assignment writes state.first") {
+		t.Fatalf("message does not name the assignment target: %q", message)
+	}
+}
+
 // TestRequireAtomicUpdatesEscapeTable pins each row of the escape predicate against the verdict
 // measured on the installed rule.
 //

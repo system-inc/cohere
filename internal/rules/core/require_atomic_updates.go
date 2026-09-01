@@ -710,14 +710,9 @@ func assignmentTargetText(ctx rule.Context, assignment *ast.Node) string {
 		return ""
 	}
 	text := ctx.SourceFile.Text()
-	start, end := left.Pos(), left.End()
+	start, end := rule.TokenRange(ctx.SourceFile, left).Pos(), left.End()
 	if start < 0 || end > len(text) || start >= end {
 		return ""
-	}
-	// Pos() includes leading trivia, so the slice is advanced past it. `rule.TokenRange` does the
-	// same job for a reported range; this is the text-only half of it.
-	for start < end && (text[start] == ' ' || text[start] == '\t' || text[start] == '\n' || text[start] == '\r') {
-		start++
 	}
 	return text[start:end]
 }
