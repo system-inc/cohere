@@ -54,6 +54,24 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		"no-restricted-exports": "ported and registered; enforces nothing until a project names which export names it bans, which is a decision about this codebase rather than a wiring step",
 		"no-restricted-imports": "ported and registered; enforces nothing until a project names which modules it bans, which is a decision about this codebase rather than a wiring step",
 
+		// Three stylistic typescript-eslint rules ported and registered without being enabled,
+		// because each carries real cleanup and the audits recommend against paying it right now.
+		// Unlike the two above, these are NOT inert: each was dry-run against the whole repository
+		// through the config layer and differentialled against the installed 8.67.0 rule over the
+		// same files, agreeing position for position.
+		//
+		//	@typescript-eslint/consistent-type-definitions   872 findings, 42 files
+		//	@typescript-eslint/no-inferrable-types           204 findings, 89 files
+		//	@typescript-eslint/prefer-regexp-exec            179 findings, 87 files
+		//
+		// All three are auto-fixable and all three fixers are pinned by upstream's own `output`
+		// cases, so enabling any of them is one config line plus a fix pass plus a review of the
+		// diff. None of their names appears in CohereSettings.json under any spelling, so there is
+		// no standing decision being honoured or reversed here.
+		"@typescript-eslint/consistent-type-definitions": "ported and registered; 872 findings to clean up first, which is a decision about this codebase",
+		"@typescript-eslint/no-inferrable-types":         "ported and registered; 204 findings to clean up first, which is a decision about this codebase",
+		"@typescript-eslint/prefer-regexp-exec":          "ported and registered; 179 findings to clean up first, which is a decision about this codebase",
+
 		// The same class as the two above, and for the same measured reason. Neither rule can
 		// report anything until somebody writes the configuration that says what to enforce:
 		// id-denylist has no denylist until one is named, and id-match's default pattern is
