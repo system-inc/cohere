@@ -40,7 +40,6 @@
 /generate_value_parser
 /generate_variant
 /build_dispatcher_npm_package
-/vendor_prettier_bundles
 /vendor_react_fixtures
 /dist/
 

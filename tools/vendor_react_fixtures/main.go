@@ -1,6 +1,6 @@
 // Command vendor_react_fixtures re-pulls React's error-named compiler fixtures at a chosen commit.
 //
-// The corpus under `internal/reactconformance/testdata/fixtures` is vendored rather than fetched at
+// The corpus under `internal/react_conformance/testdata/fixtures` is vendored rather than fetched at
 // test time, so this tool is what makes the pin reproducible: it is how the vendored tree was
 // produced and how it gets moved to a new sha. It writes nothing unless every count it expects
 // holds, because the whole value of a vendored corpus is that a human can review the diff, and a
@@ -24,7 +24,7 @@
 // `recursive=1` reports `truncated`, and this tool refuses to proceed when it is true. That check
 // is the difference between a measurement and a guess.
 //
-//	go run ./tools/vendor_react_fixtures -sha <commit> -out internal/reactconformance/testdata/fixtures
+//	go run ./tools/vendor_react_fixtures -sha <commit> -out internal/react_conformance/testdata/fixtures
 //
 // Pass -dry-run to report the counts without writing.
 package main

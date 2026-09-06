@@ -991,10 +991,14 @@ func round(duration time.Duration) time.Duration {
 // printParityCoverage says how many of the rules the config asks for this binary can actually run.
 //
 // The lint line above reports how many rules ran, which is what this binary contains. It says nothing
-// about how many were wanted, and those are different numbers by a factor that matters: 93 against
-// 205 while this migration is in progress. A reader seeing "93 rules" has no way to learn that the
-// config asked for more than twice that, and the whole argument of this tool is that a run which
-// checked less than it appears to must say so.
+// about how many were wanted, and while a port is in progress those are different numbers. A reader
+// seeing a rule count has no way to learn whether the config asked for more, and the whole argument
+// of this tool is that a run which checked less than it appears to must say so.
+//
+// The gap this closes was once wide enough to quote, and quoting it here is what made this comment
+// wrong within weeks: the figures drift with every rule that lands, while the reason they matter
+// does not. The live numbers belong in the line this function prints, which is derived, and not in
+// a comment, which is remembered.
 //
 // This is the same omission the differential harness carried until `7b590f6`, in the line a reader
 // trusts most, and it is worth fixing in both places rather than only in the instrument that gets
