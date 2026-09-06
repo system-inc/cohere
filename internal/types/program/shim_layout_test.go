@@ -54,7 +54,7 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 
 	declaredTypes, valueTypes := layoutSubjectTypes(t, fileChecker, sourceFile)
 
-	// --- Checker: numberType, booleanType, globalRegExpType -------------------------------------
+	// --- Checker: numberType, stringType, booleanType, globalRegExpType -------------------------
 	//
 	// TypeToString is the checker's own name for a type, so this compares what the accessor
 	// returned against what the checker calls it rather than against another shim read.
@@ -64,6 +64,7 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 		want     string
 	}{
 		{"Checker_numberType", checker.Checker_numberType(fileChecker), "number"},
+		{"Checker_stringType", checker.Checker_stringType(fileChecker), "string"},
 		{"Checker_booleanType", checker.Checker_booleanType(fileChecker), "boolean"},
 		{"Checker_globalRegExpType", checker.Checker_globalRegExpType(fileChecker), "RegExp"},
 	}

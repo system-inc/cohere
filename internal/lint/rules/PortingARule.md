@@ -2984,6 +2984,26 @@ about which rule motivated the edit.
 Do not rewrite history to fix the packaging afterwards. Attribution is not worth a
 rebase. Split it from the start next time.
 
+**And commit-by-pathspec is only half a defense, which is worth knowing if you have been
+leaning on it.** `git add <path>` on a file several agents edit stages THEIR in-progress
+hunks along with yours, and the pathspec on `git commit` does not undo that: it limits
+which FILES are committed, not which HUNKS.
+
+Measured, on this document. An author added a 39-line section, staged it with
+`git add internal/lint/rules/PortingARule.md`, and committed 89 lines -- the extra 50 being
+another porter's finished-but-uncommitted section on `prefer-destructuring`. Nothing was
+lost and nothing was half-written, but the commit message described only half its diff.
+
+For a shared prose file the safe form is `git add -p`, or committing from a diff you have
+actually read. `git diff --cached` before the commit answers it in one command.
+
+> **The section above this one documents its own violation.** That author had just written
+> the finding that a description decays away from the work it describes, and the commit
+> carrying that finding is itself a description that does not match its diff. That is not
+> an embarrassment, it is the strongest available evidence for the section: the failure is
+> structural rather than a matter of attention, and it caught the person who had spent the
+> previous hour thinking about precisely it.
+
 ### Put scratch outside the rules tree from the first minute
 
 This happened three times in one night, with three different agents:
@@ -3124,6 +3144,39 @@ difference between a measurement and a guess.
 commit X or file Y, search the whole tree for the thing itself. A search bounded by
 someone else's reference cannot find what their reference got wrong, which is the only
 case where checking was worth doing.
+
+### A differential that agrees exactly may be sampling what cannot disagree
+
+The blind-fixture trap is a corpus that cannot see a defect. This is its differential
+twin, and it looks like the best possible result rather than like a problem.
+
+Measured on `no-inline-comments`. A first cross-check took the 30 files at the head of the
+findings list, ran ESLint over them, and got **30 findings against our 30**. Exact
+agreement, and worthless: every one of those files had exactly ONE finding, so the sample
+could not express a disagreement about count. It was a sample of the shape least able to
+disagree, selected by the accident of sort order.
+
+Re-sampling on the 25 DENSEST files gave 1213 against 1205, and the eight-finding gap was a
+real defect in the comment scanner.
+
+The tell is available before you draw the conclusion: **if a per-file breakdown of your
+sample is all ones, the sample cannot fail.** So sort by finding count and take from the
+top, not from wherever the list happens to start. And treat a round, exactly-equal number
+with the same suspicion as a surprising one, which is the same lesson the mirror-bug
+section reaches from the other direction: symmetric errors cancel, and cancellation reads
+as confirmation.
+
+**The same shape appears in a mutation sweep.** A wrapper that reported `REFUSED` for all
+twelve mutations of one rule was mis-parsing its own tool output; running one mutation by
+hand gave `CAUGHT: 89`. A uniform verdict across every mutation is the same signal as an
+all-ones differential sample: the instrument is answering without looking.
+
+**And a filter over a linter's output should be POSITIVE, not negative.** Two oracles in
+two batches counted non-findings as findings -- "Definition for rule X was not found" and
+"Unused eslint-disable directive" -- because they filtered on `!fatal`, dropping only the
+categories their author had thought of. Both have a null rule id. Keep the rows whose
+`ruleId` matches the rule under test; that filter cannot be surprised by a category nobody
+anticipated.
 
 ### Two broken instruments that share an assumption corroborate each other
 
