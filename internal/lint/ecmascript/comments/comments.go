@@ -200,9 +200,20 @@ func All(sourceFile *ast.SourceFile) []Comment {
 // had before, so a missing kind is the old gap rather than a new defect.
 func collectListInteriors(node *ast.Node, collectAt func(int)) {
 	offer := func(list *ast.NodeList) {
-		// A non-empty list starts where its first child starts, and the walk visits every child's
-		// `Pos()` already. Only an empty list names a position nothing else does.
-		if list == nil || len(list.Nodes) > 0 {
+		if list == nil {
+			return
+		}
+		// A NON-EMPTY list names one position nothing else does: its `End()`, which sits past a
+		// trailing comma that the last element's own `End()` stops short of. So
+		// `['a', // one\n 'b', // two\n]` loses the SECOND comment, because nothing probes between
+		// the comma and the bracket.
+		//
+		// Measured, with a control: the same array written without a trailing comma on the last
+		// element finds both comments, and with one finds only the first. On Kirk's tree this was 8
+		// findings across 4 files for `no-inline-comments` before the fix, and the shape is common
+		// in hand-maintained lists.
+		if len(list.Nodes) > 0 {
+			collectAt(list.End())
 			return
 		}
 		// `Pos()` and `End()` are interchangeable here and a mutation swapping them survives the
