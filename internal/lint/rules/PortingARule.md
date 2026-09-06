@@ -796,6 +796,15 @@ believing a clean run.
 Before the rule. Every pass and fail case goes in **as written upstream**. This is
 mandatory.
 
+**Build the oracle as an artifact, not as working memory.** Whatever you write to extract
+and replay upstream's corpus, put it somewhere durable and keep it. **The oracle outlives the
+rule**: the rule is one dispatch's output, and the oracle is what lets the next person start
+from your measurements rather than from scratch. It costs nothing at the time. One agent's
+`one-var` oracle, controlled at 296 verdicts and 144 outputs, is what let that rule move to a
+fresh agent at zero cost when it turned out to be oversized for the session that sized it, and
+it was built durably because this document warns about shared scratch rather than because
+anyone foresaw a handoff.
+
 **Verify the copied strings mechanically, byte against byte.** Reading them is not
 enough and this has cost three porters. One found four transcription errors its own
 reading had passed over, the worst being a pass case whose `\u0020\u0020` had been
