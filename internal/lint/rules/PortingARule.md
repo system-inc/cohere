@@ -2045,8 +2045,17 @@ rules you just added. Two authors once found that symlink pointing at a binary i
 own session's scratchpad which they had never built: the path looked like theirs, which is
 exactly what disarms the check.
 
-Same shape as everything in this document: **take the measurement from the thing, not from
-something adjacent to it.**
+**The question is provenance, not proximity.** "Measure the thing" is necessary and not
+sufficient, and the agent who found this corrected their own first statement of it: they did
+read the count from a binary, which is a thing. It was the wrong thing and nothing in the
+reading said so. The check that works is narrower: **is this artifact the one my last command
+produced?** A size, a timestamp, a grep for the symbol you just added.
+
+**And what makes this class dangerous is not that the wrong source is nearby, it is that it
+answers.** A missing thing errors and you notice. An adjacent thing responds, plausibly, in
+the right format, at the right magnitude. That is true of the stale binary, of the symlink in
+`node_modules`, of a `git grep` run in the wrong repository, and of every instrument in the
+section above. Which is why the repair is always the same: make it refuse rather than answer.
 
 ## 11. The gate
 
