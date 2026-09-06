@@ -510,3 +510,35 @@ func TestNoUnsafeEnumComparisonGateOneIsACostGuard(t *testing.T) {
 	controlResult := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, withEnum)
 	rule_testing.ExpectFindings(t, controlResult, "mismatchedCondition")
 }
+
+// TestNoUnsafeEnumComparisonReadsUnionsConstituentwise pins which reading of `isTypeFlagSet` this
+// rule needs, because the shelf offers only one of the two and upstream uses both.
+//
+// `enum-utils/shared.ts` imports an `isTypeFlagSet` from `../../util` that decomposes a union and
+// ORs its constituents' flags, AND `tsutils.isTypeFlagSet` which reads a type's own flags. Our
+// `type_checking.IsTypeFlagSet` is the second. Reaching for it by name at both of upstream's call
+// sites would be wrong at one of them.
+//
+// This rule gets both right structurally rather than by choosing a helper: `getEnumTypes` iterates
+// union constituents and tests each, which is what decomposing means, and `getEnumValueType` is
+// only ever handed a constituent.
+//
+// The input below is the one that separates the readings. A union of two DIFFERENT enums has no
+// enum-literal flag on the composite type -- our helper answers false for it -- while both of its
+// constituents carry the flag. If this rule ever stops iterating and starts testing the whole type,
+// that union stops being seen as carrying enums at all, gate one exits early, and the finding is
+// silently lost.
+func TestNoUnsafeEnumComparisonReadsUnionsConstituentwise(t *testing.T) {
+	// A union of two enums compared against a bare string. Every constituent is an enum literal, so
+	// the comparison is unsafe and must report.
+	const source = "enum A { X = 'x' }\nenum B { Y = 'y' }\ndeclare const either: A | B;\nconst c = either === 'x';\n"
+
+	result := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, source)
+	rule_testing.ExpectFindings(t, result, "mismatchedCondition")
+
+	// The control: the same union compared against a member of one of its own enums is safe, so a
+	// rule that had started reporting every union would fail here.
+	const safe = "enum A { X = 'x' }\nenum B { Y = 'y' }\ndeclare const either: A | B;\nconst c = either === A.X;\n"
+	controlResult := rule_testing.RunTyped(t, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, safe)
+	rule_testing.ExpectClean(t, controlResult)
+}

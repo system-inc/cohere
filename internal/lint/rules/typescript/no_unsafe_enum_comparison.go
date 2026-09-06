@@ -335,6 +335,29 @@ func noUnsafeEnumComparisonEnumValueKind(t *checker.Type) noUnsafeEnumValueKind 
 //
 // The enum literals in a type, mapped to the enums that DECLARE them. `Fruit.Apple` yields `Fruit`,
 // which is what makes gate two work: two members of one enum share a base type and compare safely.
+//
+// # Which reading of `isTypeFlagSet` this needs, and why the answer differs by call site
+//
+// Upstream imports TWO functions of that name into `enum-utils/shared.ts` and uses each
+// deliberately. `../../util`'s decomposes a union and ORs its constituents' flags; `tsutils`' reads
+// the type's own flags. `getEnumLiterals` uses the first, `getEnumValueType` uses the second, and
+// the file imports both on purpose.
+//
+// Our `type_checking.IsTypeFlagSet` is the own-flags reading, so reaching for it BY NAME at both
+// sites would be wrong at one of them. Measured rather than reasoned, on `Fruit.Apple | Veg.Leek`:
+//
+//	whole type, own flags     false      <- what our helper answers on the union
+//	whole type, union-ORed    true       <- what upstream's ../../util answers
+//	per constituent           2 literals <- what this loop answers
+//
+// The loop is what makes it correct here: iterating `UnionTypeParts` first and testing each part
+// reaches the same answer as upstream's union-decomposing helper, because decomposing is exactly
+// what the loop already does. And `noUnsafeEnumComparisonEnumValueKind` is only ever called ON a
+// constituent, from `typeViolates`, so the own-flags reading is the right one there and matches
+// upstream's deliberate `tsutils` call.
+//
+// So both sites agree with upstream for different reasons, and neither would if the helper were
+// swapped for the other reading. `TestNoUnsafeEnumComparisonReadsUnionsConstituentwise` pins it.
 func noUnsafeEnumComparisonEnumTypes(typeChecker *checker.Checker, t *checker.Type) []*checker.Type {
 	var enumTypes []*checker.Type
 	for _, part := range type_checking.UnionTypeParts(t) {
