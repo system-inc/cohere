@@ -23,6 +23,18 @@ returns a partial rule, and the dispatch was the error rather than the agent. Me
 is 230 rule lines over a 1,807-line utils package and an 18,173-line corpus directory.
 Say so and stop rather than delivering two-thirds of a rule.
 
+**Cutting this document has a failure mode that cutting code does not.** Nothing goes red,
+and you learn what you removed when the next person walks into the gap. It happened here: a
+consolidation took this file from 3,902 lines to 2,554, the cut was right everywhere except
+one section, and an agent fell into exactly that hole inside the hour. So when you remove
+something, grep the file afterwards for the specific facts you believe survived rather than
+trusting the shape of the result, and expect one restore.
+
+The opposite failure is what caused the cut. Writing a finding in here had become the reward
+for making one, so the same idea accumulated in twelve costumes and the procedure got harder
+to read. **A finding that already has a section belongs as a sentence in that section**, not
+as a thirteenth heading.
+
 ## Where things are
 
     cohere tree      /Users/kirkouimet/Projects/system/cohere
