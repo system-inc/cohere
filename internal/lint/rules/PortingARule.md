@@ -3273,6 +3273,44 @@ an input, you have not measured anything. That question is cheap, it is availabl
 conclusion rather than after it, and every one of the four above would have failed it in a
 sentence.
 
+**A tighter family sits inside that one: a filter defeated by the SHAPE of the output rather
+than by its content.** Three in one night, all reading correct output through a pattern that
+could not express the answer:
+
+    grep '    --- FAIL'        misses a failing test that has no subtests, because it
+                               prints at top level with less indentation
+    filter on !fatal           keeps every non-finding ESLint emits with a null rule id
+    sample the first 30 files  every one holds exactly one finding, so the sample cannot
+                               produce any number but agreement
+
+None of these is a wrong tool or a lying tool. Each is a pattern written against the shape
+its author expected, applied to output that had a different one, and each reported a clean
+result rather than an error.
+
+**So: a filter is a probe, and it needs a control like any other.** Check the pattern against
+an output you know should match before you trust what it does not match. One command, and it
+is the same discipline this document already demands of a grep over source or a mutation over
+a rule -- the reason it gets skipped for output filters is that a filter feels like reading
+rather than measuring.
+
+Two worked corrections from the same night. `CAUGHT: N` and an indent-filtered grep gave two
+careful readers 6 and 1 for the same run, and the honest answer was two assertion failures;
+neither had said which unit they were counting. And the assertion count itself has a filter
+that cannot be fooled by structure:
+
+    grep -cE '_test\.go:[0-9]+:'      one line per t.Errorf, immune to nesting
+
+**And a note about who these keep happening to.** The multi-run trap was written by an author
+who lost a parser configuration to it an hour later. The decay section was written by an author
+who inflated a count in the same file. The observation that commit-by-pathspec is only half a
+defense was agreed to by a coordinator who then swept another agent's section into his own
+commit. Three people, one night, each caught by the trap they had just documented.
+
+That is not carelessness and it is the argument for every mechanical defense in this file:
+**knowing a trap does not route around it, because the failure arrives at a moment when
+nothing prompts the recall.** A refusal that fires, a control that must move, a filter checked
+against a known match -- those work when memory does not.
+
 ### Two broken instruments that share an assumption corroborate each other
 
 A coordinator reported a defect in a correct rule, and the reason they believed it is the
