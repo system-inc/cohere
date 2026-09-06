@@ -2475,6 +2475,45 @@ tree. Everything looks finished.
 The test for "did it land" is `git log -- <path>` or `git status`. Never the suite.
 Working tree and committed record are different questions. Say which one you looked at.
 
+### What landed is a snapshot of someone else's moment, not of your last verified state
+
+The section above asks whether your work landed. This one asks **which version** of it did,
+and the two come apart the moment somebody else does the committing.
+
+A coordinator batching several agents' work commits whatever is on disk when they run. If
+you correct a file after they read it and before they commit, the correction is not in the
+commit, and nothing anywhere reports that. Measured: a decline's audit document was
+committed saying its probe had been "since removed", in the **same commit** that added the
+probe. A committed file asserting the absence of a file committed beside it, and both were
+mine.
+
+The check is one command, and it is cheap enough to be routine after any commit you did not
+make yourself:
+
+    git diff HEAD -- <your files>          # empty means what landed is what you verified
+
+**The general shape is worth more than the git mechanics, because it is not about git.**
+Both of that author's corrections in one session were *true statements decaying* rather
+than wrong ones. "Nothing is committed by me" was accurate when written and false four
+minutes later. "The probe was removed" was accurate when written and false once it was
+restored. Neither was an error at the time; both became one.
+
+In a tree with this many concurrent agents, **a report decays faster than it is wrong**,
+and decay is the dominant failure mode rather than mistake. That has two consequences:
+
+- **Timestamp the volatile claims, or re-check them before you send.** Anything about the
+  working tree, the commit log, what other agents hold, or which tests are red has a short
+  half-life. Anything about what a rule decides on a given input does not.
+- **A red package is a question about timing before it is a question about correctness.**
+  Three false failures were called out loud in one session, each an agent reading a
+  sibling's package mid-write. Re-run before reporting; the second run is the measurement.
+
+The same decay reaches tracked files, which is worse, because a stale sentence in a
+committed document carries the authority of the codebase while being only what one author
+believed at one moment. That is the failure "Your own comment is not evidence" describes,
+arriving through time rather than through carelessness. When you correct a claim in a
+tracked file, check that the correction is in HEAD and not only in your working tree.
+
 ### Editing a shared tracked file is one mistake with three faces
 
 `internal/lint/checking/specifier.go` is imported by dozens of rules. An agent left it
