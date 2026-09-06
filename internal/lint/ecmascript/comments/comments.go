@@ -257,6 +257,28 @@ func collectListInteriors(node *ast.Node, collectAt func(int)) {
 		offer(node.AsNamedImports().Elements)
 	case ast.KindNamedExports:
 		offer(node.AsNamedExports().Elements)
+
+	case ast.KindJsxExpression:
+		// `{/* comment */}` in JSX, whose interior no other position reaches.
+		//
+		// The shape is the same as every entry above -- an empty delimiter pair holding nothing but
+		// a comment -- but it is not a NodeList, so `offer` cannot express it. A JsxExpression with
+		// a nil Expression spans exactly `{` and `}`, so its interior begins one byte past `Pos()`.
+		//
+		// Measured before adding: the scanner returns ZERO comments for `<div>{/*c*/}</div>` in a
+		// .tsx file, while the same comment written anywhere else in the same file is found. The
+		// container's `Pos()` sits ON the brace, and `GetTrailingCommentRanges` at `Pos()+1` returns
+		// the comment, so this is a position nothing probed rather than trivia the scanner cannot
+		// classify. Controlled against an ordinary trailing comment through the same call, which
+		// returns 1.
+		//
+		// This is load-bearing for `no-inline-comments`, whose JSX exception is entirely about
+		// comments in this position: 31 of its 49 corpus cases are JSX, and without this the rule
+		// is silent on all of them -- the exception passing vacuously, which reads exactly like the
+		// exception working.
+		if expression := node.AsJsxExpression(); expression != nil && expression.Expression == nil {
+			collectAt(node.Pos() + 1)
+		}
 	}
 }
 
