@@ -11,6 +11,8 @@ import (
 
 // verifyIsOptionalDecorator is the sentinel that tells the validation engine to skip every other
 // rule on a property when the value is null or undefined.
+//
+// Base's decorator name, matched literally. See the package doc for why it keeps that spelling.
 const verifyIsOptionalDecorator = "VerifyIsOptional"
 
 // verifyDecoratorPrefix is what marks a decorator as belonging to the validation engine.

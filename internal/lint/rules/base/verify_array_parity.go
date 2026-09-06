@@ -13,6 +13,9 @@ import (
 // verifyArrayLevelDecorators operate on the array container itself, so their presence satisfies
 // array parity and a property carrying one is never flagged.
 //
+// These strings are Base's decorator names and are matched literally. See the package doc: they are
+// not this program's old name, and renaming them makes the rule match nothing and report nothing.
+//
 // `VerifyIsNotEmpty` is here rather than among the value-level rules, and the original states why:
 // emptiness is a whole-container check, so on an array-typed property it evaluates the array itself
 // and rejects `[]`. It therefore satisfies parity on its own.
