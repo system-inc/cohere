@@ -445,6 +445,21 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// a mechanical one, which is a genuinely different decision from the other six in this
 		// batch and is Kirk's to make.
 		"prefer-template": "ported and registered, not enabled: 746 findings over 294 files, agreeing with ESLint exactly. It ships a working fixer, so adopting it could be mechanical rather than manual, which makes enabling it a different decision from the unfixable stylistic rules above",
+		// The first type-aware rule in these batches, and the first whose findings are defects
+		// rather than style.
+		//
+		// 508 findings over 56 files, verified differentially: a real type-aware ESLint run over the
+		// 12 densest files gives 303 against our 303. Every finding is one message id,
+		// `mismatchedCondition`, and the shape is overwhelmingly one thing -- comparing
+		// typescript-eslint's own `AST_NODE_TYPES` enum against a bare string, as in
+		// `node.callee.type === 'Identifier'`. That compiles today and silently stops matching if the
+		// enum's value ever changes, which is exactly what the rule exists to catch.
+		//
+		// Not enabled, because 508 is a scheduled cleanup and because the concentration matters: 108
+		// of them are in one file. Whether to adopt the convention, and whether to do it file by
+		// file, is Kirk's call. This is the strongest candidate in these batches for actually being
+		// turned on.
+		"@typescript-eslint/no-unsafe-enum-comparison": "ported and registered, not enabled: 508 findings over 56 files, agreeing with a type-aware ESLint run exactly on the densest 12. Unlike the stylistic rules above these are real defects -- enum members compared against bare string literals -- so enabling it is a cleanup worth scheduling rather than a convention question",
 	}
 
 	rules := All()
