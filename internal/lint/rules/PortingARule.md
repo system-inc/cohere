@@ -1217,6 +1217,29 @@ What to pull out, in order:
 
 - **Anything commented out.** Upstream telling you what it knowingly misses.
 
+**A corpus file may call `RuleTester.run` more than once, and a single-slot interceptor
+silently keeps the last one.** The reliable way to extract a corpus is to stub or
+intercept `RuleTester` and run upstream's own test file, so its own cases produce your
+fixtures rather than a parser of yours. That works, and it has one failure mode: an
+interceptor written as `capturedCases = tests` rather than `capturedCases.push(...)`
+keeps whichever call came last and drops the rest, with no error and a plausible-looking
+count.
+
+Measured: `no-invalid-this` makes two `run` calls, a 474-case JavaScript matrix and a
+98-case TypeScript block, and an earlier single-slot interceptor kept only the second and
+**lost 83% of the corpus**. `init-declarations` also makes two. Neither file looks unusual
+from the outside, and neither count looks wrong once you have it.
+
+So accumulate across calls, and **print the call count beside the case count** -- a
+one-call extraction from a two-call file is the whole defect, and it is invisible in the
+cases themselves:
+
+    console.error(`captured ${cases.length} cases from ${runCalls} run() call(s)`);
+
+Then refuse to emit anything when either number is zero, for the same reason every other
+instrument here refuses: an extraction that captured nothing looks exactly like a rule
+with a small corpus.
+
 **Take the cases verbatim.** Retyping a case is how a fixture ends up testing what
 you believe instead of what upstream asserts.
 
@@ -3184,6 +3207,65 @@ It carries the authority of the codebase while being only what one author believ
 afternoon.
 
 When a comment is your evidence for a claim, go check the thing it describes.
+
+### A justification you wrote will shape the fixtures you write next
+
+The section above says a comment is not evidence. This is the sharper form, and it is worse:
+**a justification you wrote becomes the premise your fixtures are derived from, so the
+fixtures agree with it and cannot falsify it.** You end up with a wrong belief, a test that
+confirms it, and a green suite. The loop is closed and nothing inside it can open it.
+
+Three instances in one batch, by two authors, all with locally sound reasoning at every step:
+
+    max-depth        "without this arm, sibling methods accumulate depth"
+                     They do not; the depth decrements on exit. Fixtures were written from
+                     that argument, and the mutation deleting the arm survived BOTH the
+                     corpus and those fixtures.
+
+    consistent-return
+                     "the equality on the flag word is not a mask, because a union carries
+                     its constituents' bits" -- with a test named for the distinction and a
+                     case on each side. A union does NOT carry those bits: `undefined|number`
+                     has flags 134217728, `Union` alone, so `flags & Undefined` is already
+                     zero. No input separates the two, and the mutation survives as genuine
+                     equivalence.
+
+    a whitespace scan
+                     An ASCII-only scan documented as a deliberate narrowing, with upstream's
+                     counterexample sitting in the corpus.
+
+**What breaks the loop is a mutation you did not choose the shape of.** In all three the
+survivor was the only signal, and in two of them the author's first instinct on reading it
+was to add another fixture -- which would have been written from the same premise and would
+have passed for the same reason. The third round of the same mistake is one step away, and it
+looks like diligence.
+
+So when a mutant survives an arm you have DOCUMENTED, suspect the documentation before the
+fixtures. A surviving mutant has exactly two readings, and they need different responses:
+
+    the fixtures cannot see it        add an input that discriminates
+    there is nothing to see           the arms are equivalent; say so and stop
+
+Telling them apart means going to the thing itself -- print the flag word, delete the arm and
+watch which rows move -- rather than reasoning about it again in the same terms that produced
+the claim.
+
+**Keep the rows that do NOT discriminate.** When `max-depth`'s real shape turned out to be a
+class nested inside an already-deep block rather than sibling methods, both sets stayed in the
+test, labelled. The non-discriminating rows are the evidence that the original argument was
+wrong rather than merely unproven, and without them the next reader deletes the arm, sees the
+sibling rows stay green, and concludes it was dead code.
+
+**And correcting the fixtures does not correct the justification.** This is the part with no
+instrument at all. `max-depth` shipped in one commit with a comment saying siblings accumulate
+and, a hundred lines below it, a comment recording that exact argument as disproved -- a file
+arguing with itself, with every test green. The mutation sweep found the fixture defect and
+could not touch the sentence that caused it, because **nothing fails when a comment is wrong.**
+
+So the discipline is a step, not an attitude: when an instrument corrects you, go back and
+re-read what you WROTE about the thing, not only what you tested about it. The comment is
+where the wrong belief actually lives, and it is the part that outlives the commit and teaches
+it to the next reader.
 
 ### A nil-receiver method call can be correct, so check the method before calling it a bug
 

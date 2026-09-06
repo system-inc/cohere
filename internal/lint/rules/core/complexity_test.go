@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -566,4 +568,169 @@ func TestComplexityDecoderReadsEveryOptionShape(t *testing.T) {
 	result = rule_testing.RunWithOptions(t, Complexity, complexityFile, switchy,
 		complexityOf(`{"max": 3, "variant": "modified"}`))
 	rule_testing.ExpectClean(t, result)
+}
+
+// TestComplexityNameBuilderBranches tests `complexityNameOf` DIRECTLY rather than through the
+// rule's messages.
+//
+// The two tables above assert renderings end to end, and they are the ones that caught three real
+// defects. But this rule has a single message id and a 20-branch name builder, so when an end-to-end
+// row fails it says the rendering is wrong without saying which branch produced it. Calling the
+// builder on a located node names the branch.
+//
+// Each row is one branch of the builder, and the expected string is what the installed
+// ESLint 10.8.1 rule rendered for that shape. The `find` field locates the node to name, so a row
+// tests one branch rather than whatever the walk reached first.
+func TestComplexityNameBuilderBranches(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		source string
+		// find selects which function-like node to name.
+		find func(node *ast.Node) bool
+		want string
+	}{
+		{
+			source: "function a() {}",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionDeclaration },
+			want:   "Function 'a'",
+		},
+		{
+			source: "var f = function () {};",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionExpression },
+			want:   "Function",
+		},
+		{
+			source: "function* g() {}",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionDeclaration },
+			want:   "Generator function 'g'",
+		},
+		{
+			source: "async function h() {}",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionDeclaration },
+			want:   "Async function 'h'",
+		},
+		{
+			source: "async function* i() {}",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionDeclaration },
+			want:   "Async generator function 'i'",
+		},
+		{
+			source: "var a = () => {};",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindArrowFunction },
+			want:   "Arrow function",
+		},
+		{
+			source: "class C { m() {} }",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindMethodDeclaration },
+			want:   "Method 'm'",
+		},
+		{
+			source: "class C { static m() {} }",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindMethodDeclaration },
+			want:   "Static method 'm'",
+		},
+		{
+			source: "class C { get g() {} }",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindGetAccessor },
+			want:   "Getter 'g'",
+		},
+		{
+			source: "class C { set s(v) {} }",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindSetAccessor },
+			want:   "Setter 's'",
+		},
+		{
+			source: "class C { constructor() {} }",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindConstructor },
+			want:   "Constructor",
+		},
+		{
+			// The private name is unquoted, unlike every other name.
+			source: "class C { #p() {} }",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindMethodDeclaration },
+			want:   "Private method #p",
+		},
+		{
+			source: "class C { static #p() {} }",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindMethodDeclaration },
+			want:   "Static private method #p",
+		},
+		{
+			source: "class C { static { } }",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindClassStaticBlockDeclaration },
+			want:   "Class static block",
+		},
+		{
+			source: "class C { x = 1; }",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindPropertyDeclaration },
+			want:   "Class field initializer",
+		},
+		{
+			// A function that BORROWS its name from what it is assigned to, which is the branch
+			// three end-to-end defects came from.
+			source: "class C { x = () => 1; }",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindArrowFunction },
+			want:   "Method 'x'",
+		},
+		{
+			source: "var o = { b: (a) => 1 };",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindArrowFunction },
+			want:   "Method 'b'",
+		},
+		{
+			source: "var o = { c: function () {} };",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionExpression },
+			want:   "Method 'c'",
+		},
+		{
+			// A named function expression in a property position is named for the PROPERTY, not
+			// for itself: upstream tries the property name first and falls back to the function's
+			// own id only when the property name is not static. Measured against the installed
+			// rule, which renders "Method 'd'" here.
+			source: "var o = { d: function named() {} };",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionExpression },
+			want:   "Method 'd'",
+		},
+		{
+			source: "var o = { e() {} };",
+			find:   func(n *ast.Node) bool { return n.Kind == ast.KindMethodDeclaration },
+			want:   "Method 'e'",
+		},
+	}
+
+	for _, testCase := range cases {
+		var located *ast.Node
+		probe := rule.Rule{
+			Name: "probe/complexity-name",
+			Run: func(ctx rule.Context, options any) rule.Listeners {
+				return rule.Listeners{
+					ast.KindSourceFile: func(file *ast.Node) {
+						var walk func(*ast.Node)
+						walk = func(node *ast.Node) {
+							if node == nil || located != nil {
+								return
+							}
+							if testCase.find(node) {
+								located = node
+								return
+							}
+							node.ForEachChild(func(child *ast.Node) bool { walk(child); return false })
+						}
+						walk(file)
+						if located != nil {
+							if got := complexityNameOf(ctx, located); got != testCase.want {
+								t.Errorf("%q: expected the name builder to render %q, got %q",
+									testCase.source, testCase.want, got)
+							}
+						}
+					},
+				}
+			},
+		}
+		rule_testing.Run(t, probe, complexityFile, testCase.source)
+		if located == nil {
+			t.Errorf("%q: the probe found no node to name, so this row proved nothing", testCase.source)
+		}
+	}
 }

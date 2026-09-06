@@ -423,15 +423,13 @@ func complexityNameOf(ctx rule.Context, node *ast.Node) string {
 	// measured, `class C { x = () => a||b||c; }` renders "Method 'x'" rather than "Arrow function",
 	// and `{ b: (a) => ... }` renders "Method 'b'". A count-only fixture cannot see either, because
 	// this rule has exactly one message id.
-	if owner := complexityNamingOwnerOf(node); owner != nil {
-		switch owner.Kind {
-		case ast.KindGetAccessor:
-			tokens = append(tokens, "getter")
-		case ast.KindSetAccessor:
-			tokens = append(tokens, "setter")
-		default:
-			tokens = append(tokens, "method")
-		}
+	if complexityNamingOwnerOf(node) != nil {
+		// Always "method". Upstream's Property and PropertyDefinition branch has no getter or
+		// setter arm either, and there is nothing for one to match here: the owner is a property
+		// assignment or a class field, never an accessor, because only an arrow or a function
+		// expression borrows a name at all. A first draft carried accessor arms in this branch and
+		// a mutation gutting them survived, correctly -- they were unreachable.
+		tokens = append(tokens, "method")
 	} else {
 		switch node.Kind {
 		case ast.KindGetAccessor:
@@ -471,6 +469,19 @@ func complexityNameOf(ctx rule.Context, node *ast.Node) string {
 // `getStaticPropertyName` on the parent for a property and the variable's own name otherwise. The
 // corpus exercises the property form: `var o = { c: function() {} }` renders `Method 'c'`.
 func complexityReadableNameOf(node *ast.Node) string {
+	// The OWNER's name wins when there is one, which is upstream's ordering: it reads
+	// `getStaticPropertyName(parent)` first and consults `node.id` only as a fallback.
+	if owner := complexityNamingOwnerOf(node); owner != nil && owner.Name() != nil {
+		if owner.Name().Kind == ast.KindPrivateIdentifier {
+			return owner.Name().Text()
+		}
+		if text, ok := property.Name(owner.Name(), property.Static); ok {
+			return text
+		}
+		// A computed or otherwise non-static property name, where upstream falls through to the
+		// function's own name.
+	}
+
 	if name := node.Name(); name != nil {
 		if name.Kind == ast.KindPrivateIdentifier {
 			return name.Text()
@@ -481,19 +492,6 @@ func complexityReadableNameOf(node *ast.Node) string {
 		if name.Kind == ast.KindIdentifier || name.Kind == ast.KindStringLiteral {
 			return name.Text()
 		}
-		return ""
-	}
-
-	// Anonymous, so upstream looks at what it is being bound to.
-	owner := complexityNamingOwnerOf(node)
-	if owner == nil || owner.Name() == nil {
-		return ""
-	}
-	if owner.Name().Kind == ast.KindPrivateIdentifier {
-		return owner.Name().Text()
-	}
-	if text, ok := property.Name(owner.Name(), property.Static); ok {
-		return text
 	}
 	return ""
 }
@@ -509,6 +507,11 @@ func complexityNamingOwnerOf(node *ast.Node) *ast.Node {
 	if node.Kind != ast.KindArrowFunction && node.Kind != ast.KindFunctionExpression {
 		return nil
 	}
+	// Deliberately NOT gated on the function being anonymous. Upstream tries the property name
+	// FIRST and falls back to the function's own `id` only when the property name is not static, so
+	// a named function expression in a property position is named for the PROPERTY:
+	// `{ d: function named() {} }` renders `Method 'd'`, measured against the installed rule. An
+	// earlier draft read the function's own name first and rendered `Method 'named'`.
 	parent := node.Parent
 	if parent == nil {
 		return nil
