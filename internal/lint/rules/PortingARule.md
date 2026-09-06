@@ -1741,6 +1741,29 @@ distinctions you have not thought of yet, and the failure is usually telling you
 **Mutate every discrimination the rule makes**, one at a time. **A green suite proves
 nothing until something has been shown able to turn it red.**
 
+**A survivor tells you your fixtures cannot see something. WHERE that something lives
+decides which instrument can find it.** The distinction is worth holding because it tells
+you which tool to reach for, and the two halves fail differently:
+
+    the invisible thing is in YOUR CODE      a mutation sweep reaches it
+        a quantifier, a guard, a branch      the mutant compiles and the corpus stays green
+
+    the invisible thing is in THE WORLD      only a dry run or a differential reaches it
+        a shape upstream never wrote,        no mutation of your rule can conjure the input
+        a substrate that behaves otherwise
+
+Measured on `@typescript-eslint/no-unsafe-enum-comparison`. Its `isNumberLike` is EVERY
+union constituent over SOME intersection constituent, and flipping the union quantifier to
+`some` leaves **all 85 corpus cases green**, because upstream writes no union of mixed
+primitive kind. That defect lives in the rule's own logic, so a sweep found it; every other
+blind-corpus instance in this document needed the real tree, because those defects were
+beliefs about the substrate rather than errors in a branch.
+
+The repair is the same either way and it is not "add a fixture": **build the input that
+separates the two readings, confirm the shipped rule and the mutant disagree on it, and
+add it with a control.** Confirming both halves is what distinguishes a fixture that kills
+the mutant from one that merely happens to pass.
+
 **The script takes an expression, not statements.** `import re; source = re.sub(...)`
 fails with a bare `SyntaxError` that names nothing and reads like a broken script. Keep
 the rewrite to a single expression. Separately, gofmt's alignment silently no-ops a
@@ -2431,6 +2454,26 @@ declaration is right.
 runs by default, so a bare `cohere --timing` mutates the tree. A seeded probe file was
 rewritten this way. `--no-fix` mutates nothing; `--lint` also skips the type phase,
 which you do not need for a rule timing and which costs a second.
+
+**And `--no-fix` WITHOUT `--lint` does not lint, which is a different way to get a
+confident zero.** An author measured a rule at zero findings on the whole tree this way and
+briefly believed it. The binary is not quiet about it:
+
+    types: 17 diagnostics over 3540 files in 547ms
+    phases: fix skipped (--no-fix) - types ran in 547ms - lint did not run
+            (types bailed: 17 type diagnostics - lint findings against wrong
+            semantics are noise) - unused skipped
+    this run did not check everything - the phases above say what was not checked
+
+Two separate lines announce it, one of which exists purely to say the run was partial. So
+the failure was not a silent tool; it was **reading the count without reading the statement
+of what ran**, which is smaller and far more common. The same rule measured 508 findings
+once `--lint` was passed.
+
+The general form is worth more than the flag: **a summary number is only meaningful
+together with the statement of what produced it.** Checking for the `lint:` summary line
+works precisely because its absence is the tool telling you, and the phase line is the tool
+telling you in sentences.
 
 This tells you three things fixtures cannot: whether it fires on real code and whether
 those findings are right, what it costs (one rule was 64.5% of all rule time because it
