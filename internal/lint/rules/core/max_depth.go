@@ -243,15 +243,14 @@ func (w *maxDepthWalker) walk(node *ast.Node) {
 	//
 	// Upstream needs no such arm because ESTree wraps every method body in a FunctionExpression,
 	// which its startFunction set already covers, so the frame is pushed by the body rather than by
-	// the member. Our parser hangs the body directly off the member, so without this arm a method's
-	// blocks would count against whatever function encloses the class and successive methods would
-	// accumulate.
+	// the member. Our parser hangs the body directly off the member -- probed, there is no wrapping
+	// node at all -- so the frame has to be pushed here instead.
 	//
 	// The distinguishing shape is a class nested INSIDE an already-deep block, and finding it took
-	// a correction worth recording. The obvious argument -- "two sibling methods would accumulate
-	// depth" -- is WRONG, because the depth decrements on the way out, so siblings never
-	// accumulate whether or not a frame is pushed. A mutation deleting this arm survived both the
-	// corpus and a first set of sibling-method fixtures written from that argument.
+	// a correction worth recording. The obvious argument -- "without a frame, two sibling methods
+	// would accumulate depth" -- is WRONG, because the depth decrements on the way out, so siblings
+	// never accumulate whether or not a frame is pushed. A mutation deleting this arm survived both
+	// the corpus and a first set of sibling-method fixtures written from that argument.
 	//
 	// What a frame actually does is RESET the count, so it only shows where there is a count to
 	// reset. Measured against the installed rule, which reports zero on every row:
