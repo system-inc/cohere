@@ -433,6 +433,18 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		"no-plusplus":        "ported and registered, not enabled: 616 findings over 3,540 files. Enabling it is a scheduled cleanup rather than a guardrail, and `++` in a for-loop update is idiomatic enough that the allowForLoopAfterthoughts option is probably the real question",
 		"no-continue":        "ported and registered, not enabled: 1,191 findings over 3,540 files, which is a control-flow convention for the whole tree rather than a defect class",
 		"no-inline-comments": "ported and registered, not enabled: 3,979 findings over 3,540 files, the largest count in this batch. A trailing-comment convention is a formatting decision, and at this volume it is Kirk's call rather than a porter's",
+		// The one rule in these batches with a repair, and the count is not the interesting number.
+		//
+		// 746 findings over 294 files, agreeing with ESLint exactly. What makes it worth a note is
+		// that its fixer is string surgery -- escaping `${` and backticks by backslash parity,
+		// unescaping the original quote, carrying comments into curlies, emitting a leading `;`
+		// against automatic semicolon insertion -- and every one of those was wrong in the first
+		// draft. The 74 `output` fixtures caught all of it; the message ids caught none of it.
+		//
+		// Left unenabled because 746 hand edits is a scheduled cleanup. The fixer means it could be
+		// a mechanical one, which is a genuinely different decision from the other six in this
+		// batch and is Kirk's to make.
+		"prefer-template": "ported and registered, not enabled: 746 findings over 294 files, agreeing with ESLint exactly. It ships a working fixer, so adopting it could be mechanical rather than manual, which makes enabling it a different decision from the unfixable stylistic rules above",
 	}
 
 	rules := All()
