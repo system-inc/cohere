@@ -1382,6 +1382,57 @@ controls rather than weakening the rule to make it green, which is the right sha
 case you cannot express is a fact about the harness, and hiding it inside a relaxed
 rule turns it into a fact about the rule.
 
+## 3c. If the message interpolates anything, the ids cannot see it either
+
+**This is 3b's argument arriving through a different door, and the pair is what makes it a
+property of fixtures rather than a quirk of fixers.** There, message ids cannot see a
+repair, so `output` is a fixer's only coverage. Here, a single message id cannot see a
+RENDERING, so a name-and-span test is the only coverage a rule with an interpolated
+message has. In both cases the fixtures are complete and the assertion layer is the wrong
+one.
+
+The trap is sharpest on a rule with exactly ONE message id, because then a fixture table
+records only a count. `complexity` is the measured case: 165 imported fixtures, all green,
+with three defects live and two more the corpus could not reach at all.
+
+    an arrow assigned to a class field    rendered "Arrow function", upstream says "Method 'x'"
+    an arrow in an object property        rendered "Arrow function", upstream says "Method 'b'"
+    the span for a property's function     started at `function `, upstream starts at `c: function `
+    a computed property key                counted inside the field's path, upstream counts it
+                                           in the ENCLOSING function's
+    a private method's name                rendered "Private method '#p'", upstream renders it
+                                           UNQUOTED as "Private method #p"
+
+None of the five moves a message id and none moves a count. The first three were found by
+writing a table of expected NAME and SPAN per shape; the last two by mutation.
+
+**Read `meta.messages` for placeholders, and treat each one as an assertion you owe.** A
+message with `{{name}}` in it is a computed string, and the computation is usually a
+helper large enough to have its own bugs: `complexity` interpolates a name built by
+upstream's `getFunctionNameWithKind`, 77 lines assembling `static`, `private`, `async`,
+`generator`, a kind word and a quoted name, plus a span from `getFunctionHeadLoc`. Its
+corpus exercises **14 distinct renderings across 103 findings**, so the name is most of
+what the rule computes and none of what its ids record.
+
+**Test the builder DIRECTLY, not only through the rule's messages.** An end-to-end row
+that fails tells you the rendering is wrong without telling you which of twenty branches
+produced it, and a table keyed on the branch is what turns a red line into a location.
+Doing that on `complexity` immediately found a fourth defect the end-to-end table could
+not: `{ d: function named() {} }` renders `Method 'd'`, because upstream tries the
+PROPERTY name first and falls back to the function's own `id` only when the property name
+is not static. No corpus case writes a named function expression in a property position,
+so nothing else could have caught it. The same table then exposed dead code, two accessor
+arms in a branch only an arrow or a function expression can reach.
+
+**And the parser difference cuts the other way here, so port the DECISION rather than the
+dispatch.** ESTree wraps a method in a `MethodDefinition` around a `FunctionExpression`,
+so upstream reads modifiers off the parent and the kind word off `parent.kind`. Measured,
+our parser has no wrapper at all: `KindMethodDeclaration` is both the member and the
+function. A reader porting those 77 lines faithfully will write parent-dispatch branches
+this tree can never reach, and a mutation sweep will report them as survivors because they
+are genuinely dead. The reachable version is smaller, and the arms that survive gutting
+are the ones to delete rather than to document.
+
 ## 4. Check the shelf before writing any helper
 
 The shared shelf is `internal/lint/ecmascript/` and `internal/lint/checking/` —
@@ -1963,6 +2014,52 @@ in. Refuse instead.
 options is not necessarily the spelling this tree can hand you. Check `meta.schema` for
 how many elements it declares, and if the answer is more than one, your decoder has a
 second shape to accept and your fixtures cannot tell you whether it does.
+
+### A presence check followed by a truthiness fallback is a family, and a written zero splits it
+
+Not one rule's quirk. Found in `max-depth` and `complexity`, and the shape is common
+enough in ESLint's option handling that the next rule carrying it should be expected
+rather than discovered:
+
+    if (typeof option === "object" && (hasOwn(option, "maximum") || hasOwn(option, "max")))
+        threshold = option.maximum || option.max;
+
+The guard tests PRESENCE and the `||` tests TRUTHINESS. Those agree on every value except
+zero, and on zero they do something a reading of either half alone does not predict.
+Measured against the installed rules, reading each limit out of the rule's own message
+rather than inferring it from a count:
+
+    2                        limit 2      the ordinary spelling
+    0                        limit 0      a bare zero reports everything
+    {"max": 0}               limit 0      `undefined || 0` is 0, so the zero WINS
+    {"maximum": 0}           SILENT       `0 || undefined` is undefined, and every
+                                          `count > undefined` is false, so the rule
+                                          reports NOTHING at all
+    {"max": 0, "maximum": 3} limit 3      the `||` consults maximum first
+    {}                       the default  neither key present, so the branch is never
+                                          entered: 4 for max-depth, 20 for complexity
+
+The same six rows hold for both rules, checked on each rather than generalised from one.
+**And the last row carries a trap of its own worth naming**, because it caught this
+document: probing `{}` against source that does not exceed the DEFAULT reports nothing,
+which reads exactly like the silencing row above it. Two rows that mean opposite things
+produce identical output unless the probe input is chosen to exceed the default. Use
+source past the threshold you are testing, or the measurement quietly merges two cases.
+
+**The two zero spellings do opposite things**, and one of them disables the rule entirely.
+That is not expressible as an integer threshold, so a decoder needs either a flag or a
+sentinel; collapsing the rows into "zero means zero" is wrong on both.
+
+**The mechanical tell, so this is recognised rather than rediscovered:** a presence check
+gating a truthiness pick means a written zero and an absent option take DIFFERENT paths.
+Any decoder that treats "absent" and "zero" as the same thing is wrong on at least one
+row, and whether a fixture catches it is luck. `max-depth`'s corpus happens to carry both
+zero spellings, which is the only reason the first draft of its decoder was caught.
+`complexity`'s carries neither, and the rows are pinned there by hand from measurement.
+
+So when a decoder's upstream is `hasOwn(...)` then `a || b`, write the option table out and
+drive the installed rule once per row before writing any Go. It is six inputs and it
+settles what no amount of reading the expression will.
 
 ## 7d. A screen for an ABSENT thing is most confident when it is broken
 
