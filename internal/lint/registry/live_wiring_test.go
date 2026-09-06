@@ -210,6 +210,18 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		"no-bitwise":           "ported and registered; the audit measured 82 violations with no fixer and recommends against, and this tree uses bitwise operators deliberately in hashing and bit-packing code",
 		"prefer-destructuring": "ported and registered; the audit measured 789 violations and recommends against, so adopting the convention is a decision rather than a wiring step even though the rule has a fixer",
 
+		// Ported and registered without being enabled, and the reason is a decision with a measured
+		// price rather than a wiring step. The audit recommends against at 774 violations across all
+		// three of upstream's arms; this port implements the `||` and `||=` arm only, and measured
+		// on the real tree that arm alone is 677 findings. The rule proposes suggestions rather than
+		// fixes, so nothing applies unattended and every one of the 677 is a hand edit.
+		//
+		// The name appears nowhere in CohereSettings.json under any spelling, so there is no
+		// standing decision to honour or reverse. Unlike the options-driven rules above it reports
+		// out of the box, so its absence from the enabled set is the config not naming it rather
+		// than a rule that cannot fire.
+		"@typescript-eslint/prefer-nullish-coalescing": "ported and registered; the || arm alone measures 677 findings on this tree with suggestions rather than fixes, so adopting it is a decision about a hand cleanup rather than a wiring step",
+
 		// The live config sets `react/jsx-key` to "off" explicitly, in a block of ten-plus rules
 		// this project has deliberately turned off alongside `react/react-in-jsx-scope`. That is a
 		// decision about this codebase rather than a wiring gap, and flipping it here would
