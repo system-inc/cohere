@@ -2061,6 +2061,56 @@ So when a decoder's upstream is `hasOwn(...)` then `a || b`, write the option ta
 drive the installed rule once per row before writing any Go. It is six inputs and it
 settles what no amount of reading the expression will.
 
+### The blindness is not only about decoders, and the second instance is the sharper one
+
+Everything above is a rule wrong about a shape the CONFIG produces, which at least lives
+in your own code where a reader could find it. The same blindness has a worse form: **a
+true statement about a constant in another package**, which no fixture and no mutation of
+your rule can reach at all.
+
+Measured on `prefer-destructuring`. It skips `using` and `await using` declarations,
+because a destructured `using` is a parse error and a finding there is unactionable.
+Upstream tests two declaration kinds, so the obvious port is two flag tests:
+
+    list.Flags&ast.NodeFlagsUsing != 0 || list.Flags&ast.NodeFlagsAwaitUsing != 0
+
+The second half is wrong, and the reason is one line in the vendored compiler:
+
+    NodeFlagsAwaitUsing = NodeFlagsConst | NodeFlagsUsing      ast/nodeflags.go:51
+
+It is a COMPOSITE rather than a bit of its own, so the mask is non-zero for **every
+`const` declaration** and the guard skipped all of them. The rule reported nothing on any
+modern source file, and:
+
+    upstream's 103 imported fixtures     ALL PASS
+    18 fix vectors, 30 declines          ALL PASS
+    every mutation of the rule           caught or equivalent, as expected
+    a dry run on a seeded tree           0 findings, control reporting 3
+
+**The corpus is blind by construction rather than by bad luck.** Upstream's cases are
+written in `var`, because the rule predates `const` being ubiquitous in test corpora, so
+no imported case can distinguish a rule that handles `const` from one that skips it. And
+unlike the decoder cases above, there is nothing in the rule to mutate: the code is
+correct about the operation it performs and wrong about what the constant means.
+
+**Three things follow, and the third is the one that generalises.**
+
+Reaching for a named constant is not free the way it looks. Check whether it is a single
+bit before masking against it, and prefer the narrowest flag that answers your question —
+`NodeFlagsUsing` alone is right for both spellings, since `await using` carries it too.
+
+A corpus written in one dialect is silent about the others. Upstream's is `var`-era
+JavaScript; this tree is `const`-era TypeScript. That gap is the same one that made every
+`.tsx` file gate invisible, and it is yours to close with cases of your own.
+
+And the instrument that finds this class is the same one section 7c already names: **a dry
+run through the real config layer against a seeded tree, with a control that reports.**
+Not `go test`, not the sweep. The rule here reported zero and the control reported three,
+which is the only shape that separates "this tree is clean" from "this rule cannot fire."
+Run it on every port, including the ones with no options at all — this rule's defect had
+nothing to do with its option surface, and a porter who reads 7c as being about decoders
+will skip the run on exactly the rules where it is the only instrument left.
+
 ## 7d. A screen for an ABSENT thing is most confident when it is broken
 
 **An audit's zero cannot tell a clean tree from a rule that cannot fire here.** Several
@@ -2804,6 +2854,45 @@ and decay is the dominant failure mode rather than mistake. That has two consequ
 - **A red package is a question about timing before it is a question about correctness.**
   Three false failures were called out loud in one session, each an agent reading a
   sibling's package mid-write. Re-run before reporting; the second run is the measurement.
+
+**And the thing that goes stale is systematically the DESCRIPTION rather than the work.**
+This is the part that makes the failure hard to catch, and it took four instances in one
+session before anyone said it plainly.
+
+Those four were logged as four mistakes with four causes: a commit message naming four
+rules while carrying two, a decline document asserting a probe had been removed in the
+commit that added it, a dispatch claiming a rule had a fixer that its `meta` block does not
+declare, and a report saying nothing was committed four minutes after a coordinator
+committed it. Different causes, and the temptation is to fix each one.
+
+What they share is worth more than any of them: **not one was a code defect. The artifacts
+were correct every time.** The rules worked, the probe ran, the `meta` block said what it
+said. What was wrong in each case was a claim ABOUT the work, made at a moment when it was
+true, read at a moment when it was not.
+
+That is a different failure mode from the one review is built to catch, and the difference
+is structural rather than a matter of care. Review reads a diff against a message and both
+are internally consistent; what is wrong is the relationship between a description and a
+moment, and **nothing in the diff records which moment.** A reviewer cannot see it, because
+there is nothing there to see.
+
+Two habits fall out of it, and they are cheap:
+
+- **Descriptions of volatile state need re-checking at the moment you publish them, not at
+  the moment you form them.** Anything about the working tree, the commit log, what other
+  agents hold, which tests are red, or what a rule's `meta` declares. Re-running the check
+  costs a second; the claim has usually not changed, and when it has, it has changed
+  silently.
+- **When you write a description from somebody's REPORT rather than from the artifact, say
+  so.** Three of the four came from exactly that: a message written from an agent's summary
+  instead of from `git status`, a dispatch written from an audit instead of from `meta`. A
+  report is a description too, and it decayed on its way to you.
+
+The reason this belongs in a porting standard rather than in a note about process: **the
+same discipline that makes a measurement trustworthy makes a description trustworthy, and
+it is the same discipline.** Do not assert what you have not just checked. A dispatch that
+says a rule has a fixer is a measurement claim, and `grep -c fixable` with a control is how
+you make it one.
 
 The same decay reaches tracked files, which is worse, because a stale sentence in a
 committed document carries the authority of the codebase while being only what one author
