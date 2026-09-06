@@ -64,3 +64,16 @@ jitter: boolean = true,
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
 
+## Status: ported 2026-09-06, registered and NOT enabled
+
+The audit's 203 and the port's 204 differ by one, and the cause is the instrument rather than either
+count. The audit measured through ESLint with inline `eslint-disable` comments active; cohere applies
+suppression outside the rule, so a rule fixture and a rule dry-run both see the pre-suppression
+verdict. Driving the installed 8.67.0 rule over the same 89 files with `noInlineConfig` gives 204,
+and all 204 agree with cohere position for position, columns included.
+
+Registered so it compiles in and appears in `cohere --rules`; deliberately not enabled, because
+enabling it means accepting 204 findings' worth of cleanup, and that is a decision about this
+codebase rather than a porting step. The audit's **No** above is a judgment about that cleanup cost
+and it is untouched; what has changed is only that the rule now exists to be turned on.
+

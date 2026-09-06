@@ -34,6 +34,20 @@ The remaining work a port would represent is the NAME, and nothing asks for it: 
 wrapper would also need this rule's 427-line body lifted out of the rule package, because a rule
 package may not import another rule package, for no behavioural change.
 
+## Re-verified 2026-09-06, in a later batch
+
+This rule was dispatched again as part of a four-rule type-aware batch, and the decline was checked
+rather than inherited, since the document itself says the zero is a fact about two installed versions
+and not a property of the rules.
+
+Nothing had moved. The core rule `no-useless-constructor` is still registered, still enabled at
+`CohereSettings.json:520`, and its whole fixture set is green. The namespaced spelling still appears
+nowhere in the config. `cohere --rules` lists the core name and not the `@typescript-eslint/` one,
+which is the state this document describes.
+
+So the decline stands and no code was written. The other three rules in that batch --
+`no-inferrable-types`, `prefer-regexp-exec`, `consistent-type-definitions` -- were ported.
+
 ## If this is revisited
 
 Re-run the differential before assuming the zero still holds; it is a fact about two installed
