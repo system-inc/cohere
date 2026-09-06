@@ -2052,7 +2052,13 @@ Measured tonight, with another agent's rule mid-write:
 the build, so `go build ... 2>&1 | head -2` reports success while the build failed. Redirect
 to a file and read the code:
 
+    rm -f "$S/cohere-$NAME"                                    # so a failure leaves nothing
     go build -o "$S/cohere-$NAME" ./command/cohere > "$S/build.log" 2>&1; echo "exit=$?"
+
+**Delete the target first.** That one line turns this check into the same repair as every
+other one in this document: with nothing at the path, a failed build leaves nothing to read
+and the instrument refuses instead of answering. Checking a size or a timestamp afterwards
+works too and depends on you remembering to look; deleting first does not.
 
 Three things must go wrong for a false reading: the pipe hides the failure, the artifact
 survives, and the count looks right. All three happened in one command tonight, and the agent
