@@ -1282,6 +1282,43 @@ message id, so it catches a fixer that repairs the right span with the wrong tex
 
     testing.ExpectFixedSource(t, result, "a === b")
 
+**And they are not extra coverage for a fixer. They are the ONLY coverage it has.**
+This is the asymmetry to hold onto, because it is what makes skipping them feel safe:
+a fixer that reports in the right place and repairs wrongly is *indistinguishable*, at
+the message-id layer, from a correct one. Every id fixture stays green. The span
+assertions stay green. The rule looks finished.
+
+Measured, on `dot-notation`, which is worth stating concretely because the abstract
+version of this argument does not survive contact with a deadline. The port passed all
+69 of upstream's corpus verdicts, then failed **11 of 38** `output` fixtures on the
+first run. Two defects, neither reachable by any id:
+
+    5_000['prop']   ->  5_000.prop      wanted 5_000 .prop
+    foo['bar']instanceof baz  ->  foo.barinstanceof baz
+
+The first is a transcription failure: `DECIMAL_INTEGER_PATTERN` was written from what
+the rule *looked like* it needed rather than read from `ast-utils.js:64`, and the real
+one accepts numeric separators and a leading zero before an 8 or 9.
+
+**The second is the one to remember.** It is not a wrong fix, it is a fix that produces
+valid-looking source meaning something else. `foo.barinstanceof` is a plausible
+identifier; a reviewer reading that diff sees nothing wrong, the file compiles, and the
+behaviour changed. The missing piece was upstream's third yield, which inserts a space
+when the repaired text would abut the next token.
+
+So: if `meta.fixable` is set, the `output` cases are not a nice-to-have you add if there
+is time. Porting the judgment without them ships a repair that runs unattended over the
+whole tree with nothing able to say it is wrong.
+
+**The decision to port a fixer at all turns on whether the repair is SPECIFIED, not on
+whether fixers are frightening.** Two rules in one batch went opposite ways for the same
+reason. `react/no-invalid-html-attribute`'s suggestions were declined because one of them
+does a substring replacement on SOURCE text -- `value.raw.replace(value.value, '')` --
+which repairs the wrong span whenever a bad token contains a good one as a prefix, and
+nothing upstream pins that. `dot-notation`'s fixer was ported because 34 `output` cases
+state exactly what it must write and `ExpectFixedSource` compares the whole file. Ask
+which of those two situations you are in.
+
 **`output: null` is a decision, not an omission.** It means upstream reports the case
 and deliberately declines to fix it, usually because the repair would change
 behaviour rather than spelling. Reproduce the decline. A fixer that repairs a case
@@ -2376,6 +2413,27 @@ files before reading its findings as a result.
 conclusion from two empty result files. Check that your measurement produced output at
 all before comparing outputs.
 
+**An oracle can be wrong in the PESSIMISTIC direction, and that is rarer and just as
+misleading.** The usual failure is an oracle that reports nothing and reads as clean.
+This one reported *fewer cases than it had* and read as a smaller corpus.
+
+Measured on `dot-notation`. Five of its reporting cases are legacy octals -- `01['prop']`,
+`08['prop']` and friends -- and driven through `@typescript-eslint/parser` all five come
+back as FATAL PARSE ERRORS rather than verdicts, because a legacy octal is a syntax error
+in TypeScript. The oracle said "linted 64 of 69" and the five silences looked exactly like
+five clean cases. Driving the same corpus through espree in script mode moved it to 69 of
+69, and the findings from 34 to 39.
+
+The part worth copying is what came next. A fatal parse error in the ORACLE says nothing
+about OUR parser, so the five were probed here directly: our parser reads all five and
+reports on every one, agreeing with espree. The port was stronger than the oracle could
+show, and taking the oracle's number would have recorded a limitation this rule does not
+have.
+
+So when an oracle reports fewer cases than the corpus contains, find out which ones and
+why before treating the remainder as the measurement. `linted N of M` with `M > N` is a
+result about the harness, not about the rule.
+
 **And a rule can report zero because the substrate removed what it asks about.**
 `unicode-bom` asks whether a file starts with a byte order mark. Every source file in a
 real run is read through the vendored virtual filesystem, and that read strips a leading
@@ -2713,6 +2771,33 @@ And the detail that matters most: their first neutering mutation DID NOT COMPILE
 they threw it out rather than reading the build failure as a passing control. A mutant
 that fails to build proves nothing about your tests. **Score by "could this have failed",
 never by "did something go red".**
+
+### A corpus can be complete about a rule and still unable to reach one guard
+
+This is 7b arriving in a rule that is not a matcher, which is what makes it easy to miss.
+
+`default-case` excuses a missing default when a comment after the last case matches
+`/^no default$/iu`. Removing BOTH anchors survives all 23 of upstream's cases. The corpus
+is not thin -- it covers the comment, the casing, the position, and the option -- but every
+case that exercises the DEFAULT pattern writes `no default` exactly, and the two cases with
+a near-miss comment supply their own `commentPattern`, under which anchored and unanchored
+agree. Nothing in it can separate the two readings.
+
+Driving the installed rule on two shapes the corpus never writes settles it in one command,
+with a control that fires:
+
+    // no default          excuses      (control)
+    // no default here     REPORTS
+    // say no default      REPORTS
+
+So the anchors are load-bearing and an unanchored pattern would silently excuse two shapes
+upstream flags -- in the direction that hides findings rather than inventing them.
+
+The general form: **a surviving mutant on a guard whose corpus coverage looks thorough is
+usually telling you the corpus tests the guard's SUBJECT rather than its BOUNDARY.** Every
+case wrote the matching string; none wrote a near-miss. Ask what input would sit just
+outside the guard, and check whether the corpus contains one before concluding the mutant
+is equivalent.
 
 ### A flaky test is worse than no test
 
