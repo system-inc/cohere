@@ -70,6 +70,21 @@ actually shipped. It covers, in the order you will need them:
 - running dry against the real tree, and the six distinct kinds of zero
 - the guards in `internal/lint/registry/` that catch what your own tests cannot
 
+## A `.md` with no `.go` beside it is a rule nobody built
+
+Every rule that was audited carries a document named for it, sitting where its code would
+sit: `core/no_alert.md` beside `no_alert.go`, and `core/no_bitwise.md` beside nothing.
+That second shape is the whole signal. The rule was read, measured against this tree, and
+either declined or never reached, and the document says which.
+
+So a namespace directory answers two questions at once. What is enforced is what has
+`.go` files. What was considered and left is what does not, and the reason is in the file.
+
+Building one of those means adding code beside a document already in the right place, and
+re-measuring its violation count first: those counts were taken when the audit ran and the
+tree has moved. A recommendation of Yes is a judgment from that day, not a commitment.
+Current status lives in the rules spreadsheet, not here.
+
 ## Layout, so you can find things
 
     internal/lint/rules/<namespace>/    base core next nexus react structure tailwind typescript
