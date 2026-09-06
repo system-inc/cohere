@@ -3178,6 +3178,30 @@ categories their author had thought of. Both have a null rule id. Keep the rows 
 `ruleId` matches the rule under test; that filter cannot be surprised by a category nobody
 anticipated.
 
+**All of these are one finding wearing different costumes, and the sentence is worth having
+on its own: AN INSTRUMENT THAT CANNOT EXPRESS DISAGREEMENT REPORTS AGREEMENT.**
+
+Four instances from two batches, which is what makes it a class rather than an anecdote:
+
+    a differential sampling 30 files that each hold one finding
+        -> 30 against 30, and the sample had no way to produce any other number
+
+    a sweep wrapper mis-parsing its tool, returning the same verdict for all 12 mutations
+        -> a uniform result across every input is the tool answering without looking
+
+    a guard defended by "zero outputs begin with a semicolon", counted from the string start
+        -> five of them do, after a newline, where a check anchored at position zero
+           cannot reach. The question was shaped like the answer it got.
+
+    a filter keeping rows by `!fatal` rather than by rule id
+        -> it can only drop the categories its author already knew about
+
+The shape underneath: **before believing a result, ask what input would have produced a
+different one, and check that your instrument could have seen it.** If you cannot name such
+an input, you have not measured anything. That question is cheap, it is available before the
+conclusion rather than after it, and every one of the four above would have failed it in a
+sentence.
+
 ### Two broken instruments that share an assumption corroborate each other
 
 A coordinator reported a defect in a correct rule, and the reason they believed it is the
@@ -3326,6 +3350,34 @@ Measured, against its own wave-mates:
     no-unnecessary-type-parameters    571                1,908
     no-redundant-type-constituents    534                  851
     no-unnecessary-template-expression 472
+
+**Re-measured 2026-09-06, and the numbers have drifted.** `no-unnecessary-condition` is now
+**1,001 lines of rule over 5,075 of corpus**, up from 970 and 4,316. The example is still
+accurate and its figures are not, which is the same decay an audit count suffers: **a
+threshold quoted in prose goes stale exactly like a measurement quoted in prose.** Re-run
+the two commands rather than trusting the table above; it is a worked example, not a
+current inventory.
+
+**And size the CORPUS and the SUBSTRATE, not the rule file.** The rule file is the one
+number that is not the size, and it is the one you instinctively check. Measured the same
+day, on a rule dispatched as small:
+
+    prefer-optional-chain      230 lines rule
+                             1,807 lines of prefer-optional-chain-utils/
+                            18,173 lines of tests/rules/prefer-optional-chain/
+
+A 230-line rule file reading as trivial over nearly twenty thousand lines of corpus is the
+`react/no-unused-prop-types` trap at four times the scale. Three commands, not two:
+
+    wc -l <pkg>/src/rules/<rule>.ts
+    find <pkg>/tests/rules/<rule>* -type f | xargs wc -l | tail -1
+    <plus any utils directory the rule imports>
+
+**A decomposition worth knowing for a rule in that shape.** When the substrate is mostly
+the REPAIR, the judgment half is a much smaller job with a stated boundary, and the two are
+separately dispatchable. `prefer-optional-chain`'s 1,807-line utils package is largely its
+fixer; porting the judgment and declining the repair is a real intermediate option rather
+than a half-finished rule, and the report-without-fix pattern is already established here.
 
 Nearly double its wave on the rule and more than double on the corpus, and the corpus is
 the part that costs context, because a faithful port reads all of it.
