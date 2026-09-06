@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/verify/internal/program"
-	"github.com/system-inc/verify/internal/rule"
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	"github.com/system-inc/cohere/internal/program"
+	"github.com/system-inc/cohere/internal/rule"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // Build-once, asserted against the repository the tool actually lints rather than against a fixture.

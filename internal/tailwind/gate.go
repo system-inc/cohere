@@ -3,7 +3,7 @@
 //
 // Tailwind's collapse logic — the thing that knows `px-4 py-4` is `p-4` and `w-8 h-8` is `size-8` —
 // is a signature-equivalence search sitting on the whole Tailwind compiler. It is JavaScript, it is
-// eight to ten thousand lines, and it changes every Tailwind minor. verify is Go. That boundary is
+// eight to ten thousand lines, and it changes every Tailwind minor. cohere is Go. That boundary is
 // the one place in this tool where the answer is not "delete the boundary."
 //
 // This package is the part that does not have to cross it. Two classes can only merge when

@@ -1,6 +1,6 @@
 package react
 
-import "github.com/system-inc/verify/internal/rule"
+import "github.com/system-inc/cohere/internal/rule"
 
 // init registers this package's `forbid-dom-props` rule.
 //

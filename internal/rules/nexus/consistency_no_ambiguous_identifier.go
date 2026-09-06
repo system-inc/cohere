@@ -4,8 +4,8 @@ import (
 	"regexp"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/binding"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/binding"
 )
 
 // alwaysAllowedSingleLetters are the coordinate and math names, where the single letter is the

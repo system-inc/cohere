@@ -23,11 +23,11 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
-// Run SSA over a real tree with a real checker and verify every function.
+// Run SSA over a real tree with a real checker and cohere every function.
 func TestSSAOverRealCodebase(t *testing.T) {
 	root := os.Getenv("SSA_CORPUS")
 	if root == "" {

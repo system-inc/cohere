@@ -2,7 +2,7 @@ package core
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // relationalOperatorText maps the operators this rule always checks to the text the message quotes.

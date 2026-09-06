@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // The corpus below is oxc's own, copied from `rules_of_hooks.rs` through the extractor rather

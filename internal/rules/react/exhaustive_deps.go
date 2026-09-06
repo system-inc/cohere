@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 var (
@@ -56,7 +56,7 @@ var (
 	messageExhaustiveDepsNotArrayLiteral = rule.Message{
 		Id: "exhaustiveDepsNotArrayLiteral",
 		Description: "The dependency argument is not an array written at the call site, so its " +
-			"contents cannot be read here and nothing can verify them. Pass an array literal.",
+			"contents cannot be read here and nothing can cohere them. Pass an array literal.",
 	}
 	messageExhaustiveDepsAsyncEffect = rule.Message{
 		Id: "exhaustiveDepsAsyncEffect",
@@ -203,7 +203,7 @@ var (
 // entirely at compile time and cannot change what is read at runtime. React's own corpus does not
 // contain the case, and its silence is a consequence of a `throw` in a chain walk rather than a
 // judgment anyone made. oxc unwraps it and is right. Step 1 of the resolution order is "who is
-// actually right", and it outranks step 2, so this ships as oxc. The differential will show verify
+// actually right", and it outranks step 2, so this ships as oxc. The differential will show cohere
 // agreeing with oxlint here; ESLint would disagree, and that is stated rather than hidden.
 //
 // The identical reasoning covers `as` and parentheses, which React also does not unwrap in the
@@ -338,15 +338,15 @@ var (
 //
 // # One consequence outside this file, stated because nobody else will notice it
 //
-// `cmd/verify-differential` plants a control file it calls `gate-only-exhaustive-deps`, whose whole
-// job is to prove the harness can see a finding only the gate produces. It rests on verify not
+// `cmd/cohere-differential` plants a control file it calls `gate-only-exhaustive-deps`, whose whole
+// job is to prove the harness can see a finding only the gate produces. It rests on cohere not
 // implementing this rule, and its own comment says so at length, ending with: a control resting on a
 // rule being impractical expires when somebody finds it practical. That is what just happened.
 //
-// The control is now broken: verify reports the planted effect too, so the asymmetry it measures is
+// The control is now broken: cohere reports the planted effect too, so the asymmetry it measures is
 // gone and `ControlsProven` will stop discriminating. The comment beside it already names the
 // replacement it would want, the eight enabled `better-tailwindcss` rules that reach the gate
-// through a JavaScript plugin bridge verify does not have. Not changed here, because that file is
+// through a JavaScript plugin bridge cohere does not have. Not changed here, because that file is
 // the differential's own and a rule port should not quietly rewrite the harness that judges it.
 //
 // The `additionalHooks` option is decoded and honored. The three React-only options
@@ -373,7 +373,7 @@ type ExhaustiveDepsOptions struct {
 	// unparseable pattern disables the extension rather than failing the run, which is the one place
 	// this rule departs from oxc's option handling: oxc's `from_configuration` returns an error and
 	// refuses to start. Refusing to lint an entire tree because one optional regex is malformed is a
-	// worse outcome than linting it with the built-in Hook list, and verify's decoder has no channel
+	// worse outcome than linting it with the built-in Hook list, and cohere's decoder has no channel
 	// to report a config error per rule anyway. An empty string is not an extension, which both
 	// implementations already agree on: oxc filters it out explicitly.
 	AdditionalHooks string `json:"additionalHooks"`

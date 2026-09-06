@@ -172,7 +172,7 @@ func TestTemporaryFileIsCreatedBesideTheTarget(t *testing.T) {
 
 	sawTemporary := false
 	for name := range seen {
-		if strings.HasPrefix(name, ".target.ts.verify-") {
+		if strings.HasPrefix(name, ".target.ts.cohere-") {
 			sawTemporary = true
 		}
 	}

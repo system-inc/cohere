@@ -462,7 +462,7 @@ func TestParseRegexCharacterClass_RawAstral(t *testing.T) {
 }
 
 func TestParseRegexCharacterClass_Position(t *testing.T) {
-	// Verify Start/End are byte offsets within the original pattern.
+	// Cohere Start/End are byte offsets within the original pattern.
 	els, end, ok := ParseRegexCharacterClass("foo[ab]bar", 3, RegexFlags{})
 	if !ok {
 		t.Fatal("parse failed")

@@ -3,9 +3,9 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/regexsyntax"
 )
 
 // backreferenceFile is where the fixtures pretend to live.

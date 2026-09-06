@@ -8,7 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/program"
+	"github.com/system-inc/cohere/internal/program"
 )
 
 // TestShimFieldAccessorsReadTheFieldsTheyName guards every shim accessor that is reached through an

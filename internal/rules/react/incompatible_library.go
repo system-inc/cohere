@@ -2,8 +2,8 @@ package react
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/imports"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/imports"
 )
 
 var messageIncompatibleLibrary = rule.Message{
@@ -35,7 +35,7 @@ var messageIncompatibleLibrary = rule.Message{
 //
 // The distinction is against `configuration.go`, which really is the shape that measurement describes.
 // That rule's default table is *self-consistent at every entry*, so it is structurally unable to
-// report without a user-supplied provider verify has no channel for. This one is the opposite:
+// report without a user-supplied provider cohere has no channel for. This one is the opposite:
 // every one of the three default entries carries a live `knownIncompatible` message, and the
 // message is the entire firing condition. The table is not a schema waiting to be filled, it is
 // three real libraries with three real diagnostics already in it.

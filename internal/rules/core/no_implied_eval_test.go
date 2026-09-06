@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // # How upstream's corpus was translated, and why it needed translating at all
@@ -16,7 +16,7 @@ import (
 // block, 15 rely on `commonjs`, 4 on the ecma version. Replaying `setTimeout("x = 1;")` through the
 // installed eslint 10.8.1 reports once with `setTimeout` declared and not at all without it.
 //
-// verify has no globals configuration. It asks the checker whether anything in SOURCE declares the
+// cohere has no globals configuration. It asks the checker whether anything in SOURCE declares the
 // name, and treats "nothing does" as the global. So a case's configuration translates into which
 // names its PROGRAM declares, and the fixtures below run in one of two programs accordingly.
 //
@@ -375,7 +375,7 @@ func TestNoImpliedEvalDivergesFromUpstreamOnStaticValues(t *testing.T) {
 //	globalThis.setTimeout('foo')        ecma 2020   1 finding
 //	globalThis['setInterval']('foo')    ecma 2017   0 findings
 //
-// verify has no equivalent gate to reproduce. The version a file targets is a compiler option
+// cohere has no equivalent gate to reproduce. The version a file targets is a compiler option
 // rather than a property of the name, and TypeScript's own libraries declare `globalThis`
 // unconditionally, so a program built from this tree's tsconfig has it at every target. There is no
 // state in which the checker would answer that `globalThis` is not declared.

@@ -5,14 +5,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/configuration"
+	"github.com/system-inc/cohere/internal/configuration"
 )
 
 // The live config, which is the only thing that decides whether a registered rule ever runs.
-const liveConfigPath = "/Users/kirkouimet/Projects/ahra/VerifySettings.json"
+const liveConfigPath = "/Users/kirkouimet/Projects/ahra/CohereSettings.json"
 
 // A rule's fixture proves it works. The config decides whether it runs, and nothing else connects
-// the two: `rule_testing` never reads `VerifySettings.json`, so a rule can pass both directions of its own
+// the two: `rule_testing` never reads `CohereSettings.json`, so a rule can pass both directions of its own
 // pair and be inert on every real file.
 //
 // That happened. The first `@next/next` rule registered as `next-no-assign-module-variable` while
@@ -33,10 +33,10 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 	}
 	resolved := loaded.Resolve("app/Probe.tsx")
 
-	// Rules verify implements that the live config deliberately does not enable. Each needs a reason,
+	// Rules cohere implements that the live config deliberately does not enable. Each needs a reason,
 	// because an entry here silences the guard for that rule permanently.
 	deliberatelyNotEnabled := map[string]string{
-		// The differential harness's verify-only control. The gate's oxlint plugin has no such rule,
+		// The differential harness's cohere-only control. The gate's oxlint plugin has no such rule,
 		// which is the asymmetry the control depends on, so the config cannot name it.
 		"import-require-path-alias": "the directional control for the differential",
 
@@ -310,7 +310,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 
 	// An exemption is a claim about the world, and the world moves. `import-require-path-alias` is
 	// exempt because the gate's oxlint plugin has no such rule, which is what makes it the
-	// differential's verify-only control. If somebody adds it to that plugin, the exemption becomes
+	// differential's cohere-only control. If somebody adds it to that plugin, the exemption becomes
 	// wrong silently: the guard keeps passing and the rule stays unwired for a reason that no longer
 	// exists.
 	//

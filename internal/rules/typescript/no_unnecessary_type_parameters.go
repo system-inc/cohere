@@ -3,7 +3,7 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // NoUnnecessaryTypeParameters flags a type parameter that appears only once in the signature that
@@ -402,7 +402,7 @@ func skipTypeConstituentsUpward(node *ast.Node) *ast.Node {
 //
 // CRASH PROTECTION as well as a filter, and the crash is the part no findings fixture can see.
 // `Node.TypeArguments` panics with "Unhandled case" on any node kind outside its own switch
-// (typescript-go/tsc/internal/ast/ast.go:515), and the kinds reaching here are whatever the parent
+// (TypeScript/tsc/internal/ast/ast.go:515), and the kinds reaching here are whatever the parent
 // chain of a type reference happens to be. Measured: without the kind guard the very first valid
 // case, `class ClassyArray<T> { arr: T[]; }`, takes the process down, because `T` in `T[]` has an
 // ArrayType parent that carries no type argument list. The walk recovers per FILE rather than per
@@ -578,7 +578,7 @@ func (walk *typeUsageWalk) visitType(subject *checker.Type, assumeMultipleUses b
 	// Tuple types like `[K, V]` and generic type references like `Map<K, V>`.
 	//
 	// This guard is CRASH PROTECTION as well as a branch selector. `GetTypeArguments` dereferences
-	// the type's reference data (typescript-go/tsc/internal/checker/checker.go:22011) and takes the
+	// the type's reference data (TypeScript/tsc/internal/checker/checker.go:22011) and takes the
 	// process down on a type that is not a reference. Measured with a probe that called it
 	// unguarded on the mapped type reached by upstream's `<T extends string>(t: T) => t as
 	// { [K in 'a' as T]: 0 }`: immediate nil dereference. Since the walk recovers per FILE rather

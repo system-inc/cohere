@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // noExtraneousClassFile names the fixture file.
@@ -25,7 +25,7 @@ func noExtraneousClassCaseName(index int) string {
 //
 // All four of this rule's keys default to false, so a decoder that dropped every one of them would
 // still produce the right answer for an absent key and every fixture built from a struct would pass.
-// Going through the decoder is what puts the wire shape under test: verify strips ESLint's
+// Going through the decoder is what puts the wire shape under test: cohere strips ESLint's
 // [severity, options] tuple, so what arrives is the bare object rather than a one-element array.
 func decodeNoExtraneousClassOptionsForTest(t *testing.T, raw string) any {
 	t.Helper()

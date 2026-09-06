@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // messageMaxClassesPerFileId is the id, kept separate because the message itself is built per
@@ -65,7 +65,7 @@ type maxClassesPerFileObjectShape struct {
 // default is not the zero value. Three things have to be right and none of them falls out of a
 // struct tag:
 //
-// The value may be a bare INTEGER. verify's config layer strips the severity tuple, so a config
+// The value may be a bare INTEGER. cohere's config layer strips the severity tuple, so a config
 // writing `["error", 2]` hands this the JSON `2`, which no struct can unmarshal.
 //
 // An ABSENT value must mean 1 rather than 0. The generic helper errors on empty input and the config

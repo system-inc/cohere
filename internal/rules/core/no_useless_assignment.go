@@ -2,7 +2,7 @@ package core
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 var messageNoUselessAssignment = rule.Message{
@@ -90,7 +90,7 @@ var messageNoUselessAssignment = rule.Message{
 // Two declines remain, each a silent miss rather than a wrong report:
 //
 //	unreachable writes            a write that exists only in a block control cannot arrive at is
-//	                              not judged. `verify --unused` reports the statement instead, and
+//	                              not judged. `cohere --unused` reports the statement instead, and
 //	                              names the exit that stranded it, which is the actionable finding.
 //	captured bindings             a read from another code path root silences every write to that
 //	                              binding. Upstream carries the same guard as `has_captured_read`

@@ -10,7 +10,7 @@ import (
 /*
  * Why a Go linter depends on a JavaScript interpreter.
  *
- * verify replaces Prettier, and replacing Prettier means matching it byte for byte on a tree that is
+ * cohere replaces Prettier, and replacing Prettier means matching it byte for byte on a tree that is
  * already Prettier-formatted. Anything short of that produces a diff nobody asked for and buries
  * real changes in noise. The alternative was measured rather than assumed: typescript-go ships a
  * formatter, and its FormatCodeSettings has 21 fields and no printWidth, so it has no line-breaking
@@ -42,7 +42,7 @@ import (
 // `prettier` imports nothing internal, which is what makes it the safe home; `release` already
 // depends on it, so the reference points down rather than sideways. Anyone adding a third consumer
 // of the fork should find one place here rather than guess which of two to copy.
-const ForkPathVariable = "VERIFY_PRETTIER_FORK"
+const ForkPathVariable = "COHERE_PRETTIER_FORK"
 
 // BundleFiles are the Prettier bundles the engine evaluates, in dependency order.
 //

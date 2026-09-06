@@ -45,7 +45,7 @@
 // its error and `DesignSystemForProgram` hands it back on every call, so a rule that cannot get one
 // must decline and say so. Returning a zero-valued system instead would make every rule report
 // nothing on a repository whose CSS moved, which is confident green over unchecked work and the
-// exact failure verify exists to remove.
+// exact failure cohere exists to remove.
 package tailwind
 
 import (
@@ -57,8 +57,8 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
-	"github.com/system-inc/verify/internal/rule"
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	"github.com/system-inc/cohere/internal/rule"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // DesignSystemResult is one program's design system, or the reason there is none.
@@ -177,7 +177,7 @@ func loadDesignSystemForProgram(program *compiler.Program) DesignSystemResult {
 
 // projectRootOf is the directory the program's tsconfig sits in.
 //
-// `ConfigFilePath` rather than `GetCurrentDirectory`, because the working directory is where verify
+// `ConfigFilePath` rather than `GetCurrentDirectory`, because the working directory is where cohere
 // was invoked from and the project root is where its config lives, and the two differ whenever
 // anyone runs the linter from a parent directory. Falls back to the current directory when the
 // program was built without a config file, which is what the in-memory test harnesses do.

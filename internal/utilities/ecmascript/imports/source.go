@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // A specifier can arrive in three shapes, and a rule that guards a boundary has to see all three or

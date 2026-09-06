@@ -175,7 +175,7 @@ func requireInstruction(t *testing.T, function *Function, want string) {
 // break.
 //
 // The property asserted is the divergence this package chose: the finally body is lowered ONCE.
-// verify's `controlflow` lays it out twice and both copies carry the same source positions; see the
+// cohere's `controlflow` lays it out twice and both copies carry the same source positions; see the
 // Try terminal's comment for why an IR cannot do that.
 func TestLowerTryFinally(t *testing.T) {
 	function := lowerSource(t, `

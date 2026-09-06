@@ -1,6 +1,6 @@
 // Package rule_testing runs a rule against source text and reports what it found.
 //
-// Every rule in verify ships a fixture pair: source that must produce a finding, and source that
+// Every rule in cohere ships a fixture pair: source that must produce a finding, and source that
 // must produce none. Both directions, always, in the same commit as the rule.
 //
 // That is not ceremony. During the migration this tool replaces, a class-name filter that measured
@@ -21,7 +21,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // Result is what one rule saw in one file.

@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // banTslintCommentFile is a TypeScript name, but the rule does not gate on it.
@@ -47,7 +47,7 @@ func TestBanTslintCommentStaysSilentOnUpstreamPassCases(t *testing.T) {
 // Every field on every row is measured rather than transcribed. The span is upstream's reported
 // column range converted to an offset slice of the same input; the rendered text is recovered from
 // the message the installed build produced; the fixed source is upstream's own `output` field, and
-// it was separately confirmed to equal what `verifyAndFix` writes for all eight, so the corpus and
+// it was separately confirmed to equal what `cohereAndFix` writes for all eight, so the corpus and
 // the running rule agree and there is no drift to record.
 //
 // All four assertions run on each row, which is the point. A finding at the right span with the
@@ -261,7 +261,7 @@ func TestBanTslintCommentRendersTheCommentUpstreamRenders(t *testing.T) {
 // are, so it deletes source on four measured shapes. This port widens only onto whitespace. The
 // judgment is identical on every row here, and only the rewrite differs.
 //
-// `upstreamFixed` is what the installed build's `verifyAndFix` actually wrote, captured rather than
+// `upstreamFixed` is what the installed build's `cohereAndFix` actually wrote, captured rather than
 // predicted, so the row stays honest if upstream ever narrows this itself. `wantFixed` is what this
 // port writes.
 func TestBanTslintCommentFixDeclinesToDeleteCode(t *testing.T) {

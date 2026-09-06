@@ -1,4 +1,4 @@
-// Package registry is the list of every rule verify knows.
+// Package registry is the list of every rule cohere knows.
 //
 // Rules are compiled in rather than loaded, which is what makes them free to run: a rule walks the
 // same AST the parser already built, in the same address space, so the five hundredth rule costs
@@ -21,17 +21,17 @@ package registry
 import (
 	"encoding/json"
 
-	"github.com/system-inc/verify/internal/configuration"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/configuration"
+	"github.com/system-inc/cohere/internal/rule"
 
-	_ "github.com/system-inc/verify/internal/rules/base"
-	_ "github.com/system-inc/verify/internal/rules/core"
-	_ "github.com/system-inc/verify/internal/rules/next"
-	_ "github.com/system-inc/verify/internal/rules/nexus"
-	_ "github.com/system-inc/verify/internal/rules/react"
-	_ "github.com/system-inc/verify/internal/rules/structure"
-	_ "github.com/system-inc/verify/internal/rules/tailwind"
-	_ "github.com/system-inc/verify/internal/rules/typescript"
+	_ "github.com/system-inc/cohere/internal/rules/base"
+	_ "github.com/system-inc/cohere/internal/rules/core"
+	_ "github.com/system-inc/cohere/internal/rules/next"
+	_ "github.com/system-inc/cohere/internal/rules/nexus"
+	_ "github.com/system-inc/cohere/internal/rules/react"
+	_ "github.com/system-inc/cohere/internal/rules/structure"
+	_ "github.com/system-inc/cohere/internal/rules/tailwind"
+	_ "github.com/system-inc/cohere/internal/rules/typescript"
 )
 
 // All returns every rule, in a stable order.
@@ -60,7 +60,7 @@ func Count() int {
 // only reshapes what the packages already declared.
 //
 // Required is the field that matters. `boundary-no-project-import` was enabled and inert for months
-// under the gate verify replaces: it declines every file when LibraryDirectory is empty, which is
+// under the gate cohere replaces: it declines every file when LibraryDirectory is empty, which is
 // correct behavior for a misconfigured guard and indistinguishable from a rule with nothing to
 // report. A liveness harness reporting `fixtures=54 live=53 dead=1` was the only thing that ever
 // caught it. Marking it required turns that silence into a failure.

@@ -316,7 +316,7 @@ func main() {
 		if otherResult.FunctionalRoots == result.FunctionalRoots && otherResult.PairsProbed == result.PairsProbed {
 			fmt.Fprintf(os.Stderr, "generate_collapse: %s and %s produce the same registry (%d roots, %d pairs).\n",
 				*entryPoint, other.entryPoint, result.FunctionalRoots, result.PairsProbed)
-			fmt.Fprintln(os.Stderr, "  Two design systems that cannot differ cannot verify invariance; they are one observation under two names.")
+			fmt.Fprintln(os.Stderr, "  Two design systems that cannot differ cannot cohere invariance; they are one observation under two names.")
 			fmt.Fprintln(os.Stderr, "  Every repository here vendors the Structure submodule and imports its global.css, so any two of them share a @theme.")
 			fmt.Fprintln(os.Stderr, "  Use tools/tailwind/generate_descriptor_base/testdata/independent_theme.css, which shares nothing.")
 			os.Exit(1)

@@ -1,7 +1,7 @@
 package tailwind
 
 import (
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // init registers this package's rules with the catalog.

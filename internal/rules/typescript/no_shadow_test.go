@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // TestNoShadowFires runs every invalid case from upstream corpus that carries no options key.

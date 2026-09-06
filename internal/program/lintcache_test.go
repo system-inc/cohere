@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/system-inc/verify/internal/program"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/program"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 func sampleLintCache() *program.LintCache {
@@ -365,7 +365,7 @@ func TestLintCacheSurvivesDisk(t *testing.T) {
 
 // TestLintCacheWriteLeavesNoPartialArtifact pins the atomic-rename property.
 //
-// Several verify runs can share a tree, so a reader must never observe a half-written cache. The
+// Several cohere runs can share a tree, so a reader must never observe a half-written cache. The
 // temporary file is written in the destination directory and renamed, and this asserts the
 // directory holds exactly the finished artifact afterward: a leftover temporary is the tell that a
 // failure path forgot to clean up, and it accumulates silently across runs.

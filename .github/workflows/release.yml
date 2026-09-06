@@ -1,6 +1,6 @@
 # Builds every platform binary and stages the npm packages for one version.
 #
-# There is no build matrix, which is the whole point of writing verify in Go: one machine
+# There is no build matrix, which is the whole point of writing cohere in Go: one machine
 # cross-compiles all six targets in a couple of minutes, so there is no fan-out to keep in sync and
 # no chance of six jobs disagreeing about the version they stamped. The single job also means the
 # release is atomic by construction — a target that fails to build fails the job rather than leaving
@@ -104,8 +104,8 @@ jobs:
                       exit 1
                   fi
 
-                  go vet ./cmd/... ./internal/... ./tools/...
-                  go test ./cmd/... ./internal/... ./tools/...
+                  go vet ./command/... ./internal/... ./tools/...
+                  go test ./command/... ./internal/... ./tools/...
 
             - name: Import the signing certificate
               # Skipped when the secret is absent, so a fork or a contributor without credentials
@@ -140,7 +140,7 @@ jobs:
               run: |
                   # Stored as a profile rather than passed on the command line, because a command
                   # line is visible to every process on the machine and lands in the run log.
-                  xcrun notarytool store-credentials verify-notary \
+                  xcrun notarytool store-credentials cohere-notary \
                       --apple-id "$APPLE_ID" \
                       --team-id "$APPLE_TEAM_ID" \
                       --password "$APPLE_APP_PASSWORD" \
@@ -153,10 +153,10 @@ jobs:
                   # cannot appear in a workflow conditional at all.
                   notary_profile=""
                   if [ -n "$APPLE_ID" ]; then
-                      notary_profile="verify-notary"
+                      notary_profile="cohere-notary"
                   fi
 
-                  go run ./cmd/verify-release \
+                  go run ./command/cohere-release \
                       --version "${{ inputs.version }}" \
                       --output dist \
                       --signing-identity "$MACOS_SIGNING_IDENTITY" \
@@ -168,8 +168,8 @@ jobs:
               # for. A binary that builds, packages, and cannot run is the failure that reaches
               # users, and it is invisible to every check that does not execute it.
               run: |
-                  ./dist/darwin-arm64/bin/verify --version
-                  reported=$(./dist/darwin-arm64/bin/verify --version | head -1 | awk '{print $2}')
+                  ./dist/darwin-arm64/bin/cohere --version
+                  reported=$(./dist/darwin-arm64/bin/cohere --version | head -1 | awk '{print $2}')
                   if [ "$reported" != "${{ inputs.version }}" ]; then
                       echo "the binary reports $reported but this release is ${{ inputs.version }}"
                       exit 1
@@ -183,9 +183,9 @@ jobs:
                   mkdir -p /tmp/no-platform && cd /tmp/no-platform
                   echo '{"name":"no-platform","version":"1.0.0","private":true}' > package.json
                   npm install --no-audit --no-fund --omit=optional \
-                      "$GITHUB_WORKSPACE/dist/verify"
+                      "$GITHUB_WORKSPACE/dist/cohere"
 
-                  if ./node_modules/.bin/verify --version; then
+                  if ./node_modules/.bin/cohere --version; then
                       echo "the dispatcher exited zero with no platform binary installed"
                       echo "that is the green-over-nothing failure this tool exists to prevent"
                       exit 1
@@ -194,7 +194,7 @@ jobs:
 
             - uses: actions/upload-artifact@v4
               with:
-                  name: verify-${{ inputs.version }}
+                  name: cohere-${{ inputs.version }}
                   path: dist/
                   # Long enough to investigate a bad release without keeping six 15 MB binaries
                   # per run forever.
@@ -212,10 +212,10 @@ jobs:
                   echo "//registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN" > ~/.npmrc
 
                   for package in dist/*/; do
-                      if [ "$(basename "$package")" = "verify" ]; then
+                      if [ "$(basename "$package")" = "cohere" ]; then
                           continue
                       fi
                       npm publish "$package" --access public
                   done
 
-                  npm publish dist/verify --access public
+                  npm publish dist/cohere --access public

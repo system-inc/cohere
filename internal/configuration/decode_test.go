@@ -16,7 +16,7 @@ type tuningOptions struct {
 
 // TestRequiredOptionsFailLoudlyWhenAbsent is the whole point of this file.
 //
-// boundary-no-project-import was enabled and inert for months under the gate verify replaces: it
+// boundary-no-project-import was enabled and inert for months under the gate cohere replaces: it
 // declines every file when its LibraryDirectory is empty, which is correct behavior for a
 // misconfigured guard and completely indistinguishable from a rule with nothing to report. A
 // liveness harness reporting `fixtures=54 live=53 dead=1` was the only thing that ever noticed.

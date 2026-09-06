@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/decorators"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/decorators"
 )
 
 // NoUseBeforeDefineOptions configures which kinds of binding the rule judges.

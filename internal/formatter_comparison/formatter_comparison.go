@@ -1,7 +1,7 @@
 // Package formatdiff measures typescript-go's formatter against the Prettier fork that formats this
 // codebase today.
 //
-// This exists because the question it answers decides whether `verify --format` can replace
+// This exists because the question it answers decides whether `cohere --format` can replace
 // Prettier at all, and the answer cannot come from reading either implementation. Both are large,
 // both are correct about different things, and a formatter that silently reflows a tree produces a
 // diff nobody asked for that buries real changes in noise. So the deliverable is a measurement over

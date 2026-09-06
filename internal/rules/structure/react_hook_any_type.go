@@ -3,8 +3,8 @@ package structure
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/react"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/react"
 )
 
 // reactHookAnyTypeMessage is built per finding, because it names the hook and the rules that lost
@@ -278,7 +278,7 @@ func reactHookAnyTypeCalleeName(callee *ast.Node) string {
 //
 // # The one honest limitation, stated because it is invisible otherwise
 //
-// `rule.Registered()` returns what the LINKED BINARY registered. In `cmd/verify` every rule package
+// `rule.Registered()` returns what the LINKED BINARY registered. In `cmd/cohere` every rule package
 // is imported, so this sees all of them. In this package's own test binary only `structure` rules
 // are linked, so it sees zero — which would make a fixture assert a sentence the real tool never
 // prints. That is not a fallback to paper over; it is a real difference between two binaries, so the

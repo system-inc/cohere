@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // preferStatelessFunctionFile is where the fixtures pretend to live.
@@ -20,7 +20,7 @@ const preferStatelessFunctionFile = "/repository/source/Pure.tsx"
 // than building the options struct directly.
 //
 // That is what puts the decoder under test, and it is the line with no upstream counterpart. The
-// raw json is the BARE object, not upstream's [{...}] array: verify's config layer unwraps the
+// raw json is the BARE object, not upstream's [{...}] array: cohere's config layer unwraps the
 // [severity, options] tuple before dispatch, so copying ESLint's spelling fails on every row.
 func runPreferStatelessFunction(t *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	t.Helper()
@@ -91,7 +91,7 @@ func TestPreferStatelessFunctionFires(t *testing.T) {
 //	settings react 0.14.0   ->  CLEAN
 //	settings react 19.0     ->  REPORTS
 //
-// verify has no React-version setting and this tree is on React 19, so the modern verdict is the
+// cohere has no React-version setting and this tree is on React 19, so the modern verdict is the
 // only one reachable here and the 0.14 rows would assert the opposite of what the rule must do.
 // Recorded rather than deleted, because a case whose verdict is decided ABOVE the rule is a fact
 // about the configuration rather than about the rule, and the next reader meeting three

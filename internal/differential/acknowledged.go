@@ -3,9 +3,9 @@
 // The harness exists to catch a port that drifted from the gate, so every difference it finds is a
 // defect in one of the two until someone says otherwise. But the gate is software, and software has
 // bugs: when a rule is ported to its stated semantics and the gate cannot see a case it claims to
-// enforce, the two disagree and verify is the one that is right.
+// enforce, the two disagree and cohere is the one that is right.
 //
-// "Verify and the gate agree" is the acceptance test for a faithful port, not the definition of a
+// "Cohere and the gate agree" is the acceptance test for a faithful port, not the definition of a
 // correct rule. Those are the same thing right up until the gate has a bug, and then they are
 // opposites. Without somewhere to record that, the only ways forward are to reproduce the bug so the
 // numbers match, or to let the harness sit red and lose the signal it exists to give.
@@ -37,7 +37,7 @@ func (acknowledged AcknowledgedDifference) Key() string {
 	return fmt.Sprintf("%s:%d:%s:%s", acknowledged.File, acknowledged.Line, acknowledged.Rule, acknowledged.Side)
 }
 
-// KnownGateDefects are the differences where verify is right and the gate cannot see the case.
+// KnownGateDefects are the differences where cohere is right and the gate cannot see the case.
 //
 // Each one names a defect in the tool being replaced, so each is a reason the migration is worth
 // doing rather than a cost of it. They are listed here, in source, rather than passed in at the
@@ -48,7 +48,7 @@ var KnownGateDefects = []AcknowledgedDifference{
 		File: "libraries/structure/source/services/network/NetworkService.ts",
 		Line: 228,
 		Rule: "storage-no-direct-local-storage",
-		Side: SideVerify,
+		Side: SideCohere,
 		Reason: "the gate's rule matches window.localStorage only as the object of an outer member " +
 			"expression, so it sees window.localStorage.getItem(...) and never window.localStorage " +
 			"passed as a value; this line is the latter and is a real violation of the rule's " +

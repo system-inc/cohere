@@ -3,12 +3,12 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 const constAssignmentFile = "/repository/source/components/Thing.tsx"
 
-// The tree contains zero instances of this construct, so it cannot verify this rule at all: a clean
+// The tree contains zero instances of this construct, so it cannot cohere this rule at all: a clean
 // run proves only that the rule does not fire on code containing none of the shape. These fixtures
 // are the entire specification, which raises rather than lowers the bar on where the clean cases sit.
 func TestReactComponentNoConstAssignmentFires(t *testing.T) {

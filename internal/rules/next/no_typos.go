@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
-	"github.com/system-inc/verify/internal/utilities/nextjs"
-	"github.com/system-inc/verify/internal/utilities/text"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/module"
+	"github.com/system-inc/cohere/internal/utilities/nextjs"
+	"github.com/system-inc/cohere/internal/utilities/text"
 )
 
 // dataFetchingFunctions are the three names Next.js calls by name in the Pages Router.

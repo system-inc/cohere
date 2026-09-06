@@ -7,7 +7,7 @@
 // The gap matters more than it looks. Every parse failure in this layer is silent by construction:
 // a regex that stops matching yields zero findings, and zero findings on one side makes every
 // finding on the other look one-sided while the diff stays perfectly well-formed. A path
-// normalization bug does the same thing — verify prints absolute paths, the gate prints relative
+// normalization bug does the same thing — cohere prints absolute paths, the gate prints relative
 // ones, and if they fail to reconcile then two identical findings never match and the harness
 // reports total disagreement in a shape that looks like a working result.
 //
@@ -20,7 +20,7 @@ import "testing"
 
 const ahraTreeRoot = "/Users/kirkouimet/Projects/ahra"
 
-// TestParsesRealVerifyOutput uses verify's own stdout, coverage lines and all, so the summary
+// TestParsesRealVerifyOutput uses cohere's own stdout, coverage lines and all, so the summary
 // lines have to be recognized as summaries rather than counted as unparsed findings.
 func TestParsesRealVerifyOutput(test *testing.T) {
 	output := `graph built in 1.752s — 9973 files in the program, 3407 of them ours
@@ -30,9 +30,9 @@ lint: 1 findings — 22 rules over 3407 files, 2098253 nodes visited, in 1.036s
   suppressed: 279 findings silenced by a disable comment, 264 of them without a stated reason
   config: rule consistency-require-type-suffix scoped off for 6 files by the config`
 
-	result, err := ParseVerify(output, ahraTreeRoot)
+	result, err := ParseCohere(output, ahraTreeRoot)
 	if err != nil {
-		test.Fatalf("parsing real verify output: %v", err)
+		test.Fatalf("parsing real cohere output: %v", err)
 	}
 	if len(result.Findings) != 1 {
 		test.Fatalf("want 1 finding from real output, got %d (unparsed: %v)", len(result.Findings), result.UnparsedLines)
@@ -85,12 +85,12 @@ libraries/structure/source/components/files/FileCarousel.tsx:36:8: error structu
 // and one finding becomes two one-sided differences — which is exactly what a total mismatch looks
 // like, and it looks like working output.
 func TestTheTwoGatesAgreeOnOneFindingAfterParsing(test *testing.T) {
-	verifyResult, err := ParseVerify(
+	cohereResult, err := ParseCohere(
 		`/Users/kirkouimet/Projects/ahra/app/Component.tsx:198:1 - File contains a component with 96 lines. [react-component-no-multiple-primary/tooMany]`,
 		ahraTreeRoot,
 	)
 	if err != nil {
-		test.Fatalf("parsing verify side: %v", err)
+		test.Fatalf("parsing cohere side: %v", err)
 	}
 	gateResult, err := ParseGate(
 		`app/Component.tsx:198:1: error structure(react-component-no-multiple-primary): File contains a component with 96 lines.`,
@@ -100,21 +100,21 @@ func TestTheTwoGatesAgreeOnOneFindingAfterParsing(test *testing.T) {
 		test.Fatalf("parsing gate side: %v", err)
 	}
 
-	if len(verifyResult.Findings) != 1 || len(gateResult.Findings) != 1 {
-		test.Fatalf("setup did not parse: verify %d, gate %d", len(verifyResult.Findings), len(gateResult.Findings))
+	if len(cohereResult.Findings) != 1 || len(gateResult.Findings) != 1 {
+		test.Fatalf("setup did not parse: cohere %d, gate %d", len(cohereResult.Findings), len(gateResult.Findings))
 	}
 
-	if verifyResult.Findings[0].Key() != gateResult.Findings[0].Key() {
-		test.Fatalf("the same defect keyed differently across the two formats:\n  verify %q\n  gate   %q\nnormalization is wrong, and this presents as total disagreement rather than as an error",
-			verifyResult.Findings[0].Key(), gateResult.Findings[0].Key())
+	if cohereResult.Findings[0].Key() != gateResult.Findings[0].Key() {
+		test.Fatalf("the same defect keyed differently across the two formats:\n  cohere %q\n  gate   %q\nnormalization is wrong, and this presents as total disagreement rather than as an error",
+			cohereResult.Findings[0].Key(), gateResult.Findings[0].Key())
 	}
 
 	report := Compare(Inputs{
-		VerifyFindings:   verifyResult.Findings,
+		CohereFindings:   cohereResult.Findings,
 		GateFindings:     gateResult.Findings,
-		VerifyPopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 22},
+		CoherePopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 22},
 		GatePopulation:   Population{Findings: 1, FilesWalked: 3407, Rules: 181},
-		VerifyRules:      map[string]bool{"react-component-no-multiple-primary": true},
+		CohereRules:      map[string]bool{"react-component-no-multiple-primary": true},
 		ConfiguredRules:  map[string]bool{"react-component-no-multiple-primary": true},
 	})
 	if len(report.Differences) != 0 {
@@ -125,7 +125,7 @@ func TestTheTwoGatesAgreeOnOneFindingAfterParsing(test *testing.T) {
 // TestUnparsedLinesAreSurfacedNotDropped is this layer's own vacuity guard. A format change that
 // silently stops matching must not present as a clean run.
 func TestUnparsedLinesAreSurfacedNotDropped(test *testing.T) {
-	result, err := ParseVerify("this line is neither a finding nor a summary", "")
+	result, err := ParseCohere("this line is neither a finding nor a summary", "")
 	if err != nil {
 		test.Fatalf("unexpected error: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestUnparsedLinesAreSurfacedNotDropped(test *testing.T) {
 
 // TestPluginSlashRuleNamesSurviveNormalization pins a real hazard in the shared normalizer.
 //
-// NormalizeRuleName strips everything after the first slash, to turn verify's
+// NormalizeRuleName strips everything after the first slash, to turn cohere's
 // `rule-name/messageId` into `rule-name`. Oxlint's own catalog writes rules as `plugin/rule-name`
 // — `typescript/no-explicit-any` — where the part after the slash is the rule and the part before
 // it is the plugin. The two conventions collide, and the collision is silent: the name still
@@ -147,7 +147,7 @@ func TestUnparsedLinesAreSurfacedNotDropped(test *testing.T) {
 //
 // This test used to document the boundary rather than assert the collision was handled, and it
 // named the exact moment it would bite: "if a future reader wires rule catalogs from the config
-// into Inputs.ConfiguredRules." That happened at 01:48 when verify-differential was first pointed
+// into Inputs.ConfiguredRules." That happened at 01:48 when cohere-differential was first pointed
 // at the real tree. Every config key collapsed to its plugin, the configured-rule set became three
 // junk names, and every rule read as unconfigured, so the per-rule table labelled an enabled rule
 // not-configured. It surfaced as one wrong word and would have excused every real disagreement.
@@ -156,7 +156,7 @@ func TestUnparsedLinesAreSurfacedNotDropped(test *testing.T) {
 // a new plugin needs no edit: rule names are hyphenated and message ids are camelCase, so the
 // segment containing a hyphen is the rule name. The assertions below now pin the fixed behavior.
 func TestPluginSlashRuleNamesSurviveNormalization(test *testing.T) {
-	// The forms that actually appear in gate and verify output today, which must keep working.
+	// The forms that actually appear in gate and cohere output today, which must keep working.
 	fromOutput := map[string]string{
 		"structure(react-component-no-multiple-primary)": "react-component-no-multiple-primary",
 		"nexus(consistency-require-constant-casing)":     "consistency-require-constant-casing",

@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // rangesFor lowers one source, constructs single-assignment form, and returns the outermost

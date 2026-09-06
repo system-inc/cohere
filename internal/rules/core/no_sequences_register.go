@@ -1,6 +1,6 @@
 package core
 
-import "github.com/system-inc/verify/internal/rule"
+import "github.com/system-inc/cohere/internal/rule"
 
 // The decoder is hand-rolled rather than `rule.DecodeOptionsInto`, and that is the whole reason this
 // registration is worth reading. The generic helper errors on empty input, the config layer turns

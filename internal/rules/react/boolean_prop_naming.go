@@ -6,7 +6,7 @@ import (
 	"regexp"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // BooleanPropNamingOptions configures the rule.

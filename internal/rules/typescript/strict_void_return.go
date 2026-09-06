@@ -5,8 +5,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // StrictVoidReturnOptions is the rule's one option.
@@ -29,7 +29,7 @@ type strictVoidReturnRawOptions struct {
 
 // DecodeStrictVoidReturnOptions reads the rule's configuration.
 //
-// verify's config layer strips ESLint's `[severity, options]` tuple, so the bare object arrives.
+// cohere's config layer strips ESLint's `[severity, options]` tuple, so the bare object arrives.
 func DecodeStrictVoidReturnOptions(raw []byte) (any, error) {
 	decoded, err := rule.DecodeOptionsInto[strictVoidReturnRawOptions]()(raw)
 	if err != nil {

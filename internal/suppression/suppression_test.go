@@ -178,7 +178,7 @@ func TestReasonIsParsedAndItsAbsenceIsVisible(t *testing.T) {
 
 // TestSuppressionStillAppliesWithoutAReason is the decision this package makes deliberately. The
 // missing reason is reported as its own finding elsewhere; it does not resurrect the suppressed one.
-// Measured against the codebase verify gates: 281 of the 306 suppressions naming one of our own
+// Measured against the codebase cohere gates: 281 of the 306 suppressions naming one of our own
 // rules state no reason, and refusing to honor them would turn one missing convention into hundreds
 // of unrelated failures.
 func TestSuppressionStillAppliesWithoutAReason(t *testing.T) {
@@ -353,7 +353,7 @@ func TestUnterminatedBlockCommentDoesNotHang(t *testing.T) {
 }
 
 func TestOxlintAndVerifySpellingsAreAccepted(t *testing.T) {
-	for _, tool := range []string{"eslint", "oxlint", "verify"} {
+	for _, tool := range []string{"eslint", "oxlint", "cohere"} {
 		source := "// " + tool + "-disable-next-line nexus/consistency-no-enum -- accepted.\nenum Thing {}"
 		if !Build(source).Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 1)) {
 			t.Fatalf("%s-disable-next-line was not honored", tool)
@@ -432,7 +432,7 @@ func TestEveryHonoredSpellingSuppresses(t *testing.T) {
 // one and forgotten in the other. That would leave a block that opens and never closes, which reads
 // as a working suppression while silencing the rest of the file.
 func TestEveryHonoredSpellingClosesItsBlock(t *testing.T) {
-	for _, directive := range []string{"cohere", "verify", "eslint", "oxlint"} {
+	for _, directive := range []string{"cohere", "cohere", "eslint", "oxlint"} {
 		t.Run(directive, func(t *testing.T) {
 			source := strings.Join([]string{
 				"/* " + directive + "-disable nexus/consistency-no-enum */",

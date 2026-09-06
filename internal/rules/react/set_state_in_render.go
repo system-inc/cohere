@@ -3,8 +3,8 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/high_level_intermediate_representation"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/high_level_intermediate_representation"
 )
 
 var setStateInRenderMessage = rule.Message{

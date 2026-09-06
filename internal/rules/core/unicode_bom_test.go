@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // unicodeBomFile is where the fixtures pretend to live.
@@ -42,7 +42,7 @@ func decodedUnicodeBomOptions(t *testing.T, raw string) any {
 // eslint at 10.8.1 before being written here.
 //
 // The option spelling is the BARE string upstream writes second in its `["error", "always"]` tuple.
-// verify's config layer strips the tuple, so what a decoder receives is `"always"` rather than
+// cohere's config layer strips the tuple, so what a decoder receives is `"always"` rather than
 // `["always"]`, and a fixture copying ESLint's array spelling would fail on every row.
 func TestUnicodeBomFires(t *testing.T) {
 	cases := []struct {
@@ -193,7 +193,7 @@ func TestDecodeUnicodeBomOptions(t *testing.T) {
 	})
 
 	t.Run("the wrong wire shape is an error", func(t *testing.T) {
-		// Upstream's own spelling is `["always"]`. verify strips the tuple, so an array arriving
+		// Upstream's own spelling is `["always"]`. cohere strips the tuple, so an array arriving
 		// here means the config layer's contract changed, and that should fail loudly rather than
 		// quietly enforcing the default.
 		if _, err := DecodeUnicodeBomOptions(json.RawMessage(`["always"]`)); err == nil {
@@ -212,8 +212,8 @@ func TestDecodeUnicodeBomOptions(t *testing.T) {
 // TestUnicodeBomRemovesOneMarkPerPass pins the doubled-mark behaviour.
 //
 // A file beginning with the mark twice reports ONCE and this rule's single fix removes one of them.
-// Measured against the installed build: `linter.verify` returns exactly one message carrying one
-// fix, and `verifyAndFix` strips the second only on a later pass of its own re-lint loop. A port
+// Measured against the installed build: `linter.cohere` returns exactly one message carrying one
+// fix, and `cohereAndFix` strips the second only on a later pass of its own re-lint loop. A port
 // removing both in one edit would be doing something upstream's rule never does, and no message-id
 // fixture could see the difference.
 func TestUnicodeBomRemovesOneMarkPerPass(t *testing.T) {
@@ -245,7 +245,7 @@ func TestUnicodeBomOnAnEmptyFile(t *testing.T) {
 }
 
 // TestUnicodeBomCannotSeeAMarkThroughTheRealReadPath is the test that says why this rule is
-// registered and not enabled, and it is the only test in this file that is about verify rather than
+// registered and not enabled, and it is the only test in this file that is about cohere rather than
 // about the rule.
 //
 // Every other fixture here parses a Go string, which is not the path a real run takes. A real run

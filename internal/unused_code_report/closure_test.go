@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/program"
+	"github.com/system-inc/cohere/internal/program"
 )
 
 // fixturePath resolves a fixture under testdata to an absolute path.

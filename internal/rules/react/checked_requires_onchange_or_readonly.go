@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/jsx"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/jsx"
 )
 
 var (
@@ -139,7 +139,7 @@ var checkedRequiresTargetProperties = map[string]bool{
 // it inline here. This is that rule.
 //
 // The pragma is fixed at `React` here. Upstream reads it from a `@jsx` comment or from
-// `settings.react.pragma`, and verify has no settings surface, so the second is unreachable by any
+// `settings.react.pragma`, and cohere has no settings surface, so the second is unreachable by any
 // route. The first is reachable and is NOT implemented; see `pragmaFromJsxComment` below for the
 // measurement and the reasoning.
 var CheckedRequiresOnChangeOrReadOnly = rule.Rule{

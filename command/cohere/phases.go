@@ -1,0 +1,301 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"strings"
+	"time"
+)
+
+// phaseName is one step of the pipeline, in the order it runs.
+type phaseName string
+
+const (
+	phaseFix    phaseName = "fix"
+	phaseTypes  phaseName = "types"
+	phaseLint   phaseName = "lint"
+	phaseUnused phaseName = "unused"
+)
+
+// phaseOrder is the pipeline, and the order is the design rather than a convenience.
+//
+//  1. an edit happens
+//  2. fix and format   mutates; bails only if the result cannot be parsed
+//  3. type check       bails here, alone and loudly
+//  4. lint             only reachable once the code means something
+//
+// Mutation runs first so everything downstream sees the repaired tree: reporting a finding a fixer
+// would have silently repaired wastes the reader's attention. Types gate lint because findings
+// against wrong semantics are noise a reader has to re-read after fixing the real problem — one type
+// error alone at the top beats one type error buried under a hundred style findings in a file that
+// does not compile.
+//  5. unused           a report, opt-in, and never part of the gate
+//
+// Unused runs last and only when asked for. It is the one phase a bare `cohere` does not run, and
+// that break from the other three is deliberate: the first three answer "is this correct", which
+// nobody should have to opt into, while unused answers "is this still wanted", which is a question
+// with no right answer that a build can enforce. An export held for an external consumer is unused
+// and correct. So it reports, it never fails a build on its own account, and it stays out of the
+// way of the gate people run a hundred times a day.
+//
+// It runs after types for a hard reason rather than a tidy one. The reference analysis is keyed on
+// symbol identity, and a tree that does not type-check has unresolved symbols, which read as
+// "nothing references this". Reporting live code as unused because the build was broken is the
+// failure mode that gets a report closed and never reopened, so the phase states loudly when it ran
+// without a clean type check rather than quietly producing a longer list.
+var phaseOrder = []phaseName{phaseFix, phaseTypes, phaseLint, phaseUnused}
+
+// optInPhases are the phases a bare `cohere` does not run.
+//
+// Kept as a set rather than a comparison against phaseUnused so that a second opt-in phase does not
+// have to rediscover every place the distinction matters. Three places consult it today, and a
+// fourth phase added without noticing all three would be reported wrongly in one of them.
+var optInPhases = map[phaseName]bool{phaseUnused: true}
+
+// phaseOutcome is what happened to one phase.
+type phaseOutcome string
+
+const (
+	// outcomeRan is the only outcome that means the phase's findings can be trusted as complete.
+	outcomeRan phaseOutcome = "ran"
+
+	// outcomeSkipped is a phase the caller turned off — a flag, or `--no-fix`.
+	outcomeSkipped phaseOutcome = "skipped"
+
+	// outcomeNotReached is a phase that would have run and never got the chance, because an earlier
+	// phase bailed.
+	//
+	// Distinct from skipped, and the distinction is the whole point of this file. A phase nobody
+	// asked for and a phase that was cut off by a failure upstream both produce no findings, and a
+	// reader who cannot tell them apart reads "no lint findings" off a run where lint never
+	// executed.
+	outcomeNotReached phaseOutcome = "not reached"
+
+	// outcomeReused is a phase whose work another phase already did, and whose findings are therefore
+	// complete without this phase having walked.
+	//
+	// Distinct from ran for the same reason notReached is distinct from skipped. The lint phase can
+	// reuse the fix phase's walk when nothing was rewritten, and reporting that as `ran in 0s` states
+	// two false things at once: that the walk happened here, and that it was free. The walk happened,
+	// it cost about a second, and it was billed to the phase that performed it.
+	//
+	// This is the same accounting defect the phase table already had one level down, where every row
+	// was conditional on what ran before it. A reused phase reporting a zero would have reintroduced
+	// it in a new place: a number that is arithmetically consistent and describes nothing.
+	outcomeReused phaseOutcome = "reused"
+)
+
+// phaseRecord is one phase's outcome, and what it cost.
+type phaseRecord struct {
+	Name     phaseName
+	Outcome  phaseOutcome
+	Elapsed  time.Duration
+	Detail   string
+	Findings int
+}
+
+// pipelineReport is what the whole run did, phase by phase.
+//
+// This exists because the failure this tool was built to eliminate is a confident verdict over work
+// that was never done. A run that bailed at types and a run that linted cleanly both print no lint
+// findings, and only a statement of which phases actually executed separates them. So the phase line
+// prints on every run, including the successful ones, and a bail is never silent.
+type pipelineReport struct {
+	records []phaseRecord
+	// graph is how long the type graph took to build, which is a phase in every sense that matters
+	// to a reader deciding where the time went, and is not one of the records because nothing can
+	// skip it.
+	graph time.Duration
+	// processStart is when the process began, as close to it as a Go program can observe.
+	//
+	// Recorded so the phase line can state its own completeness. Summing the phases and calling it
+	// the run time is the same error as summing the rules and calling it coverage: it reports what
+	// was measured as though it were everything that happened. On this tree the phases account for
+	// about two thirds of the wall clock, and the missing third was invisible until this field
+	// existed.
+	processStart time.Time
+}
+
+// record notes what a phase did. Called once per phase, in order.
+func (r *pipelineReport) record(name phaseName, outcome phaseOutcome, elapsed time.Duration, detail string) {
+	r.records = append(r.records, phaseRecord{
+		Name:    name,
+		Outcome: outcome,
+		Elapsed: elapsed,
+		Detail:  detail,
+	})
+}
+
+// requested records which phases the caller actually asked for.
+//
+// Only consulted for the opt-in phases. A phase that runs by default is always "requested" in the
+// sense that matters here: nobody had to ask, so being cut off by a bail is always a gap.
+type requestedPhases map[phaseName]bool
+
+// markRemainingNotReached fills in every phase after the one that bailed.
+//
+// Called at the bail rather than left implicit, because a phase that is simply absent from the
+// report is indistinguishable from one the reporter forgot. Every phase in the pipeline appears in
+// every run's output, with a stated outcome.
+//
+// An opt-in phase nobody asked for is recorded as skipped rather than as not reached, and the
+// distinction is the same one this whole file exists to preserve. "Did not run because types
+// bailed" tells the reader something was taken from them; "not requested" tells them nothing was.
+// Printing the first when the second is true manufactures a gap out of an ordinary run, which is
+// the mirror image of the silent-green failure and just as misleading.
+func (r *pipelineReport) markRemainingNotReached(bailedAt phaseName, reason string) {
+	r.markRemainingNotReachedFor(bailedAt, reason, nil)
+}
+
+// markRemainingNotReachedFor is markRemainingNotReached told which opt-in phases were asked for.
+func (r *pipelineReport) markRemainingNotReachedFor(bailedAt phaseName, reason string, requested requestedPhases) {
+	reached := false
+	for _, name := range phaseOrder {
+		if name == bailedAt {
+			reached = true
+			continue
+		}
+		if !reached {
+			continue
+		}
+		if r.has(name) {
+			continue
+		}
+		// An opt-in phase nobody named was not deprived of anything by the bail.
+		if optInPhases[name] && !requested[name] {
+			r.record(name, outcomeSkipped, 0, "not requested — this is a report, ask for it with --unused")
+			continue
+		}
+		r.record(name, outcomeNotReached, 0, fmt.Sprintf("%s bailed: %s", bailedAt, reason))
+	}
+}
+
+func (r *pipelineReport) has(name phaseName) bool {
+	for _, record := range r.records {
+		if record.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// checkedEverything reports whether every phase that reports findings actually ran.
+//
+// The warning this drives is about coverage of the *checks*, so it asks whether anything that could
+// have found a problem was prevented from looking. That is a narrower question than "did all three
+// phases run", and the difference is `--no-fix`: it deliberately mutates nothing, and a run that
+// checked types and lint completely is not a partial check merely because it declined to write. A
+// warning that fired there would appear on every continuous-integration run, and a warning that
+// fires when nothing is wrong is one people learn to stop reading — which would cost exactly the
+// case it exists for.
+//
+// A phase that was cut off is always a gap, including the fix phase, because a bail means the run
+// stopped early rather than chose not to act.
+func (r *pipelineReport) checkedEverything() bool {
+	for _, record := range r.records {
+		if record.Outcome == outcomeNotReached {
+			return false
+		}
+		// A reporting phase that never ran is a hole in the verdict. Fix is exempt when it was
+		// skipped on purpose: declining to mutate withholds no finding.
+		//
+		// Unused is exempt for a different reason, and it is worth stating rather than folding into
+		// the same clause. Fix is exempt because skipping it withholds no finding; unused withholds
+		// findings by definition when it is skipped. It is exempt because being absent is its NORMAL
+		// state — it is opt-in, so a bare `cohere` skips it every time, and a coverage warning that
+		// fires on every ordinary run is one people learn to stop reading. That would cost exactly
+		// the case the warning exists for.
+		//
+		// What keeps this honest is that the phase line still prints `unused skipped (not
+		// requested)` on every run, so the absence is stated even though it is not warned about. The
+		// warning is for a gap somebody did not choose; this one is chosen by default.
+		if record.Outcome == outcomeSkipped && record.Name != phaseFix && !optInPhases[record.Name] {
+			return false
+		}
+	}
+	return true
+}
+
+// Write prints the phase line: which phases ran, which did not, and why.
+//
+// It prints on every run rather than only on failures. The whole argument of this project is that a
+// run which checked nothing must not be able to print like a run that checked everything and found
+// it clean, and a phase summary that only appears when something went wrong reintroduces exactly
+// that ambiguity for the successful case.
+func (r *pipelineReport) Write(out io.Writer) {
+	parts := make([]string, 0, len(r.records))
+	for _, name := range phaseOrder {
+		for _, record := range r.records {
+			if record.Name != name {
+				continue
+			}
+			switch record.Outcome {
+			case outcomeRan:
+				parts = append(parts, fmt.Sprintf("%s ran in %s", record.Name, round(record.Elapsed)))
+			case outcomeSkipped:
+				parts = append(parts, fmt.Sprintf("%s skipped (%s)", record.Name, record.Detail))
+			case outcomeNotReached:
+				parts = append(parts, fmt.Sprintf("%s did not run (%s)", record.Name, record.Detail))
+			case outcomeReused:
+				// Says whose work it was, because "reused" without a source is an unfalsifiable claim:
+				// a reader cannot check a number that names no owner.
+				parts = append(parts, fmt.Sprintf("%s reused %s", record.Name, record.Detail))
+			}
+		}
+	}
+
+	fmt.Fprintf(out, "phases: %s\n", strings.Join(parts, " · "))
+
+	r.writeAccounting(out)
+
+	// The explicit sentence for the case that matters most. A reader who takes only the last line
+	// away from a bailed run must not take away a clean bill of health.
+	//
+	// It fires on a genuine gap in what was checked, not on every partial run. `--no-fix` withholds
+	// no finding, and `--lint` alone is a deliberate narrowing whose own phase line already says so;
+	// warning on those would put the sentence on ordinary runs until people stopped reading it,
+	// which would cost exactly the case it exists for.
+	if !r.checkedEverything() {
+		fmt.Fprintf(out, "  this run did not check everything — the phases above say what was not checked\n")
+	}
+}
+
+// writeAccounting states how much of the run the phases above actually explain.
+//
+// A timing line that reports only its own phases invites the reader to add them up and treat the
+// total as the run, which is wrong here by roughly a third. The gap is real work — process start,
+// configuration, walking the file scope, printing findings, exit — and none of it is attributable
+// to a phase, so leaving it unnamed makes it unownable. Naming it is the same discipline as the
+// coverage line: report what was not measured, rather than let a partial account read as a full one.
+//
+// It prints nothing when the process start was never recorded, because a computed total that is
+// silently measuring from the zero time would be worse than no line at all.
+func (r *pipelineReport) writeAccounting(out io.Writer) {
+	if r.processStart.IsZero() {
+		return
+	}
+
+	total := time.Since(r.processStart)
+	accounted := r.graph
+	for _, record := range r.records {
+		// Only phases that actually spent the time are summed. A reused phase records a zero elapsed
+		// because its work is already counted under the phase that performed it, and adding anything
+		// for it here would double-count a single walk across two rows.
+		if record.Outcome == outcomeRan {
+			accounted += record.Elapsed
+		}
+	}
+
+	unaccounted := total - accounted
+	if unaccounted < 0 {
+		// The phases run concurrently with each other in places, so a sum can exceed the wall
+		// clock. Reporting a negative remainder would be nonsense; reporting the overlap honestly
+		// is the useful reading.
+		fmt.Fprintf(out, "  total %s — graph %s plus phases, overlapping by %s\n",
+			round(total), round(r.graph), round(-unaccounted))
+		return
+	}
+
+	fmt.Fprintf(out, "  total %s — graph %s, phases %s, %s outside any phase\n",
+		round(total), round(r.graph), round(accounted-r.graph), round(unaccounted))
+}

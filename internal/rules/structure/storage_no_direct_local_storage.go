@@ -2,7 +2,7 @@ package structure
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 const localStorageReasoning = "LocalStorageService is what makes storage survive the places raw " +
@@ -48,8 +48,8 @@ var messageWindowLocalStorage = rule.Message{
 // the gate cannot see it.
 //
 // So this rule reports it and the gate does not, and the differential will classify it
-// `only-verify`. That is correct rather than a regression: reproducing the gap would mean shipping
-// a bug to keep a number matching. Ruled by `@system_verify` after the discrepancy was measured.
+// `only-cohere`. That is correct rather than a regression: reproducing the gap would mean shipping
+// a bug to keep a number matching. Ruled by `@system_cohere` after the discrepancy was measured.
 //
 // The six other direct uses in `services/network/internal/` all carry per-line disable comments, so
 // the rule fires on them and the suppression layer withholds the findings, exactly as under the

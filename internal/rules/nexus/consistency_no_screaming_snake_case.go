@@ -5,8 +5,8 @@ import (
 	"unicode"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/module"
 )
 
 // ConsistencyNoScreamingSnakeCaseOptions names constants that may keep the shouting form because

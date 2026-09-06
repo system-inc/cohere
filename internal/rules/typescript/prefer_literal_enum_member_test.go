@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // preferLiteralEnumMemberFile names the fixture file. The rule reads no path and gates on no
@@ -20,7 +20,7 @@ func preferLiteralEnumMemberCaseName(index int) string {
 // decodePreferLiteralEnumMemberOptionsForTest routes a fixture through the rule's own decoder.
 //
 // Building the options struct directly would leave the decoder untested, and the decoder is where
-// the wire shape lives: verify strips ESLint's [severity, options] tuple, so what arrives here is
+// the wire shape lives: cohere strips ESLint's [severity, options] tuple, so what arrives here is
 // the bare object rather than upstream's one-element array.
 func decodePreferLiteralEnumMemberOptionsForTest(t *testing.T, raw string) any {
 	t.Helper()

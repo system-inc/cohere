@@ -14,7 +14,7 @@ import (
 //
 //   - An unsigned binary with no quarantine attribute runs normally. This is what an `npm install`
 //     produces today: package managers extract tarballs without setting `com.apple.quarantine`, so
-//     a consumer installing verify from the registry is not blocked.
+//     a consumer installing cohere from the registry is not blocked.
 //   - The same binary with the quarantine attribute set is killed by the kernel: exit 137, SIGKILL,
 //     and zero bytes on both stdout and stderr. Measured directly on a staged darwin/arm64 build.
 //
@@ -22,7 +22,7 @@ import (
 // rather than as a package — a release asset downloaded from a browser or curl, a tarball someone
 // forwards, a binary copied out of CI — and it fails in the worst available way: silently, with no
 // output to explain it. A developer seeing an empty result would reasonably read it as a clean run,
-// which is precisely the confusion verify exists to eliminate.
+// which is precisely the confusion cohere exists to eliminate.
 //
 // So signing is not optional-but-nice. It converts a silent kill into a normal execution, and the
 // launcher's signal handling converts anything left over into a loud non-zero rather than a green
@@ -40,7 +40,7 @@ type Signing struct {
 	//	Apple Development   Authority=Apple Development ...   spctl: rejected
 	//
 	// So signing with the wrong certificate type changes the signature and not the verdict. It is
-	// worth stating because the intermediate state looks like progress: `codesign --verify` passes,
+	// worth stating because the intermediate state looks like progress: `codesign --cohere` passes,
 	// the binary carries a real Apple chain and a TeamIdentifier, and Gatekeeper still refuses it.
 	// A release that signed with what was available and stopped there would read as done.
 	Identity string
@@ -104,16 +104,16 @@ func Sign(binaryPath string, signing Signing) error {
 // signature that did not take produces a binary that ships, installs, and is killed on the first
 // machine that receives it through a quarantining path.
 func VerifySignature(binaryPath string) error {
-	command := exec.Command("codesign", "--verify", "--strict", "--verbose=2", binaryPath)
+	command := exec.Command("codesign", "--cohere", "--strict", "--verbose=2", binaryPath)
 
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("the signature on %s did not verify: %w\n%s", binaryPath, err, output)
+		return fmt.Errorf("the signature on %s did not cohere: %w\n%s", binaryPath, err, output)
 	}
 
 	// An ad-hoc signature verifies successfully and is worth nothing to Gatekeeper. Go's linker
 	// applies one to every arm64 binary, so a signing step that silently did nothing leaves a
-	// binary that passes `codesign --verify` and is still killed on a quarantined launch. Checking
+	// binary that passes `codesign --cohere` and is still killed on a quarantined launch. Checking
 	// for it is what separates "verified" from "verified as actually signed by us".
 	details, err := exec.Command("codesign", "--display", "--verbose=2", binaryPath).CombinedOutput()
 	if err != nil {
@@ -138,7 +138,7 @@ func VerifySignature(binaryPath string) error {
 // Stapling is deliberately not attempted. A ticket can only be stapled to a bundle, a disk image,
 // or an installer package, never to a bare executable, so a Mach-O binary is validated by an online
 // check against Apple's service on first launch instead. This is a real limitation rather than an
-// oversight: a machine that is entirely offline the first time it runs a quarantined verify will be
+// oversight: a machine that is entirely offline the first time it runs a quarantined cohere will be
 // blocked. The npm install path does not set quarantine at all, so this does not affect it.
 func Notarize(zipPath string, signing Signing) error {
 	if !signing.CanNotarize() {

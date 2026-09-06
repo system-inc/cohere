@@ -1,6 +1,6 @@
 package react
 
-import "github.com/system-inc/verify/internal/rule"
+import "github.com/system-inc/cohere/internal/rule"
 
 // Registered with a hand-written decoder rather than `rule.DecodeOptionsInto`.
 //

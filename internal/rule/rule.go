@@ -1,6 +1,6 @@
 // Package rule defines what a rule is and how it speaks.
 //
-// Every rule in verify walks the same AST that the type checker already built, in the same process
+// Every rule in cohere walks the same AST that the type checker already built, in the same process
 // and the same address space. That is the whole architecture in one sentence, and it is why rule
 // number five hundred costs what rule number one hundred costs. Measured on a 3,416-file codebase,
 // 107 rules living inside the linter parse 24.7 MB and run in 0.19s; 53 rules of identical shape
@@ -88,7 +88,7 @@ type Context struct {
 	// One walk serves every rule, which is the whole architecture, but that only covers work the
 	// walk itself does. A rule that derives something from the file outside the walk pays for it
 	// alone, and three rules deriving the same thing pay three times. That is not hypothetical:
-	// `verify --timing` measured three comment rules at 1,777ms combined, each visiting exactly one
+	// `cohere --timing` measured three comment rules at 1,777ms combined, each visiting exactly one
 	// node per file, because each rescanned the same comment trivia independently. Flat node counts
 	// with unequal times is the signature.
 	//
@@ -437,7 +437,7 @@ func (c Context) ReportRangeWithFixes(textRange core.TextRange, message Message,
 // so the safe form is also the convenient one, and the shape that eats trivia is not reachable by
 // accident.
 //
-// Found by @system_verify_lint_fix, running real rules through the engine on three trivia shapes
+// Found by @system_cohere_lint_fix, running real rules through the engine on three trivia shapes
 // rather than reasoning about the ranges. Upstream tsgolint gets this right via
 // `utils.TrimNodeTextRange`; our port dropped the step, most likely because the signature had no
 // SourceFile to trim with.

@@ -5,7 +5,7 @@
 //
 // # What this is for
 //
-// verify never emits CSS. It asks one question of a compiled utility: what is its `{order, count}`
+// cohere never emits CSS. It asks one question of a compiled utility: what is its `{order, count}`
 // reading, the pair `enforce-consistent-class-order` sorts on. That reading is a traversal over the
 // declarations a candidate compiles to, and this file is the tree that traversal walks plus the
 // traversal itself. The CSS parser (#ce8thd1) produces these nodes; theme resolution and the
@@ -14,7 +14,7 @@
 // # What was deliberately not ported, and why
 //
 // `ast.ts` is 1,582 lines. This is a few hundred, and the gap is not abbreviation — it is every
-// part of the file that exists to turn a tree back into text, which verify never does:
+// part of the file that exists to turn a tree back into text, which cohere never does:
 //
 //   - `toCss` (~200 lines) and all printing. Nothing here renders. The reading of a candidate is
 //     computed from the tree, and the CSS text is never materialized.
@@ -27,7 +27,7 @@
 //   - `@property` emission, `propertyFallbacksRoot`/`Universal`, and the `Polyfills` bitfield.
 //     See the note on at-root below: `@property` bodies are structurally invisible to the reading,
 //     so the machinery that generates them has no reader here.
-//   - Source maps: the `src`/`dst` `SourceLocation` fields on every node. verify reports on the
+//   - Source maps: the `src`/`dst` `SourceLocation` fields on every node. cohere reports on the
 //     class literal in the user's source, not on generated CSS, so there is no position to map back
 //     to.
 //   - `cloneAstNode`, `cssContext`, and `WalkAction.Replace`/`ReplaceSkip`/`ReplaceStop`. These are

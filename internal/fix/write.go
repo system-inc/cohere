@@ -41,7 +41,7 @@ import (
 // by accident. Both assumptions were incidental and both looked like architecture.
 //
 // A file this returns false for is passed through unguarded, and that is the honest trade: the
-// engine cannot verify a language it cannot parse, and refusing every such file would mean the
+// engine cannot check a language it cannot parse, and refusing every such file would mean the
 // formatter can never touch css or markdown. The formatter's own parser is the guard for those, and
 // a transform that produces unparseable output in its own language fails inside the engine rather
 // than here.
@@ -131,7 +131,7 @@ func writeAtomically(fileName string, text string) error {
 		mode = info.Mode().Perm()
 	}
 
-	temporary, err := os.CreateTemp(directory, "."+filepath.Base(fileName)+".verify-*")
+	temporary, err := os.CreateTemp(directory, "."+filepath.Base(fileName)+".cohere-*")
 	if err != nil {
 		return fmt.Errorf("creating a temp file beside %s: %w", fileName, err)
 	}

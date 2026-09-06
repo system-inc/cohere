@@ -1,4 +1,4 @@
-// Tests for the instrument that decides whether verify agrees with the gate.
+// Tests for the instrument that decides whether cohere agrees with the gate.
 //
 // The thing being defended here is one level up from the usual. This package exists to refuse
 // untrustworthy results, so a bug in it does not produce a wrong answer that someone notices — it
@@ -28,7 +28,7 @@ func TestRuleNamesFromBothGatesCollapseToTheSameName(t *testing.T) {
 		{"nexus(consistency-no-shouting)", "consistency-no-shouting"},
 		{"structure(react-component-no-multiple-primary)", "react-component-no-multiple-primary"},
 		{"typescript(no-explicit-any)", "no-explicit-any"},
-		// verify puts the message id after.
+		// cohere puts the message id after.
 		{"consistency-no-shouting/noShouting", "consistency-no-shouting"},
 		{"consistency-no-abbreviated-identifier/noParams", "consistency-no-abbreviated-identifier"},
 		// Already bare, from either side.
@@ -47,39 +47,39 @@ func TestRuleNamesFromBothGatesCollapseToTheSameName(t *testing.T) {
 	// is the assertion that fails if someone "simplifies" normalization in a way that happens to
 	// satisfy every case above individually.
 	fromGate := NormalizeRuleName("nexus(consistency-no-enum)")
-	fromVerify := NormalizeRuleName("consistency-no-enum/noEnum")
-	if fromGate != fromVerify {
-		t.Fatalf("the same rule normalized to %q from the gate and %q from verify, so no finding could ever match", fromGate, fromVerify)
+	fromCohere := NormalizeRuleName("consistency-no-enum/noEnum")
+	if fromGate != fromCohere {
+		t.Fatalf("the same rule normalized to %q from the gate and %q from cohere, so no finding could ever match", fromGate, fromCohere)
 	}
 }
 
 // Prove the comparison can report a difference, in each direction separately.
 //
 // Both directions are tested because they fail independently: a harness that only ever sees the
-// gate's findings reports a clean diff for every defect verify finds alone, and it looks exactly
+// gate's findings reports a clean diff for every defect cohere finds alone, and it looks exactly
 // like agreement.
 func TestCompareDetectsADifferenceInEachDirection(t *testing.T) {
 	rules := Inputs{
-		VerifyRules:     map[string]bool{"consistency-no-enum": true},
+		CohereRules:     map[string]bool{"consistency-no-enum": true},
 		ConfiguredRules: map[string]bool{"consistency-no-enum": true},
 	}
 
-	onlyVerify := rules
-	onlyVerify.VerifyFindings = []Finding{{File: "a.ts", Line: 3, Rule: "consistency-no-enum", Side: SideVerify}}
-	onlyVerify.VerifyPopulation = Population{Findings: 1, FilesWalked: 3407, Rules: 22}
-	onlyVerify.GatePopulation = Population{Findings: 0, FilesWalked: 3407}
+	onlyCohere := rules
+	onlyCohere.CohereFindings = []Finding{{File: "a.ts", Line: 3, Rule: "consistency-no-enum", Side: SideCohere}}
+	onlyCohere.CoherePopulation = Population{Findings: 1, FilesWalked: 3407, Rules: 22}
+	onlyCohere.GatePopulation = Population{Findings: 0, FilesWalked: 3407}
 
-	report := Compare(onlyVerify)
+	report := Compare(onlyCohere)
 	if len(report.Differences) != 1 {
-		t.Fatalf("a finding only verify reported must surface as one difference, got %d", len(report.Differences))
+		t.Fatalf("a finding only cohere reported must surface as one difference, got %d", len(report.Differences))
 	}
-	if report.Differences[0].OnlyOn != SideVerify {
-		t.Fatalf("difference attributed to %q, want %q", report.Differences[0].OnlyOn, SideVerify)
+	if report.Differences[0].OnlyOn != SideCohere {
+		t.Fatalf("difference attributed to %q, want %q", report.Differences[0].OnlyOn, SideCohere)
 	}
 
 	onlyGate := rules
 	onlyGate.GateFindings = []Finding{{File: "a.ts", Line: 3, Rule: "consistency-no-enum", Side: SideGate}}
-	onlyGate.VerifyPopulation = Population{Findings: 0, FilesWalked: 3407, Rules: 22}
+	onlyGate.CoherePopulation = Population{Findings: 0, FilesWalked: 3407, Rules: 22}
 	onlyGate.GatePopulation = Population{Findings: 1, FilesWalked: 3407}
 
 	report = Compare(onlyGate)
@@ -97,11 +97,11 @@ func TestCompareDetectsADifferenceInEachDirection(t *testing.T) {
 // difference would pass both direction tests and be completely broken.
 func TestMatchingFindingsAreNotDifferences(t *testing.T) {
 	report := Compare(Inputs{
-		VerifyFindings:   []Finding{{File: "a.ts", Line: 3, Column: 16, Rule: "consistency-no-enum", Side: SideVerify}},
+		CohereFindings:   []Finding{{File: "a.ts", Line: 3, Column: 16, Rule: "consistency-no-enum", Side: SideCohere}},
 		GateFindings:     []Finding{{File: "a.ts", Line: 3, Column: 9, Rule: "consistency-no-enum", Side: SideGate}},
-		VerifyPopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 22},
+		CoherePopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 22},
 		GatePopulation:   Population{Findings: 1, FilesWalked: 3407},
-		VerifyRules:      map[string]bool{"consistency-no-enum": true},
+		CohereRules:      map[string]bool{"consistency-no-enum": true},
 		ConfiguredRules:  map[string]bool{"consistency-no-enum": true},
 	})
 
@@ -118,7 +118,7 @@ func TestMatchingFindingsAreNotDifferences(t *testing.T) {
 
 // The three classifications are three different facts and must not collapse into each other.
 //
-// Getting this wrong is not cosmetic. Most of the current gap is rules verify has never claimed,
+// Getting this wrong is not cosmetic. Most of the current gap is rules cohere has never claimed,
 // and reporting those as disagreements reports noise as signal — while reporting a genuine
 // disagreement as a coverage gap hides the only class that blocks the claim.
 func TestClassificationSeparatesCoverageFromCorrectness(t *testing.T) {
@@ -128,10 +128,10 @@ func TestClassificationSeparatesCoverageFromCorrectness(t *testing.T) {
 			{File: "b.ts", Line: 2, Rule: "import-require-path-alias", Side: SideGate},
 			{File: "c.ts", Line: 3, Rule: "consistency-no-enum", Side: SideGate},
 		},
-		VerifyPopulation: Population{Findings: 0, FilesWalked: 3407, Rules: 22},
+		CoherePopulation: Population{Findings: 0, FilesWalked: 3407, Rules: 22},
 		GatePopulation:   Population{Findings: 3, FilesWalked: 3407},
-		// verify implements two of the three rules, and the config enables only one of those two.
-		VerifyRules:     map[string]bool{"import-require-path-alias": true, "consistency-no-enum": true},
+		// cohere implements two of the three rules, and the config enables only one of those two.
+		CohereRules:     map[string]bool{"import-require-path-alias": true, "consistency-no-enum": true},
 		ConfiguredRules: map[string]bool{"consistency-no-enum": true, "react-component-no-multiple-primary": true},
 	}
 
@@ -141,9 +141,9 @@ func TestClassificationSeparatesCoverageFromCorrectness(t *testing.T) {
 	}
 
 	expected := map[string]Classification{
-		// verify has no such rule, so it cannot disagree — a coverage fact.
+		// cohere has no such rule, so it cannot disagree — a coverage fact.
 		"react-component-no-multiple-primary": ClassificationNotPorted,
-		// verify has the rule, nobody enabled it, so it ran over no files — neither a port gap nor
+		// cohere has the rule, nobody enabled it, so it ran over no files — neither a port gap nor
 		// a defect.
 		"import-require-path-alias": ClassificationNotConfigured,
 		// Both sides had it and both had it on. Somebody is wrong, and this is the only class that
@@ -163,21 +163,21 @@ func TestUnportedRulesDoNotBlockAgreement(t *testing.T) {
 
 	notPorted := Compare(Inputs{
 		GateFindings:     []Finding{{File: "a.tsx", Line: 1, Rule: "react-component-no-multiple-primary", Side: SideGate}},
-		VerifyPopulation: Population{FilesWalked: 3407, Rules: 22},
+		CoherePopulation: Population{FilesWalked: 3407, Rules: 22},
 		GatePopulation:   Population{Findings: 1, FilesWalked: 3407},
-		VerifyRules:      map[string]bool{},
+		CohereRules:      map[string]bool{},
 		ConfiguredRules:  map[string]bool{},
 	})
 	notPorted.Provenance = provenance
 	if !notPorted.Agreed() {
-		t.Fatal("a rule verify has never claimed must not count against agreement")
+		t.Fatal("a rule cohere has never claimed must not count against agreement")
 	}
 
 	bothActive := Compare(Inputs{
-		VerifyFindings:   []Finding{{File: "a.ts", Line: 1, Rule: "consistency-no-enum", Side: SideVerify}},
-		VerifyPopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 22},
+		CohereFindings:   []Finding{{File: "a.ts", Line: 1, Rule: "consistency-no-enum", Side: SideCohere}},
+		CoherePopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 22},
 		GatePopulation:   Population{FilesWalked: 3407},
-		VerifyRules:      map[string]bool{"consistency-no-enum": true},
+		CohereRules:      map[string]bool{"consistency-no-enum": true},
 		ConfiguredRules:  map[string]bool{"consistency-no-enum": true},
 	})
 	bothActive.Provenance = provenance
@@ -188,15 +188,15 @@ func TestUnportedRulesDoNotBlockAgreement(t *testing.T) {
 
 // The vacuity guard: a side that walked no files is not a clean side.
 //
-// This is the exact failure the gate verify replaces shipped for days, and a diff harness inherits
+// This is the exact failure the gate cohere replaces shipped for days, and a diff harness inherits
 // it in a worse form, because an empty diff over two empty runs reads as proof of agreement.
 func TestARunOverNoFilesIsNotComparable(t *testing.T) {
 	report := Compare(Inputs{
-		VerifyPopulation: Population{FilesWalked: 0, Rules: 22},
+		CoherePopulation: Population{FilesWalked: 0, Rules: 22},
 		GatePopulation:   Population{FilesWalked: 3407},
 	})
 	if report.Comparable {
-		t.Fatal("verify walking zero files must make the comparison not comparable")
+		t.Fatal("cohere walking zero files must make the comparison not comparable")
 	}
 	if report.Agreed() {
 		t.Fatal("a not-comparable report must never claim agreement")
@@ -215,13 +215,13 @@ func TestARunOverNoFilesIsNotComparable(t *testing.T) {
 // in one night got past: each had a plausible population and an empty result.
 func TestAnEmptyDiffWithoutControlsIsNotAgreement(t *testing.T) {
 	unproven := Compare(Inputs{
-		VerifyPopulation: Population{FilesWalked: 3407, Rules: 22},
+		CoherePopulation: Population{FilesWalked: 3407, Rules: 22},
 		GatePopulation:   Population{FilesWalked: 3407},
 	})
 	unproven.Provenance = Provenance{
-		VerifyFilesLinted: 3407,
+		CohereFilesLinted: 3407,
 		GateFilesLinted:   3407,
-		VerifyRulesRun:    22,
+		CohereRulesRun:    22,
 		GateRulesRun:      181,
 		// No controls run at all.
 	}
@@ -250,9 +250,9 @@ func TestAnEmptyDiffWithoutControlsIsNotAgreement(t *testing.T) {
 // A control that fired in only one direction is not proof.
 func TestOneDirectionOfControlIsNotProven(t *testing.T) {
 	oneDirection := Provenance{
-		VerifyFilesLinted: 3407,
+		CohereFilesLinted: 3407,
 		GateFilesLinted:   3407,
-		VerifyRulesRun:    22,
+		CohereRulesRun:    22,
 		GateRulesRun:      181,
 		ControlsRun: []ControlResult{
 			{Name: "gate-only", ExpectedSide: SideGate, Rule: "react-component-no-multiple-primary", Detected: true},
@@ -276,7 +276,7 @@ func TestOneDirectionOfControlIsNotProven(t *testing.T) {
 // A population too small to be the tree is its own tell.
 func TestAnImplausiblySmallRunIsUntrustworthy(t *testing.T) {
 	tiny := provenProvenance()
-	tiny.VerifyFilesLinted = 2
+	tiny.CohereFilesLinted = 2
 	trustworthy, reasons := tiny.Trustworthy()
 	if trustworthy {
 		t.Fatal("a run over 2 files must not be trusted as a run over the tree")
@@ -289,14 +289,14 @@ func TestAnImplausiblySmallRunIsUntrustworthy(t *testing.T) {
 // provenProvenance is a run that walked the real tree and fired a control in both directions.
 func provenProvenance() Provenance {
 	return Provenance{
-		VerifyFilesLinted: 3407,
+		CohereFilesLinted: 3407,
 		GateFilesLinted:   3407,
-		VerifyRulesRun:    22,
+		CohereRulesRun:    22,
 		GateRulesRun:      181,
-		VerifyCommand:     "verify -lint",
+		CohereCommand:     "cohere -lint",
 		GateCommand:       "node RunCachedOxlint.ts --no-cache",
 		ControlsRun: []ControlResult{
-			{Name: "verify-only", ExpectedSide: SideVerify, Rule: "consistency-no-enum", Detected: true},
+			{Name: "cohere-only", ExpectedSide: SideCohere, Rule: "consistency-no-enum", Detected: true},
 			{Name: "gate-only", ExpectedSide: SideGate, Rule: "react-component-no-multiple-primary", Detected: true},
 		},
 	}
@@ -313,10 +313,10 @@ func provenProvenance() Provenance {
 // caller actually knows, rather than to the three-way split, which claims knowledge it does not have.
 func TestUnknownConfigurationDoesNotExcuseEveryRule(t *testing.T) {
 	report := Compare(Inputs{
-		VerifyFindings:   []Finding{{File: "a.ts", Line: 1, Rule: "consistency-no-enum", Side: SideVerify}},
-		VerifyPopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 22},
+		CohereFindings:   []Finding{{File: "a.ts", Line: 1, Rule: "consistency-no-enum", Side: SideCohere}},
+		CoherePopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 22},
 		GatePopulation:   Population{FilesWalked: 3407},
-		VerifyRules:      map[string]bool{"consistency-no-enum": true},
+		CohereRules:      map[string]bool{"consistency-no-enum": true},
 		// ConfiguredRules deliberately nil: the caller did not read the configuration.
 	})
 
@@ -324,7 +324,7 @@ func TestUnknownConfigurationDoesNotExcuseEveryRule(t *testing.T) {
 		t.Fatalf("expected one difference, got %d", len(report.Differences))
 	}
 	if got := report.Differences[0].Classification; got != ClassificationBothActive {
-		t.Fatalf("with configuration unknown, a rule verify implements and reported must stay %q, got %q — nil must not read as disabled",
+		t.Fatalf("with configuration unknown, a rule cohere implements and reported must stay %q, got %q — nil must not read as disabled",
 			ClassificationBothActive, got)
 	}
 
@@ -336,7 +336,7 @@ func TestUnknownConfigurationDoesNotExcuseEveryRule(t *testing.T) {
 
 // A slash means two different things depending on which side of it the rule name sits.
 //
-// verify prints `rule-name/messageId`, so the name is before the slash. The lint config keys rules
+// cohere prints `rule-name/messageId`, so the name is before the slash. The lint config keys rules
 // as `plugin/rule-name`, so the name is after it. Taking the first segment unconditionally is
 // correct for the first and silently wrong for the second, and the wrongness does not look like a
 // parse failure: every config key collapses to its plugin, so `nexus/consistency-no-enum` and
@@ -355,7 +355,7 @@ func TestAPluginPrefixedConfigKeyKeepsTheRuleName(t *testing.T) {
 		{"nexus/consistency-no-enum", "consistency-no-enum"},
 		{"structure/react-component-no-multiple-primary", "react-component-no-multiple-primary"},
 		{"typescript/no-explicit-any", "no-explicit-any"},
-		// verify findings: rule first, message id after.
+		// cohere findings: rule first, message id after.
 		{"consistency-no-enum/noEnum", "consistency-no-enum"},
 		{"consistency-no-abbreviated-identifier/noParams", "consistency-no-abbreviated-identifier"},
 		// Gate findings: plugin in parentheses.
@@ -370,25 +370,25 @@ func TestAPluginPrefixedConfigKeyKeepsTheRuleName(t *testing.T) {
 	// The property, stated as a property: all three spellings of one rule must reach the same name,
 	// because a config key and a finding have to meet in the same map for classification to work.
 	fromConfig := NormalizeRuleName("nexus/consistency-no-enum")
-	fromVerify := NormalizeRuleName("consistency-no-enum/noEnum")
+	fromCohere := NormalizeRuleName("consistency-no-enum/noEnum")
 	fromGate := NormalizeRuleName("nexus(consistency-no-enum)")
-	if fromConfig != fromVerify || fromVerify != fromGate {
-		t.Fatalf("one rule normalized three ways: config %q, verify %q, gate %q", fromConfig, fromVerify, fromGate)
+	if fromConfig != fromCohere || fromCohere != fromGate {
+		t.Fatalf("one rule normalized three ways: config %q, cohere %q, gate %q", fromConfig, fromCohere, fromGate)
 	}
 }
 
 // The verdict must state its own scope when it covers less than the configuration.
 //
-// A comparison can only speak about rules verify implements. The rest of the config is enabled in
+// A comparison can only speak about rules cohere implements. The rest of the config is enabled in
 // the gate, unported, and never compared, so a bare "agrees" reads as broader than the test. On
 // this tree that gap is most of the catalog, and the reason those rules find nothing is that the
 // gate has been enforcing them for months rather than that they are worthless. A clean diff
 // therefore cannot be the signal to remove the old tool.
 func TestTheVerdictNamesTheRulesItDidNotCompare(t *testing.T) {
 	partial := Compare(Inputs{
-		VerifyPopulation: Population{FilesWalked: 3407, Rules: 33},
+		CoherePopulation: Population{FilesWalked: 3407, Rules: 33},
 		GatePopulation:   Population{FilesWalked: 3407},
-		VerifyRules:      map[string]bool{"consistency-no-enum": true},
+		CohereRules:      map[string]bool{"consistency-no-enum": true},
 		ConfiguredRules:  map[string]bool{"consistency-no-enum": true, "unported-one": true, "unported-two": true},
 	})
 	partial.Provenance = provenProvenance()
@@ -410,9 +410,9 @@ func TestTheVerdictNamesTheRulesItDidNotCompare(t *testing.T) {
 	// The control: full coverage must not carry the disclaimer, or it becomes noise a reader learns
 	// to skip and stops meaning anything on the run where it matters.
 	full := Compare(Inputs{
-		VerifyPopulation: Population{FilesWalked: 3407, Rules: 1},
+		CoherePopulation: Population{FilesWalked: 3407, Rules: 1},
 		GatePopulation:   Population{FilesWalked: 3407},
-		VerifyRules:      map[string]bool{"consistency-no-enum": true},
+		CohereRules:      map[string]bool{"consistency-no-enum": true},
 		ConfiguredRules:  map[string]bool{"consistency-no-enum": true},
 	})
 	full.Provenance = provenProvenance()

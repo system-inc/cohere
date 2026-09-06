@@ -6,11 +6,11 @@
 // values reach this point. Whether this call happens on every path or only some. Whether the thing
 // passed here is the same object that was mutated there. A rule written against the AST that wants
 // any of those either approximates them or walks the tree a second time with its own notion of
-// order, and verify already holds three rules doing exactly that.
+// order, and cohere already holds three rules doing exactly that.
 //
 // # The decision this package makes, and why
 //
-// verify already has a basic-block control-flow graph in `internal/utilities/controlflow`, with
+// cohere already has a basic-block control-flow graph in `internal/utilities/controlflow`, with
 // predecessor edges, a dominator tree, and a monotone dataflow solver. It also has a resident
 // whole-program type checker. The obvious move was therefore a thin IR: keep pointing at AST nodes,
 // lean on the existing graph for control flow, and add only the value naming on top. That would be
@@ -56,7 +56,7 @@
 //
 // The instruction and terminal sets here are upstream's, near name-for-name. That is a deliberate
 // cost: some of it is redundant with what the type checker already knows, and a from-scratch design
-// for verify would be smaller.
+// for cohere would be smaller.
 //
 // It is paid for one reason. React ships 325 error fixtures with plain-text expectations, vendored
 // at `internal/react_conformance`, and they are the only external oracle this project has for
@@ -69,7 +69,7 @@
 // A measurable wrong answer beats an unmeasurable right one. That is the whole argument, and it is
 // the reason to prefer fidelity here specifically, not everywhere.
 //
-// Where upstream's shape is a workaround for something verify does not have, this diverges and says
+// Where upstream's shape is a workaround for something cohere does not have, this diverges and says
 // so at the divergence. The two standing cases:
 //
 //   - Upstream carries an `Environment` holding arenas for identifiers, scopes, functions, and
@@ -77,7 +77,7 @@
 //     `Function` here owns its own tables. There is no cross-function arena, because nothing in a
 //     lint pipeline compiles two functions into one graph, and a package-level arena would make
 //     every pass take a parameter it does not use.
-//   - Upstream's `typeinference` crate exists to infer what verify's checker already knows.
+//   - Upstream's `typeinference` crate exists to infer what cohere's checker already knows.
 //     `Identifier.Node` is retained on every value that came from a syntactic source precisely so a
 //     later pass can hand that node to the checker instead of inferring. That field is the seam;
 //     see its comment.
@@ -107,7 +107,7 @@
 //
 // `Scope` and `PrunedScope` are genuinely different. They are not syntax and they are not markers -
 // they are the output of React's reactive-scope construction, which is 10,980 lines upstream, the
-// largest module in the compiler, and contributes nothing to the 15 rules verify wants. A terminal
+// largest module in the compiler, and contributes nothing to the 15 rules cohere wants. A terminal
 // is the block's control flow; adding two variants that no lowering ever produces and no generic
 // pass can interpret would put a permanent hole in every `switch` over `Terminal` for a pass that
 // may never be written. If reactive scopes are ever built, they add two variants then, and every
@@ -459,7 +459,7 @@ type Identifier struct {
 	//
 	// This field is the seam to the type checker and the reason this IR does not carry a type
 	// inference pass. Upstream has 1,450 lines of `typeinference` whose job is to guess what a
-	// checker would know; verify has the checker resident in the same process. A pass that wants
+	// checker would know; cohere has the checker resident in the same process. A pass that wants
 	// the type of a value hands this node to `checker.GetTypeAtLocation` and gets the real answer,
 	// including through imports and generics, which no amount of local inference recovers.
 	//

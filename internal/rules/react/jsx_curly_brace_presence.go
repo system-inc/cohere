@@ -8,8 +8,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/comments"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/comments"
 )
 
 var (
@@ -180,7 +180,7 @@ func jsxCurlyBracePresenceIsValidSetting(value jsxCurlyBracePresenceSetting) boo
 // With `propElementValues: "never"` and `props` at its default `never`, `<App horror={<div />} />`
 // fixes to `<App horror=<div /> />`, which the missing-curly arm then fixes straight back. Driven
 // through the installed build one pass at a time, it alternates forever, and ESLint's own
-// `verifyAndFix` gives up after ten rounds with a circular-fixes warning. Corpus cases I44 and I45
+// `cohereAndFix` gives up after ten rounds with a circular-fixes warning. Corpus cases I44 and I45
 // assert one pass in each direction and this port produces exactly that; the loop is a property of
 // the option combination rather than of either fixer, so nothing here can resolve it.
 //

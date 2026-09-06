@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // The lint findings cache: what each rule reported about one file, replayed when neither the
@@ -35,7 +35,7 @@ import (
 // wiring it, because everything above describes a correct cache and none of it argues that the
 // cache is worth having.
 //
-// The measurement, 2026-08-25 on the ahra tree at load 4.2-4.4, verify at 5603f83. A perfect cache
+// The measurement, 2026-08-25 on the ahra tree at load 4.2-4.4, cohere at 5603f83. A perfect cache
 // skips exactly the cacheable rules and still runs the uncacheable ones, so running with only the
 // 50 uncacheable enabled is the upper bound on any cache here: no build cost, no invalidation, no
 // read or write. Strictly better than the real thing could be.
@@ -467,7 +467,7 @@ func (c *LintCache) Store(path string, contentHash [sha256.Size]byte, findings [
 
 // WriteLintCache persists the cache, creating the directory if it is missing.
 //
-// Written to a temporary file in the same directory and renamed into place, because several verify
+// Written to a temporary file in the same directory and renamed into place, because several cohere
 // runs can share a tree and a reader must never see a half-written artifact. Rename is atomic
 // within a filesystem; writing directly to the destination is not, and a truncated cache is the
 // shape that decodes into offsets pointing at the wrong strings.

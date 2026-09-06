@@ -6,7 +6,7 @@ import (
 	"unicode"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // NoRestrictedTypes flags types a project has decided not to use, named in configuration.
@@ -253,7 +253,7 @@ type NoRestrictedTypesBan struct {
 	// them: measured against the installed 8.67.0 build, `{"Foo": null}` and `{"Foo": false}` both
 	// fail configuration validation and the linter refuses to start. So this branch reproduces
 	// upstream's code and is unreachable through upstream's own configuration surface. It is kept
-	// because verify has no schema layer rejecting those spellings, which means a config here CAN
+	// because cohere has no schema layer rejecting those spellings, which means a config here CAN
 	// contain one, and silently banning a type somebody wrote `false` against would be the worst
 	// available reading.
 	Allowed bool

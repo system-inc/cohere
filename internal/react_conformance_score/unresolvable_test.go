@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/verify/internal/react_conformance"
+	"github.com/system-inc/cohere/internal/react_conformance"
 )
 
 // TestUnresolvableTypesIsEarnedNotAssumed probes the excuse rather than trusting it.

@@ -1,6 +1,6 @@
 // Asking the measured binary which rules it has, rather than assuming they match this one's.
 //
-// The classification split turns on whether verify implements a rule, and that fact was read from
+// The classification split turns on whether cohere implements a rule, and that fact was read from
 // `registry.All()` — the registry linked into the harness, not into the binary under measurement.
 // When the two differ, every classification describes the wrong tool, and it does so silently.
 //
@@ -58,10 +58,10 @@ func CompiledRulesOf(ctx context.Context, command GateCommand, explainFile strin
 	return rulesFromExplain(ctx, command, explainFile)
 }
 
-// rulesFromRulesFlag reads `verify -rules`, which prints one rule name per line.
+// rulesFromRulesFlag reads `cohere -rules`, which prints one rule name per line.
 //
 // An empty list is refused rather than returned. A binary that printed nothing would produce a
-// harness believing verify implements no rules at all, under which every gate finding classifies
+// harness believing cohere implements no rules at all, under which every gate finding classifies
 // not-ported and every real disagreement is excused. That is the vacuous pass this package exists
 // to refuse, arriving through the door meant to prevent it.
 func rulesFromRulesFlag(ctx context.Context, command GateCommand) (map[string]bool, error) {
@@ -83,13 +83,13 @@ func rulesFromRulesFlag(ctx context.Context, command GateCommand) (map[string]bo
 // namesFromRuleLines parses `-rules` stdout, which is bare rule names one per line.
 //
 // Split out from the invocation so the contract can be tested without a binary, because it was
-// being tested by accident: `verify -rules` gained a provenance note and this kept working only
+// being tested by accident: `cohere -rules` gained a provenance note and this kept working only
 // because the note goes to stderr while the names go to stdout. Had it landed on stdout, the guard
 // would have rejected correct output.
 //
 // The guard stays strict rather than learning to skip prose. A line this does not understand is a
 // contract change, and absorbing it quietly is how a format drift becomes a short rule list, where
-// every missing name becomes a rule the harness believes verify lacks and every real disagreement
+// every missing name becomes a rule the harness believes cohere lacks and every real disagreement
 // on it gets excused as a coverage gap.
 func namesFromRuleLines(output string) (map[string]bool, error) {
 	names := map[string]bool{}

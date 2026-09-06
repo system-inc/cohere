@@ -1,10 +1,10 @@
 package typescript
 
-import "github.com/system-inc/verify/internal/rule"
+import "github.com/system-inc/cohere/internal/rule"
 
 // init registers @typescript-eslint/no-useless-default-assignment.
 //
-// Registered and deliberately NOT enabled in the live config. VerifySettings.json line 373 carries
+// Registered and deliberately NOT enabled in the live config. CohereSettings.json line 373 carries
 // `"typescript/no-useless-default-assignment": "off"`, a standing decision somebody made under the
 // old short spelling. That key cannot resolve against this registration: `settingFor` matches
 // exactly, then trims the RULE NAME off the CONFIG KEY and requires what remains to end in a slash.

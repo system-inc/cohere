@@ -7,9 +7,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/control_flow_graph"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/property"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/control_flow_graph"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/property"
 )
 
 // ConsistentReturnSettings is the decoded option surface.

@@ -18,12 +18,12 @@ import (
 // by a separate probe. Same bundles and same settings is an assumption, not a measurement, and this
 // package's claim has to be measured through this package's code.
 //
-//	VERIFY_CORPUS_LIST=/path/to/list VERIFY_CORPUS_OUT=/path/to/dir go test ./internal/prettier/ -run TestCorpus -v
+//	COHERE_CORPUS_LIST=/path/to/list COHERE_CORPUS_OUT=/path/to/dir go test ./internal/prettier/ -run TestCorpus -v
 func TestCorpus(t *testing.T) {
-	listPath := os.Getenv("VERIFY_CORPUS_LIST")
-	outDirectory := os.Getenv("VERIFY_CORPUS_OUT")
+	listPath := os.Getenv("COHERE_CORPUS_LIST")
+	outDirectory := os.Getenv("COHERE_CORPUS_OUT")
 	if listPath == "" || outDirectory == "" {
-		t.Skip("set VERIFY_CORPUS_LIST and VERIFY_CORPUS_OUT")
+		t.Skip("set COHERE_CORPUS_LIST and COHERE_CORPUS_OUT")
 	}
 
 	engine := newTestEngine(t)

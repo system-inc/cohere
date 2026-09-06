@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-// liveConfigPath is the real config verify must agree with. Absent in CI checkouts of this repo
+// liveConfigPath is the real config cohere must agree with. Absent in CI checkouts of this repo
 // alone, which the test treats as a skip rather than a failure.
-const liveConfigPath = "/Users/kirkouimet/Projects/ahra/VerifySettings.json"
+const liveConfigPath = "/Users/kirkouimet/Projects/ahra/CohereSettings.json"
 
 // TestAgainstTheLiveConfig loads the actual file rather than a hand-written model of it.
 //

@@ -47,7 +47,7 @@ const reactPragma = "React"
 //
 // A port of that rule calling this helper starts reporting where upstream is silent, and its own
 // corpus cannot catch the difference because none of its fixtures writes a bare call. Verified at
-// both sources rather than inferred, after `@system_verify_format` found it while researching the
+// both sources rather than inferred, after `@system_cohere_format` found it while researching the
 // react ports.
 //
 // This function matches `no-children-prop`, which is the shape oxc factored out. A rule that reads
@@ -219,7 +219,7 @@ func isComponentBaseName(name string) bool {
 //
 // The corpus will not catch it. All three of that rule's fail cases are written inside
 // `createReactClass`, so a port narrowed to real components passes every one of them. Verified at
-// the source after `@system_verify_format` found it, and it is the second time a react helper has
+// the source after `@system_cohere_format` found it, and it is the second time a react helper has
 // been correct for the rule that motivated it and wrong for a neighbour that looks the same.
 //
 // The distinction to hold: *is this inside a component* and *is this inside a method-like thing*

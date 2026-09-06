@@ -10,7 +10,7 @@ package react_conformance_score
 //
 // # The join, and why it is by message id rather than by text
 //
-// verify's diagnostic text was written for verify's users and does not match React's prose, nor
+// cohere's diagnostic text was written for cohere's users and does not match React's prose, nor
 // should it. So a finding is joined to the golden through the rule's own message id, which is the
 // same join upstream's `RustBackendComparison-test.ts` makes between two backends. `Rules` below
 // is that table, and every entry was checked against a message some golden in this corpus actually
@@ -59,18 +59,18 @@ import (
 	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/program"
-	"github.com/system-inc/verify/internal/react_conformance"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rules/react"
+	"github.com/system-inc/cohere/internal/program"
+	"github.com/system-inc/cohere/internal/react_conformance"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rules/react"
 )
 
-// Rules are the verify rules wired to upstream rule names, with the message join for each.
+// Rules are the cohere rules wired to upstream rule names, with the message join for each.
 //
 // Keyed by UPSTREAM's rule name, which is what `Fixture.Rules()` reports and what `ShippedRules` is
 // keyed by, so the three tables join without a translation step.
 //
-// Seven rules rather than the fifteen verify ships. `globals` is here rather than in `score_test.go`
+// Seven rules rather than the fifteen cohere ships. `globals` is here rather than in `score_test.go`
 // so there is ONE mechanism rather than two that can drift; its own test still pins its numbers. The
 // other eight are absent for stated reasons rather than by omission:
 //
@@ -154,7 +154,7 @@ var Rules = map[string]RuleUnderTest{
 // goldens. Those 25 are the deliverable of this wiring rather than a problem with it, and they
 // partition cleanly into four causes, every one hand-checked against the golden.
 //
-// The root cause of the first three is one fact stated in the rule's own doc comment: verify's
+// The root cause of the first three is one fact stated in the rule's own doc comment: cohere's
 // `rules-of-hooks` is a port of **ESLint's** `rules-of-hooks`, whose subject is where a hook CALL
 // sits in the control-flow graph. React's `Hooks` ERROR CATEGORY is emitted by the COMPILER, which
 // runs a wider analysis over its own intermediate representation. The two share a name and a
@@ -188,7 +188,7 @@ var Rules = map[string]RuleUnderTest{
 //	3  the violation IS found, under a different one of React's four Hooks messages
 //	   The only category here that is about this join rather than about scope. React chooses between
 //	   "called conditionally" and "called within function expressions" by the nature of the
-//	   ENCLOSING function; verify reports the innermost violation it sees. Measured, upstream is not
+//	   ENCLOSING function; cohere reports the innermost violation it sees. Measured, upstream is not
 //	   self-consistent by shape either: `normalFunctionWithConditionalHook` (a conditional hook in a
 //	   plain function) gets the CONDITIONAL message, while the same conditional hook inside a
 //	   returned function expression gets the NESTED-FUNCTION one, twice. Both implementations report
@@ -201,8 +201,8 @@ var Rules = map[string]RuleUnderTest{
 //	1  a COUNT difference, same family as the three above
 //	   rules-of-hooks/error.invalid.invalid-rules-of-hooks-0de1224ce64b.js: a hook inside a
 //	   `useEffect` callback inside a returned function expression. The golden expects the
-//	   nested-function message TWICE and verify reports it once, because React reports the inner
-//	   hook AND the enclosing function expression while verify reports the innermost violation only.
+//	   nested-function message TWICE and cohere reports it once, because React reports the inner
+//	   hook AND the enclosing function expression while cohere reports the innermost violation only.
 //	   Read as a possible defect first and reclassified after reading the golden: the disagreement
 //	   is how many findings one nesting produces, not whether the code is wrong.
 //
@@ -217,23 +217,23 @@ var Rules = map[string]RuleUnderTest{
 // The three Hooks messages the corpus uses, spelled once because they are long and because a typo
 // in one copy of a 200-character literal is invisible in review.
 //
-// Upstream emits four distinct Hooks messages and verify's rule carries nine message ids, so the
+// Upstream emits four distinct Hooks messages and cohere's rule carries nine message ids, so the
 // join is many-to-one in both directions. That asymmetry is real rather than a modelling shortcut:
 // React's `Hooks` category makes one distinction (called conditionally / referenced as a value /
-// called somewhere that is not a component body / not stable across renders) where verify's rule
-// makes nine, because verify's messages were written to tell a developer which shape they wrote.
+// called somewhere that is not a component body / not stable across renders) where cohere's rule
+// makes nine, because cohere's messages were written to tell a developer which shape they wrote.
 const (
 	hooksConditional    = "Hooks must always be called in a consistent order, and may not be called conditionally. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)"
 	hooksNestedFunction = "Hooks must be called at the top level in the body of a function component or custom hook, and may not be called within function expressions. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)"
 )
 
-// UpstreamMessage is the golden-side text a verify message id corresponds to.
+// UpstreamMessage is the golden-side text a cohere message id corresponds to.
 type UpstreamMessage struct {
 	Heading string
 	Text    string
 }
 
-// RuleUnderTest pairs a verify rule with the upstream rule name it implements and the message join.
+// RuleUnderTest pairs a cohere rule with the upstream rule name it implements and the message join.
 type RuleUnderTest struct {
 	Upstream string
 	Rule     rule.Rule
@@ -259,7 +259,7 @@ const tsConfigText = `{
   "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
 }`
 
-// Analyze runs one verify rule over one fixture and returns what it found, in the shape the
+// Analyze runs one cohere rule over one fixture and returns what it found, in the shape the
 // conformance comparison expects.
 //
 // It returns `ErrUnsupported` rather than an empty Result for anything that stopped the rule from

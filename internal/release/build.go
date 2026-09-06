@@ -39,11 +39,11 @@ func DescribeBuild() string {
 
 // Options configure a release build.
 type Options struct {
-	// ModuleDirectory is the root of the verify module.
+	// ModuleDirectory is the root of the cohere module.
 	ModuleDirectory string
 
 	// OutputDirectory is where the staged packages are written. Each platform package lands in a
-	// subdirectory named for the platform, and the dispatcher package in "verify".
+	// subdirectory named for the platform, and the dispatcher package in "cohere".
 	OutputDirectory string
 
 	// Version is the published version, like "0.3.1".
@@ -191,7 +191,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		return StagedPackage{}, err
 	}
 
-	size, err := verifyBinary(binaryPath, target)
+	size, err := cohereBinary(binaryPath, target)
 	if err != nil {
 		return StagedPackage{}, err
 	}
@@ -261,7 +261,7 @@ func buildDispatcherPackage(options Options) (StagedPackage, error) {
 
 // compile cross-compiles one target, stamping the provenance in.
 func compile(options Options, target Target, binaryPath string, pin compilerPin, goToolchain string, formatter FormatterSource) error {
-	const packagePath = "github.com/system-inc/verify/internal/release"
+	const packagePath = "github.com/system-inc/cohere/internal/release"
 
 	// Strip the symbol table and DWARF. Measured on a comparable binary: marginally faster to link
 	// and 29% smaller, with nothing traded away that a released binary needs.
@@ -283,7 +283,7 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 	linkerFlags := strings.Join(stamps, " ")
 
 	arguments := append([]string{"build"}, BuildFlags...)
-	arguments = append(arguments, "-ldflags="+linkerFlags, "-o", binaryPath, "./cmd/verify")
+	arguments = append(arguments, "-ldflags="+linkerFlags, "-o", binaryPath, "./command/cohere")
 
 	command := exec.Command("go", arguments...)
 	command.Dir = options.ModuleDirectory
@@ -304,7 +304,7 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 	return nil
 }
 
-// verifyBinary confirms the build produced an executable for the platform it claims, returning its
+// cohereBinary confirms the build produced an executable for the platform it claims, returning its
 // size.
 //
 // Three questions, because the first two answer something narrower than the name suggests. Go
@@ -316,13 +316,13 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 // install cleanly, and fail at exec with a format error on a user's machine, reported as a broken
 // install rather than as the packaging mistake it is. Magic bytes separate all three families we
 // ship, so the check costs four bytes of read.
-func verifyBinary(path string, target Target) (int64, error) {
+func cohereBinary(path string, target Target) (int64, error) {
 	information, err := os.Stat(path)
 	if err != nil {
 		return 0, fmt.Errorf("go build reported success but produced no binary at %s: %w", path, err)
 	}
 
-	// A real verify binary statically links the whole TypeScript compiler and is over ten megabytes.
+	// A real cohere binary statically links the whole TypeScript compiler and is over ten megabytes.
 	// Anything near zero is a build that failed into an empty file, which packages perfectly and
 	// installs perfectly and does nothing.
 	const implausiblySmall = 1 << 20
@@ -408,10 +408,11 @@ type compilerPin struct {
 // wrong repository is worse than no commit at all — it resolves to nothing and gives a reader no
 // hint why.
 //
-// The directory name stays `typescript-go` through the migration, so it is a path rather than a
-// claim about the upstream and is left alone.
+// The directory is `TypeScript`, matching the repository it is a checkout of. It is a path rather
+// than a claim about the upstream, but the two now agree, which removes the one case where a
+// reader had to know the local name and the remote name had diverged.
 func readCompilerPin(moduleDirectory string) (compilerPin, error) {
-	submoduleDirectory := filepath.Join(moduleDirectory, "typescript-go")
+	submoduleDirectory := filepath.Join(moduleDirectory, "TypeScript")
 
 	output, err := exec.Command("git", "-C", submoduleDirectory, "rev-parse", "HEAD").Output()
 	if err != nil {

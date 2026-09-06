@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/jsx"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/jsx"
 )
 
 // JsxFragmentsMode selects which of the two fragment spellings the file is expected to use.
@@ -101,7 +101,7 @@ var messagePreferFragmentPragma = rule.Message{
 // # The pragma is fixed at React.Fragment
 //
 // Upstream reads both halves from `settings.react.pragma` and `settings.react.fragment`, and
-// verify has no settings surface at all, so both are unreachable by any route. Upstream's entire
+// cohere has no settings surface at all, so both are unreachable by any route. Upstream's entire
 // corpus configures them to `Act` and `Frag`, which is why every imported case below was replayed
 // against the installed build under the DEFAULT settings before being written down; nineteen of
 // the twenty two reproduced exactly, including the fixer output, and the three that did not are
@@ -115,7 +115,7 @@ var messagePreferFragmentPragma = rule.Message{
 // upstream's own three version cases with no settings: `<><Foo /></>` went silent and both named
 // forms reported `preferFragment` instead. The message is therefore not ported at all rather than
 // ported and left dead, because a message nothing can produce is one more thing for a reader to
-// account for. Should verify ever grow a settings surface, this is the arm to add back.
+// account for. Should cohere ever grow a settings surface, this is the arm to add back.
 //
 // # No fix, and this is the deliberate half of the port
 //

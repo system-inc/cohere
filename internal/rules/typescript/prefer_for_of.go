@@ -2,7 +2,7 @@ package typescript
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // PreferForOf flags a counted `for` loop whose index is only ever used to index one array.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // The corpus is ESLint's own, 13 valid and 19 invalid cases carrying 20 findings, extracted by
@@ -15,7 +15,7 @@ import (
 // shape, and upstream's truthiness resolution of `maximum` against `max`. A fixture handing the
 // rule a struct would leave both untested.
 //
-// The wire value is the BARE first element of upstream's options array, because verify's config
+// The wire value is the BARE first element of upstream's options array, because cohere's config
 // layer strips the severity tuple before dispatch.
 
 // decodeMaxNestedCallbacksForTest turns a fixture's JSON into options the way the config layer does.

@@ -3,9 +3,9 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimcore "github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/imports"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/imports"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // The six message ids, each carrying upstream's three interpolations.
@@ -264,7 +264,7 @@ func reportArrayTypeGenericForm(ctx rule.Context, node *ast.Node, options ArrayT
 	//	class C extends Array<string> {}              clean
 	//	let x: Array<string>;                         REPORTS, the control
 	//
-	// Found by the dry run rather than by any fixture: verify reported 713 findings on the ahra tree
+	// Found by the dry run rather than by any fixture: cohere reported 713 findings on the ahra tree
 	// where ESLint reported 711, and both extra were `extends Array<...>` in one file. A class's
 	// `extends` was already correct by accident, since typescript-go spells that one
 	// `KindExpressionWithTypeArguments`, which this listener never receives. Only the other two

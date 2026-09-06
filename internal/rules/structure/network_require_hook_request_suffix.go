@@ -3,7 +3,7 @@ package structure
 import (
 	"strings"
 
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 var messageHookShouldEndWithRequest = rule.Message{

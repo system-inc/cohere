@@ -16,10 +16,10 @@ import (
 // test ever written against it and would silently bless a completely blind harness.
 func TestAControlTheComparisonMissedIsReportedMissed(t *testing.T) {
 	planted := []Control{{
-		Name:         "verify-only",
+		Name:         "cohere-only",
 		RelativePath: "control/Planted.ts",
 		Rule:         "consistency-no-enum",
-		ExpectedSide: SideVerify,
+		ExpectedSide: SideCohere,
 	}}
 
 	// A report with no differences at all: the pipeline dropped it somewhere.
@@ -38,7 +38,7 @@ func TestAControlTheComparisonMissedIsReportedMissed(t *testing.T) {
 	// a checkControls that can never detect anything.
 	found := checkControls(planted, Report{Differences: []Difference{{
 		Finding: Finding{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum"},
-		OnlyOn:  SideVerify,
+		OnlyOn:  SideCohere,
 	}}}, nil, nil)
 	if !found[0].Detected {
 		t.Fatalf("a control present in the differences on the expected side must be detected, got %q", found[0].Detail)
@@ -52,10 +52,10 @@ func TestAControlTheComparisonMissedIsReportedMissed(t *testing.T) {
 // direction is the whole claim.
 func TestAControlOnTheWrongSideIsNotDetected(t *testing.T) {
 	planted := []Control{{
-		Name:         "verify-only",
+		Name:         "cohere-only",
 		RelativePath: "control/Planted.ts",
 		Rule:         "consistency-no-enum",
-		ExpectedSide: SideVerify,
+		ExpectedSide: SideCohere,
 	}}
 
 	results := checkControls(planted, Report{Differences: []Difference{{
@@ -77,7 +77,7 @@ func TestAControlOnTheWrongSideIsNotDetected(t *testing.T) {
 // incomplete run look complete, which is the vacuous pass this package exists to prevent,
 // reintroduced by the file that reports the evidence.
 func TestAbsentCoverageReadsAsZeroRatherThanAGuess(t *testing.T) {
-	filesWalked, rulesRun := verifyCoverageFrom([]string{
+	filesWalked, rulesRun := cohereCoverageFrom([]string{
 		"graph built in 1.642s — 9973 files in the program, 3407 of them ours",
 		"  note: rule consistency-no-utils-folder listened to no files",
 	})
@@ -86,7 +86,7 @@ func TestAbsentCoverageReadsAsZeroRatherThanAGuess(t *testing.T) {
 	}
 
 	// The real line, so this test cannot pass by never parsing anything.
-	filesWalked, rulesRun = verifyCoverageFrom([]string{
+	filesWalked, rulesRun = cohereCoverageFrom([]string{
 		"lint: 1 findings — 23 rules over 3407 files, 2098302 nodes visited, in 813ms",
 	})
 	if filesWalked != 3407 || rulesRun != 23 {
@@ -127,11 +127,11 @@ func TestPlantingRefusesToOverwriteAnExistingFile(t *testing.T) {
 func TestPlantedControlsAreWrittenThenRemoved(t *testing.T) {
 	root := t.TempDir()
 	control := Control{
-		Name:         "verify-only",
+		Name:         "cohere-only",
 		RelativePath: filepath.Join("nested", "Planted.ts"),
 		Contents:     "export enum Planted { A = 'A' }\n",
 		Rule:         "consistency-no-enum",
-		ExpectedSide: SideVerify,
+		ExpectedSide: SideCohere,
 	}
 
 	planted, cleanup, err := plantControls(RunOptions{Root: root, Controls: []Control{control}})
@@ -219,12 +219,12 @@ func TestASharedControlNeedsBothGatesToReportIt(t *testing.T) {
 		t.Fatalf("the detail must say neither gate saw it, got %q", neither[0].Detail)
 	}
 
-	verifyOnly := checkControls(planted, Report{}, seen, nil)
-	if verifyOnly[0].Detected {
-		t.Fatal("a shared control only verify reported must not be detected: one side dropped it")
+	cohereOnly := checkControls(planted, Report{}, seen, nil)
+	if cohereOnly[0].Detected {
+		t.Fatal("a shared control only cohere reported must not be detected: one side dropped it")
 	}
-	if !strings.Contains(verifyOnly[0].Detail, "only verify") {
-		t.Fatalf("the detail must name the side that saw it, got %q", verifyOnly[0].Detail)
+	if !strings.Contains(cohereOnly[0].Detail, "only cohere") {
+		t.Fatalf("the detail must name the side that saw it, got %q", cohereOnly[0].Detail)
 	}
 
 	gateOnly := checkControls(planted, Report{}, nil, seen)
@@ -240,9 +240,9 @@ func TestASharedControlNeedsBothGatesToReportIt(t *testing.T) {
 // the same class of defect as every other guard in this package.
 func TestASharedControlDoesNotProveDirection(t *testing.T) {
 	provenance := Provenance{
-		VerifyFilesLinted: 3407,
+		CohereFilesLinted: 3407,
 		GateFilesLinted:   3407,
-		VerifyRulesRun:    23,
+		CohereRulesRun:    23,
 		GateRulesRun:      181,
 		ControlsRun: []ControlResult{
 			{Name: "shared-enum", Rule: "consistency-no-enum", Detected: true},
@@ -425,13 +425,13 @@ func TestStderrTailReportsOnlyWhatThereIs(t *testing.T) {
 // is, which is this package's own failure mode: a control that always passes is not a control.
 func TestASupportFileIsNotCountedAsAControl(t *testing.T) {
 	planted := []Control{
-		{Name: "real", RelativePath: "a.ts", Rule: "consistency-no-enum", ExpectedSide: SideVerify},
+		{Name: "real", RelativePath: "a.ts", Rule: "consistency-no-enum", ExpectedSide: SideCohere},
 		{Name: "support", RelativePath: "target/b.ts", ExpectsNothing: true},
 	}
 
 	results := checkControls(planted, Report{Differences: []Difference{{
 		Finding: Finding{File: "a.ts", Line: 1, Rule: "consistency-no-enum"},
-		OnlyOn:  SideVerify,
+		OnlyOn:  SideCohere,
 	}}}, nil, nil)
 
 	if len(results) != 1 {
@@ -444,9 +444,9 @@ func TestASupportFileIsNotCountedAsAControl(t *testing.T) {
 	// And it must not be reachable as evidence: a run carrying only support files has proven
 	// nothing and must say so.
 	onlySupport := Provenance{
-		VerifyFilesLinted: 3407,
+		CohereFilesLinted: 3407,
 		GateFilesLinted:   3407,
-		VerifyRulesRun:    23,
+		CohereRulesRun:    23,
 		GateRulesRun:      159,
 		ControlsRun:       checkControls([]Control{planted[1]}, Report{}, nil, nil),
 	}
@@ -460,14 +460,14 @@ func TestASupportFileIsNotCountedAsAControl(t *testing.T) {
 
 // The captured version must be the part that distinguishes two binaries.
 //
-// A local build's first line is the constant "verify dev" for every binary ever compiled from this
+// A local build's first line is the constant "cohere dev" for every binary ever compiled from this
 // tree, so keeping it produces a field that is always populated, always plausible, and never
 // distinguishes anything. That is worse than an empty field, because it looks like provenance. The
 // first implementation did exactly that, and two binaries eleven commits apart both rendered
 // identically while producing different results.
 func TestTheCapturedVersionDistinguishesTwoBuilds(t *testing.T) {
-	older := versionLineFrom("verify dev\n  platform:       darwin/arm64\n  typescript-go:  unknown (built from verify bd344fc70555)\n")
-	newer := versionLineFrom("verify dev\n  platform:       darwin/arm64\n  compiler:       unknown (built from verify 107d82cf8568)\n")
+	older := versionLineFrom("cohere dev\n  platform:       darwin/arm64\n  typescript-go:  unknown (built from cohere bd344fc70555)\n")
+	newer := versionLineFrom("cohere dev\n  platform:       darwin/arm64\n  compiler:       unknown (built from cohere 107d82cf8568)\n")
 
 	if older == newer {
 		t.Fatalf("two builds from different commits rendered identically as %q, so the field proves nothing", older)
@@ -477,8 +477,8 @@ func TestTheCapturedVersionDistinguishesTwoBuilds(t *testing.T) {
 	}
 
 	// A release build names no commit and states its version first, so that is the fallback.
-	release := versionLineFrom("verify 1.4.0\n  platform: darwin/arm64\n")
-	if release != "verify 1.4.0" {
+	release := versionLineFrom("cohere 1.4.0\n  platform: darwin/arm64\n")
+	if release != "cohere 1.4.0" {
 		t.Fatalf("a release build must fall back to its version line, got %q", release)
 	}
 
@@ -498,13 +498,13 @@ func TestTheCapturedVersionDistinguishesTwoBuilds(t *testing.T) {
 // perturbation is how a tree with a real gap of zero gets reported as having one.
 func TestAnyFindingInAPlantedFileIsPlanted(t *testing.T) {
 	planted := []Control{
-		{Name: "declared", RelativePath: "control/Planted.ts", Rule: "consistency-no-enum", ExpectedSide: SideVerify},
+		{Name: "declared", RelativePath: "control/Planted.ts", Rule: "consistency-no-enum", ExpectedSide: SideCohere},
 		{Name: "support", RelativePath: "control/Target.ts", ExpectsNothing: true},
 	}
 
 	report := Report{Differences: []Difference{
 		// The rule the control was written for.
-		{Finding: Finding{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum"}, OnlyOn: SideVerify},
+		{Finding: Finding{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum"}, OnlyOn: SideCohere},
 		// A different rule, same planted file. Still the harness's own footprint.
 		{Finding: Finding{File: "control/Planted.ts", Line: 1, Rule: "consistency-organize-imports"}, OnlyOn: SideGate},
 		// A support file asserts nothing but a rule may still fire on it.
@@ -541,10 +541,10 @@ func TestAnyFindingInAPlantedFileIsPlanted(t *testing.T) {
 // works would fail on the evidence that it does.
 func TestAPlantedBothActiveDifferenceDoesNotBlockAgreement(t *testing.T) {
 	report := Compare(Inputs{
-		VerifyFindings:   []Finding{{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum", Side: SideVerify}},
-		VerifyPopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 23},
+		CohereFindings:   []Finding{{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum", Side: SideCohere}},
+		CoherePopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 23},
 		GatePopulation:   Population{FilesWalked: 3407},
-		VerifyRules:      map[string]bool{"consistency-no-enum": true},
+		CohereRules:      map[string]bool{"consistency-no-enum": true},
 		ConfiguredRules:  map[string]bool{"consistency-no-enum": true},
 	})
 	report.Provenance = provenProvenance()
@@ -554,7 +554,7 @@ func TestAPlantedBothActiveDifferenceDoesNotBlockAgreement(t *testing.T) {
 	}
 
 	markPlantedDifferences(&report, []Control{
-		{Name: "planted", RelativePath: "control/Planted.ts", Rule: "consistency-no-enum", ExpectedSide: SideVerify},
+		{Name: "planted", RelativePath: "control/Planted.ts", Rule: "consistency-no-enum", ExpectedSide: SideCohere},
 	})
 
 	if !report.Agreed() {
@@ -625,7 +625,7 @@ func TestTheTwoMatchersAnswerDifferentQuestions(t *testing.T) {
 
 // A local build's own disclaimer must travel with its commit.
 //
-// `verify -version` states, in a `note:` line, that a local build's rules are whatever was on disk
+// `cohere -version` states, in a `note:` line, that a local build's rules are whatever was on disk
 // when it compiled. Carrying only the commit is worse than carrying nothing: the sha is real, it
 // resolves, and it reads as provenance while saying nothing about uncommitted rules linked in
 // beside it.
@@ -635,9 +635,9 @@ func TestTheTwoMatchersAnswerDifferentQuestions(t *testing.T) {
 // they made. A disclosure that has to be sought is a disclosure that gets skipped.
 func TestALocalBuildCarriesItsOwnDisclaimer(t *testing.T) {
 	local := versionLineFrom(
-		"verify dev\n" +
+		"cohere dev\n" +
 			"  platform:       darwin/arm64\n" +
-			"  compiler:       unknown (built from verify ad96b871c377)\n" +
+			"  compiler:       unknown (built from cohere ad96b871c377)\n" +
 			"  note:           a local build, so the rules are whatever was on disk when it was compiled\n",
 	)
 
@@ -650,7 +650,7 @@ func TestALocalBuildCarriesItsOwnDisclaimer(t *testing.T) {
 
 	// A build with a commit and no note carries the commit alone rather than inventing a
 	// qualification, so the disclaimer means something when it does appear.
-	quiet := versionLineFrom("verify 1.4.0\n  compiler: unknown (built from verify 107d82cf8568)\n")
+	quiet := versionLineFrom("cohere 1.4.0\n  compiler: unknown (built from cohere 107d82cf8568)\n")
 	if !strings.Contains(quiet, "107d82cf8568") {
 		t.Fatalf("the commit must survive without a note, got %q", quiet)
 	}
@@ -659,15 +659,15 @@ func TestALocalBuildCarriesItsOwnDisclaimer(t *testing.T) {
 	}
 
 	// A release build naming no commit still falls back to its version line.
-	release := versionLineFrom("verify 1.4.0\n  platform: darwin/arm64\n")
-	if release != "verify 1.4.0" {
+	release := versionLineFrom("cohere 1.4.0\n  platform: darwin/arm64\n")
+	if release != "cohere 1.4.0" {
 		t.Fatalf("a release build must fall back to its version line, got %q", release)
 	}
 }
 
 // The `-rules` contract is bare names on stdout, and the guard must reject anything else.
 //
-// This is pinned because the contract was tested by accident rather than by design. `verify -rules`
+// This is pinned because the contract was tested by accident rather than by design. `cohere -rules`
 // gained a provenance note, and the parser kept working only because the note goes to stderr while
 // the names go to stdout. Had it landed on stdout the guard would have rejected the whole list and
 // the harness would have fallen back to the slower path, or failed, on correct output.
@@ -675,7 +675,7 @@ func TestALocalBuildCarriesItsOwnDisclaimer(t *testing.T) {
 // The guard stays strict rather than learning to skip prose, because a line the parser does not
 // understand is a contract change, and silently tolerating it is how a format drift becomes a short
 // rule list. A short list is the dangerous failure: every missing name becomes a rule the harness
-// believes verify lacks, which turns real disagreements into excused coverage gaps.
+// believes cohere lacks, which turns real disagreements into excused coverage gaps.
 func TestTheRulesContractIsBareNamesOnly(t *testing.T) {
 	bare := "consistency-no-enum\nreact-component-no-multiple-primary\n"
 	names, err := namesFromRuleLines(bare)
@@ -686,7 +686,7 @@ func TestTheRulesContractIsBareNamesOnly(t *testing.T) {
 		t.Fatalf("expected 2 names, got %d", len(names))
 	}
 
-	// The exact note `verify -rules` emits, which lives on stderr today. If it ever reaches stdout
+	// The exact note `cohere -rules` emits, which lives on stderr today. If it ever reaches stdout
 	// this must fail loudly rather than be absorbed.
 	withNote := bare + "note: 39 rules from a local build, so this is whatever was on disk when it was compiled\n"
 	if _, err := namesFromRuleLines(withNote); err == nil {
@@ -694,6 +694,6 @@ func TestTheRulesContractIsBareNamesOnly(t *testing.T) {
 	}
 
 	if _, err := namesFromRuleLines("   \n\n"); err == nil {
-		t.Fatal("an empty list must be rejected: a harness believing verify implements nothing excuses every disagreement")
+		t.Fatal("an empty list must be rejected: a harness believing cohere implements nothing excuses every disagreement")
 	}
 }

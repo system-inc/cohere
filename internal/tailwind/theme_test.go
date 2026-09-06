@@ -368,7 +368,7 @@ func TestThemeMatchesEngine(t *testing.T) {
 
 // TestThemeRepositoriesDiffer is the measurement the whole port argues from.
 //
-// verify shipped generated tables built from one repository and linted three with them. That is
+// cohere shipped generated tables built from one repository and linted three with them. That is
 // only a defect if two repositories on the same Tailwind actually resolve different themes, so this
 // asserts it directly rather than leaving it as the premise of a design document. If this test ever
 // passes trivially because the two themes became identical, the assertion below fails rather than
@@ -449,7 +449,7 @@ func TestThemeRepositoriesDiffer(t *testing.T) {
 // TestThemeLoaderReportsSkippedDirectives pins which directives the loader knows it is not acting
 // on.
 //
-// `@config` can, upstream, contribute theme values through a JavaScript config that verify never
+// `@config` can, upstream, contribute theme values through a JavaScript config that cohere never
 // runs. That is a real gap in this component, and the honest handling is to report it: a
 // repository that started declaring theme values in TypeScript would produce a theme quietly short
 // by that many keys, and this is what makes that arrive as a visible directive rather than as a

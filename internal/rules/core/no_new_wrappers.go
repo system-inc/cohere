@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // wrapperObjects are the three primitive wrapper constructors upstream names, in upstream's order.

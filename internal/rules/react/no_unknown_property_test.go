@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // noUnknownPropertyFile is where the fixtures pretend to live.
@@ -91,7 +91,7 @@ func TestNoUnknownPropertyFires(t *testing.T) {
       `, ``, []string{`unknownProp`}},
 
 		// The only two corpus cases carrying `settings.react.version`, and each is clean UPSTREAM
-		// only because of that setting. verify has no shared-settings surface, so this port answers
+		// only because of that setting. cohere has no shared-settings surface, so this port answers
 		// as though there were none, and both report. Recorded here at this port's verdict with the
 		// upstream one named, rather than deleted: the gap is a missing configuration surface, not
 		// a defect in the judgment, and deleting the cases would hide it.

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // The corpus placement measurement for the rules moved onto the live design system.

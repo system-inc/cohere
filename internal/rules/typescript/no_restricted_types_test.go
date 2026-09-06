@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 const noRestrictedTypesFile = "/repository/source/Restricted.ts"
@@ -20,7 +20,7 @@ func noRestrictedTypesCaseName(index int) string {
 // That is the whole point of doing it this way: the decoder is where the three wire shapes collapse
 // into one struct and where `false` and `null` become "not banned", and a fixture handed a
 // hand-built struct would leave every line of it untested. The options text below is the bare
-// object rather than upstream's one-element array, because verify's config layer unwraps the
+// object rather than upstream's one-element array, because cohere's config layer unwraps the
 // severity tuple before a decoder ever sees it.
 func noRestrictedTypesDecoded(t *testing.T, optionsJson string) any {
 	t.Helper()
@@ -99,7 +99,7 @@ func TestNoRestrictedTypesStaysSilent(t *testing.T) {
 		{
 			// A banned entry written as `false`, which upstream's rule reads as not banned. Its
 			// schema rejects the spelling before the rule sees it, so this is unreachable through
-			// upstream's own configuration; verify has no such schema layer, so a config here can
+			// upstream's own configuration; cohere has no such schema layer, so a config here can
 			// contain one and the branch decides what happens.
 			sourceText:  "let value: Foo;\n",
 			optionsJson: `{"types":{"Foo":false}}`,

@@ -14,11 +14,11 @@ import (
 // engine does exactly the same work per byte. Two honest measurements of the same engine can
 // therefore disagree by 2x with neither being wrong, which is what happened here.
 //
-//	VERIFY_COST_LIST=/path/to/list go test ./internal/prettier/ -run TestCost -v
+//	COHERE_COST_LIST=/path/to/list go test ./internal/prettier/ -run TestCost -v
 func TestCost(t *testing.T) {
-	listPath := os.Getenv("VERIFY_COST_LIST")
+	listPath := os.Getenv("COHERE_COST_LIST")
 	if listPath == "" {
-		t.Skip("set VERIFY_COST_LIST")
+		t.Skip("set COHERE_COST_LIST")
 	}
 	listBytes, err := os.ReadFile(listPath)
 	if err != nil {

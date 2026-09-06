@@ -19,11 +19,11 @@ func TestPlatformManifestDeclaresTheOperatingSystemAndArchitectureNpmResolvesBy(
 		expectedOperatingSystem string
 		expectedArchitecture    string
 	}{
-		{Target{"darwin", "arm64"}, "@verify/darwin-arm64", "darwin", "arm64"},
-		{Target{"darwin", "amd64"}, "@verify/darwin-x64", "darwin", "x64"},
-		{Target{"linux", "amd64"}, "@verify/linux-x64", "linux", "x64"},
-		{Target{"windows", "amd64"}, "@verify/win32-x64", "win32", "x64"},
-		{Target{"windows", "arm64"}, "@verify/win32-arm64", "win32", "arm64"},
+		{Target{"darwin", "arm64"}, "@cohere/darwin-arm64", "darwin", "arm64"},
+		{Target{"darwin", "amd64"}, "@cohere/darwin-x64", "darwin", "x64"},
+		{Target{"linux", "amd64"}, "@cohere/linux-x64", "linux", "x64"},
+		{Target{"windows", "amd64"}, "@cohere/win32-x64", "win32", "x64"},
+		{Target{"windows", "arm64"}, "@cohere/win32-arm64", "win32", "arm64"},
 	}
 
 	for _, testCase := range cases {
@@ -59,12 +59,12 @@ func TestPlatformManifestMatchesWhatTheLauncherLooksFor(t *testing.T) {
 }
 
 func TestPlatformManifestClaimsNoCommand(t *testing.T) {
-	// Only the dispatcher owns the `verify` name. A platform package with a `bin` field would race
+	// Only the dispatcher owns the `cohere` name. A platform package with a `bin` field would race
 	// it for the same link in node_modules/.bin, and which one wins depends on install order.
 	for _, target := range Targets {
 		manifest := decodeManifest(t, mustPlatformManifest(t, target, "1.2.3"))
 		if _, claimed := manifest["bin"]; claimed {
-			t.Errorf("%s declares a bin field, which would fight the dispatcher for node_modules/.bin/verify", target)
+			t.Errorf("%s declares a bin field, which would fight the dispatcher for node_modules/.bin/cohere", target)
 		}
 	}
 }
@@ -96,11 +96,11 @@ func TestDispatcherDependsOnEveryPlatformExactly(t *testing.T) {
 
 // Both command names must be installed, and both must reach the same launcher.
 //
-// Two entries rather than one because `v` is what gets typed on the loop and `verify` is what reads
+// Two entries rather than one because `v` is what gets typed on the loop and `cohere` is what reads
 // in a script, and because a single letter is short enough to collide with something already on a
 // machine. A consumer who hits that keeps a working command instead of a broken install.
 //
-// Asserted per name rather than by counting. An earlier version of this test checked only `verify`,
+// Asserted per name rather than by counting. An earlier version of this test checked only `cohere`,
 // which would have passed unchanged if `v` had silently stopped being declared: the guarantee it
 // stated was true and the guarantee anyone reading it believed was not.
 func TestDispatcherOwnsBothCommandNames(t *testing.T) {
@@ -145,7 +145,7 @@ func TestLauncherHoldsTheNoFallbackRule(t *testing.T) {
 
 	// The historical defect, spelled out: resolving to a bare name and letting the shell find
 	// something. If this ever appears, the launcher can spawn a stranger.
-	for _, forbidden := range []string{"spawnSync('verify'", `spawnSync("verify"`, "PATH"} {
+	for _, forbidden := range []string{"spawnSync('cohere'", `spawnSync("cohere"`, "PATH"} {
 		if strings.Contains(launcher, forbidden) {
 			t.Errorf("the launcher contains %q, which is the fallback-to-PATH bug this rule forbids", forbidden)
 		}

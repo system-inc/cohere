@@ -37,7 +37,7 @@ func (target Target) PackageName() string {
 // DirectoryName is the on-disk directory for this target's package, like "darwin-arm64".
 //
 // It is the package name without the scope, so that a staged release directory reads the same way
-// `node_modules/@verify/` does.
+// `node_modules/@cohere/` does.
 func (target Target) DirectoryName() string {
 	return fmt.Sprintf("%s-%s", NpmOperatingSystem(target.GoOperatingSystem), NpmArchitecture(target.GoArchitecture))
 }

@@ -3,8 +3,8 @@ package typescript
 import (
 	"encoding/json"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // NoDeprecatedOptions is the rule's one option: an allowlist of things whose deprecation is
@@ -23,7 +23,7 @@ type NoDeprecatedOptions struct {
 
 // noDeprecatedRawOptions is the wire shape.
 //
-// verify's config layer strips ESLint's `[severity, options]` tuple and stores only the second
+// cohere's config layer strips ESLint's `[severity, options]` tuple and stores only the second
 // element, so what arrives here is the bare object rather than upstream's one-element array.
 type noDeprecatedRawOptions struct {
 	Allow []noDeprecatedRawSpecifier `json:"allow"`

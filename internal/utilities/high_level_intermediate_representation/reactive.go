@@ -31,10 +31,10 @@
 // `useState`, the dispatch from `useReducer`, the ref object from `useRef`. Without that exemption
 // every `setX` in the tree is reactive and every dependency array containing one is wrong.
 //
-// # Verify has no shape registry, and the checker replaces it for the stable half only
+// # Cohere has no shape registry, and the checker replaces it for the stable half only
 //
 // Upstream identifies all of this through `shapeId`: `BuiltInUseState`, `BuiltInUseRefObject` and
-// friends, seeded into an `Environment` and propagated by 1,450 lines of type unification. Verify
+// friends, seeded into an `Environment` and propagated by 1,450 lines of type unification. Cohere
 // has none of that and does not need most of it, because the checker already knows.
 //
 // The split, measured on our own checker rather than assumed. Probed by printing the type alias and

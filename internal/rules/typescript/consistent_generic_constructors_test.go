@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 const consistentGenericConstructorsFile = "/repository/source/Constructing.ts"
@@ -17,7 +17,7 @@ func consistentGenericConstructorsCaseName(index int) string {
 // consistentGenericConstructorsSettingsFor routes a mode through the rule's own exported decoder.
 //
 // Building the options struct directly would leave the decoder untested, and the decoder is where
-// the two lines most likely to be wrong live: the bare-string wire shape verify actually delivers,
+// the two lines most likely to be wrong live: the bare-string wire shape cohere actually delivers,
 // and the fallback that keeps a bare `"error"` meaning upstream's default rather than meaning an
 // empty mode that matches no arm.
 func consistentGenericConstructorsSettingsFor(t *testing.T, wire string) any {
@@ -484,7 +484,7 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
 
 		// The array spelling an ESLint config is written in, accepted so a copied setting is read
 		// rather than refused. No upstream counterpart, because upstream never sees the unwrapped
-		// form verify delivers.
+		// form cohere delivers.
 		{wire: `["type-annotation"]`, want: ConsistentGenericConstructorsTypeAnnotation},
 		{wire: `["constructor"]`, want: ConsistentGenericConstructorsConstructor},
 

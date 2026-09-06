@@ -2,7 +2,7 @@ package typescript
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 var messageDefaultParamLastShouldBeLast = rule.Message{
@@ -40,7 +40,7 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 // The rest element sets no flag, so nothing behind it is condemned by it alone.
 //
 // The backwards sweep also means the findings are produced in reverse source order. ESLint sorts
-// its diagnostics before reporting so this is invisible upstream, and `verify` sorts too, but a
+// its diagnostics before reporting so this is invisible upstream, and `cohere` sorts too, but a
 // forward sweep carrying "is a plain parameter still ahead" is the equivalent formulation and is
 // what is written here, so that the findings come out in source order without depending on the
 // sort. Both readings were checked against the corpus's four multi-finding cases, which pin the

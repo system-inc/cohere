@@ -1,23 +1,23 @@
-module github.com/system-inc/verify
+module github.com/system-inc/cohere
 
 go 1.27
 
 replace (
-	github.com/microsoft/TypeScript/tsc/shim/ast => ./shim/ast
-	github.com/microsoft/TypeScript/tsc/shim/bundled => ./shim/bundled
-	github.com/microsoft/TypeScript/tsc/shim/checker => ./shim/checker
-	github.com/microsoft/TypeScript/tsc/shim/compiler => ./shim/compiler
-	github.com/microsoft/TypeScript/tsc/shim/core => ./shim/core
-	github.com/microsoft/TypeScript/tsc/shim/format => ./shim/format
-	github.com/microsoft/TypeScript/tsc/shim/incremental => ./shim/incremental
-	github.com/microsoft/TypeScript/tsc/shim/locale => ./shim/locale
-	github.com/microsoft/TypeScript/tsc/shim/parser => ./shim/parser
-	github.com/microsoft/TypeScript/tsc/shim/scanner => ./shim/scanner
-	github.com/microsoft/TypeScript/tsc/shim/tsoptions => ./shim/tsoptions
-	github.com/microsoft/TypeScript/tsc/shim/tspath => ./shim/tspath
-	github.com/microsoft/TypeScript/tsc/shim/vfs => ./shim/vfs
-	github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs => ./shim/vfs/cachedvfs
-	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs => ./shim/vfs/osvfs
+	github.com/microsoft/TypeScript/tsc/shim/ast => ./TypeScript-shim/ast
+	github.com/microsoft/TypeScript/tsc/shim/bundled => ./TypeScript-shim/bundled
+	github.com/microsoft/TypeScript/tsc/shim/checker => ./TypeScript-shim/checker
+	github.com/microsoft/TypeScript/tsc/shim/compiler => ./TypeScript-shim/compiler
+	github.com/microsoft/TypeScript/tsc/shim/core => ./TypeScript-shim/core
+	github.com/microsoft/TypeScript/tsc/shim/format => ./TypeScript-shim/format
+	github.com/microsoft/TypeScript/tsc/shim/incremental => ./TypeScript-shim/incremental
+	github.com/microsoft/TypeScript/tsc/shim/locale => ./TypeScript-shim/locale
+	github.com/microsoft/TypeScript/tsc/shim/parser => ./TypeScript-shim/parser
+	github.com/microsoft/TypeScript/tsc/shim/scanner => ./TypeScript-shim/scanner
+	github.com/microsoft/TypeScript/tsc/shim/tsoptions => ./TypeScript-shim/tsoptions
+	github.com/microsoft/TypeScript/tsc/shim/tspath => ./TypeScript-shim/tspath
+	github.com/microsoft/TypeScript/tsc/shim/vfs => ./TypeScript-shim/vfs
+	github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs => ./TypeScript-shim/vfs/cachedvfs
+	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs => ./TypeScript-shim/vfs/osvfs
 )
 
 require (
@@ -37,7 +37,7 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs v0.0.0
 
-	// A JavaScript interpreter, in a Go linter, on purpose. verify replaces Prettier, and replacing
+	// A JavaScript interpreter, in a Go linter, on purpose. cohere replaces Prettier, and replacing
 	// Prettier means matching it byte for byte on an already-Prettier-formatted tree. typescript-go's
 	// own formatter cannot: FormatCodeSettings has no printWidth and no line-breaking engine, and
 	// 21.8% of tracked files diverge from our fork after every settings-reachable fix. The only thing

@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // StrictMode selects which spelling of strict mode the rule asks for.
@@ -209,7 +209,7 @@ func checkStrict(ctx rule.Context, file *ast.Node, settings StrictOptions) {
 		// return, and Function otherwise.
 		//
 		// Only the first half is expressible. `ecmaFeatures.globalReturn` is a PARSER feature
-		// with no counterpart in verify, so the second half can never fire here -- and it is not
+		// with no counterpart in cohere, so the second half can never fire here -- and it is not
 		// a detail: seventeen of upstream's cases turn on it, and the same source under the same
 		// options is clean with it and reports twice without it. Those cases are recorded as
 		// unimportable in the test rather than being approximated.

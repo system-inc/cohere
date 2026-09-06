@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // PreferPromiseRejectErrorsOptions is upstream's option struct, plus the one split our wire format
@@ -131,7 +131,7 @@ func buildPreferPromiseRejectErrorsMessage() rule.Message {
 //
 // # One unresolved real-tree difference, recorded rather than left for the next reader to find
 //
-// On `modules/samsung/frame-tv/FrameTvApi.ts` the full `verify` run produces FIVE findings and
+// On `modules/samsung/frame-tv/FrameTvApi.ts` the full `cohere` run produces FIVE findings and
 // upstream, driven over the same file against the repository's root tsconfig, produces SIX. The
 // missing one is line 644, a `reject(error)` inside an immediately-invoked async function nested
 // under a `function (resolve, reject)` executor.

@@ -1,4 +1,4 @@
-# Adding a rule to verify
+# Adding a rule to cohere
 
 Every guard below names the defect that earned it. None is a style preference, and the numbers are
 the reason to believe them: a rule shipped 187 green fixtures while every finding pointed at the
@@ -49,7 +49,7 @@ that case in your own corpus. If it is not there, it is not yours.
 ## Fidelity is to what a rule decides, not how it obtains what it needs
 
 The originals walk the filesystem, read `process.cwd()`, or re-parse a neighbouring file, because
-ESLint hands them one file at a time and gives them no program. Verify has the program, one resident
+ESLint hands them one file at a time and gives them no program. Cohere has the program, one resident
 type graph, every file already parsed. **Reproducing a workaround for a constraint we do not have is
 not fidelity.** Reproduce the decision: which inputs report, which do not, where the finding points,
 what it offers.
@@ -204,8 +204,8 @@ a real measurement of a smaller thing.
 
 ## Registering, and the ways a rule is inert
 
-Add to the package's `register.go`, and add the rule name to `VerifySettings.json` in the rules
-block. **Not `.oxlintrc.json`**, which is oxlint's own config and which verify no longer reads.
+Add to the package's `register.go`, and add the rule name to `CohereSettings.json` in the rules
+block. **Not `.oxlintrc.json`**, which is oxlint's own config and which cohere no longer reads.
 
 **Grep that file for your rule name first.** Many rules are already enabled. A second entry produces
 valid JSON with a duplicate key, one silently wins, and nothing complains.
@@ -227,11 +227,11 @@ decoder.**
 
 ## Run it dry against the real tree
 
-    go build -o /tmp/verify-<yourname> ./cmd/verify
-    cd /Users/kirkouimet/Projects/ahra && /tmp/verify-<yourname> --no-fix --lint --timing 2>&1 | grep <your-rule>
+    go build -o /tmp/cohere-<yourname> ./cmd/cohere
+    cd /Users/kirkouimet/Projects/ahra && /tmp/cohere-<yourname> --no-fix --lint --timing 2>&1 | grep <your-rule>
 
 **`--no-fix` is not optional, and `--fix` is not what causes writing.** The fix phase runs by
-default, so a bare `verify --timing` mutates the tree. A seeded probe file was rewritten this way.
+default, so a bare `cohere --timing` mutates the tree. A seeded probe file was rewritten this way.
 
 This tells you three things fixtures cannot: whether it fires on real code and whether those findings
 are right, what it costs (one rule was 64.5% of all rule time because it rebuilt a map per file), and
@@ -243,9 +243,9 @@ tsconfig includes only TypeScript extensions and their rule declines JavaScript,
 does. Two moves resolve it: compare against a control rule offered the same files and known to be in
 the same state, and build a small tree that should trigger the rule.
 
-**A probe tree's config must be named `VerifySettings.json` and puts rules at the JSON top level.** A
-wrong filename is worse than a wrong shape: verify exits before linting and prints nothing your grep
-will catch, so you get a zero that was never a measurement. An author seeded `{"verify":{"rules":...}}`
+**A probe tree's config must be named `CohereSettings.json` and puts rules at the JSON top level.** A
+wrong filename is worse than a wrong shape: cohere exits before linting and prints nothing your grep
+will catch, so you get a zero that was never a measurement. An author seeded `{"cohere":{"rules":...}}`
 and got `was offered no files`, which reads exactly like the inert case.
 
 **Name probe files by index, never by the identifier under test.** macOS has a case-insensitive

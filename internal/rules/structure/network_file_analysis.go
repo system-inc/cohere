@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/module"
 )
 
 // Per-file analysis of the NetworkService hooks a file declares.
@@ -16,7 +16,7 @@ import (
 // rule reaches it first, because a helper written inside its first consumer is shaped for that
 // consumer and the next two get something that almost fits.
 //
-// The original memoizes on a module-level WeakMap keyed by the Program node. verify has the same
+// The original memoizes on a module-level WeakMap keyed by the Program node. cohere has the same
 // mechanism as a first-class thing: rule.Cached on the shared per-file cache, which every rule in a
 // run shares, so the walk happens once per file rather than once per rule per file.
 

@@ -6,17 +6,17 @@ import "testing"
 func TestAnAcknowledgedDifferenceIsClassifiedAcknowledged(t *testing.T) {
 	known := []AcknowledgedDifference{{
 		File: "app/Probe.tsx", Line: 12, Rule: "storage-no-direct-local-storage",
-		Side: SideVerify, Reason: "the gate cannot see this shape",
+		Side: SideCohere, Reason: "the gate cannot see this shape",
 	}}
 	index := acknowledgedIndex(known)
 	inputs := Inputs{
-		VerifyRules:     map[string]bool{"storage-no-direct-local-storage": true},
+		CohereRules:     map[string]bool{"storage-no-direct-local-storage": true},
 		ConfiguredRules: map[string]bool{"storage-no-direct-local-storage": true},
 		Acknowledged:    known,
 	}
 
 	exact := Finding{File: "app/Probe.tsx", Line: 12, Rule: "storage-no-direct-local-storage"}
-	if got := classifyFinding(exact, SideVerify, inputs, index); got != ClassificationAcknowledged {
+	if got := classifyFinding(exact, SideCohere, inputs, index); got != ClassificationAcknowledged {
 		t.Errorf("the acknowledged finding was classified %q rather than acknowledged", got)
 	}
 }
@@ -30,11 +30,11 @@ func TestAnAcknowledgedDifferenceIsClassifiedAcknowledged(t *testing.T) {
 func TestAnAcknowledgementExcusesNothingElse(t *testing.T) {
 	known := []AcknowledgedDifference{{
 		File: "app/Probe.tsx", Line: 12, Rule: "storage-no-direct-local-storage",
-		Side: SideVerify, Reason: "the gate cannot see this shape",
+		Side: SideCohere, Reason: "the gate cannot see this shape",
 	}}
 	index := acknowledgedIndex(known)
 	inputs := Inputs{
-		VerifyRules:     map[string]bool{"storage-no-direct-local-storage": true},
+		CohereRules:     map[string]bool{"storage-no-direct-local-storage": true},
 		ConfiguredRules: map[string]bool{"storage-no-direct-local-storage": true},
 		Acknowledged:    known,
 	}
@@ -44,9 +44,9 @@ func TestAnAcknowledgementExcusesNothingElse(t *testing.T) {
 		finding Finding
 		side    Side
 	}{
-		{"a different line in the same file", Finding{File: "app/Probe.tsx", Line: 13, Rule: "storage-no-direct-local-storage"}, SideVerify},
-		{"the same line in a different file", Finding{File: "app/Other.tsx", Line: 12, Rule: "storage-no-direct-local-storage"}, SideVerify},
-		{"a different rule at the same place", Finding{File: "app/Probe.tsx", Line: 12, Rule: "no-self-assign"}, SideVerify},
+		{"a different line in the same file", Finding{File: "app/Probe.tsx", Line: 13, Rule: "storage-no-direct-local-storage"}, SideCohere},
+		{"the same line in a different file", Finding{File: "app/Other.tsx", Line: 12, Rule: "storage-no-direct-local-storage"}, SideCohere},
+		{"a different rule at the same place", Finding{File: "app/Probe.tsx", Line: 12, Rule: "no-self-assign"}, SideCohere},
 		{"the same finding from the other side", Finding{File: "app/Probe.tsx", Line: 12, Rule: "storage-no-direct-local-storage"}, SideGate},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {

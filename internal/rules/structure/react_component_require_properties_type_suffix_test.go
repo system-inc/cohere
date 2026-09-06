@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 const typeSuffixFile = "/repository/source/components/Button.tsx"
@@ -95,7 +95,7 @@ func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
 		// A destructured parameter with a badly named type reference. This is the shape the tree
 		// actually has, in MenuItem.tsx, and the rule reported it until the identifier check was
 		// added: a genuine violation of the convention that the gate does not report, which would
-		// have become a second only-verify divergence arrived at by accident rather than a ruling.
+		// have become a second only-cohere divergence arrived at by accident rather than a ruling.
 		//
 		// Destructuring is `react-component-no-destructuring`'s business, and a destructured
 		// parameter's type is often composed (`TypeA & { ... }`) rather than the single name this

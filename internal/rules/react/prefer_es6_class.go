@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // PreferEs6ClassMode is which of the two component styles the configuration wants.

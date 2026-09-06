@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 var messageUnicodeBomExpected = rule.Message{
@@ -30,7 +30,7 @@ var messageUnicodeBomUnexpected = rule.Message{
 // Three bytes, `ef bb bf`, rather than the single code point `U+FEFF` an ESLint rule reasons about.
 // This is the whole difference between the two ports: ESLint reads its source as a JavaScript
 // string with the mark already stripped into a `hasBOM` flag, so its fixer can write the sentinel
-// range `[-1, 0)` and let the fix applier interpret it. verify's source text is the file's bytes,
+// range `[-1, 0)` and let the fix applier interpret it. cohere's source text is the file's bytes,
 // measured: `SourceFile.Text()` on a marked file begins `ef bb bf` and the source file NODE's own
 // range starts after them, at position 3. So the mark is ordinary text here and the repair is an
 // ordinary edit over `[0, 3)`.
@@ -80,7 +80,7 @@ func DefaultUnicodeBomSettings() UnicodeBomOptions {
 // `never` and the zero value is the empty string, which reports nothing at all.
 //
 // The second reason is the wire shape. Upstream's option is a bare STRING at the top of its schema
-// array, so a config writes `["error", "always"]` and verify's config layer strips the tuple before
+// array, so a config writes `["error", "always"]` and cohere's config layer strips the tuple before
 // dispatch: what arrives here is the JSON `"always"`, not `["always"]` and not `{"require":...}`.
 // A decoder built by naming a struct field could not read that at all.
 //
@@ -147,8 +147,8 @@ func (e *unicodeBomUnknownSetting) Error() string {
 //
 // A file beginning with the mark TWICE reports once and this rule's single fix removes one of them,
 // leaving a file that still begins with a mark. That is not a defect and it matches upstream:
-// measured, `linter.verify` on a doubled mark returns exactly one message carrying one fix, and it
-// is `verifyAndFix`'s re-lint loop, not the rule, that strips the second on a later pass. A port
+// measured, `linter.cohere` on a doubled mark returns exactly one message carrying one fix, and it
+// is `cohereAndFix`'s re-lint loop, not the rule, that strips the second on a later pass. A port
 // removing both in one edit would be doing something upstream's rule never does.
 //
 // # This rule is registered and NOT enabled, because it cannot see its subject here

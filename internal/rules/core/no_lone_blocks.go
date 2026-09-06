@@ -2,7 +2,7 @@ package core
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 var messageRedundantBlock = rule.Message{
@@ -71,7 +71,7 @@ var messageRedundantNestedBlock = rule.Message{
 // in sloppy mode. Upstream's corpus runs `{ function bar() {} }` twice at the SAME ecmaVersion and
 // gets opposite verdicts, differing only in `impliedStrict`.
 //
-// verify lints TypeScript, and a TypeScript file is a module, and a module body is always strict.
+// cohere lints TypeScript, and a TypeScript file is a module, and a module body is always strict.
 // So the sloppy arm has no reachable configuration and the function declaration always binds.
 // Measured rather than reasoned: driving eslint 10.8.1 on that input gives zero findings under
 // `sourceType: "module"` and one under `"script"`. Reproducing upstream's scope query would be
@@ -274,7 +274,7 @@ func holdsBlockScopedBinding(block *ast.Node) bool {
 				continue
 			}
 			// `NodeFlagsBlockScoped` is `Let | Const | Using` at
-			// `typescript-go/tsc/internal/ast/nodeflags.go:49`, so it already covers `using` and
+			// `TypeScript/tsc/internal/ast/nodeflags.go:49`, so it already covers `using` and
 			// `await using` and a separate flag test for them would be dead. Checked rather than
 			// assumed, because the name reads narrower than the constant is.
 			if declarationList.Flags&ast.NodeFlagsBlockScoped != 0 {

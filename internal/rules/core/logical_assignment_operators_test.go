@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // The corpus is ESLint's own, imported verbatim from
@@ -1927,7 +1927,7 @@ func TestLogicalAssignmentOperatorsSuggestionMessages(t *testing.T) {
 
 // TestDecodeLogicalAssignmentOperatorsOptions puts the decoder under test directly.
 //
-// The wire shape has no upstream counterpart. verify's config layer strips the severity from the
+// The wire shape has no upstream counterpart. cohere's config layer strips the severity from the
 // head of the tuple, so what arrives here is upstream's positional array rather than the single
 // object `rule.DecodeOptionsInto` would decode. The default is also not the zero value: an absent
 // option means `always`, while the zero value of the setting is the empty string, which matches

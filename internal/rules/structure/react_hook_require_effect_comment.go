@@ -4,9 +4,9 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/comments"
-	"github.com/system-inc/verify/internal/utilities/react"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/comments"
+	"github.com/system-inc/cohere/internal/utilities/react"
 )
 
 var messageMissingEffectComment = rule.Message{

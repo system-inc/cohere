@@ -15,7 +15,7 @@
 package regexpattern
 
 import (
-	"github.com/system-inc/verify/internal/utilities/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/regexsyntax"
 )
 
 // CharacterKind is how a character was written, which is a different question from what it matches.

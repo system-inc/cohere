@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 const arrayTypeFile = "/repository/source/Thing.ts"
@@ -1335,7 +1335,7 @@ func TestArrayTypeRendersTheMessageUpstreamRenders(t *testing.T) {
 // does fire and the rule would propose a rewrite that does not even parse.
 //
 // This shipped in the first draft and no fixture could see it. It was found by running the rule
-// against the real tree and diffing: verify reported 713 findings where ESLint reported 711, and
+// against the real tree and diffing: cohere reported 713 findings where ESLint reported 711, and
 // both extra were `extends Array<...>` in one file. All five rows below are the installed 8.67.0
 // build's verdict, and the last is the control that separates "declined the heritage clause" from
 // "never reached the shape".
@@ -1411,7 +1411,7 @@ func TestArrayTypeDeclinesAGenericWithTheWrongArgumentCount(t *testing.T) {
 // than the fix text, because a fix writing the right string over the wrong span passes a text
 // comparison.
 //
-// All four outputs are what the installed 8.67.0 build's `verifyAndFix` wrote.
+// All four outputs are what the installed 8.67.0 build's `cohereAndFix` wrote.
 func TestArrayTypeWrapsAReadonlyRewriteOnlyWhenItHasTo(t *testing.T) {
 	cases := []struct {
 		sourceText string

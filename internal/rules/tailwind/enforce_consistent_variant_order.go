@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	"github.com/system-inc/cohere/internal/rule"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // messageVariantOrder names both spellings, because the reader has to see the difference.
@@ -61,7 +61,7 @@ type EnforceConsistentVariantOrderOptions struct {
 // globals the sort is descending by registration order, which is what makes `sm:lg:` report as
 // `lg:sm:` rather than the other way around.
 //
-// verify cannot compute the flag the way upstream does. The variant registry carries registration
+// cohere cannot compute the flag the way upstream does. The variant registry carries registration
 // order and kind but not the selector bodies, because `variant.go` deliberately did not port the
 // thousand lines of `variants.ts` that build CSS. So the set is named here instead, and it was
 // enumerated by measurement rather than by reading: every framework variant in
@@ -157,7 +157,7 @@ func reportVariantOrder(ctx rule.Context, literal ClassLiteral, designSystem Des
 // The number upstream compares is `getVariantOrder()`, which sorts the variants this class list
 // parsed and assigns dense indices from zero, breaking the group tie through the comparison
 // function attached to order 64: the breakpoints order by their resolved `--breakpoint` widths.
-// `BuildVariantOrder` is verify's port of exactly that, so this asks it rather than the registry.
+// `BuildVariantOrder` is cohere's port of exactly that, so this asks it rather than the registry.
 //
 // The population is this one class's variants plus their nested sub-variants, which is narrower
 // than `enforce-consistent-class-order`'s (the whole literal). That is deliberate and matches
@@ -256,12 +256,12 @@ func compareVariantOrder(left int, right int) int {
 // order can never collide: the framework's highest registration is under a hundred.
 const globalVariantFlag = 65536
 
-// globalSelectorVariants is upstream's `hasGlobalSelector` as a set, because verify cannot compute it.
+// globalSelectorVariants is upstream's `hasGlobalSelector` as a set, because cohere cannot compute it.
 //
 // Upstream asks each variant for the selectors it generates and calls it global when every one of
 // them is free of `&`. That question needs the `applyFn` bodies, and `internal/tailwind/variant.go`
 // deliberately did not port them: they are the thousand lines of `variants.ts` that build CSS, and
-// verify emits none.
+// cohere emits none.
 //
 // So the set is enumerated instead, and it was measured rather than reasoned about. Every framework
 // variant in `framework_variant_table.go` was written as `hover:<variant>:flex` and run through
@@ -310,7 +310,7 @@ var globalSelectorVariants = map[string]bool{
 //
 // Upstream asks a variant for the selectors it generates and calls it global when every one is free
 // of `&`. That needs the `applyFn` bodies, and `internal/tailwind/variant.go` deliberately did not
-// port them: they are the thousand lines of `variants.ts` that build CSS, and verify emits none.
+// port them: they are the thousand lines of `variants.ts` that build CSS, and cohere emits none.
 //
 // Two sources answer it here instead. Named breakpoints come from the theme, because they are the
 // repository's own names rather than a fixed five: `--breakpoint-desktop: 80rem` makes `desktop` a

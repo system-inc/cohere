@@ -1,9 +1,9 @@
-// Package react_conformance_score runs verify's actual React rules against React's own error goldens.
+// Package react_conformance_score runs cohere's actual React rules against React's own error goldens.
 //
 // # Why this is a separate package
 //
 // `internal/react_conformance` owns the corpus, the expectation parser, and the categories. It
-// deliberately depends on nothing in verify's rule engine, so that the instrument cannot be bent by
+// deliberately depends on nothing in cohere's rule engine, so that the instrument cannot be bent by
 // the thing it measures — and so that its 0.3s suite stays cheap enough never to be gated.
 //
 // Running a real rule costs a TypeScript program build, which is roughly a second per fixture.
@@ -27,8 +27,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/react_conformance"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/react_conformance"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // fixtureRoot reaches into the sibling package's vendored corpus.
@@ -40,7 +40,7 @@ const fixtureRoot = "../react_conformance/testdata/fixtures"
 
 // TestGlobalsScoresAgainstReactsOwnGoldens is the end-to-end proof.
 //
-// It runs verify's real `react/globals` over every fixture in the corpus whose diagnostics all
+// It runs cohere's real `react/globals` over every fixture in the corpus whose diagnostics all
 // belong to upstream's `globals` rule, and requires the harness to produce a non-zero pass count.
 //
 // The assertion is a floor rather than an exact number, and that choice is deliberate in one
@@ -101,7 +101,7 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(t *testing.T) {
 	//
 	// Every one of these eleven either passes or lands in a category with a named, machine-checked
 	// reason. A `failed` here would mean the rule disagreed with a golden on a fixture that is
-	// inside its stated scope, which is the only outcome in this harness that is a defect in verify
+	// inside its stated scope, which is the only outcome in this harness that is a defect in cohere
 	// rather than a fact about the corpus.
 	if counts[react_conformance.VerdictFailed] != 0 {
 		t.Errorf("react/globals failed %d fixtures inside its own stated scope", counts[react_conformance.VerdictFailed])
@@ -165,7 +165,7 @@ func TestScoringHarnessCanFail(t *testing.T) {
 
 // TestUpstreamMessageJoinIsNotByResemblance guards the id-to-message table.
 //
-// Every entry claims a verify message id means the same thing as an upstream message. That claim is
+// Every entry claims a cohere message id means the same thing as an upstream message. That claim is
 // checkable: the upstream text must be one the corpus actually contains, and it must attribute back
 // to the rule the id belongs to. An entry that fails either half is a join made by resemblance, and
 // it would manufacture failures on fixtures the rule never had a chance at.

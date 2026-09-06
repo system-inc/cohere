@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // The property this whole package exists for: a run that checked nothing must not be able to

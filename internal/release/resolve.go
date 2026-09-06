@@ -11,23 +11,23 @@ import (
 
 // BinaryOverrideVariable points the dispatcher at a specific binary.
 //
-// This is the development affordance: build verify from source, export this, and every `verify` in
+// This is the development affordance: build cohere from source, export this, and every `cohere` in
 // every repo on the machine runs that build instead of the installed one. It is deliberately an
 // absolute-path override rather than a directory to search, so that what it selects is stated
 // rather than resolved.
-const BinaryOverrideVariable = "VERIFY_BINARY"
+const BinaryOverrideVariable = "COHERE_BINARY"
 
 // PlatformPackageScope is the npm scope the platform binaries publish under.
-const PlatformPackageScope = "@verify"
+const PlatformPackageScope = "@cohere"
 
-// ErrNoBinary reports that no verify binary could be found for this platform.
+// ErrNoBinary reports that no cohere binary could be found for this platform.
 //
 // It is a distinct error so that a caller can tell "we looked and there is nothing for this
 // platform" apart from "we could not look". Both are failures; only one is a packaging bug.
-var ErrNoBinary = errors.New("no verify binary for this platform")
+var ErrNoBinary = errors.New("no cohere binary for this platform")
 
 // PlatformPackageName is the npm package holding the binary for a Go GOOS and GOARCH, like
-// "@verify/darwin-arm64".
+// "@cohere/darwin-arm64".
 //
 // The arguments are Go's names and the result is npm's, because npm is what resolves the package
 // while Go is what built it. They disagree in two places: Go says `windows` where npm says `win32`,
@@ -75,19 +75,19 @@ func NpmArchitecture(goArchitecture string) string {
 // BinaryFileName is the name of the executable inside a platform package.
 //
 // Windows needs the extension to execute at all, so the name carries the platform rather than being
-// a bare "verify" everywhere.
+// a bare "cohere" everywhere.
 func BinaryFileName(operatingSystem string) string {
 	if operatingSystem == "windows" {
-		return "verify.exe"
+		return "cohere.exe"
 	}
-	return "verify"
+	return "cohere"
 }
 
-// Resolve returns the verify binary to run on this machine, or an error naming what it looked for.
+// Resolve returns the cohere binary to run on this machine, or an error naming what it looked for.
 //
 // The search order is override, then the platform package, and there is no third step. This is the
 // rule this package exists to hold, and it is worth restating at the place it is enforced: the gate
-// verify replaces printed a green checkmark over zero files for days because a resolver walked up
+// cohere replaces printed a green checkmark over zero files for days because a resolver walked up
 // looking for a binary, found none, fell through to the bare name `oxlint`, and the failed spawn
 // produced an empty file list — which is indistinguishable from a clean tree. So there is no
 // fallback to PATH, no fallback to a bare command name, and no fallback to a binary built for
@@ -175,7 +175,7 @@ func requireExecutable(path string, information os.FileInfo) error {
 		// modes all land here identically. Asserting the first would send a reader to inspect a
 		// tarball that is fine.
 		return fmt.Errorf(
-			"the verify binary at %s has mode %s, so it cannot be executed.\nMost often the mode was lost in packaging or extraction; a restrictive umask or a noexec mount produce it too",
+			"the cohere binary at %s has mode %s, so it cannot be executed.\nMost often the mode was lost in packaging or extraction; a restrictive umask or a noexec mount produce it too",
 			path, information.Mode(),
 		)
 	}
@@ -201,7 +201,7 @@ func binaryCandidates(root string, packageName string, binaryFileName string) []
 //
 // Both the working directory and the dispatcher's own location are walked, and every parent of
 // each. The working directory finds the install in the repo being checked; the executable's own
-// path finds it when verify is invoked from somewhere else entirely, which is what happens when a
+// path finds it when cohere is invoked from somewhere else entirely, which is what happens when a
 // tool runs it by absolute path. Walking up handles monorepos, where the binary is hoisted to the
 // workspace root rather than installed beside the package being checked.
 func SearchRoots(workingDirectory string, executablePath string) []string {

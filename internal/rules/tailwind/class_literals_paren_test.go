@@ -3,7 +3,7 @@ package tailwind
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // Parentheses are real nodes in this AST, and every rule in this package missed them.

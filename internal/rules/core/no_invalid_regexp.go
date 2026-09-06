@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	esregexp "github.com/system-inc/verify/internal/utilities/ecmascript/regexp"
+	"github.com/system-inc/cohere/internal/rule"
+	esregexp "github.com/system-inc/cohere/internal/utilities/ecmascript/regexp"
 )
 
 var messageInvalidRegexp = rule.Message{

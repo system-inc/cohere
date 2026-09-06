@@ -52,7 +52,7 @@ func TestResolveFindsThePlatformPackage(t *testing.T) {
 }
 
 func TestResolveWalksUpToAWorkspaceRoot(t *testing.T) {
-	// The monorepo case: the binary is hoisted to the workspace root, and verify runs from a
+	// The monorepo case: the binary is hoisted to the workspace root, and cohere runs from a
 	// package several directories down. A resolver that only looks beside itself reports a missing
 	// platform for an install that is actually fine.
 	clearOverride(t)
@@ -100,7 +100,7 @@ func TestOverrideTakesPrecedence(t *testing.T) {
 	root := t.TempDir()
 	writePlatformBinary(t, root, 0o755)
 
-	override := filepath.Join(t.TempDir(), "verify-local")
+	override := filepath.Join(t.TempDir(), "cohere-local")
 	writeExecutable(t, override, 0o755)
 	t.Setenv(BinaryOverrideVariable, override)
 
@@ -148,12 +148,12 @@ func TestPlatformPackageNameTranslatesGoNamesToNpmNames(t *testing.T) {
 	// Go spelling installs correctly and is never found, which on the machine is indistinguishable
 	// from a platform we never shipped. The keys here are Go's names, which is the contract.
 	cases := map[string]string{
-		"darwin/amd64":  "@verify/darwin-x64",
-		"darwin/arm64":  "@verify/darwin-arm64",
-		"linux/amd64":   "@verify/linux-x64",
-		"linux/arm64":   "@verify/linux-arm64",
-		"windows/amd64": "@verify/win32-x64",
-		"windows/arm64": "@verify/win32-arm64",
+		"darwin/amd64":  "@cohere/darwin-x64",
+		"darwin/arm64":  "@cohere/darwin-arm64",
+		"linux/amd64":   "@cohere/linux-x64",
+		"linux/arm64":   "@cohere/linux-arm64",
+		"windows/amd64": "@cohere/win32-x64",
+		"windows/arm64": "@cohere/win32-arm64",
 	}
 	for platform, expected := range cases {
 		goOperatingSystem, goArchitecture, _ := strings.Cut(platform, "/")
@@ -165,17 +165,17 @@ func TestPlatformPackageNameTranslatesGoNamesToNpmNames(t *testing.T) {
 
 func TestBinaryFileNameCarriesTheWindowsExtension(t *testing.T) {
 	// Without the extension the file does not execute on Windows at all.
-	if got := BinaryFileName("windows"); got != "verify.exe" {
+	if got := BinaryFileName("windows"); got != "cohere.exe" {
 		t.Errorf("windows binary named %s", got)
 	}
-	if got := BinaryFileName("darwin"); got != "verify" {
+	if got := BinaryFileName("darwin"); got != "cohere" {
 		t.Errorf("darwin binary named %s", got)
 	}
 }
 
 // clearOverride makes a test independent of the developer's own shell.
 //
-// Without this, a machine with VERIFY_BINARY exported would pass the "nothing is installed"
+// Without this, a machine with COHERE_BINARY exported would pass the "nothing is installed"
 // test by resolving the developer's local build — the exact green-over-nothing result these tests
 // exist to catch.
 func clearOverride(t *testing.T) {

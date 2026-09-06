@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/verify/internal/program"
+	"github.com/system-inc/cohere/internal/program"
 )
 
 func sampleCache(directories []string) *program.ResolutionCache {

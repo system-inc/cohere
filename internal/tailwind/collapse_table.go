@@ -19,7 +19,7 @@
 // fact sitting beside several repository extractions, not as framework data throughout.
 //
 // CollapseFamilies re-measured on this run against:
-//	~/Projects/system/verify/tools/tailwind/generate_descriptor_base/testdata/independent_theme.css (316 roots, 49770 pairs)
+//	~/Projects/system/cohere/tools/tailwind/generate_descriptor_base/testdata/independent_theme.css (316 roots, 49770 pairs)
 //
 // Identical families, down to the value each was discovered at.
 

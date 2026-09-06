@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 var messageNoMultiAssign = rule.Message{
@@ -33,7 +33,7 @@ type NoMultiAssignOptions struct {
 // harmless for this rule, whose one option defaults to false, and it is written out anyway because
 // the harmlessness is a property of today's default rather than of the code.
 //
-// The configured shape is the bare object rather than upstream's `[{...}]`: verify's config layer
+// The configured shape is the bare object rather than upstream's `[{...}]`: cohere's config layer
 // strips the severity-and-options tuple before dispatch, so a fixture copying ESLint's spelling
 // fails on every row.
 func DecodeNoMultiAssignOptions(raw []byte) (any, error) {

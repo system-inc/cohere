@@ -2,7 +2,7 @@ package structure
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 const cacheKeyReasoning = "Cache keys are strings that have to match exactly across the file that " +

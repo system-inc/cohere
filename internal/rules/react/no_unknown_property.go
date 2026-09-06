@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/jsx"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/jsx"
 )
 
 // noUnknownPropertyDomAttributeNames maps a lowercase DOM spelling to its React property name.
@@ -264,7 +264,7 @@ var noUnknownPropertyAriaProperties = map[string]bool{
 // noUnknownPropertyNames is every known React DOM property, searched case-insensitively.
 //
 // Upstream concatenates its two-word list, its one-word list, and version-gated additions, and
-// which additions apply depends on `settings.react.version`, a shared-settings surface verify does
+// which additions apply depends on `settings.react.version`, a shared-settings surface cohere does
 // not have. So this list reproduces the answer upstream gives with NO settings, which was
 // established by bisection rather than by reading the source.
 //
@@ -1139,7 +1139,7 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 // # Two of the three React version gates pass, and reading the source got that wrong
 //
 // Upstream gates part of its property list on `>= 16.1.0`, `>= 16.4.0` and `>= 19`. Those read
-// `settings.react.version`, which verify has no surface for, so this port reproduces the
+// `settings.react.version`, which cohere has no surface for, so this port reproduces the
 // no-settings answer.
 //
 // That answer is NOT "every gate passes", though the source reads that way: the default constant is

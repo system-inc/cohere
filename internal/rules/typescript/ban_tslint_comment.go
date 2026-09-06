@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/comments"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/comments"
 )
 
 // banTslintCommentDirective is upstream's ENABLE_DISABLE_REGEX, copied from the same tslint source
@@ -93,7 +93,7 @@ func messageBanTslintComment(text string) rule.Message {
 // the space in `someCode(); // tslint:disable-line` and the newline in a comment on its own line,
 // and all eight upstream outputs reproduce byte for byte under this reading.
 //
-// Off the corpus it deletes code. Measured on the installed build with `verifyAndFix`:
+// Off the corpus it deletes code. Measured on the installed build with `cohereAndFix`:
 //
 //	x;// tslint:disable                silently becomes `x`      the semicolon is eaten
 //	/* tslint:disable */let x = 1;     becomes `et x = 1;`       the `l` is eaten

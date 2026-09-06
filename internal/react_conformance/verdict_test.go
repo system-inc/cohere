@@ -20,7 +20,7 @@ func (d declineEverything) Analyze(Fixture) (Result, error) {
 // TestAggregatedScoreAgainstReactsOwnFixtures is the number this package exists to produce.
 //
 // It is deliberately run against an implementation that answers nothing, and that is not a
-// placeholder. Wiring verify's rule engine in here would require building a TypeScript program per
+// placeholder. Wiring cohere's rule engine in here would require building a TypeScript program per
 // fixture — roughly a second each, so about five minutes for the corpus — inside a suite whose
 // stated design property is that it costs 0.3 to 0.8 seconds and therefore never gets gated behind
 // a tag. Paying that to watch 293 fixtures land in a decline bucket that is already decidable from
@@ -31,8 +31,8 @@ func (d declineEverything) Analyze(Fixture) (Result, error) {
 // part that was never measured, and it is the part that decides whether a raw score would have
 // lied.
 //
-// The headline, at the pinned sha: of 325 fixtures, 94 carry a diagnostic a rule verify ships is
-// responsible for. 196 belong entirely to rules verify does not implement, and 35 need a Flow
+// The headline, at the pinned sha: of 325 fixtures, 94 carry a diagnostic a rule cohere ships is
+// responsible for. 196 belong entirely to rules cohere does not implement, and 35 need a Flow
 // parser. Of the 94, eleven have been run against the real rule and every one landed in `stated
 // divergence`; the remaining 83 are unscored. Every fixture has a named reason, counted here.
 func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
@@ -53,7 +53,7 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
 		t.Errorf("flow-excluded %d, want %d", got, ExpectedFlowFixtureCount)
 	}
 
-	// 166 fixtures belong entirely to rules verify does not ship: 101 of the error population, and
+	// 166 fixtures belong entirely to rules cohere does not ship: 101 of the error population, and
 	// all 65 non-Flow fixtures of the clean one.
 	//
 	// The clean fixtures all land here for a reason that is correct rather than incidental.
@@ -66,12 +66,12 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
 	//
 	// It remains the single biggest fact about the number and the one a headline score would bury:
 	// a third of React's error corpus is preserve-manual-memoization, todo, invariant and friends,
-	// none of which verify has.
+	// none of which cohere has.
 	if got := report.Counts[VerdictNoRuleShipped]; got != 166 {
 		t.Errorf("no-rule-shipped %d, want 166", got)
 	}
 
-	// The addressable set: fixtures a rule verify ships is responsible for. This is the real
+	// The addressable set: fixtures a rule cohere ships is responsible for. This is the real
 	// denominator any future parity number is measured against, and it is 189 rather than the
 	// corpus size. Unchanged by the clean population, which is the point of asserting it separately
 	// from `Considered`: adding 70 fixtures nothing can be asked about must not move this number.
@@ -110,7 +110,7 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(t *testing.T) {
 //
 // Asserting the breakdown rather than the total, because the total is a number anybody could argue
 // with and the breakdown is a list anybody can check. Six categories are most of React's error
-// corpus, and verify implements none of them; that is the honest reason the parity number is small,
+// corpus, and cohere implements none of them; that is the honest reason the parity number is small,
 // and it is a different reason from "our rules are wrong".
 func TestNoRuleShippedIsTheCorpusRatherThanTheRules(t *testing.T) {
 	fixtures := load(t)
@@ -246,7 +246,7 @@ func TestEveryCategoryIsReachable(t *testing.T) {
 		},
 		{
 			// `preserve-manual-memoization` rather than `immutability`, which this case used until
-			// `immutability` shipped on 2026-08-24. The case needs a rule verify genuinely does not
+			// `immutability` shipped on 2026-08-24. The case needs a rule cohere genuinely does not
 			// implement, so picking one that is being actively ported makes the calibration expire
 			// the day the port lands — which is exactly what happened here.
 			Name: "declined: no rule shipped",
@@ -284,7 +284,7 @@ func TestEveryCategoryIsReachable(t *testing.T) {
 // TestStatedDivergenceCategoryCanHoldAnEntry is the seventh category's reachability proof.
 //
 // It is separated from the table above because the map it reads is empty at the pinned sha, for the
-// reason written at `statedDivergences`: verify's stated boundaries and React's error-named corpus
+// reason written at `statedDivergences`: cohere's stated boundaries and React's error-named corpus
 // do not currently intersect. An empty category is exactly the thing `TestEveryCategoryIsReachable`
 // exists to distrust, so the wiring is proven directly by putting an entry in and taking it out
 // again, rather than by asserting the constant exists.
@@ -294,7 +294,7 @@ func TestStatedDivergenceCategoryCanHoldAnEntry(t *testing.T) {
 	statedDivergences[name] = StatedDivergence{
 		Fixture:  name,
 		Boundary: "TestStatedDivergenceCategoryCanHoldAnEntry",
-		Reason:   "verify deliberately does not carry this diagnostic kind",
+		Reason:   "cohere deliberately does not carry this diagnostic kind",
 	}
 	defer delete(statedDivergences, name)
 

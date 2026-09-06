@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // The fixtures below are upstream's own, copied byte for byte out of the vendored React Compiler
@@ -410,7 +410,7 @@ func runPreserveManualMemoization(t *testing.T, name string, source string) rule
 
 // TestFixturesMatchTheVendoredCorpus diffs every fixture above against the file it was copied from.
 //
-// The port brief's standing instruction is to verify copied strings mechanically rather than by
+// The port brief's standing instruction is to cohere copied strings mechanically rather than by
 // reading, because the tool that writes a fixture can change it and the result still compiles and
 // still goes green. Three porters have lost a case to a cooked escape. This is that check, and it
 // covers the two interpreted literals as well, which are the ones most exposed to it.

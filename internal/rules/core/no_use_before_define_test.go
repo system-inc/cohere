@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // The corpus is ESLint's own, imported verbatim from
@@ -29,7 +29,7 @@ type useBeforeDefineCase struct {
 	name     string
 	source   string
 	fileName string
-	// rawOptions is the options object as upstream writes it, MINUS the array wrapper. verify's
+	// rawOptions is the options object as upstream writes it, MINUS the array wrapper. cohere's
 	// config layer unwraps the [severity, options] tuple before dispatch, so a decoder receives the
 	// bare object; copying ESLint's array spelling straight in would fail every row.
 	rawOptions string

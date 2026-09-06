@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 const classLiteralPropertyStyleFile = "/repository/source/Thing.ts"

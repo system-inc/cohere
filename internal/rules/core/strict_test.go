@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // strictFile is where the fixtures pretend to live.
@@ -46,7 +46,7 @@ func runStrict(t *testing.T, testCase strictCase) rule_testing.Result {
 // # The corpus is mostly SCRIPT and this tree is almost entirely modules
 //
 // Upstream's tester defaults to `ecmaVersion: 5, sourceType: "script"`, so 107 of its 128 cases are
-// scripts, 17 modules and 4 commonjs. That is the opposite of what verify lints: measured, 2,917 of
+// scripts, 17 modules and 4 commonjs. That is the opposite of what cohere lints: measured, 2,917 of
 // 2,919 TypeScript files in the tree carry a top-level import or export.
 //
 // The script cases are still expressible and are imported. A file with no import or export is not an

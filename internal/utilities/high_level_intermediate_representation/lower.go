@@ -92,7 +92,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/property"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/property"
 )
 
 // Lower lowers one function to HIR.
@@ -399,7 +399,7 @@ func (b *builder) lowerNestedFunction(node *ast.Node) (*Function, []Place) {
 // Babel and oxc hand it scopes and it must decide, from scope ancestry, whether a reference crosses
 // a function boundary.
 //
-// verify does not need any of it, and the reason was measured rather than assumed. The resident
+// cohere does not need any of it, and the reason was measured rather than assumed. The resident
 // checker returns the SAME `*ast.Symbol` pointer for a declaration and for every reference to it,
 // including references inside a nested function: for `const C = ...; const r = () => <C/>` it
 // answers one distinct symbol across both occurrences. Symbol identity therefore already encodes
@@ -407,7 +407,7 @@ func (b *builder) lowerNestedFunction(node *ast.Node) (*Function, []Place) {
 // which symbols that function declared. Asking the enclosing builder is the whole algorithm.
 //
 // This is the same trade the package comment makes for type inference: where upstream infers what a
-// checker would know, verify asks the checker. `TestCaptureSymbolIdentityCrossesFunctions` pins the
+// checker would know, cohere asks the checker. `TestCaptureSymbolIdentityCrossesFunctions` pins the
 // property this rests on, so a checker change that broke it would fail loudly here rather than
 // quietly reverting every capture to a global.
 //
@@ -1001,7 +1001,7 @@ func (b *builder) lowerSwitchStatement(node *ast.Node, label string) {
 //
 // # The finally divergence
 //
-// The finally body is lowered ONCE and every path that must run it jumps to it. verify's
+// The finally body is lowered ONCE and every path that must run it jumps to it. cohere's
 // `controlflow` lays it out twice, once per completion path, and both copies carry the same source
 // positions. See the Try terminal's comment for why this IR cannot do that: two layouts give a
 // value two definitions that are not a merge, and single-assignment construction over that mints a

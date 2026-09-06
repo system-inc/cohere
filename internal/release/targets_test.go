@@ -7,7 +7,7 @@ import (
 )
 
 // `Targets` is the largest hand-written claim in this package: six platforms, asserted rather than
-// derived. Every other test here iterates it, which means they verify consistency *with* the list
+// derived. Every other test here iterates it, which means they cohere consistency *with* the list
 // and never the list itself — they would all pass green if it named one platform, or named a
 // platform Go cannot build.
 //

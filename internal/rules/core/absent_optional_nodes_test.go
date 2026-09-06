@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // Every rule in this package is run over shapes where a node it reaches for is legitimately absent.

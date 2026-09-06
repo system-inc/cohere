@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // jsxNoScriptUrlFile is where the fixtures pretend to live.
@@ -24,9 +24,9 @@ const jsxNoScriptUrlFile = "/repository/source/JsxNoScriptUrl.tsx"
 // All 22 were replayed against the installed build, eslint-plugin-react 7.37.5, through the ESLint
 // Linter API before any Go was written, and the corpus and the running rule agreed on every one.
 //
-// # Six cases depend on a configuration surface verify does not have
+// # Six cases depend on a configuration surface cohere does not have
 //
-// Upstream reads `settings.linkComponents` from ESLint's shared settings. verify has no
+// Upstream reads `settings.linkComponents` from ESLint's shared settings. cohere has no
 // shared-settings surface, so this port answers as though the settings were empty. Each affected
 // case is kept, at the verdict this port actually produces, with the upstream verdict named beside
 // it. The no-settings verdicts were measured by replaying the same cases against the installed

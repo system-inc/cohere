@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // noBareThrowCaseName numbers a row so a failure names which one, since many rows differ only in a

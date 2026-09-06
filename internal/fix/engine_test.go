@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // proposeOnce returns a fixed set of proposals on the first pass and nothing afterwards, which is
@@ -394,7 +394,7 @@ func TestAFailedFileIsNotReportedAsNotConverged(t *testing.T) {
 }
 
 // A run that changed nothing must not print the same line as a run that changed everything. This is
-// the ambiguity that let the gate verify replaces print green over zero files for days.
+// the ambiguity that let the gate cohere replaces print green over zero files for days.
 func TestSummaryDistinguishesAnEmptyRun(t *testing.T) {
 	empty := Summarize(nil).String()
 	busy := Summarize([]FileResult{

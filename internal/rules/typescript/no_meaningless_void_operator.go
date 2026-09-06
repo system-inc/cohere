@@ -5,8 +5,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // NoMeaninglessVoidOperatorOptions is the rule's option surface.
@@ -33,7 +33,7 @@ type noMeaninglessVoidOperatorRawOptions struct {
 
 // DecodeNoMeaninglessVoidOperatorOptions reads the rule's configuration.
 //
-// verify's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
+// cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
 // arrives is the bare object rather than upstream's one-element array.
 func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (any, error) {
 	decoded, err := rule.DecodeOptionsInto[noMeaninglessVoidOperatorRawOptions]()(raw)

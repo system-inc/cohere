@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	"github.com/system-inc/cohere/internal/rule_testing"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // # Why every fixture here runs through a program
@@ -260,7 +260,7 @@ func TestNoConflictingClassesStaysSilent(t *testing.T) {
 // edit engine never applies suggestions, which makes the difference concrete: ported as a Fix it
 // would silently pick one; ported as a suggestion a human chooses.
 //
-// This was caught by `@system_verify_lint_fix`'s research pass rather than by reading the source,
+// This was caught by `@system_cohere_lint_fix`'s research pass rather than by reading the source,
 // where the `autofix` flag reads as an instruction.
 func TestConflictingClassesProposeSuggestionsNotFixes(t *testing.T) {
 	result := runConflictFixture(t, "Component.tsx",

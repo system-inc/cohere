@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // objCallsFile is where the fixtures pretend to live.
@@ -21,7 +21,7 @@ const objCallsFile = "/repository/source/ObjCalls.ts"
 //
 // The second block is not a second corpus. It runs the same input `Math();` twice, once under
 // oxlint's `globals: { Math: "off" }` configuration and once without, so what it tests is oxlint's
-// harness config rather than anything the rule reads. verify has no analogue for that configuration
+// harness config rather than anything the rule reads. cohere has no analogue for that configuration
 // and the rule declares no options, so its pass case is unportable and its fail case is byte
 // identical to the first case of block one. Recorded rather than dropped silently.
 //

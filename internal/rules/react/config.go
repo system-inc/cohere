@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/imports"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/imports"
 )
 
 var messageInvalidTypeConfiguration = rule.Message{
@@ -43,9 +43,9 @@ var messageInvalidTypeConfiguration = rule.Message{
 // a test harness, which is why all four error fixtures import from invented modules named
 // `ReactCompilerTest` and `useDefaultExportNotTypedAsHook` that exist nowhere but that harness.
 //
-// `verify` has no channel to such a value and should not grow one. `rule.Context` carries a source
+// `cohere` has no channel to such a value and should not grow one. `rule.Context` carries a source
 // file, a program, a checker, a report function and a file cache; the only user configuration
-// verify reads is `VerifySettings.json`, which holds severities. So the user-supplied half of this
+// cohere reads is `CohereSettings.json`, which holds severities. So the user-supplied half of this
 // rule's input is absent from this tree by construction rather than by accident.
 //
 // **Measured, not assumed:** `moduleTypeProvider` appears zero times across `~/Projects/ahra`,

@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	reactUtilities "github.com/system-inc/verify/internal/utilities/react"
+	"github.com/system-inc/cohere/internal/rule"
+	reactUtilities "github.com/system-inc/cohere/internal/utilities/react"
 )
 
 // noUnusedClassComponentMethodsLifecycle is the set every component may declare without using.

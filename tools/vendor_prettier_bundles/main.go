@@ -37,8 +37,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/system-inc/verify/internal/prettier"
-	"github.com/system-inc/verify/internal/release"
+	"github.com/system-inc/cohere/internal/prettier"
+	"github.com/system-inc/cohere/internal/release"
 )
 
 // vendoredDirectory is where the committed bundles live, relative to the module root.

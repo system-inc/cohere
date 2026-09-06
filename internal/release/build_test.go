@@ -55,12 +55,12 @@ func TestVerifyBinaryRefusesTheWrongPlatformsExecutable(t *testing.T) {
 	darwin := Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
 
 	elf := writeFakeExecutable(t, []byte{0x7f, 'E', 'L', 'F'})
-	if _, err := verifyBinary(elf, darwin); err == nil {
+	if _, err := cohereBinary(elf, darwin); err == nil {
 		t.Fatalf("a Linux binary passed verification as a darwin package's contents")
 	}
 
 	windows := writeFakeExecutable(t, []byte{'M', 'Z'})
-	if _, err := verifyBinary(windows, darwin); err == nil {
+	if _, err := cohereBinary(windows, darwin); err == nil {
 		t.Fatalf("a Windows binary passed verification as a darwin package's contents")
 	}
 }
@@ -68,7 +68,7 @@ func TestVerifyBinaryRefusesTheWrongPlatformsExecutable(t *testing.T) {
 func TestVerifyBinaryRefusesSomethingThatIsNotAnExecutable(t *testing.T) {
 	// Large enough to clear the size floor and still not a program.
 	notABinary := writeFakeExecutable(t, []byte("#!/bin/sh\necho nope\n"))
-	if _, err := verifyBinary(notABinary, Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"}); err == nil {
+	if _, err := cohereBinary(notABinary, Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"}); err == nil {
 		t.Fatalf("plain text passed verification as a Linux binary")
 	}
 }
@@ -84,7 +84,7 @@ func TestVerifyBinaryAcceptsTheRightFormat(t *testing.T) {
 	for operatingSystem, magic := range cases {
 		path := writeFakeExecutable(t, magic)
 		target := Target{GoOperatingSystem: operatingSystem, GoArchitecture: "amd64"}
-		if _, err := verifyBinary(path, target); err != nil {
+		if _, err := cohereBinary(path, target); err != nil {
 			t.Errorf("a correct %s binary was refused: %v", operatingSystem, err)
 		}
 	}
@@ -104,7 +104,7 @@ func TestEveryTargetHasAKnownExecutableFormat(t *testing.T) {
 // writeFakeExecutable writes a file that clears the size floor and begins with the given bytes.
 func writeFakeExecutable(t *testing.T, magic []byte) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "verify")
+	path := filepath.Join(t.TempDir(), "cohere")
 
 	const clearsTheSizeFloor = 2 << 20
 	contents := make([]byte, clearsTheSizeFloor)
@@ -153,16 +153,16 @@ func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(t *testing.T) {
 			t.Fatalf("cross-compiling for %s: %v\n%s", target, err, output)
 		}
 
-		if _, err := verifyBinaryFormatOnly(path, target); err != nil {
+		if _, err := cohereBinaryFormatOnly(path, target); err != nil {
 			t.Errorf("the magic table rejects a binary Go actually produced for %s: %v", target, err)
 		}
 	}
 }
 
-// verifyBinaryFormatOnly runs the format check without the size floor.
+// cohereBinaryFormatOnly runs the format check without the size floor.
 //
-// A hello-world binary is well under a megabyte, so `verifyBinary` would refuse it for a reason
+// A hello-world binary is well under a megabyte, so `cohereBinary` would refuse it for a reason
 // that has nothing to do with what this test is asking.
-func verifyBinaryFormatOnly(path string, target Target) (int64, error) {
+func cohereBinaryFormatOnly(path string, target Target) (int64, error) {
 	return 0, requireExecutableFormat(path, target)
 }

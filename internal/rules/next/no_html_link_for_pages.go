@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/jsx"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/jsx"
 )
 
 var messageNoHtmlLinkForPages = rule.Message{
@@ -40,7 +40,7 @@ var messageNoHtmlLinkForPages = rule.Message{
 // `../contact` all report here and are all silent under `@next`.
 //
 // oxlint's spelling is what is ported, and the direction is deliberate. The differential harness
-// compares verify against oxlint, so a rule faithful to `@next` would read as a disagreement on
+// compares cohere against oxlint, so a rule faithful to `@next` would read as a disagreement on
 // every relative href and the instrument could not separate that from a defect. `@next`'s failure
 // mode is also the one this project exists to prevent: registered, enabled, and silently reporting
 // nothing because a directory was not where it looked. Over-reporting is visible and someone tunes

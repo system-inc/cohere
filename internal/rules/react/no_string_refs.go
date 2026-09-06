@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/jsx"
-	utilsreact "github.com/system-inc/verify/internal/utilities/react"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/jsx"
+	utilsreact "github.com/system-inc/cohere/internal/utilities/react"
 )
 
 var messageThisRefsDeprecated = rule.Message{
@@ -31,7 +31,8 @@ var messageStringInRefDeprecated = rule.Message{
 // `noTemplateLiterals` is upstream's whole option surface. `meta.schema` is the authority and it
 // declares exactly `{noTemplateLiterals: boolean}` with `additionalProperties: false`, confirmed by
 // handing the running rule a `{bogus: true}` option and watching ESLint refuse the configuration
-// by name. Our own `rule-inventory.json` records this rule as `"options": "no"`, which is wrong.
+// by name. A captured rule inventory recorded this rule as `"options": "no"`; the schema is the
+// authority and the inventory was wrong, which is why that catalog is not consulted for options.
 //
 // `CheckThisRefs` has no upstream counterpart and exists because upstream's gate for that half is
 // unreachable here. See the type doc on NoStringRefs.

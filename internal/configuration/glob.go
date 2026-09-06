@@ -7,7 +7,7 @@
 // argument suppression comments make one line at a time, made one directory at a time.
 //
 // The live case is 336 findings: `consistency-require-type-suffix` firing across
-// `libraries/structure/source/api/graphql/generated/`, which the gate verify replaces correctly
+// `libraries/structure/source/api/graphql/generated/`, which the gate cohere replaces correctly
 // stays silent on. Generated GraphQL output is not ours to name, so a rule about how we name types
 // has nothing to say about it.
 package configuration

@@ -1,7 +1,7 @@
 package regexpattern
 
 import (
-	"github.com/system-inc/verify/internal/utilities/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/regexsyntax"
 )
 
 // singleEscapeValues are the characters a named escape stands for.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // Expectations measured by diffing the rule against the engine's own sort over the whole corpus,
@@ -50,7 +50,7 @@ import (
 //
 // # A skip is honest and it is still not free, so it is loud
 //
-// `verify` vendors no `node_modules` of its own, so the walk has to start somewhere that has one. It
+// `cohere` vendors no `node_modules` of its own, so the walk has to start somewhere that has one. It
 // starts at the corpus repository, which is where the class-order fixtures in `internal/tailwind`
 // were captured from and the only installed 4.3.3 on this machine.
 //
@@ -91,7 +91,7 @@ const classOrderFixtureStylesheet = `@import "tailwindcss";`
 
 // classOrderFixtureSearchRoot is where the upward walk for `node_modules/tailwindcss` begins.
 //
-// The corpus repository rather than this checkout, because `verify` installs no npm packages and the
+// The corpus repository rather than this checkout, because `cohere` installs no npm packages and the
 // walk would find nothing from anywhere inside it. Same path the class-order corpus in
 // `internal/tailwind/testdata` was captured against, so the fixtures and the corpus agree on which
 // engine version they mean.

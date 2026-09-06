@@ -3,7 +3,7 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // ConsistentTypeAssertionsStyle is which assertion spelling the rule enforces.
@@ -60,7 +60,7 @@ type consistentTypeAssertionsRawOptions struct {
 
 // DecodeConsistentTypeAssertionsOptions reads the rule's configuration.
 //
-// verify's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
+// cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
 // is the bare object rather than upstream's one-element array.
 //
 // Upstream's schema is a discriminated union: `{assertionStyle: "never"}` admits no other key, while

@@ -64,7 +64,7 @@ import (
 	"math/big"
 	"sort"
 
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // classOrderKey is everything the sort needs about one class, resolved against a live design system.

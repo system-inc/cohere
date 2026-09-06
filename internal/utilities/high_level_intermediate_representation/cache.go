@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // ForFunction is Lower followed by Construct, computed once per function per file and shared by
@@ -17,7 +17,7 @@ import (
 // Three react rules lower the same functions independently, each over the whole source file:
 // set-state-in-render, static-components, and set-state-in-effect. A component holding a `useMemo`,
 // a state setter, and a JSX tag was lowered three times and converted to single-assignment form
-// three times. Measured with `verify --timing` before this existed: set-state-in-effect 829ms,
+// three times. Measured with `cohere --timing` before this existed: set-state-in-effect 829ms,
 // set-state-in-render 535ms, static-components 494ms, against every syntactic react rule under
 // 20ms. The author of the most expensive one named the cause exactly — "a property of lowering, not
 // this rule" — and a shared per-file cache as the fix.
@@ -121,7 +121,7 @@ func ForFunction(ctx rule.Context, node *ast.Node) *Function {
 //
 // An earlier version of this comment claimed 570ms, and that number was measured wrong in a way
 // worth recording because the trap is easy to fall into twice. It came from runs under `--timing`,
-// which wraps every listener call in a `time.Now` pair; `cmd/verify/timing.go` says so on the line
+// which wraps every listener call in a `time.Now` pair; `cmd/cohere/timing.go` says so on the line
 // that prints the total, in as many words -- compare rules to each other, never these totals to a
 // normal run. It also came from three samples against a machine whose run-to-run spread is larger
 // than the effect being measured. The honest procedure is what produced the numbers above:

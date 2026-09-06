@@ -20,7 +20,7 @@ var ReleaseBuildFlags = []string{"-trimpath", "-ldflags=-s -w"}
 
 // Paths locates the pieces of the cache relative to a module.
 type Paths struct {
-	// ModuleDirectory is the root of the verify module.
+	// ModuleDirectory is the root of the cohere module.
 	ModuleDirectory string
 
 	// CacheDirectory holds both the built binaries and the Go build cache. It lives inside the
@@ -29,12 +29,12 @@ type Paths struct {
 	CacheDirectory string
 }
 
-// DefaultPaths puts the cache at `.cache/verify/` inside the module, which the repo already
+// DefaultPaths puts the cache at `.cache/cohere/` inside the module, which the repo already
 // ignores.
 func DefaultPaths(moduleDirectory string) Paths {
 	return Paths{
 		ModuleDirectory: moduleDirectory,
-		CacheDirectory:  filepath.Join(moduleDirectory, ".cache", "verify"),
+		CacheDirectory:  filepath.Join(moduleDirectory, ".cache", "cohere"),
 	}
 }
 
@@ -53,7 +53,7 @@ func (paths Paths) GoCacheDirectory() string {
 // The name carries the platform as well as the hash. A cache directory can outlive a change of
 // machine, and a binary for the wrong architecture fails in a far more confusing way than a miss.
 func (paths Paths) BinaryPath(hash string) string {
-	return filepath.Join(paths.BinaryDirectory(), fmt.Sprintf("verify-%s-%s-%s", runtime.GOOS, runtime.GOARCH, hash))
+	return filepath.Join(paths.BinaryDirectory(), fmt.Sprintf("cohere-%s-%s-%s", runtime.GOOS, runtime.GOARCH, hash))
 }
 
 // DevelopmentBinaryPath is the stable path used by `--dev`.
@@ -63,7 +63,7 @@ func (paths Paths) BinaryPath(hash string) string {
 // nothing changed. The stable path is what makes the no-op reachable, so the authoring loop gets
 // the cheap case whenever the tree has not actually moved.
 func (paths Paths) DevelopmentBinaryPath() string {
-	return filepath.Join(paths.BinaryDirectory(), "verify-dev")
+	return filepath.Join(paths.BinaryDirectory(), "cohere-dev")
 }
 
 // Resolve returns the path to a binary matching the current inputs, building it if needed.
@@ -164,7 +164,7 @@ func build(paths Paths, packagePath string, binaryPath string) error {
 	command.Stderr = os.Stderr
 
 	if err := command.Run(); err != nil {
-		return fmt.Errorf("building verify: %w", err)
+		return fmt.Errorf("building cohere: %w", err)
 	}
 
 	// Go reports success by exit code, but the thing we are about to exec is the file. Checking it

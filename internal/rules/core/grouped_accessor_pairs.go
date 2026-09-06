@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/property"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/property"
 )
 
 // GroupedAccessorPairsOrder is upstream's three-valued first option.
@@ -25,7 +25,7 @@ const (
 // GroupedAccessorPairsOptions carries the part of upstream's option surface this port implements.
 //
 // The wire shape is an ARRAY, unlike most rules here, because upstream's schema is positional:
-// `["getBeforeSet", { enforceForTSTypes: true }]`. verify's config layer strips the severity from
+// `["getBeforeSet", { enforceForTSTypes: true }]`. cohere's config layer strips the severity from
 // the front, so what reaches the decoder is that array rather than a bare object.
 //
 // `enforceForTSTypes` is deliberately not implemented; see the rule's doc comment and

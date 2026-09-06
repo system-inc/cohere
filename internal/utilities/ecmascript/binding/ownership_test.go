@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/binding"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/binding"
 )
 
 // answersFor drives IsForeignName over every occurrence of `target` in a source and returns the

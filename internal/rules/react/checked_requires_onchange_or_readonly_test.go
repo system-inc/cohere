@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // checkedRequiresFile is where the fixtures pretend to live.
@@ -38,7 +38,7 @@ const checkedRequiresFile = "/repository/source/CheckedRequires.tsx"
 // means the rule was configured as a bare severity, which is what hands a real rule nil options,
 // and 27 of the 35 cases take that path.
 //
-// The wire shape is the BARE object, not upstream's `[{...}]` array. verify's config layer unwraps
+// The wire shape is the BARE object, not upstream's `[{...}]` array. cohere's config layer unwraps
 // the `[severity, options]` tuple before dispatch, so the array wrapper the corpus writes is gone
 // by the time a decoder sees anything.
 

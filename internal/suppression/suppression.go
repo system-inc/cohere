@@ -26,7 +26,7 @@ package suppression
 
 import "strings"
 
-// Directive spellings verify honors, with identical grammar.
+// Directive spellings cohere honors, with identical grammar.
 //
 // `cohere-disable` is what new code writes. `eslint-disable` keeps working because 387 of them
 // already exist across the codebase this tool gates, written by the linter this replaces, and
@@ -129,7 +129,7 @@ func (d *Directive) HasReason() bool {
 //
 // A directive naming no rules covers every rule; one naming rules covers only those, matched by
 // plugin-qualified suffix so `nexus/consistency-no-enum` in a comment resolves against the bare
-// `consistency-no-enum` a rule registers under. The corpus writes the plugin prefix and verify's
+// `consistency-no-enum` a rule registers under. The corpus writes the plugin prefix and cohere's
 // registry does not, and reconciling that here is cheaper than making every rule carry a prefix it
 // has no other use for.
 func (d *Directive) Covers(ruleName string, line int) bool {
@@ -322,7 +322,7 @@ func (i *Index) Unused() []*Directive {
 
 // WithoutReason returns the directives that never said why.
 //
-// Measured before it is enforced. Across the codebase verify gates, 281 of the 306 directives
+// Measured before it is enforced. Across the codebase cohere gates, 281 of the 306 directives
 // naming one of our own rules carry no reason, so a hard requirement on day one would turn working
 // code red rather than teaching anyone anything. The count is the argument for the requirement;
 // the requirement is a policy the caller sets.

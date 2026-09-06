@@ -6,7 +6,7 @@
 //
 // # Why this component carries the argument for the whole port
 //
-// The generated tables verify shipped before this were per-repository, not per-Tailwind-release:
+// The generated tables cohere shipped before this were per-repository, not per-Tailwind-release:
 // running the generator against two repositories on the same Tailwind 4.3.3 produced tables that
 // differed, because each project's own `@theme` entries were baked in as though they were framework
 // facts. Measured on the corpus this file is tested against, ahra resolves 744 theme entries and
@@ -40,16 +40,16 @@
 // # What was deliberately not ported, and why
 //
 // `keyframes` and its two methods. Upstream collects `@keyframes` rules found inside `@theme` so it
-// can re-emit them after the `@theme` rule is removed from the output. verify emits no CSS, and the
+// can re-emit them after the `@theme` rule is removed from the output. cohere emits no CSS, and the
 // reading of a candidate, the `{order, count}` pair the class-order comparator sorts on, never
 // consults them. Adding a set that nothing reads would be untested surface that reads as supported.
 //
-// `src` on each entry, the `SourceLocation` upstream carries so it can build source maps. verify
+// `src` on each entry, the `SourceLocation` upstream carries so it can build source maps. cohere
 // reports on the class literal in a user's source file, never on generated CSS.
 //
 // `markUsedVariable` and `ThemeOptionUsed` are ported, because the bit is observable through
 // `GetOptions` and a port that dropped it would silently answer a different bitfield than the
-// engine. Nothing in verify calls it yet; see its doc comment.
+// engine. Nothing in cohere calls it yet; see its doc comment.
 package tailwind
 
 import (
@@ -498,7 +498,7 @@ func (theme *Theme) variableReference(themeKey string) (string, bool) {
 
 // MarkUsedVariable sets ThemeOptionUsed on a key and reports whether this call is what set it.
 //
-// Nothing in verify calls this. It is ported because the bit it sets is readable through
+// Nothing in cohere calls this. It is ported because the bit it sets is readable through
 // GetOptions, so a Theme that silently lacked it would answer a different bitfield than the engine
 // for any consumer that did mark usage, and because the `!isUsed` return is the kind of
 // first-caller-wins signal that is easy to get backwards when written later from memory. The key is

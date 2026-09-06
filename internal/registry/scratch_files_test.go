@@ -65,11 +65,11 @@ func TestNoScratchFilesRemain(t *testing.T) {
 	// same design is quiet there and deafening here.
 	//
 	// So it runs where it is actionable: before a commit, when a probe left behind is about to
-	// become permanent. `VERIFY_CHECK_SCRATCH=1 go test ./internal/registry/` is the invocation, and
+	// become permanent. `COHERE_CHECK_SCRATCH=1 go test ./internal/registry/` is the invocation, and
 	// the commit path sets it. Everywhere else it says why it did not run, so a reader never mistakes
 	// a skip for a pass.
-	if os.Getenv("VERIFY_CHECK_SCRATCH") == "" {
-		t.Skip("set VERIFY_CHECK_SCRATCH=1 to run; skipped during ordinary work because a live " +
+	if os.Getenv("COHERE_CHECK_SCRATCH") == "" {
+		t.Skip("set COHERE_CHECK_SCRATCH=1 to run; skipped during ordinary work because a live " +
 			"agent's probe is a legitimate mid-measurement file, and a guard that fires on normal " +
 			"work stops being read")
 	}

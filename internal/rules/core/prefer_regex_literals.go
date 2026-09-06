@@ -7,10 +7,10 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/comments"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/regexpattern"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/comments"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/regexpattern"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/regexsyntax"
 )
 
 // PreferRegexLiteralsOptions is the rule's option surface.
@@ -144,7 +144,7 @@ func messageReplaceWithIntendedLiteralAndFlags(flags string) rule.Message {
 //
 // Upstream withholds a suggestion when the pattern or flags are invalid AT THE CONFIGURED
 // ecmaVersion, so `new RegExp('abc', 'd')` reports with no suggestion under ecmaVersion 2021
-// and with one under 2022. verify has no per-file ecmaVersion: the program is compiled once
+// and with one under 2022. cohere has no per-file ecmaVersion: the program is compiled once
 // against one set of compiler options and a rule cannot ask what language edition a file
 // claims. So validity is judged at the latest edition, which means this rule offers a
 // suggestion in five of upstream's own cases where upstream withholds one.

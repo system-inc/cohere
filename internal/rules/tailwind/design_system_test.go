@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/verify/internal/program"
-	"github.com/system-inc/verify/internal/rule"
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	"github.com/system-inc/cohere/internal/program"
+	"github.com/system-inc/cohere/internal/rule"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // The suite that makes "built once per run" a fact rather than a comment.
@@ -299,7 +299,7 @@ func TestDesignSystemBuildsAgainForASecondProgram(t *testing.T) {
 // TestDesignSystemDeclinesRatherThanReportingClean is the failing-safe contract.
 //
 // A project with no Tailwind entry point must produce an error a rule can decline on, never a
-// zero-valued design system. The distinction is the whole reason verify exists: a rule reporting no
+// zero-valued design system. The distinction is the whole reason cohere exists: a rule reporting no
 // findings because the CSS could not be read is indistinguishable from a clean tree, and it is the
 // one failure mode a linter must not have.
 func TestDesignSystemDeclinesRatherThanReportingClean(t *testing.T) {

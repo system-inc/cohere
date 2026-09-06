@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/module"
 )
 
 // ConsistencyRequireConstantCasingOptions names exported constants a framework or library reads
@@ -328,7 +328,7 @@ func isFactoryProducedFunction(initializer *ast.Node) bool {
 // class it was constructed from; it is a document handed to a client. The cast is the author saying
 // so, and this rule has no type information to overrule it with.
 //
-// Parity with the gate verify replaces is the acceptance criterion, and 95 findings on a clean
+// Parity with the gate cohere replaces is the acceptance criterion, and 95 findings on a clean
 // baseline is the shape a false-positive family takes.
 func isClassInstance(initializer *ast.Node, usage *fileUsageIndex) bool {
 	expression := initializer

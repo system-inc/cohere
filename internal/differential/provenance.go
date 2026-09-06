@@ -22,15 +22,15 @@ import (
 //
 // # What is proven, and how it got there
 //
-// Both directions now fire, against ~/Projects/ahra, through `cmd/verify-differential`. Each rests
+// Both directions now fire, against ~/Projects/ahra, through `cmd/cohere-differential`. Each rests
 // on a structural asymmetry rather than a configurable one, which is what keeps a control from
 // quietly ceasing to discriminate:
 //
-//	import-require-path-alias      verify has it; the oxlint plugin does not define it at all
-//	exhaustive-deps                the gate has it; verify implements no react-hooks rule at all
+//	import-require-path-alias      cohere has it; the oxlint plugin does not define it at all
+//	exhaustive-deps                the gate has it; cohere implements no react-hooks rule at all
 //
-// The gate-side control used to be `consistency-organize-imports`, on the ground that verify did not
-// implement it. Verify implements it now, at `internal/rules/structure/consistency_organize_imports.go`,
+// The gate-side control used to be `consistency-organize-imports`, on the ground that cohere did not
+// implement it. Cohere implements it now, at `internal/rules/structure/consistency_organize_imports.go`,
 // so that asymmetry is gone and this comment named a control that had already been replaced. The
 // replacement is not a documentation detail: a control resting on "not ported yet" expires the moment
 // somebody ports it, and the expiry is silent, because a control that has stopped discriminating still
@@ -41,7 +41,7 @@ import (
 // stale name here cost nothing. It is still worth reading as the warning it is.
 //
 // The replacement's own ground, and the one caveat on it, are recorded at the control itself in
-// `cmd/verify-differential/main.go`. Read it before treating this control as permanent: it rests on
+// `cmd/cohere-differential/main.go`. Read it before treating this control as permanent: it rests on
 // nobody porting a 4,477-line rule, which is a judgment about effort rather than a fact about the
 // tools, and the note there names the sturdier ground to move to if that stops holding.
 //
@@ -51,27 +51,27 @@ import (
 //
 // This took a while to reach, and the history is worth keeping because the intermediate states all
 // looked like completion. A run with a shared control alone reported a confident population and an
-// empty diff; a run with the verify-only control alone would have been half-blind in a way nothing
-// in the output revealed, since it could miss everything the gate sees and verify does not.
+// empty diff; a run with the cohere-only control alone would have been half-blind in a way nothing
+// in the output revealed, since it could miss everything the gate sees and cohere does not.
 //
 // The verdict itself has been shown able to go negative, which a clean result cannot establish: the
 // react rule's line threshold was skewed from 60 to 90 in a throwaway build, and the report flipped
 // to `disagrees` with the new differences classified both-active rather than not-ported.
 type Provenance struct {
-	// VerifyFilesLinted and GateFilesLinted are how many files each side actually walked. A zero
+	// CohereFilesLinted and GateFilesLinted are how many files each side actually walked. A zero
 	// here means the run proved nothing regardless of what the diff says.
-	VerifyFilesLinted int
+	CohereFilesLinted int
 	GateFilesLinted   int
 
-	// VerifyRulesRun and GateRulesRun are how many rules each side had loaded.
-	VerifyRulesRun int
+	// CohereRulesRun and GateRulesRun are how many rules each side had loaded.
+	CohereRulesRun int
 	GateRulesRun   int
 
-	// VerifyCommand and GateCommand are the exact invocations, so a reader can rerun them.
-	VerifyCommand string
+	// CohereCommand and GateCommand are the exact invocations, so a reader can rerun them.
+	CohereCommand string
 	GateCommand   string
 
-	// VerifyVersion is what the verify binary says it is, captured from the binary that actually
+	// CohereVersion is what the cohere binary says it is, captured from the binary that actually
 	// ran rather than from the source tree beside it.
 	//
 	// This exists because of a real wrong answer. A run at 03:22 reported 128 disagreements on
@@ -83,7 +83,7 @@ type Provenance struct {
 	//
 	// A binary is the one input to this instrument that changes without leaving a trace in the
 	// report, so its identity is recorded next to the numbers it produced.
-	VerifyVersion string
+	CohereVersion string
 
 	// ControlsRun records the planted-violation controls that were exercised this run, if any.
 	// Empty means the harness's ability to detect a difference was not demonstrated, which is a
@@ -101,7 +101,7 @@ type ControlResult struct {
 	// Name identifies the control in the report.
 	Name string
 
-	// ExpectedSide is the gate that should see this violation. A control that only verify can see
+	// ExpectedSide is the gate that should see this violation. A control that only cohere can see
 	// and a control that only the gate can see prove different halves of the pipeline, and a
 	// harness that runs one direction only is half-proven — a parse bug on the unexercised side
 	// would still report clean.
@@ -126,14 +126,14 @@ type ControlResult struct {
 func (provenance Provenance) Trustworthy() (bool, []string) {
 	reasons := []string{}
 
-	if provenance.VerifyFilesLinted == 0 {
-		reasons = append(reasons, "verify linted 0 files, so its result is empty rather than clean")
+	if provenance.CohereFilesLinted == 0 {
+		reasons = append(reasons, "cohere linted 0 files, so its result is empty rather than clean")
 	}
 	if provenance.GateFilesLinted == 0 {
 		reasons = append(reasons, "the gate linted 0 files, so its result is empty rather than clean")
 	}
-	if provenance.VerifyRulesRun == 0 {
-		reasons = append(reasons, "verify ran 0 rules")
+	if provenance.CohereRulesRun == 0 {
+		reasons = append(reasons, "cohere ran 0 rules")
 	}
 	if provenance.GateRulesRun == 0 {
 		reasons = append(reasons, "the gate ran 0 rules")
@@ -142,10 +142,10 @@ func (provenance Provenance) Trustworthy() (bool, []string) {
 	// A file count that is implausibly small is its own tell. The ahra tree is thousands of files;
 	// a run reporting a handful walked something other than the tree, and that is the failure mode
 	// where a clean answer is most convincing and most wrong.
-	if provenance.VerifyFilesLinted > 0 && provenance.VerifyFilesLinted < minimumPlausibleFileCount {
+	if provenance.CohereFilesLinted > 0 && provenance.CohereFilesLinted < minimumPlausibleFileCount {
 		reasons = append(reasons, fmt.Sprintf(
-			"verify linted only %d files, which is too few to be the tree — check the directory it was pointed at",
-			provenance.VerifyFilesLinted,
+			"cohere linted only %d files, which is too few to be the tree — check the directory it was pointed at",
+			provenance.CohereFilesLinted,
 		))
 	}
 
@@ -186,7 +186,7 @@ func (provenance Provenance) ControlsProven() bool {
 		if !control.Detected {
 			return false
 		}
-		if control.ExpectedSide == SideVerify {
+		if control.ExpectedSide == SideCohere {
 			sawVerifyDirection = true
 		}
 		if control.ExpectedSide == SideGate {
@@ -209,10 +209,10 @@ const minimumPlausibleFileCount = 100
 func (provenance Provenance) Describe() string {
 	builder := &strings.Builder{}
 
-	fmt.Fprintf(builder, "verify: %d files, %d rules — %s\n",
-		provenance.VerifyFilesLinted, provenance.VerifyRulesRun, provenance.VerifyCommand)
-	if provenance.VerifyVersion != "" {
-		fmt.Fprintf(builder, "        %s\n", provenance.VerifyVersion)
+	fmt.Fprintf(builder, "cohere: %d files, %d rules — %s\n",
+		provenance.CohereFilesLinted, provenance.CohereRulesRun, provenance.CohereCommand)
+	if provenance.CohereVersion != "" {
+		fmt.Fprintf(builder, "        %s\n", provenance.CohereVersion)
 	}
 	fmt.Fprintf(builder, "gate:   %d files, %d rules — %s\n",
 		provenance.GateFilesLinted, provenance.GateRulesRun, provenance.GateCommand)

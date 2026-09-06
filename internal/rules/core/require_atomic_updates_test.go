@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // requireAtomicUpdatesCorpusProvenance records where the imported cases came from and how they were
@@ -352,7 +352,7 @@ func TestRequireAtomicUpdatesEscapeTable(t *testing.T) {
 // from a bare ESLint run, with the measurement rather than an argument.
 //
 // Upstream skips a reference whose `resolved` is null, and ESLint decides "resolved" from its scope
-// analysis plus the configured globals list. Verify asks the checker, which resolves against the
+// analysis plus the configured globals list. Cohere asks the checker, which resolves against the
 // program's declarations. Upstream's own case 26 is exactly this: it ships with
 // `globals: { process: "readonly" }`, and measured on the installed eslint 10.8.1 the same source
 // without that declaration is completely silent while with it there are two findings.
@@ -430,7 +430,7 @@ async function main() {
 // this reported the identical span twice.
 //
 // No imported case can see it: upstream's corpus writes no assignment inside a `finally` at all, and
-// its one try/catch case puts the writes in the arms. This came off `verify --lint` over the real
+// its one try/catch case puts the writes in the arms. This came off `cohere --lint` over the real
 // tree, where the guard-flag shape below appears in several files.
 //
 // Measured against the installed eslint 10.8.1: one finding, at the `g = false` in the `finally`.
@@ -501,7 +501,7 @@ func TestRequireAtomicUpdatesFinallyReportsOnce(t *testing.T) {
 // keeps it from passing on a rule that simply reports every catch-block write.
 //
 // This is `modules/kingdom/KingdomShadeController.ts:203` on the real tree, and it is one of the 8
-// findings verify reports there that ESLint does not. See the rule's doc comment.
+// findings cohere reports there that ESLint does not. See the rule's doc comment.
 func TestRequireAtomicUpdatesCatchDoesNotInheritTryRefresh(t *testing.T) {
 	const declarations = `declare function a(): Promise<void>;
 declare function b(): Promise<number>;
@@ -516,7 +516,7 @@ declare function use(value: unknown): void;
 	})
 
 	t.Run("a read at the end of the try does not refresh the catch", func(t *testing.T) {
-		// ESLint reports only `entry.position` here. Verify reports both, because the fork to the
+		// ESLint reports only `entry.position` here. Cohere reports both, because the fork to the
 		// handler is a real successor edge and the read on the normal path is not on it.
 		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "catch.ts", declarations+
 			`async function f(entry: any) { if (entry.status !== 1) return;
@@ -549,7 +549,7 @@ declare function use(value: unknown): void;
 }
 
 // TestRequireAtomicUpdatesRestoreInFinallyIsJudged pins the shape behind seven of the eight findings
-// verify reports on the real tree that ESLint does not.
+// cohere reports on the real tree that ESLint does not.
 //
 // A handler saved into a local, replaced, and restored in a `finally` after an await is a real
 // last-writer-wins race: two overlapping calls restore in the wrong order and the second installs a
@@ -582,7 +582,7 @@ async function withRestore() {
 
 	t.Run("restoring through an ambient declaration is judged the same way", func(t *testing.T) {
 		// The binding is declared rather than local, which is the only thing that changes. Both
-		// report here, so the shape is not what separates verify from ESLint on the real tree.
+		// report here, so the shape is not what separates cohere from ESLint on the real tree.
 		result := rule_testing.RunTyped(t, RequireAtomicUpdates, "restore.ts",
 			`declare function callback(): Promise<void>;
 declare const ambientHolder: { slot: number };

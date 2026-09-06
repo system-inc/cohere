@@ -28,7 +28,7 @@ import (
 )
 
 // subjectPath is lib.dom.d.ts, 2.35 MB, the largest declaration file in the tree and one that
-// every run of verify parses. Named here rather than discovered so the report can state it.
+// every run of cohere parses. Named here rather than discovered so the report can state it.
 const subjectPath = "/Users/kirkouimet/Projects/ahra/node_modules/.pnpm/typescript@6.0.3/node_modules/typescript/lib/lib.dom.d.ts"
 
 // flatNode is what a cache would actually store: no pointers, no interface, fixed width.
@@ -1040,7 +1040,7 @@ func TestProbeGraphSplit(t *testing.T) {
 
 	parseMedian := median(parseTimings)
 
-	// The graph phase measured on this tree, five runs of `verify --no-fix`, median. Stated as
+	// The graph phase measured on this tree, five runs of `cohere --no-fix`, median. Stated as
 	// a constant with its provenance rather than re-measured here, because running the full
 	// binary from a test would measure a different process under different load.
 	const measuredGraphMilliseconds = 528.0
@@ -1051,7 +1051,7 @@ func TestProbeGraphSplit(t *testing.T) {
 		len(files), len(buildInfo.FileNames), missing)
 	fmt.Printf("source                %.1f MB\n", float64(totalBytes)/(1024*1024))
 	fmt.Printf("parse, standalone     %.0f ms   median of %d\n", parseMilliseconds, splitRuns)
-	fmt.Printf("graph phase           %.0f ms   measured, verify --no-fix, median of 5\n",
+	fmt.Printf("graph phase           %.0f ms   measured, cohere --no-fix, median of 5\n",
 		measuredGraphMilliseconds)
 	fmt.Printf("parse share           %.0f%% of graph\n",
 		100*parseMilliseconds/measuredGraphMilliseconds)

@@ -10,8 +10,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rules/nexus"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rules/nexus"
 )
 
 // proposeFromRules runs real rules over the current text and collects their fixes.

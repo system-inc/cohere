@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 var messageNoUselessConstructor = rule.Message{
@@ -84,7 +84,7 @@ var messageNoUselessConstructorRemove = rule.Message{
 // 427 lines and sixteen helpers moved for no behavioural change.
 //
 // Nothing asks for the name either. `TestParityAgainstInventory` walks REGISTERED rules and asks
-// whether each appears in `rule-inventory.json`, not the reverse, and that file carries no entry for
+// whether each appeared in the captured rule inventory, not the reverse, and it carried no entry for
 // this rule under either spelling, so a missing `@typescript-eslint/` registration costs nothing in
 // the differential. Checked with a control against a rule that does have an entry.
 //

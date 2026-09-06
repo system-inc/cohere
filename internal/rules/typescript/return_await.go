@@ -3,8 +3,8 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // ReturnAwaitMode is the rule's single option, a bare string rather than an object.
@@ -40,7 +40,7 @@ func DefaultReturnAwaitSettings() ReturnAwaitOptions {
 // DecodeReturnAwaitOptions reads the rule's configuration.
 //
 // The option is a bare JSON string, not an object, so upstream's `["error"]` tuple becomes a lone
-// string once verify's config layer strips the severity. An unrecognised value keeps the default
+// string once cohere's config layer strips the severity. An unrecognised value keeps the default
 // rather than silently selecting a mode nobody asked for.
 func DecodeReturnAwaitOptions(raw []byte) (any, error) {
 	decoded, err := rule.DecodeOptionsInto[string]()(raw)

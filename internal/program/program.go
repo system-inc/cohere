@@ -26,7 +26,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
-	"github.com/system-inc/verify/internal/configuration"
+	"github.com/system-inc/cohere/internal/configuration"
 )
 
 // Graph is a built type graph: the program, and the checkers that answer questions about it.

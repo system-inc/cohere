@@ -32,7 +32,7 @@ type FrozenBinary struct {
 // floor is being replaced under it.
 //
 // It is deliberately narrow, and every constraint here follows from one invariant: **a run that did
-// not verify the rules match must never look like one that did.**
+// not cohere the rules match must never look like one that did.**
 //
 //   - It is reached only by an explicit request, never automatically.
 //   - It is never a fallback from a failed rebuild. That is the failure that would actually happen,
@@ -114,14 +114,14 @@ func ResolveFrozen(paths Paths) (FrozenBinary, error) {
 }
 
 // binaryNamePrefix is what every cached binary's filename starts with.
-const binaryNamePrefix = "verify-"
+const binaryNamePrefix = "cohere-"
 
 // developmentHashSuffix marks the sidecar recording what the development binary was built from.
 const developmentHashSuffix = ".hash"
 
 // hashFromBinaryName reads the input hash back out of a cached binary's filename.
 //
-// The name is `verify-<goos>-<goarch>-<hash>`, so the hash is the last segment. A name that does
+// The name is `cohere-<goos>-<goarch>-<hash>`, so the hash is the last segment. A name that does
 // not carry one — the stable development binary, for instance — reports that rather than an empty
 // string, because the caller prints this and a blank would read as a missing value rather than as
 // a binary that never had a hash in its name.

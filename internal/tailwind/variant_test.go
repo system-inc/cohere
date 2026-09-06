@@ -16,7 +16,7 @@ import (
 //
 // Measured rather than transcribed, because the two are different claims and `getVariantOrder` is
 // where they part. Reading `variants.ts` shows every variant holding an `order` number and invites
-// a static table of variant to position; verify has shipped exactly that table, 145 entries. Asking
+// a static table of variant to position; cohere has shipped exactly that table, 145 entries. Asking
 // the engine says the number a consumer sees is a dense rank assigned per run over only the
 // variants that run parsed, with ties collapsed. A transcribed table agrees with the engine on any
 // corpus whose variant set matches the one it was generated from, which is why a table generated
@@ -825,7 +825,7 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(t *testing.T) {
 
 // TestVariantOrderIsRunScoped is the known-dirty control for the shipped table.
 //
-// A static variant-to-position table is the shape verify ships today and the shape this component
+// A static variant-to-position table is the shape cohere ships today and the shape this component
 // argues against. The argument is only sound if the engine's index genuinely moves, so this asserts
 // it does: the same variant must receive different indices in two runs whose populations differ.
 //

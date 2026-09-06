@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/system-inc/verify/internal/react_conformance"
+	"github.com/system-inc/cohere/internal/react_conformance"
 )
 
 // TestUnjoinedMessageIdsAreEnumerated measures what the message join DROPS.

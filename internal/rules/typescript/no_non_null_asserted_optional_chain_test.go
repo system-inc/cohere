@@ -3,13 +3,13 @@ package typescript
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 const assertedOptionalChainFile = "/repository/source/Thing.ts"
 
 // The cases below are the original's own test file plus a run of the real plugin at 8.67.0, which
-// is the only answer key this rule has: the tree verify gates contains zero non-null assertions, so
+// is the only answer key this rule has: the tree cohere gates contains zero non-null assertions, so
 // a clean run over it cannot distinguish a working port from an inert one.
 func TestNoNonNullAssertedOptionalChainFires(t *testing.T) {
 	cases := []struct {

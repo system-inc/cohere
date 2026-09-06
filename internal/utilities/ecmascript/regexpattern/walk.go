@@ -3,7 +3,7 @@ package regexpattern
 import (
 	"unicode/utf8"
 
-	"github.com/system-inc/verify/internal/utilities/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/regexsyntax"
 )
 
 // walker holds the position and the enclosing structure while scanning a pattern.

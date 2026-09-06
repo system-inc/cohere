@@ -52,7 +52,7 @@ func MatchIgnoringCase(candidate string, wanted string) bool {
 //   - a nil name, which the parser can produce on malformed input
 //
 // This exists because the same three-part guard was written twice inside this file, at the two
-// loops below, and `@system_verify_format` found a third rule about to hand-roll it: a rule that
+// loops below, and `@system_cohere_format` found a third rule about to hand-roll it: a rule that
 // reports *on the attribute* rather than on the element needs the node, and neither element-level
 // helper gives it one. Two copies of a guard inside the package whose doc comment says the shelf
 // prevents drift is the drift, so it is one function now and both loops call it.

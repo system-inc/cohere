@@ -3,8 +3,8 @@ package react
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/high_level_intermediate_representation"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/high_level_intermediate_representation"
 )
 
 var messageNoDerivingStateInEffects = rule.Message{
@@ -543,7 +543,7 @@ func isUseEffectExactly(ctx rule.Context, function *high_level_intermediate_repr
 // `lastName`, so upstream's "every dep is actually captured" check fails and it abandons the effect.
 // The silence is a side effect of the fold, not a rule anybody wrote down.
 //
-// Verify has no constant propagation, so our lowering keeps the capture and every one of those
+// Cohere has no constant propagation, so our lowering keeps the capture and every one of those
 // checks passes. Three of upstream's clean fixtures reported without this. The lowered form was
 // printed rather than guessed at: the enclosing function holds `$23 = Primitive Swift` then
 // `$24 = StoreLocal const lastName$25 = $23`, and the callback holds `$15 = LoadContext lastName$7`

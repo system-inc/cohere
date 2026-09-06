@@ -6,9 +6,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/jsx"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/jsx"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // NoDeprecated is typescript-eslint's `no-deprecated`: using something marked `@deprecated` is a

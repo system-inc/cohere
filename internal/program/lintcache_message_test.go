@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/program"
+	"github.com/system-inc/cohere/internal/program"
 )
 
 // A cached finding has to be printable, and today it is not.
 //
 // LintCacheFinding stores MessageId and not the description. That is only safe if an id determines
-// its text, because printRuleDiagnostic (cmd/verify/main.go) prints Message.Description directly and
+// its text, because printRuleDiagnostic (cmd/cohere/main.go) prints Message.Description directly and
 // nothing in the tree derives text from an id. Where an id does not determine its text, replaying a
 // cached finding prints an empty or wrong message beside a correct file, range and rule — a cache
 // serving a confidently wrong answer, which is the one failure mode here that looks like success.

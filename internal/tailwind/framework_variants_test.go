@@ -415,7 +415,7 @@ func TestLoadedDesignSystemRegistersTheFrameworkVariants(t *testing.T) {
 //
 // `ParseVariant` returns nil for an unregistered root and `ParseCandidate` then yields zero
 // candidates for the whole class, so a missing registration is not a ranking difference, it is a
-// class the engine reads and verify cannot. This asserts the population directly, because a rule
+// class the engine reads and cohere cannot. This asserts the population directly, because a rule
 // reading a system that cannot parse would decline on every one of these and a differential would
 // score the silence as agreement.
 func TestLoadedDesignSystemParsesVariantBearingClasses(t *testing.T) {

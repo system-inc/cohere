@@ -93,7 +93,7 @@ func (s *IncrementalSession) Diagnostics(ctx context.Context) []*ast.Diagnostic 
 // session, produces a build info that records nothing as checked and a warm run that skips
 // nothing, which costs more than not caching at all.
 //
-// Verify does not otherwise emit, and this does not change that: under NoEmit the emit path
+// Cohere does not otherwise emit, and this does not change that: under NoEmit the emit path
 // writes the build info and no JavaScript.
 //
 // Returns any diagnostics from the write itself. A failed write must not pass silently: the

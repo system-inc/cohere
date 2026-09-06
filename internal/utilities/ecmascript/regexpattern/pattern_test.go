@@ -3,7 +3,7 @@ package regexpattern
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/utilities/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/regexsyntax"
 )
 
 // collect walks a pattern and returns every character it reports.

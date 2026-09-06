@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // The corpus is ESLint's own, extracted by loading its test file with a stubbed RuleTester and
@@ -203,13 +203,13 @@ func TestNoUnexpectedMultilineDescriptions(t *testing.T) {
 }
 
 // Cases upstream's corpus does not write, each measured against the installed build at 10.8.1 with
-// `Linter#verify` under `sourceType: "script"` before being written here. They exist because this
+// `Linter#cohere` under `sourceType: "script"` before being written here. They exist because this
 // port makes a decision at each of them that no imported fixture can see.
 //
 // The command, so the next reader can re-take these rather than trust them:
 //
 //	node -e 'const {Linter}=require("eslint");console.log(JSON.stringify(
-//	  new Linter().verify(CODE,{rules:{"no-unexpected-multiline":"error"},
+//	  new Linter().cohere(CODE,{rules:{"no-unexpected-multiline":"error"},
 //	  languageOptions:{ecmaVersion:2022,sourceType:"script"}})))'
 func TestNoUnexpectedMultilineMeasuredAgainstTheInstalledBuild(t *testing.T) {
 	silent := []struct {

@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
-	"github.com/system-inc/verify/internal/rules/core"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rules/core"
 )
 
 // The corpus is ESLint's own, taken verbatim from
@@ -109,7 +109,7 @@ func TestPreferPromiseRejectErrorsFires(t *testing.T) {
 // the options struct, so the wire shape is under test and not only the struct.
 //
 // The wire shape is the bare object. Upstream writes `options: [{ allowEmptyReject: true }]`, and
-// verify's config layer unwraps the severity tuple before dispatch, so the decoder receives what is
+// cohere's config layer unwraps the severity tuple before dispatch, so the decoder receives what is
 // inside the array.
 func decodePreferPromiseRejectErrorsOptions(t *testing.T, wire string) any {
 	t.Helper()
@@ -173,7 +173,7 @@ func TestPreferPromiseRejectErrorsDefaultsWithoutADecoder(t *testing.T) {
 //	"/* global Promise:off */ Promise.reject('x')"
 //	{ code: "Promise.reject('x')", languageOptions: { globals: { Promise: "off" } } }
 //
-// verify has no globals surface, so neither input can be expressed and both would REPORT here. That
+// cohere has no globals surface, so neither input can be expressed and both would REPORT here. That
 // is a fact about the harness rather than about the rule: what those cases assert is that a
 // non-global Promise is exempt, and the five source-level shadowing cases in the silent list assert
 // exactly the same judgment through a mechanism this tree does have.

@@ -8,7 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/program"
+	"github.com/system-inc/cohere/internal/program"
 )
 
 // TestAliasAccessorsWalkTheChainToADeprecation guards the two alias accessors this shim exposes.

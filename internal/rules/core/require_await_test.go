@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // requireAwaitFile is where the fixtures pretend to live.
@@ -35,7 +35,7 @@ func runRequireAwait(t *testing.T, testCase requireAwaitCase) rule_testing.Resul
 // names its function, and what each suggestion writes. All 41 reproduced.
 //
 // Every finding this rule produces carries a suggestion and none carries a fix, so there is no
-// `ExpectFixedSource` here: `verifyAndFix` reports no change at all for this rule, because a
+// `ExpectFixedSource` here: `cohereAndFix` reports no change at all for this rule, because a
 // suggestion is offered to a human rather than applied. Asserting the suggestion's replacement text
 // is the equivalent, and it is done per finding below.
 func requireAwaitFiresCases() []requireAwaitCase {

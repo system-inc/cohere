@@ -3,8 +3,8 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // NoForInArray flags a `for...in` loop whose subject is array-like.
@@ -23,7 +23,7 @@ import (
 // # Absorbed from tsgolint, which is the source of record for this rule
 //
 // Provenance: tsgolint `internal/rules/no_for_in_array/no_for_in_array.go`, vendored at commit
-// `05b7fbc` and absorbed onto verify's own rule interface here. It reaches for
+// `05b7fbc` and absorbed onto cohere's own rule interface here. It reaches for
 // `GetConstrainedTypeAtLocation`, `TypeRecurser`, `GetNumberIndexType` and `GetForStatementHeadLoc`
 // because that is what upstream reaches for, and this note is why a reader finds those helpers in a
 // file that otherwise looks native.
@@ -50,9 +50,9 @@ import (
 // family. It is live upstream rather than absorbed downstream, because `cmd/tsgolint/main.go`
 // builds its `ConfiguredRule` with `Name: r.Name` and no mapping table.
 //
-// The suffix cannot ship here. verify keys the catalog, the config file, and suppression comments
+// The suffix cannot ship here. cohere keys the catalog, the config file, and suppression comments
 // on this exact string, so `no-for-in-array-rule` would register a rule that
-// `typescript/no-for-in-array` in `VerifySettings.json` never enables, that the inventory entry
+// `typescript/no-for-in-array` in `CohereSettings.json` never enables, that the inventory entry
 // never matches, and that no suppression comment an author would plausibly write could silence. It
 // is corrected below, at the line, with the measurement recorded beside it.
 //
@@ -129,8 +129,8 @@ var NoForInArray = rule.Rule{
 	// Upstream spells this "no-for-in-array-rule". That trailing "-rule" is a typo, and correcting
 	// it is the one correction this absorption carries.
 	//
-	// It is not cosmetic. verify keys the catalog, the config, and suppression comments on this
-	// string, so shipping upstream's spelling would register a rule no `VerifySettings.json` entry
+	// It is not cosmetic. cohere keys the catalog, the config, and suppression comments on this
+	// string, so shipping upstream's spelling would register a rule no `CohereSettings.json` entry
 	// enables, that the inventory's `typescript/no-for-in-array` never matches, and that no
 	// `cohere-disable` comment an author would actually write could silence.
 	//

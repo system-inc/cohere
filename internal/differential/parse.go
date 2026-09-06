@@ -13,7 +13,7 @@ import (
 //
 // That choice is deliberate and it costs something, so it is worth stating. Parsing the human
 // format means the harness reads exactly what a human reads, which is the artifact both sides
-// actually ship. Asking verify for a machine format would mean adding an output mode that exists
+// actually ship. Asking cohere for a machine format would mean adding an output mode that exists
 // only for this harness, and a format nobody looks at is a format that drifts from the one
 // everybody looks at until the harness is measuring a surface that no longer matches the tool.
 //
@@ -23,14 +23,14 @@ import (
 // clean because it failed to read one side.
 
 var (
-	// verifyFindingPattern matches verify's rule output:
+	// cohereFindingPattern matches cohere's rule output:
 	//   /abs/path/File.ts:240:16 - Message text here [rule-name/messageId]
-	verifyFindingPattern = regexp.MustCompile(`^(.+?):(\d+):(\d+) - (.*) \[([^\]]+)\]\s*$`)
+	cohereFindingPattern = regexp.MustCompile(`^(.+?):(\d+):(\d+) - (.*) \[([^\]]+)\]\s*$`)
 
-	// verifyTypeDiagnosticPattern matches verify's type output, which the lint-only harness should
+	// cohereTypeDiagnosticPattern matches cohere's type output, which the lint-only harness should
 	// recognize as "not a rule finding" rather than as an unparsed line:
 	//   /abs/path/File.ts:10:5 - error TS2304: Cannot find name 'x'.
-	verifyTypeDiagnosticPattern = regexp.MustCompile(`^(.+?):(\d+):(\d+) - error TS(\d+): (.*)$`)
+	cohereTypeDiagnosticPattern = regexp.MustCompile(`^(.+?):(\d+):(\d+) - error TS(\d+): (.*)$`)
 
 	// gateFindingPattern matches RunCachedOxlint.ts output:
 	//   relative/path/File.tsx:198:1: error structure(rule-name): Message text here
@@ -55,11 +55,11 @@ type ParseResult struct {
 	SummaryLines []string
 }
 
-// ParseVerify reads verify's lint output into findings.
+// ParseCohere reads cohere's lint output into findings.
 //
-// root is the directory paths are made relative to, so verify's absolute paths and the gate's
+// root is the directory paths are made relative to, so cohere's absolute paths and the gate's
 // relative ones compare.
-func ParseVerify(output string, root string) (ParseResult, error) {
+func ParseCohere(output string, root string) (ParseResult, error) {
 	result := ParseResult{Findings: []Finding{}, UnparsedLines: []string{}, SummaryLines: []string{}}
 
 	for _, line := range strings.Split(output, "\n") {
@@ -77,11 +77,11 @@ func ParseVerify(output string, root string) (ParseResult, error) {
 		// A type diagnostic is a real finding but not a rule finding, and this harness compares
 		// rules. Recognized explicitly so it does not land in UnparsedLines and read as a parse
 		// failure.
-		if verifyTypeDiagnosticPattern.MatchString(trimmed) {
+		if cohereTypeDiagnosticPattern.MatchString(trimmed) {
 			continue
 		}
 
-		match := verifyFindingPattern.FindStringSubmatch(trimmed)
+		match := cohereFindingPattern.FindStringSubmatch(trimmed)
 		if match == nil {
 			result.UnparsedLines = append(result.UnparsedLines, trimmed)
 			continue
@@ -155,13 +155,13 @@ func ParseGate(output string, root string) (ParseResult, error) {
 	return result, nil
 }
 
-// isVerifySummaryLine recognizes verify's coverage and verdict output.
+// isVerifySummaryLine recognizes cohere's coverage and verdict output.
 func isVerifySummaryLine(line string) bool {
 	if strings.HasPrefix(line, "  ") {
 		return true
 	}
 	// `phases:` says which phases ran and which were skipped, so a lint-only run cannot be mistaken
-	// for a full one. Added to verify after this parser was written, and caught by the harness's
+	// for a full one. Added to cohere after this parser was written, and caught by the harness's
 	// refusal to compare when a line does not parse rather than by anyone noticing — which is the
 	// whole argument for that refusal being an error instead of a note.
 	for _, prefix := range []string{"graph built in ", "lint: ", "types: ", "fix: ", "format: ", "phases: "} {
@@ -194,7 +194,7 @@ func parsePosition(lineText string, columnText string) (int, int, error) {
 
 // relativeTo normalizes a path against the tree root so both gates' paths compare.
 //
-// The two sides genuinely differ here — verify prints absolute paths and the gate prints paths
+// The two sides genuinely differ here — cohere prints absolute paths and the gate prints paths
 // relative to the project — and this is the single most likely place for a silent total mismatch,
 // because a path difference makes every finding look one-sided and the diff still comes back
 // well-formed. It is the reason the controls exist.

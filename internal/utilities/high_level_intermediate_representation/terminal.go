@@ -238,7 +238,7 @@ type Label struct {
 //
 // # The finally divergence, stated where it will be found
 //
-// verify's `controlflow` lays a `finally` body out TWICE - once for normal completion, once for the
+// cohere's `controlflow` lays a `finally` body out TWICE - once for normal completion, once for the
 // abrupt path - and both copies carry the same source positions. This IR does NOT. The finally body
 // is lowered once, and the paths that must run it jump to it.
 //

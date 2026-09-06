@@ -30,7 +30,7 @@ type DeadDeclaration struct {
 	Range    TextSpan
 	Exported bool
 
-	// Intentional carries a `verify-keep` written above the declaration.
+	// Intentional carries a `cohere-keep` written above the declaration.
 	Intentional intentionalReason
 }
 

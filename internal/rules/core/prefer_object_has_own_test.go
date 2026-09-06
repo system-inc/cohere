@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // The corpus is ESLint's own, 59 valid and 33 invalid cases, extracted by loading its test file
@@ -227,7 +227,7 @@ func TestPreferObjectHasOwnScopeGuard(t *testing.T) {
 //
 // `/* global Object: off */` is an ESLint configuration comment that removes a global from its
 // scope analysis, so the rule's `variable && variable.scope.type === "global"` test fails and the
-// input is clean. Nothing in verify reads that comment and the type checker still resolves `Object`
+// input is clean. Nothing in cohere reads that comment and the type checker still resolves `Object`
 // to lib.es5.d.ts, so the guard passes and the finding stands.
 //
 // Pinned at the layer that decides it: this is a configuration-surface difference rather than a

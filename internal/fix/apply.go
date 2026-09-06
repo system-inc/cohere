@@ -1,6 +1,6 @@
 // Package fix applies the repairs rules propose, and refuses the ones that would corrupt a file.
 //
-// This is the only component in verify that writes to source. Everything else reads: the parser
+// This is the only component in cohere that writes to source. Everything else reads: the parser
 // reads bytes, the checker reads the parse, a rule reads the tree and proposes. A proposal is
 // inert until this package decides it lands, which is what lets a rule be written by anyone and
 // still be safe — a rule cannot damage a file it has no way to write to.
@@ -26,7 +26,7 @@ package fix
 import (
 	"sort"
 
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // Proposal is one rule's suggested edit, carrying who proposed it.

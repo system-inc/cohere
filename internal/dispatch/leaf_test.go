@@ -11,12 +11,12 @@ import (
 //
 // `internal/rule` is the interface a rule codes against, so depending on it is the entire point.
 var allowedRuleImports = map[string]bool{
-	"github.com/system-inc/verify/internal/rule": true,
+	"github.com/system-inc/cohere/internal/rule": true,
 
 	// The generated Tailwind collapse table and its gate. Exact rather than a prefix, because a
 	// prefix without a trailing slash would also admit `internal/tailwindanything`, and one with a
 	// trailing slash matches no package at all when the package is the directory itself.
-	"github.com/system-inc/verify/internal/tailwind": true,
+	"github.com/system-inc/cohere/internal/tailwind": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.
@@ -59,7 +59,7 @@ var allowedRuleImports = map[string]bool{
 // in this same file exists to prevent. Two guards of ours would have been pulling against each
 // other, and the measurement is what says which one was wrong.
 var allowedRuleImportPrefixes = []string{
-	"github.com/system-inc/verify/internal/utilities/",
+	"github.com/system-inc/cohere/internal/utilities/",
 }
 
 // A rule edit must not trigger a deep rebuild, and this is a build-time check rather than a review
@@ -85,7 +85,7 @@ func TestRulePackagesStayLeaves(t *testing.T) {
 
 	for _, rulePackage := range rulePackages {
 		for _, imported := range listImports(t, rulePackage) {
-			if !strings.HasPrefix(imported, "github.com/system-inc/verify/") {
+			if !strings.HasPrefix(imported, "github.com/system-inc/cohere/") {
 				// Third-party and standard-library imports are not what this guards: the compiler
 				// shim is most of what a rule touches, and it is not ours to be deep in.
 				continue

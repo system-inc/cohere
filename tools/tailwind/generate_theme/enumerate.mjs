@@ -73,7 +73,7 @@ function loadStylesheet(identifier, base) {
 }
 
 /*
- * `@config` and `@plugin` load JavaScript. verify never runs either, and neither contributes theme
+ * `@config` and `@plugin` load JavaScript. cohere never runs either, and neither contributes theme
  * entries through this path, so the module is stubbed rather than executed. A real `@config` that
  * defined theme values would be a gap; the two repositories in the corpus use `@config` only for
  * content globs.

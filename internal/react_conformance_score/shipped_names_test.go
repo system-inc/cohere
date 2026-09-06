@@ -5,15 +5,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/react_conformance"
-	"github.com/system-inc/verify/internal/registry"
+	"github.com/system-inc/cohere/internal/react_conformance"
+	"github.com/system-inc/cohere/internal/registry"
 )
 
 // TestShippedRuleNamesAreRegistered makes the second column of `ShippedRules` executable.
 //
 // # Why this test has to exist, and why it lives here
 //
-// `ShippedRules` maps an upstream rule name to the name verify registers that rule under. Until
+// `ShippedRules` maps an upstream rule name to the name cohere registers that rule under. Until
 // 2026-08-24 every value read `react/<name>`, and not one of those strings was a registered rule:
 // the react-compiler rules register BARE. The map's own doc comment asserted the opposite, claiming
 // a rename on either side would be "a visible edit rather than a silent unjoin".
@@ -26,7 +26,7 @@ import (
 //
 // This test is the fix: it evaluates every value against the live registry. It lives in
 // `react_conformance_score` rather than beside the map because `react_conformance` deliberately depends
-// on nothing in verify's rule engine, and importing `registry` there would couple the instrument to
+// on nothing in cohere's rule engine, and importing `registry` there would couple the instrument to
 // the thing it measures.
 //
 // Scored by mutation: setting `hooks` back to `react/rules-of-hooks` SURVIVED the entire suite
@@ -44,18 +44,18 @@ func TestShippedRuleNamesAreRegistered(t *testing.T) {
 		t.Fatal("the registry is empty, so this test would pass vacuously")
 	}
 
-	for upstream, verifyName := range react_conformance.ShippedRules {
-		if registered[verifyName] {
+	for upstream, cohereName := range react_conformance.ShippedRules {
+		if registered[cohereName] {
 			continue
 		}
 		// Name the near miss rather than only the absence. A namespaced spelling is the specific
 		// error this test was written for, so saying so beats "not found" and sending the reader to
 		// grep the registry.
 		hint := ""
-		if bare := strings.TrimPrefix(verifyName, "react/"); bare != verifyName && registered[bare] {
+		if bare := strings.TrimPrefix(cohereName, "react/"); bare != cohereName && registered[bare] {
 			hint = "; the rule registers BARE as " + bare + ", with no `react/` namespace"
 		}
-		t.Errorf("ShippedRules[%q] = %q, which no rule registers%s", upstream, verifyName, hint)
+		t.Errorf("ShippedRules[%q] = %q, which no rule registers%s", upstream, cohereName, hint)
 	}
 }
 
@@ -63,7 +63,7 @@ func TestShippedRuleNamesAreRegistered(t *testing.T) {
 //
 // A rule wired here but absent from `ShippedRules` would run and then have its fixtures classified
 // as `no rule shipped`, so it would score nothing while appearing to work. The reverse is allowed
-// and expected: `ShippedRules` is what verify HAS, `Rules` is what this harness has WIRED, and the
+// and expected: `ShippedRules` is what cohere HAS, `Rules` is what this harness has WIRED, and the
 // gap between them is the honest measure of what is left to do.
 func TestEveryWiredRuleIsAShippedRule(t *testing.T) {
 	for _, upstream := range UpstreamNames() {
@@ -71,7 +71,7 @@ func TestEveryWiredRuleIsAShippedRule(t *testing.T) {
 			t.Errorf("rule %q is wired in the engine but absent from ShippedRules, so its fixtures would be classified as unshipped", upstream)
 		}
 		if Rules[upstream].Rule.Name == "" {
-			t.Errorf("rule %q is wired with no underlying verify rule", upstream)
+			t.Errorf("rule %q is wired with no underlying cohere rule", upstream)
 		}
 		if len(Rules[upstream].Messages) == 0 {
 			t.Errorf("rule %q is wired with an empty message join, so it can never report anything", upstream)
@@ -81,15 +81,15 @@ func TestEveryWiredRuleIsAShippedRule(t *testing.T) {
 
 // TestWiredRuleNamesMatchTheRegisteredRule checks the engine wires the rule it claims to.
 //
-// `RuleUnderTest.Upstream` names an upstream rule and `.Rule` carries a verify rule value; nothing
-// structural stops those two disagreeing. This asserts the verify rule's own `.Name` is the one
+// `RuleUnderTest.Upstream` names an upstream rule and `.Rule` carries a cohere rule value; nothing
+// structural stops those two disagreeing. This asserts the cohere rule's own `.Name` is the one
 // `ShippedRules` says implements that upstream rule, so wiring `react.UseMemo` under the key
 // `gating` fails here rather than producing a confidently wrong per-rule scoreboard.
 func TestWiredRuleNamesMatchTheRegisteredRule(t *testing.T) {
 	for _, upstream := range UpstreamNames() {
 		want := react_conformance.ShippedRules[upstream]
 		if got := Rules[upstream].Rule.Name; got != want {
-			t.Errorf("engine wires %q to verify rule %q, but ShippedRules says %q implements it", upstream, got, want)
+			t.Errorf("engine wires %q to cohere rule %q, but ShippedRules says %q implements it", upstream, got, want)
 		}
 	}
 }

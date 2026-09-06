@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/program"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/program"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // A rule that asks the checker a question must not crash the run, and this needs enough files to

@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/program"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/program"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // defaultTsConfig is a minimal, self-contained project.
@@ -52,7 +52,7 @@ const defaultTsConfig = `{
 // second per call to build the program, which is why this is a separate entry point rather than the
 // default: a microsecond parse is the right harness for the rules that only need one.
 //
-// Identified by @system_verify_lint_rules, which stopped porting a 1,208-line rule on discovering
+// Identified by @system_cohere_lint_rules, which stopped porting a 1,208-line rule on discovering
 // it could be written but not proven, rather than writing fixtures that would have passed
 // vacuously.
 func RunTyped(t *testing.T, subject rule.Rule, fileName string, sourceText string) Result {

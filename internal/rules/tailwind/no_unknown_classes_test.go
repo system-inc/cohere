@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	"github.com/system-inc/cohere/internal/rule_testing"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // Expectations measured against the real plugin, and against the real corpus for the silent half.
@@ -37,7 +37,7 @@ const unknownFixtureStylesheetPath = "app/_theme/styles/theme.css"
 
 // unknownFixtureSearchRoot is where the upward walk for `node_modules/tailwindcss` begins.
 //
-// The corpus repository rather than this checkout, because `verify` installs no npm packages.
+// The corpus repository rather than this checkout, because `cohere` installs no npm packages.
 const unknownFixtureSearchRoot = "/Users/kirkouimet/Projects/ahra/app/_theme/styles"
 
 // unknownFixtureStylesheet is the fixture's root stylesheet, and it declares utilities of its own.

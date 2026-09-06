@@ -27,7 +27,7 @@ import (
  * happens here because upstream declines to do it there.
  *
  * Checking that claim about typescript-go costs a paragraph and it is worth it, because the obvious
- * probe returns the wrong answer with no error. `git ls-files typescript-go/tsc/internal/bundled/libs`
+ * probe returns the wrong answer with no error. `git ls-files TypeScript/tsc/internal/bundled/libs`
  * from this repository returns 0 and exit 0. The same command from inside the submodule returns 108.
  * A submodule's contents never appear in the parent's index, so both readings are correct answers to
  * different questions asked in identical words: does the parent track these (no, and it never will)
@@ -92,7 +92,7 @@ type BundleSource struct {
 // to answer "where is the fork", back when disk was the only mode -- and the change is the point.
 // A developer pointing at a live fork is the only caller in Disk mode.
 //
-// There is no caching. `New` is called once per process (cmd/verify/format.go:149, reached from one
+// There is no caching. `New` is called once per process (cmd/cohere/format.go:149, reached from one
 // production call site), so the read is not on a hot path, and a cached read cannot see a fork that
 // changed mid-run -- which is exactly the case Disk mode exists to serve. Caching here would
 // optimize the mode that does not need it at the cost of correctness in the mode that does.

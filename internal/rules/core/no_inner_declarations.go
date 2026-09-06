@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // messageNoInnerDeclarationsId is the id. The message is built per finding, because it carries both
@@ -63,7 +63,7 @@ type noInnerDeclarationsSecondOption struct {
 // TRUE, so a zero-value struct silently inverts the rule and every fixture built from a struct
 // rather than routed through here would pass anyway.
 //
-// The wire shape is upstream's own positional array MINUS the severity, which verify's config layer
+// The wire shape is upstream's own positional array MINUS the severity, which cohere's config layer
 // has already stripped. A rule written as `["error", "both"]` reaches this as the JSON `"both"`;
 // one written as `["error", "both", {...}]` reaches it as `["both", {...}]`. Both spellings are
 // accepted because both are what the config layer can produce for a two-option rule.

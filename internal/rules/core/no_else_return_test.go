@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // elseReturnFile is where the fixtures pretend to live.
@@ -188,7 +188,7 @@ func TestNoElseReturnStaysSilent(t *testing.T) {
 // repairs that do not overlap, so ExpectFixedSource applies both at once and lands one pass
 // further along.
 //
-// Measured rather than assumed: driving the installed rule with verifyAndFix, which loops to a
+// Measured rather than assumed: driving the installed rule with cohereAndFix, which loops to a
 // fixed point, produces exactly what this port produces in one pass, character for character
 // including the double spaces its own block unwrap leaves behind. So the end state agrees and
 // only the per-pass deferral differs, which is the edit engine's business rather than a rule's.

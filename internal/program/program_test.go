@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/program"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/program"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // writeProject lays a tiny TypeScript project on disk and returns its directory.

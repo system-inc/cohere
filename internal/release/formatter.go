@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/verify/internal/prettier"
+	"github.com/system-inc/cohere/internal/prettier"
 )
 
 // FormatterForkPathVariable overrides where the Prettier fork is read from.

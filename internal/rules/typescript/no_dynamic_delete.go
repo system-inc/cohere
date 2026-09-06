@@ -2,7 +2,7 @@ package typescript
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // NoDynamicDelete flags `delete` applied to a computed member whose key is not a plain literal.

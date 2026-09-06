@@ -1,15 +1,15 @@
-// Package differential compares what verify found against what the gate it replaces found.
+// Package differential compares what cohere found against what the gate it replaces found.
 //
-// The claim this package exists to test is "verify agrees with the gate." That claim is not one
+// The claim this package exists to test is "cohere agrees with the gate." That claim is not one
 // claim. With 181 rules configured it is 181 separate claims, and an aggregate agreement can hold
-// while any number of individual rules disagree in ways that cancel: verify missing three findings
+// while any number of individual rules disagree in ways that cancel: cohere missing three findings
 // on one rule and inventing three on another sums to zero and looks like agreement.
 //
 // So a difference is keyed by file, line, and rule, and the report is per rule rather than a count.
 //
 // The harder problem is the empty diff. Two gates that both report nothing produce identical output
 // whether one of them checked the tree or checked no files at all, and that is precisely the failure
-// the gate verify replaces shipped for days. A diff harness inherits that failure mode and makes it
+// the gate cohere replaces shipped for days. A diff harness inherits that failure mode and makes it
 // worse, because an empty diff over two vacuous runs reads as proof of agreement.
 //
 // The defense is Population, carried on every Report. A comparison states how many findings each
@@ -29,8 +29,8 @@ import (
 type Side string
 
 const (
-	// SideVerify is ours: the Go binary.
-	SideVerify Side = "verify"
+	// SideCohere is ours: the Go binary.
+	SideCohere Side = "cohere"
 	// SideGate is theirs: oxlint behind RunCachedOxlint.
 	SideGate Side = "gate"
 )
@@ -61,7 +61,7 @@ func (finding Finding) Key() string {
 // NormalizeRuleName strips the decoration each gate puts around a rule name.
 //
 // The two formats decorate in opposite directions. The gate prints `structure(rule-name)` or
-// `nexus(rule-name)`, putting the plugin outside. verify prints `rule-name/messageId`, putting the
+// `nexus(rule-name)`, putting the plugin outside. cohere prints `rule-name/messageId`, putting the
 // message identifier after. Neither decoration is part of the rule's identity, and comparing
 // decorated names would report every single rule as a disagreement — a total mismatch that still
 // looks like well-formed output, which is the failure this whole package is built to refuse.
@@ -76,7 +76,7 @@ func NormalizeRuleName(raw string) string {
 	// A slash means two opposite things depending on who wrote it, and an earlier version of this
 	// function assumed there was only one meaning:
 	//
-	//	rule-name/messageId          verify's findings   the name is BEFORE the slash
+	//	rule-name/messageId          cohere's findings   the name is BEFORE the slash
 	//	plugin/rule-name             the config's keys   the name is AFTER the slash
 	//
 	// Taking the first segment unconditionally is right for the first and silently wrong for the
@@ -98,7 +98,7 @@ func NormalizeRuleName(raw string) string {
 	//
 	// The distinguishing shape is the second segment rather than the first. A message id is
 	// camelCase and therefore never hyphenated, so a hyphen *after* the slash means the config's
-	// `plugin/rule-name` form and the name is after; anything else is verify's `rule-name/messageId`
+	// `plugin/rule-name` form and the name is after; anything else is cohere's `rule-name/messageId`
 	// form and the name is before. That reading is correct for both plugins whose names contain a
 	// hyphen and plugins whose names do not.
 	if slash := strings.IndexByte(name, '/'); slash >= 0 {
@@ -169,12 +169,12 @@ func printAcknowledgedCaveat(out io.Writer, byClassification map[Classification]
 type Classification string
 
 const (
-	// ClassificationNotPorted means verify has no rule by this name, so the gate finding it alone
+	// ClassificationNotPorted means cohere has no rule by this name, so the gate finding it alone
 	// is expected and says nothing about agreement. This is the largest class during the migration
 	// and the one that must not be mistaken for a defect.
 	ClassificationNotPorted Classification = "not-ported"
-	// ClassificationNotConfigured means the rule exists in verify but the config never enables it,
-	// so verify ran it over no files.
+	// ClassificationNotConfigured means the rule exists in cohere but the config never enables it,
+	// so cohere ran it over no files.
 	ClassificationNotConfigured Classification = "not-configured"
 	// ClassificationBothActive means both sides have this rule and both had it enabled, and they
 	// still disagree on this file and line. This is the class that is always a defect in one of the
@@ -196,19 +196,19 @@ const (
 type RuleAgreement struct {
 	Rule           string
 	Shared         int
-	OnlyVerify     int
+	OnlyCohere     int
 	OnlyGate       int
 	Classification Classification
 }
 
 // Agrees reports whether the two gates said the same thing about this rule everywhere.
 func (agreement RuleAgreement) Agrees() bool {
-	return agreement.OnlyVerify == 0 && agreement.OnlyGate == 0
+	return agreement.OnlyCohere == 0 && agreement.OnlyGate == 0
 }
 
 // Report is a whole comparison: what differed, per rule, over what population.
 type Report struct {
-	VerifyPopulation Population
+	CoherePopulation Population
 	GatePopulation   Population
 	Differences      []Difference
 	Agreements       []RuleAgreement
@@ -235,7 +235,7 @@ type Report struct {
 
 // Agreed reports whether every rule active on both sides agreed.
 //
-// Rules the migration has not reached yet do not count against agreement, because a rule verify
+// Rules the migration has not reached yet do not count against agreement, because a rule cohere
 // has never claimed to implement cannot disagree with anything. Only ClassificationBothActive does.
 // Both guards are asked before the findings are, and in this order, because each one describes a
 // way the finding list can be empty for a reason that has nothing to do with the code being clean.
@@ -263,14 +263,14 @@ func (report Report) Agreed() bool {
 
 // Inputs is everything Compare needs that it cannot derive from the findings themselves.
 type Inputs struct {
-	VerifyFindings   []Finding
+	CohereFindings   []Finding
 	GateFindings     []Finding
-	VerifyPopulation Population
+	CoherePopulation Population
 	GatePopulation   Population
-	// VerifyRules is every rule name compiled into verify. A gate finding whose rule is absent here
+	// CohereRules is every rule name compiled into cohere. A gate finding whose rule is absent here
 	// is not-ported rather than a disagreement.
-	VerifyRules map[string]bool
-	// ConfiguredRules is every rule name the lint config enables. A verify rule absent here ran over
+	CohereRules map[string]bool
+	// ConfiguredRules is every rule name the lint config enables. A cohere rule absent here ran over
 	// no files by design.
 	ConfiguredRules map[string]bool
 	// Acknowledged are differences someone decided are correct, each with a reason. Nil means none,
@@ -299,26 +299,26 @@ func Compare(inputs Inputs) Report {
 	}
 
 	report := Report{
-		VerifyPopulation: inputs.VerifyPopulation,
+		CoherePopulation: inputs.CoherePopulation,
 		GatePopulation:   inputs.GatePopulation,
 		Comparable:       true,
-		ComparedRules:    len(inputs.VerifyRules),
+		ComparedRules:    len(inputs.CohereRules),
 		ConfiguredRules:  len(inputs.ConfiguredRules),
 	}
 
 	// The vacuity guard, before any diffing. A side that walked no files cannot be compared against
 	// one that did, and the diff would look clean rather than broken, so this is a refusal and not a
-	// warning. This is the exact shape of failure the gate verify replaces shipped: green over zero.
+	// warning. This is the exact shape of failure the gate cohere replaces shipped: green over zero.
 	switch {
-	case inputs.VerifyPopulation.FilesWalked == 0:
+	case inputs.CoherePopulation.FilesWalked == 0:
 		report.Comparable = false
-		report.NotComparableReason = "verify walked no files, so its silence is not a result"
+		report.NotComparableReason = "cohere walked no files, so its silence is not a result"
 	case inputs.GatePopulation.FilesWalked == 0:
 		report.Comparable = false
 		report.NotComparableReason = "the gate walked no files, so its silence is not a result"
 	}
 
-	verifyByKey := indexByKey(inputs.VerifyFindings)
+	cohereByKey := indexByKey(inputs.CohereFindings)
 	gateByKey := indexByKey(inputs.GateFindings)
 
 	perRule := map[string]*RuleAgreement{}
@@ -331,24 +331,24 @@ func Compare(inputs Inputs) Report {
 		return created
 	}
 
-	for key, finding := range verifyByKey {
+	for key, finding := range cohereByKey {
 		agreement := agreementFor(finding.Rule)
 		if _, sharedWithGate := gateByKey[key]; sharedWithGate {
 			agreement.Shared++
 			continue
 		}
-		agreement.OnlyVerify++
-		classification := classifyFinding(finding, SideVerify, inputs, acknowledged)
+		agreement.OnlyCohere++
+		classification := classifyFinding(finding, SideCohere, inputs, acknowledged)
 		countDifference(finding.Rule, classification)
 		report.Differences = append(report.Differences, Difference{
 			Finding:        finding,
-			OnlyOn:         SideVerify,
+			OnlyOn:         SideCohere,
 			Classification: classification,
 		})
 	}
 
 	for key, finding := range gateByKey {
-		if _, sharedWithVerify := verifyByKey[key]; sharedWithVerify {
+		if _, sharedWithVerify := cohereByKey[key]; sharedWithVerify {
 			continue
 		}
 		agreement := agreementFor(finding.Rule)
@@ -363,12 +363,12 @@ func Compare(inputs Inputs) Report {
 	}
 
 	// A rule's own classification is asked from the side that actually differed, because
-	// not-ported is only meaningful for a gate finding: verify cannot report a rule it does not
-	// compile. A rule that agreed everywhere is classified from the verify side, where "both sides
+	// not-ported is only meaningful for a gate finding: cohere cannot report a rule it does not
+	// compile. A rule that agreed everywhere is classified from the cohere side, where "both sides
 	// had it on" is the true and useful answer.
 	for ruleName, agreement := range perRule {
-		side := SideVerify
-		if agreement.OnlyGate > 0 && agreement.OnlyVerify == 0 {
+		side := SideCohere
+		if agreement.OnlyGate > 0 && agreement.OnlyCohere == 0 {
 			side = SideGate
 		}
 		agreement.Classification = classify(ruleName, side, inputs)
@@ -415,7 +415,7 @@ func classifyFinding(finding Finding, onlyOn Side, inputs Inputs, acknowledged m
 
 // classify decides why a rule's findings differ, from the two runs alone.
 func classify(ruleName string, onlyOn Side, inputs Inputs) Classification {
-	knownToVerify := inputs.VerifyRules[ruleName]
+	knownToCohere := inputs.CohereRules[ruleName]
 	configured := inputs.ConfiguredRules[ruleName]
 
 	// A nil map means the caller never read the lint config, which is not the same as a config that
@@ -426,19 +426,19 @@ func classify(ruleName string, onlyOn Side, inputs Inputs) Classification {
 	configurationKnown := inputs.ConfiguredRules != nil
 
 	switch {
-	// The gate found it and verify has no such rule. Expected during the migration, and the reason
+	// The gate found it and cohere has no such rule. Expected during the migration, and the reason
 	// a raw count of differences is not a measure of disagreement.
-	case onlyOn == SideGate && !knownToVerify:
+	case onlyOn == SideGate && !knownToCohere:
 		return ClassificationNotPorted
-	// Verify has the rule but nothing turned it on, so it walked no files.
-	case knownToVerify && configurationKnown && !configured:
+	// Cohere has the rule but nothing turned it on, so it walked no files.
+	case knownToCohere && configurationKnown && !configured:
 		return ClassificationNotConfigured
 	// Both sides have it and we cannot say whether it was enabled. Treating that as a disagreement
 	// is the conservative direction: it surfaces for a human instead of being filed as expected.
-	case knownToVerify && !configurationKnown:
+	case knownToCohere && !configurationKnown:
 		return ClassificationBothActive
 	// Both sides had this rule and both had it on. Somebody is wrong.
-	case knownToVerify && configured:
+	case knownToCohere && configured:
 		return ClassificationBothActive
 	default:
 		return ClassificationUnclassified
@@ -458,8 +458,8 @@ func indexByKey(findings []Finding) map[string]Finding {
 // The population line comes first and unconditionally, before any verdict, because the question a
 // reader must be able to answer before believing a diff is "did both of these actually run."
 func Write(out *strings.Builder, report Report) {
-	fmt.Fprintf(out, "population: verify %d findings over %d files (%d rules) · gate %d findings over %d files\n",
-		report.VerifyPopulation.Findings, report.VerifyPopulation.FilesWalked, report.VerifyPopulation.Rules,
+	fmt.Fprintf(out, "population: cohere %d findings over %d files (%d rules) · gate %d findings over %d files\n",
+		report.CoherePopulation.Findings, report.CoherePopulation.FilesWalked, report.CoherePopulation.Rules,
 		report.GatePopulation.Findings, report.GatePopulation.FilesWalked,
 	)
 
@@ -525,8 +525,8 @@ func Write(out *strings.Builder, report Report) {
 		if !agreement.Agrees() {
 			verdict = "DIFFER"
 		}
-		fmt.Fprintf(out, "  %-8s %-52s shared %-5d only-verify %-5d only-gate %-5d  %s\n",
-			verdict, agreement.Rule, agreement.Shared, agreement.OnlyVerify, agreement.OnlyGate,
+		fmt.Fprintf(out, "  %-8s %-52s shared %-5d only-cohere %-5d only-gate %-5d  %s\n",
+			verdict, agreement.Rule, agreement.Shared, agreement.OnlyCohere, agreement.OnlyGate,
 			agreement.Classification,
 		)
 	}
@@ -534,18 +534,18 @@ func Write(out *strings.Builder, report Report) {
 	if report.Agreed() {
 		// The verdict states its own scope, because the sentence a reader carries away is this one
 		// and it is easy to read as broader than the test. A comparison can only speak about rules
-		// verify implements: the rest of the config is enabled in the gate, unported, and was never
+		// cohere implements: the rest of the config is enabled in the gate, unported, and was never
 		// compared. Silence about them reads as coverage.
 		//
 		// This matters more than it looks. Every finding the gate produces on this tree today comes
-		// from a rule verify already has, and the 138 unported rules find nothing — not because
+		// from a rule cohere already has, and the 138 unported rules find nothing — not because
 		// they are worthless, but because the gate has been enforcing them for months and the tree
 		// is clean of what they prevent. A clean diff therefore cannot be the signal to remove the
 		// old tool: it would keep reading clean right up until somebody wrote a violation of an
 		// unported rule, and then keep reading clean while the tree got worse.
 		if report.ConfiguredRules > report.ComparedRules {
 			fmt.Fprintf(out,
-				"\n✓ agrees on the %d rules verify implements, of %d the config enables\n"+
+				"\n✓ agrees on the %d rules cohere implements, of %d the config enables\n"+
 					"  the other %d are unported and were not compared, so this is not a verdict about them\n",
 				report.ComparedRules, report.ConfiguredRules, report.ConfiguredRules-report.ComparedRules,
 			)

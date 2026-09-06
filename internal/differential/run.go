@@ -47,25 +47,25 @@ func (command GateCommand) String() string {
 type RunOptions struct {
 	// Root is the tree both gates lint, and the directory paths are made relative to.
 	Root string
-	// Verify and Gate are the two invocations.
-	Verify GateCommand
+	// Cohere and Gate are the two invocations.
+	Cohere GateCommand
 	Gate   GateCommand
-	// VerifyRules is every rule name compiled into verify, and ConfiguredRules every rule the lint
+	// CohereRules is every rule name compiled into cohere, and ConfiguredRules every rule the lint
 	// config enables. Both are read by the caller rather than inferred here, for the reason stated
 	// on Inputs: a rule that works and finds nothing is invisible in the output.
-	VerifyRules     map[string]bool
+	CohereRules     map[string]bool
 	ConfiguredRules map[string]bool
 	// Controls are the planted violations that prove the pipeline can carry a difference. Running
 	// with none is allowed and produces a report that says, in as many words, that it proved
 	// nothing — rather than a clean one.
 	Controls []Control
-	// ExtraVerifyRuleSettings are rules to enable for verify's run only, merged over the tree's own
-	// lint config and handed to verify with `-lint-config`. The gate always runs against the
+	// ExtraCohereRuleSettings are rules to enable for cohere's run only, merged over the tree's own
+	// lint config and handed to cohere with `-lint-config`. The gate always runs against the
 	// unmodified configuration.
 	//
 	// This exists for one narrow purpose and it is worth stating so nobody widens it casually.
-	// A directional control needs a rule verify can report and the gate structurally cannot, and
-	// the shared config does not enable such a rule, so verify would run it over no files and the
+	// A directional control needs a rule cohere can report and the gate structurally cannot, and
+	// the shared config does not enable such a rule, so cohere would run it over no files and the
 	// control would miss for a configuration reason rather than a harness one.
 	//
 	// Asymmetric configuration is otherwise exactly what this instrument must never do: comparing
@@ -73,7 +73,7 @@ type RunOptions struct {
 	// implementation. So the asymmetry is confined to rules the gate cannot express at all, where
 	// there is no shared setting to diverge from, and every finding it produces is classified
 	// not-ported rather than counted against agreement.
-	ExtraVerifyRuleSettings map[string]any
+	ExtraCohereRuleSettings map[string]any
 }
 
 // Control is a violation planted where the harness knows in advance what should happen to it.
@@ -136,24 +136,24 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		return Report{}, err
 	}
 
-	verifyCommand, removeConfig, err := verifyCommandWithExtraRules(options)
+	cohereCommand, removeConfig, err := cohereCommandWithExtraRules(options)
 	defer removeConfig()
 	if err != nil {
 		return Report{}, err
 	}
 
-	verifyOutput, verifyErr := runGate(ctx, verifyCommand)
-	if verifyErr != nil {
-		return Report{}, fmt.Errorf("running verify: %w", verifyErr)
+	verifyOutput, cohereErr := runGate(ctx, cohereCommand)
+	if cohereErr != nil {
+		return Report{}, fmt.Errorf("running cohere: %w", cohereErr)
 	}
 	gateOutput, gateErr := runGate(ctx, options.Gate)
 	if gateErr != nil {
 		return Report{}, fmt.Errorf("running the gate: %w", gateErr)
 	}
 
-	verifyParsed, err := ParseVerify(verifyOutput, options.Root)
+	cohereParsed, err := ParseCohere(verifyOutput, options.Root)
 	if err != nil {
-		return Report{}, fmt.Errorf("parsing verify output: %w", err)
+		return Report{}, fmt.Errorf("parsing cohere output: %w", err)
 	}
 	gateParsed, err := ParseGate(gateOutput, options.Root)
 	if err != nil {
@@ -163,10 +163,10 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 	// An unparsed line is a finding the diff cannot see, so it is a hard failure rather than a
 	// note. Continuing past it would compare two partial lists and report the difference between
 	// them as though it were the difference between the gates.
-	if len(verifyParsed.UnparsedLines) > 0 {
+	if len(cohereParsed.UnparsedLines) > 0 {
 		return Report{}, fmt.Errorf(
-			"verify printed %d lines this harness could not parse, so its findings are incomplete; first: %q",
-			len(verifyParsed.UnparsedLines), verifyParsed.UnparsedLines[0],
+			"cohere printed %d lines this harness could not parse, so its findings are incomplete; first: %q",
+			len(cohereParsed.UnparsedLines), cohereParsed.UnparsedLines[0],
 		)
 	}
 	if len(gateParsed.UnparsedLines) > 0 {
@@ -176,19 +176,19 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		)
 	}
 
-	verifyFilesWalked, verifyRulesRun := verifyCoverageFrom(verifyParsed.SummaryLines)
-	// The gate prints no coverage line of its own, so its population is the file count verify
+	cohereFilesWalked, cohereRulesRun := cohereCoverageFrom(cohereParsed.SummaryLines)
+	// The gate prints no coverage line of its own, so its population is the file count cohere
 	// reported for the same tree. That is a borrowed number and it is marked as such here rather
 	// than presented as the gate's own claim: it establishes that the tree was non-empty, which is
 	// the property the vacuity guard needs, and nothing more.
-	gateFilesWalked := verifyFilesWalked
+	gateFilesWalked := cohereFilesWalked
 
 	report := Compare(Inputs{
-		VerifyFindings:   verifyParsed.Findings,
+		CohereFindings:   cohereParsed.Findings,
 		GateFindings:     gateParsed.Findings,
-		VerifyPopulation: Population{Findings: len(verifyParsed.Findings), FilesWalked: verifyFilesWalked, Rules: verifyRulesRun},
+		CoherePopulation: Population{Findings: len(cohereParsed.Findings), FilesWalked: cohereFilesWalked, Rules: cohereRulesRun},
 		GatePopulation:   Population{Findings: len(gateParsed.Findings), FilesWalked: gateFilesWalked},
-		VerifyRules:      options.VerifyRules,
+		CohereRules:      options.CohereRules,
 		ConfiguredRules:  options.ConfiguredRules,
 		// The known gate defects are compiled in rather than passed at the command line: an
 		// acknowledgement that can be supplied per-run can be supplied by whoever wants a green
@@ -197,14 +197,14 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 	})
 
 	report.Provenance = Provenance{
-		VerifyFilesLinted: verifyFilesWalked,
+		CohereFilesLinted: cohereFilesWalked,
 		GateFilesLinted:   gateFilesWalked,
-		VerifyRulesRun:    verifyRulesRun,
+		CohereRulesRun:    cohereRulesRun,
 		GateRulesRun:      len(options.ConfiguredRules),
-		VerifyCommand:     options.Verify.String(),
-		VerifyVersion:     verifyVersionOf(ctx, options.Verify),
+		CohereCommand:     options.Cohere.String(),
+		CohereVersion:     cohereVersionOf(ctx, options.Cohere),
 		GateCommand:       options.Gate.String(),
-		ControlsRun:       checkControls(planted, report, verifyParsed.Findings, gateParsed.Findings),
+		ControlsRun:       checkControls(planted, report, cohereParsed.Findings, gateParsed.Findings),
 	}
 
 	// Marked after the comparison rather than during it, because Compare must stay unaware of
@@ -221,7 +221,7 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 // report.Differences rather than in either gate's raw findings: a control that one gate found but
 // the comparison dropped is exactly the bug worth catching, and checking the raw output instead
 // would sail straight past it.
-func checkControls(planted []Control, report Report, verifyFindings []Finding, gateFindings []Finding) []ControlResult {
+func checkControls(planted []Control, report Report, cohereFindings []Finding, gateFindings []Finding) []ControlResult {
 	results := make([]ControlResult, 0, len(planted))
 	for _, control := range planted {
 		result := ControlResult{
@@ -239,7 +239,7 @@ func checkControls(planted []Control, report Report, verifyFindings []Finding, g
 		}
 
 		if control.ExpectedShared {
-			results = append(results, checkSharedControl(control, result, verifyFindings, gateFindings))
+			results = append(results, checkSharedControl(control, result, cohereFindings, gateFindings))
 			continue
 		}
 
@@ -270,11 +270,11 @@ func checkControls(planted []Control, report Report, verifyFindings []Finding, g
 // being tested is that the finding survived each side's parse and normalization and then matched.
 // Asking the difference list could only ever say the control was absent from it, which is true both
 // when both sides saw it and when neither did — the two outcomes this control exists to separate.
-func checkSharedControl(control Control, result ControlResult, verifyFindings []Finding, gateFindings []Finding) ControlResult {
-	seenByVerify := false
-	for _, finding := range verifyFindings {
+func checkSharedControl(control Control, result ControlResult, cohereFindings []Finding, gateFindings []Finding) ControlResult {
+	seenByCohere := false
+	for _, finding := range cohereFindings {
 		if controlMatches(control, finding) {
-			seenByVerify = true
+			seenByCohere = true
 			break
 		}
 	}
@@ -287,12 +287,12 @@ func checkSharedControl(control Control, result ControlResult, verifyFindings []
 	}
 
 	switch {
-	case seenByVerify && seenByGate:
+	case seenByCohere && seenByGate:
 		result.Detected = true
-	case !seenByVerify && !seenByGate:
+	case !seenByCohere && !seenByGate:
 		result.Detail = fmt.Sprintf("neither gate reported %s in %s, so the plant never reached either one", control.Rule, control.RelativePath)
-	case seenByVerify:
-		result.Detail = fmt.Sprintf("only verify reported %s in %s, and both were expected to", control.Rule, control.RelativePath)
+	case seenByCohere:
+		result.Detail = fmt.Sprintf("only cohere reported %s in %s, and both were expected to", control.Rule, control.RelativePath)
 	default:
 		result.Detail = fmt.Sprintf("only the gate reported %s in %s, and both were expected to", control.Rule, control.RelativePath)
 	}
@@ -444,21 +444,21 @@ func stderrTail(text string) string {
 // maximumStderrLines is how much of a failed gate's stderr reaches the error message.
 const maximumStderrLines = 5
 
-// verifyCoverageLinePattern reads the population out of verify's own coverage line:
+// cohereCoverageLinePattern reads the population out of cohere's own coverage line:
 //
 //	lint: 1 findings — 23 rules over 3407 files, 2098302 nodes visited, in 813ms
-var verifyCoverageLinePattern = regexp.MustCompile(`^lint: \d+ findings? — (\d+) rules? over (\d+) files?`)
+var cohereCoverageLinePattern = regexp.MustCompile(`^lint: \d+ findings? — (\d+) rules? over (\d+) files?`)
 
-// verifyCoverageFrom reads files-walked and rules-run out of verify's summary lines.
+// cohereCoverageFrom reads files-walked and rules-run out of cohere's summary lines.
 //
 // Returning zeros when the line is absent is deliberate and is not a fallback. A missing coverage
-// line means verify did not finish its lint phase, and zero is precisely the value that makes the
+// line means cohere did not finish its lint phase, and zero is precisely the value that makes the
 // vacuity guard refuse the comparison — which is the correct outcome for a run that did not
 // complete. Defaulting to a plausible number here would be the vacuous pass this package exists to
 // prevent, introduced by the file that reports the evidence.
-func verifyCoverageFrom(summaryLines []string) (int, int) {
+func cohereCoverageFrom(summaryLines []string) (int, int) {
 	for _, line := range summaryLines {
-		match := verifyCoverageLinePattern.FindStringSubmatch(strings.TrimSpace(line))
+		match := cohereCoverageLinePattern.FindStringSubmatch(strings.TrimSpace(line))
 		if match == nil {
 			continue
 		}
@@ -507,7 +507,7 @@ func missingDirectories(directory string, root string) ([]string, error) {
 	return missing, nil
 }
 
-// verifyCommandWithExtraRules gives verify a config carrying the extra rules, when there are any.
+// cohereCommandWithExtraRules gives cohere a config carrying the extra rules, when there are any.
 //
 // The merged config is written beside the tree's own rather than over it, and removed afterward, so
 // the gate and every other process in this worktree keep reading the unmodified file. Editing the
@@ -516,39 +516,39 @@ func missingDirectories(directory string, root string) ([]string, error) {
 //
 // With no extra rules this returns the command untouched, so the ordinary path allocates nothing
 // and writes nothing.
-func verifyCommandWithExtraRules(options RunOptions) (GateCommand, func(), error) {
+func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error) {
 	noCleanup := func() {}
-	if len(options.ExtraVerifyRuleSettings) == 0 {
-		return options.Verify, noCleanup, nil
+	if len(options.ExtraCohereRuleSettings) == 0 {
+		return options.Cohere, noCleanup, nil
 	}
 
-	// Deliberately `.oxlintrc.json` rather than verify's own `VerifySettings.json`. This harness
+	// Deliberately `.oxlintrc.json` rather than cohere's own `CohereSettings.json`. This harness
 	// runs the real oxlint binary to compare against, and oxlint reads its own config and would
-	// reject ours: `VerifySettings.json` enables rules oxlint does not implement, `no-octal` among
+	// reject ours: `CohereSettings.json` enables rules oxlint does not implement, `no-octal` among
 	// them, and an unknown rule name makes oxlint refuse to start rather than skip the line. The
 	// two files split for that reason and this side must keep pointing at oxlint's.
 	configPath := filepath.Join(options.Root, ".oxlintrc.json")
 	existing, err := os.ReadFile(configPath)
 	if err != nil {
-		return options.Verify, noCleanup, fmt.Errorf("reading the lint config to extend it: %w", err)
+		return options.Cohere, noCleanup, fmt.Errorf("reading the lint config to extend it: %w", err)
 	}
 
 	var document map[string]any
 	if err := json.Unmarshal(existing, &document); err != nil {
-		return options.Verify, noCleanup, fmt.Errorf("parsing the lint config to extend it: %w", err)
+		return options.Cohere, noCleanup, fmt.Errorf("parsing the lint config to extend it: %w", err)
 	}
 
 	rules, _ := document["rules"].(map[string]any)
 	if rules == nil {
 		rules = map[string]any{}
 	}
-	for name, setting := range options.ExtraVerifyRuleSettings {
+	for name, setting := range options.ExtraCohereRuleSettings {
 		// Refusing rather than overwriting. A rule the shared config already configures is one the
 		// gate may also run, so overriding it here would compare the two sides under different
 		// settings for a rule they both have, which is the asymmetry this must never introduce.
 		if _, alreadyConfigured := rules[name]; alreadyConfigured {
-			return options.Verify, noCleanup, fmt.Errorf(
-				"rule %q is already configured in the tree's lint config, so enabling it only for verify would compare the two gates under different settings",
+			return options.Cohere, noCleanup, fmt.Errorf(
+				"rule %q is already configured in the tree's lint config, so enabling it only for cohere would compare the two gates under different settings",
 				name,
 			)
 		}
@@ -558,7 +558,7 @@ func verifyCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 
 	extended, err := json.Marshal(document)
 	if err != nil {
-		return options.Verify, noCleanup, fmt.Errorf("encoding the extended lint config: %w", err)
+		return options.Cohere, noCleanup, fmt.Errorf("encoding the extended lint config: %w", err)
 	}
 
 	// Beside the original, because the config's own directory is what relative ignore patterns and
@@ -566,12 +566,12 @@ func verifyCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 	// change which files those patterns match.
 	extendedPath := filepath.Join(options.Root, ".oxlintrc.differential.json")
 	if _, err := os.Stat(extendedPath); err == nil {
-		return options.Verify, noCleanup, fmt.Errorf(
+		return options.Cohere, noCleanup, fmt.Errorf(
 			"%s already exists, so a differential run is in flight or one was interrupted; not overwriting it", extendedPath,
 		)
 	}
 	if err := os.WriteFile(extendedPath, extended, 0o644); err != nil {
-		return options.Verify, noCleanup, fmt.Errorf("writing the extended lint config: %w", err)
+		return options.Cohere, noCleanup, fmt.Errorf("writing the extended lint config: %w", err)
 	}
 
 	cleanup := func() {
@@ -580,12 +580,12 @@ func verifyCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 		}
 	}
 
-	command := options.Verify
+	command := options.Cohere
 	command.Arguments = append(append([]string{}, command.Arguments...), "-lint-config", ".oxlintrc.differential.json")
 	return command, cleanup, nil
 }
 
-// verifyVersionOf asks the binary that ran what it is.
+// cohereVersionOf asks the binary that ran what it is.
 //
 // Asked of the binary rather than derived from the source tree beside it, because those are exactly
 // the two things that drift apart: a cached or previously-built binary sits at a path whose name
@@ -595,7 +595,7 @@ func verifyCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 // A failure here is recorded as unknown rather than raised. The version is context for a reader,
 // not an input to any verdict, and refusing to compare because a binary declined to introduce
 // itself would be the harness failing over something that changes nothing about the comparison.
-func verifyVersionOf(ctx context.Context, command GateCommand) string {
+func cohereVersionOf(ctx context.Context, command GateCommand) string {
 	probe := command
 	probe.Arguments = []string{"-version"}
 
@@ -607,9 +607,9 @@ func verifyVersionOf(ctx context.Context, command GateCommand) string {
 	return versionLineFrom(output)
 }
 
-// versionLineFrom picks the line of `verify -version` output that identifies the build.
+// versionLineFrom picks the line of `cohere -version` output that identifies the build.
 //
-// The first line is the version name, and on a local build it is the constant "verify dev" for
+// The first line is the version name, and on a local build it is the constant "cohere dev" for
 // every binary ever compiled from this tree. Taking it produces a field that is always populated,
 // always plausible, and never distinguishes anything, which is worse than an empty one because it
 // looks like provenance. The first attempt at this did exactly that, and two binaries eleven
@@ -662,7 +662,7 @@ func versionLineFrom(output string) string {
 //
 // Matched by file rather than by rule, and that distinction was a defect for one revision. Matching
 // on the control's declared rule leaves any OTHER rule that fires on the same planted file counted
-// as observed, and one did: the verify-only control's file trips the gate's import-ordering rule as
+// as observed, and one did: the cohere-only control's file trips the gate's import-ordering rule as
 // well as the rule it was written for, so the summary read "1 observed, 2 planted" when both were
 // this harness's own footprint.
 //

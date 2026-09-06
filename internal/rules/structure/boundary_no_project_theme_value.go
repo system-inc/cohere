@@ -6,9 +6,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
-	"github.com/system-inc/verify/internal/utilities/jsx"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/module"
+	"github.com/system-inc/cohere/internal/utilities/jsx"
 )
 
 // messageForbiddenThemeValue names the value, the component, and what is allowed instead.
@@ -67,7 +67,7 @@ const interfaceNameSuffix = "Interface"
 // The original discovers its theme files by walking `process.cwd() + "libraries/structure/source"`
 // with `readdirSync`, parsing each match with a second `@typescript-eslint/parser` instance, and
 // caching the result in a module-level variable. It does that because ESLint hands a rule one file
-// at a time and gives it no way to see the others. Verify has the whole program, so this reads the
+// at a time and gives it no way to see the others. Cohere has the whole program, so this reads the
 // same files out of `ctx.Program` instead.
 //
 // Two defects are avoided rather than ported, and both are ones this codebase has already paid for:

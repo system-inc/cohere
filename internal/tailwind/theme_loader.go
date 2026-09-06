@@ -24,13 +24,13 @@
 //     at-rule around the imported tree. `source(none)`, which both corpus repositories use, is
 //     accepted and ignored because it selects content files rather than affecting the theme. Any
 //     other modifier is an error rather than a silent drop; see resolveImports.
-//   - `@config` and `@plugin`. Both load JavaScript, and verify runs none at lint time. A
+//   - `@config` and `@plugin`. Both load JavaScript, and cohere runs none at lint time. A
 //     JavaScript config that defined theme values would land in the theme upstream and not here,
 //     which is a real gap and is why loadStylesheetTheme returns the directive it skipped rather
 //     than swallowing it.
 //   - `@utility`, `@custom-variant`, `@variant`, `@apply`, `@tailwind`. These are sibling tasks
 //     (#4f04x54, #1cahbv8) and none of them contributes a theme entry.
-//   - Keyframes collected from inside `@theme`. See the note in theme.go: verify emits no CSS.
+//   - Keyframes collected from inside `@theme`. See the note in theme.go: cohere emits no CSS.
 package tailwind
 
 import (
@@ -248,7 +248,7 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 	var walkErr error
 	Walk(node.Nodes, func(child *Node) WalkAction {
 		if child.Kind == KindAtRule && child.Name == "@keyframes" {
-			// Upstream collects these to re-emit; verify emits no CSS. See theme.go.
+			// Upstream collects these to re-emit; cohere emits no CSS. See theme.go.
 			return WalkSkip
 		}
 

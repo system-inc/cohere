@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/verify/internal/prettier"
+	"github.com/system-inc/cohere/internal/prettier"
 )
 
 // The defect these guard is the one the ruling singled out: a release that embeds a stale Prettier

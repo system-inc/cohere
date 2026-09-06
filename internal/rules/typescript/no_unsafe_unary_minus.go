@@ -5,8 +5,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // NoUnsafeUnaryMinus flags unary negation applied to a value that is not a number or a bigint.
@@ -26,7 +26,7 @@ import (
 // # Absorbed from tsgolint, which is the source of record for this rule
 //
 // Provenance: tsgolint `internal/rules/no_unsafe_unary_minus/no_unsafe_unary_minus.go`, vendored at
-// commit `05b7fbc` and absorbed onto verify's own rule interface here. It reaches for
+// commit `05b7fbc` and absorbed onto cohere's own rule interface here. It reaches for
 // `GetConstrainedTypeAtLocation` and `UnionTypeParts` because that is what upstream reaches for,
 // and this note is why a reader finds those helpers in a file that otherwise looks native.
 //

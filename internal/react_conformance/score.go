@@ -274,5 +274,5 @@ type NothingImplemented struct{}
 
 // Analyze declines.
 func (NothingImplemented) Analyze(Fixture) (Result, error) {
-	return Result{}, &ErrUnsupported{Reason: "no React compiler rules are implemented in verify yet"}
+	return Result{}, &ErrUnsupported{Reason: "no React compiler rules are implemented in cohere yet"}
 }

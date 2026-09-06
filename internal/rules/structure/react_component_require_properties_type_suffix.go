@@ -4,9 +4,9 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
-	"github.com/system-inc/verify/internal/utilities/react"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/module"
+	"github.com/system-inc/cohere/internal/utilities/react"
 )
 
 const propertiesTypeSuffixReasoning = "A component's property type is the one type a reader looks " +
@@ -79,7 +79,7 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 			// Caught by the tree rather than by review: without this the rule reported
 			// `MenuItem.tsx`, whose parameter destructures and is typed `MenuItemInterface`. That
 			// is a genuine violation of the convention and the gate does not report it, so
-			// reporting it here would have been a second only-verify divergence, arrived at by
+			// reporting it here would have been a second only-cohere divergence, arrived at by
 			// accident rather than by a ruling.
 			parameterName := parameters[0].AsParameterDeclaration().Name()
 			if parameterName == nil || parameterName.Kind != ast.KindIdentifier {

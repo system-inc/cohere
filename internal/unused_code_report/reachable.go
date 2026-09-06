@@ -2,7 +2,7 @@ package unused_code_report
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/utilities/control_flow_graph"
+	"github.com/system-inc/cohere/internal/utilities/control_flow_graph"
 )
 
 // Unreachable is one statement that cannot run.

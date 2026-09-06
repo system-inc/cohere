@@ -2,8 +2,8 @@ package core
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/control_flow_graph"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/control_flow_graph"
 )
 
 // occurrenceKind separates the three things an identifier occurrence can be to the liveness pass.
@@ -316,7 +316,7 @@ func analyzeRootLiveness(ctx rule.Context, root *ast.Node, exported map[string]b
 	//
 	// It is a decline rather than an oversight. A write control cannot arrive at is not a dead
 	// store, it is unreachable code, and that is a different finding with a different repair.
-	// Confirmed rather than assumed: `verify --unused` on that same input reports the statement
+	// Confirmed rather than assumed: `cohere --unused` on that same input reports the statement
 	// with the cause spelled out, "an earlier return, throw, break, or continue leaves before this
 	// line", which is the sentence a reader can act on. Reporting it here as well would tell them
 	// to remove an assignment when the whole line cannot run.

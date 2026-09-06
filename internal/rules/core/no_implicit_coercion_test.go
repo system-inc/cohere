@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // noImplicitCoercionFile is where the fixtures pretend to live.
@@ -469,7 +469,7 @@ func TestNoImplicitCoercionMultiplyByOneOperandShapes(t *testing.T) {
 // Upstream writes every case on one line, so no imported fixture produces a recommendation
 // containing a newline. That matters beyond the rule: the message embeds the operand's own source
 // text, so a `!!(` whose operand closes several lines later renders a multi-line message, and any
-// instrument that reads verify's output line by line loses the finding.
+// instrument that reads cohere's output line by line loses the finding.
 //
 // This was reported as a missing finding at DialogRoot.tsx:175:25 and it was not one. The rule
 // reports it, the live run prints it, and two extraction scripts on opposite sides of the

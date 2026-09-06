@@ -2,8 +2,8 @@ package react
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/jsx"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/jsx"
 )
 
 var messageJsxIdentifierNotDefined = rule.Message{
@@ -68,7 +68,7 @@ var messageJsxIdentifierNotDefined = rule.Message{
 // # The globals option is not portable and the divergence is stated
 //
 // Upstream's second tester block is one pair over the same source, `let x = <A.B />;`, passing
-// under `globals: {A: "readonly"}` and failing without it. `verify` has no globals surface at all,
+// under `globals: {A: "readonly"}` and failing without it. `cohere` has no globals surface at all,
 // so there is nothing to configure and the pass half of that pair cannot be expressed. Only the
 // fail half is carried below. An ambient declaration is the equivalent our tree does have, and it
 // is covered by a case of our own rather than by pretending upstream's option exists.

@@ -2,8 +2,8 @@ package react
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	hir "github.com/system-inc/verify/internal/utilities/high_level_intermediate_representation"
+	"github.com/system-inc/cohere/internal/rule"
+	hir "github.com/system-inc/cohere/internal/utilities/high_level_intermediate_representation"
 )
 
 var messagePreserveManualMemoizationValueUnmemoized = rule.Message{

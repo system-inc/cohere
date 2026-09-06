@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // SwitchExhaustivenessCheck flags a switch over a union of literal types that does not handle every
@@ -26,7 +26,7 @@ import (
 // # Absorbed from tsgolint, which is the source of record for this rule
 //
 // Provenance: tsgolint `internal/rules/switch_exhaustiveness_check/switch_exhaustiveness_check.go`,
-// vendored at commit `05b7fbc` and absorbed onto verify's own rule interface here. It reaches for
+// vendored at commit `05b7fbc` and absorbed onto cohere's own rule interface here. It reaches for
 // `TypeRecurser`, `GetConstrainedTypeAtLocation`, `UnionTypeParts`, `IntersectionTypeParts`,
 // `IsTypeFlagSet`, `Some`, `Every` and `Ref` because that is what upstream reaches for, and this
 // note is why a reader finds those helpers in a file that otherwise looks native.
@@ -79,7 +79,7 @@ import (
 //
 // # The option surface is THREE live options, and the inventory says zero
 //
-// `rule-inventory.json` carried `"options": "no"` for this rule. That is wrong, and it is the
+// A captured rule inventory carried `"options": "no"` for this rule. That is wrong, and it is the
 // eighth inventory error found in this lane and the most consequential, because each of these
 // options flips a whole class of input rather than tuning an edge:
 //

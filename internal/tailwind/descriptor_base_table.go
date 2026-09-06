@@ -30,7 +30,7 @@
 //	    -input <b.json> -context <b-context.json> \
 //	    -output internal/tailwind/descriptor_base_table.go
 
-// # What `verify` answers on a repository it has never seen, and what it does not
+// # What `cohere` answers on a repository it has never seen, and what it does not
 //
 // The question `#twany` asked, answered at the end of that tree rather than left in commit messages.
 // Measured against `tools/tailwind/generate_descriptor_base/testdata/independent_theme.css`, a design

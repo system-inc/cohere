@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // fallthroughFile is where the fixtures pretend to live.
@@ -435,7 +435,7 @@ func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
 		// Upstream lists this input as a *pass* case, and it is a pass case there because oxc's
 		// Tester runs the whole engine and the engine consumes the directive. Our
 		// `rule_testing.Run` walks one rule and applies no suppressions, so the finding is expected
-		// here and `verify` swallows it in a real run. The rule's own job is only to refuse to read
+		// here and `cohere` swallows it in a real run. The rule's own job is only to refuse to read
 		// `eslint-disable-next-line no-fallthrough` as permission to fall through, which it does:
 		// were the directive guard removed, a custom pattern could turn any suppression into an
 		// excuse. Moved out of the imported clean set with the divergence stated rather than

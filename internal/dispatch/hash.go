@@ -1,4 +1,4 @@
-// Package dispatch resolves which verify binary to run, rebuilding it when its inputs change.
+// Package dispatch resolves which cohere binary to run, rebuilding it when its inputs change.
 //
 // Rules are compiled into the binary, which is what makes them free to run. The cost of that choice
 // is that adding a rule means rebuilding. This package pays that cost automatically and exactly
@@ -32,7 +32,7 @@ const hashLength = 16
 //
 // Every field here is a thing that, if it changed without the hash changing, would leave a stale
 // binary looking like a fresh one. The set is deliberately wider than "the rules directory": the
-// toolchain miscompiles differently across versions, the pinned typescript-go commit is most of
+// toolchain miscompiles differently across versions, the pinned TypeScript commit is most of
 // the code, and the build flags change the binary that comes out.
 type Inputs struct {
 	// GoVersion is the toolchain identity, as `go env GOVERSION GOOS GOARCH`. A binary built by a
@@ -66,7 +66,7 @@ func (inputs Inputs) Compute() (string, error) {
 	// serialize to the same bytes. Without the framing, moving a string from one field to another
 	// would hash identically.
 	fmt.Fprintf(digest, "goVersion\x00%s\x00", inputs.GoVersion)
-	fmt.Fprintf(digest, "typeScriptGoCommit\x00%s\x00", inputs.TypeScriptGoCommit)
+	fmt.Fprintf(digest, "typeScriptCommit\x00%s\x00", inputs.TypeScriptGoCommit)
 	for _, flag := range inputs.BuildFlags {
 		fmt.Fprintf(digest, "buildFlag\x00%s\x00", flag)
 	}
@@ -103,7 +103,7 @@ func CollectInputs(moduleDirectory string, packagePath string, buildFlags []stri
 		return Inputs{}, err
 	}
 
-	commit, err := typeScriptGoCommit(moduleDirectory)
+	commit, err := typeScriptCommit(moduleDirectory)
 	if err != nil {
 		return Inputs{}, err
 	}
@@ -140,18 +140,18 @@ func goEnvironment(moduleDirectory string) (string, error) {
 	return strings.Join(strings.Fields(string(output)), " "), nil
 }
 
-// typeScriptGoCommit reads the pinned commit of the vendored compiler.
-func typeScriptGoCommit(moduleDirectory string) (string, error) {
-	command := exec.Command("git", "-C", filepath.Join(moduleDirectory, "typescript-go"), "rev-parse", "HEAD")
+// typeScriptCommit reads the pinned commit of the vendored compiler.
+func typeScriptCommit(moduleDirectory string) (string, error) {
+	command := exec.Command("git", "-C", filepath.Join(moduleDirectory, "TypeScript"), "rev-parse", "HEAD")
 
 	output, err := command.Output()
 	if err != nil {
-		return "", fmt.Errorf("reading the pinned typescript-go commit: %w", err)
+		return "", fmt.Errorf("reading the pinned TypeScript commit: %w", err)
 	}
 
 	commit := strings.TrimSpace(string(output))
 	if commit == "" {
-		return "", fmt.Errorf("the pinned typescript-go commit came back empty")
+		return "", fmt.Errorf("the pinned TypeScript commit came back empty")
 	}
 	return commit, nil
 }

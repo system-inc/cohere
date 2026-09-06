@@ -9,9 +9,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/configuration"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/suppression"
+	"github.com/system-inc/cohere/internal/configuration"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/suppression"
 )
 
 // Coverage is what a run actually looked at.
@@ -78,7 +78,7 @@ type Coverage struct {
 	//
 	// During the migration this is most of the number, and the two mean opposite things. A directive
 	// that silenced nothing while its rule ran is dead scaffolding worth deleting. One naming a rule
-	// verify has not ported yet silenced nothing because nothing looked, and deleting it would strip
+	// cohere has not ported yet silenced nothing because nothing looked, and deleting it would strip
 	// a suppression the gate still needs. Collapsing them tells a reader to delete comments that are
 	// load-bearing today.
 	UnusedSuppressionsForUnrunRules int
@@ -540,7 +540,7 @@ func dispatchFile(
 		}
 	}
 
-	// The rules this run actually ran, so a directive naming only rules verify has not ported can be
+	// The rules this run actually ran, so a directive naming only rules cohere has not ported can be
 	// told apart from one whose rule ran and found nothing to silence.
 	//
 	// Built from `rules` rather than from listeningCounts: a rule that declined every file in this
@@ -563,7 +563,7 @@ type suppressionTally struct {
 	// unusedForUnrunRule is the subset of unusedDirectives naming only rules this run did not run.
 	//
 	// Separated because the two mean opposite things to a reader. A directive that silenced nothing
-	// while its rule ran is dead scaffolding worth deleting. A directive naming a rule verify has
+	// while its rule ran is dead scaffolding worth deleting. A directive naming a rule cohere has
 	// not ported yet silenced nothing because nothing looked, and deleting it would remove a
 	// suppression the gate still needs. Reporting them as one number tells a reader to go delete
 	// comments that are load-bearing today.
@@ -609,7 +609,7 @@ func bareRuleName(name string) string {
 // tally reads what a file's directives actually did, after the walk.
 //
 // The reasonless count is per withheld finding rather than per directive, because that is the
-// number that answers the question being asked: how much of what verify chose not to tell you was
+// number that answers the question being asked: how much of what cohere chose not to tell you was
 // silenced by someone who did not say why.
 func tally(directives *suppression.Index, ranRule map[string]bool) suppressionTally {
 	counted := suppressionTally{}

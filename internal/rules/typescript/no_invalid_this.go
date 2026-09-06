@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/comments"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/comments"
 )
 
 var messageUnexpectedThis = rule.Message{
@@ -43,7 +43,7 @@ var messageUnexpectedThis = rule.Message{
 // valid. It also special-cases `sourceType: module` and the `globalReturn` parser feature at the
 // program level.
 //
-// None of that survives contact with what verify lints. Every file here is a TypeScript module, so
+// None of that survives contact with what cohere lints. Every file here is a TypeScript module, so
 // every function body is strict and top-level `this` is always `undefined`. That was confirmed against
 // the installed rule at 8.67.0 rather than reasoned about: the whole 91-case corpus was driven through
 // the ESLint Linter interface twice, once with the source types the corpus declares and once with
@@ -209,7 +209,7 @@ func (w *noInvalidThisWalker) walk(node *ast.Node) {
 
 // currentlyValid reads the top of the stack.
 //
-// An empty stack is top level. Every file verify lints is a TypeScript module, where top-level
+// An empty stack is top level. Every file cohere lints is a TypeScript module, where top-level
 // `this` is `undefined`, so the answer there is false. Core reaches the same answer through
 // `node.sourceType === "module"`.
 func (w *noInvalidThisWalker) currentlyValid() bool {

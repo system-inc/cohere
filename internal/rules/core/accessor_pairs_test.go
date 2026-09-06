@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // accessorPairsFile is where the fixtures pretend to live.
@@ -623,7 +623,7 @@ func TestDecodeAccessorPairsOptions(t *testing.T) {
 	})
 
 	t.Run("the wire shape is the bare object, not upstream's array", func(t *testing.T) {
-		// verify's config layer unwraps the `[severity, options]` tuple before dispatch, so the
+		// cohere's config layer unwraps the `[severity, options]` tuple before dispatch, so the
 		// decoder is handed `{...}` where upstream's schema writes `[{...}]`.
 		if _, err := DecodeAccessorPairsOptions([]byte(`[{"setWithoutGet": false}]`)); err == nil {
 			t.Error("the array spelling decoded, which means the wire shape is not what is assumed")

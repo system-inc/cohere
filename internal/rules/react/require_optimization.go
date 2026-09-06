@@ -5,8 +5,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	reactUtilities "github.com/system-inc/verify/internal/utilities/react"
+	"github.com/system-inc/cohere/internal/rule"
+	reactUtilities "github.com/system-inc/cohere/internal/utilities/react"
 )
 
 var messageRequireOptimizationNoShouldComponentUpdate = rule.Message{

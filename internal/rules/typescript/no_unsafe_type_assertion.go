@@ -3,11 +3,11 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
-// NoUnsafeTypeAssertion flags a type assertion that tells the checker something it cannot verify,
+// NoUnsafeTypeAssertion flags a type assertion that tells the checker something it cannot cohere,
 // which is every assertion whose expression is not already assignable to the asserted type.
 //
 //	valid:   const a = '' as string | number;       widening, so the checker can still check it

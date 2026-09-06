@@ -96,7 +96,7 @@ func main() {
 
 	packages, err := packages.Load(&packages.Config{
 		// TODO: path relative to repo root
-		Dir:  "./shim/compiler",
+		Dir:  "./TypeScript-shim/compiler",
 		Mode: packages.LoadSyntax,
 	}, packagesToShimFullNames...)
 	if err != nil {
@@ -108,7 +108,7 @@ func main() {
 	var tempBuffer bytes.Buffer
 
 	for _, pkg := range packages {
-		shimDirPath := path.Join("./shim/", strings.TrimPrefix(pkg.PkgPath, tsgoInternalPrefix))
+		shimDirPath := path.Join("./TypeScript-shim/", strings.TrimPrefix(pkg.PkgPath, tsgoInternalPrefix))
 		var extraShim ExtraShim
 		extraShimFilePath := path.Join(shimDirPath, "extra-shim.json")
 		if data, err := os.ReadFile(extraShimFilePath); err == nil {

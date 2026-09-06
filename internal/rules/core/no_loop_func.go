@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/reference"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/reference"
 )
 
 var messageNoLoopFunc = rule.Message{
@@ -113,9 +113,9 @@ var messageNoLoopFunc = rule.Message{
 // listeners reach none of them.
 //
 // Measured against the installed eslint 10.8.1 build: all eleven method-like shapes report, and
-// with three listeners verify reported two. The corpus writes no method, accessor or class in any
+// with three listeners cohere reported two. The corpus writes no method, accessor or class in any
 // of its 96 cases, so nothing imported could see it. It was found by a cross-linter comparison on
-// the real tree, where eslint reported three findings verify missed, all three object shorthand
+// the real tree, where eslint reported three findings cohere missed, all three object shorthand
 // methods inside a `for(;;)` loop capturing reassigned outer bindings.
 //
 // The loop-boundary climb is widened to match. Without that half, a closure written inside a method
@@ -134,9 +134,9 @@ var messageNoLoopFunc = rule.Message{
 // `const o = { *onStatement(sql) { return 1; } };`:
 //
 //	eslint require-yield   "*onStatement"                     the ESTree node it was handed
-//	verify require-yield   "*onStatement(sql) { return 1; }"  the whole method declaration
+//	cohere require-yield   "*onStatement(sql) { return 1; }"  the whole method declaration
 //	eslint no-loop-func    "(statementSql) { return u; }"     the FunctionExpression value
-//	verify no-loop-func    "onStatement(statementSql) { ... }" the whole method declaration
+//	cohere no-loop-func    "onStatement(statementSql) { ... }" the whole method declaration
 //
 // The two upstream spans do not even agree with each other, because each rule reports whichever
 // ESTree node its listener happened to receive, and for a method those are different nodes. Ours

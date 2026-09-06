@@ -50,7 +50,7 @@ package tailwind
 import (
 	"regexp"
 
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // alwaysKnownClasses are markers Tailwind treats specially rather than as utilities.

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 const componentFile = "/repository/source/components/Thing.tsx"
@@ -310,7 +310,7 @@ func TestReactComponentNoMultiplePrimaryCountsCodeLinesOnly(t *testing.T) {
 // The depth limit is behavior, not a safety valve, so it is pinned rather than assumed.
 //
 // The original bounds its walk at depth 20 and returns false past it, which means JSX buried deeper
-// than that does not make a function a component to the gate verify replaces. An unbounded Go walk
+// than that does not make a function a component to the gate cohere replaces. An unbounded Go walk
 // would find it and report a finding the gate does not have, so the bound ports with the rule.
 //
 // The nesting here is deliberate rather than realistic: this shape does not occur on our tree, which

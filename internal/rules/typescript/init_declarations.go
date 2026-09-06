@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // InitDeclarationsMode is which way the rule points.
@@ -61,7 +61,7 @@ func DefaultInitDeclarationsSettings() InitDeclarationsOptions {
 // `ignoreForLoopInit` is `options[1]`, so the ESLint spelling is
 // `["error", "never", {"ignoreForLoopInit": true}]`.
 //
-// verify's config layer does not pass that through. `parseRuleSetting` reads a rule value as either a
+// cohere's config layer does not pass that through. `parseRuleSetting` reads a rule value as either a
 // bare severity or a `[severity, options]` PAIR, and stores `tuple[1]` and nothing after it, so a
 // decoder here is handed exactly one JSON value. For this rule that value is the bare string
 // `"never"`. A decoder written to upstream's shape fails at run time with an unmarshal error naming a
@@ -84,7 +84,7 @@ func DecodeInitDeclarationsOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 
-	// The spelling verify actually delivers: the mode as a bare string.
+	// The spelling cohere actually delivers: the mode as a bare string.
 	var mode string
 	if err := json.Unmarshal(raw, &mode); err == nil {
 		options.Mode = initDeclarationsModeOf(mode)
@@ -237,7 +237,7 @@ var InitDeclarations = rule.Rule{
 
 		// A rule named without a mode does nothing, matching the installed build. Declining here
 		// rather than inside the listener means an unconfigured rule registers no listener at all,
-		// which is also what makes the inertness visible in `verify --timing` rather than silent.
+		// which is also what makes the inertness visible in `cohere --timing` rather than silent.
 		if settings.Mode != InitDeclarationsAlways && settings.Mode != InitDeclarationsNever {
 			return nil
 		}

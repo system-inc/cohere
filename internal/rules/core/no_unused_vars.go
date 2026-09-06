@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/reference"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/reference"
 )
 
 var messageNoUnusedVars = rule.Message{
@@ -43,7 +43,7 @@ var messageNoUnusedVars = rule.Message{
 // treated as used. That is upstream's answer too, for the same reason, and it is the conservative
 // direction: the alternative is reporting a component's only export as dead because this file
 // happens not to call it. The program-wide claim is a real and different analysis and it already
-// exists here as `verify --unused`, which is opt-in precisely so that reading every file in the
+// exists here as `cohere --unused`, which is opt-in precisely so that reading every file in the
 // program does not poison the per-file findings cache. See `rule.ReadsProgram` for why that
 // separation is structural rather than stylistic: a rule reading beyond its own file, cached on
 // that file's hash, serves a stale answer forever and nothing notices.

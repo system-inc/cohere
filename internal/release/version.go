@@ -1,4 +1,4 @@
-// Package release holds what a shipped verify knows about itself: which build it is, and where its
+// Package release holds what a shipped cohere knows about itself: which build it is, and where its
 // binary comes from on a machine that has no source and no Go toolchain.
 //
 // The two halves answer the two questions a bug report has to answer. `Provenance` says what was
@@ -48,7 +48,7 @@ var (
 	//
 	// The formatter is JavaScript built out of a separate repository and pulled in at build time
 	// from a path on the build machine, not a pinned dependency. Nothing else in the binary records
-	// which build that was, so without this stamp two binaries from the same verify commit can
+	// which build that was, so without this stamp two binaries from the same cohere commit can
 	// format the same file differently and neither can say why. Formatting differences are the
 	// worst kind to debug from a report, because every diff after the first one is noise.
 	//
@@ -149,7 +149,7 @@ func (provenance Provenance) IsDevelopment() bool {
 // one is an old binary that predates the stamping, the other is a build that lost its stamp.
 func (provenance Provenance) String() string {
 	lines := []string{
-		"verify " + provenance.Version,
+		"cohere " + provenance.Version,
 		"  platform:       " + provenance.Platform,
 		"  go:             " + provenance.GoToolchain,
 		"  compiler:       " + provenance.describeCompiler(),
@@ -259,7 +259,7 @@ func resolveCompilerCommit() string {
 			// Named for what it actually is. Reporting this repository's commit under the
 			// compiler's label would be a true fact wearing a wrong name, which is worse than
 			// the honest "unknown" because a reader would act on it.
-			return fmt.Sprintf("unknown (built from verify %s)", shortCommit(setting.Value))
+			return fmt.Sprintf("unknown (built from cohere %s)", shortCommit(setting.Value))
 		}
 	}
 	return "unknown"

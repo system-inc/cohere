@@ -7,10 +7,10 @@
 //
 // Every other piece of the Tailwind port could in principle have been replaced by a generated
 // table. This one could not, and it is the reason the port is necessary rather than an
-// optimization. The tables verify shipped before this were generated per-repo: running the
+// optimization. The tables cohere shipped before this were generated per-repo: running the
 // generator against two repositories on the same Tailwind 4.3.3 produced tables that differed,
 // because each project's own `@utility` blocks and `@theme` entries were baked in as though they
-// were framework facts. This parser is what lets verify read the repository in front of it.
+// were framework facts. This parser is what lets cohere read the repository in front of it.
 //
 // # Why not tdewolff/parse/v2/css
 //
@@ -74,7 +74,7 @@ const (
 // CSSSyntaxError is a malformed-stylesheet error.
 //
 // Upstream carries a SourceLocation so it can render `file:line:column`. This port carries the byte
-// offset instead: verify reports on the class literal in a user's source file, never on CSS it
+// offset instead: cohere reports on the class literal in a user's source file, never on CSS it
 // parsed, so an offset is enough to identify the input that failed and a line table would be
 // machinery with no reader. The message text matches upstream so a failure here is greppable
 // against the upstream source that produced it.

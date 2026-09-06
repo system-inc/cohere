@@ -87,7 +87,7 @@ func (r Resolved) RawOptionsFor(ruleName string) json.RawMessage {
 // nothing now that they are compiled in.
 //
 // This has to be resolved somewhere, and getting it wrong is not subtle: matching on the exact name
-// alone made every rule unconfigured, therefore disabled, and verify printed 0 findings over 3,408
+// alone made every rule unconfigured, therefore disabled, and cohere printed 0 findings over 3,408
 // files with exit 0. The coverage line is what caught it, reporting every rule scoped off for every
 // file. A tool without that line would have shipped a green run that checked nothing.
 //
@@ -110,7 +110,7 @@ func (r Resolved) settingFor(ruleName string) (RuleSetting, bool) {
 // Resolve computes the effective configuration for one file path.
 //
 // Precedence is base rules first, then each matching override in order, later blocks winning. That
-// is how both ESLint and oxlint resolve, and matching them exactly is the whole point: verify cannot
+// is how both ESLint and oxlint resolve, and matching them exactly is the whole point: cohere cannot
 // be diffed honestly against the gate it replaces while the two disagree about which rules were
 // even supposed to run.
 func (c *Config) Resolve(path string) Resolved {

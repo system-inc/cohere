@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/scope"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/scope"
 )
 
 var messageNoPropertyAlias = rule.Message{
@@ -72,7 +72,7 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 				// PropertyAccessExpression carrying a question-dot token, so without this check the
 				// rule reads every `const x = o?.x` as a plain alias.
 				//
-				// Measured rather than reasoned: without it, verify reported 71 findings on the
+				// Measured rather than reasoned: without it, cohere reported 71 findings on the
 				// ahra tree where the gate reports zero, and the first ones inspected were all
 				// `node.id?.name` and `options?.entityKey`. Matching the gate is the whole
 				// acceptance criterion, so the exemption ports even though a case could be made

@@ -1,4 +1,4 @@
-# verify
+# cohere
 
 One binary that type-checks, lints, fixes, and formats a TypeScript codebase — in one process,
 over one AST, against one type graph.
@@ -15,7 +15,7 @@ boundaries: rules crossing into a JavaScript isolate, a Tailwind plugin making a
 cross-thread round trip per class literal, and a type checker rebuilding a 9,530-file program from
 scratch on every run, once per shard.
 
-`verify` removes the boundaries by standing in the type checker's own language.
+`cohere` removes the boundaries by standing in the type checker's own language.
 
 ## Built on
 
@@ -37,10 +37,10 @@ scratch on every run, once per shard.
 ```sh
 git submodule update --init --depth 1 typescript-go
 go build ./...
-go run ./command/verify
+go run ./command/cohere
 ```
 
-`verify` cannot verify itself — it is a Go program and its phases check TypeScript. This repo is
+`cohere` cannot cohere itself — it is a Go program and its phases check TypeScript. This repo is
 gated by Go's own toolchain: `gofmt -l .`, `go vet ./...`, `go test ./...`, `go build ./...`.
 
 ## Porting a rule
@@ -100,7 +100,7 @@ to a mutant nothing catches. Three appeared twice, in different members' harness
 - **A filter that cannot match.** `grep -c` counts matching lines per file and `grep -o` counts
   occurrences; a total built from the wrong one reports zero against output that has failures in it.
 - **A restore that silently did not run.** An unset variable in the cleanup leaves the mutant in the
-  tree, and a restore that did nothing looks exactly like one that worked. Verify with `cmp`.
+  tree, and a restore that did nothing looks exactly like one that worked. Cohere with `cmp`.
 
 The shape is always the same and it is the same shape the rules themselves fail in: **the probe did not
 run, and nothing said so.** A sweep is what everything else here is trusted on, so it is the one
@@ -123,7 +123,7 @@ without a fix is the subset you can show correct.
 
 A port is faithful to what a rule **decides**, not to how it **obtains what it needs**. The originals
 walk the filesystem and read `process.cwd()` because ESLint hands them one file at a time and gives
-them no program. `verify` has the program. Reproducing a workaround for a constraint we do not have is
+them no program. `cohere` has the program. Reproducing a workaround for a constraint we do not have is
 not fidelity.
 
 Where a rule has no tree exposure and the upstream gives no reasoning, fidelity is the only available
@@ -133,15 +133,15 @@ the intuitive reading beside the actual one so the next reader does not correct 
 ## The dispatcher
 
 Rules are compiled in rather than loaded, which is what makes them free to run. The cost is that
-adding a rule means rebuilding, so `command/verify-dispatch` pays that cost automatically: it hashes
-everything the binary is built from, looks for `.cache/verify/bin/verify-<platform>-<hash>`, and
+adding a rule means rebuilding, so `command/cohere-dispatch` pays that cost automatically: it hashes
+everything the binary is built from, looks for `.cache/cohere/bin/cohere-<platform>-<hash>`, and
 execs it when present or builds it first when absent. Editing a rule costs one rebuild; every run
 after it is a stat and an exec.
 
 ```sh
-verify                    # resolve, rebuild if the rules moved, exec
-verify --dev              # build to a stable path instead of a hash-named one
-verify --dispatch-verbose # say so when a rebuild fires
+cohere                    # resolve, rebuild if the rules moved, exec
+cohere --dev              # build to a stable path instead of a hash-named one
+cohere --dispatch-verbose # say so when a rebuild fires
 ```
 
 Anything the dispatcher does not own is forwarded to the real binary untouched.
@@ -155,7 +155,7 @@ compares it, so a stable name never means a stale binary.
 The build flags are fixed at `-trimpath -ldflags="-s -w"`. They make the link marginally faster and
 the binary 29% smaller, and `-trimpath` is a build-input change rather than a link flag: turning it
 on invalidates the entire compile cache, measured at 33s on a warm 2.0 GB cache. Flipping it per run
-would pay that repeatedly, so it does not vary. `GOCACHE` is pinned inside `.cache/verify/` so that
+would pay that repeatedly, so it does not vary. `GOCACHE` is pinned inside `.cache/cohere/` so that
 other Go work neither shares it nor evicts it — Go's default cache trims entries unused for about
 five days, which would quietly turn a warm rebuild into a cold one.
 
@@ -168,17 +168,17 @@ clean tree.
 
 ## Releasing
 
-`verify` reaches a machine as an npm install. One thin dispatcher package resolves a per-platform
+`cohere` reaches a machine as an npm install. One thin dispatcher package resolves a per-platform
 binary package, the same shape oxlint and tsgo use:
 
 ```
-verify                  the package you install; a Node launcher, no binary
-@verify/darwin-arm64    ~43 MB Go binary, stripped
-@verify/darwin-x64
-@verify/linux-arm64     for CI and containers
-@verify/linux-x64
-@verify/win32-arm64
-@verify/win32-x64
+cohere                  the package you install; a Node launcher, no binary
+@cohere/darwin-arm64    ~43 MB Go binary, stripped
+@cohere/darwin-x64
+@cohere/linux-arm64     for CI and containers
+@cohere/linux-x64
+@cohere/win32-arm64
+@cohere/win32-x64
 ```
 
 Every size here names the build that produced it, because the same commit measures 43.1 MB stripped
@@ -209,7 +209,7 @@ installs correctly and is never found, which on the machine is indistinguishable
 never shipped.
 
 ```sh
-go run ./command/verify-release --version 0.1.0 --output dist
+go run ./command/cohere-release --version 0.1.0 --output dist
 ```
 
 One command builds all six from one machine, in about two minutes, and it stages rather than
@@ -223,7 +223,7 @@ installing one thing. Node is present by construction in an npm install, and `re
 the package manager where a package actually is instead of modeling pnpm, npm, and yarn layouts by
 hand.
 
-`verify --version` reports the version, the platform, the Go toolchain, and the vendored compiler as
+`cohere --version` reports the version, the platform, the Go toolchain, and the vendored compiler as
 `owner/name@commit`, so a bug report names what was running rather than "latest". The stamps go in
 at link time; an unstamped local build says `dev` and says why.
 
@@ -240,11 +240,11 @@ them in and stamps the fork's `HEAD` beside the compiler pin, so `--version` gro
 line naming exactly which Prettier a binary formats with.
 
 That stamp exists because the fork is reached by a path on a build machine, not by a version. Without
-it, two binaries built from the same verify commit can format the same file differently and neither
+it, two binaries built from the same cohere commit can format the same file differently and neither
 can say why, and formatting differences are the worst kind to debug from a report: every diff after
 the first one is noise.
 
-The flag is off by default, because the formatter is not wired into verify yet and a release should
+The flag is off by default, because the formatter is not wired into cohere yet and a release should
 not demand a built fork for a feature nothing reaches. When it is on, the build refuses a fork that
 is absent, unbuilt, missing any required bundle, holding a zero-byte one, or whose bundles are older
 than its tracked source. It refuses before cross-compiling anything, so a stale fork costs a second
@@ -258,10 +258,10 @@ time anyone formatted markdown.
 Staleness is measured by modification time against the fork's newest tracked source file, not by
 recording a commit beside the bundles. A recorded commit only catches a rebuild someone remembered
 to re-record; the case that actually happens is an edited working tree that was never rebuilt, where
-the commit has not moved and the bundles are wrong anyway. `VERIFY_PRETTIER_FORK` points at a
+the commit has not moved and the bundles are wrong anyway. `COHERE_PRETTIER_FORK` points at a
 checkout somewhere other than the default path.
 
-`VERIFY_BINARY=/path/to/verify` points every `verify` on the machine at a local build. A broken
+`COHERE_BINARY=/path/to/cohere` points every `cohere` on the machine at a local build. A broken
 override is fatal rather than a fallback, even when a good install is sitting right there: someone
 who sets it has stated which binary they want, and quietly running a different one would hand them
 results they would read as their own build's.
@@ -286,5 +286,5 @@ summary, because an unsigned release is fine and an unsigned release that looks 
 
 Note that a notarization ticket cannot be stapled to a bare executable — only to a bundle, a disk
 image, or an installer package — so a notarized Mach-O is validated by an online check on first
-launch. A machine that is entirely offline the first time it runs a quarantined `verify` is still
+launch. A machine that is entirely offline the first time it runs a quarantined `cohere` is still
 blocked. The npm path does not set quarantine, so this does not affect it.

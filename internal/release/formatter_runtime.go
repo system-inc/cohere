@@ -3,10 +3,10 @@ package release
 import (
 	"fmt"
 
-	"github.com/system-inc/verify/internal/prettier"
+	"github.com/system-inc/cohere/internal/prettier"
 )
 
-// VerifyEmbeddedBundles checks that the bundles this binary carries are the ones it was stamped
+// CohereEmbeddedBundles checks that the bundles this binary carries are the ones it was stamped
 // with, and says which copy it actually looked at.
 //
 // This is the runtime half of the vendoring. The build stamps a digest over the bytes it embedded;
@@ -21,7 +21,7 @@ import (
 //
 // A binary with no stamp reports that it cannot say, rather than passing. Those are different facts
 // and collapsing them would let an unstamped build read as verified.
-func VerifyEmbeddedBundles() error {
+func CohereEmbeddedBundles() error {
 	provenance := Current()
 
 	source, err := prettier.Bundles()

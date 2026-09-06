@@ -67,7 +67,7 @@
 // # Failing safe
 //
 // A design system that will not build is no opinion, never a clean tree. LoadDesignSystem returns
-// an error and the caller declines; it never returns a half-built value. verify exists to eliminate
+// an error and the caller declines; it never returns a half-built value. cohere exists to eliminate
 // confident green over unchecked work, and a rule reporting zero findings because the CSS could not
 // be read is exactly that failure wearing the right colour.
 package tailwind
@@ -111,7 +111,7 @@ type LoadedDesignSystem struct {
 
 	// SkippedDirectives is every `@config` and `@plugin` the graph held.
 	//
-	// A `@config` can contribute theme values through JavaScript, which verify does not run, so a
+	// A `@config` can contribute theme values through JavaScript, which cohere does not run, so a
 	// non-empty list means the theme may be short by however many keys that config declared. Kept
 	// so a caller can decide, rather than dropped so a caller cannot.
 	SkippedDirectives []SkippedDirective

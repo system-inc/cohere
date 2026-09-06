@@ -232,7 +232,7 @@ var buildConfigFiles = map[string]bool{
 	"LintConfiguration":       true,
 	"EsLintConfiguration":     true,
 	"TypeScriptConfiguration": true,
-	"VerifySettings":          true,
+	"CohereSettings":          true,
 	"next-env":                true,
 }
 

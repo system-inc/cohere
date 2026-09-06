@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // requireArraySortCompareFile names the fixture file. The rule reads no path and gates on no
@@ -25,7 +25,7 @@ func requireArraySortCompareCaseName(index int) string {
 // silently inverts the rule, and every fixture built from a struct would pass anyway.
 //
 // An empty specifier means the case ran with no options at all, which is upstream's default and is
-// also what verify hands a rule configured as a bare "error".
+// also what cohere hands a rule configured as a bare "error".
 func requireArraySortCompareOptionsFor(t *testing.T, optionsJson string) any {
 	t.Helper()
 	if optionsJson == "" {

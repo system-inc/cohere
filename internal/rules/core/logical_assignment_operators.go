@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/comments"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/comments"
 )
 
 const messageLogicalAssignmentAssignmentId = "assignment"
@@ -131,7 +131,7 @@ func DefaultLogicalAssignmentOperatorsSettings() LogicalAssignmentOperatorsOptio
 // DecodeLogicalAssignmentOperatorsOptions turns the configured value into options.
 //
 // Upstream's schema is a two-element positional array whose first element is a string and whose
-// second is an object, and whose `never` arm forbids the second element entirely. verify's config
+// second is an object, and whose `never` arm forbids the second element entirely. cohere's config
 // layer strips the severity from the head of the tuple and hands the decoder what remains, so the
 // wire value here is the positional array itself rather than a single object. That is why this is
 // hand-rolled rather than `rule.DecodeOptionsInto`: the generic helper decodes one object, and the

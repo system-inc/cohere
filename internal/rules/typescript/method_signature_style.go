@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // messageMethodSignatureStyleErrorMethod is upstream's `errorMethod`.
@@ -179,7 +179,7 @@ func reportMethodSignatureShouldBeProperty(ctx rule.Context, node *ast.Node) {
 		// fixes into independent proposals and refuses an overlap outright, so attaching both would
 		// mean neither lands.
 		//
-		// Measured: upstream's `verifyAndFix` on `m(a: string): void; m(a: number): void;` writes
+		// Measured: upstream's `cohereAndFix` on `m(a: string): void; m(a: number): void;` writes
 		// `m: ((a: string) => void) & ((a: number) => void);`, which is exactly what the first
 		// signature's repair alone produces here. The judgment is unchanged, both signatures still
 		// report, and only the redundant second copy of the repair is dropped.

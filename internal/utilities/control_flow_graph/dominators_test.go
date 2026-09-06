@@ -184,7 +184,7 @@ func TestDominatorsRejectABrokenTree(t *testing.T) {
 	}
 }
 
-// TestDominatorsOnKnownShapes pins the tree on shapes whose dominance a reader can verify by eye,
+// TestDominatorsOnKnownShapes pins the tree on shapes whose dominance a reader can cohere by eye,
 // so a future change that keeps the brute-force check happy by breaking BOTH sides still fails here.
 //
 // These assert the property rather than block indices, because block numbering is construction

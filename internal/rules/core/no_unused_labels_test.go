@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // unusedLabelsFile is where the fixtures pretend to live.
@@ -494,7 +494,7 @@ func TestNoUnusedLabelsMarksOnlyTheNearestMatchingLabel(t *testing.T) {
 // symptom is a rule that quietly stops repairing rather than one that reports wrongly, which is why
 // no message-id fixture could have seen it.
 //
-// Both expectations were taken from ESLint's own Linter rather than derived: verifyAndFix rewrites
+// Both expectations were taken from ESLint's own Linter rather than derived: cohereAndFix rewrites
 // `{ A: (foo) }` to `{ (foo) }` and `foo; A: (bar)` to `foo; (bar)`. Nothing can rejoin across a
 // `{`, a `;`, or a `:`, and at the start of the file there is no previous token to rejoin with.
 func TestNoUnusedLabelsFixesWhenThePrecedingTokenTerminates(t *testing.T) {

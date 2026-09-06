@@ -8,7 +8,7 @@ import (
 /*
  * The fork was reachable by two independent paths and only one of them was overridable.
  *
- * `internal/release` resolved VERIFY_PRETTIER_FORK to decide which bundles it vouched for, while
+ * `internal/release` resolved COHERE_PRETTIER_FORK to decide which bundles it vouched for, while
  * this engine read a hardcoded constant to decide which bundles it loaded. Neither consulted the
  * other, so a machine that set the variable got a release guard reporting green about a directory
  * nothing loaded from, and an engine still reading a home directory on one laptop.
@@ -110,7 +110,7 @@ func TestEmbedMatchesBundleFiles(t *testing.T) {
 // It lives here rather than in `release` because `prettier` imports nothing internal, so this
 // direction is the one that cannot create a cycle.
 func TestReleaseResolvesThroughTheEngine(t *testing.T) {
-	if ForkPathVariable != "VERIFY_PRETTIER_FORK" {
+	if ForkPathVariable != "COHERE_PRETTIER_FORK" {
 		t.Fatalf("the variable is %q; release's exported alias and any CI that sets it both assume the old spelling", ForkPathVariable)
 	}
 }

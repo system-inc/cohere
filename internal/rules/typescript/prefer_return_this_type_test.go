@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 const preferReturnThisTypeFile = "/repository/source/Returning.ts"
@@ -98,7 +98,7 @@ func TestPreferReturnThisTypeStaysSilent(t *testing.T) {
 		// gate exists to keep out. It is crash protection rather than a behavioral filter: an
 		// assertion node answers `Type()` (so it passes the return-type gate) and answers nil to
 		// `Body()`, and `Parameters()` on a node that is not function-like dereferences nil. With
-		// the gate removed these two panic, and the verify walk recovers per FILE rather than per
+		// the gate removed these two panic, and the cohere walk recovers per FILE rather than per
 		// rule, so one of them would cost every rule its verdict on that file.
 		//
 		// No ExpectFindings assertion can see a panic, which is why the gate survived a mutation
@@ -262,7 +262,7 @@ func TestPreferReturnThisTypeFires(t *testing.T) {
 			wantFixed:  "class Foo {\n  f(): (this | undefined) | null {\n    return this;\n  }\n}\n",
 		},
 		// The class name twice in one union reports ONCE and rewrites ONCE. Upstream's tester shows
-		// `this | this` only because verifyAndFix re-lints until the text stops changing; a single
+		// `this | this` only because cohereAndFix re-lints until the text stops changing; a single
 		// application of the same messages writes `this | Foo`, measured, and this port is one pass.
 		{
 			sourceText: "class Foo {\n  f(): Foo | Foo {\n    return this;\n  }\n}\n",

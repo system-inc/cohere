@@ -19,8 +19,8 @@ import (
 // in this file skipped, and the package reported as passing over an engine that could not load a
 // single bundle:
 //
-//	VERIFY_PRETTIER_FORK=/nonexistent go test ./internal/prettier/
-//	ok  github.com/system-inc/verify/internal/prettier  0.208s   exit=0
+//	COHERE_PRETTIER_FORK=/nonexistent go test ./internal/prettier/
+//	ok  github.com/system-inc/cohere/internal/prettier  0.208s   exit=0
 //
 // The message that skip carried reached a `-v` reader and nobody else, and that was not a property
 // of `t.Skipf` that some other mechanism dodges. Measured both directions: a `TestMain` writing the

@@ -3,7 +3,7 @@
 //
 // Four rules in the base layer ask the same two questions in different vocabularies:
 // `graphql-nullable-parity`, `orm-column-nullable-parity`, `serializable-nullable-parity` and
-// `verify-optional-parity` each read a boolean flag off a decorator call and compare it against
+// `cohere-optional-parity` each read a boolean flag off a decorator call and compare it against
 // whether a TypeScript type admits nothing. The flag's name differs per rule; the judgment does not.
 //
 // So the judgment lives here rather than four times over. The original TypeScript layer reached the
@@ -15,7 +15,7 @@ package decorators
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // NullableTypeFlags is the mask that decides whether a type counts as nullable for parity.

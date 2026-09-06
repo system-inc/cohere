@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // onlyThrowErrorFile is the fixture name every case in this file runs under.

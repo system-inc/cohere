@@ -5,7 +5,7 @@
  * The Go port of the variant half of the sort is checked against these answers rather than against
  * a reading of `variants.ts`, for the reason generate_theme exists: the two are different
  * claims. The one that decides this component is `getVariantOrder`. Reading `variants.ts` suggests
- * a variant has a fixed position, and verify has shipped a 145-entry table of exactly that shape.
+ * a variant has a fixed position, and cohere has shipped a 145-entry table of exactly that shape.
  * Asking the engine says the position is assigned per run, densely, over only the variants that
  * were actually parsed, with ties collapsed to a shared index. `hover` is 0 in a run that parsed
  * two variants and 1 in a run that parsed six. The absolute number is not a fact about `hover`.
@@ -20,7 +20,7 @@
  * the engine's whole sort, run over a real class list, returning each class's final rank. It is
  * also the public API Tailwind's own Prettier plugin consumes, so a Go port that agrees with it
  * agrees with the thing the ecosystem treats as the answer. Comparing a rendered selector would
- * have tested the 1,000 lines of `variants.ts` that verify deliberately does not port; comparing
+ * have tested the 1,000 lines of `variants.ts` that cohere deliberately does not port; comparing
  * the rank tests exactly the part it does.
  *
  * # The three corpora, and why all three
@@ -244,7 +244,7 @@ function describeClassOrder(designSystem, classes) {
  * Synthetic class lists, each chosen for a pair a real corpus does not write.
  *
  * The first group is the one this whole component exists to settle: a stacked variant against a
- * single one. verify's shipped comparator holds that every single variant precedes every stacked
+ * single one. cohere's shipped comparator holds that every single variant precedes every stacked
  * one, arrived at by fixture failure. If the engine agrees, these lists confirm it on pairs the
  * original four class lists never covered. If it disagrees, these are where it shows.
  */

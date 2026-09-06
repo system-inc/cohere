@@ -473,7 +473,7 @@ func TestRunnerCanDetectAFailure(t *testing.T) {
 
 // TestFirstHonestScoreIsZeroOfThreeHundredTwentyFive is the state of the world today.
 //
-// Nothing in verify implements a React compiler rule, so the honest score is zero. What this test
+// Nothing in cohere implements a React compiler rule, so the honest score is zero. What this test
 // actually guards is the denominator: a zero over 325 considered is a measurement, and a zero over
 // nothing considered is an empty suite wearing the same digit. The assertions on Considered and
 // Declined are what separate them, and `Score.Check` proves the buckets partition the corpus rather

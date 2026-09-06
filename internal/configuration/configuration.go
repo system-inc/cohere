@@ -54,7 +54,7 @@ type RuleSetting struct {
 	// configured with a bare severity.
 	//
 	// A rule that requires an option and is handed nil either guards everything or nothing, and both
-	// are silent. Four rules in the gate verify replaces were dead for months underneath exactly
+	// are silent. Four rules in the gate cohere replaces were dead for months underneath exactly
 	// that, so the distinction between "no options" and "options I did not read" is kept.
 	Options json.RawMessage
 }
@@ -93,11 +93,11 @@ type Config struct {
 //
 // oxlint's mechanism is `warn_correctness(plugins)` in `config_builder.rs:570`: every rule whose
 // category is `Correctness` AND whose plugin is declared, at severity `Warn`. Reproducing that
-// directly needs each rule's category, and neither this registry nor `rule-inventory.json` carries
+// directly needs each rule's category, and neither this registry nor the captured inventory carried
 // one -- adding categories for 214 rules would be a fresh transcription of oxc's metadata, which is
 // a larger and less trustworthy job than the one this solves.
 //
-// The table is not a transcription. `rule-inventory.json`'s `enabledBy: pluginDefault` was
+// The table is not a transcription. The captured inventory's `enabledBy: pluginDefault` was
 // established empirically, by planting violations and watching the real oxlint binary report rules
 // named in no config -- `no-const-assign` and `react/no-children-prop` among them. That is a
 // measurement of what the tool actually enables, which is what parity is about, rather than a
@@ -144,10 +144,10 @@ func pluginContributing(ruleName string) string {
 //   - The set does not contain a rule whose violation is arguably fine, which is what `warn` would
 //     assert. `no-const-assign` is a runtime TypeError, `no-this-before-super` is a crash,
 //     `no-obj-calls` calls a non-function, `react/no-direct-mutation-state` silently drops a render.
-//   - The tool being replaced is the floor rather than the target. verify exists because that gate
+//   - The tool being replaced is the floor rather than the target. cohere exists because that gate
 //     was insufficient, so inheriting its severity because it is the incumbent proves too much.
 //
-// The choice was originally made by someone who left no note, and `VerifySettings.json` is untracked
+// The choice was originally made by someone who left no note, and `CohereSettings.json` is untracked
 // so there is no author or date to recover. That is a gap in the record rather than evidence the
 // choice was careless: reverting an undocumented decision to a weaker one BECAUSE it is undocumented
 // is how a codebase loses hard-won strictness one blameless commit at a time.
@@ -185,7 +185,7 @@ func RulesFromPlugins(plugins []string, named map[string]RuleSetting) map[string
 //
 // A configuration that cannot be read is an error rather than an empty configuration. An empty config lints
 // everything with nothing configured, which is indistinguishable from a clean run and is precisely
-// the failure this project keeps finding: three configurations in the gate verify replaces ran
+// the failure this project keeps finding: three configurations in the gate cohere replaces ran
 // successfully having loaded zero plugins.
 func Load(path string) (*Config, error) {
 	contents, err := os.ReadFile(path)
@@ -300,7 +300,7 @@ var ignoredTopLevelKeys = map[string]string{
 // That is the same defect as a rule offered no files, sitting in this tool's own front door: the
 // author believes something is configured, every check is green, and nothing runs. Refusing is the
 // shape the rest of the tool already takes -- `Load` errors rather than returning an empty config for
-// exactly this reason, and its comment says three configurations in the gate verify replaces "ran
+// exactly this reason, and its comment says three configurations in the gate cohere replaces "ran
 // successfully having loaded zero plugins."
 //
 // Warning was the alternative and it was rejected on the tool's own thesis. A warning goes into an
@@ -419,10 +419,15 @@ func truncate(value string) string {
 
 // pluginDefaultRules builds the table. See PluginDefaultRules for why it is a table.
 //
-// Generated from `rule-inventory.json`'s `enabledBy: pluginDefault` entries and pinned by
-// `TestPluginDefaultsMatchTheInventory`, which reads that file and fails on any drift. Written out
-// rather than read at runtime because `internal/config` has no business reading a repository-root
-// JSON file to answer a question about its own semantics, and a test can hold the two together.
+// These 41 entries were derived from a captured inventory of what oxlint's `plugins` declarations
+// turn on without any rules block naming them, proven at capture time by planting violations rather
+// than by reading a config. That inventory is deleted and this table is now the only record of it,
+// which is a deliberate trade: the catalog was a frozen snapshot, so the test that pinned this
+// against it could only ever catch a hand-edit here, never real upstream drift.
+//
+// What that means for a change: adding or removing an entry is no longer checked by anything. If
+// oxlint's defaults move, the way to find out is to plant a violation for the rule and see whether
+// the gate reports it with no config entry naming it -- the same probe that produced this list.
 func pluginDefaultRules() map[string]string {
 	return map[string]string{
 		"constructor-super":                   PluginEslint,

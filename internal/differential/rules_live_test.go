@@ -7,23 +7,23 @@ import (
 	"testing"
 )
 
-// A live check against a real verify binary, skipped unless one is named.
+// A live check against a real cohere binary, skipped unless one is named.
 //
 // The parse has to be proven against actual output rather than a fixture, because a fixture is a
 // copy of what I believed the format was, and the failure this guards against is precisely the
 // format not matching that belief. Run with:
 //
-//	VERIFY_BINARY=/tmp/verify-head VERIFY_TREE=~/Projects/ahra go test -run TestCompiledRulesAgainstARealBinary ./internal/differential/
+//	COHERE_BINARY=/tmp/cohere-head COHERE_TREE=~/Projects/ahra go test -run TestCompiledRulesAgainstARealBinary ./internal/differential/
 func TestCompiledRulesAgainstARealBinary(t *testing.T) {
-	binary := os.Getenv("VERIFY_BINARY")
-	tree := os.Getenv("VERIFY_TREE")
-	explainFile := os.Getenv("VERIFY_EXPLAIN_FILE")
+	binary := os.Getenv("COHERE_BINARY")
+	tree := os.Getenv("COHERE_TREE")
+	explainFile := os.Getenv("COHERE_EXPLAIN_FILE")
 	if binary == "" || tree == "" || explainFile == "" {
-		t.Skip("set VERIFY_BINARY, VERIFY_TREE and VERIFY_EXPLAIN_FILE to run this against a real build")
+		t.Skip("set COHERE_BINARY, COHERE_TREE and COHERE_EXPLAIN_FILE to run this against a real build")
 	}
 
 	names, err := CompiledRulesOf(context.Background(), GateCommand{
-		Name: "verify", Program: binary, Directory: tree,
+		Name: "cohere", Program: binary, Directory: tree,
 	}, explainFile)
 	if err != nil {
 		t.Fatalf("could not read the rule list: %v", err)

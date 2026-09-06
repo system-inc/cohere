@@ -4,18 +4,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/react_conformance"
+	"github.com/system-inc/cohere/internal/react_conformance"
 )
 
 // TestConfigFixturesNeedAModuleTypeProvider holds the `config` divergence in place.
 //
-// `statedDivergences` claims all four Config goldens depend on a `moduleTypeProvider` verify has no
+// `statedDivergences` claims all four Config goldens depend on a `moduleTypeProvider` cohere has no
 // channel to receive. A claim in a map is a label; this is what makes it a measurement. It asserts
 // the mechanism (every fixture imports a module that exists only in upstream's test harness) rather
 // than the symptom (the rule reports nothing), because the symptom is equally satisfied by a rule
 // that is simply broken.
 //
-// If verify ever grows a type-provider channel and these start reporting, this fails and the
+// If cohere ever grows a type-provider channel and these start reporting, this fails and the
 // divergence entries have to be revisited deliberately.
 func TestConfigFixturesNeedAModuleTypeProvider(t *testing.T) {
 	fixtures, err := react_conformance.Load(fixtureRoot)

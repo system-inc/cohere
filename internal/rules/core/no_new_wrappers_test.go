@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // newWrappersFile is where the fixtures pretend to live.
@@ -93,7 +93,7 @@ func TestNoNewWrappersDeclinesAnImportedShadow(t *testing.T) {
 //
 // `{globals: {String: "off"}}` and `/* global Boolean:off */` both remove the name from ESLint's
 // environment, so `getVariableByName` returns nothing and the rule declines. Neither mechanism
-// exists in verify: there is no globals configuration and no global comment reader, and the
+// exists in cohere: there is no globals configuration and no global comment reader, and the
 // checker resolves both names to the TypeScript standard library regardless. Recording them as
 // reporting is the honest pin, because the layer that makes them clean upstream is a layer above
 // the rule rather than a judgment inside it.

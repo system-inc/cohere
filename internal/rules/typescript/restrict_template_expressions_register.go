@@ -1,10 +1,10 @@
 package typescript
 
-import "github.com/system-inc/verify/internal/rule"
+import "github.com/system-inc/cohere/internal/rule"
 
 // init registers @typescript-eslint/restrict-template-expressions.
 //
-// Registered and deliberately NOT enabled in the live config. VerifySettings.json carries
+// Registered and deliberately NOT enabled in the live config. CohereSettings.json carries
 // `"typescript/restrict-template-expressions": "off"`, a standing decision somebody made under the
 // old short spelling. That key cannot resolve against this registration: `settingFor` matches
 // exactly, then trims the RULE NAME off the CONFIG KEY, and the old key is shorter than

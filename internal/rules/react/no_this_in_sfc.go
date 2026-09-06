@@ -2,8 +2,8 @@ package react
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	utilsreact "github.com/system-inc/verify/internal/utilities/react"
+	"github.com/system-inc/cohere/internal/rule"
+	utilsreact "github.com/system-inc/cohere/internal/utilities/react"
 )
 
 var messageNoThisInSfc = rule.Message{

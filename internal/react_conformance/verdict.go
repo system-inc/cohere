@@ -40,7 +40,7 @@ const (
 	VerdictPassed Verdict = "passed"
 
 	// VerdictFailed means the rule ran, the fixture was answerable, and it disagreed with the
-	// golden. This is the only category that is a defect in verify.
+	// golden. This is the only category that is a defect in cohere.
 	VerdictFailed Verdict = "failed"
 
 	// VerdictUnreachableFixture means the fixture never reaches this validator upstream either.
@@ -59,7 +59,7 @@ const (
 	// real code and score zero here, and that is a fact about the corpus rather than the rule.
 	VerdictUnresolvableTypes Verdict = "declined: unresolvable types"
 
-	// VerdictStatedDivergence means verify deliberately differs, with the boundary written down.
+	// VerdictStatedDivergence means cohere deliberately differs, with the boundary written down.
 	//
 	// Held separate from failure on purpose. `exhaustive-deps` carries 15 of 17 diagnostic kinds
 	// with `TestExhaustiveDepsScopeIsStated` naming the eight dropped cases; `set-state-in-effect`
@@ -67,17 +67,17 @@ const (
 	// score that called them failures would be measuring care as if it were error.
 	VerdictStatedDivergence Verdict = "excluded: stated divergence"
 
-	// VerdictNoRuleShipped means no rule in verify claims this fixture's diagnostics.
+	// VerdictNoRuleShipped means no rule in cohere claims this fixture's diagnostics.
 	//
 	// Separate from unreachable, because the response is different: unreachable means nobody could
 	// score it, this means we have not written the rule yet. Six of upstream's 26 rules are the
-	// bulk of the corpus and verify ships none of them.
+	// bulk of the corpus and cohere ships none of them.
 	VerdictNoRuleShipped Verdict = "declined: no rule shipped"
 
 	// VerdictFlowSyntax means the fixture needs a Flow parser.
 	VerdictFlowSyntax Verdict = "excluded: flow syntax"
 
-	// VerdictNotScored means a rule verify ships owns this fixture but no rule engine was run.
+	// VerdictNotScored means a rule cohere ships owns this fixture but no rule engine was run.
 	//
 	// This is the honest name for the state the harness is in today, and it is deliberately NOT
 	// folded into any decline. A decline says something about the fixture; this says something

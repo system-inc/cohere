@@ -43,7 +43,7 @@ package tailwind
 import (
 	"strings"
 
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // splitCandidateIn breaks a class into prefix, root, value and importance, against a design system.

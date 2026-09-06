@@ -244,7 +244,7 @@ func FixFile(fileName string, propose Propose, maxPasses int) (FileResult, error
 // re-format, which is a loop. A total, idempotent transform running last converges in one shot
 // regardless of what the fixes did.
 //
-// Identified by @system_verify_format, which read this package and found the failure mode before
+// Identified by @system_cohere_format, which read this package and found the failure mode before
 // anything was built against it.
 type Transform func(fileName string, text string) (string, error)
 

@@ -12,7 +12,7 @@
 // # We do not owe that port, and this file is the measurement rather than the claim
 //
 // `Identifier.Node` carries the real TypeScript node -- when measured, 60,819 of 61,738 corpus
-// identifiers had one, 98.5% -- and verify runs the checker in the same process. So the question goes to
+// identifiers had one, 98.5% -- and cohere runs the checker in the same process. So the question goes to
 // `GetTypeAtLocation` and comes back with the answer the compiler actually computed, through
 // imports and generics, which no amount of local inference recovers. `reactive.go` established this
 // pattern; this is its second consumer.

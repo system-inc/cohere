@@ -3,8 +3,8 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // noBaseToStringUsefulness is upstream's `Usefulness` enum.
@@ -51,7 +51,7 @@ type noBaseToStringRawOptions struct {
 
 // DecodeNoBaseToStringOptions reads the rule's configuration.
 //
-// verify's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
+// cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
 // is the bare object rather than upstream's one-element array.
 //
 // The pointer on IgnoredTypeNames is what separates an absent key from an explicit empty list, and

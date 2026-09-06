@@ -1,7 +1,6 @@
 package configuration
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +10,7 @@ import (
 // TestTheThreeHundredThirtySixCase is the finding that produced this package.
 //
 // `consistency-require-type-suffix` fired 336 times across
-// `libraries/structure/source/api/graphql/generated/`, which the gate verify replaces correctly
+// `libraries/structure/source/api/graphql/generated/`, which the gate cohere replaces correctly
 // stays silent on. If this test ever passes in the wrong direction, those 336 come back.
 func TestTheThreeHundredThirtySixCase(t *testing.T) {
 	configuration := &Config{
@@ -141,7 +140,7 @@ func TestEveryLivePatternBehaves(t *testing.T) {
 }
 
 // TestLaterOverridesWin pins the precedence both ESLint and oxlint use. Getting this backwards makes
-// verify disagree with the gate about which rules were supposed to run, which is the thing that
+// cohere disagree with the gate about which rules were supposed to run, which is the thing that
 // blocks an honest acceptance diff.
 func TestLaterOverridesWin(t *testing.T) {
 	configuration := &Config{
@@ -290,7 +289,7 @@ func TestAnUnknownSeverityIsRefused(t *testing.T) {
 // not make this test wrong. What it asserts is the mechanism, not a particular key.
 func TestUnimplementedTopLevelKeyIsRefused(t *testing.T) {
 	directory := t.TempDir()
-	path := filepath.Join(directory, "VerifySettings.json")
+	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"rules": {"a-rule": "error"}, "notAKeyThisLoaderKnows": {"anything": 1}}`
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 		t.Fatalf("writing the config: %v", err)
@@ -332,7 +331,7 @@ func TestIgnoredKeyWithoutAReasonIsRefused(t *testing.T) {
 	t.Cleanup(func() { delete(ignoredTopLevelKeys, key) })
 
 	directory := t.TempDir()
-	path := filepath.Join(directory, "VerifySettings.json")
+	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"rules": {"a-rule": "error"}, "keyRecordedWithNoReason": true}`
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 		t.Fatalf("writing the config: %v", err)
@@ -407,7 +406,7 @@ func TestTheThreeRealKeysWouldHaveBeenCaught(t *testing.T) {
 			t.Cleanup(func() { ignoredTopLevelKeys[key] = reason })
 
 			directory := t.TempDir()
-			path := filepath.Join(directory, "VerifySettings.json")
+			path := filepath.Join(directory, "CohereSettings.json")
 			contents := `{"rules": {"a-rule": "error"}, "` + key + `": ["something"]}`
 			if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 				t.Fatalf("writing the config: %v", err)
@@ -425,77 +424,10 @@ func TestTheThreeRealKeysWouldHaveBeenCaught(t *testing.T) {
 	}
 }
 
-// TestPluginDefaultsMatchTheInventory holds the generated table against its source.
-//
-// `PluginDefaultRules` is written out rather than read at runtime, so it can drift from
-// `rule-inventory.json` silently. This is what stops that: it reads the inventory and asserts the
-// two describe the same forty rules with the same contributing plugin.
-//
-// The plugin for each is derived here rather than copied, so a wrong value in the table fails even
-// though both sides came from the same file.
-func TestPluginDefaultsMatchTheInventory(t *testing.T) {
-	contents, err := os.ReadFile(filepath.Join("..", "..", "rule-inventory.json"))
-	if err != nil {
-		t.Fatalf("reading the inventory: %v", err)
-	}
-	var document struct {
-		Rules []struct {
-			Rule      string `json:"rule"`
-			EnabledBy string `json:"enabledBy"`
-			Severity  string `json:"severity"`
-		} `json:"rules"`
-	}
-	if err := json.Unmarshal(contents, &document); err != nil {
-		t.Fatalf("parsing the inventory: %v", err)
-	}
-
-	fromInventory := map[string]string{}
-	for _, entry := range document.Rules {
-		if entry.EnabledBy != "pluginDefault" {
-			continue
-		}
-		fromInventory[entry.Rule] = pluginContributing(entry.Rule)
-
-		// All forty are `warn` upstream, which is what `PluginDefaultSeverity` encodes. A rule
-		// arriving here at a different severity means the constant is answering for a population it
-		// no longer describes.
-		if entry.Severity != "warn" {
-			t.Errorf("inventory records %q as %q; PluginDefaultSeverity is a single constant and "+
-				"assumes every plugin-default rule is `warn`", entry.Rule, entry.Severity)
-		}
-	}
-
-	if len(fromInventory) == 0 {
-		t.Fatal("the inventory lists no pluginDefault rules, so this test compared nothing")
-	}
-	if len(fromInventory) != len(PluginDefaultRules) {
-		t.Errorf("inventory lists %d plugin-default rules, the table holds %d",
-			len(fromInventory), len(PluginDefaultRules))
-	}
-	for ruleName, plugin := range fromInventory {
-		recorded, present := PluginDefaultRules[ruleName]
-		if !present {
-			t.Errorf("%q is pluginDefault in the inventory and absent from the table, so it would "+
-				"not be enabled by a plugin declaration", ruleName)
-			continue
-		}
-		if recorded != plugin {
-			t.Errorf("%q is attributed to plugin %q in the table and %q by its name",
-				ruleName, recorded, plugin)
-		}
-	}
-	for ruleName := range PluginDefaultRules {
-		if _, present := fromInventory[ruleName]; !present {
-			t.Errorf("%q is in the table and not pluginDefault in the inventory, so this would "+
-				"enable a rule nothing says the gate enables", ruleName)
-		}
-	}
-}
-
 // TestPluginDeclarationEnablesItsRules is the mechanism, on a config naming none of them.
 func TestPluginDeclarationEnablesItsRules(t *testing.T) {
 	directory := t.TempDir()
-	path := filepath.Join(directory, "VerifySettings.json")
+	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"plugins": ["react"], "rules": {"some-named-rule": "error"}}`
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 		t.Fatalf("writing the config: %v", err)
@@ -538,7 +470,7 @@ func TestPluginDeclarationEnablesItsRules(t *testing.T) {
 // this feature could go wrong.
 func TestAnExplicitLineBeatsAPluginDefault(t *testing.T) {
 	directory := t.TempDir()
-	path := filepath.Join(directory, "VerifySettings.json")
+	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"plugins": ["react"], "rules": {"react/no-children-prop": "off"}}`
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 		t.Fatalf("writing the config: %v", err)

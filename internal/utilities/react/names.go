@@ -49,7 +49,7 @@ func IsHookName(name string) bool {
 // `utils/react.rs:761` is `is_uppercase` and belongs to the hook path.
 //
 // So an earlier version of this comment claimed "oxlint uses `char::is_uppercase`" and generalized
-// from the wrong function in the right file. Caught by `@system_verify_format` while adopting this
+// from the wrong function in the right file. Caught by `@system_cohere_format` while adopting this
 // for the react ports.
 //
 // Reachable and measured: `É` and `Ω` answer true here and false under both sources, so

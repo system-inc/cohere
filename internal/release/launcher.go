@@ -4,12 +4,12 @@ import (
 	"strings"
 )
 
-// DispatcherLauncher returns the Node script published as the `verify` command.
+// DispatcherLauncher returns the Node script published as the `cohere` command.
 //
 // The launcher is Node rather than Go, which is a deliberate reversal of the obvious design. A Go
 // dispatcher would have to be cross-compiled per platform, which makes it a seventh platform
 // package rather than one package everyone installs — and the whole point of the dispatcher package
-// is that a consumer runs one `pnpm add verify` and gets the right binary. Node is already present
+// is that a consumer runs one `pnpm add cohere` and gets the right binary. Node is already present
 // by construction (this is an npm install), and `require.resolve` asks the package manager where a
 // package actually is, which is more reliable than any filesystem walk: it understands pnpm's
 // isolated store, npm's hoisting, and yarn's layouts without having to model any of them.
@@ -34,11 +34,11 @@ func DispatcherLauncher() string {
 const launcherSource = `#!/usr/bin/env node
 'use strict';
 
-// The verify launcher. It finds the binary for this platform and hands the process over to it.
+// The cohere launcher. It finds the binary for this platform and hands the process over to it.
 //
 // The one rule this file exists to hold: a missing binary exits non-zero naming the platform. It
 // never falls through to a bare command name, never resolves a binary built for another platform,
-// and never exits zero having run nothing. The gate verify replaces printed a green checkmark over
+// and never exits zero having run nothing. The gate cohere replaces printed a green checkmark over
 // zero files for days because a resolver did exactly that, and an empty result is indistinguishable
 // from a clean tree.
 
@@ -52,10 +52,10 @@ const overrideVariable = '__OVERRIDE_VARIABLE__';
 // Node's process.arch and process.platform are already npm's spelling, which is the same spelling
 // the platform packages publish under. No translation belongs here.
 const platformPackage = scope + '/' + process.platform + '-' + process.arch;
-const binaryFileName = process.platform === 'win32' ? 'verify.exe' : 'verify';
+const binaryFileName = process.platform === 'win32' ? 'cohere.exe' : 'cohere';
 
 function fail(message) {
-    process.stderr.write('verify: ' + message + '\n');
+    process.stderr.write('cohere: ' + message + '\n');
     process.exit(1);
 }
 

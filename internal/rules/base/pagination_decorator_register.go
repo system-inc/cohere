@@ -1,6 +1,6 @@
 package base
 
-import "github.com/system-inc/verify/internal/rule"
+import "github.com/system-inc/cohere/internal/rule"
 
 // init registers base/pagination-decorator.
 //
@@ -8,7 +8,7 @@ import "github.com/system-inc/verify/internal/rule"
 // touch nothing in common.
 //
 // Registered and left unenabled. `base` is api-phi-health's layer rather than ahra's, api-phi-health
-// carries no VerifySettings.json of its own, and ahra's config names no `base/` rule. Where these
+// carries no CohereSettings.json of its own, and ahra's config names no `base/` rule. Where these
 // get turned on is Kirk's call rather than a porter's.
 func init() {
 	rule.Register(rule.Registration{Rule: PaginationDecorator})

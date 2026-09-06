@@ -2,9 +2,9 @@ package react
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/jsx"
-	utilsreact "github.com/system-inc/verify/internal/utilities/react"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/jsx"
+	utilsreact "github.com/system-inc/cohere/internal/utilities/react"
 )
 
 // voidDomElements is the set of HTML elements that are written self-closing and hold no content.

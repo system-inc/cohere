@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 var messageInvalidGatingDirective = rule.Message{
@@ -38,7 +38,7 @@ var messageMultipleGatingDirectives = rule.Message{
 //
 // A linter has no such dependency. Neither diagnostic reads `source`: one asks whether a string is
 // an identifier, the other counts directives. Porting the gate literally would register a rule that
-// cannot produce a finding under any configuration verify can express, since verify has no React
+// cannot produce a finding under any configuration cohere can express, since cohere has no React
 // Compiler config surface to set `dynamicGating` from. That is the inert-rule failure the port
 // brief names: it would pass every fixture, lint every file, and be structurally incapable of
 // reporting.

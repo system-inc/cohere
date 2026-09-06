@@ -3,7 +3,7 @@ package differential_test
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/differential"
+	"github.com/system-inc/cohere/internal/differential"
 )
 
 // A slash means two opposite things depending on who wrote it, and getting it wrong does not look
@@ -40,7 +40,7 @@ func TestNormalizeRuleName(t *testing.T) {
 			name:  "rule and message id",
 			raw:   "react-component-no-multiple-primary/noMultiplePrimary",
 			want:  "react-component-no-multiple-primary",
-			notes: "verify's own findings put the rule before the slash",
+			notes: "cohere's own findings put the rule before the slash",
 		},
 		{name: "short rule and message id", raw: "no-enum/enumDeclared", want: "no-enum"},
 		{name: "bare name", raw: "no-debugger", want: "no-debugger"},

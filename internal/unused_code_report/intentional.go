@@ -20,7 +20,7 @@ import (
 // It changes the summary rather than hiding the line: `18 unused, 4 declared intentional` is a
 // different statement from `18 unused`, and collapsing the two would lose the fact that somebody
 // looked. A marked export stays countable and stays visible under `--unused-all`.
-const intentionalMarker = "verify-keep"
+const intentionalMarker = "cohere-keep"
 
 // intentionalReason is the text a person wrote after the marker, if any.
 //
@@ -52,8 +52,8 @@ func findIntentionalMarker(text string) intentionalReason {
 			continue
 		}
 
-		// The marker must be a whole word on its trailing edge, so `verify-keeper` and
-		// `verify-keeping` do not count. The same discipline the suppression parser applies to
+		// The marker must be a whole word on its trailing edge, so `cohere-keeper` and
+		// `cohere-keeping` do not count. The same discipline the suppression parser applies to
 		// `eslint-disabled`, and for the same reason: a prefix match silently accepts a word nobody
 		// meant as a directive.
 		after := trimmed[index+len(intentionalMarker):]

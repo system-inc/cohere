@@ -4,7 +4,7 @@ import (
 	"regexp"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // NoRequireImportsOptions tunes which `require` forms this rule permits.

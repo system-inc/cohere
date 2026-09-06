@@ -1,6 +1,6 @@
 package core
 
-import "github.com/system-inc/verify/internal/rule"
+import "github.com/system-inc/cohere/internal/rule"
 
 // init registers no-constructor-return.
 //

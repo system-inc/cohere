@@ -3,7 +3,7 @@ package literal_test
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/utilities/ecmascript/literal"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/literal"
 )
 
 // expectMapping asserts the whole mapping, which is what a caller indexes with. Asserting only the

@@ -1,6 +1,6 @@
 package core
 
-import "github.com/system-inc/verify/internal/rule"
+import "github.com/system-inc/cohere/internal/rule"
 
 // The decoder is hand-rolled rather than `rule.DecodeOptionsInto`, so that empty input decodes to the
 // default rather than erroring into a nil the caller reads as a zero value. Nothing inverts here --

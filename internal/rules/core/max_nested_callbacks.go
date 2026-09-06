@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // messageMaxNestedCallbacksId is the id. The message itself is built per finding, because the
@@ -73,7 +73,7 @@ type maxNestedCallbacksObjectShape struct {
 // default is not the zero value, and the two spellings of the limit interact in a way no struct tag
 // can express.
 //
-// The value may be a bare INTEGER: verify's config layer strips the severity tuple, so a config
+// The value may be a bare INTEGER: cohere's config layer strips the severity tuple, so a config
 // writing `["error", 3]` hands this the JSON `3`, which no struct can unmarshal.
 //
 // An ABSENT value must mean 10 rather than 0. A rule configured as a bare `"error"` reaches the

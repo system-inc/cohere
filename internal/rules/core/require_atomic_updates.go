@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/control_flow_graph"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/control_flow_graph"
 )
 
 var messageRequireAtomicUpdatesVariable = rule.Message{
@@ -132,17 +132,17 @@ type RequireAtomicUpdatesOptions struct {
 //
 // # Two divergences from ESLint, both measured on the whole tree and both kept
 //
-// Run end to end over `~/Projects/ahra` on 2026-08-26, verify reports 39 and ESLint 31, and the
-// difference is entirely one-way: verify is a strict SUPERSET, with 8 findings ESLint declines and
-// zero that ESLint reports and verify misses. Both classes are recorded below with the reduction
-// that isolates them, because each is a place a later reader would otherwise "fix" verify back to
+// Run end to end over `~/Projects/ahra` on 2026-08-26, cohere reports 39 and ESLint 31, and the
+// difference is entirely one-way: cohere is a strict SUPERSET, with 8 findings ESLint declines and
+// zero that ESLint reports and cohere misses. Both classes are recorded below with the reduction
+// that isolates them, because each is a place a later reader would otherwise "fix" cohere back to
 // ESLint's answer.
 //
 // # Divergence one, resolution: 7 of the 8
 //
 // Upstream skips a reference whose `resolved` is null, so an identifier naming nothing declared is
 // never judged. ESLint decides "declared" from its own scope analysis plus the configured globals
-// list, and verify has neither: our answer comes from the checker, which resolves against the
+// list, and cohere has neither: our answer comes from the checker, which resolves against the
 // program's type declarations.
 //
 // The two disagree in one direction, and upstream's own corpus contains the case. Case 26 assigns
@@ -224,7 +224,7 @@ type RequireAtomicUpdatesOptions struct {
 // mechanism is the refresh rather than statement count or position.
 //
 // The catch runs when `await b()` rejects. On that path `use(e.p)` never executes, so the refresh
-// ESLint credits did not happen and `e` is still built from a pre-suspension read. Verify reports
+// ESLint credits did not happen and `e` is still built from a pre-suspension read. Cohere reports
 // it; ESLint does not. This is `modules/kingdom/KingdomShadeController.ts:203`, and it is the only
 // one of the 8 where the two implementations disagree about a JUDGMENT rather than about what
 // resolves.
@@ -492,7 +492,7 @@ func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings Requ
 	//	function o() { let g = false; async function f() {
 	//	    if (g) return; g = true; try { await s(); } finally { g = false; } } }
 	//
-	// The installed rule reports `g = false` ONCE, at column 106. Before this, verify reported the
+	// The installed rule reports `g = false` ONCE, at column 106. Before this, cohere reported the
 	// identical span twice. No imported case could see it: upstream's corpus writes no assignment
 	// inside a `finally` at all, and its one try/catch case puts the writes in the arms.
 	//

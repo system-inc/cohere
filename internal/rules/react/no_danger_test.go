@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // noDangerFile is where the fixtures pretend to live.
@@ -23,7 +23,7 @@ const noDangerFile = "/repository/source/Danger.tsx"
 // A fixture handing RunWithOptions a struct would leave both the default fallback and the JSON tag
 // untested, and either could be wrong while every fixture stayed green.
 //
-// The raw JSON here is the BARE object, not upstream's [{...}] array. verify's config layer unwraps
+// The raw JSON here is the BARE object, not upstream's [{...}] array. cohere's config layer unwraps
 // the [severity, options] tuple before dispatch, so copying ESLint's spelling into a fixture fails
 // on every row.
 func runNoDanger(t *testing.T, sourceText string, rawOptions string) rule_testing.Result {

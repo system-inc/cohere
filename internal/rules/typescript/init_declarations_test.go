@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // initDeclarationsFile names the fixture file.
@@ -22,7 +22,7 @@ func initDeclarationsCaseName(index int) string {
 //
 // The wire shape is the unusual part of this rule and the reason every option fixture goes through
 // the decoder rather than building the struct. Upstream's schema is a positional array whose first
-// element is a bare mode string, and verify's config layer stores only the SECOND element of a
+// element is a bare mode string, and cohere's config layer stores only the SECOND element of a
 // [severity, options] pair, so what reaches this decoder is that mode string on its own rather than
 // any array. Building the options struct directly in a fixture would leave that entirely untested,
 // which is exactly what happened: the first version of this decoder read an array, every fixture
@@ -520,7 +520,7 @@ func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
 		raw  string
 		want InitDeclarationsOptions
 	}{
-		// The spelling verify actually delivers: `parseRuleSetting` stores tuple[1] and nothing
+		// The spelling cohere actually delivers: `parseRuleSetting` stores tuple[1] and nothing
 		// after it, so `["error", "never"]` reaches this decoder as the bare string `"never"`.
 		// These four rows are the ones that matter, and the first version of this decoder failed
 		// every one of them at run time while passing every array row below.

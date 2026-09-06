@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // jsxNoUselessFragmentFile is where the fixtures pretend to live.
@@ -25,7 +25,7 @@ const jsxNoUselessFragmentFile = "/repository/source/JsxNoUselessFragment.tsx"
 // generator. No case was typed by hand.
 //
 // All 30 were run against the installed build, 7.37.5, through the ESLint Linter API with the
-// TypeScript parser, driving `verifyAndFix` as well as `verify` so the REPAIR was measured and not
+// TypeScript parser, driving `cohereAndFix` as well as `cohere` so the REPAIR was measured and not
 // only the judgment.
 //
 // # One case is held back, and it is a duplicate with an opposite verdict
@@ -162,7 +162,7 @@ func runJsxNoUselessFragment(t *testing.T, sourceText string, rawOptions string)
 //
 // So this applies at most one fix per distinct range, back to front, which is what the engine does
 // with a duplicate pair, and it returns the source unchanged when there is nothing to apply. Both
-// behaviours were checked against the installed build's own `verifyAndFix` on the same inputs.
+// behaviours were checked against the installed build's own `cohereAndFix` on the same inputs.
 func applyJsxNoUselessFragmentFixes(t *testing.T, result rule_testing.Result) string {
 	t.Helper()
 

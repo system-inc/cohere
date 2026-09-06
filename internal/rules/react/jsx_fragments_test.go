@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // The corpus is upstream's, extracted by stubbing its RuleTester and capturing the case objects the
@@ -13,7 +13,7 @@ import (
 //
 // One mechanical transformation was applied and it is the reason this file needs a note. Upstream
 // configures `settings.react.pragma` to `Act` and `settings.react.fragment` to `Frag`, and every
-// one of its cases writes those names. verify has no settings surface, so the two names were
+// one of its cases writes those names. cohere has no settings surface, so the two names were
 // rewritten to `React` and `Fragment` by a whole-word substitution, and then ALL TWENTY TWO cases
 // were replayed against the installed build under default settings before anything was written
 // down. Nineteen reproduced their upstream verdict exactly, including the fixer output on all
@@ -365,7 +365,7 @@ func TestJsxFragmentsShapesUpstreamDoesNotWrite(t *testing.T) {
 // TestJsxFragmentsVersionArmIsNotPorted records a divergence rather than asserting a behaviour.
 //
 // Upstream carries a third message, `fragmentsNotSupported`, which fires when
-// `settings.react.version` is below 16.2. verify has no settings surface, and with no version
+// `settings.react.version` is below 16.2. cohere has no settings surface, and with no version
 // configured upstream's own `version.js` sets its default to `999.999.999`, so every
 // `testReactVersion` comparison passes and the arm is unreachable.
 //

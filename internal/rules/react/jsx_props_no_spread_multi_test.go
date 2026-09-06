@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // jsxPropsNoSpreadMultiFile is where the fixtures pretend to live. A .tsx extension, because the

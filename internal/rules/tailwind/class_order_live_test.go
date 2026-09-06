@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // The acceptance suite for the live class-order sort, measured against the engine's own answers.

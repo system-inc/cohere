@@ -291,7 +291,7 @@ func TestSummaryCountsReformattedFiles(t *testing.T) {
 
 // A transform that declines a file must be recorded as a skip, not as a clean pass.
 //
-// Asked for by @system_verify_format: its goja formatter doubles a standalone tilde in markdown,
+// Asked for by @system_cohere_format: its goja formatter doubles a standalone tilde in markdown,
 // turning approximately-25K into strikethrough, so markdown is scoped out until that is fixed. The
 // engine does not care which files a transform handles, but the coverage line must not report a
 // skipped file the same way it reports a file that was already correctly formatted. Those mean

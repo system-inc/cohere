@@ -3,7 +3,7 @@ package program
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/suppression"
+	"github.com/system-inc/cohere/internal/suppression"
 )
 
 // A directive naming only rules this run did not run is not dead scaffolding.

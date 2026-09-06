@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/verify/internal/fix"
+	"github.com/system-inc/cohere/internal/fix"
 )
 
 // Apply writes a plan to disk, refusing anything it cannot show to be safe.
@@ -194,7 +194,7 @@ func WriteCandidates(out io.Writer, name string, candidates []Candidate) {
 	}
 	fmt.Fprintf(out, "\nName one of them by position:\n")
 	if len(candidates) > 0 {
-		fmt.Fprintf(out, "  verify rename %s:%d:%d <newName>\n",
+		fmt.Fprintf(out, "  cohere rename %s:%d:%d <newName>\n",
 			candidates[0].FileName, candidates[0].Line, candidates[0].Column)
 	}
 }

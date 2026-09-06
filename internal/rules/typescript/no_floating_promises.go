@@ -6,8 +6,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // NoFloatingPromisesOptions is upstream's option struct, field-for-field.
@@ -101,7 +101,7 @@ func buildFloatingVoidMessage() rule.Message {
 // # Absorbed from tsgolint, which is the source of record for this rule
 //
 // Provenance: tsgolint `internal/rules/no_floating_promises/no_floating_promises.go`, fetched from
-// `main` and absorbed onto verify's own rule interface here. The checker logic is upstream's
+// `main` and absorbed onto cohere's own rule interface here. The checker logic is upstream's
 // unchanged; what moved is the interface it speaks. `rule.RuleContext` became `rule.Context`,
 // `RuleListeners` became `Listeners`, `RuleMessage` became `Message`, `RuleSuggestion{FixesArr:}`
 // became `Suggestion{Fixes:}`, and the four `RuleFix*` builders became their `ctx.` equivalents,
@@ -122,9 +122,9 @@ func buildFloatingVoidMessage() rule.Message {
 // file is the corpus instead: seventy-two clean cases, ninety-seven reporting a hundred and
 // forty-six findings, and two hundred and thirty-two exact suggestion outputs.
 //
-// # The option surface is FIVE keys, and the inventory said none
+// # The option surface is FIVE keys, and a captured inventory said none
 //
-// `rule-inventory.json` records `"options": "no"` for this rule. It has five, and both references
+// A rule catalog recorded `"options": "no"` for this rule. It has five, and both references
 // agree on all of them: `allowForKnownSafeCalls`, `allowForKnownSafePromises`, `checkThenables`,
 // `ignoreIIFE`, `ignoreVoid`. Counted from tsgolint's option struct and confirmed against the
 // plugin's `meta.schema` rather than taken from the inventory.

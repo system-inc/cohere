@@ -111,7 +111,7 @@ package tailwind
 import (
 	"strings"
 
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 // resolveClassFactsIn reads a class's four deciding facts against a live design system.

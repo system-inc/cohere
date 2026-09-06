@@ -22,7 +22,7 @@ import (
 // every downstream check green. A range wider than the rule intended is damage no later validation
 // can detect.
 //
-// Found by @system_verify_lint_fix running real rules through the engine rather than reasoning
+// Found by @system_cohere_lint_fix running real rules through the engine rather than reasoning
 // about ranges.
 func TestFixHelpersDoNotEatLeadingTrivia(t *testing.T) {
 	cases := []struct {

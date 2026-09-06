@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 func buildConditionalMessage() rule.Message {
@@ -98,7 +98,7 @@ type NoMisusedPromisesOptions struct {
 // # Absorbed from tsgolint, which is the source of record for this rule
 //
 // Provenance: tsgolint `internal/rules/no_misused_promises/no_misused_promises.go`, at commit
-// `076823b`, absorbed onto verify's own rule interface here. It reaches for `GetCallSignatures`,
+// `076823b`, absorbed onto cohere's own rule interface here. It reaches for `GetCallSignatures`,
 // `GetConstructSignatures`, `IsThenableType`, `IsArrayMethodCallWithPredicate`, `GetHeritageClauses`,
 // `IsRestParameterDeclaration`, `UnionTypeParts`, `IsTypeFlagSet`, `Some`, `Map`, `Flatten` and `Ref`
 // because that is what upstream reaches for, and this note is why a reader finds those helpers in a
@@ -149,7 +149,7 @@ type NoMisusedPromisesOptions struct {
 // 6, voidReturnAttribute 3, voidReturnReturnValue 2). A port that invented this set would have passed
 // every fixture it also invented, which is why the count is recorded here.
 //
-// `rule-inventory.json` describes the option surface for this rule and it is not to be trusted as the
+// A captured rule inventory described the option surface for this rule and it was not to be trusted as the
 // authority; upstream's struct is. That is the standing lesson of this lane rather than a remark
 // about this entry.
 //

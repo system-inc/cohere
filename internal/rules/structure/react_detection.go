@@ -2,7 +2,7 @@ package structure
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/utilities/react"
+	"github.com/system-inc/cohere/internal/utilities/react"
 )
 
 // React detection: does this function hold JSX or call a hook?
@@ -18,7 +18,7 @@ import (
 //
 // The bound is behavior rather than a safety valve, which is why it is reproduced rather than
 // dropped. A deeply nested component whose JSX sits past the limit reads as "not a component" to the
-// gate verify replaces, and a Go walk with no limit would find it and report a finding the gate
+// gate cohere replaces, and a Go walk with no limit would find it and report a finding the gate
 // does not. Parity is the acceptance criterion, so the limit ports with the rule.
 const jsxWalkDepthLimit = 20
 

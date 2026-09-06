@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // The corpus below is ESLint's own, imported verbatim from
@@ -606,7 +606,7 @@ var preferRegexLiteralsReporting = []preferRegexLiteralsRow{
 // With `RegExp` or `String` declared off, upstream's ReferenceTracker finds no global reference and
 // the rule never looks at the call.
 //
-// verify has no such surface. Globals come from the TypeScript standard library, which always
+// cohere has no such surface. Globals come from the TypeScript standard library, which always
 // declares `RegExp` and `String`, and there is no configuration that can un-declare one. So these
 // report here, and pinning them as reporting is the honest record: the brief's instruction for a
 // case decided above the rule is to record it at the layer that actually decides it rather than to
@@ -625,7 +625,7 @@ var preferRegexLiteralsDecidedByGlobalsConfig = []preferRegexLiteralsRow{
 
 // TestPreferRegexLiteralsReportsWhatTheGlobalsConfigWouldHaveSilenced pins those four as reporting.
 //
-// Asserting the divergence rather than deleting the cases is the point: if verify ever grows a
+// Asserting the divergence rather than deleting the cases is the point: if cohere ever grows a
 // surface for declaring a global off, this test is what tells the next reader these four were a
 // known consequence of not having one, and it fails the moment the behaviour changes in either
 // direction.
@@ -642,36 +642,36 @@ func TestPreferRegexLiteralsReportsWhatTheGlobalsConfigWouldHaveSilenced(t *test
 //
 // ESLint carries `languageOptions.ecmaVersion` per config, and this rule consults it twice: through
 // `getRegexppEcmaVersion`, which decides whether a pattern or a flag PARSES, and through the global
-// scope, which decides whether `globalThis` exists as a name at all. verify has no equivalent. A
+// scope, which decides whether `globalThis` exists as a name at all. cohere has no equivalent. A
 // program is compiled once against one set of compiler options, and a rule cannot ask what language
 // edition an individual file claims, so validity here is judged at the latest edition.
 //
-// The rows below record what verify does, with upstream's own gate in the note. They split three
+// The rows below record what cohere does, with upstream's own gate in the note. They split three
 // ways and the directions are opposite, which is why they are one table rather than one sentence:
 //
 //   - `globalThis` did not exist before ES2020, so upstream is SILENT on the three cases pinned at
-//     ecmaVersion 5, 2015 and 2017 and verify REPORTS them. Reporting is the safe direction: the
+//     ecmaVersion 5, 2015 and 2017 and cohere REPORTS them. Reporting is the safe direction: the
 //     code is a `RegExp` construction either way, and every file in this codebase targets an
 //     edition where `globalThis` is real.
 //   - The `d`, `u`, `v` and `uv` flags each arrived in a known year, so upstream WITHHOLDS the
-//     suggestion when a case is pinned before it and verify OFFERS one. Also the safe direction: a
+//     suggestion when a case is pinned before it and cohere OFFERS one. Also the safe direction: a
 //     suggestion is never applied without a human, and the literal it proposes is valid today.
-//   - Inline modifiers, `(?i:foo)`, are an ES2025 addition, so this one runs the OTHER way. Verify
+//   - Inline modifiers, `(?i:foo)`, are an ES2025 addition, so this one runs the OTHER way. Cohere
 //     withholds where upstream at ecmaVersion 2025 offers. Measured directly against eslint 10.8.1:
-//     the same input yields no suggestion at 2024 and one at 2025, so verify currently matches the
+//     the same input yields no suggestion at 2024 and one at 2025, so cohere currently matches the
 //     2024 reading. This is the one row where closing the gap would mean teaching the pattern
 //     scanner a syntax it does not know, rather than reading a version we do not have.
 //
 // One row is not about the version at all and rides along because it is the same kind of fact.
 // `new window['RegExp'](...)` reports upstream only because the config declares `window` a global;
-// with no DOM library in the fixture program the checker resolves nothing, so verify is silent. It
+// with no DOM library in the fixture program the checker resolves nothing, so cohere is silent. It
 // is pinned here rather than deleted so the difference stays visible.
 var preferRegexLiteralsDecidedByLanguageEdition = []preferRegexLiteralsRow{
-	// Upstream is silent because `globalThis` is not a name before ES2020. Verify reports.
+	// Upstream is silent because `globalThis` is not a name before ES2020. Cohere reports.
 	{source: "new globalThis.RegExp('a');", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "ecmaVersion 5, silent upstream"},
 
 	// Upstream withholds the suggestion because the flag does not exist at the pinned edition.
-	// Verify offers one.
+	// Cohere offers one.
 	{source: "new RegExp(/a/, 'd');", ids: []string{"unexpectedRedundantRegExpWithFlags"}, options: "{\"disallowRedundantWrapping\":true}", upstreamLanguageOptions: "ecmaVersion 2021, no suggestion upstream"},
 	{source: "RegExp('abc', 'u');", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "ecmaVersion 3, no suggestion upstream"},
 	{source: "new RegExp('abc', 'd');", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "ecmaVersion 2021, no suggestion upstream"},
@@ -681,16 +681,16 @@ var preferRegexLiteralsDecidedByLanguageEdition = []preferRegexLiteralsRow{
 	{source: "new RegExp(/[[A--B]]/v, 'u')", ids: []string{"unexpectedRedundantRegExpWithFlags"}, options: "{\"disallowRedundantWrapping\":true}", upstreamLanguageOptions: "ecmaVersion 2024, no suggestion upstream"},
 	{source: "new RegExp(/[[A--B]]/v, 'g')", ids: []string{"unexpectedRedundantRegExpWithFlags"}, options: "{\"disallowRedundantWrapping\":true}", upstreamLanguageOptions: "ecmaVersion 2024, one suggestion upstream"},
 
-	// The other direction: an ES2025 syntax the pattern scanner does not know, so verify withholds
+	// The other direction: an ES2025 syntax the pattern scanner does not know, so cohere withholds
 	// where upstream at 2025 offers.
 	{source: "new RegExp('(?i:foo)bar')", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "ecmaVersion 2025, one suggestion upstream"},
 }
 
-// TestPreferRegexLiteralsRecordsTheLanguageEditionDivergence pins those cases at what verify does.
+// TestPreferRegexLiteralsRecordsTheLanguageEditionDivergence pins those cases at what cohere does.
 //
 // Asserting them rather than deleting them is the point. Each is a real behavioural difference from
 // upstream, and a difference nobody wrote down is one the next reader rediscovers as a bug. If
-// verify ever grows a per-file language edition, this test is what fails and tells them these rows
+// cohere ever grows a per-file language edition, this test is what fails and tells them these rows
 // were a known consequence of not having one.
 //
 // Only the finding is asserted here, not the suggestion. The finding is the part that is stable
@@ -827,7 +827,7 @@ func runPreferRegexLiterals(t *testing.T, row preferRegexLiteralsRow) rule_testi
 		return rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile, row.source)
 	}
 	// Routed through the rule's own registered decoder rather than by building the options struct,
-	// so the wire shape and the json tag are under test too. verify's config layer unwraps the
+	// so the wire shape and the json tag are under test too. cohere's config layer unwraps the
 	// `[severity, options]` tuple before dispatch, so the decoder receives the bare object even
 	// though upstream's corpus writes it inside an array.
 	decoded, err := rule.DecodeOptionsInto[PreferRegexLiteralsOptions]()([]byte(row.options))

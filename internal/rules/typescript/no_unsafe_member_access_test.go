@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 const noUnsafeMemberAccessFile = "/repository/source/Members.ts"
@@ -17,7 +17,7 @@ func noUnsafeMemberAccessCaseName(index int) string {
 // noUnsafeMemberAccessDecoded routes a fixture's options through the rule's own exported decoder
 // rather than building the options struct directly.
 //
-// The options text is the bare object rather than upstream's one-element array, because verify's
+// The options text is the bare object rather than upstream's one-element array, because cohere's
 // config layer unwraps the severity tuple before a decoder ever sees it. Going through the decoder
 // is what puts the wire key name and the absent-versus-explicit-false handling under test.
 func noUnsafeMemberAccessDecoded(t *testing.T, optionsJson string) any {

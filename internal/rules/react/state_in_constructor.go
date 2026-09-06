@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	utilsreact "github.com/system-inc/verify/internal/utilities/react"
+	"github.com/system-inc/cohere/internal/rule"
+	utilsreact "github.com/system-inc/cohere/internal/utilities/react"
 )
 
 // StateInConstructorMode is which of the two initialization styles the configuration wants.

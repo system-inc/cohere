@@ -3,7 +3,7 @@ package react_conformance_score
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/react_conformance"
+	"github.com/system-inc/cohere/internal/react_conformance"
 )
 
 // TestWiredRulesAgainstReactsOwnGoldens is the measurement: every wired rule over every fixture

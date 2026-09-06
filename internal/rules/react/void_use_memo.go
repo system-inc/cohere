@@ -2,7 +2,7 @@ package react
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 var messageUseMemoCallbackReturnsNothing = rule.Message{
@@ -175,7 +175,7 @@ var messageUseMemoResultUnused = rule.Message{
 //
 // **An aliased import escapes the rule entirely.** `import {useMemo as useM} from 'react'` is a
 // real `useMemo` and neither authority reports it, because both test the written name rather than
-// resolving it. verify has a whole-program checker and could resolve it. Deliberately not done: it
+// resolving it. cohere has a whole-program checker and could resolve it. Deliberately not done: it
 // would report a class of finding neither authority produces, and a differential would show it.
 var VoidUseMemo = rule.Rule{
 	// No namespace prefix. The config writes `react/void-use-memo`, and the parity guard strips the

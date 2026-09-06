@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // loopFuncFile is where the fixtures pretend to live.
@@ -522,11 +522,11 @@ func TestNoLoopFuncDestructuredBindingsCarryTheirKind(t *testing.T) {
 //
 // The corpus writes no method, accessor or class anywhere in its 96 cases, so nothing imported could
 // see it. It was found by a cross-linter comparison on the real tree: ESLint reported three findings
-// verify missed, all three in one file, all three object shorthand methods inside a `for(;;)` loop
+// cohere missed, all three in one file, all three object shorthand methods inside a `for(;;)` loop
 // capturing reassigned outer bindings.
 //
 // Measured against the installed eslint 10.8.1 build: all eleven rows report, and before the
-// listener was widened verify reported two of them.
+// listener was widened cohere reported two of them.
 func TestNoLoopFuncJudgesEveryMethodLikeShape(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -614,7 +614,7 @@ func TestNoLoopFuncNestedClosureInsideAMethodAnchorsOnTheMethod(t *testing.T) {
 // belongs to the enclosing Property. Upstream therefore reports from `(statementSql)`; we report
 // from `onStatement`, so a reader can see which member is at fault.
 //
-// Measured on the real tree: verify and eslint agree on all ten findings by file and line, and
+// Measured on the real tree: cohere and eslint agree on all ten findings by file and line, and
 // differ in column on exactly the three methods, by exactly the length of the name. The gate keys
 // on file, line and rule and excludes column deliberately, so this is not a parity failure.
 //

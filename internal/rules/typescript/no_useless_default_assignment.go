@@ -4,8 +4,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // NoUselessDefaultAssignmentOptions is the rule's option surface.
@@ -38,7 +38,7 @@ type noUselessDefaultAssignmentRawOptions struct {
 
 // DecodeNoUselessDefaultAssignmentOptions reads the rule's configuration.
 //
-// verify's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
+// cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
 // arrives is the bare object rather than upstream's one-element array.
 func DecodeNoUselessDefaultAssignmentOptions(raw []byte) (any, error) {
 	decoded, err := rule.DecodeOptionsInto[noUselessDefaultAssignmentRawOptions]()(raw)

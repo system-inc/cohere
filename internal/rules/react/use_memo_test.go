@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // A `.tsx` name, because most cases here write JSX in a component body the way React's own probe
@@ -338,7 +338,7 @@ func TestUseMemoFires(t *testing.T) {
 			// decided above the rule. `rule_testing` runs one rule against one file and consults no
 			// other, so no layer here could reproduce the upstream silence, and bending this rule to
 			// go quiet on a `const` target would break the ordinary `let` case it shares a code path
-			// with. verify surfaces the same conflict through the type checker rather than through a
+			// with. cohere surfaces the same conflict through the type checker rather than through a
 			// lint rule, so a reader of real output sees both findings rather than this one alone.
 			name:     "assignmentToOuterConstAlsoReports",
 			source:   "function Component() {\n  const x = 1;\n  const y = useMemo(() => { x = 1; return 1; }, []);\n  return [x, y];\n}\n",

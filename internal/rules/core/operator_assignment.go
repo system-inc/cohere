@@ -7,8 +7,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/comments"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/comments"
 )
 
 const messageOperatorAssignmentReplacedId = "replaced"
@@ -66,7 +66,7 @@ func DefaultOperatorAssignmentSettings() OperatorAssignmentOptions {
 // DecodeOperatorAssignmentOptions turns the configured value into options.
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` for the same two reasons the other string-enum
-// rules in this package are: the wire value is a bare STRING rather than an object, since verify's
+// rules in this package are: the wire value is a bare STRING rather than an object, since cohere's
 // config layer strips the severity tuple before dispatch, and the default is not the zero value.
 // An unrecognised string is an error rather than a quiet fallback, because falling back would
 // enforce a mode nobody asked for and say nothing.
@@ -226,7 +226,7 @@ func operatorAssignmentUnwrapParentheses(node *ast.Node) *ast.Node {
 	return node
 }
 
-// operatorAssignmentVerify is upstream's `verify`, the `always` arm.
+// operatorAssignmentVerify is upstream's `cohere`, the `always` arm.
 func operatorAssignmentVerify(ctx rule.Context, node *ast.Node) {
 	assignment := node.AsBinaryExpression()
 	if assignment.OperatorToken == nil || assignment.OperatorToken.Kind != ast.KindEqualsToken {

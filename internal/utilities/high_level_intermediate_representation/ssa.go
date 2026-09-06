@@ -59,7 +59,7 @@
 //
 // Redundant-phi elimination is a separate pass, `EliminateRedundantPhis`, in ssa_eliminate.go.
 // Reclassifying `const`/`let` after renaming - upstream's
-// `rewrite_instruction_kinds_based_on_reassignment` - is NOT implemented, because nothing in verify
+// `rewrite_instruction_kinds_based_on_reassignment` - is NOT implemented, because nothing in cohere
 // reads `InstructionKind` yet and a reclassification no pass consumes is untested by construction.
 package high_level_intermediate_representation
 

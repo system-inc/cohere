@@ -19,8 +19,8 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // lowerTypedForSSA lowers the first function in code with a real type checker attached.
@@ -52,8 +52,8 @@ func lowerTypedForSSA(t *testing.T, code string) *Function {
 	return lowered
 }
 
-// verifyEverywhere checks the SSA invariants on a function and every nested function.
-func verifyEverywhere(t *testing.T, function *Function) {
+// cohereEverywhere checks the SSA invariants on a function and every nested function.
+func cohereEverywhere(t *testing.T, function *Function) {
 	t.Helper()
 	var each func(*Function)
 	each = func(f *Function) {

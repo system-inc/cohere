@@ -2,7 +2,7 @@ package typescript
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // PreferLiteralEnumMemberOptions is the rule's option surface.
@@ -29,7 +29,7 @@ type preferLiteralEnumMemberRawOptions struct {
 
 // DecodePreferLiteralEnumMemberOptions reads the rule's configuration.
 //
-// verify's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
+// cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
 // is the bare object rather than upstream's one-element array.
 func DecodePreferLiteralEnumMemberOptions(raw []byte) (any, error) {
 	decoded, err := rule.DecodeOptionsInto[preferLiteralEnumMemberRawOptions]()(raw)

@@ -3,7 +3,7 @@ package structure
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 const separateExportFile = "/repository/source/components/Button.tsx"
@@ -168,7 +168,7 @@ func TestReactComponentNoSeparateNamedExportStaysSilent(t *testing.T) {
 // The fix deletes the export statement and nothing else.
 //
 // Asserted against the resulting source rather than against the message id, using the assertion
-// `@system_verify` added after finding that an id-only fixture let a rewrite corrupt every import
+// `@system_cohere` added after finding that an id-only fixture let a rewrite corrupt every import
 // it touched while the suite stayed green. A fix is the one part of a rule that changes source, so
 // the only honest test of it is what the source becomes.
 //

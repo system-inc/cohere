@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-// ShippedRules are the upstream rule names verify has an implementation for, mapped to the name
-// verify registers that rule under.
+// ShippedRules are the upstream rule names cohere has an implementation for, mapped to the name
+// cohere registers that rule under.
 //
-// Keyed by UPSTREAM's rule name rather than verify's, because the join to the corpus goes through
+// Keyed by UPSTREAM's rule name rather than cohere's, because the join to the corpus goes through
 // upstream's `getRuleForCategory`.
 //
 // # The value side was wrong for every entry, and nothing could see it
@@ -28,7 +28,7 @@ import (
 // map's second column a claim rather than a caption. That is the open finding `#5vyycz7` measured:
 // the parity guard cannot see a namespaced spelling because this side was never executed.
 //
-// `hooks` maps to verify's `rules-of-hooks`, which is the one place the two names differ.
+// `hooks` maps to cohere's `rules-of-hooks`, which is the one place the two names differ.
 var ShippedRules = map[string]string{
 	"config":               "react-hooks/config",
 	"error-boundaries":     "react-hooks/error-boundaries",
@@ -107,7 +107,7 @@ func (f Fixture) CallsHook() bool {
 	return hookCallPattern.MatchString(f.Source)
 }
 
-// StatedDivergence names a fixture verify deliberately does not reproduce, with where the boundary
+// StatedDivergence names a fixture cohere deliberately does not reproduce, with where the boundary
 // is written down.
 //
 // Entries are the machine-checked ones. A divergence that lives only in a doc comment is not in
@@ -120,20 +120,20 @@ type StatedDivergence struct {
 	// Boundary is the test that holds the divergence in place.
 	Boundary string
 
-	// Reason is what verify decided and why.
+	// Reason is what cohere decided and why.
 	Reason string
 }
 
-// statedDivergences names the fixtures verify deliberately does not reproduce.
+// statedDivergences names the fixtures cohere deliberately does not reproduce.
 //
-// The stated boundaries verify's react rules carry were all measured against oxc's inline corpus or
+// The stated boundaries cohere's react rules carry were all measured against oxc's inline corpus or
 // against the executable ESLint rule, and every one of them was checked against this corpus while
 // building this file. None of them lands on a fixture in the 325:
 //
 //   - exhaustive-deps at 15 of 17 kinds (`TestExhaustiveDepsScopeIsStated`, eight named cases): its
 //     rule is `exhaustive-deps`, an ESLint rule. The corpus's nearest categories are
 //     `memo-dependencies` (14 fixtures) and `exhaustive-effect-dependencies` (4), which are the
-//     COMPILER's dependency validators and a different mechanism. Neither is a rule verify ships.
+//     COMPILER's dependency validators and a different mechanism. Neither is a rule cohere ships.
 //   - set-state-in-effect's ref exemption, pinned as a fixture that fails when fixed: that rule has
 //     zero error-named fixtures in this corpus, so the divergence cannot be exercised here.
 //   - no-unused-vars at 301 of 303: not a react rule and not in this corpus at all.
@@ -151,7 +151,7 @@ type StatedDivergence struct {
 //
 // What that means for the number is worth stating plainly rather than leaving implicit: 0 passed
 // and 11 excluded is NOT the same claim as 11 passed. The rule is unmeasured against this corpus,
-// not validated by it. The honest reading is that React's error goldens for `globals` and verify's
+// not validated by it. The honest reading is that React's error goldens for `globals` and cohere's
 // `globals` do not overlap, and closing that gap is a scope decision rather than a bug fix.
 var statedDivergences = map[string]StatedDivergence{
 	// The nested-function subset. `react/globals` reports only writes lexically inside the
@@ -168,7 +168,7 @@ var statedDivergences = map[string]StatedDivergence{
 	"error.assign-global-in-component-tag-function.js": {
 		Fixture:  "error.assign-global-in-component-tag-function.js",
 		Boundary: "TestGlobalsBoundary",
-		Reason:   "the write is inside a nested arrow, which verify's globals reports only for the compilation root's own body",
+		Reason:   "the write is inside a nested arrow, which cohere's globals reports only for the compilation root's own body",
 	},
 	"error.assign-global-in-jsx-children.js": {
 		Fixture:  "error.assign-global-in-jsx-children.js",
@@ -191,11 +191,11 @@ var statedDivergences = map[string]StatedDivergence{
 		Reason:   "the write is inside a nested arrow that is then called, which needs the effects pass",
 	},
 
-	// The compilation gate. verify's react rules fire only inside a function React Compiler would
+	// The compilation gate. cohere's react rules fire only inside a function React Compiler would
 	// compile, which for a `Component`-named function requires JSX or a hook call in the body. The
 	// gate was measured over seventeen probe rounds against React's own rule and is shared with
 	// `unsupported-syntax`. These fixtures are components by NAME with neither JSX nor a hook, so
-	// upstream's test harness compiles them and verify's gate correctly does not.
+	// upstream's test harness compiles them and cohere's gate correctly does not.
 	//
 	// This is the one divergence here that is arguably worth closing, and it is recorded rather
 	// than hidden for exactly that reason: it is invisible in application code, where a component
@@ -204,12 +204,12 @@ var statedDivergences = map[string]StatedDivergence{
 	"error.reassignment-to-global.js": {
 		Fixture:  "error.reassignment-to-global.js",
 		Boundary: "TestGlobalsGateIsSharedWithUnsupportedSyntax",
-		Reason:   "the function has neither JSX nor a hook call, so verify's compilation gate declines it while upstream's test harness compiles it anyway",
+		Reason:   "the function has neither JSX nor a hook call, so cohere's compilation gate declines it while upstream's test harness compiles it anyway",
 	},
 	"new-mutability/error.reassignment-to-global.js": {
 		Fixture:  "new-mutability/error.reassignment-to-global.js",
 		Boundary: "TestGlobalsGateIsSharedWithUnsupportedSyntax",
-		Reason:   "the function has neither JSX nor a hook call, so verify's compilation gate declines it",
+		Reason:   "the function has neither JSX nor a hook call, so cohere's compilation gate declines it",
 	},
 	"new-mutability/error.reassignment-to-global-indirect.js": {
 		Fixture:  "new-mutability/error.reassignment-to-global-indirect.js",
@@ -238,7 +238,7 @@ var statedDivergences = map[string]StatedDivergence{
 	// file, not a JSON key, and not anything a linter can read off disk; upstream supplies it from
 	// `snap/src/sprout/shared-runtime-type-provider.ts`.
 	//
-	// verify implements the half whose input is a fact about the compiler rather than a value
+	// cohere implements the half whose input is a fact about the compiler rather than a value
 	// nobody passes: `defaultModuleTypeProvider`, three hardcoded modules. `configuration.go`'s doc
 	// comment measures that half and shows it is structurally unable to fire, because every
 	// hardcoded entry pairs a `use`-prefixed name with a `hook` type, so the contradiction the rule
@@ -251,27 +251,27 @@ var statedDivergences = map[string]StatedDivergence{
 	"error.invalid-type-provider-hook-name-not-typed-as-hook.js": {
 		Fixture:  "error.invalid-type-provider-hook-name-not-typed-as-hook.js",
 		Boundary: "TestConfigFixturesNeedAModuleTypeProvider",
-		Reason:   "the diagnostic needs a `moduleTypeProvider` function value from upstream's test harness, which verify has no channel to receive; measured as reporting nothing",
+		Reason:   "the diagnostic needs a `moduleTypeProvider` function value from upstream's test harness, which cohere has no channel to receive; measured as reporting nothing",
 	},
 	"error.invalid-type-provider-hook-name-not-typed-as-hook-namespace.js": {
 		Fixture:  "error.invalid-type-provider-hook-name-not-typed-as-hook-namespace.js",
 		Boundary: "TestConfigFixturesNeedAModuleTypeProvider",
-		Reason:   "imports the harness-only module `ReactCompilerTest`, whose type configuration verify has no channel to receive",
+		Reason:   "imports the harness-only module `ReactCompilerTest`, whose type configuration cohere has no channel to receive",
 	},
 	"error.invalid-type-provider-hooklike-module-default-not-hook.js": {
 		Fixture:  "error.invalid-type-provider-hooklike-module-default-not-hook.js",
 		Boundary: "TestConfigFixturesNeedAModuleTypeProvider",
-		Reason:   "imports the harness-only module `useDefaultExportNotTypedAsHook`, whose type configuration verify has no channel to receive",
+		Reason:   "imports the harness-only module `useDefaultExportNotTypedAsHook`, whose type configuration cohere has no channel to receive",
 	},
 	"error.invalid-type-provider-nonhook-name-typed-as-hook.js": {
 		Fixture:  "error.invalid-type-provider-nonhook-name-typed-as-hook.js",
 		Boundary: "TestConfigFixturesNeedAModuleTypeProvider",
-		Reason:   "imports the harness-only module `ReactCompilerTest`, whose type configuration verify has no channel to receive",
+		Reason:   "imports the harness-only module `ReactCompilerTest`, whose type configuration cohere has no channel to receive",
 	},
 
 	// Three `set-state-in-render` goldens recorded under an upstream feature flag that defaults to
-	// OFF, so the expectation describes a compiler verify does not implement rather than a finding
-	// verify missed.
+	// OFF, so the expectation describes a compiler cohere does not implement rather than a finding
+	// cohere missed.
 	//
 	// Measured in React's own unminified bundle rather than inferred:
 	// `enableUseKeyedState: z.boolean().default(false)` at line 31626 and
@@ -286,7 +286,7 @@ var statedDivergences = map[string]StatedDivergence{
 	"error.invalid-setstate-unconditional-with-keyed-state.js": {
 		Fixture:  "error.invalid-setstate-unconditional-with-keyed-state.js",
 		Boundary: "TestOptInPragmaFixturesAreEnumerated",
-		Reason:   "the golden was recorded under `@enableUseKeyedState`, an upstream flag defaulting to false that verify does not implement",
+		Reason:   "the golden was recorded under `@enableUseKeyedState`, an upstream flag defaulting to false that cohere does not implement",
 	},
 	"error.invalid-unconditional-set-state-prop-in-render.js": {
 		Fixture:  "error.invalid-unconditional-set-state-prop-in-render.js",
@@ -299,7 +299,7 @@ var statedDivergences = map[string]StatedDivergence{
 		Reason:   "the golden was recorded under `@enableTreatSetIdentifiersAsStateSetters`, an upstream flag defaulting to false",
 	},
 
-	// The gate again, in its sharpest form. `useFoo` is hook-NAMED but calls no hook, and verify's
+	// The gate again, in its sharpest form. `useFoo` is hook-NAMED but calls no hook, and cohere's
 	// gate requires a hook CALL in the body, not a hook name on the function. The rule's own doc
 	// comment states this directly at globals.go:195 (`function useFoo() { useState(0); g = 1; }
 	// reports, hook`), and it was re-confirmed by probe here rather than read off that line:
@@ -316,7 +316,7 @@ var statedDivergences = map[string]StatedDivergence{
 	"error.update-global-should-bailout.tsx": {
 		Fixture:  "error.update-global-should-bailout.tsx",
 		Boundary: "TestGlobalsGateIsSharedWithUnsupportedSyntax",
-		Reason:   "`useFoo` is hook-named but calls no hook, and verify's compilation gate requires a hook call in the body; probed with controls showing the same write reports from a function that does call one",
+		Reason:   "`useFoo` is hook-named but calls no hook, and cohere's compilation gate requires a hook call in the body; probed with controls showing the same write reports from a function that does call one",
 	},
 
 	// Three `preserve-manual-memoization` goldens that upstream's own fixture headers call
@@ -337,13 +337,13 @@ var statedDivergences = map[string]StatedDivergence{
 	//	  carries upstream's `todo-repro` prefix, its marker for a known-wrong reproduction
 	//
 	// This is a different kind of entry from the pragma three above, and the difference is worth
-	// stating. Those describe a compiler verify does not implement. These describe a verdict
+	// stating. Those describe a compiler cohere does not implement. These describe a verdict
 	// upstream itself disowns, so reproducing them would mean copying a bug -- which is the one
 	// case where matching the answer key is the wrong goal.
 	//
 	// `error.useMemo-aliased-var.ts` is deliberately NOT here. Its header says "This is technically
 	// a false positive, but source is already breaking `exhaustive-deps`", which is upstream
-	// describing an input it considers invalid rather than a verdict it considers wrong, and verify
+	// describing an input it considers invalid rather than a verdict it considers wrong, and cohere
 	// fires on it today. The distinction is the second clause: a fixture upstream calls a mistake
 	// outright is excluded, one it blames on the input is not.
 	"preserve-memo-validation/error.todo-useCallback-captures-invalidating-value.ts": {
@@ -397,12 +397,12 @@ func StatedDivergenceNames() map[string]StatedDivergence {
 	return names
 }
 
-// Classify decides which category a fixture belongs to for the rules verify ships.
+// Classify decides which category a fixture belongs to for the rules cohere ships.
 //
 // Order matters and is defended here, because each step short-circuits the ones below it and a
 // different order produces a different number from the same inputs.
 //
-//  1. Flow first. A fixture verify cannot parse cannot be judged on any other axis, and calling it
+//  1. Flow first. A fixture cohere cannot parse cannot be judged on any other axis, and calling it
 //     anything else would be a claim about a file that was never read.
 //  2. Stated divergence next, ahead of everything except parseability. A deliberate decision should
 //     not be reclassified as a corpus artifact just because the fixture also happens to lack an
@@ -426,7 +426,7 @@ func Classify(fixture Fixture, result Result, err error) FixtureVerdict {
 		return verdict
 	}
 
-	// A stated divergence outranks everything below it EXCEPT the question of whether verify ships a
+	// A stated divergence outranks everything below it EXCEPT the question of whether cohere ships a
 	// rule that could have been asked at all. Claiming "we deliberately differ" about a fixture no
 	// registered rule reaches would be the score taking credit for a judgment nothing acts on, which
 	// is the same error `VerdictNoRuleShipped`'s comment warns about from the other side.
@@ -460,7 +460,7 @@ func Classify(fixture Fixture, result Result, err error) FixtureVerdict {
 
 	if len(shipped) == 0 {
 		verdict.Verdict = VerdictNoRuleShipped
-		verdict.Reason = "verify ships no rule for " + strings.Join(rules, ", ")
+		verdict.Reason = "cohere ships no rule for " + strings.Join(rules, ", ")
 		return verdict
 	}
 

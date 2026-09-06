@@ -3,7 +3,7 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // PreferReturnThisType flags a class method or property function annotated with the class's own
@@ -61,7 +61,7 @@ import (
 // `ast.ForEachReturnStatement` descends through statement containers only: blocks, `if`, loops,
 // `switch`, `try`, labels. It does not enter a nested function or arrow, and neither does
 // upstream's `forEachReturnStatement`, whose case list this matches statement for statement.
-// Verified by reading both: `typescript-go/tsc/internal/ast/utilities.go:1157` and
+// Verified by reading both: `TypeScript/tsc/internal/ast/utilities.go:1157` and
 // `typescript-eslint/packages/eslint-plugin/src/util/astUtils.ts:52` carry the same fifteen kinds,
 // because both descend from the TypeScript compiler's own helper.
 //
@@ -132,7 +132,7 @@ import (
 //
 // A union with the class name written twice reports ONCE and rewrites ONCE, leaving the second
 // occurrence. `f(): Foo | Foo` becomes `f(): this | Foo` in a single pass. Upstream's own tester
-// shows `this | this` only because `verifyAndFix` re-lints until the source stops changing;
+// shows `this | this` only because `cohereAndFix` re-lints until the source stops changing;
 // measured against a single application of the same messages, upstream writes `this | Foo` too.
 // This port is a single pass and matches it.
 var PreferReturnThisType = rule.Rule{
@@ -411,7 +411,7 @@ func thisTypeOf(classType *checker.Type) *checker.Type {
 // *checker.UnionType` rather than returning nil. That is reachable from real source and this port
 // shipped it briefly: `class Foo { f = function (): Foo { return this; } }` gives `this` inside a
 // plain function expression the type `any`, which is an intrinsic, and it arrives here whenever the
-// `this` keyword fast path above does not consume the return first. The verify walk recovers per
+// `this` keyword fast path above does not consume the return first. The cohere walk recovers per
 // FILE rather than per rule, so one panic here costs every rule its verdict on that file.
 //
 // Found by a mutation that neutralized the fast path, which is worth recording: the fast path was

@@ -6,14 +6,14 @@ import (
 )
 
 // DispatcherPackageName is the package a consumer actually installs.
-const DispatcherPackageName = "verify"
+const DispatcherPackageName = "cohere"
 
 // ShortCommandName is what a consumer types on the loop they sit in all day.
 //
 // One letter, because the whole argument of this tool is that verification stops being a thing you
 // do and becomes a property the codebase has. A command run after every edit should cost as little
 // to type as it costs to run, and six keystrokes charged on that loop is a real toll.
-const ShortCommandName = "v"
+const ShortCommandName = "c"
 
 // FullCommandName is the same command under the name that reads in a script.
 //
@@ -27,7 +27,7 @@ const ShortCommandName = "v"
 // rather than a broken install. It is also the name that belongs in continuous integration, in
 // documentation, and in a script somebody reads a year from now, where brevity buys nothing and
 // saying what it does buys everything.
-const FullCommandName = "verify"
+const FullCommandName = "cohere"
 
 // launcherRelativePath is where the launcher sits inside the dispatcher package.
 //
@@ -41,7 +41,7 @@ const FullCommandName = "verify"
 const launcherRelativePath = "bin/" + FullCommandName
 
 // RepositoryURL is where the source lives, recorded in every published package.
-const RepositoryURL = "https://github.com/system-inc/verify"
+const RepositoryURL = "https://github.com/system-inc/cohere"
 
 // PlatformManifest is the package.json for one platform's binary package.
 //
@@ -54,7 +54,7 @@ func PlatformManifest(target Target, version string) ([]byte, error) {
 	manifest := map[string]any{
 		"name":        target.PackageName(),
 		"version":     version,
-		"description": fmt.Sprintf("The verify binary for %s.", target),
+		"description": fmt.Sprintf("The cohere binary for %s.", target),
 		"license":     "MIT",
 		"repository":  map[string]string{"type": "git", "url": RepositoryURL},
 
@@ -66,7 +66,7 @@ func PlatformManifest(target Target, version string) ([]byte, error) {
 		"files": []string{"bin/"},
 
 		// Deliberately no `bin` field. The platform packages are data, not commands: the dispatcher
-		// owns the `verify` name, and a second package claiming it would race for the same link in
+		// owns the `cohere` name, and a second package claiming it would race for the same link in
 		// `node_modules/.bin` and win or lose depending on install order.
 	}
 	return marshalManifest(manifest)
@@ -76,7 +76,7 @@ func PlatformManifest(target Target, version string) ([]byte, error) {
 //
 // Every platform package is an optional dependency. That is what makes an install on an unsupported
 // platform succeed with a missing binary rather than fail outright — which sounds worse and is
-// better, because the failure then happens at `verify --version` with a message naming the
+// better, because the failure then happens at `cohere --version` with a message naming the
 // platform, instead of inside a package manager's dependency resolution where it says nothing
 // useful. The loud failure is the dispatcher's job and it is a better place to fail from.
 func DispatcherManifest(version string) ([]byte, error) {

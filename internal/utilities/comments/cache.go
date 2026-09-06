@@ -1,6 +1,6 @@
 package comments
 
-import "github.com/system-inc/verify/internal/rule"
+import "github.com/system-inc/cohere/internal/rule"
 
 // ForFile is All, computed once per file and shared by every rule that asks.
 //
@@ -12,7 +12,7 @@ import "github.com/system-inc/verify/internal/rule"
 // naming the old home is not cosmetic: two packages keying the same scan differently would each
 // compute it, which is precisely the cost this exists to remove.
 //
-// Measured with `verify --timing` before this existed: consistency-no-shouting 807ms,
+// Measured with `cohere --timing` before this existed: consistency-no-shouting 807ms,
 // consistency-no-long-line-comment 619ms, consistency-no-single-line-jsdoc 601ms, each visiting
 // exactly one node per file. Flat node counts with unequal times is the signature of work done
 // outside the walk.

@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/module"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/module"
 )
 
 // withSourceFile parses a source and hands the file to `ask`.

@@ -7,9 +7,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/comments"
-	"github.com/system-inc/verify/internal/utilities/ecmascript/property"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/comments"
+	"github.com/system-inc/cohere/internal/utilities/ecmascript/property"
 )
 
 // noEmptyFunctionAllowKinds is upstream's `ALLOW_OPTIONS`, in its order.
@@ -38,7 +38,7 @@ import (
 //
 // So porting the extension would register a second NAME rather than a second check. A rule package
 // may not import another rule package, so a wrapper would need this file's body lifted into
-// `internal/utilities`, and `rule-inventory.json` carries no entry for this rule under either
+// `internal/utilities`, and the captured rule inventory carried no entry for this rule under either
 // spelling, so nothing in the differential asks for the name. The audit lists the extension as an
 // unported line item, which reads as work outstanding; it is not.
 var noEmptyFunctionAllowKinds = []string{

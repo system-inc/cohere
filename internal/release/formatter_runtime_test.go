@@ -4,14 +4,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/prettier"
+	"github.com/system-inc/cohere/internal/prettier"
 )
 
 // TestEmbeddedBundlesMatchTheirOwnDigest is the positive half: the bytes this test binary carries
 // digest to a stable value, computed through the same function the build stamps with.
 //
 // It does not assert against the stamp, because a `go test` binary has none. What it holds is that
-// the two paths into the hash agree, which is the property the comparison in VerifyEmbeddedBundles
+// the two paths into the hash agree, which is the property the comparison in CohereEmbeddedBundles
 // depends on.
 func TestEmbeddedBundlesMatchTheirOwnDigest(t *testing.T) {
 	source, err := prettier.Bundles()
@@ -39,7 +39,7 @@ func TestEmbeddedBundlesMatchTheirOwnDigest(t *testing.T) {
 	}
 }
 
-// TestBothDigestPathsAgree is the load-bearing one. VerifyEmbeddedBundles compares a digest of
+// TestBothDigestPathsAgree is the load-bearing one. CohereEmbeddedBundles compares a digest of
 // in-memory bytes against a stamp computed from a directory, so the two paths agreeing is what makes
 // the comparison mean anything. If they ever diverge the check fails on correct bundles, somebody
 // relaxes it, and the stamp stops being worth carrying.

@@ -8,7 +8,7 @@
 //
 // The distinction this tool enforces is the one generate_theme enforces, and for this component
 // it lands on `getVariantOrder`. Reading `variants.ts` suggests every variant holds a fixed
-// position, and verify has shipped a 145-entry table of exactly that shape. Asking the engine says
+// position, and cohere has shipped a 145-entry table of exactly that shape. Asking the engine says
 // the position is assigned per run over only the variants that were parsed, densely, with ties
 // collapsed: `hover` is index 0 in a run that parsed two variants and index 1 in a run that parsed
 // six. No static table can represent that, and a port built from one agrees with the engine on any

@@ -3,8 +3,8 @@ package typescript
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // RequireArraySortCompareOptions is the rule's option surface.
@@ -41,7 +41,7 @@ type requireArraySortCompareRawOptions struct {
 
 // DecodeRequireArraySortCompareOptions reads the rule's configuration.
 //
-// verify's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
+// cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
 // arrives here is the bare object rather than upstream's one-element array.
 //
 // An absent key keeps the default rather than zeroing it, which is the entire point of the pointer

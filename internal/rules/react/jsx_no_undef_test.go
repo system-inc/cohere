@@ -3,7 +3,7 @@ package react
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // jsxNoUndefFile is where the fixtures pretend to live.
@@ -19,7 +19,7 @@ const jsxNoUndefFile = "/repository/source/JsxNoUndef.tsx"
 // per input and no per-input recovery was needed. Block 2 is a second tester that is not
 // snapshotted and carries one pair over `let x = <A.B />;`, distinguished only by a `globals`
 // option. Its fail half is below; its pass half is the one case in this corpus that cannot be
-// expressed here, because `verify` has no globals surface for it to configure. That is stated in
+// expressed here, because `cohere` has no globals surface for it to configure. That is stated in
 // the rule's doc comment rather than quietly dropped.
 //
 // Every string was decoded from the extractor's `-dump` output and then checked byte against byte

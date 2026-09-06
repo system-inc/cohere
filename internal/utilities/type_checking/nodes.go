@@ -85,7 +85,7 @@ func GetHeritageClauses(node *ast.Node) *ast.NodeList {
 	return nil
 }
 
-// Source: typescript-go/internal/core/core.go
+// Source: TypeScript/tsc/internal/core/core.go
 func Filter[T any](slice []T, f func(T) bool) []T {
 	for i, value := range slice {
 		if !f(value) {
@@ -102,7 +102,7 @@ func Filter[T any](slice []T, f func(T) bool) []T {
 	return slice
 }
 
-// Source: typescript-go/internal/core/core.go
+// Source: TypeScript/tsc/internal/core/core.go
 func FilterIndex[T any](slice []T, f func(T, int, []T) bool) []T {
 	for i, value := range slice {
 		if !f(value, i, slice) {
@@ -119,7 +119,7 @@ func FilterIndex[T any](slice []T, f func(T, int, []T) bool) []T {
 	return slice
 }
 
-// Source: typescript-go/internal/core/core.go
+// Source: TypeScript/tsc/internal/core/core.go
 func Map[T, U any](slice []T, f func(T) U) []U {
 	if len(slice) == 0 {
 		return nil
@@ -131,7 +131,7 @@ func Map[T, U any](slice []T, f func(T) U) []U {
 	return result
 }
 
-// Source: typescript-go/internal/core/core.go
+// Source: TypeScript/tsc/internal/core/core.go
 func Some[T any](slice []T, f func(T) bool) bool {
 	for _, value := range slice {
 		if f(value) {
@@ -141,7 +141,7 @@ func Some[T any](slice []T, f func(T) bool) bool {
 	return false
 }
 
-// Source: typescript-go/internal/core/core.go
+// Source: TypeScript/tsc/internal/core/core.go
 func Every[T any](slice []T, f func(T) bool) bool {
 	for _, value := range slice {
 		if !f(value) {
@@ -151,7 +151,7 @@ func Every[T any](slice []T, f func(T) bool) bool {
 	return true
 }
 
-// Source: typescript-go/internal/core/core.go
+// Source: TypeScript/tsc/internal/core/core.go
 func Flatten[T any](array [][]T) []T {
 	var result []T
 	for _, subArray := range array {

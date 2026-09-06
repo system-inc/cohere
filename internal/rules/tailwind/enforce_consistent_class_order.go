@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 func messageInconsistentClassOrder(ordered string) rule.Message {
@@ -100,7 +100,7 @@ var EnforceConsistentClassOrder = rule.Rule{
 		// repository that does not use Tailwind. A project that HAS Tailwind and whose CSS would not
 		// read is the loud case, and it is reported once per file rather than swallowed, because a
 		// rule reporting zero findings over unreadable CSS is indistinguishable from a clean tree
-		// and that is the one failure verify exists to remove.
+		// and that is the one failure cohere exists to remove.
 		designSystem := DesignSystemForProgram(ctx)
 		if designSystem.Err != nil {
 			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) || ctx.Program == nil {

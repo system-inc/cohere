@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/jsx"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/jsx"
 )
 
 // jsxNoScriptUrlMessage is the single finding this rule produces.
@@ -40,7 +40,7 @@ type JsxNoScriptUrlOptions struct {
 	// IncludeFromSettings is decoded and, faithfully, decides nothing here.
 	//
 	// Upstream reads `settings.linkComponents` from ESLint's shared-settings surface when this is
-	// true. verify has no shared-settings surface at all, so there is nothing to include from and
+	// true. cohere has no shared-settings surface at all, so there is nothing to include from and
 	// the flag has no effect. It is decoded rather than dropped so a configuration written for
 	// upstream parses instead of erroring, and so the divergence is visible at one named field
 	// rather than as a silently rejected key. See the rule doc comment for what this costs.
@@ -72,7 +72,7 @@ type jsxNoScriptUrlWireObject struct {
 // Exported so fixtures drive the same path the config drives, which is what puts the positional
 // union under test rather than assumed.
 //
-// The wire shape is verify's, not upstream's. verify's config layer strips the severity-and-options
+// The wire shape is cohere's, not upstream's. cohere's config layer strips the severity-and-options
 // tuple and hands the decoder the FIRST option value, but this rule's option surface is POSITIONAL
 // across two slots, which that convention cannot express. So the accepted body wraps upstream's own
 // list under a `positional` key:
@@ -232,7 +232,7 @@ func jsxNoScriptUrlLinkComponents(options JsxNoScriptUrlOptions) map[string][]st
 // # The shared-settings half of the option surface has no substrate here, and it costs findings
 //
 // Upstream reads `settings.linkComponents` from ESLint's shared settings when `includeFromSettings`
-// is true. verify has no shared-settings surface anywhere, so that half of the rule cannot be
+// is true. cohere has no shared-settings surface anywhere, so that half of the rule cannot be
 // expressed and this port answers as though the settings were empty. Measured, this is exactly what
 // it costs on upstream's own corpus:
 //

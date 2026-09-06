@@ -61,7 +61,7 @@ const (
 // VerifySSA checks that a function is in single static assignment form and returns every violation.
 //
 // An empty result means the property holds. It does NOT mean the function was worth checking: a
-// function whose variable references all lowered to `LoadGlobal` has almost nothing to verify and
+// function whose variable references all lowered to `LoadGlobal` has almost nothing to cohere and
 // passes trivially. `SSAStats` is how a caller tells a real pass from a vacuous one.
 //
 // Nested functions are not descended into; call it per function.

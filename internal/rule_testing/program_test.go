@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // awaitedTypeIsThenable is a minimal type-aware rule, written to exercise the harness rather than

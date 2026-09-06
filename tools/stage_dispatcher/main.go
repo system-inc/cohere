@@ -1,6 +1,6 @@
 // Command stage_dispatcher stages only the dispatcher package, which compiles nothing.
 //
-// It exists so the install path can be exercised while `command/verify` is mid-edit by another author:
+// It exists so the install path can be exercised while `command/cohere` is mid-edit by another author:
 // the full release build cross-compiles the real binary and correctly refuses to stage a partial
 // release when that build fails.
 package main
@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/system-inc/verify/internal/release"
+	"github.com/system-inc/cohere/internal/release"
 )
 
 func main() {
@@ -32,7 +32,7 @@ func main() {
 		panic(err)
 	}
 
-	launcherPath := filepath.Join(directory, "bin", "verify")
+	launcherPath := filepath.Join(directory, "bin", "cohere")
 	if err := os.WriteFile(launcherPath, []byte(release.DispatcherLauncher()), 0o755); err != nil {
 		panic(err)
 	}

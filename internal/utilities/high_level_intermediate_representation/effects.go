@@ -397,7 +397,7 @@ const (
 	// Upstream's `Environment` carries a shape registry keyed by `TypeId`, so `props.items.push(x)`
 	// resolves `push` against the array shape rather than against a bare name. This pass keys on
 	// the syntactic name, which is what `reactive.go` also had to do and for the same stated
-	// reason: verify has the real checker but no shape registry, and building one is Stage 4 work.
+	// reason: cohere has the real checker but no shape registry, and building one is Stage 4 work.
 	// The consequence is that a name shadowed by an unrelated method of the same spelling gets the
 	// builtin's effect.
 	EffectGapTypeDirectedShapes
@@ -506,7 +506,7 @@ type aliasingSignatureEffect struct {
 //
 // See `EffectGapTypeDirectedShapes`. A user-defined `push` on an unrelated class gets Array's
 // signature here and does not upstream. That is a real divergence and it is the same shape
-// `reactive.go` accepted for `isHookCallee` for the same reason: verify has no shape registry.
+// `reactive.go` accepted for `isHookCallee` for the same reason: cohere has no shape registry.
 // It is recorded rather than hidden, and the direction is that a mutating effect is applied where
 // upstream might apply the default -- which is also a mutating effect, so the two agree on the
 // mutation question and differ only on transitivity.

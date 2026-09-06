@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // proposal is a fixture shorthand: a rule name and the span it wants to replace.
@@ -122,7 +122,7 @@ func TestTwoInsertionsAtOnePointDoNotBothApply(t *testing.T) {
 // Trimming a range past its leading trivia must never turn a genuine overlap into a silent
 // non-overlap.
 //
-// Raised by @system_verify_lint when it landed the trivia fix: trimmed ranges are strictly
+// Raised by @system_cohere_lint when it landed the trivia fix: trimmed ranges are strictly
 // narrower, so two fixes that used to collide through shared trivia might now be admitted as
 // adjacent, and two rules would both rewrite a region the overlap rule previously protected.
 //

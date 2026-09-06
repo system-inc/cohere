@@ -10,7 +10,7 @@
 // Almost all of it. `variants.ts` is 1,317 lines and roughly 1,000 of them build CSS: the `applyFn`
 // of every registered variant, which rewrites a rule into a `@media` wrapper or a `:hover`
 // selector, plus `substituteAtSlot`, `substituteAtVariant` and the selector machinery around them.
-// verify emits no CSS. What it needs from this file is the variant's sort position and nothing
+// cohere emits no CSS. What it needs from this file is the variant's sort position and nothing
 // downstream of it, so the `applyFn` bodies are absent rather than stubbed. A stub would read as
 // supported.
 //
@@ -22,7 +22,7 @@
 //
 // This is the finding that decides the component, and it is the opposite of what the source
 // suggests. Reading `variants.ts` shows every registered variant holding an `order` number, which
-// invites a static table of variant to position. verify has shipped exactly that table, 145
+// invites a static table of variant to position. cohere has shipped exactly that table, 145
 // entries, generated once.
 //
 // `getVariantOrder` in `design-system.ts` does not read those numbers out to consumers. It sorts
@@ -297,7 +297,7 @@ func (registry *VariantRegistry) Compare(left *ParsedVariant, right *ParsedVaria
 	leftRegistration, leftIsRegistered := registry.registrations[left.Root]
 	rightRegistration, rightIsRegistered := registry.registrations[right.Root]
 	// Upstream indexes the registry with a non-null assertion, because a candidate that named an
-	// unregistered variant never parses and so never reaches the sort. verify reaches this function
+	// unregistered variant never parses and so never reaches the sort. cohere reaches this function
 	// from a differential harness that may hold a class the parser rejected, so an unregistered root
 	// is ranked past every registered one instead of panicking. Both unregistered roots then fall
 	// through to the name comparison below, which keeps each one's classes grouped.
@@ -372,7 +372,7 @@ func (registry *VariantRegistry) Compare(left *ParsedVariant, right *ParsedVaria
 
 // unregisteredVariantOrder ranks a root the registry has never seen, past every registered one.
 //
-// Upstream cannot reach this state, so the value is verify's own and is chosen to be far past any
+// Upstream cannot reach this state, so the value is cohere's own and is chosen to be far past any
 // plausible registration count rather than to mean anything.
 const unregisteredVariantOrder = 1 << 24
 

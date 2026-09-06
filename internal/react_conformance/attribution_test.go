@@ -226,7 +226,7 @@ func TestAttributionIsAMeasurementNotAGuess(t *testing.T) {
 
 // TestRulesShippedInVerifyWithNoErrorNamedFixture states the corpus gap as an assertion.
 //
-// Four rules verify ships cannot be scored against this corpus at all, and the reason is the
+// Four rules cohere ships cannot be scored against this corpus at all, and the reason is the
 // corpus rather than the rules. Writing it down as a test rather than a comment means that if
 // upstream later adds an error-named fixture for one of them, this fails and someone goes and
 // scores it, instead of the rule staying permanently in a decline bucket nobody revisits.

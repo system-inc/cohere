@@ -2,7 +2,7 @@ package core
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // NoThisBeforeSuper requires a derived class constructor to call `super()` before it touches
@@ -52,7 +52,7 @@ import (
 // "a violation happened locally", then walks edges propagating the first set across the second. We
 // have no CFG. TypeScript's flow graph is not a substitute and this was measured rather than
 // assumed: `ast.FlowNode` carries `Antecedent` and `Antecedents` and no successor edges anywhere in
-// `typescript-go/tsc/internal/ast/flow.go`, because it exists for *narrowing* and is keyed on the
+// `TypeScript/tsc/internal/ast/flow.go`, because it exists for *narrowing* and is keyed on the
 // expression positions where a type could change. There is no `super()` instruction in it to find.
 //
 // So the analysis here is structural, over the statement tree, and it reproduces upstream's verdict

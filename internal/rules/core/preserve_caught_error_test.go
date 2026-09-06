@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // The case strings in this file were extracted mechanically from oxc's inline corpus at
@@ -618,7 +618,7 @@ func TestPreserveCaughtErrorOptionDefaultsToOff(t *testing.T) {
 
 	decode := rule.DecodeOptionsInto[PreserveCaughtErrorOptions]()
 
-	// A rule configured as bare "error" is handed nil, which is what our own VerifySettings.json
+	// A rule configured as bare "error" is handed nil, which is what our own CohereSettings.json
 	// does for this rule. That path has to reach the same verdict as an explicit false.
 	if result := rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", bareCatch, nil); len(result.Diagnostics) != 0 {
 		t.Errorf("nil options must behave as the documented default, got %d findings", len(result.Diagnostics))

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	tailwindengine "github.com/system-inc/verify/internal/tailwind"
+	"github.com/system-inc/cohere/internal/rule"
+	tailwindengine "github.com/system-inc/cohere/internal/tailwind"
 )
 
 func messageCanonicalCollapse(inputs []string, output string) rule.Message {

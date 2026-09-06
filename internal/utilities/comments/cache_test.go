@@ -3,14 +3,14 @@ package comments
 import (
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
+	"github.com/system-inc/cohere/internal/rule"
 )
 
 // `ForFile` had no direct test until now.
 //
 // It was exercised through the three rules that call it, which proves those three get comments and
 // says nothing about the property the function exists for. A rule reaching for it next would be
-// trusting a measurement nobody can re-run, which is the state `@system_verify_lint_rules_tailwind`
+// trusting a measurement nobody can re-run, which is the state `@system_cohere_lint_rules_tailwind`
 // named `unverified`: committed, green, reachable, and unproven.
 //
 // The property is not "returns comments". `All` already does that and is tested. The property is

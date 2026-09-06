@@ -81,7 +81,7 @@ import "sort"
 // A nil system is a nil table rather than a bare framework one. A caller that lost its design system
 // must decline, and handing it a table describing Tailwind-with-no-repository would answer every
 // class confidently and be wrong on every repository token, which is the confident-green failure
-// verify exists to remove.
+// cohere exists to remove.
 func NewTable(system *LoadedDesignSystem) *Table {
 	if system == nil {
 		return nil

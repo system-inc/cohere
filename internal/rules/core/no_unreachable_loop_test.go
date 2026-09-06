@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // unreachableLoopFile is where the fixtures pretend to live.
@@ -59,7 +59,7 @@ func TestNoUnreachableLoopStaysSilent(t *testing.T) {
 // shape and the field name are the two lines with no upstream counterpart, and a fixture handing
 // the rule a struct leaves both untested.
 //
-// The JSON here is the bare object. Upstream writes `[{...}]` in its corpus and verify's config
+// The JSON here is the bare object. Upstream writes `[{...}]` in its corpus and cohere's config
 // layer unwraps the severity tuple before dispatch, so the array wrapper never reaches a decoder.
 func TestNoUnreachableLoopOptions(t *testing.T) {
 	decode := rule.DecodeOptionsInto[NoUnreachableLoopOptions]()

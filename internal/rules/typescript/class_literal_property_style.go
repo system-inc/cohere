@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // messageClassLiteralPropertyStylePreferField is upstream's `preferFieldStyle`.
@@ -60,7 +60,7 @@ func messageClassLiteralPropertyStylePreferGetterSuggestion() rule.Message {
 // # It offers SUGGESTIONS, not fixes, and the difference is the whole safety story
 //
 // `meta` carries `hasSuggestions: true` and NO `fixable`, so the edit engine never applies this
-// repair unattended. Measured rather than read: `verifyAndFix` on a reporting input returns
+// repair unattended. Measured rather than read: `cohereAndFix` on a reporting input returns
 // `fixed: false` and leaves the source untouched.
 //
 // That matters because the getter direction genuinely changes types, and a fix would apply that

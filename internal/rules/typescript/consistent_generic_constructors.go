@@ -5,9 +5,9 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/utilities/comments"
-	"github.com/system-inc/verify/internal/utilities/type_checking"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/utilities/comments"
+	"github.com/system-inc/cohere/internal/utilities/type_checking"
 )
 
 // ConsistentGenericConstructorsMode selects which side of the assignment carries the type arguments.
@@ -35,7 +35,7 @@ func DefaultConsistentGenericConstructorsSettings() ConsistentGenericConstructor
 // DecodeConsistentGenericConstructorsOptions reads the rule's configuration.
 //
 // Upstream's `meta.schema` is a one-element positional tuple holding a bare string, so the ESLint
-// spelling is `["error", "type-annotation"]`. verify's config layer unwraps the
+// spelling is `["error", "type-annotation"]`. cohere's config layer unwraps the
 // `[severity, options]` pair before dispatch, so a decoder here is handed the bare string rather than
 // an array. Both are accepted anyway, so a setting copied out of an ESLint config is read rather than
 // refused.
@@ -50,7 +50,7 @@ func DecodeConsistentGenericConstructorsOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 
-	// The spelling verify actually delivers: the mode as a bare string.
+	// The spelling cohere actually delivers: the mode as a bare string.
 	var mode string
 	if err := json.Unmarshal(raw, &mode); err == nil {
 		options.Mode = consistentGenericConstructorsModeOf(mode)

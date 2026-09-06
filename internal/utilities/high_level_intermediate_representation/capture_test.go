@@ -14,8 +14,8 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/verify/internal/rule"
-	"github.com/system-inc/verify/internal/rule_testing"
+	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
 // lowerTypedFunctions lowers every outermost function in code with a real checker.
@@ -401,7 +401,7 @@ func TestCaptureKeepsSSAValid(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			outer := lowerTypedFunctions(t, "ssa.tsx", code)[0]
 			Construct(outer)
-			verifyEverywhere(t, outer)
+			cohereEverywhere(t, outer)
 
 			// A test that verified an empty graph would prove nothing.
 			if len(outer.Functions) == 0 {
