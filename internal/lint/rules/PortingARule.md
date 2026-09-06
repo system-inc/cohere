@@ -1,67 +1,27 @@
-# Porting a rule into cohere
+# Porting a rule
 
-> **If you read one thing, read this.** Ten of this document's sections are about
-> INSTRUMENTS THAT FAILED SILENTLY, and almost all of them were written in a
-> single night. Not one was a hard rule-porting problem. They were: a probe that
-> printed to stdout, a `go test -run` pattern that matched no test and printed
-> `ok`, a grep that matched nothing and read as a clean tree, a mutant that would
-> not compile and read as a passing control, a lint run from the wrong directory,
-> a guard that could not fail, and a comment its own author cited back as
-> evidence.
->
-> The pattern under all of them: **absence of a signal reported as a negative
-> result.** A measurement that did not happen looks exactly like a measurement
-> that found nothing wrong, and it looks that way from the inside, to a careful
-> person who fully intends to check.
->
-> So the discipline is not "be careful". It is: make the instrument refuse.
-> Baseline-green, mutant-red, restored-green — three runs, never one. Find the
-> line that only appears when real work happened, and refuse to print a result
-> without it. Then break the refusal once and watch it fire.
->
-> The rules are the easy part. The instruments are where the night went.
+You are porting one ESLint rule to this tree. Read this document once before you
+start, then work the numbered steps in order.
 
-You are porting one lint rule to Go, from the implementation that DEFINED it.
-This document is the standard and the order; follow it over your instincts. Every
-line in it was earned by a real defect shipping.
+Two things to know before step 1.
 
-## A note on this document's own history
+**If the substrate is genuinely absent, the deliverable changes from a port to a
+measurement.** Prove the absence with a compiling probe that has a control, say what
+is missing and how big it is, and stop. A sized absence is a real result and a
+half-built binder nobody can review is not.
 
-This was written when the program was called `verify`, and it has been rewritten
-for `cohere` and for the directory layout the repository has today. Where a
-lesson was about a thing that has since been removed or replaced, the lesson is
-kept and the replacement is named at the line, because the reasoning usually
-outlives the mechanism.
+**Size the rule before you accept it.** Three commands, and read the corpus and the
+substrate rather than the rule file, which is the one number that is not the size.
 
-Three things changed in ways worth knowing before you read further:
+    wc -l <rule>.ts                        the number that misleads
+    wc -l tests/**/<rule>.test.ts          the corpus, which is usually the cost
+    wc -l <utils-the-rule-imports>/*.ts    the substrate hiding behind a facade
 
-- **`rule-inventory.json` is gone.** Sections that used to tell you to add an
-  entry, to compute parity against it, or to keep its counters honest are marked
-  where they appear. What replaced it is named in each case.
-- **The word `verify` still legitimately appears in three places** and only one
-  of them is this program. See "Three families of the word `verify`" below before
-  you grep or sweep for it.
-- **The control-flow substrate grew.** The `no-useless-return` lesson below was
-  written when a dataflow join was impossible here. It is now
-  `control_flow_graph.Solve`, and the section says so.
-
-## Three families of the word `verify`
-
-This matters more than it looks, because a sweep already broke it once.
-
-1. **The program.** It is `cohere` now. Binary `cohere`, launcher command `c`,
-   Go module `github.com/system-inc/cohere`, config file `CohereSettings.json`.
-2. **Ordinary English.** "Verify that the fixture fails." Leave it alone.
-3. **Base's validation decorators.** `VerifyIsEmail`, `VerifyIsArray`,
-   `VerifyBy` and about forty siblings, plus the two rules
-   `base/verify-array-parity` and `base/verify-optional-parity`. These are Kam's
-   public API in the Base framework and they keep that spelling forever.
-   `internal/lint/rules/base/doc.go` explains why, and it is worth reading before
-   you touch anything in that package.
-
-The failure mode for family 3 is silent in the worst way: those rules key on
-those literal strings, so a renamed table matches nothing, the rules report
-nothing, and the tree goes green having checked less than it appears to.
+Past roughly 600 rule lines over a 2,000-line corpus, an agent with 300K of headroom
+returns a partial rule, and the dispatch was the error rather than the agent. Measured:
+`no-unnecessary-condition` is 1,001 lines over 5,075 of corpus, and `prefer-optional-chain`
+is 230 rule lines over a 1,807-line utils package and an 18,173-line corpus directory.
+Say so and stop rather than delivering two-thirds of a rule.
 
 ## Where things are
 
@@ -170,788 +130,6 @@ name your throwaway packages for your rule too.
 Work in this order. Do not skip ahead to writing the rule.
 
 ---
-
-## 0. You are not blocked
-
-**But if the substrate is genuinely absent, the deliverable changes from a port
-to a measurement.** This section pushes hard toward proving absence with a
-compiling probe and then continuing, and the instinct that creates is to build
-the missing substrate anyway, which produces a half-built binder nobody can
-review. When a probe with a control shows the foundation is not there, say what
-is missing, what you probed with, how big the missing piece is, and stop.
-
-A sized absence is a real result. One porter stopped on `no-redeclare` this way:
-the checker returns 1 declaration for duplicate `class E {}` and duplicate
-`type G` (the exact cases the rule must report) while legitimately-merging pairs
-correctly return 2, `LocalSymbol()` recovers nothing, and a local `var Object`
-shadows rather than merges so `builtinGlobals` has no substrate. They extracted
-the 52-case corpus anyway and reported 48/52 reproducing with all 4 mismatches in
-builtin globals. That is a scope-and-binding pass, new substrate rather than a
-rule port, and the next person starts from measurement instead of a blank page.
-
-There is no rule in this lane that waits for someone else. If a substrate looks
-missing, prove it with a compiling probe before believing it (three capabilities
-were called unavailable in one night on the evidence of a grep through a Go type
-alias, and all three were reachable). If a rule's source looks absent, check the
-clone before believing it. If a rule is too large for one pass, decompose it
-yourself and say how you split it. If a sibling's half-written file breaks the
-package, wait it out or work in a package they are not holding, and never repair
-their file.
-
-**Use your judgment and say what you decided.** A port you can defend beats a
-question you asked.
-
-**The react-hooks rules are not where the clone's name suggests.**
-`/tmp/lint-sources/react` is a SPARSE checkout and currently holds only
-`compiler/packages/babel-plugin-react-compiler`. There is no
-`eslint-plugin-react-hooks` directory in the ref at all; the package is named
-**`eslint-plugin-react-compiler`**, and the sparse checkout has to be widened
-before any of it is on disk:
-
-    cd /tmp/lint-sources/react
-    git sparse-checkout add compiler/packages/eslint-plugin-react-compiler
-
-Rule source lands at `compiler/packages/eslint-plugin-react-compiler/src/rules/`,
-and the corpora are in `__tests__/`, named after the RULE rather than after the
-file: `NoCapitalizedCallsRule-test.ts` for `capitalized-calls`,
-`InvalidHooksRule-test.ts` for `hooks`, `NoRefAccessInRender-tests.ts` for
-`refs`.
-
-This matters because the failure is silent in the worst way. A porter who greps
-`/tmp/lint-sources` for their rule name finds nothing, concludes the corpus does
-not exist, and invents fixtures, which is exactly the thing this document exists
-to prevent. The plugin ships 29 rules; the absence is a checkout artifact, not
-upstream.
-
-**A rule the config already turned off may look unconfigured to your port.**
-Rules register under their full upstream name, and `settingFor`
-(`internal/lint/configuration/resolve.go:96`) resolves a config key by exact
-match, then by trimming the key by the rule name and requiring what remains to
-end in `/`. A key written in an OLD short spelling is *shorter* than the new
-name, so the trim is a no-op and the branch never fires:
-
-    config key : typescript/require-array-sort-compare
-    rule name  : @typescript-eslint/require-array-sort-compare
-    endswith?  : False
-
-Each such key is a standing decision somebody made. Porting one of those rules
-and running `EnableRule.ts` would turn it back on **through a spelling difference
-rather than because anyone changed their mind**, the worst way to reverse a
-decision, because it leaves no trace and reads as an accident nobody authored.
-
-So before enabling any rule, grep the config for its BARE name as well as its
-full one:
-
-    grep 'require-array-sort-compare' /Users/kirkouimet/Projects/ahra/CohereSettings.json
-
-If you find a prior `off`, stop. Register the rule, leave it unenabled, and say
-in the commit that the prior `off` is why, naming the line.
-
-**You no longer have to take this on faith.** A `--lint` run names every config
-key that matches no registered rule:
-
-    config: key "no-dupe-keys" matches no registered rule, so its off never
-    applies — either the rule is not ported yet, or the key is spelled for an
-    older name
-
-Measured on the current tree: four such keys, down from thirteen when this was
-first written, and none of them is now a stranded rename. If your rule's bare
-name shows up in that list after you enable it, your enable did not take effect.
-Check it; the line is cheap and the alternative is a rule that passes every
-fixture and lints nothing.
-
-**A fixer that rebuilds a signature loses the return annotation too — check BOTH
-sides of the parameter list.** `no-arrow-function-lifecycle` already declined the
-repair when a parameter could not be rendered by name, and its test cited the
-eight declarations `no-undef-init` widened to `any` as the reason. It still
-dropped `: void`, because a return annotation sits OUTSIDE the parameter list and
-the parameter check could not see it:
-
-    componentDidMount = (): void => {}   ->   componentDidMount() {}
-
-Fixed by declining, matching what the rule already did for typed parameters. Two
-rules in one night lost type information this way, so if your fixer constructs a
-replacement span rather than deleting one, enumerate what lives inside that span:
-parameters, return type, `!`, `?`, generics, `readonly`.
-
-The pattern that works is the one this rule already had for parameters: **report
-the finding, withhold the repair, and say why in a test.** A rule that reports
-without fixing is useful; a fixer that quietly deletes a type is not. Prove the
-decline with a mutation: disable the guard and confirm the new cases fail.
-
-**`$?` after a pipe is the exit of the LAST stage, not the build.** This is the
-same trap as the stale binary, one layer down, and it bit a coordinator's own
-checkpoint script:
-
-    go build -o out ./command/cohere 2>&1 | head -2; echo "exit=$?"   # reports head's 0
-
-`go build -o` does not overwrite its target when compilation fails, so the old
-binary stays in place answering `--rules` with a plausible number while your exit
-check says everything is fine. Redirect to a file and read the exit directly
-instead:
-
-    go build -o out ./command/cohere > build.log 2>&1; echo "exit=$?"
-    head -3 build.log
-
-Then treat a non-empty `build.log` as a reason to distrust every number that
-follows. A count that comes back surprisingly low, surprisingly high, or simply
-unchanged when you expected movement is the symptom; the cause is usually that
-you are reading a binary from before your edit.
-
-**Checker methods are spelled `Checker_getX`, not `GetX`, and grepping the
-natural name finds nothing.** A porter probing for `getContextualType` found zero
-hits for `GetContextualType` and four for `Checker_getContextualType`. Grepping
-the spelling you expect returns an empty result that reads exactly like a missing
-substrate.
-
-    grep "GetContextualType"          -> 0     looks absent
-    grep "Checker_getContextualType"  -> 4     is present and reachable
-
-That porter caught it only because their control returned zero on the same
-pattern, which is the standard applied to a search rather than to a rule. Same
-family as `ast.IsParameter` vs `ast.IsParameterDeclaration`: the substrate is
-there under a name you did not guess.
-
-**And if a checker method genuinely is absent, the shim is extendable.**
-`TypeScript-shim/checker/extra-shim.json` allowlists unexported methods for the
-generator; `ExtraMethods.Checker` already carries a couple of dozen including
-`getContextualType` and `getResolvedSignature`, so adding one is routine rather
-than novel. But dozens of rules import that shim, so land a shim change as its
-own commit with its own probe, never in the same diff as a rule. The file's own
-`ExtraDeclarations` block records why: substituting half a type left the mirror
-24 bytes short and silently corrupted every field after it, read by offset
-through `unsafe.Pointer`, with nothing crashing and no test failing. Run
-`go test ./...` after regenerating, not just your package. The generator lives at
-`internal/types/tools/generate_shims/`.
-
-**`undefined: ast.Something` is usually a spelling difference, not a missing
-substrate.** This tree's predicates are named after the DECLARATION, not the
-concept: there is no `ast.IsParameter`, there is `ast.IsParameterDeclaration`.
-Same for the class, the constructor, the call signature and most of the rest.
-Before concluding the substrate is absent and writing up a measurement, grep for
-the concept rather than the exact name you tried:
-
-    grep -rhoE "func Is[A-Z][a-zA-Z]*" TypeScript/tsc/internal/ast/*.go | sort -u | grep -i param
-    grep -n "IsParameterDeclaration" TypeScript-shim/ast/shim.go
-
-The second command matters: a helper exists for you only if the shim linknames
-it. `TypeScript-shim/ast/shim.go` is the list of what this binary can actually
-reach, and something present in the vendored compiler but absent from the shim is
-a real gap.
-
-This distinction is worth a minute because this document elsewhere tells you that
-a sized absence is a real result and to stop when the foundation is not there.
-That guidance is correct and it does not apply to a helper you have merely
-misnamed.
-
-**If your rule touches `ctx.Program`, declare `ReadsProgram: true`.** Two rules
-have shipped without it, and in the second case the guard was already failing
-when the rule was committed. It is two for two on type-aware rules, because the
-flag is easy to write last and easy to forget.
-
-Reading the program means the rule's verdict for one file depends on the program
-that file was compiled in: compiler options like `NoImplicitThis` or
-`IsolatedDeclarations`, whether a declaration lives in the default library, a
-symbol resolved across a module boundary. Undeclared, a findings cache keyed on
-this file's hash keeps serving an answer computed under options that have since
-changed — silence rather than a crash, which is the worse failure. The field's
-own doc comment on `rule.Rule` carries the reasoning and a dated count.
-
-Check before you commit, not after:
-
-    grep -n "ctx.Program" internal/lint/rules/<pkg>/<rule>.go
-    go test -count=1 ./internal/types/program/
-
-`NeedsTypeChecker` and `ReadsProgram` are different claims. The first says you
-need the checker; the second says your answer depends on the whole program. Many
-rules want both. There is a third, `ResolvesReactValueTypes`, which is narrower
-still: it declares that the rule identifies a React value by asking the checker
-for its TYPE, so a file where the hook call resolves to `any` costs it every
-finding silently. Read the field's doc comment before declaring it.
-
-**Do not copy a `.tsx`/`.jsx` file gate, and do not assert one in a test.** Three
-shipped react rules — `no-did-mount-set-state`, `no-direct-mutation-state`,
-`no-this-in-sfc` — declined every file not ending `.tsx`/`.jsx`. That is oxc's
-`source_type().is_jsx()`, carried over when they were ported from oxc.
-eslint-plugin-react gates none of them, and a React class in a `.ts` file is
-ordinary and legal. Measured: a byte-identical class reported in `.tsx` and was
-silent in `.ts`, across thousands of `.ts` files. Removing the gates produced
-zero new findings, so it closed a blind spot rather than opening work.
-
-Each of the three carried a TEST asserting the gate, one of them saying outright
-that upstream's corpus is entirely `.tsx` so nothing in it can tell a working gate
-from an absent one. The suite locked the bug in rather than catching it. If you
-are about to write a case asserting your rule is silent in a `.ts` file, check
-upstream first: it almost certainly is not.
-
-**A file gate is not automatically wrong, though.** `getter_return` legitimately
-skips TypeScript, because upstream's `should_run` reads
-`!ctx.source_type().is_typescript()`: the compiler already reports a
-non-returning getter, and `get x(): boolean | undefined` is correct TypeScript
-that the rule would wrongly flag. The test is whether UPSTREAM gates, not whether
-a gate looks tidy. Every whole-rule early exit in the tree was audited when the
-three above were found — the Next.js directory scopes and the
-`ctx.SourceFile == nil` guards are all correct.
-
-**Write the `_register.go` early, not last.** Between writing `<rule>.go` and
-writing `<rule>_register.go`, `TestEveryRuleIsRegistered` fails for the whole
-package, and the failure names YOUR rule to every sibling agent and to the
-coordinator. It is indistinguishable from an abandoned port. One rule sat in that
-state for eight minutes and read as stalled work when the agent was simply
-writing the rule body.
-
-The register file is three lines and can be written the moment the rule variable
-has a name:
-
-    func init() { rule.Register(rule.Registration{Rule: <RuleVariable>}) }
-
-Write it second, immediately after the rule declaration compiles.
-
-**Your new file shares a namespace with every committed rule beside it.** A Go
-package is one namespace, so a helper you add can break a rule you never opened.
-Two files in `internal/lint/rules/react/` each defined `jsxElementTagName`; the
-committed one was clean in `git status` and untouched, and it stopped compiling
-the moment the second file appeared. The error even points at the *committed*
-file, which reads as someone else's breakage until you check `git status` and see
-your own file is the untracked one.
-
-Before naming a package-level helper, grep for the name in your rule's directory:
-
-    grep -rn "func <helperName>" internal/lint/rules/<package>/
-
-If it exists and does what you need, call it. If it exists and does something
-different, prefix yours with the rule name (`forbidElementsTagName`). Note the
-two above also had different signatures, so the collision surfaced as a type
-error on the other rule's line rather than as a redeclaration on yours.
-
-**Copy upstream's fixture tsconfig verbatim when you build a typed oracle.**
-`tests/fixtures/tsconfig.json` in the typescript-eslint tree has no DOM lib and
-does carry the node types. An agent used their own tsconfig instead and three of
-`unbound-method`'s cases disagreed with the oracle; all three were the instrument
-rather than the rule.
-
-**An audit count can be structurally wrong rather than merely stale.** Four rules
-in one night diverged from an audit because the tree changed after it ran, which
-re-running would fix. `strict` diverges for a different reason: the audit was
-measured through ESLint, whose flat config sets no `sourceType`, so its default of
-`module` applies to every file. cohere derives moduleness from the source text. On
-a file with no top-level import or export the two instruments answer different
-questions, and re-running the audit reproduces the same wrong number.
-
-    ESLint, sourceType module  ->  0 findings
-    ESLint, sourceType script  ->  4 findings
-
-The rule and upstream agree exactly once source type is held constant. Any rule
-whose verdict depends on source type is in this class, and the count itself cannot
-reveal it. If your rule's findings disagree with an audit, check whether the two
-instruments are being asked the same question before assuming either is wrong.
-
-**A test-case generator can collapse contradictory expectations onto one row.**
-Keying rows on `(code, options)` looked sufficient and was not: the same source
-under the same options carries opposite verdicts with and without a parser feature
-like `ecmaFeatures.impliedStrict`. Eight apparent rule defects were one generator
-defect. Key on everything that changes the verdict, including source type, ecma
-version and parser features.
-
-**A confident zero is the most dangerous result in this project, and most of them
-are instrument failures.** One agent's sweep returned `0` three times running and
-every one was the harness rather than the tree:
-
-- a zsh glob that expanded to nothing, so the command ran on no files
-- a flat-config `files: ['**/*']`, which matches no file that HAS an extension
-- absolute paths outside the config base directory, which make the Linter answer
-  "No matching configuration found" and report nothing rather than erroring
-
-**That last one also has a false-POSITIVE costume, and it is the more convincing of the
-two.** The Linter does not merely stay silent: it returns its complaint as a MESSAGE in
-the ordinary messages array, so an extractor counting `messages.length` reads a
-configuration failure as a finding. A corpus extraction reported "183 of 183 cases
-reported through the installed rule" and every one of the 183 was the same complaint
-about the fixture path. That number looks like a working oracle rather than a broken one,
-which is worse than a zero: a zero at least invites suspicion.
-
-**The mechanical fix generalises past this instrument.** A real finding carries a
-`messageId`; the Linter's own complaints do not. So refuse any message without one rather
-than counting it:
-
-    const complaints = messages.filter(m => !m.messageId);
-    if (complaints.length > 0) { /* refuse, naming the first */ }
-
-Then seed fixtures INSIDE the config base with a relative filename, which is what makes
-the complaint stop happening at all.
-
-The coordinator hit the same class twice in one night: `$?` after a pipe reporting
-`head`'s success while the build failed, and a `cd` that drifted into another repo
-so `git status` came back clean.
-
-**The clone and node_modules are different versions, and where they differ on a
-FIXER the clone may be the one to trust.** When this was measured,
-`/tmp/lint-sources/typescript-eslint` was 8.68.0 against ahra's 8.67.0. 8.68 added
-`shouldWrapInParentheses` to `return-await`'s `removeAwait`, and without it:
-
-    const test = async () => await { a: 1 };
-      ->  const test = async () => { a: 1 };
-
-Verified with the compiler: that body parses as a **Block**, not a parenthesized
-expression, so the function silently stops returning anything. A meaning-changing
-repair, same class as `no-undef-init` and `no-arrow-function-lifecycle`.
-
-The usual guidance is that the installed build is the oracle, because the
-differential compares against it. **That reason does not hold when the difference
-is a bug fix rather than a behaviour disagreement**: porting the older behaviour
-would mean deliberately reproducing corruption. Take the clone's behaviour there
-and say so at the line.
-
-Note that `/tmp/lint-sources` now carries two typescript-eslint checkouts at
-different versions (`typescript-eslint` and `tse-fresh` at 8.69.0). Check the
-`package.json` version of whichever you are reading before you cite it, and diff
-the clone's source against the installed build's before trusting either.
-
-**Two smaller fixer traps from the same porter.** Reaching for the "invalid"
-precedence constant when you mean "must not win" is negative, so the comparison
-still goes the wrong way and it fails SILENTLY toward writing less-parenthesized
-code — they made it twice in one rule. And when two findings on one expression
-propose overlapping edits, the harness refuses to apply them rather than guessing;
-that refusal is correct, because upstream reaches its final text by running the
-fixer repeatedly. Assert the proposed fix text rather than working around it with
-an applied result the real pipeline never produces.
-
-**When upstream's algorithm reads `allPrevSegments`, it is doing a dataflow join
-and a tree walk cannot substitute.** A porter spent four rounds on
-`no-useless-return` writing source-order models, each right on the shapes they had
-measured and wrong on a different set:
-
-    round 1  source-order model            21 failures
-    round 2  branches as alternatives      10
-    round 3  switch fall-through + dedup    7
-    round 4  unreachability gate           12   <- worse
-
-The tell was in upstream all along, in `getUselessReturns`:
-
-    getUselessReturns(uselessReturns, segment.allPrevSegments.filter(isReturned))
-
-Each segment inherits its pending returns from its PREDECESSORS, recursing through
-unreachable ones. That is a join over a control-flow graph, and a source-order walk
-has no representation of a merge point, so every model has to approximate it.
-`if (a) { return; } return;` needs two findings and `return; return;` needs one,
-and the difference is not source order or nesting but whether the two returns sit
-on segments that join.
-
-The porter's first read was that the CFG was the wrong tool, on the evidence that
-three graph predicates failed to separate those cases. The correct reading was that
-they had tried three WRONG predicates.
-
-**This is the section whose mechanism has since changed, and the lesson survived
-it.** When it was written, the graph exposed `Blocks`, `Successors` and `Reachable`
-and nothing else, so the predecessor direction and the per-block fixpoint had to be
-built by hand. `internal/lint/ecmascript/control_flow_graph/` now ships that
-analysis for every consumer at once:
-
-    Solve[V, E](graph, direction, lattice)   monotone dataflow to a fixed point,
-                                             forward or backward, unreachable
-                                             blocks excluded
-    AnalyzeDominators[E](graph)              dominator tree
-    AnalyzePaths[E](graph)                   path analysis
-
-`no-useless-return` shipped. `Solve`'s own doc comment records why it exists rather
-than each analysis writing its own loop, and names the two things
-`no-useless-assignment`'s hand-rolled version settled for.
-
-So the guidance that survives is the diagnosis, not the workaround: if upstream's
-implementation is segment bookkeeping, do not port it as a visitor, reach for
-`Solve`. And if three attempts at a graph predicate all fail, suspect the
-predicates before concluding the graph is wrong.
-
-**A control is only a control if you read where it reports.** A porter seeded a
-violating file, swept, and got the same count as before with nothing from the seed.
-Their script already carried a guard for exactly that case and printed
-
-    UNMATCHED: /tmp/wd/seed/Control.ts
-
-to **stderr**, while they were grepping stdout for a count. The guard was correct,
-ran, detected the fault, and told nobody. They had written it after hitting the
-same trap two batches earlier, and then walked past its output.
-
-This is the zero-assertion probe one layer out: an instrument that CAN report
-failure, into a channel nobody is watching, is not much better than one that
-cannot. So merge stderr (`2>&1`) into whatever you actually read, or assert on the
-guard's output rather than eyeballing it.
-
-The underlying cause is worth knowing on its own: a seeded file placed OUTSIDE the
-config base matches no flat-config entry, and the Linter answers "No matching
-configuration found" rather than erroring. **Seed inside the tree**, sweep, then
-remove the seed. The porter's corrected run gave 12 with the seed and 11 without,
-which is what a working control looks like.
-
-**Never accept a zero without a control** — source that unambiguously violates the
-rule, run through the same harness. If the control does not fire, the instrument is
-broken and the zero means nothing. If you are measuring a rule's coverage, say in
-your report whether your control fired; a number from a harness with no control is
-not a measurement.
-
-This is the same failure the `.tsx` file gate produced for three rules, the same
-one `unicode-bom` produces, and the same one an unconfigured options-driven rule
-produces. They are indistinguishable from a clean tree in a findings count and only
-a control separates them.
-
-**A rule package may not import another rule package.** A guard enforces it and
-states the cost: a leaf edit rebuilds in about 1.8s, a deep one in about 8.5s, paid
-by every agent in the tree on every edit.
-
-This bites extension rules specifically, because upstream's is literally
-`baseRule.create(context)` and reaching for our ported core rule mirrors what
-upstream does. `@typescript-eslint/no-dupe-class-members` shipped that way and the
-guard failed on committed code.
-
-Delegating is still the right shape — re-deriving a core rule's logic gives the two
-rules two chances to disagree about the same question. What has to change is where
-the shared code lives: lift it into `internal/lint/ecmascript/...`, which both
-packages can reach. `imports.BindingsOf`
-(`internal/lint/ecmascript/imports/bindings.go:36`) and `jsx.ElementParts`
-(`internal/lint/ecmascript/jsx/attributes.go:124`) are both exactly this, lifted
-out of rule packages for the same reason.
-
-Run the guard suites BEFORE committing, not after:
-
-    go test -count=1 ./internal/lint/registry/ ./internal/types/program/
-
-Those carry the registration, wiring, fixture-pair, crash-corpus, checker-declaration
-and scratch-package guards between them.
-
-**Read decorated parameters through `node.Parameters()`, and do not write a
-resolver.** Upstream's `resolveDecoratedParameterNode` is thirty lines and exists
-for two estree constraints we do not have. Measured across all five shapes it
-normalises:
-
-    m(@D(K) plain: string)                          constructor(@D(K) private readonly p: string)
-    m(@D(K) defaulted: string = 'x')                constructor(@D(K) public optional?: string)
-    m(@D(K) rest: string[])
-
-All five are a single flat `KindParameter` here, and the decorator's parent is
-`KindParameter` in every case. There is no `TSParameterProperty` wrapper to unwrap:
-a parameter property is an ordinary parameter carrying modifiers, and
-`AsParameterDeclaration()` reads `Name()`, `Type`, `QuestionToken` and `Initializer`
-off all five identically. The membership test against the enclosing function's
-`params` is also unnecessary, because you iterate `node.Parameters()` and read
-decorators off each rather than starting from a decorator and walking up.
-
-So: `node.Parameters()` plus `decorators.Of(parameter)`
-(`internal/lint/ecmascript/decorators/`), and stop there.
-
-**But `Node.Text()` panics on a destructured parameter's name**, and that IS worth
-guarding:
-
-    m({ a, b }: Options)   ->   Unhandled case in Node.Text: *ast.BindingPattern
-
-Reproduced directly: the name node is `KindObjectBindingPattern` and `Text()` panics
-on it, while a rest parameter's name is a plain identifier and is fine. The walk
-recovers per FILE rather than per rule, so one such parameter costs every rule in
-the package its verdict on that file. This is the 167-file class.
-
-Any rule reading a parameter's NAME is exposed. Guard the kind first
-(`name.Kind == ast.KindIdentifier`), and add a test row covering a destructured
-parameter, an array pattern and a rest parameter. **Check the row against a
-control**: make the rule read a parameter name and confirm the row fails, or it
-passes vacuously and proves nothing.
-
-**Porting into a NEW rule namespace needs two shared edits, and without them every
-rule in it is dead.** Six `base/` rules were on disk, well written and
-fixture-green, and not one could execute:
-
-    internal/lint/registry/registry.go        needs  _ ".../internal/lint/rules/base"
-    internal/lint/registry/rule_names_test.go needs  "base": true in knownNamespaces
-
-The first is the fatal one. Without that blank import the package never
-initialises, so no `init()` runs, nothing registers, and `--rules` simply does not
-list your rule. The second makes
-`TestRegisteredNamesMatchTheirUpstreamSpelling` fail for any name in the new
-namespace. (This guard used to live in a file called `parity_test.go`; it is
-`rule_names_test.go` now, and `knownNamespaces` is at line 47.)
-
-This is the "a green fixture set does not mean the rule runs" failure at package
-scale, and it is worse than the per-rule version because the whole namespace is
-affected at once and each porter's own tests still pass. **If you are first into a
-namespace, make both edits and say so in your commit so the others do not each
-rediscover them.**
-
-**The source repository may not be able to run its own lint, and you still need an
-oracle.** `api-phi-health` was at one point mid-merge with 72 unresolved conflicts
-and no `@nexus` package in `node_modules`, so `eslint --config LintConfiguration.ts`
-died on a missing module. Do not repair another project from a porting session.
-Import the rule module directly with a loader hook mapping `@nexus/` to
-`libraries/base/libraries/nexus/` and drive it through ESLint's `Linter` API
-instead.
-
-That is worth the setup rather than falling back to invented fixtures. Driving the
-real rule caught two behaviours a porter would not have written from first
-principles: a property KEY named `getGlobalContainer` reports, and so does a locally
-declared function of that name, because the rule tests the name rather than
-resolving it. Both would have been wrong fixtures.
-
-**When porting OUR rules rather than upstream ones, the original's walk may exist
-for a parser difference we do not have.** The base-layer rules were written against
-ESTree, and `resolveDecoratedParameterNode` is thirty lines normalising three
-shapes: a plain identifier, an `AssignmentPattern` for a defaulted parameter, and a
-`TSParameterProperty` for a constructor parameter property, plus a membership test
-against the enclosing function's `params` so an identifier inside the decorator's
-own arguments is not mistaken for the parameter.
-
-Measured across all four shapes in our parser: **the decorator's parent is
-`KindParameter` every time**, and the defaulted and parameter-property forms differ
-only in fields hanging off that same node. So the walk is `node.Parent` with a kind
-guard, and the membership test protects against nothing, since a decorator's own
-arguments are not its parent.
-
-That is fidelity to the DECISION rather than to the workaround, and it is the
-opposite instinct from an upstream port, where reproducing the original exactly is
-usually right. Ask whether each piece of machinery exists for a judgment or for a
-parser limitation, and measure before assuming.
-
-**One part stayed load bearing and it is the part that looks droppable.** The kind
-guard itself: a decorator can sit on a class, a method, a property or an accessor,
-and all four were measured reaching the listener with a parent of some other kind.
-Without it a class decorator walks to the class and is treated as a parameter. When
-you simplify a walk, the guard is usually what has to survive.
-
-**A core/extension pair is often one job, and there are three distinct ways to
-discover that.** All three have cost an agent a cycle:
-
-1. **The extension wraps core** (`getESLintCoreRule`), so the core algorithm already
-   lives inside the shipped namespaced port. `init-declarations`, `no-invalid-this`.
-2. **The extension is a standalone reimplementation and is strictly stronger**, so a
-   faithful core port would be inert here. `no-implied-eval`: core resolves
-   `setTimeout` through global scope and this config declares no globals.
-3. **Our core already folded the extension's filters in**, so the two are
-   behaviourally identical. `no-useless-constructor`: the extension layers three
-   accessibility filters and a parameter-property filter over core, and our core
-   carries all of them as named helpers. Measured at 65 inputs with zero divergence,
-   including 11 adversarial shapes built to attack each filter.
-
-For case 3 the deciding question is whether anything needs the second NAME. It
-usually does not, and there is no `Aliases` field on `rule.Rule`, so registering one
-rule under two names is a registry change rather than a port.
-
-> **What changed here.** This paragraph used to say "check `rule-inventory.json` for
-> the name before building a wrapper", and to lean on
-> `TestParityAgainstInventory`. That file was deleted and that test is gone. Ask the
-> binary instead — `<cohere binary> --rules | grep <name>` — which is the more direct
-> question anyway, and was always the better instrument: the inventory was a claim
-> about the tree, and `--rules` is the tree.
-
-When you find any of the three, **write the measurement into the code** rather than
-only into your report. The next person reads the audit, sees an unported line item,
-and re-derives it otherwise.
-
-**A core rule may already be shipped under its `@typescript-eslint/` name — check
-BOTH spellings before you write anything.** An audit lists `eslint-core/x.md` and
-`typescript-eslint/@typescript-eslint__x.md` as separate line items, and for an
-`extendsBaseRule` pair they are usually ONE job. Four core rules read as unported
-this way and three agents were dispatched to build duplicates before catching it
-themselves:
-
-    default-param-last · no-implied-eval · no-invalid-this · prefer-promise-reject-errors
-
-All four are live, registered and enabled under `@typescript-eslint/`. Two of them
-were reported as "Strong Yes rules that were missed" for three checkpoints running.
-They were not missed; the census matched bare names only.
-
-    <binary> --rules | grep -E "^(@typescript-eslint/)?<rule>$"
-
-One expression, both spellings. But finding the namespaced one does NOT
-automatically mean your work is done:
-
-**If the extension WRAPS core** (`getESLintCoreRule` in its source), the core
-algorithm necessarily already lives inside our namespaced port, because there is
-nowhere else it could be. A bare port is a second implementation of code already
-present.
-
-**If the extension is a STANDALONE reimplementation**, the core rule is genuinely
-absent and porting it is real work, even though the tree is already enforced in some
-form by the enabled namespaced rule. Expect such a port to add no new findings on
-this tree; that is the rule being already covered in practice, not a broken port,
-and you should say so in your report rather than chase the zero.
-
-    grep -l getESLintCoreRule \
-      /tmp/lint-sources/typescript-eslint/packages/eslint-plugin/src/rules/<rule>.ts
-
-**Three typescript-eslint targets are extension rules, and an audit's line count is
-less than half the job.** `@typescript-eslint/consistent-return`,
-`no-empty-function`, and `no-useless-constructor` each open with
-
-    const baseRule = getESLintCoreRule('<same-name>');
-
-and their `create` is `const rules = baseRule.create(context)` plus a
-TypeScript-specific filter on top. The wrapper cannot report anything on its own:
-every finding comes from the ESLint core rule underneath.
-
-So the real size is wrapper + core, not the wrapper the audit measured:
-
-    consistent-return        132 wrapper +  207 core  =  339
-    no-empty-function        184 wrapper +  235 core  =  419
-    no-useless-constructor    75 wrapper +  262 core  =  337
-
-Port the core rule first, as its own bare-named rule with its own corpus, then the
-extension on top of it. An agent handed "consistent-return, 132 lines" sized against
-the wrapper alone will run out of room.
-
-**A screening caveat, paid for by a wrong answer.** Counting `context.report` to
-decide whether a rule can fire flags 33 of one remaining pool, and 32 of those are
-false. eslint-plugin-react calls a wrapped `report(context, ...)` helper imported
-from `../util/report`, and typescript-eslint extension rules delegate to a base
-rule. Match `\breport\s*\(` and check for `getESLintCoreRule` before concluding a
-rule cannot report. The only true zero in that pool was `react/jsx-uses-vars`.
-
-**Some `react-hooks` targets are not rules at all.** Every one of
-`capitalized-calls`, `exhaustive-effect-dependencies`, `fbt`, `hooks`,
-`memo-dependencies`, `memoized-effect-dependencies`, `rule-suppression`, and
-`syntax` is a React Compiler diagnostic category, not a portable AST rule. Two of
-them (`hooks`, `memo-dependencies`) reported **21 violations** in one audit, so the
-count alone makes them look like ordinary work. They have no `create()` and no
-visitor. They are defined as `ErrorCategory` cases in
-`react/compiler/packages/babel-plugin-react-compiler/src/CompilerError.ts`, and
-producing any of these findings requires lowering the function to the compiler's own
-HIR, inferring reactivity and memoization, and validating against that inference.
-There is no visitor to port. Confirm for yourself with:
-
-    grep -n "name: '<rule>'" \
-      /tmp/lint-sources/react/compiler/packages/babel-plugin-react-compiler/src/CompilerError.ts
-
-A hit there means the name is a compiler category and there is nothing to port.
-
-Their zero is the same trap as `unicode-bom` and `jsx-uses-vars`: **a rule that is
-off by default, or that cannot report at all, measures zero violations and an audit
-reads that zero as a clean tree.** Whenever an audit note pairs a strong
-recommendation with "violations: none", confirm the rule can fire before you believe
-the count.
-
-Note that this tree now carries a real React Compiler conformance harness at
-`internal/lint/rules/react/conformance/`, with a vendored corpus and its own
-scoring. If your target is one of these categories, read that package before
-concluding anything about what is and is not reachable.
-
-**A fixer that is right about JavaScript can be wrong about TypeScript.**
-`no-undef-init` once rewrote `let x: SomeType | undefined = undefined;` to `let x;`
-across eight files in libraries/structure. Upstream's fixer removes the initializer,
-which is correct in JavaScript; here it also stranded the type annotation, and every
-one of those declarations silently widened to `any`. It compiled, so nothing failed
-— the damage was only visible in `git diff`.
-
-The cause is structural and it will bite any fixer that computes a span from a
-node's neighbour. Upstream reads `node.id.range[1]`, which is right in ESTree, where
-a TypeScript annotation is **part of the id node**. In our AST `Type` and
-`ExclamationToken` are **siblings of the name**, so the same offset sits before them
-and the removal swallows them. Fixed by starting the removal at
-`declaration.Type.End()` when there is an annotation.
-
-Three things follow.
-
-1. Any fixer whose range starts or ends at a binding name must account for `Type`
-   and `ExclamationToken` sitting between the name and the initializer.
-2. **Add TypeScript cases upstream cannot have.** Its corpus is JavaScript, so all
-   eight of `no-undef-init`'s `output` cases pass while every annotated declaration
-   in the tree is destroyed. The gap between upstream's corpus and our tree is
-   exactly TypeScript syntax, and that is your job to close.
-3. **Mutate your fixer test.** Disable the branch and confirm the new cases fail.
-   All six of the added cases fail under mutation; a test that passes both ways
-   proves nothing.
-
-And the operational lesson, learned three times on the same eight files: **reverting
-the files does not fix the fixer, and fixing the fixer does not fix the binary.**
-The eight were reverted, damaged again ten minutes later, the rule was corrected and
-mutation-tested, and they were damaged a THIRD time forty minutes after that.
-
-The third round was not the rule. The binary the ahra tree ran was a **symlink into
-a scratchpad build** that was 19 hours stale, predating the fix. Every agent
-invoking it from that directory ran the old fixer no matter what was committed.
-
-So when you fix a rule that writes:
-
-1. Fix the rule and mutation-test it.
-2. Rebuild whatever the ahra tree's binary actually points at. Check its mtime and
-   its `--rules` count against the tree's; a low count is the tell.
-3. Only then repair the damaged files.
-
-Doing 3 before 2 means doing 3 again.
-
-> **That symlink is gone, and finding it was worth the paragraph it took.** While this
-> document was being rewritten, `~/Projects/ahra/node_modules/.bin/verify` still pointed
-> at a 77 MB binary under `~/.local/bin/` built before the rename, with no `cohere` entry
-> beside it. Anyone typing the old name got a linter from a previous day and no warning.
-> Both were removed on 2026-09-06.
->
-> The lesson survives the cleanup, because the shape recurs every time a name changes:
-> **a resolved binary is not the binary you just built.** Check the mtime and the
-> `--rules` count of whatever actually answered before you trust a number from it, and
-> drive your own build by absolute path.
-
-**Our parser keeps parentheses; typescript-eslint's folds them away.**
-`KindParenthesizedExpression` is a real node here and does not exist in the tree
-upstream recurses over, so **any ported rule that walks through an expression will
-see a node upstream never sees**. Measured on `prefer-literal-enum-member`: without
-an unwrap the port reported two of upstream's OWN passing cases.
-
-**It runs in BOTH directions, and one porter hit each in a single batch.** The extra
-node does not only make you over-report:
-
-- **It cost findings.** `prefer-object-has-own` missed five sites until unwrapped,
-  because upstream's parser delivers `(( Object.prototype.hasOwnProperty )).call(...)`
-  pre-folded.
-- **It removed a step.** `no-unexpected-multiline` walks past closing parens
-  upstream; ours already ends past them, so the same code over-walked.
-- **It hid a real defect from the ENTIRE imported corpus.** In
-  `max-nested-callbacks`, both of upstream's immediately-invoked passing cases are
-  parenthesized, so its `callee === node` test is never consulted here — deleting
-  the Go equivalent survived all 32 corpus cases. The distinguishing shape is
-  `!function(){}()`, which carries no parens and which upstream had no reason to
-  write.
-
-That last one is the whole argument for testing shapes the corpus does not write. A
-guard can be dead against every imported case and still be load-bearing on real
-source.
-
-No imported fixture can flag this, because upstream's corpus cannot express the
-shape — its parser deleted the node before the test was written. That makes it
-invisible to the one check this document otherwise leans on hardest.
-
-Unwrap in a loop rather than a single step, because `((2))` nests:
-
-    for expression.Kind == ast.KindParenthesizedExpression {
-        expression = expression.AsParenthesizedExpression().Expression
-    }
-
-**Do not reach for `ast.SkipParentheses` here.** It dereferences its argument, and
-the thing you are unwrapping is often optional — an enum initializer, a default, a
-return argument. That helper is how this project lost 167 files to a nil panic.
-Write the loop with the nil check you need.
-
-**`react/jsx-uses-vars` is not a rule you can port, and two agents correctly
-declined it before anyone checked.** It contains **zero `context.report` calls**.
-Its entire body calls `markVariableAsUsed` to feed `no-unused-vars`, which is why
-upstream disables the message-id lint on it. There is nothing to report, so there is
-no fires-and-silent pair, and `TestEveryRuleShipsAFixturePair` cannot be satisfied
-by a faithful port.
-
-**A THIRD agent was dispatched to it anyway, and measured something better than that
-argument.** The reason to decline is stronger than "it cannot report", and this is
-the version that survives someone adding a marking surface later:
-
-**A faithful port would be REDUNDANT, because our checker already resolves the
-reference.** Upstream needs this rule because eslint-scope does not connect a JSX
-element name to its declaration. Ours does. `GetSymbolAtLocation` on a JSX tag name
-returns the same symbol OBJECT as the declaration, controlled against an intrinsic
-`div` resolving elsewhere so it is not nil-equals-nil.
-
-Measured end to end: six bindings referenced only from JSX, taken from
-`jsx-uses-vars`'s own corpus, all come back CLEAN from our `no-unused-vars`, with
-two controls that do report. On the real tree, `no-unused-vars` ran on every file
-and none of its findings were in any `.tsx` file. No JSX-only component is falsely
-flagged anywhere, which is exactly the outcome this rule exists to produce.
-
-**And the coordination lesson.** That section already said "Do not assign this as a
-port" and named two prior declines. It reached a third agent because the claim-check
-tested four axes and never read the file. **Knowledge that exists but is not
-CHECKABLE does not prevent anything.** If you decline a rule, put the decline
-somewhere a mechanical check can find it, not only in prose.
 
 ## 0b. Know which kind of rule you have before you start
 
@@ -1556,18 +734,42 @@ asking different questions believing they asked the same one.
 > under the name it proposed. **Search the shelf by the question rather than by any
 > census's proposed name**, because the name is the part that drifts.
 
-## 4b. "Complete" is not a status you can report before the fixtures have run
+## Our tree and upstream's tree disagree in both directions
 
-Two authors paused describing their work as complete: compiling, gofmt clean, fixtures
-written. When the next ran them, one had **two failing span assertions and seven blind
-spots the sweep found**, and the other had **four rule defects and nine wrong
-fixtures**, including twenty-two clean upstream cases being reported as violations.
-None of it was visible from outside.
+Two facts about the parser, and they produce opposite defects. Most porters learn one.
 
-**Never describe work as complete before the fixtures have executed.** Say what
-compiles, say what has run, and keep those separate. **If you inherit work described
-as complete, run it first and expect failures.** A paused artifact that compiles is a
-plausible artifact, not a verified one.
+**Our tree keeps nodes upstream's parser folds away.** Parentheses, computed names, chain
+expressions. So any port reasoning about a node's immediate parent or its exact span has to
+unwrap first: `({ a: (function(){}) })` reports upstream and needs the parenthesis unwrapped
+here, and the fix range has to cover it or the repair leaves a stray `)`.
+
+**Upstream merges shapes our tree keeps separate.** In ESTree a property, a method, a getter
+and a setter are one `Property` node distinguished by a `kind` field, so upstream must guard
+against accessors reaching its shorthand tests. Here each has its own syntax kind and matches
+no arm, so it falls through on its own and **upstream's guard has nothing to guard.** A
+mutation sweep reports such a guard as a survivor, correctly. Delete it and record why: a
+documented unreachable branch is a justification, dead code is not.
+
+**Node positions include trivia and upstream's `range` does not.** `Pos()` begins at leading
+trivia and a list's `End()` sits past a trailing comma that the last element's own `End()`
+stops short of. Every fixer built on raw `Pos()`/`End()` is off by whatever trivia is there,
+and this has produced defects in four separate rules: a replacement span eating the space in
+`var foo = 'a' + b`, a paren landing before the whitespace, a comment between two properties
+reading as a comment inside the second, and a token-start scan that skipped whitespace but not
+comments and so swallowed a comment's first byte.
+
+**An `As*()` accessor is an interface conversion, not a cast.** `parent.AsCallExpression()` on
+a `NewExpression` panics rather than returning nil, and a shared `case KindA, KindB:` arm is
+exactly where you reach for one accessor for two kinds. This shipped once and crashed 71 real
+files while all 111 of the rule's fixtures passed, because upstream's corpus has no
+`new Foo(function(){})` case. Give each kind its own arm.
+
+The walk recovers per file and takes every applicable rule down with it, so one rule's panic
+costs all of them their verdict on that file, and the run still prints an ordinary summary.
+The shared crash guard does not save you either: it walks every rule through the untyped
+harness, so a rule declaring `NeedsTypeChecker` has its typed paths unexercised. **Your own dry
+run is the only instrument that sees this class**, and only if you grep the crash line before
+believing a clean run.
 
 ## 5. Write the fixtures first, from the corpus, verbatim
 
@@ -1933,6 +1135,131 @@ watched both survive, and found the arms genuinely reachable because the parser 
 from illegal source. Same lesson from the other direction: the mutant was right that the
 fixtures were blind, and wrong about why.
 
+## The one lesson this document keeps relearning
+
+Every instrument failure recorded here is the same failure, and it has appeared in a
+fixture set, a mutation sweep, a differential sample, an extractor, a grep, and a shell.
+
+**An instrument that cannot express disagreement reports agreement.**
+
+So before believing a result, ask what input would have produced a different one, and
+check that your instrument could have seen it. **If you cannot name such an input,
+nothing has been measured.** The question is available before the conclusion, which is
+what makes it worth more than the instances below.
+
+Six worked examples, each of which cost real time:
+
+**A corpus blind by construction.** `prefer-destructuring` passed all 103 of its imported
+fixtures while reporting nothing on any modern file, because its guard tested
+`NodeFlagsAwaitUsing` as a bit when it is a composite (`NodeFlagsConst | NodeFlagsUsing`)
+and so matched every `const`. Upstream's corpus is written in `var`, so no imported case
+could see the difference and no mutation of the rule could conjure one.
+
+**A differential that agrees exactly.** A cross-check took the 30 files at the head of a
+findings list and got 30 findings against 30. Every one of those files had exactly one
+finding, so the sample could not express a disagreement about count. Re-sampling the 25
+densest files gave 1213 against 1205, and the eight-finding gap was a real defect. **If a
+per-file breakdown of your sample is all ones, the sample cannot fail.**
+
+**A filter defeated by output shape rather than content.** A grep for `    --- FAIL` could
+not see a failure printed at top level; two oracles filtering on `!fatal` counted
+"Definition for rule X was not found" and "Unused eslint-disable directive" as findings,
+both having a null rule id. **A filter is a probe and needs a control like any other:**
+check the pattern against an output you know should match. And filter positively, on the
+rule id you are testing, rather than negatively on the categories you happened to think of.
+
+**A uniform verdict.** A sweep wrapper reported `REFUSED` for all twelve mutations of one
+rule; running one by hand gave `CAUGHT: 89`. A uniform result across every input is the
+same signal as a confident zero: the instrument is answering without looking.
+
+**A wrong denominator.** A differential harness silently dropped six files on unknown-rule
+directives, and the smaller sample read as agreement. An audit's counts were taken with
+inline `eslint-disable` active, so 203 there is 204 here. **Make the harness refuse on a
+wrong denominator rather than warn**, because a warning beside a plausible numerator is
+read past.
+
+**A command answering about the wrong repository.** A `git grep` finding nothing, a build
+failing for want of a module, a rules count of zero, all from a working directory that had
+drifted. A wrong-directory zero is indistinguishable from a right-directory zero. Assert
+where you are standing before you believe a count:
+
+    [ "$(git rev-parse --show-toplevel)" = "$expected" ] || { echo "wrong repo"; exit 1; }
+
+The repair is the same in every case and it is not "add a fixture". **Build the input that
+separates the two readings, confirm the shipped code and the mutant disagree on it, and add
+it with a control.** Confirming both halves is what separates a fixture that kills a mutant
+from one that merely happens to pass.
+
+### Which instrument reaches which defect, and why you often need two
+
+A surviving mutant tells you your fixtures cannot see something. Where that something lives
+decides which tool can reach it:
+
+    in your own code                  a mutation sweep reaches it
+      a quantifier, a guard, a branch     the mutant compiles and the corpus stays green
+
+    in the world                      only a dry run or a differential reaches it
+      a shape upstream never wrote,       no mutation of your rule can conjure the input
+      a substrate that behaves otherwise
+
+That fork is the easy case. **The common case is a sequence and it needs both.** Measured on
+`prefer-regexp-exec`: the dry run found a `const` guard silent on `let r = /x/; a.match(r)`,
+which upstream reports; the replacement guard was then written, and a mutation deleting it
+survived all 37 corpus rows, because upstream never binds a regex to a `let`; only upstream's
+own behaviour settled what the guard should say.
+
+**A fix made in response to a dry run is code no fixture has ever judged**, because the
+fixtures are precisely what failed to raise it. So sweep after a dry-run repair, on the guard
+you just touched rather than on the rule at large: re-sweeping everything is slower and buries
+the one mutation that matters among a dozen already green.
+
+### A control is only a control if you break it and watch it fail
+
+Two rules, and they apply to every measurement above.
+
+**Prove the probe can fail before you trust that it passes.** A control that cannot fail is
+worth nothing, and the failure mode is not exotic: a sed pattern that matches nothing, a test
+that recovers from the panic it exists to surface, a guard whose expectation agrees with any
+value at all. Plant the defect, watch the probe fire, restore, watch it pass.
+
+**Two broken instruments that share an assumption corroborate each other.** Agreement between
+two measurements is evidence only if they could have disagreed. Two runs of the same wrong
+grep agree perfectly. Prefer instruments that fail differently: the strongest confirmation in
+this document is a node count matching across two agents' independent full-tree runs, because
+nothing was shared between them but the tree.
+
+### Your own comment is not evidence, and neither is a justification you wrote
+
+A comment asserting a fact is a claim, not a measurement, and the cheapest thing in this
+document is checking one. A doc comment here asserted that upstream's operator pattern
+`/^[<>!=]?={0,2}$/` required the `=`; `{0,2}` permits zero, so bare `<` and `>` match.
+Running upstream's own pattern settled it in one command.
+
+**And a justification you write will shape the fixtures you write next.** Having argued why a
+guard is right, the cases you then reach for are the ones that agree with the argument. One
+guard here withheld 50 of 74 repairs, defended by "zero of the outputs begin with a semicolon"
+counted from the string start; five of them do, mid-string after a newline, where the check
+could not look. **The question was shaped like the answer it got.** When you find yourself
+defending a decision rather than measuring it, that is the moment to build the discriminating
+input instead.
+
+### Check the thing you were just credited for
+
+An audit carries counts and reasons, and they fail differently. A count decays, and
+re-measuring produces a number that visibly disagrees. **A reason does not decay: it is either
+true or it was never true**, and re-running the count leaves a false reason standing beside a
+freshly confirmed number, which makes the whole row look verified.
+
+`sort-vars` is audited No for two stated reasons: 2 violations, and "overlaps a rule we
+already enforce in-house". The count is right. The overlap does not exist, and never did.
+
+An audit field can also be accurate about upstream and wrong about what a port needs:
+`prefer-arrow-callback` is listed "needs type information: no", which is true of ESLint, which
+gets scope from eslint-scope, and false here, where telling a genuine self-reference from a
+shadowed one is name resolution reached through the checker.
+
+**A threshold quoted in prose decays exactly like a count.** This document's own sizing example
+was 970 lines over 4,316 when written and is 1,001 over 5,075 today.
 
 ## 7b. If the rule's judgment is a matcher, the corpus is not enough
 
@@ -2496,6 +1823,52 @@ the rule's own file. If you reach the checker only through a shelf helper in ano
 file, the guard reports that you over-declared. That message is wrong and the
 declaration is right.
 
+### Registering without enabling needs an exemption entry, in the same commit
+
+Most ports land registered and not enabled, because the tree has a cost the rule would
+flag and enabling it is a scheduled cleanup rather than a wiring step. That is a normal
+outcome and it is not finished until the guard knows about it.
+
+`TestEveryRegisteredRuleIsReachableFromTheLiveConfig` fails for any registered rule the
+live config cannot resolve, because such a rule passes its own fixtures and lints nothing.
+Add an entry to the `deliberatelyNotEnabled` map naming the measured count and why:
+
+    "no-continue": "ported and registered, not enabled: 1,191 findings over 3,540 files,
+                    which is a control-flow convention for the whole tree rather than a
+                    defect class",
+
+**The entry and the rule go in the same commit.** A rule committed without its entry leaves
+HEAD red for everybody else, and it has happened here. That map lives in a file several
+agents edit at once, so read §12 before staging it.
+
+## Ship the judgment, decline the fixer, and record the split as a decision
+
+A rule whose judgment is portable and whose repair is not should ship as two decisions rather
+than waiting for both. Reporting without a fix is the subset you can show correct, and the
+reason has teeth: **a rule that reports correctly and repairs wrongly is strictly worse than
+one that only reports**, because the wrong repair is applied unattended.
+
+That is measured, not hypothetical. `object-shorthand` shipped eleven defects and every one was
+in a repair, never in a count; nine produced source that parses fine and means something else,
+including dropped generic type parameters, so `key: <T>(): void => {}` became `key(): void {}`
+with four findings unchanged.
+
+**The distinguishing question is whether upstream's `output` fixtures fully specify the
+repair.** If they do, port it: `prefer-template` was worth porting whole despite five repair
+defects, because each was findable by byte-exact comparison against upstream's own output. If
+the repair reconstructs a reference or synthesises a node the corpus never pins, the fixer is a
+separate job.
+
+**Read the `output` ratio before accepting any judgment/fixer split.** Line counts mislead here.
+`prefer-optional-chain` looks like the ideal candidate until you count: the fixer is 324 lines
+of 1,807, and 729 of its 739 corpus cases carry an `output`. Halving that rule along the
+judgment line discards 98% of its coverage, whatever the source division suggests.
+
+**And record the split as a decision, not as an absence.** An undocumented missing fixer reads
+as an unfinished port, and the next person re-derives the whole analysis before discovering
+somebody already made the call. Put the reason and the boundary in the rule's doc and leave the
+repair cases in the corpus so the fixer stays separately dispatchable.
+
 ## 10. Run it dry against the real tree
 
     go build -o <your scratchpad>/cohere-<yourname> ./command/cohere
@@ -2633,103 +2006,6 @@ fixtures never reach the nil path in the rule harness; the proof was an A/B on t
 tree, same flags, differing only in that file — 167 crashed before, 0 after. When your
 unit test cannot reach the defect, say so in the test comment and name what did prove
 it, rather than letting a green suite imply coverage it does not have.
-
-## 10b. A prebuilt binary is probably not yours
-
-**This has been the highest-cost trap in this setup, and the first author to hit it
-nearly drew the wrong conclusion from it.**
-
-The ahra tree resolves a linter binary through `node_modules/.bin/`, and that is a
-symlink to a binary somebody built earlier. Rebuilding into your own scratchpad does
-not update it. So the sequence that looks like a wiring failure is:
-
-    go build -o <scratchpad>/cohere ./command/cohere   # your rule is in this
-    <scratchpad>/cohere --lint probe.tsx               # reports, N rules
-    <the node_modules one>                             # 0 findings, N-2 rules
-
-**The intermediate state is coherent, which is what makes it dangerous.** The gap moves
-by exactly one or two, which reads as evidence that your rule has a false negative
-rather than as evidence that two different binaries answered.
-
-**Do not stop at recognising the path.** Two authors in one wave found that symlink
-pointing at a binary sitting *inside their own session's scratchpad directory* which
-they had never built. The path looks like yours, which is precisely what disarms the
-check — you glance at it, see your session id, and conclude you are running your own
-build. Compare the rule COUNT instead, which cannot be faked by a familiar path:
-
-    <that binary> --rules | wc -l          # what the tree actually runs
-    <your binary> --rules | wc -l          # what you built
-
-**And a small gap is more dangerous than a large one.** 224 against 248 reads as "my
-two new rules plus some noise," which feels roughly right. It was 24 apart because a
-dozen sibling agents had landed ports since that binary was built. A gap of two would
-have been more convincing and just as wrong.
-
-**Your own freshly built binary goes stale too.** An author chased a phantom
-false-positive class for a while: an hour-old build reported substituted templates
-(`${tag}`) that the current rule declines. A seeded probe disagreed with the saved log
-and settled it; the dry run went 49 findings to 3 on rebuild. Rebuild before you
-measure, and when a log and a live probe disagree, trust the probe.
-
-**A dead ESLint still prints a comparison, and the comparison is against zero.** One
-wrong plugin prefix — `react/no-deriving-state-in-effects`, which actually lives in
-`react-hooks` — makes ESLint treat the key as fatal and refuse to lint a single file. A
-both-linters run still completes and still prints "reported 438 more than eslint",
-because 438 is being compared against nothing. Every agreement claim made in that
-window was measured against a linter that never ran.
-
-**When ESLint finally ran, the instruments were the problem, not the linters.** The
-first real comparison read 230 against 117 across fourteen diverging rules, which looked
-like a serious parity failure. It was three measurement bugs stacked:
-
-- **A prefix-only regex.** Extracting rule names with a pattern that required a
-  `plugin/` prefix silently dropped every bare core rule, so `no-param-reassign` read as
-  41-versus-0 when ESLint reports it at the identical line.
-- **Wrapped message text counted as findings.** `grep -c "\[no-misused-spread/"` counted
-  the rule's own explanation, which contains its tag and spills onto a second line.
-  Anchor on lines that *start with a path*; a rule with long help text otherwise
-  inflates its own count.
-- **Untracked scratch in the linted tree.** A previous agent's directory of oracle and
-  extractor files was linted by ESLint and ignored by cohere, inventing nine findings
-  across three rules.
-
-After all three: **225 versus 223, two diverging rules out of eighteen.** The lesson is
-not "check your regex" but that a cross-tool comparison has *two* extraction paths and
-both are hypotheses. Before reporting a gap, pick one finding the diff claims is
-one-sided and grep for it directly in the other tool's raw output — a single confirmed
-line settles it faster than any amount of re-reading the aggregate.
-
-**The root cause was in `EnableRule.ts`, and it is a class rather than an incident.**
-`eslintNameFor` derived the ESLint namespace from the rule's prefix, but `react/` covers
-**two** plugins: `eslint-plugin-react` and `eslint-plugin-react-hooks` (which carries
-everything from the React Compiler). The function already handled exactly this failure
-for `typescript/` to `@typescript-eslint/`; react-hooks was the same door nobody had
-walked through. It now asks the plugin which names it owns rather than keeping a list —
-measured, the two rule sets have **zero** overlap, so the question has one answer.
-
-**It recurred two waves later through a different door.**
-`use-unknown-in-catch-callback-variable` was registered under the **bare** name instead
-of `typescript/`. `eslintNameFor` translates `typescript/` to `@typescript-eslint/`; a
-bare name never triggers that translation, so the bare spelling went straight through to
-the ESLint surface and ESLint refused to start again. Same fatal, same fake comparison
-line against zero.
-
-The general rule: **an ESLint plugin rule needs its plugin prefix, and the generator can
-only add a prefix it can see.** Before you enable, check what cohere actually registers
-— `cohere --rules | grep <name>` — against how its siblings are spelled in the config. A
-rule whose cohere-side name carries no namespace is the one that will slip through, and
-it looks completely ordinary in the diff.
-
-**And the first fix silently restored the bug.** A dynamic `require` in this ESM project
-threw, into a catch that returned an empty set, which left every name spelled `react/`
-again. It read fine and was wrong. The static import fails at load instead of at the one
-call site that matters — which is the general lesson: **a fallback that returns "nothing
-found" turns a load error into a silent wrong answer.**
-
-So before you believe any cross-linter verdict, confirm **both** sides produced output,
-and read the whole tail rather than the summary line. A `TypeError: Key "rules"` or
-`Could not find "<rule>" in plugin "<name>"` anywhere in that output means the eslint
-side is zero and the comparison is meaningless.
 
 ## 11. The gate
 
@@ -2905,240 +2181,40 @@ The check is worth doing either way, and it is cheap. Do it as the last step bef
 report done. If the line is missing and you did not remove it yourself, say so rather
 than restoring it silently, so the cause gets established rather than papered over.
 
-## 12. Commit by pathspec
+## 12. Commit by pathspec, and stage and commit in one motion
 
-    git add <your files> && git commit -F <message file> -- <your files>
+Name your files. `git add -A` in a tree where several agents are working takes work
+that is not yours.
 
-Other agents work in this tree concurrently. Pass paths explicitly to both commands,
-never `git add -A`, never `git commit -a`, and read `git status` for files that are not
-yours before staging.
+**The pathspec on `git commit` limits which files are committed, not which hunks.**
+`git add <path>` on a file another agent has edited stages their in-progress work along
+with yours, and committing with a pathspec does not undo that. On a shared file, split
+the diff by hunk and apply only yours:
 
-If another agent's change is in your diff, commit it and say so.
+    git diff -- <shared file> > /tmp/f.patch     # then keep your hunk only
+    git apply --cached /tmp/f.patch
+    git diff --cached --name-only                # read this before committing
 
-**Check git history, not just the filesystem, before concluding what is yours.** An
-author told a previous one had not finished found the rule file committed by that author
-and its registration committed by a third, so `git status` was clean for both. The
-reverse is likewise invisible: another agent may commit your registration inside their
-commit, so a clean status does not mean your registration landed. Grep for it after
-committing.
+**And staging is itself shared state.** Anything you stage is exposed to every other
+agent's commit until you commit it, so `git diff --cached` verifies the past rather than
+the future. Both of one night's mismatches happened in that window, in opposite
+directions: one agent staged cleanly, checked, and had their work taken in the gap before
+their own commit; another swept a section in without noticing. **Stage and commit in one
+motion.** It is the only form that closes the window.
 
-**A green suite does not mean committed.** An agent reported a sibling's rule as landed
-because `go test ./...` was green across every package. It had never been committed —
-three untracked files, with the sibling still writing.
+`PortingARule.md` is the one file here that several agents edit in the same session.
+Treat it as the special case it is.
 
-**Untracked `.go` files compile into their package exactly like tracked ones.** So an
-uncommitted rule passes every guard, registers in the binary, appears in the lint output,
-and satisfies wiring checks whose entries are also sitting uncommitted in the working
-tree. Everything looks finished.
+**Write the commit message from the staged diff, not from your notes**, and run
+`git show --stat` afterwards. An agent's report is a statement about their working tree
+when they wrote it; your commit is a statement about the index when you ran it, and those
+drift. If a commit did take someone else's work, record it rather than rebasing: the
+content is correct and in the tree, and attribution is not worth rewriting history for.
 
-The test for "did it land" is `git log -- <path>` or `git status`. Never the suite.
-Working tree and committed record are different questions. Say which one you looked at.
-
-### What landed is a snapshot of someone else's moment, not of your last verified state
-
-The section above asks whether your work landed. This one asks **which version** of it did,
-and the two come apart the moment somebody else does the committing.
-
-A coordinator batching several agents' work commits whatever is on disk when they run. If
-you correct a file after they read it and before they commit, the correction is not in the
-commit, and nothing anywhere reports that. Measured: a decline's audit document was
-committed saying its probe had been "since removed", in the **same commit** that added the
-probe. A committed file asserting the absence of a file committed beside it, and both were
-mine.
-
-The check is one command, and it is cheap enough to be routine after any commit you did not
-make yourself:
-
-    git diff HEAD -- <your files>          # empty means what landed is what you verified
-
-**The general shape is worth more than the git mechanics, because it is not about git.**
-Both of that author's corrections in one session were *true statements decaying* rather
-than wrong ones. "Nothing is committed by me" was accurate when written and false four
-minutes later. "The probe was removed" was accurate when written and false once it was
-restored. Neither was an error at the time; both became one.
-
-In a tree with this many concurrent agents, **a report decays faster than it is wrong**,
-and decay is the dominant failure mode rather than mistake. That has two consequences:
-
-- **Timestamp the volatile claims, or re-check them before you send.** Anything about the
-  working tree, the commit log, what other agents hold, or which tests are red has a short
-  half-life. Anything about what a rule decides on a given input does not.
-- **A red package is a question about timing before it is a question about correctness.**
-  Three false failures were called out loud in one session, each an agent reading a
-  sibling's package mid-write. Re-run before reporting; the second run is the measurement.
-
-**And the thing that goes stale is systematically the DESCRIPTION rather than the work.**
-This is the part that makes the failure hard to catch, and it took four instances in one
-session before anyone said it plainly.
-
-Those four were logged as four mistakes with four causes: a commit message naming four
-rules while carrying two, a decline document asserting a probe had been removed in the
-commit that added it, a dispatch claiming a rule had a fixer that its `meta` block does not
-declare, and a report saying nothing was committed four minutes after a coordinator
-committed it. Different causes, and the temptation is to fix each one.
-
-What they share is worth more than any of them: **not one was a code defect. The artifacts
-were correct every time.** The rules worked, the probe ran, the `meta` block said what it
-said. What was wrong in each case was a claim ABOUT the work, made at a moment when it was
-true, read at a moment when it was not.
-
-That is a different failure mode from the one review is built to catch, and the difference
-is structural rather than a matter of care. Review reads a diff against a message and both
-are internally consistent; what is wrong is the relationship between a description and a
-moment, and **nothing in the diff records which moment.** A reviewer cannot see it, because
-there is nothing there to see.
-
-Two habits fall out of it, and they are cheap:
-
-- **Descriptions of volatile state need re-checking at the moment you publish them, not at
-  the moment you form them.** Anything about the working tree, the commit log, what other
-  agents hold, which tests are red, or what a rule's `meta` declares. Re-running the check
-  costs a second; the claim has usually not changed, and when it has, it has changed
-  silently.
-- **When you write a description from somebody's REPORT rather than from the artifact, say
-  so.** Three of the four came from exactly that: a message written from an agent's summary
-  instead of from `git status`, a dispatch written from an audit instead of from `meta`. A
-  report is a description too, and it decayed on its way to you.
-
-The reason this belongs in a porting standard rather than in a note about process: **the
-same discipline that makes a measurement trustworthy makes a description trustworthy, and
-it is the same discipline.** Do not assert what you have not just checked. A dispatch that
-says a rule has a fixer is a measurement claim, and `grep -c fixable` with a control is how
-you make it one.
-
-The same decay reaches tracked files, which is worse, because a stale sentence in a
-committed document carries the authority of the codebase while being only what one author
-believed at one moment. That is the failure "Your own comment is not evidence" describes,
-arriving through time rather than through carelessness. When you correct a claim in a
-tracked file, check that the correction is in HEAD and not only in your working tree.
-
-**And `git diff HEAD` is not enough, because the part most likely to be left behind is
-not in your files.** The check above answers "did the version that landed match the
-version I verified", and it answers it only about paths you name. A rule's legality
-usually depends on at least one hunk that lives somewhere else, and a sweep-up commit
-takes what it recognises as yours.
-
-Measured. A rule was ported, registered, fixture-green and byte-identical to its author's
-working tree when a coordinator's batch commit swept it up. `git diff HEAD` over every one
-of the author's files was empty. The rule compiled, appeared in `--rules`, passed its own
-package's suite, and was **illegal at HEAD**, because the entry excusing it from
-`TestEveryRegisteredRuleIsReachableFromTheLiveConfig` was one hunk in
-`internal/lint/registry/live_wiring_test.go` and had not been committed with it. A fresh
-checkout was red and the guard named the rule.
-
-Every instrument an author or a reviewer would reach for said fine:
-
-    the rule's own package suite      green
-    go build ./... && go vet ./...    clean
-    git status                        clean for the author's paths
-    git diff HEAD -- <author files>   empty
-    internal/lint/registry            RED, and it names the rule
-
-**Only the last one can see it, and it is the only one that is not about your files.** The
-failure is structural rather than careless: cross-package edits are exactly the work a
-commit scoped by pathspec is most likely to miss, and they are also the work whose absence
-your own package cannot detect. That is the same asymmetry as the mutation sweep's
-cross-package blind spot in section 7, arriving through the commit rather than through the
-scoring.
-
-So after any commit you did not make yourself, and before reporting a port complete:
-
-    git diff HEAD -- <your files>                 what landed is what you verified
-    go test ./internal/lint/registry/             what landed is LEGAL
-
-Run the second even when the first is empty, and especially then, because an empty diff is
-what makes the situation look finished. And when the guard names your rule, confirm the
-attribution with a control rather than assuming: stash the hunk, watch the guard name it,
-restore the hunk, watch the name disappear. Six other rules were in that failure list and
-all six belonged to other agents mid-flight; without the stash there is no way to tell your
-own omission from someone else's in-progress work, and the two look identical in the
-output.
-
-### Editing a shared tracked file is one mistake with three faces
-
-`internal/lint/checking/specifier.go` is imported by dozens of rules. An agent left it
-half-written one night and every one of those rules became unbuildable, which meant every
-OTHER agent's `go test ./...` went red with an error in a file they had never opened.
-
-A half-written rule file costs its author. A half-written shared utility costs everyone,
-and they cannot tell it is not theirs without investigating.
-
-One cause, three symptoms:
-
-    a wide build window          an uncompilable line sat in a shared utility while
-                                 others' `go test ./...` went red in a file they
-                                 never opened
-    a misattributed entry        a shared-file line was in the working tree when
-                                 ANOTHER agent committed that file, so it landed in
-                                 the wrong commit
-    an unreviewable packaging    94 lines of shared utility buried inside a 4,629-line
-                                 rule diff
-
-**Know the count before you edit.**
-
-    grep -rl "lint/ecmascript/<name>" internal/lint/rules/ | wc -l
-
-That takes a second and tells you whether you are holding a rule or a load-bearing wall.
-
-**Commit the shared change SEPARATELY, before the rule.** Same reason a shim extension
-commits alone: a file that dozens of rules read should be reviewable on its own, and
-buried under a rule diff nobody can see what moved.
-
-**Run `go test ./...`, never just your package.** Your package passing says nothing about
-the others that import the same file. The full-suite run IS the control for a
-shared-utility change, exactly as it is for a shim regeneration.
-
-**And the reasoning that talks you out of it is seductive, so name it.** One agent's was:
-the helper exists only for this rule and would be dead code alone, so it reads as one
-change. That is wrong because reviewability is about WHO CAN BE HURT by the file, not
-about which rule motivated the edit.
-
-Do not rewrite history to fix the packaging afterwards. Attribution is not worth a
-rebase. Split it from the start next time.
-
-**And commit-by-pathspec is only half a defense, which is worth knowing if you have been
-leaning on it.** `git add <path>` on a file several agents edit stages THEIR in-progress
-hunks along with yours, and the pathspec on `git commit` does not undo that: it limits
-which FILES are committed, not which HUNKS.
-
-Measured, on this document. An author added a 39-line section, staged it with
-`git add internal/lint/rules/PortingARule.md`, and committed 89 lines -- the extra 50 being
-another porter's finished-but-uncommitted section on `prefer-destructuring`. Nothing was
-lost and nothing was half-written, but the commit message described only half its diff.
-
-For a shared prose file the safe form is `git add -p`, or committing from a diff you have
-actually read. `git diff --cached` before the commit answers it in one command.
-
-> **The section above this one documents its own violation.** That author had just written
-> the finding that a description decays away from the work it describes, and the commit
-> carrying that finding is itself a description that does not match its diff. That is not
-> an embarrassment, it is the strongest available evidence for the section: the failure is
-> structural rather than a matter of attention, and it caught the person who had spent the
-> previous hour thinking about precisely it.
-
-### Put scratch outside the rules tree from the first minute
-
-This happened three times in one night, with three different agents:
-
-    internal/lint/rules/posprobe/                    scratch package
-    internal/lint/rules/react/zz_unc_debug_test.go   debug test, and it FAILED
-
-Both made a package red for every other agent, with a failure naming a file they had
-never opened. The second is the worse shape: a FAILING debug test in the rules tree is
-indistinguishable, from outside, from the rule under test being broken.
-
-**So make the probe's home the first thing you create, not an afterthought:**
-
-    internal/<your_rule>_probe/
-
-The guards and package test runs scan only `internal/lint/rules/`, so a probe outside it
-costs nobody anything and you can keep it as long as you want.
-
-**A `zz_` prefix does not help.** It sorts the file to the end of a listing; it does not
-exempt it from the package's test run.
-
-And when you are told to move one: MOVE it, do not delete it. Live instrumentation you
-are actively reading is worth more than a green guard.
+**Put scratch outside the rules tree from the first minute.** A probe package under
+`internal/` compiles with everything else and breaks the build for every other agent. Use
+your own scratchpad directory, never a shared name, and remove probes before reporting
+unless one is a standing guard worth keeping.
 
 ## 13. Report back
 
@@ -3148,62 +2224,7 @@ command that established it.
 
 ---
 
-## Standing lessons that do not belong to one step
-
-### A control is only a control if you break it and watch it fail
-
-Every instrument should be checked by breaking what it measures. One author did this
-wholesale and it is worth copying:
-
-    corpus extraction check   goes red when one fixture body is corrupted
-    span arithmetic check     goes red (50 of 62) when the shift is removed
-    shape probe               flips when the token reads are stubbed
-    fixture suite             goes red when the rule is neutered
-
-And the detail that matters most: their first neutering mutation DID NOT COMPILE, and
-they threw it out rather than reading the build failure as a passing control. A mutant
-that fails to build proves nothing about your tests. **Score by "could this have failed",
-never by "did something go red".**
-
-### A corpus can be complete about a rule and still unable to reach one guard
-
-This is 7b arriving in a rule that is not a matcher, which is what makes it easy to miss.
-
-`default-case` excuses a missing default when a comment after the last case matches
-`/^no default$/iu`. Removing BOTH anchors survives all 23 of upstream's cases. The corpus
-is not thin -- it covers the comment, the casing, the position, and the option -- but every
-case that exercises the DEFAULT pattern writes `no default` exactly, and the two cases with
-a near-miss comment supply their own `commentPattern`, under which anchored and unanchored
-agree. Nothing in it can separate the two readings.
-
-Driving the installed rule on two shapes the corpus never writes settles it in one command,
-with a control that fires:
-
-    // no default          excuses      (control)
-    // no default here     REPORTS
-    // say no default      REPORTS
-
-So the anchors are load-bearing and an unanchored pattern would silently excuse two shapes
-upstream flags -- in the direction that hides findings rather than inventing them.
-
-The general form: **a surviving mutant on a guard whose corpus coverage looks thorough is
-usually telling you the corpus tests the guard's SUBJECT rather than its BOUNDARY.** Every
-case wrote the matching string; none wrote a near-miss. Ask what input would sit just
-outside the guard, and check whether the corpus contains one before concluding the mutant
-is equivalent.
-
-### A flaky test is worse than no test
-
-A mutation on map iteration order was caught by a two-group fixture only about 8% of the
-time — measured, 22 reversals in 200 runs — because Go's randomisation happens to favour
-insertion order when there are only two keys.
-
-The author did the right thing: put the determinism in the RULE, and wrote at the line
-that the fixture is not the guard. A test that fails 8% of the time reads as green, gets
-trusted, and then blames something unrelated on the run where it does fail.
-
-If a control only fires probabilistically, it is not a control. Fix the code and say so
-at the line.
+## Facts about this substrate that cost somebody an hour
 
 ### Proving a zero: count the subject matter, and use the parser to do it
 
@@ -3244,317 +2265,6 @@ replaced one unproven zero with another one wearing a lab coat.
 **Then write it where it is durable, not in a probe.** The probe directory gets deleted.
 The rule's own doc comment and its test survive. Anyone reading that rule later should see
 what was searched and what was found.
-
-### Two measurement rules that apply to everything above
-
-**Run a control alongside any zero.** Grep for something you know is present, in the same
-place, with the same command. A zero from a real absence and a zero from a bad pattern, a
-wrong path, or a shim alias are the same zero. One extra command, and it is the
-difference between a measurement and a guess.
-
-**Search for the thing, not for the citation.** If somebody tells you a claim lives at
-commit X or file Y, search the whole tree for the thing itself. A search bounded by
-someone else's reference cannot find what their reference got wrong, which is the only
-case where checking was worth doing.
-
-### A differential that agrees exactly may be sampling what cannot disagree
-
-The blind-fixture trap is a corpus that cannot see a defect. This is its differential
-twin, and it looks like the best possible result rather than like a problem.
-
-Measured on `no-inline-comments`. A first cross-check took the 30 files at the head of the
-findings list, ran ESLint over them, and got **30 findings against our 30**. Exact
-agreement, and worthless: every one of those files had exactly ONE finding, so the sample
-could not express a disagreement about count. It was a sample of the shape least able to
-disagree, selected by the accident of sort order.
-
-Re-sampling on the 25 DENSEST files gave 1213 against 1205, and the eight-finding gap was a
-real defect in the comment scanner.
-
-The tell is available before you draw the conclusion: **if a per-file breakdown of your
-sample is all ones, the sample cannot fail.** So sort by finding count and take from the
-top, not from wherever the list happens to start. And treat a round, exactly-equal number
-with the same suspicion as a surprising one, which is the same lesson the mirror-bug
-section reaches from the other direction: symmetric errors cancel, and cancellation reads
-as confirmation.
-
-**The same shape appears in a mutation sweep.** A wrapper that reported `REFUSED` for all
-twelve mutations of one rule was mis-parsing its own tool output; running one mutation by
-hand gave `CAUGHT: 89`. A uniform verdict across every mutation is the same signal as an
-all-ones differential sample: the instrument is answering without looking.
-
-**And a filter over a linter's output should be POSITIVE, not negative.** Two oracles in
-two batches counted non-findings as findings -- "Definition for rule X was not found" and
-"Unused eslint-disable directive" -- because they filtered on `!fatal`, dropping only the
-categories their author had thought of. Both have a null rule id. Keep the rows whose
-`ruleId` matches the rule under test; that filter cannot be surprised by a category nobody
-anticipated.
-
-**All of these are one finding wearing different costumes, and the sentence is worth having
-on its own: AN INSTRUMENT THAT CANNOT EXPRESS DISAGREEMENT REPORTS AGREEMENT.**
-
-Four instances from two batches, which is what makes it a class rather than an anecdote:
-
-    a differential sampling 30 files that each hold one finding
-        -> 30 against 30, and the sample had no way to produce any other number
-
-    a sweep wrapper mis-parsing its tool, returning the same verdict for all 12 mutations
-        -> a uniform result across every input is the tool answering without looking
-
-    a guard defended by "zero outputs begin with a semicolon", counted from the string start
-        -> five of them do, after a newline, where a check anchored at position zero
-           cannot reach. The question was shaped like the answer it got.
-
-    a filter keeping rows by `!fatal` rather than by rule id
-        -> it can only drop the categories its author already knew about
-
-The shape underneath: **before believing a result, ask what input would have produced a
-different one, and check that your instrument could have seen it.** If you cannot name such
-an input, you have not measured anything. That question is cheap, it is available before the
-conclusion rather than after it, and every one of the four above would have failed it in a
-sentence.
-
-**A tighter family sits inside that one: a filter defeated by the SHAPE of the output rather
-than by its content.** Three in one night, all reading correct output through a pattern that
-could not express the answer:
-
-    grep '    --- FAIL'        misses a failing test that has no subtests, because it
-                               prints at top level with less indentation
-    filter on !fatal           keeps every non-finding ESLint emits with a null rule id
-    sample the first 30 files  every one holds exactly one finding, so the sample cannot
-                               produce any number but agreement
-
-None of these is a wrong tool or a lying tool. Each is a pattern written against the shape
-its author expected, applied to output that had a different one, and each reported a clean
-result rather than an error.
-
-**So: a filter is a probe, and it needs a control like any other.** Check the pattern against
-an output you know should match before you trust what it does not match. One command, and it
-is the same discipline this document already demands of a grep over source or a mutation over
-a rule -- the reason it gets skipped for output filters is that a filter feels like reading
-rather than measuring.
-
-Two worked corrections from the same night. `CAUGHT: N` and an indent-filtered grep gave two
-careful readers 6 and 1 for the same run, and the honest answer was two assertion failures;
-neither had said which unit they were counting. And the assertion count itself has a filter
-that cannot be fooled by structure:
-
-    grep -cE '_test\.go:[0-9]+:'      one line per t.Errorf, immune to nesting
-
-**And a note about who these keep happening to.** The multi-run trap was written by an author
-who lost a parser configuration to it an hour later. The decay section was written by an author
-who inflated a count in the same file. The observation that commit-by-pathspec is only half a
-defense was agreed to by a coordinator who then swept another agent's section into his own
-commit. Three people, one night, each caught by the trap they had just documented.
-
-That is not carelessness and it is the argument for every mechanical defense in this file:
-**knowing a trap does not route around it, because the failure arrives at a moment when
-nothing prompts the recall.** A refusal that fires, a control that must move, a filter checked
-against a known match -- those work when memory does not.
-
-### Two broken instruments that share an assumption corroborate each other
-
-A coordinator reported a defect in a correct rule, and the reason they believed it is the
-part worth keeping.
-
-A finding whose message quotes multi-line source puts its rule tag on a DIFFERENT line
-from its `file:line:column` address. Three extractions assumed one finding per line, and
-the first two both produced 28-against-29 — the same wrong answer, from the same wrong
-assumption. Agreement between them read as confirmation.
-
-The third instrument broke differently, giving 43 findings with 14 extra. Checking two of
-those at source showed `String(x)` and a bare property name, neither a coercion, and only
-then was the instrument the obvious suspect.
-
-**So: independent-looking measurements are only independent if they fail differently.**
-Two greps over the same log, written by the same person in the same minute, share every
-assumption their author has. When two checks agree, ask what assumption they share before
-treating the agreement as evidence.
-
-And the cheap protection, which is what finally worked: **verify a sample at the SOURCE,
-not in the log.** A finding you can read in the file is real; a count you extracted is a
-claim about your extractor.
-
-**The author then went further and found the general rule.** Their own two extractions had
-MIRROR bugs: one dropped a multi-line finding, the other counted a wrapped continuation as
-its own finding. One lost, one gained, and the total came back as exact agreement with
-zero position mismatches. **It was wrong in both columns and looked perfect.**
-
-So:
-
-**An instrument that reads a linter's output line by line is assuming one finding is one
-line.** That assumption breaks for every rule whose message quotes the code it is
-complaining about, which is not exotic — cohere's messages are long and explanatory by
-design, and a glance at any dry run shows them wrapping. Split the output into RECORDS at
-each path-anchored line and look for the rule tag anywhere in the record; do not filter
-line by line.
-
-**Compare addresses on both sides with the SAME extractor.** Two scripts that disagree
-with each other while neither disagrees with the rule is the signature of this bug.
-
-**And a result that comes back perfect deserves the same suspicion as one that comes back
-surprising.** Symmetric errors cancel, and cancellation reads as confirmation.
-
-**A third failure mode is worse than losing or duplicating: FABRICATION.** A walk-forward
-parser paired each address with the NEXT rule tag it saw, which for a multi-line finding
-belongs to a different rule. It did not merely miscount, it invented findings, and they
-were plausible enough to read as real ones.
-
-The tell is what caught it, and it generalises: two of the fabricated "extras" were
-`String(x)` and a bare property name, neither of which is an implicit coercion at all.
-**When a diff produces findings that are wrong in KIND rather than in count, the
-instrument is the first suspect, not the last.** A miscount can be a real disagreement; a
-category error cannot.
-
-**Scope your comparison explicitly, and say the scope out loud.** Two correct measurements
-of the same rule read as a contradiction when one is whole-tree and the other is one
-library: 59 against 29 looked like a conflict and was not. Both numbers were right.
-
-### An extractor that drops languageOptions manufactures fake disagreements
-
-Measured on `no-implicit-coercion`. Its corpus contains `!!(foo + bar)` TWICE with
-opposite verdicts:
-
-    :292  output: "Boolean(foo + bar)"      fixable
-    :319  output: null                      declined
-          languageOptions: { globals: { Boolean: "off" } }
-
-Same code, opposite answers, and the only difference is a field a naive extractor throws
-away. An author's first extractor dropped it, the replay reported a disagreement with the
-installed rule, and for a minute that read exactly like a real divergence in the port.
-
-**The failure looks like the rule and lives in the instrument.** So: render
-`languageOptions` beside every extracted case, and when a replay disagrees on a case whose
-code appears more than once in the corpus, suspect the extractor before suspecting the
-port.
-
-**The load-bearing behaviour underneath, worth knowing on its own:** the `!!` fix is
-withheld when `Boolean` is not a GLOBAL, not merely when it is shadowed. Shadowing by
-`var`, by `let`, and by a parameter each withdraw it, measured separately.
-
-### "auto-fixable: yes" in an audit can mean one arm out of nine
-
-Same rule. An audit said auto-fixable and a coordinator repeated that in a dispatch.
-Measured against the installed build, exactly ONE of nine arms carries an applicable fix:
-
-    !!foo             fix (and only when Boolean resolves to the global)
-    +foo              suggestion only
-    1 * foo           suggestion only
-    foo - 0           suggestion only
-    '' + foo          suggestion only
-    foo + ''          suggestion only
-    foo += ''         suggestion only
-    -(-foo)           suggestion only
-    ~foo.indexOf(x)   neither, reports bare
-
-The corpus confirms it: 4 top-level non-null outputs, all `Boolean(...)`, against 44
-explicit `output: null`. Counting `output:` lines flatly gives 43 and is WRONG, because
-outputs nested inside a `suggestions:` array look identical to a grep. Match on
-indentation or parse it.
-
-**This changes what "prove the fixer" means.** `ExpectFixedSource` can only cover the 4 fix
-cases. The other 44 need assertions reaching into `Diagnostics[].Suggestions`, the way
-`internal/lint/rules/core/array_callback_return_test.go` already does, and the two surfaces
-must be mutated SEPARATELY — a fix mutation cannot see a suggestion defect.
-
-### When the clone beats the installed build: a same-tag strict superset
-
-The usual guidance is that the INSTALLED build is the oracle, because the clone runs ahead
-and porting to unreleased behaviour makes us disagree with the tool we are replacing.
-`react/no-unknown-property` is a measured exception, and the conditions are narrow enough
-to state exactly.
-
-The author first read the data tables from the installed build and ended up carrying four
-corpus cases at a verdict that contradicted upstream's own expectation. They reversed it:
-
-    both artifacts declare 7.37.5      the clone is unreleased commits on the SAME
-                                       tag, not a newer release we lag
-    onScrollEnd, onScrollEndCapture,   present in the clone's rule file, ABSENT
-    closedby                           from the installed one
-    onLoad                             widened to include body
-    removals                           NONE. Diffing both attribute tables in
-                                       both directions returns nothing missing
-    repairs                            none of the four carries a fix
-
-So the clone is a strict superset: four additions, no removals, no behaviour reversals, and
-nothing that rewrites source.
-
-**That combination is what makes it safe.** A superset of a permit-list only ever makes the
-rule quieter, so the worst case is a missed finding rather than a false one, and with no
-repair attached there is no way for the difference to rewrite somebody's code. Reverse any
-of those conditions and the installed build wins again.
-
-**The general test, before you take the clone over the release:** same version string on
-both, additions only in both directions of the diff, and no fixer on the differing entries.
-Check all three. Two out of three is not the exception.
-
-### Size the rule before you dispatch it
-
-An agent at 293K returned empty on `no-unnecessary-condition` after nine minutes, leaving
-nothing on disk and no probe. That reads as exhaustion and was not: the rule is simply too
-big for the budget it was given, and the dispatch was the error.
-
-Measured, against its own wave-mates:
-
-    no-unnecessary-condition          970 lines rule    4,316 lines corpus
-    no-unnecessary-type-parameters    571                1,908
-    no-redundant-type-constituents    534                  851
-    no-unnecessary-template-expression 472
-
-**Re-measured 2026-09-06, and the numbers have drifted.** `no-unnecessary-condition` is now
-**1,001 lines of rule over 5,075 of corpus**, up from 970 and 4,316. The example is still
-accurate and its figures are not, which is the same decay an audit count suffers: **a
-threshold quoted in prose goes stale exactly like a measurement quoted in prose.** Re-run
-the two commands rather than trusting the table above; it is a worked example, not a
-current inventory.
-
-**And size the CORPUS and the SUBSTRATE, not the rule file.** The rule file is the one
-number that is not the size, and it is the one you instinctively check. Measured the same
-day, on a rule dispatched as small:
-
-    prefer-optional-chain      230 lines rule
-                             1,807 lines of prefer-optional-chain-utils/
-                            18,173 lines of tests/rules/prefer-optional-chain/
-
-A 230-line rule file reading as trivial over nearly twenty thousand lines of corpus is the
-`react/no-unused-prop-types` trap at four times the scale. Three commands, not two:
-
-    wc -l <pkg>/src/rules/<rule>.ts
-    find <pkg>/tests/rules/<rule>* -type f | xargs wc -l | tail -1
-    <plus any utils directory the rule imports>
-
-**A decomposition worth knowing for a rule in that shape.** When the substrate is mostly
-the REPAIR, the judgment half is a much smaller job with a stated boundary, and the two are
-separately dispatchable. `prefer-optional-chain`'s 1,807-line utils package is largely its
-fixer; porting the judgment and declining the repair is a real intermediate option rather
-than a half-finished rule, and the report-without-fix pattern is already established here.
-
-Nearly double its wave on the rule and more than double on the corpus, and the corpus is
-the part that costs context, because a faithful port reads all of it.
-
-**Two commands before every dispatch, and they take a second:**
-
-    wc -l /tmp/lint-sources/<pkg>/src/rules/<rule>.ts
-    wc -l /tmp/lint-sources/<pkg>/tests/rules/<rule>.test.ts
-
-**And the CORPUS is the number that matters, not the rule.** A coordinator sized
-`react/no-unused-prop-types` by its rule file, saw 171 lines, and called it small. Its
-corpus is 6,778 lines and it needs a further 578-line shared substrate (`usedPropTypes.js`)
-that nothing in the tree had. That is ~7,500 lines of reading behind a 171-line rule, and
-the agent came back empty after doing excellent measurement work it never got to spend.
-
-A tiny rule over a huge corpus is the trap, because the rule file is what you instinctively
-check. Add the SUBSTRATE the rule imports to the count too — a thin rule that is a caller
-over 2,900 lines of `Components.js` plus `usedPropTypes.js` is not a thin port.
-
-Rough calibration: a rule under ~600 lines with a corpus under ~2,000 lands comfortably in
-an agent with 300K of headroom. Past that, send it to the freshest agent available or
-expect a handoff rather than a rule.
-
-**And when an agent returns empty, check the rule's size before concluding the agent is
-spent.** That inference has been made wrongly in the other direction too, reading a rate
-limit as context exhaustion. The transcript's token count and the rule's line count are both
-one command away; neither needs guessing.
 
 ### When two agents need the same collector, scope and STATE the boundary
 
@@ -3633,109 +2343,6 @@ The comment was what was wrong.
 condition at every validated node rather than by reading the identifier. When a cluster of
 fixtures under-reports, suspect one predicate read too broadly before suspecting many
 separate bugs.
-
-### Your own comment is not evidence
-
-The sharpest self-diagnosis of one night, in the author's own words: "a comment I wrote is
-not evidence, it is my own earlier claim, and citing it back laundered a guess into a fact."
-
-They had written a backwards statement into a file at commit time, then repeated it from
-their own comment as though reading an observation. The two greps that would have settled it
-were available the whole time.
-
-This is worse than an unchecked memory, because a comment in a file LOOKS like documentation.
-It carries the authority of the codebase while being only what one author believed on one
-afternoon.
-
-When a comment is your evidence for a claim, go check the thing it describes.
-
-### A justification you wrote will shape the fixtures you write next
-
-The section above says a comment is not evidence. This is the sharper form, and it is worse:
-**a justification you wrote becomes the premise your fixtures are derived from, so the
-fixtures agree with it and cannot falsify it.** You end up with a wrong belief, a test that
-confirms it, and a green suite. The loop is closed and nothing inside it can open it.
-
-**This section caught its own subject while it was being written, on 2026-09-06**, and that
-is the argument for not skipping it. Its author, drafting the warning below, was at the same
-time testing `complexity`'s name builder and found a rendering they had derived rather than
-measured -- with a fixture written from the derivation, agreeing with it, passing. Upstream
-renders `{ d: function named() {} }` as `Method 'd'`, because the property name is tried
-first and the function's own `id` is only a fallback. Not a subtle case; invisible only
-because no corpus case puts a named function expression in a property position.
-
-So the count is four instances, and the fourth is the one that matters: knowing about this
-failure, and writing it down at that moment, did not prevent it. What caught it was an
-instrument.
-
-The other three, in the same batch and by two authors, all with locally sound reasoning at
-every step:
-
-    max-depth        "without this arm, sibling methods accumulate depth"
-                     They do not; the depth decrements on exit. Fixtures were written from
-                     that argument, and the mutation deleting the arm survived BOTH the
-                     corpus and those fixtures.
-
-    consistent-return
-                     "the equality on the flag word is not a mask, because a union carries
-                     its constituents' bits" -- with a test named for the distinction and a
-                     case on each side. A union does NOT carry those bits: `undefined|number`
-                     has flags 134217728, `Union` alone, so `flags & Undefined` is already
-                     zero. No input separates the two, and the mutation survives as genuine
-                     equivalence.
-
-    a whitespace scan
-                     An ASCII-only scan documented as a deliberate narrowing, with upstream's
-                     counterexample sitting in the corpus.
-
-**What breaks the loop is an instrument whose shape you did not choose.** In the three above
-that was a surviving mutant, and it was the only signal; in two of them the author's first
-instinct on reading it was to add another fixture, which would have been written from the
-same premise and would have passed for the same reason. The next round of the same mistake
-is one step away and it looks like diligence.
-
-The fourth had a different instrument, and the difference is worth keeping: no mutant found
-it, because the rule agreed with itself everywhere the mutation could reach. What found it
-was testing the name builder directly, against a table of shapes chosen from the question
-rather than from the corpus, and then driving upstream once per row. A mutation sweep asks
-whether your fixtures can see; a table built from the question asks whether you pointed them
-anywhere near the thing.
-
-So when a mutant survives an arm you have DOCUMENTED, suspect the documentation before the
-fixtures. A surviving mutant has exactly two readings, and they need different responses:
-
-    the fixtures cannot see it        add an input that discriminates
-    there is nothing to see           the arms are equivalent; say so and stop
-
-Telling them apart means going to the thing itself -- print the flag word, delete the arm and
-watch which rows move -- rather than reasoning about it again in the same terms that produced
-the claim.
-
-**Keep the rows that do NOT discriminate.** When `max-depth`'s real shape turned out to be a
-class nested inside an already-deep block rather than sibling methods, both sets stayed in the
-test, labelled. The non-discriminating rows are the evidence that the original argument was
-wrong rather than merely unproven, and without them the next reader deletes the arm, sees the
-sibling rows stay green, and concludes it was dead code.
-
-**A documented unreachable branch is a justification, so delete it rather than explaining
-it.** The same `complexity` name builder carried two accessor arms in a branch only an
-arrow or a function expression can reach, which therefore can never be an accessor. A
-mutation gutting them survived, correctly. The tempting response is a comment saying why
-they are there; that comment would be exactly the kind of claim this section is about, and
-it would outlive whoever could still check it. The reachable version is smaller, and an arm
-that survives gutting is a candidate for deletion before it is a candidate for
-documentation.
-
-**And correcting the fixtures does not correct the justification.** This is the part with no
-instrument at all. `max-depth` shipped in one commit with a comment saying siblings accumulate
-and, a hundred lines below it, a comment recording that exact argument as disproved -- a file
-arguing with itself, with every test green. The mutation sweep found the fixture defect and
-could not touch the sentence that caused it, because **nothing fails when a comment is wrong.**
-
-So the discipline is a step, not an attitude: when an instrument corrects you, go back and
-re-read what you WROTE about the thing, not only what you tested about it. The comment is
-where the wrong belief actually lives, and it is the part that outlives the commit and teaches
-it to the next reader.
 
 ### A nil-receiver method call can be correct, so check the method before calling it a bug
 
@@ -3877,26 +2484,71 @@ the duplicate be a config question.
 Turning either rule off is Kirk's decision, not an author's, and not a night-watch one.
 Report the overlap; do not resolve it.
 
-### Check the thing you were just credited for
+### A flaky test is worse than no test
 
-The defects most worth finding live past the point where anyone else would look. Review
-reaches work on its way in. It cannot reach work that has already been accepted, praised, and
-moved on from, and that is where this repository keeps finding its real defects.
+A mutation on map iteration order was caught by a two-group fixture only about 8% of the
+time — measured, 22 reversals in 200 runs — because Go's randomisation happens to favour
+insertion order when there are only two keys.
 
-Measured over one night, 91 commits, four of them carrying the author's own defect in the
-subject line. A guard cited as a task's closing condition that could not fail, because it read
-a surface where the two things it compared had already been merged. A doc comment stating a
-false premise about another package, whose conclusion happened to survive on different
-grounds. A diagnosis two nodes independently confirmed that named the wrong compiler pass.
-Three comments quoting a rule count that had been accurate and silently stopped being.
+The author did the right thing: put the determinism in the RULE, and wrote at the line
+that the fixture is not the guard. A test that fails 8% of the time reads as green, gets
+trusted, and then blames something unrelated on the run where it does fail.
 
-**None was found by review.** Every one was found by the author re-checking something already
-credited.
+If a control only fires probabilistically, it is not a control. Fix the code and say so
+at the line.
 
-So the discipline is not more review, it is a habit: after you are told the work is good, go
-check the thing the praise attached to. **Applause means everyone else has stopped looking**,
-which makes it simultaneously the cheapest moment to find what remains and the moment least
-likely to feel like it needs checking.
+### "auto-fixable: yes" in an audit can mean one arm out of nine
 
-This only works if reporting a defect in your own accepted work is costless. It is, here. The
-only person who can reach that population is the author, and only after the applause.
+Same rule. An audit said auto-fixable and a coordinator repeated that in a dispatch.
+Measured against the installed build, exactly ONE of nine arms carries an applicable fix:
+
+    !!foo             fix (and only when Boolean resolves to the global)
+    +foo              suggestion only
+    1 * foo           suggestion only
+    foo - 0           suggestion only
+    '' + foo          suggestion only
+    foo + ''          suggestion only
+    foo += ''         suggestion only
+    -(-foo)           suggestion only
+    ~foo.indexOf(x)   neither, reports bare
+
+The corpus confirms it: 4 top-level non-null outputs, all `Boolean(...)`, against 44
+explicit `output: null`. Counting `output:` lines flatly gives 43 and is WRONG, because
+outputs nested inside a `suggestions:` array look identical to a grep. Match on
+indentation or parse it.
+
+**This changes what "prove the fixer" means.** `ExpectFixedSource` can only cover the 4 fix
+cases. The other 44 need assertions reaching into `Diagnostics[].Suggestions`, the way
+`internal/lint/rules/core/array_callback_return_test.go` already does, and the two surfaces
+must be mutated SEPARATELY — a fix mutation cannot see a suggestion defect.
+
+### When the clone beats the installed build: a same-tag strict superset
+
+The usual guidance is that the INSTALLED build is the oracle, because the clone runs ahead
+and porting to unreleased behaviour makes us disagree with the tool we are replacing.
+`react/no-unknown-property` is a measured exception, and the conditions are narrow enough
+to state exactly.
+
+The author first read the data tables from the installed build and ended up carrying four
+corpus cases at a verdict that contradicted upstream's own expectation. They reversed it:
+
+    both artifacts declare 7.37.5      the clone is unreleased commits on the SAME
+                                       tag, not a newer release we lag
+    onScrollEnd, onScrollEndCapture,   present in the clone's rule file, ABSENT
+    closedby                           from the installed one
+    onLoad                             widened to include body
+    removals                           NONE. Diffing both attribute tables in
+                                       both directions returns nothing missing
+    repairs                            none of the four carries a fix
+
+So the clone is a strict superset: four additions, no removals, no behaviour reversals, and
+nothing that rewrites source.
+
+**That combination is what makes it safe.** A superset of a permit-list only ever makes the
+rule quieter, so the worst case is a missed finding rather than a false one, and with no
+repair attached there is no way for the difference to rewrite somebody's code. Reverse any
+of those conditions and the installed build wins again.
+
+**The general test, before you take the clone over the release:** same version string on
+both, additions only in both directions of the diff, and no fixer on the differing entries.
+Check all three. Two out of three is not the exception.
