@@ -82,6 +82,16 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		"id-length": "ported and registered; audited No at 862 violations with no fixer, so enabling is a decision for whoever takes that cleanup",
 		"max-depth": "ported and registered; audited No at 176 violations with no fixer, so enabling is a decision for whoever takes that cleanup",
 
+		// Audited **No** at 326 violations, and there is a second argument against enabling beyond
+		// the cleanup cost: the Tricorder paper the standard cites names cyclomatic complexity as
+		// failing the bar for a useful diagnostic, because the number correlates poorly with what
+		// actually makes code hard to read. Both arguments are about ENABLING rather than about
+		// porting, and the port exists so the decision can be revisited without redoing the work.
+		//
+		// Not inert when unconfigured: the default threshold is 20, so enabling would start
+		// reporting immediately.
+		"complexity": "ported and registered; audited No at 326 violations with no fixer, and the metric itself is contested, so enabling is a decision rather than a wiring step",
+
 		// Ported and registered without being enabled, because enabling it is a decision with work
 		// attached rather than a wiring step. The audit measured 54 violations and the rule has no
 		// fixer, so every one is a hand edit; the config has never named it under either spelling.
@@ -105,6 +115,23 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// built binary from the ahra tree -- 387 rules in `--rules-enabled`, `consistent-return`
 		// present, `@typescript-eslint/consistent-return` absent.
 		"@typescript-eslint/consistent-return": "ported and registered; the bare consistent-return is already enabled and the two enforce different things, so which one this tree wants is a decision rather than a wiring step",
+
+		// Four stylistic rules ported together, registered and left unenabled because each is a
+		// convention this codebase has not adopted and adopting one is a cleanup with a measured
+		// price rather than a wiring step. The audits recommend "No" for all four, and their counts
+		// are what that recommendation rests on: no-underscore-dangle 100, prefer-destructuring 789,
+		// no-negated-condition 504, no-bitwise 82. Only prefer-destructuring has a fixer, so three of
+		// the four are entirely hand edits.
+		//
+		// None of the four names appears anywhere in CohereSettings.json under any spelling, so
+		// there is no standing decision to honour or reverse; there is simply nothing to enable
+		// until Kirk chooses the convention. Unlike the options-driven rules above, all four report
+		// out of the box, so their zero here is the config not naming them rather than a rule that
+		// cannot fire.
+		"no-underscore-dangle": "ported and registered; the audit measured 100 violations with no fixer and recommends against, so adopting the convention is a decision rather than a wiring step",
+		"no-negated-condition": "ported and registered; the audit measured 504 violations with no fixer and recommends against, so adopting the convention is a decision rather than a wiring step",
+		"no-bitwise":           "ported and registered; the audit measured 82 violations with no fixer and recommends against, and this tree uses bitwise operators deliberately in hashing and bit-packing code",
+		"prefer-destructuring": "ported and registered; the audit measured 789 violations and recommends against, so adopting the convention is a decision rather than a wiring step even though the rule has a fixer",
 
 		// The live config sets `react/jsx-key` to "off" explicitly, in a block of ten-plus rules
 		// this project has deliberately turned off alongside `react/react-in-jsx-scope`. That is a
