@@ -12,6 +12,13 @@ almost every defect this document records was a correct-looking measurement rath
 hard piece of logic. Read it and you should come away primed to distrust your own
 instrument before you distrust the rule.
 
+Whether that priming actually works is untested, and is the one claim here with no
+measurement behind it. Agents who read this document have corrected their own findings
+unprompted, but every one of them was also being checked closely and having their
+corrections treated as ordinary, so the two explanations are not separated. The test that
+separates them is an agent who reads this and is not watched. Until somebody runs it, read
+the paragraph above as the intent of the document rather than as its demonstrated effect.
+
 Two things to know before step 1.
 
 **If the substrate is genuinely absent, the deliverable changes from a port to a
