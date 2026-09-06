@@ -1176,6 +1176,19 @@ check that your instrument could have seen it. **If you cannot name such an inpu
 nothing has been measured.** The question is available before the conclusion, which is
 what makes it worth more than the instances below.
 
+And there is one repair, which every instance below received:
+
+**Make the instrument refuse rather than answer.**
+
+A missing thing errors and you notice. A wrong thing responds, plausibly, in the right
+format, at the right magnitude, which is why none of the failures below announced itself.
+So arrange for the wrong answer to be impossible rather than detectable: a harness that
+errors on a mismatched denominator, a filter checked against output it must match, a
+deleted build target so a failed build leaves nothing to read, a command that exits
+non-zero when it is standing in the wrong repository. Six unrelated places got that same
+repair in one night, which is the sign it is the statement and everything below is a face
+of it.
+
 Six worked examples, each of which cost real time:
 
 **A corpus blind by construction.** `prefer-destructuring` passed all 103 of its imported
@@ -2055,10 +2068,9 @@ to a file and read the code:
     rm -f "$S/cohere-$NAME"                                    # so a failure leaves nothing
     go build -o "$S/cohere-$NAME" ./command/cohere > "$S/build.log" 2>&1; echo "exit=$?"
 
-**Delete the target first.** That one line turns this check into the same repair as every
-other one in this document: with nothing at the path, a failed build leaves nothing to read
-and the instrument refuses instead of answering. Checking a size or a timestamp afterwards
-works too and depends on you remembering to look; deleting first does not.
+The `rm -f` is the whole check, and it is the general repair rather than a rule of its own:
+with nothing at the path, a failed build leaves nothing to read. Verifying a size or a
+timestamp afterwards works too and depends on you remembering to look.
 
 Three things must go wrong for a false reading: the pipe hides the failure, the artifact
 survives, and the count looks right. All three happened in one command tonight, and the agent
