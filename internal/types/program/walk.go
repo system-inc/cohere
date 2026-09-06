@@ -228,9 +228,22 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// The checker is acquired only when an applicable rule declares it reads one.
 				//
 				// CheckerForFile hands out an exclusive lock held until release, and it is held across
-				// the whole dispatch below rather than around a single query, so acquiring it serializes
-				// this file's entire walk against every other file's. Measured: about 50% of the lint
-				// phase, 366-417ms against 557-575ms on the same tree at controlled load.
+				// the whole dispatch below rather than around a single query.
+				//
+				// This comment used to say that acquiring it serializes this file's entire walk against
+				// every other file's, at about 50% of the lint phase. That was measured and is wrong,
+				// and the correction matters because the wrong version sends the next reader hunting a
+				// bottleneck that is not there. Instrumented on 2026-08-24, per worker against a 2.45s
+				// phase: 1,306ms waiting to acquire and 834ms holding and working, so 53% wait, which
+				// reads like confirmation of the old number and is not.
+				//
+				// High wait does not mean lost throughput, because while one worker waits the other
+				// fifteen work. The comparison that settles it is `--single-threaded`: 12.68-13.52s
+				// against 2.32-2.52s parallel, so parallel is 5.35x faster. If the lock serialized each
+				// file's walk against every other's, those would be nearly equal.
+				//
+				// The honest statement of the cost is that the lock is why this gets 5.35x rather than
+				// something closer to 16x. That lost headroom is real; it is not elapsed time.
 				//
 				// This is paid now. Measured against the live registry on 2026-08-25: 212 rules
 				// registered, 44 of them declaring NeedsTypeChecker, so the guard acquires on any file
