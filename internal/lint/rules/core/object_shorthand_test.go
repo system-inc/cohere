@@ -421,3 +421,58 @@ func TestObjectShorthandRepairKeepsSignatureAndSpacing(t *testing.T) {
 		rule_testing.ExpectFixedSource(t, result, testCase.fixed)
 	}
 }
+
+// TestObjectShorthandIgnoresAccessors covers the two accessor guards, both of which survived a
+// mutation sweep against all 262 imported fixtures.
+//
+// Upstream drops getters and setters twice over: `Property:exit` returns early on
+// `node.kind === "get" || "set"`, and `checkConsistency` filters them out of its count with
+// `canHaveShorthand` before comparing. The corpus writes accessors, but never beside the
+// configuration that would reveal either guard, so deleting them changes nothing it can see.
+//
+// Every verdict is what the installed ESLint 10.8.1 rule answered:
+//
+//	{ get a() {} }            never                 clean -- an accessor has no longform to want
+//	{ set a(v) {} }           never                 clean
+//	{ get a() {} }            always                clean
+//	{ get a() {}, b: b }      consistent            clean -- the accessor is not counted, so the
+//	                                                object is all-longform rather than mixed
+//	{ get a() {}, b }         consistent            clean -- likewise all-shorthand
+//	{ get a() {}, b: b }      consistent-as-needed  1 -- `b: b` could be shorthand and is not
+//
+// Rows four and five are the ones that fail without the consistency filter: counting the accessor
+// as shorthand makes each object look mixed and reports `unexpectedMix`. Row six is the control,
+// confirming the object is still being judged rather than skipped entirely.
+func TestObjectShorthandIgnoresAccessors(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		source   string
+		mode     string
+		findings []string
+	}{
+		{source: "var o = { get a() {} };", mode: `"never"`},
+		{source: "var o = { set a(v) {} };", mode: `"never"`},
+		{source: "var o = { get a() {} };", mode: `"always"`},
+		{source: "var o = { get a() {}, b: b };", mode: `"consistent"`},
+		{source: "var o = { get a() {}, b };", mode: `"consistent"`},
+		{
+			source: "var o = { get a() {}, b: b };", mode: `"consistent-as-needed"`,
+			findings: []string{messageObjectShorthandExpectedAllPropertiesShorthanded.Id},
+		},
+	}
+
+	for _, testCase := range cases {
+		result := rule_testing.RunWithOptions(t, ObjectShorthand, objectShorthandFile,
+			testCase.source, objectShorthandOf(testCase.mode))
+		if len(result.Diagnostics) != len(testCase.findings) {
+			t.Errorf("%q under %s: expected %d findings, got %d %v",
+				testCase.source, testCase.mode, len(testCase.findings),
+				len(result.Diagnostics), result.MessageIds())
+			continue
+		}
+		if len(testCase.findings) > 0 {
+			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		}
+	}
+}

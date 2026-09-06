@@ -265,14 +265,16 @@ var ObjectShorthand = rule.Rule{
 
 // checkObjectShorthandMember is upstream's `Property:exit` for the four per-property modes.
 func checkObjectShorthandMember(ctx rule.Context, member *ast.Node, settings ObjectShorthandSettings) {
-	// Getters and setters are ignored: they have no shorthand form to convert to.
-	if member.Kind == ast.KindGetAccessor || member.Kind == ast.KindSetAccessor {
-		return
-	}
-	// A spread has no key at all.
-	if member.Kind == ast.KindSpreadAssignment {
-		return
-	}
+	// Upstream needs two guards here that this port does not, and they are recorded rather than
+	// carried as dead code.
+	//
+	// It returns early on `node.kind === "get" || "set"` and on a spread, because in ESTree all
+	// four shapes are one `Property` type and would otherwise reach the shorthand tests. Our parser
+	// gives each its own kind, so an accessor or a spread simply matches none of the switch arms
+	// below and falls through. Verified rather than assumed: deleting the equivalent guards changes
+	// no verdict on `{ get a() {} }` under any mode, so a mutation removing them survives -- as
+	// genuine equivalence, not as a fixture blind spot. `TestObjectShorthandIgnoresAccessors` pins
+	// the behaviour either way.
 
 	applyToMethods := settings.Mode == ObjectShorthandMethods || settings.Mode == ObjectShorthandAlways
 	applyToProperties := settings.Mode == ObjectShorthandProperties || settings.Mode == ObjectShorthandAlways
@@ -422,7 +424,15 @@ func checkObjectShorthandConsistency(ctx rule.Context, node *ast.Node, checkRedu
 	for _, member := range literal.Properties.Nodes {
 		switch member.Kind {
 		case ast.KindGetAccessor, ast.KindSetAccessor, ast.KindSpreadAssignment:
-			// Upstream's `isConciseProperty` filter drops accessors before counting.
+			// Upstream's `canHaveShorthand` filter drops accessors and spreads before counting, and
+			// unlike the per-property guards above this one is NOT redundant in spirit -- an
+			// accessor reaching the shorthand tally would make `{ get a() {}, b }` look mixed and
+			// report `unexpectedMix`, where upstream is clean.
+			//
+			// It is redundant in FACT here for the same parser reason: neither kind matches the
+			// counting arms below either, so a mutation deleting this case also survives. Kept
+			// because it states the intent at the place a reader looks for it, and because a future
+			// arm added to this switch would need it.
 			continue
 		case ast.KindMethodDeclaration, ast.KindShorthandPropertyAssignment:
 			shorthand++
