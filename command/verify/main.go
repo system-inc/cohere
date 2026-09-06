@@ -65,6 +65,17 @@ func run() error {
 	// finding list, and the differential harness cannot tell them apart from the outside. This is how
 	// it asks.
 	listRules := flag.Bool("rules", false, "print the rules this binary implements, one per line, and exit")
+	// `-rules` answers what the binary CAN run; this answers what it WILL. The two differ by every
+	// rule the config never names, and that gap is invisible from the outside: a rule the config
+	// cannot resolve passes its own fixtures and lints nothing, which reads exactly like a rule that
+	// found nothing wrong.
+	//
+	// Reconstructing the answer by hand is the alternative, and it is worse than it looks. Doing it
+	// against this config meant walking a nested rules block, then the overrides, then deciding
+	// whether a scoped `off` counts, and the hand-derived set was wrong on 29 of 356 rules when
+	// finally checked against the real resolver. ESLint has had `--print-config` for this reason.
+	listRulesEnabled := flag.Bool("rules-enabled", false,
+		"print the rules the lint config actually resolves, with severity, and exit")
 	// Off by default until the engine is shown to agree with the existing gate across the real
 	// corpus. Reformatting the tree away from what the gate produces is worse than not formatting,
 	// so enabling is a separate decision from wiring.
@@ -109,6 +120,69 @@ func run() error {
 				"note: %d rules from a local build, so this is whatever was on disk when it was compiled, not necessarily what is committed\n",
 				len(names),
 			)
+		}
+		return nil
+	}
+
+	if *listRulesEnabled {
+		lintConfig, err := configuration.Load(*lintConfigFileName)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", *lintConfigFileName, err)
+		}
+
+		// Resolution is per file, because an override can turn a rule off for one path and leave it
+		// on everywhere else, so there is no single answer for the whole tree. The probe path names
+		// which file the answer is about, and it defaults to a plain TypeScript source at the root
+		// rather than to nothing: a caller who forgets to pass one gets the ordinary case rather
+		// than an error, and a caller who wants the generated-file answer asks for it by name.
+		probePath := "index.ts"
+		if arguments := flag.Args(); len(arguments) > 0 {
+			probePath = arguments[0]
+		}
+		resolved := lintConfig.Resolve(probePath)
+		if resolved.Ignored {
+			fmt.Fprintf(os.Stderr, "note: %s is excluded by ignore pattern %q, so no rule applies to it\n",
+				probePath, resolved.IgnoredBy)
+			return nil
+		}
+
+		// Only rules the binary actually implements. A config key naming a rule this build does not
+		// have resolves to a severity and still runs nothing, and printing it here would report a
+		// rule as enabled that cannot fire. That gap is real rather than hypothetical: this config
+		// carries several keys spelled for an older name, and they are exactly the rules whose
+		// standing decision silently stopped applying.
+		implemented := make(map[string]bool, len(registry.All()))
+		for _, registered := range registry.All() {
+			implemented[registered.Name] = true
+		}
+
+		type enabledRule struct {
+			name     string
+			severity string
+		}
+		var enabled []enabledRule
+		unimplemented := 0
+		for name, setting := range resolved.Rules {
+			if setting.Severity == configuration.SeverityOff {
+				continue
+			}
+			if !implemented[name] {
+				unimplemented++
+				continue
+			}
+			enabled = append(enabled, enabledRule{name: name, severity: setting.Severity.String()})
+		}
+		sort.Slice(enabled, func(first, second int) bool { return enabled[first].name < enabled[second].name })
+		for _, rule := range enabled {
+			fmt.Printf("%s\t%s\n", rule.name, rule.severity)
+		}
+
+		fmt.Fprintf(os.Stderr, "note: %d rules enabled for %s, of %d implemented by this binary\n",
+			len(enabled), probePath, len(implemented))
+		if unimplemented > 0 {
+			fmt.Fprintf(os.Stderr,
+				"note: %d config keys name a rule this binary does not implement, so their setting applies to nothing\n",
+				unimplemented)
 		}
 		return nil
 	}
