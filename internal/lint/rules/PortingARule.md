@@ -2595,6 +2595,24 @@ So grep the crash line before you believe a clean run:
 
     cohere --lint 2>&1 | grep -c "crashed:"     # must be 0
 
+**And assert where you are standing before you believe a count.** The measurement runs
+against a tree in another directory, so every command in this section is one `cd` away
+from answering about the wrong repository, and it answers quietly: a `--rules` count of
+zero, a `git grep` that finds nothing, a `go build` that fails for want of a module. None
+of those looks like an error. A wrong-directory zero is indistinguishable from a
+right-directory zero, and the reading that follows is confident and wrong.
+
+    [ "$(git rev-parse --show-toplevel)" = "$expected" ] || { echo "wrong repo"; exit 1; }
+
+One line, and it converts a plausible zero into a loud failure. This is the same repair as
+making a differential harness refuse on a wrong denominator rather than warn, applied to
+the shell instead of to a test: **an instrument that cannot tell you it was asked the wrong
+question must be made to refuse rather than to answer.** Three separate people hit this in
+one night from three directions -- an extractor counting "No matching configuration found"
+as a finding, a harness silently dropping six files, and a coordinator measuring from the
+wrong checkout five times -- so the pattern is not a personal lapse and a reminder will not
+fix it. Only the refusal does.
+
 Two things make this class hard to find from fixtures. **`ast.SkipParentheses`
 dereferences its argument**, so any helper that can answer nil is a panic one call
 later — `memberAccessObject` answers nil for every callee that is neither a property
