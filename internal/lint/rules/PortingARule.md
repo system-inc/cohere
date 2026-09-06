@@ -1391,6 +1391,50 @@ report what you found either way. The shelf is younger than the rules it serves.
 `TestShimFieldAccessorsReadTheFieldsTheyName` and the wrapped-accessor guard both
 police this boundary from the other side.
 
+**And the harder case: a shelf helper that is entirely CORRECT and answers a
+different question than the one you are asking.** Every example above is a helper
+that is wrong about something. This one is not, and that makes it worse: there is
+nothing to find by reading it, because the code and its doc comment agree with each
+other and both are accurate.
+
+Measured on `@typescript-eslint/consistent-return`, whose void filter asks "does this
+return type include `void`". The shelf has `checking.IsTypeFlagSet`, whose name is
+exactly that question. It reads the type's OWN flags. typescript-eslint's
+`isTypeFlagSet` first decomposes a union and ORs its constituents' flags, which is a
+different question with the same name:
+
+    void                     shelf T   upstream T   agree
+    void | number            shelf F   upstream T   DISAGREE
+    Promise<void | number>   shelf F   upstream T   DISAGREE   (on the awaited type)
+
+Both disagreements are upstream PASSING cases — `function foo(flag?: boolean): number
+| void` and a `Promise<void | number>` alias — so the shelf helper reports two clean
+inputs. **Neither is a fixture you would think to add**, because both come from
+upstream's valid list and a port failing two of nineteen valid cases reads as two
+unlucky fixtures rather than as a wrong helper.
+
+**The trap is reaching for it BY NAME.** The standard already tells you to search the
+shelf before writing a helper, and that instruction is what delivers you to the wrong
+function: you search for your question, you find a name that is your question, and
+the match itself is the evidence you stop on. A name cannot encode which of several
+readings of a question a function took, and the more natural the name the more
+readings it covers.
+
+So the rule that survives is narrower than "probe a shelf helper against upstream". It
+is: **when a shelf helper's name IS your question, that is when to go read upstream's
+implementation of the same-named helper and diff the two**, because a name collision
+between the shelf and upstream is the one case where the collision is doing your
+thinking for you.
+
+**Write the divergent one local rather than fixing the shelf.** Correcting
+`checking.IsTypeFlagSet` to decompose unions would silently change the answer for
+every other caller, none of which asked for it, and the shelf helper is not wrong —
+it is the other reading, which some of those callers presumably want. A local
+`consistentReturnUnionFlagSet` with the measurement at the line costs one function and
+moves nobody. Adding a second helper to the shelf beside the first is the option to
+avoid: two shelf functions whose names differ by a word are how two callers end up
+asking different questions believing they asked the same one.
+
 > **On the shelf census.** Earlier revisions pointed at a `SHELF-CENSUS.md`, a
 > whole-corpus read from 2026-08-23. It is not in this repository, and its "missing
 > utilities" section was already stale in every entry checked when it was last
@@ -1622,6 +1666,29 @@ carries this warning in its own comments.
 
 A sweep against a red package is not a weaker measurement. It is not a measurement. A
 scoped sweep is a real measurement of a smaller thing.
+
+**"Unscoped" does not mean "sees everything", and the difference has a measured
+instance.** The fourth argument scopes the run to one rule's tests, and dropping it
+widens the run to the whole PACKAGE — not to the tree. The tool builds and tests one
+package either way, so any guard living elsewhere is invisible to both spellings.
+
+Scored on `@typescript-eslint/consistent-return`, mutating the rule's `Name` string:
+
+    scoped to TestConsistentReturn        SURVIVED
+    unscoped over ./internal/lint/rules/typescript   SURVIVED
+    go test ./internal/lint/registry/     CAUGHT, twice
+
+Twice, because two different guards see it: `TestEveryRuleShipsAFixturePair` loses the
+rule's test file, and `TestEveryRegisteredRuleIsReachableFromTheLiveConfig` reports the
+renamed name as unreachable from the config. Neither lives in the rule's package and
+neither can.
+
+So the reflex "re-run it unscoped to be sure" does not close this gap. **Anything
+resting on a cross-package guard is scored by running that package's suite against the
+mutant directly**, which for a rename means editing the file, running
+`go test ./internal/lint/registry/`, and restoring it. Say in your report which of the
+two you did, because a survivor from a package sweep and a survivor from the registry
+suite are different claims.
 
 **A survival verdict can be a sampling artifact, so re-run a survivor before believing
 it.** A porter's map-iteration mutant was caught 1 run in 8: Go randomises map order,
@@ -2513,6 +2580,48 @@ committed document carries the authority of the codebase while being only what o
 believed at one moment. That is the failure "Your own comment is not evidence" describes,
 arriving through time rather than through carelessness. When you correct a claim in a
 tracked file, check that the correction is in HEAD and not only in your working tree.
+
+**And `git diff HEAD` is not enough, because the part most likely to be left behind is
+not in your files.** The check above answers "did the version that landed match the
+version I verified", and it answers it only about paths you name. A rule's legality
+usually depends on at least one hunk that lives somewhere else, and a sweep-up commit
+takes what it recognises as yours.
+
+Measured. A rule was ported, registered, fixture-green and byte-identical to its author's
+working tree when a coordinator's batch commit swept it up. `git diff HEAD` over every one
+of the author's files was empty. The rule compiled, appeared in `--rules`, passed its own
+package's suite, and was **illegal at HEAD**, because the entry excusing it from
+`TestEveryRegisteredRuleIsReachableFromTheLiveConfig` was one hunk in
+`internal/lint/registry/live_wiring_test.go` and had not been committed with it. A fresh
+checkout was red and the guard named the rule.
+
+Every instrument an author or a reviewer would reach for said fine:
+
+    the rule's own package suite      green
+    go build ./... && go vet ./...    clean
+    git status                        clean for the author's paths
+    git diff HEAD -- <author files>   empty
+    internal/lint/registry            RED, and it names the rule
+
+**Only the last one can see it, and it is the only one that is not about your files.** The
+failure is structural rather than careless: cross-package edits are exactly the work a
+commit scoped by pathspec is most likely to miss, and they are also the work whose absence
+your own package cannot detect. That is the same asymmetry as the mutation sweep's
+cross-package blind spot in section 7, arriving through the commit rather than through the
+scoring.
+
+So after any commit you did not make yourself, and before reporting a port complete:
+
+    git diff HEAD -- <your files>                 what landed is what you verified
+    go test ./internal/lint/registry/             what landed is LEGAL
+
+Run the second even when the first is empty, and especially then, because an empty diff is
+what makes the situation look finished. And when the guard names your rule, confirm the
+attribution with a control rather than assuming: stash the hunk, watch the guard name it,
+restore the hunk, watch the name disappear. Six other rules were in that failure list and
+all six belonged to other agents mid-flight; without the stash there is no way to tell your
+own omission from someone else's in-progress work, and the two look identical in the
+output.
 
 ### Editing a shared tracked file is one mistake with three faces
 
