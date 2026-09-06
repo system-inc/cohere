@@ -1860,7 +1860,7 @@ the repair reconstructs a reference or synthesises a node the corpus never pins,
 separate job.
 
 **Read the `output` ratio before accepting any judgment/fixer split.** Line counts mislead here.
-`prefer-optional-chain` looks like the ideal candidate until you count: the fixer is 324 lines
+`prefer-optional-chain` looks like the ideal candidate until you count: the fixer is 323 lines
 of 1,807, and 729 of its 739 corpus cases carry an `output`. Halving that rule along the
 judgment line discards 98% of its coverage, whatever the source division suggests.
 
