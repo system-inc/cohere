@@ -743,6 +743,14 @@ expressions. So any port reasoning about a node's immediate parent or its exact 
 unwrap first: `({ a: (function(){}) })` reports upstream and needs the parenthesis unwrapped
 here, and the fix range has to cover it or the repair leaves a stray `)`.
 
+**Unwrap on every side of the question, not only on the node you are inspecting.** This has
+now cost findings in four rules across three batches, and the miss is rarely the obvious
+argument: `a || (b && c)` never reaches the `&&` in a mixed-expression walk, and
+`Boolean(((a = b), b || c))` needs unwrapping on both sides of the comparison rather than on
+the argument alone. Most corpora write few parenthesized forms, so guessing wrong costs
+nothing until the real tree. When a walk misses a shape you expected it to reach, probe the
+parent chain and read what is actually there before adjusting the walk again.
+
 **Upstream merges shapes our tree keeps separate.** In ESTree a property, a method, a getter
 and a setter are one `Property` node distinguished by a `kind` field, so upstream must guard
 against accessors reaching its shorthand tests. Here each has its own syntax kind and matches
