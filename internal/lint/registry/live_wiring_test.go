@@ -69,6 +69,19 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		"id-denylist": "ported and registered; denies nothing until a project names which identifiers it bans, which is a decision about this codebase rather than a wiring step",
 		"id-match":    "ported and registered; matches everything until a project names a naming pattern, which is a decision about this codebase rather than a wiring step",
 
+		// Both audited **No** -- a judgment about ENABLING, on cleanup cost rather than on
+		// correctness, and it stands. The counts are why: id-length measured 862 violations on the
+		// ahra tree and max-depth 176, neither rule ships a fixer, so every one is a hand edit or a
+		// refactor. Porting them is still worth doing, because a No that was never ported cannot be
+		// revisited without redoing the work.
+		//
+		// Unlike the four rules above, these are NOT inert when unconfigured: id-length enforces a
+		// minimum of 2 by default and max-depth a depth of 4, so enabling either would start
+		// reporting immediately. That is exactly why enabling is somebody's decision rather than a
+		// wiring step, and why they are listed here rather than switched on.
+		"id-length": "ported and registered; audited No at 862 violations with no fixer, so enabling is a decision for whoever takes that cleanup",
+		"max-depth": "ported and registered; audited No at 176 violations with no fixer, so enabling is a decision for whoever takes that cleanup",
+
 		// Ported and registered without being enabled, because enabling it is a decision with work
 		// attached rather than a wiring step. The audit measured 54 violations and the rule has no
 		// fixer, so every one is a hand edit; the config has never named it under either spelling.
@@ -353,6 +366,27 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// say so.
 		"react/sort-comp":                 "registered but not enabled: ported as a guardrail rather than a cleanup, and measured at zero findings over 3,540 files with the rule demonstrably live (not in the offered-no-files list, and a seeded probe reports). Enabling it is a decision about adopting a member-ordering convention the tree already satisfies",
 		"react/no-invalid-html-attribute": "registered but not enabled: ported as a guardrail rather than a cleanup, and measured at zero findings over 3,540 files with the rule demonstrably live (not in the offered-no-files list, and a seeded probe reports). Enabling it costs nothing today and would catch a future invalid rel value",
+		// Four ESLint core rules ported in one batch, all deliberately unenabled.
+		//
+		// A DIFFERENT shape from the react pair above, and the difference is the point: those two
+		// measured zero on this tree, so enabling them would cost nothing. These four measure
+		// 121, 62, 178 and 217 findings respectively over 3,540 files, so enabling any of them is a
+		// cleanup somebody has to schedule rather than a guardrail somebody can flip on.
+		//
+		// Each was audited "No", and that judgment was about ENABLING rather than about the port.
+		// The refusals stand; the rules are here so the decision is a config line rather than a
+		// missing implementation.
+		//
+		// The counts were re-measured on 2026-09-06 rather than inherited from the audit, and one
+		// had moved: class-methods-use-this was audited at 194 and now reports 217. The tree grew.
+		// All four were then differentially compared against ESLint driving the same rule over the
+		// same files, and class-methods-use-this agrees on all 1,163 files it touches with zero
+		// disagreements -- a comparison that found two real defects here first, both TypeScript
+		// shapes upstream's JavaScript corpus cannot express.
+		"dot-notation":           "ported and registered, not enabled: 121 findings over 3,540 files, so enabling it is a scheduled cleanup rather than a guardrail. Audited No, and that refusal was about enabling rather than about the port",
+		"default-case":           "ported and registered, not enabled: 62 findings over 3,540 files, so enabling it is a scheduled cleanup rather than a guardrail. Audited No, and that refusal was about enabling rather than about the port",
+		"func-name-matching":     "ported and registered, not enabled: 178 findings over 3,540 files, so enabling it is a scheduled cleanup rather than a guardrail. Audited No, and that refusal was about enabling rather than about the port",
+		"class-methods-use-this": "ported and registered, not enabled: 217 findings over 3,540 files (the audit said 194; the tree grew, and the new count agrees with ESLint on all 1,163 files it touches). Audited No, and that refusal was about enabling rather than about the port",
 	}
 
 	rules := All()
