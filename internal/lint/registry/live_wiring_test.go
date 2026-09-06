@@ -74,6 +74,25 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// fixer, so every one is a hand edit; the config has never named it under either spelling.
 		"@typescript-eslint/no-deprecated": "ported and registered; the audit measured 54 violations and the rule has no fixer, so enabling is a decision for whoever takes that cleanup",
 
+		// Ported and registered without being enabled, and the reason is a decision rather than a
+		// wiring gap. The bare `consistent-return` is already enabled at CohereSettings.json:506,
+		// and the two are NOT interchangeable: the extension is the core rule plus two type-driven
+		// filters, measured at 13 divergences over upstream's own 30-case corpus, every one of them
+		// the extension going silent where the core reports.
+		//
+		// So enabling this is not "turn on a ported rule". It is choosing between two rules that
+		// enforce different things on the same tree, and doing it by adding a key would leave the
+		// bare one enabled as well, reporting the 13 the extension exists to suppress. The audit
+		// measured 121 violations for the extension and it has no fixer, so every site is a hand
+		// edit either way.
+		//
+		// The namespaced name does not resolve to the existing short key, which was checked rather
+		// than assumed: `settingFor` trims the CONFIGURED name by the RULE name, and a short key is
+		// not a suffix of a longer rule name, so the trim is a no-op. Confirmed by driving the
+		// built binary from the ahra tree -- 387 rules in `--rules-enabled`, `consistent-return`
+		// present, `@typescript-eslint/consistent-return` absent.
+		"@typescript-eslint/consistent-return": "ported and registered; the bare consistent-return is already enabled and the two enforce different things, so which one this tree wants is a decision rather than a wiring step",
+
 		// The live config sets `react/jsx-key` to "off" explicitly, in a block of ten-plus rules
 		// this project has deliberately turned off alongside `react/react-in-jsx-scope`. That is a
 		// decision about this codebase rather than a wiring gap, and flipping it here would
