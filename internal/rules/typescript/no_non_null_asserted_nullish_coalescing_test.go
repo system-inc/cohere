@@ -45,6 +45,8 @@ func applyNoNonNullAssertedNullishCoalescingSuggestion(t *testing.T, source stri
 // six are most of what this rule decides, and none of them can be reached without resolving the
 // identifier to its binding.
 func TestNoNonNullAssertedNullishCoalescingStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"foo ?? bar;",
 		"foo ?? bar!;",
@@ -87,6 +89,8 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnUpstreamPassCases(t *tes
 // The harness writes each fixture as `strings.TrimSpace(source)+"\n"`, so both the span slices and
 // the expected rewrites are against that trimmed text rather than the Go literal.
 func TestNoNonNullAssertedNullishCoalescingFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText     string
 		wantSpan       string
@@ -221,6 +225,8 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnUpstreamFailCases(t *testing.T
 // worth reading twice: resolving to the wrong binding would flip both rows, and each row alone would
 // still look correct.
 func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -313,6 +319,8 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWr
 // The hoisted-write row pairs with its write-below twin in the clean test above, and together they
 // are what make the end-position comparison a real discrimination rather than a detail.
 func TestNoNonNullAssertedNullishCoalescingFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText     string
 		wantSpan       string
@@ -391,6 +399,8 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnShapesTheCorpusDoesNotWrite(t 
 // identifier case goes silent. That is the dangerous direction: the clean fixtures would all pass
 // having proven nothing.
 func TestNoNonNullAssertedNullishCoalescingNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoNonNullAssertedNullishCoalescing.NeedsTypeChecker {
 		t.Fatal("the assignment test resolves an identifier to its binding, so the rule must declare NeedsTypeChecker")
 	}

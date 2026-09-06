@@ -7,6 +7,8 @@ import (
 )
 
 func TestNoCssTagsReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -46,6 +48,8 @@ func TestNoCssTagsReports(t *testing.T) {
 }
 
 func TestNoCssTagsIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

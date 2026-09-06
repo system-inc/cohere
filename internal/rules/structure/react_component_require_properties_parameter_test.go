@@ -9,6 +9,8 @@ import (
 const propertiesParameterFile = "/repository/source/components/Button.tsx"
 
 func TestReactComponentRequirePropertiesParameterFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -51,6 +53,8 @@ func TestReactComponentRequirePropertiesParameterFires(t *testing.T) {
 }
 
 func TestReactComponentRequirePropertiesParameterStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -139,6 +143,8 @@ func TestReactComponentRequirePropertiesParameterStaysSilent(t *testing.T) {
 // Asserted through the suggestion rather than through ExpectFixedSource, which reads only the
 // automatic fixes and correctly refuses to check a rule that proposes none.
 func TestReactComponentRequirePropertiesParameterSuggestsRenamingTheDeclaration(t *testing.T) {
+	t.Parallel()
+
 	const source = "export function Button(props: { label: string }) {\n" +
 		"    return <button>{props.label}</button>;\n}\n"
 	const wanted = "export function Button(properties: { label: string }) {\n" +

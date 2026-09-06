@@ -130,6 +130,8 @@ func contextRequiresAccessSilentCases() []contextRequiresAccessCase {
 }
 
 func TestContextRequiresAccessFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range contextRequiresAccessFiresCases() {
 		t.Run(testCase.name, func(t *testing.T) {
 			wantIds := make([]string, len(testCase.wantKeys))
@@ -142,6 +144,8 @@ func TestContextRequiresAccessFires(t *testing.T) {
 }
 
 func TestContextRequiresAccessStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range contextRequiresAccessSilentCases() {
 		t.Run(testCase.name, func(t *testing.T) {
 			rule_testing.ExpectClean(t, runContextRequiresAccess(t, testCase))
@@ -155,6 +159,8 @@ func TestContextRequiresAccessStaysSilent(t *testing.T) {
 // keys. A rule that found the right methods through the wrong key would report the right count with
 // the wrong word, and would tell the reader to add a decorator that fixes nothing.
 func TestContextRequiresAccessNamesTheKey(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range contextRequiresAccessFiresCases() {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := runContextRequiresAccess(t, testCase)
@@ -191,6 +197,8 @@ func TestContextRequiresAccessNamesTheKey(t *testing.T) {
 //	                                 accepts calls only. It DOES: the access check uses a different
 //	                                 helper that also accepts a bare identifier.
 func TestContextRequiresAccessSurprises(t *testing.T) {
+	t.Parallel()
+
 	cases := []contextRequiresAccessCase{
 		{
 			name: "an alias TO a configured name protects nothing and is clean",
@@ -284,6 +292,8 @@ func TestContextRequiresAccessSurprises(t *testing.T) {
 // nothing turns on these answers in practice. If one appears, this test is where the decision was
 // recorded rather than inferred.
 func TestContextRequiresAccessUnmeasurableShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []contextRequiresAccessCase{
 		{
 			name: "a decorated constructor is a member like any other",
@@ -347,6 +357,8 @@ func TestContextRequiresAccessUnmeasurableShapes(t *testing.T) {
 // difference exists -- an empty requirement map matches nothing either way, so no fixture over
 // findings could tell a guarded rule from an unguarded one.
 func TestContextRequiresAccessRegistersNothingUnconfigured(t *testing.T) {
+	t.Parallel()
+
 	listenersFor := func(options any) rule.Listeners {
 		return ContextRequiresAccess.Run(rule.Context{}, options)
 	}
@@ -370,6 +382,8 @@ func TestContextRequiresAccessRegistersNothingUnconfigured(t *testing.T) {
 // be accepted silently. The second is the dangerous one: it reports on every injection of that key
 // with a message naming no decorator to add.
 func TestDecodeContextRequiresAccessOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil input yields an empty list", func(t *testing.T) {
 		decoded, err := DecodeContextRequiresAccessOptions(nil)
 		if err != nil {
@@ -416,6 +430,8 @@ func TestDecodeContextRequiresAccessOptions(t *testing.T) {
 // an argument about what a rule does not call is exactly the kind that stops being true after an
 // edit.
 func TestContextRequiresAccessSurvivesUnusualParameters(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		// A destructured parameter, whose name is a binding pattern rather than an identifier.
 		"class A { m(@InjectRequestContext(AccountRequestContextKey) { a }: { a: string }) {} }",

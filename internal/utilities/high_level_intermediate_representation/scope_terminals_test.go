@@ -51,6 +51,8 @@ func scopeTerminalsIn(function *Function) []*Scope {
 // decision reversible: if the producer is ever removed or silently stops firing, this fails rather
 // than leaving a hole in every switch.
 func TestScopeTerminalsAreBuilt(t *testing.T) {
+	t.Parallel()
+
 	function, _, _, result := terminalsFor(t, `
 		function Component(props) {
 			const items = [];
@@ -85,6 +87,8 @@ func TestScopeTerminalsAreBuilt(t *testing.T) {
 // could not have found them. They were found by enumerating every switch over `Terminal` before the
 // variant was added, which is the method this test exists to keep honest.
 func TestScopeTerminalIsReachableThroughFallthrough(t *testing.T) {
+	t.Parallel()
+
 	terminal := &Scope{Scope: 7, Block: 3, Fallthrough: 9, Order: 4}
 
 	block, ok := Fallthrough(terminal)
@@ -122,6 +126,8 @@ func TestScopeTerminalIsReachableThroughFallthrough(t *testing.T) {
 // TestScopeTerminalPrints pins the printer arm, which has no default and would have gone red, but
 // whose OUTPUT nothing else asserts.
 func TestScopeTerminalPrints(t *testing.T) {
+	t.Parallel()
+
 	function := NewFunction(nil, "probe", FunctionKindOther)
 	got := printTerminal(function, &Scope{Scope: 2, Block: 5, Fallthrough: 8})
 	want := "Scope @2 block=bb5 fallthrough=bb8"
@@ -145,6 +151,8 @@ func TestScopeTerminalPrints(t *testing.T) {
 // The tell was that the built count EXCEEDED the control, which is why the corpus test below asserts
 // against the merged count rather than merely asserting the count is non-zero.
 func TestScopeTerminalsKeyOnTheMergedGroup(t *testing.T) {
+	t.Parallel()
+
 	function, scopes, identity, result := terminalsFor(t, `
 		function Component(props) {
 			const a = {};
@@ -190,6 +198,8 @@ func TestScopeTerminalsKeyOnTheMergedGroup(t *testing.T) {
 // stops. A linter declines the function instead, for the reason `ValidateScopes` gives: a linter
 // that stops on a graph it dislikes is worse than one that declines a function.
 func TestScopeTerminalsDeclineOnUnnestedScopes(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := scopesFor(t, `
 		function Component(props) {
 			const a = {};
@@ -238,6 +248,8 @@ func (o overlappingIdentity) RangeOf(scope ScopeId) MutableRange {
 // consuming from a queue that only shrinks. This counts the visits and asserts they are bounded by
 // exactly that, so an accidental re-entry becomes a failure rather than a slowdown.
 func TestScopeTerminalsAreASinglePass(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := scopesFor(t, `
 		function Component(props) {
 			const list = [];
@@ -297,6 +309,8 @@ func TestScopeTerminalsAreASinglePass(t *testing.T) {
 // the single forward sweep over instructions correct. That is a consequence of the traversal, not of
 // a sort, and asserting it here means a future reintroduction of a sort has to keep it true.
 func TestScopeRewritesAreQueuedInTraversalOrderNotSortedByPosition(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := scopesFor(t, `
 		function Component(props) {
 			const a = {};
@@ -338,6 +352,8 @@ func TestScopeRewritesAreQueuedInTraversalOrderNotSortedByPosition(t *testing.T)
 // which is why both mutants of it survived: the fixtures could not see a comparator that should not
 // have been consulted. Measured on this source, the collision is at position 7.
 func TestAScopeEndingWhereAnotherBeginsClosesFirst(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := scopesFor(t, `
 		function Component(props) {
 			const a = {};
@@ -383,6 +399,8 @@ func TestAScopeEndingWhereAnotherBeginsClosesFirst(t *testing.T) {
 // wrong is silent -- a phi reading from a block that no longer flows there produces wrong values and
 // no crash.
 func TestScopeTerminalsPreserveSingleAssignmentForm(t *testing.T) {
+	t.Parallel()
+
 	function, _, _, result := terminalsFor(t, `
 		function Component(props) {
 			let total = 0;
@@ -441,6 +459,8 @@ func TestScopeTerminalsPreserveSingleAssignmentForm(t *testing.T) {
 // "fixtures assert the wrong layer" category -- every fixture covering these blocks asserted their
 // structure and none asserted what the jump claimed to be.
 func TestScopeEndJumpsWithBreak(t *testing.T) {
+	t.Parallel()
+
 	function, _, _, result := terminalsFor(t, `
 		function Component(props) {
 			const a = {};
@@ -491,6 +511,8 @@ func TestScopeEndJumpsWithBreak(t *testing.T) {
 // ZERO -- which `MarkEvaluationOrder` documents as meaning the finalizer never reached them. Any
 // pass reading evaluation order after this one would silently compare against zero.
 func TestScopeTerminalsRenumberTheGraph(t *testing.T) {
+	t.Parallel()
+
 	function, _, _, result := terminalsFor(t, `
 		function Component(props) {
 			const a = {};
@@ -533,6 +555,8 @@ func TestScopeTerminalsRenumberTheGraph(t *testing.T) {
 
 // TestScopeTerminalsGapsAreDeclared pins the gap list, so closing one is a visible event.
 func TestScopeTerminalsGapsAreDeclared(t *testing.T) {
+	t.Parallel()
+
 	gaps := ScopeTerminalsGaps()
 	if len(gaps) != 1 || gaps[0] != ScopeTerminalsGapPrunedScope {
 		t.Errorf("gaps are %v, want exactly [ScopeTerminalsGapPrunedScope]", gaps)
@@ -546,6 +570,8 @@ func TestScopeTerminalsGapsAreDeclared(t *testing.T) {
 // Adding it would create the exact `Optional` shape this package already carries as a warning. If a
 // later stage ports one of those passes, it adds the variant in the same commit and updates this.
 func TestPrunedScopeIsNotDeclared(t *testing.T) {
+	t.Parallel()
+
 	contents, err := os.ReadFile("terminal.go")
 	if err != nil {
 		t.Fatalf("reading terminal.go: %v", err)
@@ -573,6 +599,8 @@ func TestPrunedScopeIsNotDeclared(t *testing.T) {
 // terminals against 2,874 scopes, and the excess was 412 duplicates. A bare non-zero count could not
 // have seen that.
 func TestScopeTerminalsRecoverEveryScopeFromTheGraph(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}

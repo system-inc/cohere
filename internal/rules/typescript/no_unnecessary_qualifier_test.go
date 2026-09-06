@@ -23,6 +23,8 @@ func noUnnecessaryQualifierCaseName(index int) string {
 // is nil. The two `Foo` cases where an enum and a namespace merge pass because the scope lookup for
 // the accessed symbol's flags returns an empty scope.
 func TestNoUnnecessaryQualifierStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"namespace X {\n  export type T = number;\n}\n\nnamespace Y {\n  export const x: X.T = 3;\n}\n",
 		"namespace A {}\nnamespace A.B {\n  export type Z = 1;\n}\n",
@@ -105,6 +107,8 @@ type noUnnecessaryQualifierFinding struct {
 // `A.B.C.D` it is `A.B.C` rather than `A`. Asserting only the message id would leave both the span
 // and the nesting suppression free to be wrong.
 func TestNoUnnecessaryQualifierFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []noUnnecessaryQualifierFinding

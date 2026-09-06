@@ -25,6 +25,8 @@ const jsxPropsNoSpreadMultiFile = "/repository/source/Spread.tsx"
 // separates two different properties of one receiver, and the fourth is the only parenthesized
 // input in either corpus and is what pins that the receivers are compared rather than the text.
 func TestJsxPropsNoSpreadMultiFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -194,6 +196,8 @@ func TestJsxPropsNoSpreadMultiFires(t *testing.T) {
 // The clean cases are the whole discrimination, and the imported four are joined by the shapes our
 // tree can produce that oxc's cannot.
 func TestJsxPropsNoSpreadMultiStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -306,6 +310,8 @@ func TestJsxPropsNoSpreadMultiStaysSilent(t *testing.T) {
 // reporting the peeled expression would point at `props.foo` inside `{...(props.foo).baz}`, which
 // is not what upstream underlines.
 func TestJsxPropsNoSpreadMultiReportsTheEarlierSpread(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -362,6 +368,8 @@ func TestJsxPropsNoSpreadMultiReportsTheEarlierSpread(t *testing.T) {
 // of the first, first and second spreads. A rule reporting the right count from the wrong pairing,
 // or reporting the same node three times, passes every other assertion in this file.
 func TestJsxPropsNoSpreadMultiPairsByPosition(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "const a = <App {...props.a} {...props.a} {...props.a} />;\n"
 	result := rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile, sourceText)
 	if len(result.Diagnostics) != 3 {
@@ -385,6 +393,8 @@ func TestJsxPropsNoSpreadMultiPairsByPosition(t *testing.T) {
 // messages here are near-identical prose differing only in their opening noun, so a containment
 // check would pass against either one. Equality is what separates them.
 func TestJsxPropsNoSpreadMultiRendersBothMessages(t *testing.T) {
+	t.Parallel()
+
 	identifierResult := rule_testing.Run(t, JsxPropsNoSpreadMulti, jsxPropsNoSpreadMultiFile,
 		"const a = <App {...props} {...props} />;\n")
 	if len(identifierResult.Diagnostics) != 1 {

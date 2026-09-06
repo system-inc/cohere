@@ -36,6 +36,8 @@ const exhaustiveDepsFile = "/repository/source/ExhaustiveDeps.tsx"
 // whole comes last. ESLint reports the summary first, so an expectation copied from its output
 // order would be wrong about eleven cases while being right about every id.
 func TestExhaustiveDepsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -238,6 +240,8 @@ func TestExhaustiveDepsFires(t *testing.T) {
 // dependency array, which React turns into two findings because its chain walk throws on a node
 // kind it does not name, and which this rule unwraps because `!` cannot change what is read.
 func TestExhaustiveDepsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          });\n        }",
 		"function MyComponent() {\n          useEffect(() => {\n            const local = {};\n            console.log(local);\n          }, []);\n        }",
@@ -405,6 +409,8 @@ func TestExhaustiveDepsStaysSilent(t *testing.T) {
 // regress: an unported kind's input must not crash the walk or produce a finding of a DIFFERENT
 // kind, and only running them says so.
 func TestExhaustiveDepsScopeIsStated(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		reason     string
@@ -473,6 +479,8 @@ func exhaustiveDepsIndexLabel(value int) string {
 // would look external, and the rule would go completely quiet while every StaysSilent case above
 // passed vacuously. A later revert to `rule_testing.Run` would look like a green suite.
 func TestExhaustiveDepsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !ExhaustiveDeps.NeedsTypeChecker {
 		t.Fatal("this rule resolves every identifier through the checker and must declare it")
 	}
@@ -501,6 +509,8 @@ func TestExhaustiveDepsRequiresTheTypedHarness(t *testing.T) {
 // unnecessary. So `useEffective` reports and `useMyEffect2` is silent, and a substring test gets
 // both backwards.
 func TestExhaustiveDepsAdditionalHooks(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		optionsJson string
@@ -564,6 +574,8 @@ func TestExhaustiveDepsAdditionalHooks(t *testing.T) {
 // the same comparison was run over seventeen real components from this repository, where all
 // seventeen suggested arrays matched character for character.
 func TestExhaustiveDepsSuggestsTheCorrectedArray(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -634,6 +646,8 @@ func TestExhaustiveDepsSuggestsTheCorrectedArray(t *testing.T) {
 // difference between advice a person reads and an edit that lands in their file unattended. A later
 // change moving the rewrite into `Fixes` would be invisible to every other test here.
 func TestExhaustiveDepsProposesNoAutomaticFix(t *testing.T) {
+	t.Parallel()
+
 	source := "function C(props) { useEffect(() => { console.log(props.foo); }, []); }"
 	result := rule_testing.RunTyped(t, ExhaustiveDeps, exhaustiveDepsFile, source)
 	if len(result.Diagnostics) != 1 {
@@ -659,6 +673,8 @@ func TestExhaustiveDepsProposesNoAutomaticFix(t *testing.T) {
 // constructs in neither branch, a rule answering "any ternary is a construction" would pass the
 // first two and be wrong about ordinary code.
 func TestExhaustiveDepsConstructionRecursesThroughBranches(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -697,6 +713,8 @@ func TestExhaustiveDepsConstructionRecursesThroughBranches(t *testing.T) {
 // problem, and the DECLARATION for a construction, because the fix is at the declaration and not at
 // the Hook. A rule pointing all three at the Hook call would pass every other test in this file.
 func TestExhaustiveDepsPointsAtTheRightNode(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -745,6 +763,8 @@ func TestExhaustiveDepsPointsAtTheRightNode(t *testing.T) {
 //
 // Every expectation below was read off React 7.1.1 before it was written.
 func TestExhaustiveDepsNonEffectRebuildsTheArray(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

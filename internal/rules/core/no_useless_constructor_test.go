@@ -19,6 +19,8 @@ const uselessConstructorFile = "/repository/source/UselessConstructor.ts"
 // Upstream splits them across two rule testers, one per parser. Both are imported as one set,
 // because our parser reads TypeScript natively and the split is a fact about espree.
 func TestNoUselessConstructorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"class A { }",
 		"class A { constructor(){ doSomething(); } }",
@@ -72,6 +74,8 @@ func TestNoUselessConstructorStaysSilent(t *testing.T) {
 // is a real decision rather than formatting: a class body member that would otherwise continue
 // the previous expression needs one. Upstream computes that and its outputs pin it.
 func TestNoUselessConstructorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantOutput string
@@ -151,6 +155,8 @@ func applyUselessConstructorSuggestion(t *testing.T, source string, suggestion r
 // the whole member would include the body and a port reporting the name alone would drop the
 // modifier. Both would pass every message-id fixture.
 func TestNoUselessConstructorSpansTheHead(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantReported string
@@ -182,6 +188,8 @@ func TestNoUselessConstructorSpansTheHead(t *testing.T) {
 // declared; on a base class it says what was already true. All four measured against the
 // installed build.
 func TestNoUselessConstructorAccessibility(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		wantFinding bool
@@ -208,6 +216,8 @@ func TestNoUselessConstructorAccessibility(t *testing.T) {
 // constant, because comparing a diagnostic to the constant it was built from moves both sides
 // together under mutation.
 func TestNoUselessConstructorMessages(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUselessConstructor, uselessConstructorFile,
 		"class A { constructor() {} }")
 	if len(result.Diagnostics) != 1 {
@@ -231,6 +241,8 @@ func TestNoUselessConstructorMessages(t *testing.T) {
 // Upstream's corpus writes neither, because both are mistakes nobody makes on purpose. All five rows
 // measured against the installed eslint at 10.8.1.
 func TestNoUselessConstructorForwardingMustMatchExactly(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		wantFinding bool
@@ -270,6 +282,8 @@ func TestNoUselessConstructorForwardingMustMatchExactly(t *testing.T) {
 // Upstream's corpus writes no `implements` at all, because its default parser cannot parse one.
 // All five rows measured against the installed eslint at 10.8.1 with the TypeScript parser.
 func TestNoUselessConstructorHeritageAndSoleStatement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		wantFinding bool

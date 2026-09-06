@@ -37,6 +37,8 @@ import (
 // same dependencies is what makes the arm split matter, and if a future change stops producing that
 // shape the reason this code exists has quietly evaporated.
 func TestPrunedScopesAreRecordedRatherThanCompared(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 		import {useCallback} from 'react';
 		function sum(a, b) { return a + b; }

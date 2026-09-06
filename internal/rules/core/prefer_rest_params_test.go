@@ -18,6 +18,8 @@ const preferRestParamsFile = "/repository/source/PreferRestParams.ts"
 // plain harness the rule receives a nil checker, goes completely silent, and every StaysSilent case
 // below would pass while proving nothing. TestPreferRestParamsRequiresTheTypedHarness pins that.
 func TestPreferRestParamsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -48,6 +50,8 @@ func TestPreferRestParamsFires(t *testing.T) {
 // parameter. The last two are normal member access, which upstream deliberately permits: reading
 // `arguments.length` or `arguments.callee` is not the array-like abuse this rule targets.
 func TestPreferRestParamsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -76,6 +80,8 @@ func TestPreferRestParamsStaysSilent(t *testing.T) {
 // Every finding must point at the `arguments` identifier itself, not at the enclosing statement,
 // the member expression, or the function.
 func TestPreferRestParamsPointsAtTheIdentifier(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -110,6 +116,8 @@ func TestPreferRestParamsPointsAtTheIdentifier(t *testing.T) {
 // "reports at the right one of two candidate identifiers" are different claims. An arrow inherits
 // the enclosing function's implicit binding, so the finding belongs to the arrow's own reference.
 func TestPreferRestParamsReportsTheArrowsOwnReference(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "function outer() { arguments; var bar = () => arguments; }"
 
 	result := rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, sourceText)
@@ -129,6 +137,8 @@ func TestPreferRestParamsReportsTheArrowsOwnReference(t *testing.T) {
 // single-span edit and has to invent a parameter name. Under this tree's rule that is not even a
 // suggestion. A later commit adding a fix should have to delete this test on purpose.
 func TestPreferRestParamsProposesNoRepair(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, PreferRestParams, preferRestParamsFile, "function foo() { arguments; }")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -143,6 +153,8 @@ func TestPreferRestParamsProposesNoRepair(t *testing.T) {
 // would fail in a way that reads like a rule bug. This pins the distinction so a revert to
 // rule_testing.Run fails here, loudly, saying what it actually is.
 func TestPreferRestParamsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "function foo() { arguments; }"
 
 	if !PreferRestParams.NeedsTypeChecker {
@@ -159,6 +171,8 @@ func TestPreferRestParamsRequiresTheTypedHarness(t *testing.T) {
 // distinctions that a structural walk would get wrong are untested by it entirely. Each of these
 // was measured against the checker before it was written down.
 func TestPreferRestParamsResolvesShadowsWherverTheyAreDeclared(t *testing.T) {
+	t.Parallel()
+
 	silent := []struct {
 		name       string
 		sourceText string

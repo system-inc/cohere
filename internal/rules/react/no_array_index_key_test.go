@@ -31,6 +31,8 @@ const noArrayIndexKeyFile = "/repository/source/Keys.tsx"
 
 // TestNoArrayIndexKeyFires runs the forty-one failing cases from upstream.
 func TestNoArrayIndexKeyFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -163,6 +165,8 @@ func TestNoArrayIndexKeyFires(t *testing.T) {
 // than obvious passes: a key built from the item rather than the index, an index used as a
 // subscript rather than as the key, and a callback with too few parameters to have an index at all.
 func TestNoArrayIndexKeyStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -242,6 +246,8 @@ func TestNoArrayIndexKeyStaysSilent(t *testing.T) {
 // The listener guards on a nil checker, so the plain harness makes the whole rule silent rather
 // than crashing, which is the quieter and more dangerous failure.
 func TestNoArrayIndexKeyRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "foo.map((bar, i) => <Foo key={i} />)\n"
 
 	typed := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, source)
@@ -263,6 +269,8 @@ func TestNoArrayIndexKeyRequiresTheTypedHarness(t *testing.T) {
 // the run fails before any rule is offered a file. Weakening the rule to make such a fixture pass
 // would turn a fact about the harness into a fact about the rule.
 func TestNoArrayIndexKeyHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	source := "foo.map((bar, i) => <Foo key={i} />)\n"
 	result := rule_testing.RunTyped(t, NoArrayIndexKey, "/repository/source/Suffix.tsx", source)
 	rule_testing.ExpectFindings(t, result, "noArrayIndex")
@@ -275,6 +283,8 @@ func TestNoArrayIndexKeyHasNoFileSuffixGate(t *testing.T) {
 // upstream is silent, so only the two-parameter fold separates them. The corpus does test both
 // folds, and the near-miss rows below are not in it.
 func TestNoArrayIndexKeyIteratorMethods(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -326,6 +336,8 @@ func TestNoArrayIndexKeyIteratorMethods(t *testing.T) {
 // test, and the two answers differ: the computed form is silent upstream and the call-as-callee
 // form reports, so a guard that declined both would be wrong in one direction.
 func TestNoArrayIndexKeyCalleeShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -363,6 +375,8 @@ func TestNoArrayIndexKeyCalleeShapes(t *testing.T) {
 // one: `(bar, i = 0)` reads as an index to a human and is an assignment pattern to the parser.
 // Both measured against the installed build.
 func TestNoArrayIndexKeyParameterShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -390,6 +404,8 @@ func TestNoArrayIndexKeyParameterShapes(t *testing.T) {
 // plainly inside it. A port that generalized any of these would report on code upstream leaves
 // alone, and nothing in the corpus writes `Number(i)` or `i.toFixed()`.
 func TestNoArrayIndexKeyKeyExpressionShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		key     string
@@ -446,6 +462,8 @@ func TestNoArrayIndexKeyKeyExpressionShapes(t *testing.T) {
 // the stack: a name is in scope only inside its own callback, so the same identifier is clean
 // before and after.
 func TestNoArrayIndexKeyStackBehaviour(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -493,6 +511,8 @@ func TestNoArrayIndexKeyStackBehaviour(t *testing.T) {
 // last row shows how narrow that test is: any other receiver keeps the ordinary argument order, so
 // the same two-argument shape is silent.
 func TestNoArrayIndexKeyReactChildren(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -534,6 +554,8 @@ func TestNoArrayIndexKeyReactChildren(t *testing.T) {
 // the bare name through its own variable index and requires the import's source to be exactly
 // `react`. The last row is what that requirement buys, and nothing in the corpus writes it.
 func TestNoArrayIndexKeyCreateElement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -611,6 +633,8 @@ func TestNoArrayIndexKeyCreateElement(t *testing.T) {
 // `RunTyped` writes `strings.TrimSpace(source) + "\n"` to disk, so the expectation is sliced from
 // the same transform rather than from the Go literal, which would be one byte off.
 func TestNoArrayIndexKeySpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -654,6 +678,8 @@ func TestNoArrayIndexKeySpans(t *testing.T) {
 // Asserted against a literal typed here rather than against the rule's own constant, which would
 // move on both sides under mutation and could not fail.
 func TestNoArrayIndexKeyMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageNoArrayIndexKey.Id != "noArrayIndex" {
 		t.Errorf("message id = %q", messageNoArrayIndexKey.Id)
 	}

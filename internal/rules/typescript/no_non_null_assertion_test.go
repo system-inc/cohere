@@ -12,6 +12,8 @@ import (
 const nonNullAssertionFile = "/repository/source/Thing.ts"
 
 func TestNoNonNullAssertionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -49,6 +51,8 @@ func TestNoNonNullAssertionFires(t *testing.T) {
 }
 
 func TestNoNonNullAssertionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -89,6 +93,8 @@ func TestNoNonNullAssertionStaysSilent(t *testing.T) {
 // above: every case there passes whether or not a suggestion is attached, and whether or not the
 // suggestion would parse. This is the guard for the half that ships silently.
 func TestNoNonNullAssertionSuggestions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -130,6 +136,8 @@ func TestNoNonNullAssertionSuggestions(t *testing.T) {
 //
 // The reference implementation consulted for this port recognizes only the first of these.
 func TestNoNonNullAssertionWithholdsSuggestionsThatWouldNotParse(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -169,6 +177,8 @@ func TestNoNonNullAssertionWithholdsSuggestionsThatWouldNotParse(t *testing.T) {
 // else. Mutation testing found this check unpinned by every other fixture here, which is why it has
 // its own.
 func TestNoNonNullAssertionWithholdsSuggestionsOutsideTheObjectPosition(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -32,6 +32,8 @@ type errorBoundariesCase struct {
 }
 
 func TestErrorBoundariesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []errorBoundariesCase{
 		{
 			name:   "upstreamJsxInTryWithCatch",
@@ -236,6 +238,8 @@ func TestErrorBoundariesFires(t *testing.T) {
 }
 
 func TestErrorBoundariesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []errorBoundariesCase{
 		{
 			name:   "upstreamTodoTryWithFinallyNoCatch",
@@ -462,6 +466,8 @@ func TestErrorBoundariesStaysSilent(t *testing.T) {
 // source below is that fixture with its pragma comment removed, so the offsets differ while the
 // reported text does not, and the text is what this asserts.
 func TestErrorBoundariesSpan(t *testing.T) {
+	t.Parallel()
+
 	source := "function Component(props) {\n  let el;\n  try {\n    el = <div />;\n  } catch {\n    return null;\n  }\n  return el;\n}\n"
 	result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", source)
 	if len(result.Diagnostics) != 1 {
@@ -481,6 +487,8 @@ func TestErrorBoundariesSpan(t *testing.T) {
 // Measured on React first: `<div><span /></div>` inside a try produces two findings, one spanning
 // the whole outer element and one spanning the inner.
 func TestErrorBoundariesSpanOnNestedElements(t *testing.T) {
+	t.Parallel()
+
 	source := "function Component() {\n  let el;\n  try {\n    el = <div><span /></div>;\n  } catch {\n    return null;\n  }\n  return el;\n}\n"
 	result := rule_testing.Run(t, ErrorBoundaries, "component.tsx", source)
 	if len(result.Diagnostics) != 2 {
@@ -504,6 +512,8 @@ func TestErrorBoundariesSpanOnNestedElements(t *testing.T) {
 // guard and equality on both fields is the whole assertion. Asserting against the rule's own
 // constant would move with it under mutation and guard nothing.
 func TestErrorBoundariesMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageJsxInTryStatement.Id != "jsxInTryStatement" {
 		t.Errorf("message id is %q", messageJsxInTryStatement.Id)
 	}
@@ -521,6 +531,8 @@ func TestErrorBoundariesMessage(t *testing.T) {
 // from names, parameters and returns. A later revert adding a checker call would go silent under
 // the plain harness rather than failing, which is why this is asserted rather than assumed.
 func TestErrorBoundariesRunsWithoutTheTypeChecker(t *testing.T) {
+	t.Parallel()
+
 	if ErrorBoundaries.NeedsTypeChecker {
 		t.Error("the rule declares a type checker it never asks anything")
 	}

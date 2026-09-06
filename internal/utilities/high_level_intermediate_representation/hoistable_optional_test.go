@@ -25,6 +25,8 @@ import (
 // The two halves are atomic. Measured, neither alone moves anything: the hoistable change without
 // the flag reaching the tree is inert, and the flag without this change is flattened at the arm.
 func TestOptionalLoadsProveNothingAboutTheirObject(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		source     string
@@ -81,6 +83,8 @@ func TestOptionalLoadsProveNothingAboutTheirObject(t *testing.T) {
 // Kept separate from the fixture-level test above because it fails for one reason: an optional load
 // contributing a non-null fact. A rule-level assertion can go green for several.
 func TestOptionalHoistableIsNotRecorded(t *testing.T) {
+	t.Parallel()
+
 	optional := &PropertyLoad{
 		Object:   Place{Identifier: 7},
 		Property: "items",

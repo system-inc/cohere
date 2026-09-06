@@ -31,6 +31,8 @@ const switchExhaustivenessFile = "switchExhaustiveness.ts"
 // switch appears here as silent and in the invalid table as reporting, differing only in which
 // option was set. A port that ignored options entirely would fail both tables rather than neither.
 func TestSwitchExhaustivenessCheckStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -724,6 +726,8 @@ switch (value) {
 // exactly the shape a name-based implementation would mishandle and a type-identity-based one
 // handles for free.
 func TestSwitchExhaustivenessCheckFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -1370,6 +1374,8 @@ switch (value) {
 // Dropped instead, it would have been the quietest kind of loss: the file still parses, the switch
 // still looks like every other switch in the table, and nothing would have been red.
 func TestSwitchExhaustivenessCheckResolvesAnEnumAcrossAModuleBoundary(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedFiles(t, SwitchExhaustivenessCheck, map[string]string{
 		// Byte for byte tsgolint's own fixture module at
 		// internal/rules/fixtures/switch-exhaustiveness-check.ts, which its test file imports by
@@ -1416,6 +1422,8 @@ export namespace A {
 // second call goes silent, this fails, and the next reader is told the option came alive rather
 // than discovering it from a user's bug report.
 func TestSwitchExhaustivenessCheckIgnoresTheCommentPattern(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = `
 declare const literal: 'a' | 'b' | 'c';
 
@@ -1493,6 +1501,8 @@ switch (value) {
 // rewrites source would otherwise land here unannounced, and the whole imported corpus above would
 // stay green while it did — every case in it asserts message ids only.
 func TestSwitchExhaustivenessCheckShipsNoRepairs(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedWithOptions(
 		t, SwitchExhaustivenessCheck, switchExhaustivenessFile, `
 declare const literal: 'a' | 'b' | 'c';
@@ -1527,6 +1537,8 @@ switch (literal) {
 // port that reported the statement would produce a finding spanning the entire switch body, which
 // no id assertion could see, so this pins the exact text.
 func TestSwitchExhaustivenessCheckReportsTheDiscriminantNotTheStatement(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = `
 declare const someDiscriminant: 'a' | 'b';
 function run() {
@@ -1559,6 +1571,8 @@ function run() {
 // The span is the clause including its body, not just the `default` keyword, because upstream
 // reports the whole `CaseOrDefaultClause` node.
 func TestSwitchExhaustivenessCheckReportsTheDefaultClauseForADangerousDefault(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = `
 declare const literal: 'a' | 'b';
 switch (literal) {
@@ -1603,6 +1617,8 @@ switch (literal) {
 // suite would keep proving something and half would be proving nothing, which reads as a healthy
 // suite.
 func TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker(t *testing.T) {
+	t.Parallel()
+
 	if !SwitchExhaustivenessCheck.NeedsTypeChecker {
 		t.Fatal("the rule must declare NeedsTypeChecker: without a checker it reports nothing rather than failing, so every clean fixture would pass vacuously")
 	}
@@ -1645,6 +1661,8 @@ func TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker(t *testing.T) {
 // and `allowDefaultCaseForExhaustiveSwitch` defaults to TRUE. Flattening them would silently invert
 // that option for every user who did not set it.
 func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(t *testing.T) {
+	t.Parallel()
+
 	decode := rule.DecodeOptionsInto[SwitchExhaustivenessCheckOptions]()
 
 	decoded, err := decode([]byte(`{"allowDefaultCaseForExhaustiveSwitch":false,"requireDefaultForNonUnion":true}`))
@@ -1708,6 +1726,8 @@ func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(t *testing.T) {
 // first two to be SILENT and the third to REPORT, and under our tsconfig the first two are silent
 // for the wrong reason and the third is silent outright.
 func TestSwitchExhaustivenessCheckExclusionsAreStated(t *testing.T) {
+	t.Parallel()
+
 	// Upstream's invalid case: with noUncheckedIndexedAccess, `x[0]` is `string | undefined`, the
 	// switch covers only `'hi'`, and `undefined` is a missing branch. Without the flag the
 	// discriminant is plain `string`, which contains a non-literal type and has no missing literal

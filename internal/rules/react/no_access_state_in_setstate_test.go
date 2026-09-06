@@ -25,6 +25,8 @@ import (
 const noAccessStateInSetstateFile = "/repository/source/NoAccessStateInSetstate.tsx"
 
 func TestNoAccessStateInSetstateStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText string }{
 		{"upstream valid 0", "\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(state => ({value: state.value + 1}))\n          }\n        });\n      "},
 		{"upstream valid 1", "\n        var Hello = createReactClass({\n          multiplyValue: function(obj) {\n            return obj.value*2\n          },\n          onClick: function() {\n            var value = this.state.value\n            this.multiplyValue({ value: value })\n          }\n        });\n      "},
@@ -46,6 +48,8 @@ func TestNoAccessStateInSetstateStaysSilent(t *testing.T) {
 }
 
 func TestNoAccessStateInSetstateFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		messageIds       []string
@@ -76,6 +80,8 @@ func TestNoAccessStateInSetstateFires(t *testing.T) {
 // different recorded nodes, so an anchor mistake on the variable or method route would be invisible
 // from the direct one.
 func TestNoAccessStateInSetstateSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText, reported string }{
 		{
 			"the direct route points at the state access",
@@ -114,6 +120,8 @@ func TestNoAccessStateInSetstateSpans(t *testing.T) {
 // finding to the constant it was reported with moves both sides together under mutation and passes
 // either way.
 func TestNoAccessStateInSetstateMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 		"class Hello extends React.Component {\n  onClick() {\n    this.setState({value: this.state.value + 1});\n  }\n}")
 	if len(result.Diagnostics) != 1 {
@@ -143,6 +151,8 @@ func TestNoAccessStateInSetstateMessageText(t *testing.T) {
 // the method route reporting TWICE AT THE SAME SPAN is bookkeeping a reader would reasonably
 // "correct" into deduplication.
 func TestNoAccessStateInSetstateShapesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		messageIds       []string
@@ -220,6 +230,8 @@ func TestNoAccessStateInSetstateShapesUpstreamDoesNotWrite(t *testing.T) {
 // This is the discrimination most likely to be "fixed" by a later reader into name resolution,
 // which would report code upstream calls clean.
 func TestNoAccessStateInSetstateScopeIdentity(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		messageIds       []string
@@ -265,6 +277,8 @@ func TestNoAccessStateInSetstateScopeIdentity(t *testing.T) {
 // halves are in upstream's corpus; they are restated here as an adjacent pair because reading them
 // side by side is what makes the rule's judgment legible.
 func TestNoAccessStateInSetstateFirstArgumentOnly(t *testing.T) {
+	t.Parallel()
+
 	clean := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 		"var Hello = createReactClass({\n  onClick: function() {\n    this.setState({}, () => console.log(this.state));\n  }\n});")
 	rule_testing.ExpectClean(t, clean)
@@ -281,6 +295,8 @@ func TestNoAccessStateInSetstateFirstArgumentOnly(t *testing.T) {
 // Measured against the installed build: `this.props` is silent, so the name comparison is
 // load-bearing rather than decorative and this rule is about state specifically.
 func TestNoAccessStateInSetstateOnlyStateIsMatched(t *testing.T) {
+	t.Parallel()
+
 	silent := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 		"class Hello extends React.Component {\n  onClick() {\n    this.setState({value: this.props.value + 1});\n  }\n}")
 	rule_testing.ExpectClean(t, silent)
@@ -304,6 +320,8 @@ func TestNoAccessStateInSetstateOnlyStateIsMatched(t *testing.T) {
 // upstream misses it because its identifier arm never looks at a bare argument. Reproduced rather
 // than improved on, because widening it changes which files report.
 func TestNoAccessStateInSetstateIdentifierPosition(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		messageIds       []string
@@ -352,6 +370,8 @@ func TestNoAccessStateInSetstateIdentifierPosition(t *testing.T) {
 // Both measured reporting against the installed build. Upstream's own corpus writes `v + 1` only
 // through the `this.state.value + 1` direct route, where the climb is not consulted.
 func TestNoAccessStateInSetstateBinaryExpressionClimb(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText string }{
 		{
 			"one enclosing binary expression",
@@ -392,6 +412,8 @@ func TestNoAccessStateInSetstateBinaryExpressionClimb(t *testing.T) {
 // The class-property rows are a third distinction: upstream's `else if` requires a
 // FunctionExpression, so a property holding an ARROW is silent and one holding a `function` reports.
 func TestNoAccessStateInSetstateMethodRoute(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		findings         int
@@ -469,6 +491,8 @@ func TestNoAccessStateInSetstateMethodRoute(t *testing.T) {
 // Both mutants over these lines survived until these rows existed, and both distinguishing inputs
 // were measured silent against the installed build.
 func TestNoAccessStateInSetstateObjectPatternGates(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		messageIds       []string

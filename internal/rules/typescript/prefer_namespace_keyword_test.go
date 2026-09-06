@@ -15,6 +15,8 @@ const preferNamespaceKeywordFile = "/repository/source/Namespaces.ts"
 // case, which reports twice: nesting a module declaration inside another module BLOCK is not
 // exempt. Only the dotted form is, and the two look alike in source while parsing differently.
 func TestPreferNamespaceKeywordFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -47,6 +49,8 @@ func TestPreferNamespaceKeywordFires(t *testing.T) {
 // KindModuleDeclaration, so every exemption oxc gets from its grammar is a test this rule has to
 // perform by hand. These five are the only fixtures standing over those hand-written guards.
 func TestPreferNamespaceKeywordStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -101,6 +105,8 @@ func TestPreferNamespaceKeywordStaysSilent(t *testing.T) {
 // it. A rule that rewrote the first hit would corrupt both while still producing a finding whose
 // id and span are correct.
 func TestPreferNamespaceKeywordFixesWriteWhatTheyClaim(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -146,6 +152,8 @@ func TestPreferNamespaceKeywordFixesWriteWhatTheyClaim(t *testing.T) {
 // constants. Comparing a diagnostic against the constant it was reported with is an equality
 // that cannot fail, because a mutation moves both sides together.
 func TestPreferNamespaceKeywordReportsTheRightSpanAndText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

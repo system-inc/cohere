@@ -27,6 +27,8 @@ import (
 const jsxFragmentsFile = "/repository/source/JsxFragments.tsx"
 
 func TestJsxFragmentsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		options          JsxFragmentsOptions
@@ -51,6 +53,8 @@ func TestJsxFragmentsStaysSilent(t *testing.T) {
 }
 
 func TestJsxFragmentsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		options          JsxFragmentsOptions
@@ -94,6 +98,8 @@ func TestJsxFragmentsFires(t *testing.T) {
 // a message-id assertion alone cannot see a repair, which is exactly how the two rules this tree
 // has already lost type information to got through review.
 func TestJsxFragmentsTypeArgumentsAreReportedAndNotRewritten(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText string }{
 		{"type argument on a paired tag", "<React.Fragment<T>><Foo /></React.Fragment>;"},
 		{"type argument on a self closing tag", "<React.Fragment<T> />;"},
@@ -124,6 +130,8 @@ func TestJsxFragmentsTypeArgumentsAreReportedAndNotRewritten(t *testing.T) {
 // entire element. A message-id assertion cannot see this, and the two spellings of the named form
 // are different node kinds here, so an anchor mistake on one would be invisible from the other.
 func TestJsxFragmentsSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText, reported string
 		options                    JsxFragmentsOptions
@@ -174,6 +182,8 @@ func TestJsxFragmentsSpans(t *testing.T) {
 // mutation visible: comparing a finding to the constant it was reported with moves both sides
 // together and passes either way.
 func TestJsxFragmentsMessageText(t *testing.T) {
+	t.Parallel()
+
 	shorthand := rule_testing.RunTypedWithOptions(t, JsxFragments, jsxFragmentsFile,
 		"<React.Fragment><Foo /></React.Fragment>;", JsxFragmentsOptions{Mode: JsxFragmentsSyntax})
 	if len(shorthand.Diagnostics) != 1 {
@@ -215,6 +225,8 @@ func TestJsxFragmentsMessageText(t *testing.T) {
 // a decoder that did not fall back would hand the rule a zero-value mode matching neither arm, so
 // the rule would register on every file and report nothing.
 func TestDecodeJsxFragmentsOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -248,6 +260,8 @@ func TestDecodeJsxFragmentsOptions(t *testing.T) {
 // is what keeps the rule working. Every other fixture in this file reaches the rule through an
 // options struct, so nothing else here can see this line.
 func TestJsxFragmentsNilOptionsUsesTheDefault(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, JsxFragments, jsxFragmentsFile,
 		"<React.Fragment><Foo /></React.Fragment>;")
 	rule_testing.ExpectFindings(t, result, "preferFragment")
@@ -261,6 +275,8 @@ func TestJsxFragmentsNilOptionsUsesTheDefault(t *testing.T) {
 // resolution and goes silent, so a later revert to the untyped harness fails here rather than
 // passing vacuously.
 func TestJsxFragmentsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !JsxFragments.NeedsTypeChecker {
 		t.Fatal("this rule resolves a bare tag name through the checker and must declare it")
 	}
@@ -283,6 +299,8 @@ func TestJsxFragmentsRequiresTheTypedHarness(t *testing.T) {
 // reports BOTH, so a rule that stopped descending after the outer one would pass every imported
 // case.
 func TestJsxFragmentsShapesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		options          JsxFragmentsOptions
@@ -378,6 +396,8 @@ func TestJsxFragmentsShapesUpstreamDoesNotWrite(t *testing.T) {
 // The `json` import is used here to spell the decoder's wire shape once, which keeps this test
 // honest about what the config layer actually delivers.
 func TestJsxFragmentsVersionArmIsNotPorted(t *testing.T) {
+	t.Parallel()
+
 	for _, messageId := range []string{"fragmentsNotSupported"} {
 		for _, source := range []string{
 			"<><Foo /></>;",
@@ -429,6 +449,8 @@ func TestJsxFragmentsVersionArmIsNotPorted(t *testing.T) {
 // than checking only the property half. A guard that dropped the object comparison would report
 // every `Something.Fragment` in the tree.
 func TestJsxFragmentsSurvivorShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		messageIds       []string
@@ -472,6 +494,8 @@ func TestJsxFragmentsSurvivorShapes(t *testing.T) {
 // The other two rows pin the pragma half of the same question for the identifier and member-access
 // initializers, both measured silent.
 func TestJsxFragmentsNonReactSources(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText string }{
 		{
 			"require of another module is not the fragment source",

@@ -21,6 +21,8 @@ func preferFunctionTypeCaseName(index int) string {
 // construct signature beside a call signature, and a call signature with no annotated return type.
 // Skipping any of them ships that class of false positive.
 func TestPreferFunctionTypeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"interface Foo {\n  (): void;\n  bar: number;\n}\n",
 		"type Foo = {\n  (): void;\n  bar: number;\n};\n",
@@ -64,6 +66,8 @@ type preferFunctionTypeFinding struct {
 // The repair is half this rule and the corpus asserts it, so `wantOutput` is the specification
 // rather than a convenience. Three findings carry no repair and say so.
 func TestPreferFunctionTypeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []preferFunctionTypeFinding

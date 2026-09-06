@@ -27,6 +27,8 @@ const evalFile = "/repository/source/Eval.ts"
 // difference is observable: a direct call fires under the typed harness, and the whole rule goes
 // quiet without it.
 func TestNoEvalRequiresTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.RunTyped(t, NoEval, evalFile, "var EVAL = eval; EVAL('foo')"), "noEval")
 	rule_testing.ExpectClean(t,
@@ -34,6 +36,8 @@ func TestNoEvalRequiresTypedHarness(t *testing.T) {
 }
 
 func TestNoEvalFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -91,6 +95,8 @@ func TestNoEvalFires(t *testing.T) {
 // window[eval]('foo') }` subscripts with a *variable* holding the string, so the property read is
 // whatever that variable names and is not statically `eval`.
 func TestNoEvalStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -159,6 +165,8 @@ func TestNoEvalStaysSilent(t *testing.T) {
 // permitted, because an indirect eval cannot reach the calling scope and so is a far smaller
 // hazard than the direct form.
 func TestNoEvalAllowIndirect(t *testing.T) {
+	t.Parallel()
+
 	allowed := []string{
 		"(0, eval)('foo')",
 		"(0, window.eval)('foo')",
@@ -208,6 +216,8 @@ func TestNoEvalAllowIndirect(t *testing.T) {
 // whose defect is where it points passes a complete fixture pair while being wrong. The spans below
 // are read off oxc's own snapshot, which prints the reported column for every diagnostic.
 func TestNoEvalSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

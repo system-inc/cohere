@@ -43,6 +43,8 @@ const didMountFile = "/repository/source/DidMount.tsx"
 // once by default. A port that ignored the function count would report twice here and still look
 // plausible, because the case is in the failing list either way.
 func TestNoDidMountSetStateFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name           string
 		sourceText     string
@@ -170,6 +172,8 @@ func TestNoDidMountSetStateFires(t *testing.T) {
 // a port asking only "is this inside componentDidMount" gets wrong, and three of them reappear as
 // failures in the option table above.
 func TestNoDidMountSetStateStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name           string
 		sourceText     string
@@ -303,6 +307,8 @@ func TestNoDidMountSetStateStaysSilent(t *testing.T) {
 // mutation to the rule survived the imported corpus, or because reading the reference implementation
 // showed a branch nothing upstream reaches.
 func TestNoDidMountSetStateOwnCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name           string
 		sourceText     string
@@ -726,6 +732,8 @@ class Hello extends React.Component {
 // interpolated value, because a containment check on a rendered string passes for a string that has
 // the needle plus a defect.
 func TestNoDidMountSetStateReportsTheCallee(t *testing.T) {
+	t.Parallel()
+
 	sourceText := `
 class Hello extends React.Component {
   componentDidMount() {
@@ -755,6 +763,8 @@ class Hello extends React.Component {
 // than the callee would point at four characters in one spelling and sixteen in the other while
 // passing an id assertion in both.
 func TestNoDidMountSetStateReportsTheCalleeOnASubscript(t *testing.T) {
+	t.Parallel()
+
 	sourceText := `
 class Hello extends React.Component {
   componentDidMount() {

@@ -15,6 +15,8 @@ import (
 // probe is indistinguishable from a real decline.
 
 func TestNoUnwantedPolyfillioReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -115,6 +117,8 @@ func TestNoUnwantedPolyfillioReports(t *testing.T) {
 }
 
 func TestNoUnwantedPolyfillioIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -253,6 +257,8 @@ func TestNoUnwantedPolyfillioIsSilent(t *testing.T) {
 // before the closing slash, so both ends are asserted here by slicing the source with the finding's
 // own range.
 func TestNoUnwantedPolyfillioPointsAtTheSourceAttribute(t *testing.T) {
+	t.Parallel()
+
 	source := "export const A = () => <script src='https://polyfill.io/v3/polyfill.min.js' />;"
 	result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
@@ -283,6 +289,8 @@ func TestNoUnwantedPolyfillioPointsAtTheSourceAttribute(t *testing.T) {
 // to an assertion on the message id, so the rendered text is compared exactly rather than with a
 // containment check: a containment check passes on a string carrying extra text.
 func TestNoUnwantedPolyfillioNamesTheFeaturesItFound(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -345,6 +353,8 @@ func TestNoUnwantedPolyfillioNamesTheFeaturesItFound(t *testing.T) {
 // guard: a mutation renaming the constant moves both sides of the comparison together, and that
 // mutant survived a suite whose every other assertion used the constant.
 func TestNoUnwantedPolyfillioUsesStableMessageIds(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -379,6 +389,8 @@ func TestNoUnwantedPolyfillioUsesStableMessageIds(t *testing.T) {
 // and a mutation rewriting the sentence survived until this existed. Compared with equality rather
 // than containment: a containment check passes on a string that has grown extra text.
 func TestNoUnwantedPolyfillioSecurityMessageText(t *testing.T) {
+	t.Parallel()
+
 	source := "export const A = () => <script src='https://polyfill.io/v3/polyfill.min.js' />;"
 	result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
@@ -398,6 +410,8 @@ func TestNoUnwantedPolyfillioSecurityMessageText(t *testing.T) {
 // a duplicate is never described as one. This is the distinction a port folding the two arms into
 // one code path loses, and half the imported corpus still passes without it.
 func TestNoUnwantedPolyfillioSecurityArmReturnsBeforeTheFeatureCheck(t *testing.T) {
+	t.Parallel()
+
 	source := "export const A = () => <script src='https://cdn.polyfill.io/v2/polyfill.min.js?features=Promise' />;"
 	result := rule_testing.Run(t, NoUnwantedPolyfillio, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {

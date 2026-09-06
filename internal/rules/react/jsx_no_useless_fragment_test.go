@@ -48,6 +48,8 @@ const jsxNoUselessFragmentFile = "/repository/source/JsxNoUselessFragment.tsx"
 
 // TestJsxNoUselessFragmentFires asserts ids, count, and the repaired source.
 func TestJsxNoUselessFragmentFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -108,6 +110,8 @@ func countJsxNoUselessFragmentFixes(result rule_testing.Result) int {
 
 // TestJsxNoUselessFragmentStaysSilent runs upstream's clean cases.
 func TestJsxNoUselessFragmentStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -214,6 +218,8 @@ func applyJsxNoUselessFragmentFixes(t *testing.T, result rule_testing.Result) st
 // The decline is mutation-tested. Disabling `jsxNoUselessFragmentHasNonKeyAttributes` makes these
 // rows fail, which is what separates a real guard from a comment claiming one.
 func TestJsxNoUselessFragmentDeclinesToDropAttributes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -259,6 +265,8 @@ func TestJsxNoUselessFragmentDeclinesToDropAttributes(t *testing.T) {
 //
 // Every expected output was produced by the installed build's own fixer first.
 func TestJsxNoUselessFragmentFixKeepsTypeScript(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -313,6 +321,8 @@ func TestJsxNoUselessFragmentFixKeepsTypeScript(t *testing.T) {
 // because the edit lands somewhere the reader was never shown, so this is asserted on a rule that
 // carries a repair rather than left to the fix assertion alone.
 func TestJsxNoUselessFragmentSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -364,6 +374,8 @@ func TestJsxNoUselessFragmentSpans(t *testing.T) {
 // rule's own constants, because comparing a diagnostic to the constant it was reported with is an
 // equality whose two sides move together under mutation.
 func TestJsxNoUselessFragmentMessagesReadAsWritten(t *testing.T) {
+	t.Parallel()
+
 	result := runJsxNoUselessFragment(t, "declare const x: any;\nconst a = <div><>{x}</></div>;\n", "")
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("got %d findings, want 2", len(result.Diagnostics))
@@ -392,6 +404,8 @@ func TestJsxNoUselessFragmentMessagesReadAsWritten(t *testing.T) {
 // rows are the surprising ones: upstream's html test is `/^[a-z]+$/`, letters only, so `<h1>` and
 // `<my-tag>` are NOT html elements to this rule and a fragment inside either reports only one arm.
 func TestJsxNoUselessFragmentMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -473,6 +487,8 @@ func TestJsxNoUselessFragmentMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T)
 
 // TestJsxNoUselessFragmentDecodesItsOptions exercises the decoder the config layer calls.
 func TestJsxNoUselessFragmentDecodesItsOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -504,6 +520,8 @@ func TestJsxNoUselessFragmentDecodesItsOptions(t *testing.T) {
 
 // TestJsxNoUselessFragmentRejectsMalformedOptions asserts the decoder surfaces bad input.
 func TestJsxNoUselessFragmentRejectsMalformedOptions(t *testing.T) {
+	t.Parallel()
+
 	if _, err := DecodeJsxNoUselessFragmentOptions([]byte(`{"allowExpressions":`)); err == nil {
 		t.Fatal("truncated JSON decoded without error")
 	}
@@ -518,6 +536,8 @@ func TestJsxNoUselessFragmentRejectsMalformedOptions(t *testing.T) {
 // fragment inside a `div` still reports one finding with the option on. Measured, and the corpus
 // writes only the top-level shape where the difference is invisible.
 func TestJsxNoUselessFragmentAllowExpressionsSilencesOneArmOnly(t *testing.T) {
+	t.Parallel()
+
 	const topLevel = "declare const x: any;\nconst a = <>{x}</>;\n"
 	rule_testing.ExpectFindings(t, runJsxNoUselessFragment(t, topLevel, ""), "NeedsMoreChildren")
 	rule_testing.ExpectClean(t, runJsxNoUselessFragment(t, topLevel, `{"allowExpressions":true}`))
@@ -534,6 +554,8 @@ func TestJsxNoUselessFragmentAllowExpressionsSilencesOneArmOnly(t *testing.T) {
 // The config layer turns a decoder error into nil for a non-required rule, and `options.(T)` on nil
 // yields the zero value, which here IS the default. Asserted rather than assumed.
 func TestJsxNoUselessFragmentHandlesNilOptions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, JsxNoUselessFragment, jsxNoUselessFragmentFile,
 		"declare const x: any;\nconst a = <>{x}</>;\n", nil)
 	rule_testing.ExpectFindings(t, result, "NeedsMoreChildren")
@@ -541,6 +563,8 @@ func TestJsxNoUselessFragmentHandlesNilOptions(t *testing.T) {
 
 // TestJsxNoUselessFragmentNeedsNoChecker pins that this rule is syntactic.
 func TestJsxNoUselessFragmentNeedsNoChecker(t *testing.T) {
+	t.Parallel()
+
 	const source = "declare const Foo: any;\nconst a = <><Foo /></>;\n"
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, JsxNoUselessFragment,
 		jsxNoUselessFragmentFile, source, JsxNoUselessFragmentOptions{}), "NeedsMoreChildren")
@@ -555,6 +579,8 @@ func TestJsxNoUselessFragmentNeedsNoChecker(t *testing.T) {
 // are the ones that matter: they reach the listeners through error recovery with a nil opener or
 // closer, which is exactly what the fix's bounds function guards against.
 func TestJsxNoUselessFragmentSurvivesShapesThatWouldPanic(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		"const a = <div />;\n",
 		"const a = <></>;\n",
@@ -585,6 +611,8 @@ func TestJsxNoUselessFragmentSurvivesShapesThatWouldPanic(t *testing.T) {
 // with settings removed it goes clean, which is the answer this port produces. Recorded here rather
 // than dropped, so the next reader sees the whole corpus accounted for.
 func TestJsxNoUselessFragmentPragmaIsFixedAtReact(t *testing.T) {
+	t.Parallel()
+
 	const source = "declare const SomeReact: any;\ndeclare const foo: any;\nconst a = <SomeReact.SomeFragment>{foo}</SomeReact.SomeFragment>;\n"
 	rule_testing.ExpectClean(t, runJsxNoUselessFragment(t, source, ""))
 
@@ -611,6 +639,8 @@ func TestJsxNoUselessFragmentPragmaIsFixedAtReact(t *testing.T) {
 // self-closing spelling has its own listener, and the rows below run every spelling of a fragment
 // through the rule so a regression that dropped one is visible here rather than only in the guard.
 func TestJsxNoUselessFragmentReadsBothFragmentSpellings(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

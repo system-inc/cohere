@@ -45,6 +45,8 @@ func decodedUnicodeBomOptions(t *testing.T, raw string) any {
 // cohere's config layer strips the tuple, so what a decoder receives is `"always"` rather than
 // `["always"]`, and a fixture copying ESLint's array spelling would fail on every row.
 func TestUnicodeBomFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -71,6 +73,8 @@ func TestUnicodeBomFires(t *testing.T) {
 }
 
 func TestUnicodeBomStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -100,6 +104,8 @@ func TestUnicodeBomStaysSilent(t *testing.T) {
 // node would point at the first real token in exactly the case where the mark is what is being
 // complained about.
 func TestUnicodeBomReportsAtPositionZero(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -129,6 +135,8 @@ func TestUnicodeBomReportsAtPositionZero(t *testing.T) {
 // could quietly detach from what they describe, and because a rule whose two arms are near-mirrors
 // is the shape where one message ends up reported by both arms.
 func TestUnicodeBomMessages(t *testing.T) {
+	t.Parallel()
+
 	if messageUnicodeBomExpected.Id != "expected" {
 		t.Fatalf("expected id %q, got %q", "expected", messageUnicodeBomExpected.Id)
 	}
@@ -157,6 +165,8 @@ func TestUnicodeBomMessages(t *testing.T) {
 // An unrecognised string must be an error rather than a quiet fallback, because falling back would
 // enforce the opposite of what a misspelled config asked for and say nothing.
 func TestDecodeUnicodeBomOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("empty input defaults to never", func(t *testing.T) {
 		decoded, err := DecodeUnicodeBomOptions(nil)
 		if err != nil {
@@ -217,6 +227,8 @@ func TestDecodeUnicodeBomOptions(t *testing.T) {
 // removing both in one edit would be doing something upstream's rule never does, and no message-id
 // fixture could see the difference.
 func TestUnicodeBomRemovesOneMarkPerPass(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, UnicodeBom, unicodeBomFile, "\ufeff\ufeffvar a = 1;",
 		decodedUnicodeBomOptions(t, "\"never\""))
 	rule_testing.ExpectFindings(t, result, "unexpected")
@@ -230,6 +242,8 @@ func TestUnicodeBomRemovesOneMarkPerPass(t *testing.T) {
 // file holding nothing but the mark, and under `never` it is clean. Worth pinning because an empty
 // file is the one input where a prefix test and a length test could plausibly disagree.
 func TestUnicodeBomOnAnEmptyFile(t *testing.T) {
+	t.Parallel()
+
 	t.Run("always", func(t *testing.T) {
 		result := rule_testing.RunWithOptions(t, UnicodeBom, unicodeBomFile, "",
 			decodedUnicodeBomOptions(t, "\"always\""))
@@ -258,6 +272,8 @@ func TestUnicodeBomOnAnEmptyFile(t *testing.T) {
 // rule can be enabled: run `EnableRule.ts 'unicode-bom' --layer universal`, drop the entry from
 // `deliberatelyNotEnabled`, and update the rule's doc comment. Nothing else about the port changes.
 func TestUnicodeBomCannotSeeAMarkThroughTheRealReadPath(t *testing.T) {
+	t.Parallel()
+
 	directory := t.TempDir()
 
 	marked := filepath.Join(directory, "Marked.ts")

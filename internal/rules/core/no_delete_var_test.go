@@ -9,6 +9,8 @@ import (
 const deleteVarFile = "/repository/source/Thing.ts"
 
 func TestNoDeleteVarFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -28,6 +30,8 @@ func TestNoDeleteVarFires(t *testing.T) {
 }
 
 func TestNoDeleteVarStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

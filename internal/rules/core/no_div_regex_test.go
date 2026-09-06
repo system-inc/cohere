@@ -21,6 +21,8 @@ const divRegexFile = "/repository/source/DivRegex.ts"
 // that lands inside the literal produces different source but there is only one input to notice it
 // on.
 func TestNoDivRegexFires(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoDivRegex, divRegexFile, "var f = function() { return /=foo/; };"),
 		"unexpected")
@@ -32,6 +34,8 @@ func TestNoDivRegexFires(t *testing.T) {
 // the pattern, but the character at index 1 of the token is the backslash, so the positional test
 // fails. That second case is the whole reason the rule needs no escape handling of its own.
 func TestNoDivRegexStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"var f = function() { return /foo/ig.test('bar'); };",
 		`var f = function() { return /\=foo/; };`,
@@ -51,6 +55,8 @@ func TestNoDivRegexStaysSilent(t *testing.T) {
 // wrong byte produces a different file and an identical fix text, so a text comparison cannot tell
 // the two apart. The cases below this one are where that gets exercised properly.
 func TestNoDivRegexFixes(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFixedSource(t,
 		rule_testing.Run(t, NoDivRegex, divRegexFile, "var f = function() { return /=foo/; };"),
 		"var f = function() { return /[=]foo/; };")
@@ -74,6 +80,8 @@ func TestNoDivRegexFixes(t *testing.T) {
 // A port that parsed the pattern and asked whether the first element can match `=` would report the
 // first two, one of which is the output of its own fixer. That is a rule that never converges.
 func TestNoDivRegexIsPositionalNotSemantic(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -107,6 +115,8 @@ func TestNoDivRegexIsPositionalNotSemantic(t *testing.T) {
 // clean. That is a real difference from `no-regex-spaces`, which handles both spellings, and it is
 // upstream's difference rather than something dropped here.
 func TestNoDivRegexDeclinesTheConstructor(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -139,6 +149,8 @@ func TestNoDivRegexDeclinesTheConstructor(t *testing.T) {
 //
 // The parenthesized case pins that the span is the literal rather than the parentheses; measured.
 func TestNoDivRegexReportsTheWholeLiteral(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantStart  int
@@ -182,6 +194,8 @@ func TestNoDivRegexReportsTheWholeLiteral(t *testing.T) {
 // Every expected output below parses as a regular expression matching the same input as its
 // original, which is the property that makes this a fix rather than a suggestion.
 func TestNoDivRegexRepairsExactlyTheEqualsSign(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSource string
@@ -210,6 +224,8 @@ func TestNoDivRegexRepairsExactlyTheEqualsSign(t *testing.T) {
 // makes this fall out rather than needing a guard, and this pins it so a later rewrite toward a
 // pattern parse fails loudly instead of producing a rule that never settles.
 func TestNoDivRegexRepairIsIdempotent(t *testing.T) {
+	t.Parallel()
+
 	repaired := "var a = /[=]foo/;"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoDivRegex, divRegexFile, repaired))
 }
@@ -219,6 +235,8 @@ func TestNoDivRegexRepairIsIdempotent(t *testing.T) {
 // The id literal is typed here rather than read from the rule's own constant, so a rename cannot
 // move both sides at once and stay green.
 func TestNoDivRegexMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoDivRegex, divRegexFile, "var a = /=foo/;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -251,6 +269,8 @@ func TestNoDivRegexMessage(t *testing.T) {
 // The assertion is that the rule returns at all. Each input is also expected to be clean, since a
 // literal with no second character cannot begin with an equals sign.
 func TestNoDivRegexSurvivesATruncatedLiteral(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -290,6 +310,8 @@ func TestNoDivRegexSurvivesATruncatedLiteral(t *testing.T) {
 // rule's, because the file already carries a syntax error from the compiler and a second complaint
 // pointing at the same two characters is what the sibling regex rules also decline to suppress.
 func TestNoDivRegexOnAnUnterminatedLiteralIsOurs(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoDivRegex, divRegexFile, "var a = /="), "unexpected")
 }

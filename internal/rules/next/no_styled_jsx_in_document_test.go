@@ -12,6 +12,8 @@ import (
 // upstream gave it, because for this rule the path is load-bearing data rather than decoration: the
 // only clean case upstream ships for the gate is a reporting body under a non-document name.
 func TestNoStyledJsxInDocumentReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -77,6 +79,8 @@ func TestNoStyledJsxInDocumentReports(t *testing.T) {
 }
 
 func TestNoStyledJsxInDocumentIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -177,6 +181,8 @@ func TestNoStyledJsxInDocumentIsSilent(t *testing.T) {
 // measured on the release binary at offset 17 length 11 over `export const a = <style jsx>{"x"}
 // </style>;`, which is exactly `<style jsx>`.
 func TestNoStyledJsxInDocumentPointsAtTheOpeningElement(t *testing.T) {
+	t.Parallel()
+
 	source := "export const a = <style jsx>{\"x\"}</style>;\n"
 	result := rule_testing.Run(t, NoStyledJsxInDocument, "pages/_document.tsx", source)
 	rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
@@ -189,6 +195,8 @@ func TestNoStyledJsxInDocumentPointsAtTheOpeningElement(t *testing.T) {
 
 // A self-closing element reports over its whole self, since it has no separate opening node.
 func TestNoStyledJsxInDocumentPointsAtASelfClosingElement(t *testing.T) {
+	t.Parallel()
+
 	source := "export const a = <style jsx />;\n"
 	result := rule_testing.Run(t, NoStyledJsxInDocument, "pages/_document.tsx", source)
 	rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
@@ -202,6 +210,8 @@ func TestNoStyledJsxInDocumentPointsAtASelfClosingElement(t *testing.T) {
 // The rendered text is asserted rather than a substring of it, because a predicate weaker than the
 // property it guards is not a guard.
 func TestNoStyledJsxInDocumentRendersItsMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoStyledJsxInDocument, "pages/_document.tsx",
 		"export const a = <style jsx>{\"x\"}</style>;\n")
 	rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)

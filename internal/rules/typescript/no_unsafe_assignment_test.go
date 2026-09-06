@@ -45,6 +45,8 @@ func noUnsafeAssignmentOnDisk(sourceText string) string {
 // value's, `unknown` is silent because absorbing an `any` is what `unknown` is for, and a generic
 // whose argument matches is silent because nothing disagrees.
 func TestNoUnsafeAssignmentStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		isJsx      bool
@@ -211,6 +213,8 @@ func TestNoUnsafeAssignmentStaysSilentOnUpstreamPassCases(t *testing.T) {
 // And the rendered text is asserted exactly, because two of the seven messages interpolate a type
 // name and one interpolates two, and a message-id assertion cannot see any of that.
 func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		isJsx      bool
@@ -647,6 +651,8 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(t *testing.T) {
 // types to compare, so upstream returns before the loop. Both verdicts measured on the installed
 // 8.67.0 build, each with the control that separates the guard from the shape.
 func TestNoUnsafeAssignmentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -734,6 +740,8 @@ func TestNoUnsafeAssignmentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T
 // listener turns that into silence rather than a panic. Silence is the more dangerous failure: every
 // clean case passes vacuously and every reporting case fails in a way that reads as a rule bug.
 func TestNoUnsafeAssignmentRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "const x: string = 1 as any;"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeAssignment,
 		noUnsafeAssignmentFileFor(false), source))
@@ -752,6 +760,8 @@ func TestNoUnsafeAssignmentRequiresTheTypedHarness(t *testing.T) {
 // There is no finding to assert; the assertion is that the run completes. Upstream cannot reach most
 // of these because its parser refuses the file outright.
 func TestNoUnsafeAssignmentSurvivesShapesTheParserRecoversFrom(t *testing.T) {
+	t.Parallel()
+
 	for name, sourceText := range map[string]string{
 		"emptyArrayPattern":  "declare const a: any[];\nconst [] = a;",
 		"emptyObjectPattern": "declare const o: { a: any };\nconst {} = o;",

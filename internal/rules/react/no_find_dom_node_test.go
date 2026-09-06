@@ -30,6 +30,8 @@ const findDOMNodeFile = "/repository/source/FindDomNode.tsx"
 // backtick, so a Go raw string carries each one unchanged; that was checked rather than assumed,
 // because the tool writing a fixture is exactly what has cooked escapes for three previous porters.
 func TestNoFindDOMNodeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -110,6 +112,8 @@ func TestNoFindDOMNodeFires(t *testing.T) {
 // which pins that the receiver is checked against a fixed set of three names rather than accepted
 // as any namespace.
 func TestNoFindDOMNodeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -170,6 +174,8 @@ func TestNoFindDOMNodeStaysSilent(t *testing.T) {
 // discriminations the rule makes, and everything below exists because a mutation or a probe showed
 // the imports could not see it.
 func TestNoFindDOMNodeFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -222,6 +228,8 @@ func TestNoFindDOMNodeFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
 
 // The silent cases upstream does not ship. Each was run on oxlint and produced zero findings.
 func TestNoFindDOMNodeStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -271,6 +279,8 @@ func TestNoFindDOMNodeStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 // the quotes rather than the eleven of the cooked name. A port reporting the name inside the quotes
 // would be off by one on each side, and every assertion in the two tests above would still pass.
 func TestNoFindDOMNodeReportsTheNameNode(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -308,6 +318,8 @@ func TestNoFindDOMNodeReportsTheNameNode(t *testing.T) {
 // Every imported fail case carries exactly one finding, so nothing there can catch a rule that
 // reports the first violation and stops, or one that reports per file.
 func TestNoFindDOMNodeReportsEachCallSeparately(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = `class C {
                 a() { findDOMNode(this); }
                 b() { ReactDOM.findDOMNode(this); }
@@ -326,6 +338,8 @@ func TestNoFindDOMNodeReportsEachCallSeparately(t *testing.T) {
 
 // A nested call reports at both levels, so the outer match does not consume the inner one.
 func TestNoFindDOMNodeReportsANestedCall(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = `findDOMNode(ReactDOM.findDOMNode(this));`
 
 	result := rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, sourceText)
@@ -335,6 +349,8 @@ func TestNoFindDOMNodeReportsANestedCall(t *testing.T) {
 // The rendered message is asserted exactly rather than by substring, because a fixture whose
 // predicate is weaker than the property it guards is not a guard.
 func TestNoFindDOMNodeMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, `findDOMNode(this);`)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
@@ -355,6 +371,8 @@ func TestNoFindDOMNodeMessageText(t *testing.T) {
 // not need it: oxc's `run` reads only the callee's syntax, and the measured behavior on a shadowing
 // parameter and on an aliased import proves no resolution happens.
 func TestNoFindDOMNodeDoesNotNeedTheTypeChecker(t *testing.T) {
+	t.Parallel()
+
 	if NoFindDOMNode.NeedsTypeChecker {
 		t.Fatal("no-find-dom-node declares the type checker; it decides on syntax alone")
 	}

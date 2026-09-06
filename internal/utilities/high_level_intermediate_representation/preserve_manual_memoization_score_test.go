@@ -31,6 +31,8 @@ import (
 // only be driven up. The count is logged rather than pinned exactly, and the floor moves when
 // someone improves it.
 func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
+	t.Parallel()
+
 	fixtures, err := react_conformance.Load("../../react_conformance/testdata/fixtures")
 	if err != nil {
 		t.Fatalf("loading the vendored corpus: %v", err)
@@ -319,6 +321,8 @@ func TestPreserveManualMemoizationAgainstGoldens(t *testing.T) {
 // from a rule that went quiet, and this rule's registration is being held precisely on the strength
 // of this number.
 func TestPreserveManualMemoizationFalsePositiveRate(t *testing.T) {
+	t.Parallel()
+
 	fixtures, err := react_conformance.Load("../../react_conformance/testdata/fixtures")
 	if err != nil {
 		t.Fatalf("loading the vendored corpus: %v", err)

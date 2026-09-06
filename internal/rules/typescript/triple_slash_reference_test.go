@@ -29,6 +29,8 @@ func decodeTripleSlashOptions(t *testing.T, configuration string) any {
 // All sixteen of upstream's passing inputs, extracted by the fixture tool and written out by a
 // script so no escape sequence passed through a shell or a keyboard on the way here.
 func TestTripleSlashReferenceStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -65,6 +67,8 @@ func TestTripleSlashReferenceStaysSilentOnUpstreamPassCases(t *testing.T) {
 // The snapshot records five diagnostics against these five inputs, one each, so the extractor
 // reported no discrepancy and every count below is one.
 func TestTripleSlashReferenceFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -97,6 +101,8 @@ func TestTripleSlashReferenceFiresOnUpstreamFailCases(t *testing.T) {
 // and the prefer-import counting each have several plausible readings and the corpus separates
 // none of them.
 func TestTripleSlashReferenceFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		configuration string
@@ -136,6 +142,8 @@ func TestTripleSlashReferenceFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
 // file would pass every fires case above and every upstream fail case, and would report on real
 // source that TypeScript does not treat as a directive at all.
 func TestTripleSlashReferenceStaysSilentOnCasesUpstreamDoesNotCover(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		configuration string
@@ -182,6 +190,8 @@ func TestTripleSlashReferenceStaysSilentOnCasesUpstreamDoesNotCover(t *testing.T
 // trimming trivia on this rule's behalf and the span is entirely the rule's own arithmetic. Every
 // message-id fixture above stays green over a span off by the two leading slashes.
 func TestTripleSlashReferencePointsAtTheDirective(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		configuration string
@@ -220,6 +230,8 @@ func TestTripleSlashReferencePointsAtTheDirective(t *testing.T) {
 // messageTripleSlashReference, because comparing a finding against the constant it was built from
 // moves both sides together under mutation and asserts nothing.
 func TestTripleSlashReferenceNamesTheModuleInItsMessage(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		configuration string
@@ -265,6 +277,8 @@ func TestTripleSlashReferenceNamesTheModuleInItsMessage(t *testing.T) {
 // Measured on the release binary before this was written. A file with three identical directives
 // and one import reports once, against line three.
 func TestTripleSlashReferenceKeepsTheLastOfTwoIdenticalDirectives(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -301,6 +315,8 @@ func TestTripleSlashReferenceKeepsTheLastOfTwoIdenticalDirectives(t *testing.T) 
 // alongside the overwrite test so the two cases that separate "keyed by name" from "keyed by
 // position" sit together.
 func TestTripleSlashReferenceReportsTwoDirectivesInSourceOrder(t *testing.T) {
+	t.Parallel()
+
 	const source = "/// <reference types=\"a\" />\n/// <reference types=\"b\" />\nimport * as y from 'b';\nimport * as x from 'a';\n"
 
 	result := rule_testing.RunWithOptions(t, TripleSlashReference, tripleSlashFile, source,
@@ -323,6 +339,8 @@ func TestTripleSlashReferenceReportsTwoDirectivesInSourceOrder(t *testing.T) {
 // directive in every JavaScript file in a tree upstream leaves alone, and JavaScript is where these
 // directives are most common.
 func TestTripleSlashReferenceDeclinesJavaScript(t *testing.T) {
+	t.Parallel()
+
 	const source = "/// <reference path=\"foo\" />\n"
 
 	rule_testing.ExpectFindings(t,
@@ -353,6 +371,8 @@ func TestTripleSlashReferenceDeclinesJavaScript(t *testing.T) {
 // Our own rule inventory records this rule as taking no options at all, which is what makes writing
 // the surface down here worth more than usual.
 func TestDecodeTripleSlashReferenceOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		configuration string
@@ -427,6 +447,8 @@ func TestDecodeTripleSlashReferenceOptions(t *testing.T) {
 // The nil case is the one the config actually produces. The others are here because a value of the
 // wrong type reaches the same line and must not silently disable the rule either.
 func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		options any
@@ -472,6 +494,8 @@ func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(t *testing.
 // Four directives above the first statement, each reporting, is what an early exit fires too soon
 // would break; the fifth below the statement is what a missing exit would wrongly report.
 func TestTripleSlashReferenceScansEveryDirectiveBeforeTheCutoff(t *testing.T) {
+	t.Parallel()
+
 	const source = "/// <reference path=\"a\" />\n" +
 		"/// <reference path=\"b\" />\n" +
 		"/// <reference path=\"c\" />\n" +

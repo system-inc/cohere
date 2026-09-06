@@ -34,6 +34,8 @@ const dangerWithChildrenFile = "/repository/source/DangerWithChildren.tsx"
 // indifferent to whether the tag is a host element or a component, and that indifference is
 // upstream's, so dropping either half of each pair would leave it untested.
 func TestNoDangerWithChildrenFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -72,6 +74,8 @@ func TestNoDangerWithChildrenFires(t *testing.T) {
 // turns on a formatting newline not counting as a child. And one is a self-referential
 // `const props = {...props}`, which is a cycle a naive recursion hangs on.
 func TestNoDangerWithChildrenStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -112,6 +116,8 @@ func TestNoDangerWithChildrenStaysSilent(t *testing.T) {
 // instead, so this is a real choice between two shapes rather than the only thing a react rule can
 // do, and getting it wrong here would underline one word where upstream underlines a block.
 func TestNoDangerWithChildrenPointsAtTheWholeElement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -155,6 +161,8 @@ func TestNoDangerWithChildrenPointsAtTheWholeElement(t *testing.T) {
 // is not a guard: a doubled word or a stray prefix is a substring match away from passing while the
 // message is wrong. This message interpolates nothing, so the assertion is exact.
 func TestNoDangerWithChildrenRendersItsMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
 		"<div dangerouslySetInnerHTML={{ __html: \"HTML\" }}>Children</div>")
 	rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
@@ -180,6 +188,8 @@ func TestNoDangerWithChildrenRendersItsMessage(t *testing.T) {
 // compares `callee.property.name`, so a bare call is not a member expression, an element access is
 // not a static member, and `document` is never special-cased.
 func TestNoDangerWithChildrenMatchesUpstreamsNarrowerCalleeTest(t *testing.T) {
+	t.Parallel()
+
 	danger := "{ dangerouslySetInnerHTML: { __html: \"HTML\" } }"
 
 	t.Run("a bare createElement call is silent, where the shelf helper would accept it", func(t *testing.T) {
@@ -220,6 +230,8 @@ func TestNoDangerWithChildrenMatchesUpstreamsNarrowerCalleeTest(t *testing.T) {
 // outright on a `ComputedPropertyName`, so a version reading key text before checking the kind
 // takes the whole run down on any `{[k]: v}` anywhere in the tree.
 func TestNoDangerWithChildrenReadsKeysThatNeedNoEvaluation(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		sourceText  string
@@ -273,6 +285,8 @@ func TestNoDangerWithChildrenReadsKeysThatNeedNoEvaluation(t *testing.T) {
 // Asserting the declaration directly is what makes that revert visible, since no fixture can see
 // the difference between "correctly silent" and "silent because the checker was nil".
 func TestNoDangerWithChildrenNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoDangerWithChildren.NeedsTypeChecker {
 		t.Fatal("this rule resolves spread identifiers through the checker and must declare it")
 	}
@@ -284,6 +298,8 @@ func TestNoDangerWithChildrenNeedsTheTypedHarness(t *testing.T) {
 // a `/` boundary, so a namespaced name here would lint zero files while every fixture above stayed
 // green. That failure has already shipped once in `internal/rules/next/`.
 func TestNoDangerWithChildrenIsRegisteredWithoutItsNamespace(t *testing.T) {
+	t.Parallel()
+
 	if NoDangerWithChildren.Name != "react/no-danger-with-children" {
 		t.Fatalf("want the bare rule name, got %q", NoDangerWithChildren.Name)
 	}
@@ -300,6 +316,8 @@ func TestNoDangerWithChildrenIsRegisteredWithoutItsNamespace(t *testing.T) {
 // Upstream states the same gate as its own first move, with the reason that a call this short is
 // not a proper createElement call.
 func TestNoDangerWithChildrenDeclinesCallsTooShortToCarryProps(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

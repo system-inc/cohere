@@ -19,6 +19,8 @@ const fallthroughFile = "/repository/source/Fallthrough.tsx"
 // 30 fail inputs, and the snapshot records 32 diagnostics. That gap is real and recovered by hand
 // below: exactly two inputs report twice, and every other fail input reports once.
 func TestNoFallthroughFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -137,6 +139,8 @@ func TestNoFallthroughFires(t *testing.T) {
 
 // The clean cases are the whole discrimination, and each was added upstream when somebody hit it.
 func TestNoFallthroughStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -288,6 +292,8 @@ func TestNoFallthroughStaysSilent(t *testing.T) {
 // is fallen *into*, from its `case` or `default` keyword through the end of its body, and not the
 // clause that failed to break. Read off the snapshot's underline rather than guessed.
 func TestNoFallthroughPointsAtTheClauseFallenInto(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -350,6 +356,8 @@ func TestNoFallthroughPointsAtTheClauseFallenInto(t *testing.T) {
 // Cases written from reading our own code rather than upstream's, each covering a discrimination
 // the imported corpus never exercises.
 func TestNoFallthroughCasesFromOurOwnReading(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a labeled break naming the switch leaves it", func(t *testing.T) {
 		// Upstream's corpus has no labeled break at all, and a port crediting only a bare `break`
 		// would report this. A labeled break jumps out of whatever it names, and in every case that

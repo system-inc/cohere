@@ -17,6 +17,8 @@ import (
 // of 400 real files came back clean for exactly that reason. The control that caught it was the
 // tree's own fixture, which is a known violation and must report.
 func TestConsistencyOrganizeImportsFires(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name   string
 		source string
@@ -106,6 +108,8 @@ func TestConsistencyOrganizeImportsFires(t *testing.T) {
 }
 
 func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name string
 		// fileName is the path the rule is handed. Empty means the default below, and it exists so
@@ -218,6 +222,8 @@ func TestConsistencyOrganizeImportsStaysSilent(t *testing.T) {
 //
 // Each case below was run against the original for comparison, and the divergences are the point.
 func TestConsistencyOrganizeImportsFixesTheSection(t *testing.T) {
+	t.Parallel()
+
 	// The ordinary case, which is every one of the 109 files this landed for.
 	rule_testing.ExpectFixedSource(t,
 		rule_testing.Run(t, ConsistencyOrganizeImports, "Component.tsx",
@@ -247,6 +253,8 @@ func TestConsistencyOrganizeImportsFixesTheSection(t *testing.T) {
 // what the rule did for every file before it could fix anything. What changed is only that the
 // fixer says nothing rather than guessing.
 func TestConsistencyOrganizeImportsDeclinesToFixWhatItCannotMove(t *testing.T) {
+	t.Parallel()
+
 	/*
 	 * A statement between two imports runs before the imports below it. The rendering appends it
 	 * after every one of them, which would move code across an evaluation boundary, and there is no

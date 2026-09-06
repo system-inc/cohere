@@ -34,6 +34,8 @@ func restrictTemplateExpressionsSettingsFor(t *testing.T, wire string) any {
 // TestRestrictTemplateExpressionsStaysSilent is upstream's sixty passing cases verbatim, across
 // every option setting its corpus exercises.
 func TestRestrictTemplateExpressionsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wire       string
@@ -128,6 +130,8 @@ func TestRestrictTemplateExpressionsStaysSilent(t *testing.T) {
 // The text is asserted by equality because the message interpolates a type name through the
 // checker, and that name is the only part of the output a reader uses to understand the finding.
 func TestRestrictTemplateExpressionsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wire         string
@@ -646,6 +650,8 @@ func TestRestrictTemplateExpressionsFires(t *testing.T) {
 // The three inputs below are the three defaults that separate the two: a number, a boolean and an
 // interpolated `Error` are all allowed by default and all reported under the strict preset.
 func TestRestrictTemplateExpressionsReadsNilOptionsAsUpstreamsDefault(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"declare const n: number;\n`${n}`;\n",
 		"declare const b: boolean;\n`${b}`;\n",
@@ -670,6 +676,8 @@ func TestRestrictTemplateExpressionsReadsNilOptionsAsUpstreamsDefault(t *testing
 //
 // Unreachable from every other test here, because RunTyped always supplies a live checker.
 func TestRestrictTemplateExpressionsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !RestrictTemplateExpressions.NeedsTypeChecker {
 		t.Fatal("the rule must declare NeedsTypeChecker: every judgment is about an interpolated value's type")
 	}
@@ -695,6 +703,8 @@ func TestRestrictTemplateExpressionsRequiresTheTypedHarness(t *testing.T) {
 // in a way no imported case catches: every one of upstream's allow cases supplies a list, so the
 // interaction with the default is never exercised.
 func TestRestrictTemplateExpressionsAllowReplacesTheDefault(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "declare const e: Error;\n`${e}`;\n"
 
 	// An allow list naming something else drops Error, so this reports.

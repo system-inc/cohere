@@ -27,6 +27,8 @@ const getterReturnFile = "/repository/source/Getter.js"
 // catches a bug is the one nobody would think to write. Two of these earned that outright: the
 // try/catch pair and the loop pair, both of which a plausible first implementation gets backwards.
 func TestGetterReturnFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -131,6 +133,8 @@ func TestGetterReturnFires(t *testing.T) {
 // A port that read the option as a global mute would pass every fixture in the block above and
 // fail every one of these.
 func TestGetterReturnFiresWithAllowImplicit(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -167,6 +171,8 @@ func TestGetterReturnFiresWithAllowImplicit(t *testing.T) {
 // builtin. And the control-flow group at the end is the reason this rule needed an analysis at all
 // rather than a search for the token `return`.
 func TestGetterReturnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -270,6 +276,8 @@ func TestGetterReturnStaysSilent(t *testing.T) {
 // The option's actual job: a bare `return;` now satisfies the rule, including one behind an if that
 // is followed by a real return.
 func TestGetterReturnStaysSilentWithAllowImplicit(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -305,6 +313,8 @@ func TestGetterReturnStaysSilentWithAllowImplicit(t *testing.T) {
 // Written against a `.ts` name deliberately. Every other fixture here uses `.js`, so without this
 // one nothing would notice if the decline were removed.
 func TestGetterReturnDeclinesTypeScript(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, GetterReturn, "/repository/source/Getter.ts",
 		"var foo = {\n            get bar(): boolean | undefined {\n                if (Math.random() > 0.5) {\n                    return true;\n                }\n            }\n        };"))
 }
@@ -333,6 +343,8 @@ func TestGetterReturnDeclinesTypeScript(t *testing.T) {
 // brace and the whitespace before it. It does not: the range is trivia-trimmed at both ends. That
 // is the case for asserting a span by slicing the source rather than by reasoning about offsets.
 func TestGetterReturnPointsAtTheGetterHead(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

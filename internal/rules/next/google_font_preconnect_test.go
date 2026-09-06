@@ -7,6 +7,8 @@ import (
 )
 
 func TestGoogleFontPreconnectReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -48,6 +50,8 @@ func TestGoogleFontPreconnectReports(t *testing.T) {
 }
 
 func TestGoogleFontPreconnectIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

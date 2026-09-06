@@ -10,6 +10,8 @@ import (
 const outcomeFile = "/repository/source/Thing.ts"
 
 func TestConsistencyNoBooleanOutcomeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -29,6 +31,8 @@ func TestConsistencyNoBooleanOutcomeFires(t *testing.T) {
 }
 
 func TestConsistencyNoBooleanOutcomeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	// Every one of these is a shape that would fire if the rule keyed on the flag name alone. The
 	// exemptions are the difference between a rule people keep and one they switch off.
 	cases := []struct {
@@ -58,6 +62,8 @@ func TestConsistencyNoBooleanOutcomeStaysSilent(t *testing.T) {
 }
 
 func TestConsistencyNoBooleanOutcomeRespectsTheAllowedTypeNamesOption(t *testing.T) {
+	t.Parallel()
+
 	// Telemetry envelopes carry timing or cost on both paths, since a failed model call still bills.
 	// Splitting those into a union puts the cost in the success arm and loses it where it is needed.
 	sourceText := "export interface ClaudeCallResultInterface {\n    success: boolean;\n    error: string;\n}\n"
@@ -72,6 +78,8 @@ func TestConsistencyNoBooleanOutcomeRespectsTheAllowedTypeNamesOption(t *testing
 
 // The suggestion strips role suffixes so the name it offers is one someone would actually write.
 func TestConsistencyNoBooleanOutcomeSuggestsAStrippedName(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ConsistencyNoBooleanOutcome, outcomeFile,
 		"export interface ClaudeCallResultInterface {\n    success: boolean;\n    error: string;\n}\n")
 	rule_testing.ExpectFindings(t, result, "booleanOutcome")

@@ -37,6 +37,8 @@ func noRestrictedTypesDecoded(t *testing.T, optionsJson string) any {
 // the configured key, a non-empty literal where only the empty one is banned, and an entry written
 // as `false` which un-bans rather than bans.
 func TestNoRestrictedTypesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string
@@ -146,6 +148,8 @@ type noRestrictedTypesFinding struct {
 // their repaired sources, and every finding's rendered text and span taken from the installed 8.67.0
 // build.
 func TestNoRestrictedTypesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		optionsJson  string
@@ -607,6 +611,8 @@ func TestNoRestrictedTypesFires(t *testing.T) {
 // not exclusive and returning after the fix dropped the suggestions, and an empty `fixWith` is
 // FALSY upstream so it produces no repair rather than one deleting the type.
 func TestNoRestrictedTypesOffersSuggestions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name            string
 		optionsJson     string
@@ -734,6 +740,8 @@ func TestNoRestrictedTypesOffersSuggestions(t *testing.T) {
 // control, since a rule that is inert for the right reason and one that is inert for the wrong
 // reason are indistinguishable without something that fires.
 func TestNoRestrictedTypesSurvivesNilOptions(t *testing.T) {
+	t.Parallel()
+
 	for _, raw := range [][]byte{nil, []byte("")} {
 		decoded, err := DecodeNoRestrictedTypesOptions(raw)
 		if err != nil {

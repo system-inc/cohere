@@ -33,6 +33,8 @@ const preferEs6ClassFile = "/repository/source/PreferEs6Class.tsx"
 
 // TestPreferEs6ClassFires runs the three failing cases from upstream, one finding each.
 func TestPreferEs6ClassFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		mode       PreferEs6ClassMode
@@ -73,6 +75,8 @@ func TestPreferEs6ClassFires(t *testing.T) {
 
 // TestPreferEs6ClassStaysSilent runs the five passing cases from upstream.
 func TestPreferEs6ClassStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		mode       PreferEs6ClassMode
@@ -143,6 +147,8 @@ func runPreferEs6Class(t *testing.T, mode PreferEs6ClassMode, sourceText string)
 // above, and report nothing on the real tree. Every other fixture here reaches the rule through the
 // decoder, so nothing else in this file can see it.
 func TestPreferEs6ClassReportsWithoutOptions(t *testing.T) {
+	t.Parallel()
+
 	source := "var Hello = createReactClass({ render: function() { return null; } });\n"
 	result := rule_testing.Run(t, PreferEs6Class, preferEs6ClassFile, source)
 	rule_testing.ExpectFindings(t, result, "shouldUseES6Class")
@@ -154,6 +160,8 @@ func TestPreferEs6ClassReportsWithoutOptions(t *testing.T) {
 // here has no such gate. The source deliberately holds no JSX so a .ts file parses and the parser's
 // opinion cannot be mistaken for the rule's.
 func TestPreferEs6ClassHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	source := "var Hello = createReactClass({ render: function() { return null; } });\n"
 	for _, fileName := range []string{
 		"/repository/source/Suffix.tsx",
@@ -178,6 +186,8 @@ func TestPreferEs6ClassHasNoFileSuffixGate(t *testing.T) {
 //
 // Every row measured against the installed build.
 func TestPreferEs6ClassFactoryNames(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -220,6 +230,8 @@ func TestPreferEs6ClassFactoryNames(t *testing.T) {
 // parent is the enclosing object. A port asking "is this the factory's first argument" would pass
 // the whole corpus and get both rows below wrong. Both measured.
 func TestPreferEs6ClassArgumentPosition(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an object in second position still reports", func(t *testing.T) {
 		source := `var H = createReactClass(x, { render() { return null; } });`
 		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
@@ -256,6 +268,8 @@ func TestPreferEs6ClassArgumentPosition(t *testing.T) {
 // Reproduced rather than improved on. A port that helpfully added class expressions would report on
 // code upstream leaves alone and no imported fixture could see it. Both rows measured.
 func TestPreferEs6ClassNeverAnchorsOnDeclarationsOnly(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a class declaration reports", func(t *testing.T) {
 		source := "class Hello extends React.Component { render() { return null; } }\n"
 		result := runPreferEs6Class(t, PreferEs6ClassNever, source)
@@ -275,6 +289,8 @@ func TestPreferEs6ClassNeverAnchorsOnDeclarationsOnly(t *testing.T) {
 // anchors doing work: a port testing for a `Component` substring would pass every corpus case and
 // report on both. Every row measured against the installed build.
 func TestPreferEs6ClassBaseNames(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		heritage string
@@ -331,6 +347,8 @@ func TestPreferEs6ClassBaseNames(t *testing.T) {
 // revives the path they become the fixtures that fail, which is the point of writing them down
 // rather than leaving the absence unrecorded.
 func TestPreferEs6ClassIgnoresJsDocComponents(t *testing.T) {
+	t.Parallel()
+
 	for _, tag := range []string{
 		"@extends React.Component",
 		"@augments React.Component",
@@ -351,6 +369,8 @@ func TestPreferEs6ClassIgnoresJsDocComponents(t *testing.T) {
 // cheapest guard against a dispatch that registers both listeners regardless of mode, which would
 // report twice on a file holding both styles while every corpus case still passed.
 func TestPreferEs6ClassArmsAreDisjoint(t *testing.T) {
+	t.Parallel()
+
 	factory := "var Hello = createReactClass({ render() { return null; } });\n"
 	class := "class Hello extends React.Component { render() { return null; } }\n"
 
@@ -377,6 +397,8 @@ func TestPreferEs6ClassArmsAreDisjoint(t *testing.T) {
 // at the brace and excludes `createReactClass(` entirely; the Never arm reports the whole class
 // declaration. Measured by reading the reported columns from the installed build.
 func TestPreferEs6ClassSpans(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Always underlines the object, not the call", func(t *testing.T) {
 		source := "var Hello = createReactClass({ render() { return null; } });\n"
 		result := runPreferEs6Class(t, PreferEs6ClassAlways, source)
@@ -410,6 +432,8 @@ func TestPreferEs6ClassSpans(t *testing.T) {
 // deliberate: comparing a finding to the constant it was reported with is an equality that moves on
 // both sides under mutation and cannot fail.
 func TestPreferEs6ClassMessages(t *testing.T) {
+	t.Parallel()
+
 	if messagePreferEs6ClassShouldUseEs6Class.Id != "shouldUseES6Class" {
 		t.Errorf("Always arm id = %q", messagePreferEs6ClassShouldUseEs6Class.Id)
 	}
@@ -428,6 +452,8 @@ func TestPreferEs6ClassMessages(t *testing.T) {
 
 // TestDecodePreferEs6ClassOptions pins the decoder, which has no upstream counterpart.
 func TestDecodePreferEs6ClassOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no options at all means Always", func(t *testing.T) {
 		decoded, err := DecodePreferEs6ClassOptions(nil)
 		if err != nil {

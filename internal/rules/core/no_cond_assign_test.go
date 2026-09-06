@@ -17,6 +17,8 @@ var exceptParensOptions = NoCondAssignOptions(NoCondAssignExceptParens)
 // Fires, default mode. Every case here is upstream's `fail` list carrying `None` for options,
 // meaning the default `except-parens`.
 func TestNoCondAssignFiresUnderExceptParens(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -51,6 +53,8 @@ func TestNoCondAssignFiresUnderExceptParens(t *testing.T) {
 // its assignment branch both fire on a bare assignment in a test position. This asserts one finding
 // each. The divergence is deliberate and is argued at the rule.
 func TestNoCondAssignFiresUnderAlways(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -87,6 +91,8 @@ func TestNoCondAssignFiresUnderAlways(t *testing.T) {
 
 // Stays silent. Upstream's whole `pass` list, each with the mode it was written under.
 func TestNoCondAssignStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -153,6 +159,8 @@ func TestNoCondAssignStaysSilent(t *testing.T) {
 
 // Cases upstream does not cover, each here for a reason stated at the case.
 func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no options at all falls back to except-parens", func(t *testing.T) {
 		// The registry hands a rule its decoded options, and a rule configured with a bare severity
 		// gets nothing at all. Upstream's corpus always supplies a mode, so nothing there pins what
@@ -269,6 +277,8 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 // rather than just its operator passes every fixture above. Upstream points at the operator token
 // specifically, and the two differ by the whole left operand.
 func TestNoCondAssignReportsTheOperator(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -305,6 +315,8 @@ func TestNoCondAssignReportsTheOperator(t *testing.T) {
 // The `while (a /* = */ = b) {}` case above pins the comment, and this pins the column upstream
 // snapshots for it, so a span that is right in text but shifted in position still fails.
 func TestNoCondAssignOperatorSpanMatchesUpstreamOffset(t *testing.T) {
+	t.Parallel()
+
 	const source = "while (a /* = */ = b) {}"
 	result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, source, alwaysOptions)
 	if len(result.Diagnostics) != 1 {

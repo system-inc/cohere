@@ -9,6 +9,8 @@ import (
 const noInvalidRegexpFile = "/repository/source/Patterns.ts"
 
 func TestNoInvalidRegexpFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -57,6 +59,8 @@ func TestNoInvalidRegexpFires(t *testing.T) {
 }
 
 func TestNoInvalidRegexpStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

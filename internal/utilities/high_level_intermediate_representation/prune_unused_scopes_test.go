@@ -12,6 +12,8 @@ import (
 // only about the pruned side. Both directions are asserted first, on real source, so the cases below
 // are known to be discriminating rather than assumed to be.
 func TestPruneUnusedScopesPrunesSomethingAndKeepsSomething(t *testing.T) {
+	t.Parallel()
+
 	functions, scopes, pruned, kept := 0, 0, 0, 0
 
 	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
@@ -59,6 +61,8 @@ func TestPruneUnusedScopesPrunesSomethingAndKeepsSomething(t *testing.T) {
 // Pruning it here would delete a scope a downstream pass still needs, and nothing about the
 // resulting tree would look wrong.
 func TestPruneUnusedScopesKeepsScopesHoldingAReturn(t *testing.T) {
+	t.Parallel()
+
 	// A scope with no declarations at all, so only the return condition can keep it.
 	withReturn := &ReactiveScopeBlock{Scope: 1, Instructions: ReactiveBlock{
 		&ReactiveTerminalStatement{Terminal: &ReactiveReturn{}},
@@ -102,6 +106,8 @@ func TestPruneUnusedScopesKeepsScopesHoldingAReturn(t *testing.T) {
 // from a scope nested inside it. Only the first keeps the scope, and telling them apart is the
 // entire reason `ScopeDependencies` records an origin.
 func TestPruneUnusedScopesKeepsScopesWithOwnDeclarations(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name        string
 		origin      ScopeId
@@ -135,6 +141,8 @@ func TestPruneUnusedScopesKeepsScopesWithOwnDeclarations(t *testing.T) {
 //
 // Only 2 of 1,576 corpus scopes carry a reassignment, so corpus coverage says almost nothing here.
 func TestPruneUnusedScopesKeepsScopesWithReassignments(t *testing.T) {
+	t.Parallel()
+
 	dependencies := &ScopeDependencies{
 		reassignments: map[ScopeId][]IdentifierId{1: {7}},
 	}

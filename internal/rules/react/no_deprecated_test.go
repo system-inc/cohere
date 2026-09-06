@@ -53,6 +53,8 @@ const noDeprecatedFile = "/repository/source/NoDeprecated.tsx"
 // dropped the `, use X instead` clause, or printed the wrong version would leave the id and the
 // count fixed and be invisible to `ExpectFindings`. The whole string is compared for that reason.
 func TestNoDeprecatedFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -193,6 +195,8 @@ func TestNoDeprecatedFires(t *testing.T) {
 }
 
 func TestNoDeprecatedStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -288,6 +292,8 @@ func TestNoDeprecatedStaysSilent(t *testing.T) {
 // Every want below is the slice upstream underlines, taken from the installed build's reported
 // columns rather than from reading the source.
 func TestNoDeprecatedSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -347,6 +353,8 @@ func TestNoDeprecatedSpans(t *testing.T) {
 // `#2abaqvt`). Writing this test is how a later reader learns the `.tsx` in `noDeprecatedFile` is
 // a parser choice rather than a rule one.
 func TestNoDeprecatedHasNoFileGate(t *testing.T) {
+	t.Parallel()
+
 	const source = "React.renderComponent()"
 	for _, fileName := range []string{
 		"/repository/source/Probe.ts",

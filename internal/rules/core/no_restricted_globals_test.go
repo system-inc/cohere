@@ -327,6 +327,8 @@ func noRestrictedGlobalsAmbientDeclarations(environmentGlobals *string) string {
 
 // TestNoRestrictedGlobalsFires runs both of upstream's invalid blocks.
 func TestNoRestrictedGlobalsFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noRestrictedGlobalsFiringCasesBlock0 {
 		t.Run("javascript/"+testCase.source, func(t *testing.T) {
 			runNoRestrictedGlobalsCase(t, testCase)
@@ -345,6 +347,8 @@ func TestNoRestrictedGlobalsFires(t *testing.T) {
 // which is the exclusion a port is most likely to get wrong, and several of them differ only in
 // how deeply the type is nested.
 func TestNoRestrictedGlobalsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noRestrictedGlobalsCleanCasesBlock0 {
 		t.Run("javascript/"+testCase.source, func(t *testing.T) {
 			runNoRestrictedGlobalsCase(t, testCase)
@@ -368,6 +372,8 @@ func TestNoRestrictedGlobalsStaysSilent(t *testing.T) {
 //	window.foo                the PROPERTY, `foo`, not `window.foo` and not `window`
 //	window["foo"]             the string literal, again the property half
 func TestNoRestrictedGlobalsSpan(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name        string
 		source      string
@@ -440,6 +446,8 @@ func TestNoRestrictedGlobalsSpan(t *testing.T) {
 // because registering no listener at all is measurably cheaper on a tree of this size than one
 // map lookup per identifier in every file.
 func TestNoRestrictedGlobalsIsInertWithoutConfiguration(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{"foo;", "window.foo();", "event;"} {
 		t.Run(source, func(t *testing.T) {
 			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals,
@@ -454,6 +462,8 @@ func TestNoRestrictedGlobalsIsInertWithoutConfiguration(t *testing.T) {
 // StaysSilent case pass vacuously and every Fires case look like a rule defect. Asserted so a later
 // revert to `Run` fails loudly here rather than quietly everywhere.
 func TestNoRestrictedGlobalsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	decoded := decodeNoRestrictedGlobalsOptionsForTest(t, `["foo"]`)
 
 	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoRestrictedGlobals,

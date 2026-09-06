@@ -9,6 +9,8 @@ import (
 const typeofFile = "/repository/source/Thing.ts"
 
 func TestValidTypeofFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -32,6 +34,8 @@ func TestValidTypeofFires(t *testing.T) {
 }
 
 func TestValidTypeofStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

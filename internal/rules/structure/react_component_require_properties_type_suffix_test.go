@@ -9,6 +9,8 @@ import (
 const typeSuffixFile = "/repository/source/components/Button.tsx"
 
 func TestReactComponentRequirePropertiesTypeSuffixFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -60,6 +62,8 @@ func TestReactComponentRequirePropertiesTypeSuffixFires(t *testing.T) {
 }
 
 func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -161,6 +165,8 @@ func TestReactComponentRequirePropertiesTypeSuffixStaysSilent(t *testing.T) {
 //
 // The fix derives the corrected name rather than appending to the wrong one.
 func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFixedSource(t,
 		rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile,
 			"import type { ButtonProps } from './Types';\n"+
@@ -202,6 +208,8 @@ func TestReactComponentRequirePropertiesTypeSuffixFixDerivesTheName(t *testing.T
 // two. `ExpectFindings` asserts a count and cannot tell a missing second finding from correct
 // behavior.
 func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -262,6 +270,8 @@ func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.
 // The finding is kept and only the fix is withheld. The name still violates the convention, and
 // which of the two declarations survives is a decision only the author can make.
 func TestReactComponentRequirePropertiesTypeSuffixRefusesATakenName(t *testing.T) {
+	t.Parallel()
+
 	source := "export interface MenuItemProperties { a: string }\n" +
 		"export type MenuItemInterface = MenuItemProperties;\n" +
 		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
@@ -283,6 +293,8 @@ func TestReactComponentRequirePropertiesTypeSuffixRefusesATakenName(t *testing.T
 // Without this, disabling every fix in the rule passes the test above, and a rule that proposes
 // nothing is indistinguishable from one that correctly refuses one collision.
 func TestReactComponentRequirePropertiesTypeSuffixStillFixesWhenTheNameIsFree(t *testing.T) {
+	t.Parallel()
+
 	source := "export interface MenuItemInterface { a: string }\n" +
 		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
 

@@ -11,6 +11,8 @@ const constantCasingFile = "/repository/source/Thing.ts"
 const constantCasingComponentFile = "/repository/source/Thing.tsx"
 
 func TestConsistencyRequireConstantCasingFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -137,6 +139,8 @@ func TestConsistencyRequireConstantCasingFires(t *testing.T) {
 }
 
 func TestConsistencyRequireConstantCasingStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -323,6 +327,8 @@ func TestConsistencyRequireConstantCasingStaysSilent(t *testing.T) {
 // The framework option exists because a name a library reads verbatim is a contract rather than a
 // choice, and the rule cannot know which names those are.
 func TestConsistencyRequireConstantCasingFrameworkNames(t *testing.T) {
+	t.Parallel()
+
 	source := "export const runtime = 'edge';\n"
 
 	reported := rule_testing.Run(t, ConsistencyRequireConstantCasing, constantCasingFile, source)
@@ -336,6 +342,8 @@ func TestConsistencyRequireConstantCasingFrameworkNames(t *testing.T) {
 // The suggestion has to be a name the rule's own predicates accept, or the reader who takes it gets
 // the same report again. This is the check that catches a converter handing back its own input.
 func TestConsistencyRequireConstantCasingSuggestionsAreAccepted(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -385,6 +393,8 @@ func TestConsistencyRequireConstantCasingSuggestionsAreAccepted(t *testing.T) {
 // acceptable" stayed green with the fold removed, so it was measuring the wrong property. These
 // assert the exact string, which is the only thing that pins the fold down.
 func TestConsistencyRequireConstantCasingSuggestionText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

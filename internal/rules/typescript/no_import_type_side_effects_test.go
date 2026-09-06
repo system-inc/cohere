@@ -17,6 +17,8 @@ const importTypeSideEffectsFile = "/repository/source/ImportTypeSideEffects.ts"
 // ones, and every invalid case ships an `output`, so the repair below is asserted rather than
 // eyeballed. Cases added beyond the corpus are marked and say what they cover.
 func TestNoImportTypeSideEffectsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -38,6 +40,8 @@ func TestNoImportTypeSideEffectsFires(t *testing.T) {
 }
 
 func TestNoImportTypeSideEffectsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -67,6 +71,8 @@ func TestNoImportTypeSideEffectsStaysSilent(t *testing.T) {
 // @typescript-eslint 8.67.0 rule before being written down, by driving it through the ESLint Linter
 // API, and each covers a decision the corpus leaves unpinned.
 func TestNoImportTypeSideEffectsBeyondTheCorpus(t *testing.T) {
+	t.Parallel()
+
 	// The empty specifier list is upstream's own early return and no corpus case reaches it. A
 	// universal quantifier over an empty list is vacuously true, so a port that drops the guard
 	// reports this and offers `import type {} from 'mod';` as the repair.
@@ -153,6 +159,8 @@ func TestNoImportTypeSideEffectsBeyondTheCorpus(t *testing.T) {
 // last character, and which no message-id assertion can see. Asserted against a literal rather than
 // against the rule's own constant, because a constant compared to itself moves under mutation.
 func TestNoImportTypeSideEffectsSpansTheDeclaration(t *testing.T) {
+	t.Parallel()
+
 	const source = "const before = 1;\nimport { type A, type B } from 'mod';\n"
 	result := rule_testing.Run(t, NoImportTypeSideEffects, importTypeSideEffectsFile, source)
 	rule_testing.ExpectFindings(t, result, "useTopLevelQualifier")
@@ -166,6 +174,8 @@ func TestNoImportTypeSideEffectsSpansTheDeclaration(t *testing.T) {
 // The message carries no format verbs, so there is nothing to render and the assertion is on the
 // value itself. Both fields, because the description is the half a reader acts on.
 func TestNoImportTypeSideEffectsMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageUseTopLevelQualifier.Id != "useTopLevelQualifier" {
 		t.Fatalf("message id was %q", messageUseTopLevelQualifier.Id)
 	}
@@ -178,6 +188,8 @@ func TestNoImportTypeSideEffectsMessage(t *testing.T) {
 // The rule takes no options, so it must survive being handed nil the way a bare "error" configuration
 // hands it. Bypasses the decoder entirely, which every fixture above reaches the rule through.
 func TestNoImportTypeSideEffectsTakesNoOptions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, NoImportTypeSideEffects,
 		importTypeSideEffectsFile, "import { type A } from 'mod';", nil)
 	rule_testing.ExpectFindings(t, result, "useTopLevelQualifier")

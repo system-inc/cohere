@@ -19,6 +19,8 @@ const relatedGetterSetterPairsFile = "/repository/source/Accessors.ts"
 // was also driven through the installed 8.67.0 build before this file existed, and all sixteen were
 // clean there.
 func TestRelatedGetterSetterPairsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -55,6 +57,8 @@ func TestRelatedGetterSetterPairsStaysSilent(t *testing.T) {
 // one, and a named alias all reach the same verdict, which is what pins that the comparison is on
 // TYPES and not on the spelling of the annotation.
 func TestRelatedGetterSetterPairsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -90,6 +94,8 @@ func TestRelatedGetterSetterPairsFires(t *testing.T) {
 // front than the Go literal here. That is why the expectation is compared against a slice of the
 // harness's own result rather than against a slice of the literal.
 func TestRelatedGetterSetterPairsSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -134,6 +140,8 @@ func TestRelatedGetterSetterPairsSpans(t *testing.T) {
 // parameter position, a setter written before its getter, and a `declare class`, which is the
 // control proving the abstract exclusion below is about `abstract` and not about having no body.
 func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -192,6 +200,8 @@ func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(t *testing.T) {
 // a class holds and are told apart only by their parent, so a rule anchored on the accessor kind
 // rather than on the container would report it.
 func TestRelatedGetterSetterPairsStaysSilentOnMeasuredShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -248,6 +258,8 @@ func TestRelatedGetterSetterPairsStaysSilentOnMeasuredShapes(t *testing.T) {
 // node directly would be two characters wider than upstream on exactly this input, and no imported
 // fixture can see it because the corpus writes no parenthesized type.
 func TestRelatedGetterSetterPairsSpansOnMeasuredShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -284,6 +296,8 @@ func TestRelatedGetterSetterPairsSpansOnMeasuredShapes(t *testing.T) {
 // outer method reports its own pair and never sees the outer names, which is what the per-container
 // listener buys instead of upstream's push-and-pop stack.
 func TestRelatedGetterSetterPairsReportsInSourceOrder(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -318,6 +332,8 @@ func TestRelatedGetterSetterPairsReportsInSourceOrder(t *testing.T) {
 // then pass vacuously and the whole suite would prove nothing. This fails loudly if the guard is
 // ever removed and the shim's nil tolerance changes underneath it.
 func TestRelatedGetterSetterPairsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "class C {\n  get value(): number { return 1; }\n  set value(v: string) {}\n}"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, RelatedGetterSetterPairs,
 		relatedGetterSetterPairsFile, source))
@@ -330,6 +346,8 @@ func TestRelatedGetterSetterPairsRequiresTheTypedHarness(t *testing.T) {
 // than against the rule's own constant, because a comparison to the constant moves with it under
 // mutation and passes while the message is wrong.
 func TestRelatedGetterSetterPairsMessage(t *testing.T) {
+	t.Parallel()
+
 	source := "class C {\n  get value(): number { return 1; }\n  set value(v: string) {}\n}"
 	result := rule_testing.RunTyped(t, RelatedGetterSetterPairs, relatedGetterSetterPairsFile, source)
 	if len(result.Diagnostics) != 1 {

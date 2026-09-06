@@ -114,6 +114,8 @@ func widenedTableFrom(scopes *ReactiveScopes, aligned *AlignedScopes) *ReactiveS
 // pass structurally cannot reach, so it staying at 1 is what proves the drop from 166 came from
 // widening scopes rather than from losing them.
 func TestAlignClosesTheFullBlockNestingAssertion(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -230,6 +232,8 @@ func TestAlignClosesTheFullBlockNestingAssertion(t *testing.T) {
 // merge's output is not a fixpoint of the merge once ranges are widened underneath it. Both orders
 // run here side by side so that the cost of getting it backwards is a number rather than a warning.
 func TestAlignMustRunBeforeTheMerge(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -298,6 +302,8 @@ func TestAlignMustRunBeforeTheMerge(t *testing.T) {
 // distinguish a guarded implementation from an unguarded one and a future reader adding a guard
 // "for safety" would be making an unmeasured change that no corpus test could see.
 func TestAlignMinimisesWithoutAGuard(t *testing.T) {
+	t.Parallel()
+
 	// A construct whose terminal sits at 5 and whose fallthrough begins at 9, so an active scope
 	// starting after 5 has its start minimised back to 5 and its end pushed out to 9.
 	build := func(scopeRange MutableRange) (*Function, *ReactiveScopes) {
@@ -345,6 +351,8 @@ func TestAlignMinimisesWithoutAGuard(t *testing.T) {
 // and every fallthrough our lowering reuses is reused by a branch. So the exclusion is what makes
 // upstream's "unique fallthroughs" invariant hold on our graph.
 func TestAlignExcludesBranchTerminals(t *testing.T) {
+	t.Parallel()
+
 	widened := func(makeTerminal func(fallthroughBlock BlockId) Terminal) MutableRange {
 		function, scopes := buildAlignCaseWithTerminal(t, alignCase{
 			scope:        MutableRange{4, 6},
@@ -384,6 +392,8 @@ func TestAlignExcludesBranchTerminals(t *testing.T) {
 // them a case that would otherwise have widened. That is a fixture blind spot rather than an
 // equivalence, and this is the fixture.
 func TestAlignPushFilterDeclinesAScopeThatEndedBeforeTheTerminal(t *testing.T) {
+	t.Parallel()
+
 	// The scope reads at 2 and ends at 3, so it is active when the block begins (its end exceeds the
 	// block's first instruction at 2) and dead by the terminal at 5. The fallthrough begins at 9.
 	function, scopes := buildAlignCase(t, alignCase{
@@ -411,6 +421,8 @@ func TestAlignPushFilterDeclinesAScopeThatEndedBeforeTheTerminal(t *testing.T) {
 // Built synthetically rather than found, because that shape does not occur in the corpus: a scope
 // whose first sighting is inside a narrow value block and whose second is inside a wider one.
 func TestAlignRecordsAScopeOnceCoversTheSeenGate(t *testing.T) {
+	t.Parallel()
+
 	_, scopes := buildAlignCase(t, alignCase{
 		scope:        MutableRange{4, 6},
 		terminalId:   5,
@@ -465,6 +477,8 @@ func TestAlignRecordsAScopeOnceCoversTheSeenGate(t *testing.T) {
 // corpus exercises the branch once and no assertion over totals could see it move, which is why this
 // fixture is synthetic and the measurement is recorded here.
 func TestAlignGotoWidensAcrossSeveralOpenConstructs(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := buildNestedGotoCase(t)
 	aligned := AlignReactiveScopesToBlockScopes(function, scopes)
 
@@ -495,6 +509,8 @@ func TestAlignGotoWidensAcrossSeveralOpenConstructs(t *testing.T) {
 // innermost-targeting goto whose end falls SHORT of that fallthrough: upstream leaves it alone and
 // the pop then widens only its start, while removing the test drags its end forward too.
 func TestAlignGotoSkipsTheInnermostOpenConstruct(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := buildInnermostGotoCase(t)
 	aligned := AlignReactiveScopesToBlockScopes(function, scopes)
 
@@ -531,6 +547,8 @@ func TestAlignGotoSkipsTheInnermostOpenConstruct(t *testing.T) {
 // block start, so nothing retires it, and only the containment test declines it. The expectation is
 // React's own output on that graph rather than a derivation.
 func TestAlignDeclinesAPlaceReadOutsideItsScope(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := buildAlignCase(t, alignCase{
 		scope:        MutableRange{9, 12},
 		terminalId:   8,
@@ -552,6 +570,8 @@ func TestAlignDeclinesAPlaceReadOutsideItsScope(t *testing.T) {
 // and the value-block tree could be assigned twice. The zero is the measurement; the non-zero branch
 // count beside it is the control that proves the probe fired.
 func TestAlignFallthroughsAreUniqueOnceBranchesAreExcluded(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -603,6 +623,8 @@ func TestAlignFallthroughsAreUniqueOnceBranchesAreExcluded(t *testing.T) {
 // after it. This pass does, so the stale table and the re-derived one must now differ, and the
 // direction of the difference is the check that matters: this pass only ever widens.
 func TestAlignReDerivesMemberRanges(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -651,6 +673,8 @@ func TestAlignReDerivesMemberRanges(t *testing.T) {
 // width one, which is the cell that must stay empty. Both populations are asserted non-empty as
 // well, because a table with one population missing measures a collapse rather than a structure.
 func TestAlignPreservesScopeWidthAndMembership(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -705,6 +729,8 @@ func TestAlignPreservesScopeWidthAndMembership(t *testing.T) {
 // count-only assertion would report the reversed comparator as still equivalent and inherit a
 // verdict that has actually expired.
 func TestAlignVoidsTheMergesComparatorVerdicts(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -786,6 +812,8 @@ func TestAlignVoidsTheMergesComparatorVerdicts(t *testing.T) {
 // only scope ranges, so it structurally cannot reach it, and the control that proves the attribution
 // is running the assertion with the scope items removed entirely: the same violation is still there.
 func TestAlignLeavesFallthroughSelfNestingUnclosed(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -823,6 +851,8 @@ func TestAlignLeavesFallthroughSelfNestingUnclosed(t *testing.T) {
 
 // TestAlignGapsAreDeclared makes closing a gap a visible event rather than a silent improvement.
 func TestAlignGapsAreDeclared(t *testing.T) {
+	t.Parallel()
+
 	gaps := AlignGaps()
 	if len(gaps) != 1 || gaps[0] != AlignGapFallthroughSelfNesting {
 		t.Errorf("AlignGaps returned %v; a change here means a gap opened or closed and the "+
@@ -842,6 +872,8 @@ func TestAlignGapsAreDeclared(t *testing.T) {
 // Both denominators are reported so that a future reader sees the distinction rather than
 // rediscovering it.
 func TestAlignIsASingleSweep(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -885,6 +917,8 @@ func TestAlignIsASingleSweep(t *testing.T) {
 // Two Go maps back this pass where upstream has insertion-ordered structures, so a nondeterminism
 // here would be the shape that makes a cache non-reproducible without ever producing a wrong answer.
 func TestAlignIsDeterministic(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -913,6 +947,8 @@ func TestAlignIsDeterministic(t *testing.T) {
 
 // TestAlignHandlesAnEmptyScopeTable is the ordinary answer for a function with no entangled values.
 func TestAlignHandlesAnEmptyScopeTable(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{}
 	if got := AlignReactiveScopesToBlockScopes(function, &ReactiveScopes{}); got.Len() != 0 {
 		t.Errorf("an empty scope table produced %d scopes", got.Len())

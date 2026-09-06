@@ -634,6 +634,8 @@ declare function f<T extends (A extends B ? C : D)>(): T | null;
 // most exposed on, because the walk cannot descend into a mapped type here; each is marked in the
 // divergence test below rather than deleted.
 func TestNoUnnecessaryTypeParametersStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noUnnecessaryTypeParametersValidCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
@@ -645,6 +647,8 @@ func TestNoUnnecessaryTypeParametersStaysSilent(t *testing.T) {
 // TestNoUnnecessaryTypeParametersFires runs upstream's invalid list, asserting one message id per
 // expected finding so a case reporting twice is distinguished from a case reporting once.
 func TestNoUnnecessaryTypeParametersFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noUnnecessaryTypeParametersInvalidCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
@@ -673,6 +677,8 @@ func TestNoUnnecessaryTypeParametersFires(t *testing.T) {
 // including all four of its REPORTING ones, because the uses that decide them are visible before
 // the walk reaches the mapped type. The four below need what is inside it.
 func TestNoUnnecessaryTypeParametersMappedTypeDivergence(t *testing.T) {
+	t.Parallel()
+
 	cases := []noUnnecessaryTypeParametersCase{
 		{name: "valid88", source: `
 declare function mappedReturnType<T extends string>(
@@ -726,6 +732,8 @@ function inferredMappedReturnType<T extends string>(x: T) {
 // clean, which is upstream's verdict, and that is what establishes the rule is right and the
 // instrument is what differs.
 func TestNoUnnecessaryTypeParametersUnresolvedImportIsAHarnessLimit(t *testing.T) {
+	t.Parallel()
+
 	withUnresolvableImport := `
 
 const isNodeOfType =
@@ -775,6 +783,8 @@ const isNodeOfType =
 // message constant: comparing a finding to the constant it was built from moves both sides together
 // under mutation and proves nothing.
 func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		source      string
@@ -837,6 +847,8 @@ func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(t *testing.T) {
 // the engine never applies it unattended. A rule that shipped this as a fix would pass every
 // message-id fixture while rewriting code upstream would only have offered to rewrite.
 func TestNoUnnecessaryTypeParametersOffersTheConstraintSuggestion(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile,
 		"declare class C<V> {}\n")
 
@@ -865,6 +877,8 @@ func TestNoUnnecessaryTypeParametersOffersTheConstraintSuggestion(t *testing.T) 
 // which is how a typed rule panics with a nil receiver while its declaration reads as correct. The
 // assertion is here so a later revert fails loudly rather than going vacuously green.
 func TestNoUnnecessaryTypeParametersDeclinesWithoutATypeChecker(t *testing.T) {
+	t.Parallel()
+
 	if !NoUnnecessaryTypeParameters.NeedsTypeChecker {
 		t.Fatal("the rule reads the checker, so it must declare NeedsTypeChecker")
 	}
@@ -891,6 +905,8 @@ func TestNoUnnecessaryTypeParametersDeclinesWithoutATypeChecker(t *testing.T) {
 // with a harness that refuses to report unless a firing control fires and a clean control stays
 // clean.
 func TestNoUnnecessaryTypeParametersArrayCarveOut(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		source       string
@@ -938,6 +954,8 @@ func TestNoUnnecessaryTypeParametersArrayCarveOut(t *testing.T) {
 // Every expectation below was measured against the installed 8.67.0 build, through a harness that
 // refuses to report unless a firing control fires and a clean control stays clean.
 func TestNoUnnecessaryTypeParametersConstraintRecursion(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		source       string
@@ -1007,6 +1025,8 @@ func TestNoUnnecessaryTypeParametersConstraintRecursion(t *testing.T) {
 // The number-index and string-index visits are separate lines and were mutated separately, because
 // a mutation of one cannot see a defect in the other.
 func TestNoUnnecessaryTypeParametersIndexSignaturesCountTwice(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

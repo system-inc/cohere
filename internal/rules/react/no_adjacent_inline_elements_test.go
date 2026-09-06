@@ -30,6 +30,8 @@ const noAdjacentInlineElementsFile = "/repository/source/NoAdjacentInlineElement
 
 // TestNoAdjacentInlineElementsFires runs the three failing cases from upstream.
 func TestNoAdjacentInlineElementsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -49,6 +51,8 @@ func TestNoAdjacentInlineElementsFires(t *testing.T) {
 
 // TestNoAdjacentInlineElementsStaysSilent runs the fourteen passing cases from upstream.
 func TestNoAdjacentInlineElementsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -90,6 +94,8 @@ func TestNoAdjacentInlineElementsStaysSilent(t *testing.T) {
 // `.jsx` and `.js` are not covered because the typed program's tsconfig includes only TypeScript
 // extensions, which is a fact about the harness rather than about the rule.
 func TestNoAdjacentInlineElementsHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	for _, suffix := range []string{".tsx", ".ts"} {
 		t.Run(suffix, func(t *testing.T) {
 			result := rule_testing.RunTyped(
@@ -115,6 +121,8 @@ func TestNoAdjacentInlineElementsHasNoFileSuffixGate(t *testing.T) {
 // be wrong about the whole JSX arm. That is the exact failure the corpus cannot catch, because every
 // fixture that could distinguish the two readings happens to use whitespace.
 func TestNoAdjacentInlineElementsIgnoresWhitespaceInJsx(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -150,6 +158,8 @@ func TestNoAdjacentInlineElementsIgnoresWhitespaceInJsx(t *testing.T) {
 // these and the rest were measured, including the empty string, which is the sharp one: it has no
 // whitespace to find, so it counts as inline and adjacency holds.
 func TestNoAdjacentInlineElementsWhitespaceMattersInCreateElement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -191,6 +201,8 @@ func TestNoAdjacentInlineElementsWhitespaceMattersInCreateElement(t *testing.T) 
 // The crash is unreachable from the JSX arm, where a call only appears inside an expression
 // container, which upstream never inspects. The third case pins that.
 func TestNoAdjacentInlineElementsDoesNotCrashWhereUpstreamDoes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -223,6 +235,8 @@ func TestNoAdjacentInlineElementsDoesNotCrashWhereUpstreamDoes(t *testing.T) {
 // would report twice on inputs upstream reports once, and the corpus's longest failing case holds a
 // single pair, so nothing in it could see the difference.
 func TestNoAdjacentInlineElementsReportsOncePerContainer(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -244,6 +258,8 @@ func TestNoAdjacentInlineElementsReportsOncePerContainer(t *testing.T) {
 // The list holds lowercase HTML names, so a component reference is a different name whatever it
 // renders, and a member-named tag has no plain name to compare at all. Both measured.
 func TestNoAdjacentInlineElementsNameMatching(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -282,6 +298,8 @@ func TestNoAdjacentInlineElementsNameMatching(t *testing.T) {
 // stated by the corpus beyond one case, and the asymmetry with the INNER children is the surprising
 // part: upstream gates the outer call and never checks the inner ones at all.
 func TestNoAdjacentInlineElementsCreateElementShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -316,6 +334,8 @@ func TestNoAdjacentInlineElementsCreateElementShapes(t *testing.T) {
 // the two adjacent children, which is a real choice: the reader is being told about a relationship,
 // and neither child is wrong on its own.
 func TestNoAdjacentInlineElementsAnchorsOnTheContainer(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -347,6 +367,8 @@ func TestNoAdjacentInlineElementsAnchorsOnTheContainer(t *testing.T) {
 // harness that arm guards and goes silent while the JSX arm keeps reporting. A later revert of
 // `NeedsTypeChecker` fails here rather than producing a vacuous green.
 func TestNoAdjacentInlineElementsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "import {createElement} from 'react';\ncreateElement(\"div\", undefined, [createElement(\"a\"), createElement(\"span\")]);"
 
 	untyped := rule_testing.Run(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, source)
@@ -366,6 +388,8 @@ func TestNoAdjacentInlineElementsRequiresTheTypedHarness(t *testing.T) {
 // name. Asserted against a literal typed here rather than against the rule's own constant, so both
 // sides cannot move together under mutation.
 func TestNoAdjacentInlineElementsMessageExplainsTheRendering(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoAdjacentInlineElements, noAdjacentInlineElementsFile, `<div><a></a><a></a></div>;`)
 	rule_testing.ExpectFindings(t, result, "inlineElement")
 	message := result.Diagnostics[0].Message

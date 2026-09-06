@@ -94,6 +94,8 @@ func runConsistentTypeAssertions(t *testing.T, fileName string, sourceText strin
 // an option matrix: the same source is valid under one assertion style and invalid under another,
 // and the two literal-assertion settings cross that independently.
 func TestConsistentTypeAssertionsStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -205,6 +207,8 @@ func TestConsistentTypeAssertionsStaysSilentOnUpstreamPassCases(t *testing.T) {
 // parenthesization, so a case like `<string>(foo + bar)` is where a naive text swap breaks. Those
 // rows are in here rather than left to inference.
 func TestConsistentTypeAssertionsFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText      string
 		options         string
@@ -1227,6 +1231,8 @@ func TestConsistentTypeAssertionsFiresOnUpstreamFailCases(t *testing.T) {
 // overlap policy and a fixture reimplementing it would assert a result the real pipeline never
 // produces. So that case is pinned on the fix text it proposes instead.
 func TestConsistentTypeAssertionsOnPrecedenceShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -1283,6 +1289,8 @@ func TestConsistentTypeAssertionsOnPrecedenceShapesUpstreamsCorpusDoesNotWrite(t
 // failure mode this whole file would otherwise pass through silently, since every fixture above
 // names its options explicitly.
 func TestConsistentTypeAssertionsDecoderReadsUpstreamsUnion(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		raw  string
 		want ConsistentTypeAssertionsOptions
@@ -1331,6 +1339,8 @@ func TestConsistentTypeAssertionsDecoderReadsUpstreamsUnion(t *testing.T) {
 // A rule named as "error" with no object is handed nil, and the fallback is the only thing between
 // that and an empty assertion style that matches no branch.
 func TestConsistentTypeAssertionsFallsBackWhenHandedNilOptions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedWithOptions(t, ConsistentTypeAssertions,
 		consistentTypeAssertionsFile, "declare const foo: any;\nconst x = <Foo>foo;\n", nil)
 	rule_testing.ExpectFindings(t, result, "as")
@@ -1352,6 +1362,8 @@ func TestConsistentTypeAssertionsFallsBackWhenHandedNilOptions(t *testing.T) {
 // assertion is wrapped because its parent is the outer one, at equal precedence: that is the
 // comparison under test. The outer one is not wrapped, because its own parent is a declarator.
 func TestConsistentTypeAssertionsWrapsAnOperandOfEqualPrecedence(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "declare const foo: any;\nconst x = <Foo><Bar>foo;\n"
 	result := runConsistentTypeAssertions(t, consistentTypeAssertionsFile, sourceText,
 		`{"assertionStyle": "as"}`)
@@ -1395,6 +1407,8 @@ func TestConsistentTypeAssertionsWrapsAnOperandOfEqualPrecedence(t *testing.T) {
 //
 // Measured against the installed 8.x build, one program per case, suggestions included.
 func TestConsistentTypeAssertionsOnSuggestionAndTemplateShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name            string
 		why             string

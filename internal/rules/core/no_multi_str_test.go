@@ -28,6 +28,8 @@ const multiStrJsxFile = "/repository/source/MultiStr.tsx"
 //
 // The two clean cases are split out below, because one of them has to parse as JSX.
 func TestNoMultiStrFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"var x = 'Line 1 \\\n Line 2'",
 		"test('Line 1 \\\n Line 2');",
@@ -52,6 +54,8 @@ func TestNoMultiStrFires(t *testing.T) {
 // JSX exemption removed. That is why the exemption gets its own test below rather than resting on
 // this case.
 func TestNoMultiStrStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a string on one line", func(t *testing.T) {
 		rule_testing.ExpectClean(t,
 			rule_testing.Run(t, NoMultiStr, multiStrFile, "var a = 'Line 1 Line 2';"))
@@ -85,6 +89,8 @@ func TestNoMultiStrStaysSilent(t *testing.T) {
 // Without the exemption this rule would report every multiline attribute value in every component
 // file in the tree, which is a false-positive class no imported fixture can see.
 func TestNoMultiStrJsxExemption(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -126,6 +132,8 @@ func TestNoMultiStrJsxExemption(t *testing.T) {
 // sitting on one source line, is clean, while a string whose value contains NO newline because the
 // continuation swallows it does report. The rule is about the source, not the string.
 func TestNoMultiStrDistinguishesEscapesFromContinuations(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -156,6 +164,8 @@ func TestNoMultiStrDistinguishesEscapesFromContinuations(t *testing.T) {
 // clean on the installed build. Here that falls out of the listener map, and a port adding the
 // template kind to it would report on every multiline template in the tree.
 func TestNoMultiStrDeclinesOtherLiteralKinds(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -185,6 +195,8 @@ func TestNoMultiStrDeclinesOtherLiteralKinds(t *testing.T) {
 // rather than about the line number, and a span that stopped at the line break would slice to
 // something with no closing quote.
 func TestNoMultiStrReportsTheWholeLiteral(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -216,6 +228,8 @@ func TestNoMultiStrReportsTheWholeLiteral(t *testing.T) {
 // The id literal is typed here rather than read from the rule's own constant, so a rename cannot
 // move both sides at once and stay green.
 func TestNoMultiStrMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoMultiStr, multiStrFile, "var x = 'Line 1 \\\n Line 2'")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))

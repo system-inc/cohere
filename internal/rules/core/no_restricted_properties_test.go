@@ -153,6 +153,8 @@ func noRestrictedPropertiesSilentCases() []noRestrictedPropertiesCase {
 }
 
 func TestNoRestrictedPropertiesFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noRestrictedPropertiesFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectFindings(t, runNoRestrictedProperties(t, testCase),
@@ -162,6 +164,8 @@ func TestNoRestrictedPropertiesFires(t *testing.T) {
 }
 
 func TestNoRestrictedPropertiesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noRestrictedPropertiesSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t, runNoRestrictedProperties(t, testCase))
@@ -179,6 +183,8 @@ func TestNoRestrictedPropertiesStaysSilent(t *testing.T) {
 // Verified against the installed build the same way: `foo.bar; baz.qux;` with no options reports
 // nothing, on source that names exactly the shape a restriction would ban.
 func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(t *testing.T) {
+	t.Parallel()
+
 	source := "foo.bar; baz.qux; var { bar } = foo;"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoRestrictedProperties,
 		noRestrictedPropertiesFile, source))
@@ -206,6 +212,8 @@ func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(t *testing.T) {
 // this tree renders code. The rest of each sentence is upstream's wording, including the ordering
 // of the two optional suffixes: the allowance first, then the project message.
 func TestNoRestrictedPropertiesRendersTheWholeMessage(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -308,6 +316,8 @@ func TestNoRestrictedPropertiesRendersTheWholeMessage(t *testing.T) {
 // pattern reports on the whole pattern rather than on the property being read -- which is why one
 // pattern restricting two properties reports twice on the same span. Both are upstream's `node`.
 func TestNoRestrictedPropertiesPointsAtTheAccess(t *testing.T) {
+	t.Parallel()
+
 	restrictBar := NoRestrictedPropertiesOptions{
 		Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}},
 	}
@@ -356,6 +366,8 @@ func TestNoRestrictedPropertiesPointsAtTheAccess(t *testing.T) {
 //
 // The last two rows are the controls that separate "is a pattern" from "is any object literal".
 func TestNoRestrictedPropertiesReadsAssignmentDestructuring(t *testing.T) {
+	t.Parallel()
+
 	restrictBad := NoRestrictedPropertiesOptions{
 		Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bad"}},
 	}
@@ -399,6 +411,8 @@ func TestNoRestrictedPropertiesReadsAssignmentDestructuring(t *testing.T) {
 // Three of those cost findings and one adds a false one. Widening the shelf helper would change four
 // other rules, so this rule carries its own predicate; these rows are what pin the difference.
 func TestNoRestrictedPropertiesReadsUpstreamsPropertyNames(t *testing.T) {
+	t.Parallel()
+
 	restrict := func(property string) NoRestrictedPropertiesOptions {
 		return NoRestrictedPropertiesOptions{
 			Restrictions: []NoRestrictedPropertiesRestriction{{Property: property}},
@@ -438,6 +452,8 @@ func TestNoRestrictedPropertiesReadsUpstreamsPropertyNames(t *testing.T) {
 // config matching nothing forever, and the two self-contradictory pairings would be accepted
 // silently. None of these is reachable from a fixture that builds the options struct directly.
 func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil input yields an empty list", func(t *testing.T) {
 		decoded, err := DecodeNoRestrictedPropertiesOptions(nil)
 		if err != nil {
@@ -484,6 +500,8 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 //
 // So the assertion is on the listener set rather than on any finding.
 func TestNoRestrictedPropertiesRegistersNothingUnconfigured(t *testing.T) {
+	t.Parallel()
+
 	listenersFor := func(options any) rule.Listeners {
 		return NoRestrictedProperties.Run(rule.Context{}, options)
 	}
@@ -519,6 +537,8 @@ func TestNoRestrictedPropertiesRegistersNothingUnconfigured(t *testing.T) {
 //
 // Both verdicts were measured against the installed rule before the rows were written.
 func TestNoRestrictedPropertiesSkipsParenthesesAndRestElements(t *testing.T) {
+	t.Parallel()
+
 	restrictFooBar := NoRestrictedPropertiesOptions{
 		Restrictions: []NoRestrictedPropertiesRestriction{{Object: "foo", Property: "bar"}},
 	}

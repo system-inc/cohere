@@ -16,6 +16,8 @@ const variablesDeclarations = "import { networkService } from './NetworkService.
 const variablesFile = "/repository/source/api/UserRequest.ts"
 
 func TestNetworkRequireHookVariablesTypeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -89,6 +91,8 @@ func TestNetworkRequireHookVariablesTypeFires(t *testing.T) {
 }
 
 func TestNetworkRequireHookVariablesTypeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -68,6 +68,8 @@ func invokedFor(t *testing.T, source string) (*Function, AssumedInvokedFunctions
 // an uncalled function moves a load to somewhere it can throw. So a fixture that declares a callback
 // and never calls it must report nothing, and it is asserted rather than assumed.
 func TestAssumedInvokedFunctionsRecognisesEachCallShape(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string

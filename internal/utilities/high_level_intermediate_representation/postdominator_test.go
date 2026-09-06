@@ -115,6 +115,8 @@ var postDominatorShapes = []struct {
 // TestPostDominatorsMatchTheDefinition checks every ordered pair of blocks in every shape against a
 // reachability walk that shares no code with the tree.
 func TestPostDominatorsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+
 	for _, shape := range postDominatorShapes {
 		t.Run(shape.name, func(t *testing.T) {
 			function := lowerSource(t, shape.code)
@@ -160,6 +162,8 @@ func TestPostDominatorsMatchTheDefinition(t *testing.T) {
 // which any assertion catches, but a plausible tree with one edge redirected, which is exactly what
 // a wrong node ordering in Cooper-Harvey-Kennedy yields.
 func TestPostDominatorDefinitionCheckCanFail(t *testing.T) {
+	t.Parallel()
+
 	// A corruption is only detectable where there was structure to destroy. Self-parenting a block
 	// removes every ancestor from its chain, so it changes an answer only when the chain held a
 	// REAL block; a block whose immediate post-dominator is already the synthetic exit has nothing
@@ -242,6 +246,8 @@ func TestPostDominatorDefinitionCheckCanFail(t *testing.T) {
 // running `eslint-plugin-react-hooks`'s `set-state-in-render` on the equivalent input. They are
 // recorded as membership questions about the block a call lands in, which is what the rule asks.
 func TestUnconditionalBlocksOnMeasuredShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		code string
@@ -310,6 +316,8 @@ func blockHoldingLastCall(function *Function) (BlockId, bool) {
 // It is separate from the definition check because it is true even for a function with no return at
 // all, where the post-dominator tree is empty and every other question is vacuous.
 func TestUnconditionalBlocksAlwaysContainsTheEntry(t *testing.T) {
+	t.Parallel()
+
 	for _, shape := range postDominatorShapes {
 		t.Run(shape.name, func(t *testing.T) {
 			function := lowerSource(t, shape.code)
@@ -324,6 +332,8 @@ func TestUnconditionalBlocksAlwaysContainsTheEntry(t *testing.T) {
 // TestUnconditionalBlocksIsASubsetOfPostDominators states the relationship between the two
 // functions in this file, so a change to one that silently diverges from the other is caught.
 func TestUnconditionalBlocksIsASubsetOfPostDominators(t *testing.T) {
+	t.Parallel()
+
 	for _, shape := range postDominatorShapes {
 		t.Run(shape.name, func(t *testing.T) {
 			function := lowerSource(t, shape.code)
@@ -341,6 +351,8 @@ func TestUnconditionalBlocksIsASubsetOfPostDominators(t *testing.T) {
 // TestUnconditionalBlocksHandlesDegenerateInput checks the two shapes a caller can produce that are
 // not functions at all.
 func TestUnconditionalBlocksHandlesDegenerateInput(t *testing.T) {
+	t.Parallel()
+
 	if got := UnconditionalBlocks(nil); got != nil {
 		t.Errorf("UnconditionalBlocks(nil) = %v, want nil", got)
 	}

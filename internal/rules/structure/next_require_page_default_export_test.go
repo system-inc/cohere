@@ -10,6 +10,8 @@ const pageFile = "/repository/app/account/settings/page.tsx"
 const layoutFile = "/repository/app/account/settings/layout.tsx"
 
 func TestNextRequirePageDefaultExportFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -77,6 +79,8 @@ func TestNextRequirePageDefaultExportFires(t *testing.T) {
 }
 
 func TestNextRequirePageDefaultExportStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string

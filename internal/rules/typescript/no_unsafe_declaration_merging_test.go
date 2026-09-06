@@ -16,6 +16,8 @@ const unsafeDeclarationMergingFile = "/repository/source/Merged.ts"
 // the symbol records first and the opposite-kind test is asked against it. The rule note explains
 // why that asymmetry is upstream's decision rather than an artifact.
 func TestNoUnsafeDeclarationMergingFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -41,6 +43,8 @@ func TestNoUnsafeDeclarationMergingFires(t *testing.T) {
 // opposite-kind test then finds a single declaration of the same kind as the node. These fixtures are
 // what pins that, since the rule reads as though it would merge them.
 func TestNoUnsafeDeclarationMergingStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -71,6 +75,8 @@ func TestNoUnsafeDeclarationMergingStaysSilent(t *testing.T) {
 // is of the opposite kind. So three interfaces after a class produce two findings, and two
 // interfaces before a class produce one.
 func TestNoUnsafeDeclarationMergingCountsFindingsPerDeclaration(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -107,6 +113,8 @@ func TestNoUnsafeDeclarationMergingCountsFindingsPerDeclaration(t *testing.T) {
 // If this test ever fails, the port has been improved rather than broken, and the question is
 // whether the differential harness wants the improvement, not whether the rule is wrong.
 func TestNoUnsafeDeclarationMergingGoesSilentWhenAThirdKindIsFirst(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -130,6 +138,8 @@ func TestNoUnsafeDeclarationMergingGoesSilentWhenAThirdKindIsFirst(t *testing.T)
 // specifically. An interface beside a function, a namespace beside a class, and an interface beside
 // an interface are all merges and all silent.
 func TestNoUnsafeDeclarationMergingStaysSilentOnUnpairedKinds(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -159,6 +169,8 @@ func TestNoUnsafeDeclarationMergingStaysSilentOnUnpairedKinds(t *testing.T) {
 // guards nothing, because a mutation to the constant moves both sides of it at once. These strings
 // are the independent copy that makes the assertion mean something.
 func TestNoUnsafeDeclarationMergingPointsAtTheName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -204,6 +216,8 @@ func TestNoUnsafeDeclarationMergingPointsAtTheName(t *testing.T) {
 // Both offsets below are computed from the source by hand rather than read back from the rule, so
 // the assertion has an independent copy of the answer.
 func TestNoUnsafeDeclarationMergingPointsAtTheFirstDeclaration(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -237,6 +251,8 @@ func TestNoUnsafeDeclarationMergingPointsAtTheFirstDeclaration(t *testing.T) {
 // `node.Symbol()` is nil for all of these inputs under the untyped harness, because typescript-go
 // populates symbol tables when the program is built.
 func TestNoUnsafeDeclarationMergingNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoUnsafeDeclarationMerging.NeedsTypeChecker {
 		t.Fatal("the rule resolves through the checker and must declare NeedsTypeChecker")
 	}
@@ -255,6 +271,8 @@ func TestNoUnsafeDeclarationMergingNeedsTheTypedHarness(t *testing.T) {
 // above is: comparing a message to its own constant is an equality that moves on both sides at once
 // and catches nothing.
 func TestNoUnsafeDeclarationMergingDescriptionExplainsTheHazard(t *testing.T) {
+	t.Parallel()
+
 	const want = "A class and an interface sharing a name are merged into one type, and the members " +
 		"the interface contributes are never initialized by the class constructor. TypeScript does " +
 		"not check them, so reading one compiles and returns undefined at runtime. Give the " +
@@ -282,6 +300,8 @@ func TestNoUnsafeDeclarationMergingDescriptionExplainsTheHazard(t *testing.T) {
 // reports. So the guard has to decline the anonymous form specifically rather than decline default
 // exports as a family.
 func TestNoUnsafeDeclarationMergingHandlesAnAnonymousClass(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an anonymous default export beside an interface", func(t *testing.T) {
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeDeclarationMerging,
 			unsafeDeclarationMergingFile, "interface Foo {}\nexport default class {}\n"))
@@ -309,6 +329,8 @@ func TestNoUnsafeDeclarationMergingHandlesAnAnonymousClass(t *testing.T) {
 // All six were pinned on the release oxlint binary at exactly one finding before being written here,
 // which is what makes this a fidelity test rather than an opinion about what the rule should do.
 func TestNoUnsafeDeclarationMergingSeesThroughAnExport(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

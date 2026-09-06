@@ -56,6 +56,8 @@ func runInitDeclarations(t *testing.T, sourceText string, options string) rule_t
 // The same source appears in this list and in the failing one under the opposite mode, which is why
 // the options travel with each row rather than being set once for the file.
 func TestInitDeclarationsStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -131,6 +133,8 @@ func TestInitDeclarationsStaysSilentOnUpstreamPassCases(t *testing.T) {
 // The message interpolates the variable name, so it is asserted as text too. That is the one place a
 // format string could be wrong while every id and every span stayed right.
 func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		options      string
@@ -352,6 +356,8 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(t *testing.T) {
 //
 // Measured against the installed 8.x build, with a reporting control for each mode in the same runs.
 func TestInitDeclarationsLeavesDestructuringPatternsAlone(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -448,6 +454,8 @@ func TestInitDeclarationsLeavesDestructuringPatternsAlone(t *testing.T) {
 //
 // Measured against the installed 8.x build with a reporting control in the same run.
 func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -516,6 +524,8 @@ func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(t *testing.T) {
 // configuration should keep the rule doing what it does by default rather than silently inverting
 // it, which is what a zero-valued mode would do.
 func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		raw  string
 		want InitDeclarationsOptions
@@ -590,6 +600,8 @@ func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
 //
 // `EnableRule.ts` writes the bare severity spelling, so this IS how the rule is configured here.
 func TestInitDeclarationsIsInertWhenNamedWithoutAMode(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "var foo;\nvar bar = 1;\n"
 
 	// Handed nil, which is what the config layer passes for a rule named as a bare severity.

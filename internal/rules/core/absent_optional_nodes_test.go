@@ -42,6 +42,8 @@ import (
 // new rule reaches for something optional in a shape not listed, the fix is to add the shape rather
 // than to trust the green.
 func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		// Declarations with no initializer, which is where a rule reaching for one finds nil.
 		"declare const absent: unknown;\nexport const value = 1;\n",

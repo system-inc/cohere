@@ -155,6 +155,8 @@ func strictSilentCases() []strictCase {
 }
 
 func TestStrictFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range strictFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectFindings(t, runStrict(t, testCase), testCase.wantIds...)
@@ -163,6 +165,8 @@ func TestStrictFires(t *testing.T) {
 }
 
 func TestStrictStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range strictSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t, runStrict(t, testCase))
@@ -176,6 +180,8 @@ func TestStrictStaysSilent(t *testing.T) {
 // whole directive statement, so a fixer that deleted the wrong statement, or trimmed a neighbour,
 // passes every assertion above.
 func TestStrictFixesTheSource(t *testing.T) {
+	t.Parallel()
+
 	applied := 0
 	for _, testCase := range strictFiresCases() {
 		if testCase.wantFixedSource == "" {
@@ -203,6 +209,8 @@ func TestStrictFixesTheSource(t *testing.T) {
 // list, is reported with nothing offered, because choosing between deleting the directive and
 // changing the surrounding code is a judgment the rule cannot make.
 func TestStrictDeclinesToRepair(t *testing.T) {
+	t.Parallel()
+
 	declined := 0
 	for _, testCase := range strictFiresCases() {
 		if testCase.wantFixedSource != "" {
@@ -240,6 +248,8 @@ func TestStrictDeclinesToRepair(t *testing.T) {
 // first two rows are the ones upstream cannot contain; the last four are the controls that keep
 // them honest by showing the predicate still says no to the three real cases.
 func TestStrictReadsTypeScriptParameterLists(t *testing.T) {
+	t.Parallel()
+
 	never := StrictOptions{Mode: StrictNever}
 	cases := []strictCase{
 		// An annotation and a return type leave the parameter simple, so the directive is merely
@@ -273,6 +283,8 @@ func TestStrictReadsTypeScriptParameterLists(t *testing.T) {
 // directive STATEMENT, so a parameter annotation, a return type and a generic list all sit outside
 // the deleted range by construction. These rows turn that argument into a measurement.
 func TestStrictRepairPreservesTypeSyntax(t *testing.T) {
+	t.Parallel()
+
 	cases := []strictCase{
 		// The `never` mode does not repair, so these use the module collapse, which does.
 		{"'use strict'; export function f(a: string): void {}", nil, []string{"module"},
@@ -300,6 +312,8 @@ func TestStrictRepairPreservesTypeSyntax(t *testing.T) {
 // Each row configures a DIFFERENT mode and expects the same `module` finding, which is what pins
 // the override. Without them a rule that simply ignored the option would look correct.
 func TestStrictCollapsesEveryModeInAModule(t *testing.T) {
+	t.Parallel()
+
 	source := "'use strict'; export const a = 1;"
 	for _, mode := range []StrictMode{StrictSafe, StrictGlobal, StrictFunction, StrictNever} {
 		t.Run(string(mode), func(t *testing.T) {
@@ -344,6 +358,8 @@ func TestStrictCollapsesEveryModeInAModule(t *testing.T) {
 // expressible about them: the two parser features have no configuration surface at all, so no
 // spelling of the options can reach the `implied` message.
 func TestStrictHasNoImpliedMode(t *testing.T) {
+	t.Parallel()
+
 	// `implied` is one of upstream's ten message ids and this port can never emit it, because the
 	// parser feature that selects it does not exist here. If a future harness gains one, this
 	// fails and the cases above become importable.
@@ -368,6 +384,8 @@ func TestStrictHasNoImpliedMode(t *testing.T) {
 // the rule is selected by string equality, so an unrecognized spelling must fail rather than pick a
 // silent fifth behaviour of reporting nothing.
 func TestDecodeStrictOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil input selects Safe", func(t *testing.T) {
 		decoded, err := DecodeStrictOptions(nil)
 		if err != nil {
@@ -409,6 +427,8 @@ func TestDecodeStrictOptions(t *testing.T) {
 // a port that helpfully reported the middle row would disagree with the tool it replaces on real
 // source, and nothing in the corpus would have said so.
 func TestStrictStopsAtANonStrictDirective(t *testing.T) {
+	t.Parallel()
+
 	never := StrictOptions{Mode: StrictNever}
 	cases := []strictCase{
 		{"'use strict'; foo();", never, []string{"never"}, ""},
@@ -449,6 +469,8 @@ func TestStrictStopsAtANonStrictDirective(t *testing.T) {
 //
 // This test asserts the reachable half, so a change that broke Safe entirely still fails.
 func TestStrictSafeResolvesToFunctionForAScript(t *testing.T) {
+	t.Parallel()
+
 	safe := StrictOptions{Mode: StrictSafe}
 	// A script with a top-level function and no directive: Function mode reports, Global would
 	// have reported on the whole program instead, so the message id separates them.

@@ -33,6 +33,8 @@ var preferReduceTypeParameterModules = map[string]string{
 // across files. Under that merge upstream's valid case 10 reports, which reads exactly like a
 // wrong case in upstream's own corpus and is an artifact of how it was measured.
 func TestPreferReduceTypeParameterStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"new (class Mine {\n  reduce() {}\n})().reduce(() => {}, 1 as any);\n",
 		"class Mine {\n  reduce() {}\n}\n\nnew Mine().reduce(() => {}, 1 as any);\n",
@@ -109,6 +111,8 @@ func preferReduceTypeParameterFilesFor(sourceText string) map[string]string {
 // `strings.TrimSpace(source)+"\n"` and comparing against the untrimmed literal fails on the
 // trailing bytes alone.
 func TestPreferReduceTypeParameterFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		wantSpan    string

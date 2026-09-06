@@ -27,6 +27,8 @@ import (
 // that fixture with no error at all. Fixing it took ungated false positives from 35 to 34 with
 // golden unchanged.
 func TestUnextractableDependencyAbandonsTheWholeList(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name        string
 		source      string
@@ -86,6 +88,8 @@ func TestUnextractableDependencyAbandonsTheWholeList(t *testing.T) {
 // retain exactly the steps guarded by `?.`, even though the PropertyLoad instructions themselves
 // are non-optional.
 func TestDropManualMemoizationRecoversOptionalPlacesFromControlFlow(t *testing.T) {
+	t.Parallel()
+
 	deps, isNil, result := memoDepsFor(t, `
 		import {useMemo} from 'react';
 		function Component(props) {
@@ -120,6 +124,8 @@ func TestDropManualMemoizationRecoversOptionalPlacesFromControlFlow(t *testing.T
 // must not: upstream accepts globals in dependency arrays and derives their optionality with a
 // separate terminal walk.
 func TestDropManualMemoizationRecoversOptionalGlobalDependency(t *testing.T) {
+	t.Parallel()
+
 	deps, isNil, result := memoDepsFor(t, `
 		import {useMemo} from 'react';
 		declare const GLOBAL: {field?: {leaf: number}} | undefined;
@@ -151,6 +157,8 @@ func TestDropManualMemoizationRecoversOptionalGlobalDependency(t *testing.T) {
 // through the enclosing ternary would accept a dependency expression upstream classifies as
 // unextractable and silently compare against only one of its two possible values.
 func TestDropManualMemoizationDoesNotProjectOptionalThroughTernaryPhi(t *testing.T) {
+	t.Parallel()
+
 	deps, isNil, result := memoDepsFor(t, `
 		import {useMemo} from 'react';
 		function Component({condition, value}) {

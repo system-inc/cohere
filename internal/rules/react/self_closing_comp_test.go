@@ -13,6 +13,8 @@ import (
 const selfClosingCompFile = "/repository/source/SelfClosingComp.tsx"
 
 func TestSelfClosingCompStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		options          SelfClosingCompOptions
@@ -66,6 +68,8 @@ func TestSelfClosingCompStaysSilent(t *testing.T) {
 // value artifact in a fixable rule's corpus: a fixer that repairs the right span with the wrong
 // text passes any message-id assertion.
 func TestSelfClosingCompFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText, wantFixed string
 		options                     SelfClosingCompOptions
@@ -112,6 +116,8 @@ func TestSelfClosingCompFires(t *testing.T) {
 // silently cooked one into a plain space and produced a confident wrong measurement that disagreed
 // with a Go probe of the same input.
 func TestSelfClosingCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -194,6 +200,8 @@ func TestSelfClosingCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *
 // Every shape below reaches the text-reading path. A findings assertion would pass vacuously if the
 // rule crashed, so this asserts by running at all.
 func TestSelfClosingCompDoesNotPanicOnJsxText(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		"var a = <div>\n</div>;",
 		"var a = <div> </div>;",
@@ -223,6 +231,8 @@ func TestSelfClosingCompDoesNotPanicOnJsxText(t *testing.T) {
 // The empty-input row is the one that matters most: a rule configured as a bare `"error"` reaches
 // the decoder with no bytes at all.
 func TestDecodeSelfClosingCompOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		raw           string
@@ -272,6 +282,8 @@ func TestDecodeSelfClosingCompOptions(t *testing.T) {
 // and a rule that reports nothing. The explicit fallback is what prevents that, and nothing else in
 // this file would notice if it were removed.
 func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{"var a = <div></div>;", "var a = <Foo></Foo>;"} {
 		t.Run(sourceText, func(t *testing.T) {
 			result := rule_testing.RunWithOptions(t, SelfClosingComp, selfClosingCompFile, sourceText, nil)
@@ -298,6 +310,8 @@ func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(t *testing.T) {
 // This distinction matters because the two zeros look identical from a findings assertion, and
 // asserting a finding on `.ts` would be asserting something false about the parser.
 func TestSelfClosingCompHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "var a = <div></div>;\n"
 	for _, fileName := range []string{
 		"/repository/source/Suffix.tsx",

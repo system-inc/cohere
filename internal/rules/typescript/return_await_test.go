@@ -39,6 +39,8 @@ func returnAwaitOptionsFor(t *testing.T, optionsJson string) any {
 // same source is valid under `never` and reports under `always`. Measured one file per program
 // against the installed 8.67.0 build, using upstream's own fixture compilerOptions verbatim.
 func TestReturnAwaitStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string
@@ -276,6 +278,8 @@ type returnAwaitFinding struct {
 // fixes and not suggestions, and collapsing the two would have the edit engine rewriting which
 // frame catches a rejection.
 func TestReturnAwaitFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		optionsJson  string
@@ -958,6 +962,8 @@ func TestReturnAwaitFires(t *testing.T) {
 // Block rather than an object literal, so the function silently stops returning anything. The
 // installed build produces exactly that; these rows assert the corrected output.
 func TestReturnAwaitFixes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string
@@ -1162,6 +1168,8 @@ func TestReturnAwaitFixes(t *testing.T) {
 // suggestion and NO fix, plus the suggestion text. A row that arrived as a fix would pass every
 // message-id assertion in the firing test above.
 func TestReturnAwaitOffersSuggestionsRatherThanFixes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText      string
 		optionsJson     string

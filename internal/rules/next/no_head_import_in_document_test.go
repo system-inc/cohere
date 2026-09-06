@@ -19,6 +19,8 @@ import (
 
 // Every case here reports exactly once.
 func TestNoHeadImportInDocumentReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -153,6 +155,8 @@ func TestNoHeadImportInDocumentReports(t *testing.T) {
 // because not one of them writes the module twice. Measured on the release binary, which
 // reports at both column 1 and column 34 for a file holding two.
 func TestNoHeadImportInDocumentReportsOncePerImport(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -181,6 +185,8 @@ func TestNoHeadImportInDocumentReportsOncePerImport(t *testing.T) {
 
 // No case here reports.
 func TestNoHeadImportInDocumentIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -334,6 +340,8 @@ func TestNoHeadImportInDocumentIsSilent(t *testing.T) {
 // already strips it, so wrapping here would move the finding off upstream's span onto the
 // specifier for no gain.
 func TestNoHeadImportInDocumentPointsAtTheImportDeclaration(t *testing.T) {
+	t.Parallel()
+
 	source := "// a comment\n// another\nimport Head from 'next/head';\n"
 
 	result := rule_testing.Run(t, NoHeadImportInDocument, "pages/_document.tsx", source)
@@ -349,6 +357,8 @@ func TestNoHeadImportInDocumentPointsAtTheImportDeclaration(t *testing.T) {
 // which a count assertion cannot see. Upstream reports at column 1 and column 34 for the single-line
 // form; here they are on separate lines.
 func TestNoHeadImportInDocumentPointsAtEachImportSeparately(t *testing.T) {
+	t.Parallel()
+
 	source := "import Head from 'next/head';\nimport Other from 'next/head';\n"
 
 	result := rule_testing.Run(t, NoHeadImportInDocument, "pages/_document.tsx", source)
@@ -372,6 +382,8 @@ func TestNoHeadImportInDocumentPointsAtEachImportSeparately(t *testing.T) {
 // Equality rather than containment, because a predicate weaker than the property it guards is not a
 // guard.
 func TestNoHeadImportInDocumentMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoHeadImportInDocument, "pages/_document.tsx",
 		"import Head from 'next/head';\n")
 	rule_testing.ExpectFindings(t, result, messageNoHeadImportInDocument.Id)

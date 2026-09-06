@@ -17,6 +17,8 @@ import (
 // JSON.stringify, so no escape sequence was ever typed on the way here. Verified byte for
 // byte against the corpus after writing.
 func TestNoUnescapedEntitiesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -60,6 +62,8 @@ func TestNoUnescapedEntitiesStaysSilent(t *testing.T) {
 // array. Order is asserted, and it is upstream's loop order rather than source order: see
 // reportEntities.
 func TestNoUnescapedEntitiesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		source  string
@@ -184,6 +188,8 @@ func decodeNoUnescapedEntitiesOptionsForTest(t *testing.T, raw string) any {
 // START is identical to upstream's; the end is one byte later. That is the divergence, and this is
 // where it is pinned, so a later change to the span fails loudly rather than drifting.
 func TestNoUnescapedEntitiesPointsAtTheCharacter(t *testing.T) {
+	t.Parallel()
+
 	const source = "const a = <div>x\"y</div>;"
 
 	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)
@@ -207,6 +213,8 @@ func TestNoUnescapedEntitiesPointsAtTheCharacter(t *testing.T) {
 // constants: comparing a diagnostic against the constant the rule reported with is equality that
 // moves on both sides under mutation.
 func TestNoUnescapedEntitiesRendersUpstreamsMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", "const a = <div>'</div>;")
 	rule_testing.ExpectFindings(t, result, "unescapedEntityAlts")
 
@@ -224,6 +232,8 @@ func TestNoUnescapedEntitiesRendersUpstreamsMessageText(t *testing.T) {
 // is NOT reproduced: the id is what suppressions and metrics resolve against, and the sentence is
 // ours to write clearly. The divergence is stated here rather than left for a reader to find.
 func TestNoUnescapedEntitiesRendersTheBareStringMessage(t *testing.T) {
+	t.Parallel()
+
 	options := decodeNoUnescapedEntitiesOptionsForTest(t, `{"forbid":["&"]}`)
 
 	result := rule_testing.RunWithOptions(
@@ -246,6 +256,8 @@ func TestNoUnescapedEntitiesRendersTheBareStringMessage(t *testing.T) {
 // A suggestion writing the right string over the wrong span passes any text comparison, so the
 // assertion is on the rewritten whole file.
 func TestNoUnescapedEntitiesOffersEveryAlternativeAsASuggestion(t *testing.T) {
+	t.Parallel()
+
 	const source = "const a = <div>x\"y</div>;"
 
 	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)
@@ -289,6 +301,8 @@ func TestNoUnescapedEntitiesOffersEveryAlternativeAsASuggestion(t *testing.T) {
 // lands one column off, which no message-id fixture and no single-line case can see. Expected
 // output measured on the installed rule.
 func TestNoUnescapedEntitiesRepairsTheRightLineOfAMultiLineNode(t *testing.T) {
+	t.Parallel()
+
 	const source = "const a = <div>ok\n  bad: \"q\"\n  more</div>;"
 
 	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)
@@ -316,6 +330,8 @@ func TestNoUnescapedEntitiesRepairsTheRightLineOfAMultiLineNode(t *testing.T) {
 // Two entity kinds and three findings, because a single-kind case cannot see the difference and a
 // two-finding case of one kind cannot either.
 func TestNoUnescapedEntitiesReportsInSourceOrder(t *testing.T) {
+	t.Parallel()
+
 	const source = "const a = <div>Multiple errors: '>> default parser</div>;"
 
 	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)
@@ -347,6 +363,8 @@ func TestNoUnescapedEntitiesReportsInSourceOrder(t *testing.T) {
 // every file and finds nothing, which looks exactly like a clean tree. Every other fixture in this
 // file reaches the rule through options, so nothing else can see it.
 func TestNoUnescapedEntitiesUsesTheDefaultsWhenHandedNilOptions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(
 		t, NoUnescapedEntities, "component.tsx", "const a = <div>'</div>;", nil)
 	rule_testing.ExpectFindings(t, result, "unescapedEntityAlts")
@@ -359,6 +377,8 @@ func TestNoUnescapedEntitiesUsesTheDefaultsWhenHandedNilOptions(t *testing.T) {
 // configuration that explicitly asked for silence. Measured on the installed rule: `{forbid: []}`
 // is clean on source the defaults report on.
 func TestNoUnescapedEntitiesSeparatesAnAbsentForbidFromAnEmptyOne(t *testing.T) {
+	t.Parallel()
+
 	const source = "const a = <div>a'b\"c</div>;"
 
 	absent := decodeNoUnescapedEntitiesOptionsForTest(t, `{}`)
@@ -379,6 +399,8 @@ func TestNoUnescapedEntitiesSeparatesAnAbsentForbidFromAnEmptyOne(t *testing.T) 
 // divergence: upstream CRASHES on it with "Cannot read properties of undefined (reading 'map')",
 // measured, and this drops it instead.
 func TestNoUnescapedEntitiesDeclinesTheForbidEntriesUpstreamCannotUse(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		options string
@@ -406,6 +428,8 @@ func TestNoUnescapedEntitiesDeclinesTheForbidEntriesUpstreamCannotUse(t *testing
 // and upstream reports it as `unescapedEntityAlts` with nothing to offer, rendering as
 // "`&` can be escaped with ." Reproduced including the space before the period.
 func TestNoUnescapedEntitiesReportsAnObjectEntryWithNoAlternatives(t *testing.T) {
+	t.Parallel()
+
 	options := decodeNoUnescapedEntitiesOptionsForTest(t, `{"forbid":[{"char":"&","alternatives":[]}]}`)
 
 	result := rule_testing.RunWithOptions(
@@ -429,6 +453,8 @@ func TestNoUnescapedEntitiesReportsAnObjectEntryWithNoAlternatives(t *testing.T)
 // literal, because a Literal is never a direct child of a JSX element or fragment. Measured both
 // ways on the installed rule, and both of these are clean there.
 func TestNoUnescapedEntitiesIgnoresTextThatIsNotJsxText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -454,6 +480,8 @@ func TestNoUnescapedEntitiesIgnoresTextThatIsNotJsxText(t *testing.T) {
 // letter and an astral emoji reports exactly the two ASCII quotes and points at them, so a scan
 // that misread a continuation byte would fail here rather than in the tree.
 func TestNoUnescapedEntitiesScansBytesWithoutMisreadingMultiByteText(t *testing.T) {
+	t.Parallel()
+
 	const source = "const a = <div>café \"q\" \U0001F600 'y'</div>;"
 
 	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)
@@ -477,6 +505,8 @@ func TestNoUnescapedEntitiesScansBytesWithoutMisreadingMultiByteText(t *testing.
 // is `&`, which is not forbidden by default, so a decoded scan reports on the `&gt;` and not on
 // this. Both are here for that reason.
 func TestNoUnescapedEntitiesLeavesEscapedEntitiesAlone(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t,
 		rule_testing.Run(t, NoUnescapedEntities, "component.tsx", "const a = <div>&gt;&amp;&quot;&apos;&#125;</div>;"))
 }
@@ -518,6 +548,8 @@ func applyOneSuggestion(t *testing.T, source string, suggestion rule.Suggestion)
 //
 // So this asserts the range rather than the output, because the output cannot see it.
 func TestNoUnescapedEntitiesRepairsCoverTheWholeNode(t *testing.T) {
+	t.Parallel()
+
 	const source = "const a = <div>a'b\"c</div>;"
 
 	result := rule_testing.Run(t, NoUnescapedEntities, "component.tsx", source)

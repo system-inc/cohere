@@ -124,6 +124,8 @@ func noWarningCommentsSilentCases() []noWarningCommentsCase {
 }
 
 func TestNoWarningCommentsFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noWarningCommentsFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectFindings(t, runNoWarningComments(t, testCase), testCase.wantIds...)
@@ -132,6 +134,8 @@ func TestNoWarningCommentsFires(t *testing.T) {
 }
 
 func TestNoWarningCommentsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noWarningCommentsSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t, runNoWarningComments(t, testCase))
@@ -147,6 +151,8 @@ func TestNoWarningCommentsStaysSilent(t *testing.T) {
 // reports twice and the two findings must name different terms, in the order the terms were
 // configured.
 func TestNoWarningCommentsNamesTheMatchedTerm(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noWarningCommentsFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			result := runNoWarningComments(t, testCase)
@@ -184,6 +190,8 @@ func TestNoWarningCommentsNamesTheMatchedTerm(t *testing.T) {
 //
 // Every expectation here was read off the installed rule's own rendered message.
 func TestNoWarningCommentsTruncatesOnAWordBoundary(t *testing.T) {
+	t.Parallel()
+
 	anywhere := NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}
 	cases := []struct {
 		sourceText string
@@ -245,6 +253,8 @@ func TestNoWarningCommentsTruncatesOnAWordBoundary(t *testing.T) {
 // The Cyrillic row is the control that makes the rest meaningful -- it is clean because the Te is a
 // different letter from an ASCII T, not because of any boundary rule.
 func TestNoWarningCommentsUsesAsciiWordBoundaries(t *testing.T) {
+	t.Parallel()
+
 	anywhere := NoWarningCommentsOptions{
 		Terms: []string{"todo"}, Location: NoWarningCommentsAnywhere,
 	}
@@ -284,6 +294,8 @@ func TestNoWarningCommentsUsesAsciiWordBoundaries(t *testing.T) {
 // sits between the anchor and the term, and configuring that asterisk as a decoration character
 // makes the same comment report. Both measured.
 func TestNoWarningCommentsReadsTheCommentValue(t *testing.T) {
+	t.Parallel()
+
 	decorated := NoWarningCommentsOptions{Decoration: []string{"*"}}
 	cases := []noWarningCommentsCase{
 		{"// TODO: fix this", nil, []string{"unexpectedComment"}, []string{"todo"}},
@@ -327,6 +339,8 @@ func fmtOptions(options any) string {
 // test, an `eslint-disable` for any other rule would be exempt; without the directive test, an
 // ordinary comment discussing the rule would be.
 func TestNoWarningCommentsExemptsItsOwnDirective(t *testing.T) {
+	t.Parallel()
+
 	cases := []noWarningCommentsCase{
 		// A directive naming this rule: exempt even though it contains no term at all, which is
 		// why the row below it is the one that proves the exemption does something.
@@ -358,6 +372,8 @@ func TestNoWarningCommentsExemptsItsOwnDirective(t *testing.T) {
 // matching nothing, and a multi-character decoration entry would widen the character class in a way
 // nobody wrote. Neither is reachable from a fixture that builds the options struct directly.
 func TestDecodeNoWarningCommentsOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil input yields the defaults", func(t *testing.T) {
 		decoded, err := DecodeNoWarningCommentsOptions(nil)
 		if err != nil {
@@ -401,6 +417,8 @@ func TestDecodeNoWarningCommentsOptions(t *testing.T) {
 // the rule would report on no comment at all. Every fixture above reaches the rule through the
 // decoder, so none of them can see that.
 func TestNoWarningCommentsWithNilOptionsUsesTheDefaults(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{"// TODO x", "// FIXME x", "// XXX x"} {
 		rule_testing.ExpectFindings(t, rule_testing.Run(t, NoWarningComments,
 			noWarningCommentsFile, source), "unexpectedComment")

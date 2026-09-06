@@ -16,6 +16,8 @@ import (
 // a single finding each rather than two.
 
 func TestNextScriptForGaReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -63,6 +65,8 @@ func TestNextScriptForGaReports(t *testing.T) {
 }
 
 func TestNextScriptForGaIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -105,6 +109,8 @@ func TestNextScriptForGaIsSilent(t *testing.T) {
 // the plugin. Each case names the verdict it pins.
 
 func TestNextScriptForGaReportsTheMeasuredEdgeCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -168,6 +174,8 @@ func TestNextScriptForGaReportsTheMeasuredEdgeCases(t *testing.T) {
 }
 
 func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -277,6 +285,8 @@ func TestNextScriptForGaIsSilentOnTheMeasuredEdgeCases(t *testing.T) {
 // inside the src branch. Without it this input reports twice and no fixture above can see it,
 // because every other case carries at most one matching arm.
 func TestNextScriptForGaReportsOnceWhenBothArmsMatch(t *testing.T) {
+	t.Parallel()
+
 	source := "export const A = <script src=\"https://www.google-analytics.com/analytics.js\" dangerouslySetInnerHTML={{__html: `www.googletagmanager.com/gtm.js`}} />;\n"
 	result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", source)
 	rule_testing.ExpectFindings(t, result, "nextScriptForGa")
@@ -286,6 +296,8 @@ func TestNextScriptForGaReportsOnceWhenBothArmsMatch(t *testing.T) {
 // looking would find the second value and report on an input that is silent upstream, measured
 // against a duplicated key.
 func TestNextScriptForGaReadsOnlyTheFirstHtmlKey(t *testing.T) {
+	t.Parallel()
+
 	source := "export const A = <script dangerouslySetInnerHTML={{__html: `harmless`, __html: `www.google-analytics.com/analytics.js`}} />;\n"
 	result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", source)
 	rule_testing.ExpectClean(t, result)
@@ -295,6 +307,8 @@ func TestNextScriptForGaReadsOnlyTheFirstHtmlKey(t *testing.T) {
 // snapshot's caret, which underlines the six characters of `script`. Message ids cannot see where a
 // finding points, so this is the only fixture that records the choice.
 func TestNextScriptForGaPointsAtTheTagName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -328,6 +342,8 @@ func TestNextScriptForGaPointsAtTheTagName(t *testing.T) {
 // and proves nothing. This rule interpolates nothing, so the description is fixed text and equality
 // is the right predicate.
 func TestNextScriptForGaMessage(t *testing.T) {
+	t.Parallel()
+
 	source := "export const A = <script src=\"https://www.google-analytics.com/analytics.js\" />;\n"
 	result := rule_testing.Run(t, NextScriptForGa, "pages/index.tsx", source)
 	rule_testing.ExpectFindings(t, result, "nextScriptForGa")
@@ -353,6 +369,8 @@ func TestNextScriptForGaMessage(t *testing.T) {
 // costing one finding, and no ExpectFindings fixture can see one, so this asserts on the shapes
 // themselves. Upstream is silent on all of them, measured.
 func TestNextScriptForGaSurvivesPropertyShapesItCannotConvert(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -408,6 +426,8 @@ func TestNextScriptForGaSurvivesPropertyShapesItCannotConvert(t *testing.T) {
 // including the third, where the two spellings differ only in case and the case-insensitive matcher
 // makes the first one the match.
 func TestNextScriptForGaAnswersFromTheFirstDangerouslySetInnerHtml(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

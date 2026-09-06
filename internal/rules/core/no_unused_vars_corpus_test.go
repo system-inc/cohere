@@ -745,6 +745,8 @@ var noUnusedVarsUpstreamReports = []string{
 // TestNoUnusedVarsStaysSilentOnUpstreamCleanCases asserts every clean case upstream ships stays
 // clean here. All 409 pass, which is the half of the corpus that catches a rule reporting too much.
 func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range noUnusedVarsUpstreamClean {
 		result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source)
 		if len(result.Diagnostics) != 0 {
@@ -766,6 +768,8 @@ func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(t *testing.T) {
 //
 // One of the two is a case upstream cannot report either and documents as such in its own source.
 func TestNoUnusedVarsFiresOnUpstreamReportingCases(t *testing.T) {
+	t.Parallel()
+
 	silent := 0
 	for _, source := range noUnusedVarsUpstreamReports {
 		if len(rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source).Diagnostics) == 0 {

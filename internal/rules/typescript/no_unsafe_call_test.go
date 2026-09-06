@@ -23,6 +23,8 @@ func noUnsafeCallCaseName(index int) string {
 // which one is in force. The two cases where the setting DOES decide the verdict are in the
 // firing test, at the ids upstream produces under our configuration.
 func TestNoUnsafeCallStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"function foo(x: () => void) {\n  x();\n}\n",
 		"function foo(x?: { a: () => void }) {\n  x?.a();\n}\n",
@@ -93,6 +95,8 @@ type noUnsafeCallFinding struct {
 // template report on the CALLEE, so `x.a.b.c.d.e.f.g()` underlines everything but the parentheses,
 // while `new` reports on the WHOLE expression. Collapsing those would satisfy every id.
 func TestNoUnsafeCallFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []noUnsafeCallFinding

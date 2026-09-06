@@ -18,6 +18,8 @@ import (
 // parts than any other in phase 6 -- a classification, a graph, a propagation and a transform -- so
 // the baseline is asserted on real source before any specific claim.
 func TestPruneNonEscapingScopesPrunesAndKeeps(t *testing.T) {
+	t.Parallel()
+
 	functions, scopesBefore, pruned, roots, memoized := 0, 0, 0, 0, 0
 
 	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
@@ -68,6 +70,8 @@ func TestPruneNonEscapingScopesPrunesAndKeeps(t *testing.T) {
 // A scope producing a value the function returns must survive: the caller holds it, so memoizing it
 // is what stops the caller seeing a new identity every render.
 func TestPruneNonEscapingScopesKeepsAReturnedValue(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Identifiers: []*Identifier{{Id: 0}, {Id: 1}}}
 	produced := Place{Identifier: 1}
 
@@ -101,6 +105,8 @@ func TestPruneNonEscapingScopesKeepsAReturnedValue(t *testing.T) {
 // The same scope with the return removed must prune. Without this the keep above passes on a pass
 // that never prunes anything at all.
 func TestPruneNonEscapingScopesPrunesAValueNothingHolds(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Identifiers: []*Identifier{{Id: 0}, {Id: 1}}}
 	produced := Place{Identifier: 1}
 
@@ -133,6 +139,8 @@ func TestPruneNonEscapingScopesPrunesAValueNothingHolds(t *testing.T) {
 // A value passed to a hook escapes because React may retain it. The closure handed to `useEffect` is
 // the standard case: it does not appear in any return and must still be memoized.
 func TestPruneNonEscapingScopesTreatsHookArgumentsAsEscaping(t *testing.T) {
+	t.Parallel()
+
 	roots := hookArgumentRoots(t, `
 		import {useEffect} from 'react';
 		function Component(props) {
@@ -227,6 +235,8 @@ func runTypedSource(t *testing.T, source string, visit func(*Function, *shimchec
 // A pass whose output varies run to run makes a cache non-reproducible without ever producing an
 // answer anyone can point at as wrong, which is the failure mode this asserts against.
 func TestPruneNonEscapingScopesIsDeterministic(t *testing.T) {
+	t.Parallel()
+
 	const runs = 3
 	var results []PruneNonEscapingScopesResult
 
@@ -287,6 +297,8 @@ func TestPruneNonEscapingScopesIsDeterministic(t *testing.T) {
 // roots; without it, 809. That difference is the whole of what this map does, and a hand-written
 // case cannot reach it.
 func TestPruneNonEscapingScopesResolvesLoadLocalIndirection(t *testing.T) {
+	t.Parallel()
+
 	roots, definitionsRecorded := 0, 0
 
 	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
@@ -329,6 +341,8 @@ func TestPruneNonEscapingScopesResolvesLoadLocalIndirection(t *testing.T) {
 // Missing that load leaves the join declaration at MemoizationNever, so an escaping useMemo result
 // is treated as non-escaping and its scope is pruned.
 func TestPruneNonEscapingScopesVisitsASequenceNestedInALogical(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Identifiers: []*Identifier{
 		{Id: 0, Declaration: 1}, // allocation
 		{Id: 1, Declaration: 2}, // value carried out of the sequence
@@ -377,6 +391,8 @@ func TestPruneNonEscapingScopesVisitsASequenceNestedInALogical(t *testing.T) {
 // assertion phrased only about pruning, and a pass that marks none satisfies any assertion phrased
 // only about survival. This file has produced fixtures that passed for exactly that reason.
 func TestMemoMarkersArePrunedOnlyWhenTheirScopeWas(t *testing.T) {
+	t.Parallel()
+
 	// Measured on the vendored corpus rather than on constructed source: whether a marker's value
 	// carries a scope depends on lowering and on four passes upstream of this one, so a hand-written
 	// fixture would be asserting the pipeline rather than the pass.
@@ -496,6 +512,8 @@ func markerCounts(function *Function, checker *shimchecker.Checker) (pruned, rea
 // where the scope holding a memo block's declared dependency is replaced here and
 // `preserve-manual-memoization` then declines to judge it, staying silent where upstream reports.
 func TestPruneNonEscapingScopesReportsWhatItReplaced(t *testing.T) {
+	t.Parallel()
+
 	replaced, stillPresent := 0, 0
 	forEachCorpusFunctionWithChecker(t, 100, func(function *Function, checker *shimchecker.Checker) {
 		InferReactive(function, checker)

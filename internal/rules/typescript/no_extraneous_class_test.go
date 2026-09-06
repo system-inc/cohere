@@ -58,6 +58,8 @@ func runNoExtraneousClass(t *testing.T, sourceText string, options string) rule_
 // puts the difference in a modifier, so the arm that keeps a class with only an accessor or only an
 // abstract member from reporting has to read modifiers where upstream reads a node type.
 func TestNoExtraneousClassStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -99,6 +101,8 @@ func TestNoExtraneousClassStaysSilentOnUpstreamPassCases(t *testing.T) {
 // a class declared inside a constructor is judged on its own and reported independently of the class
 // holding it.
 func TestNoExtraneousClassFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -209,6 +213,8 @@ func TestNoExtraneousClassFiresOnUpstreamFailCases(t *testing.T) {
 // source, with a reporting control in the same run. Two of them changed this port: the named class
 // expression, and the decorated parameter.
 func TestNoExtraneousClassOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -405,6 +411,8 @@ func TestNoExtraneousClassOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
 // the right answer for every absent key and every fixture above would still pass. This is the only
 // thing in the file that can tell a decoder that reads its input from one that does not.
 func TestNoExtraneousClassDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		raw  string
 		want NoExtraneousClassOptions
@@ -446,6 +454,8 @@ func TestNoExtraneousClassDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(t *
 // satisfy, so the fallback is the only thing between that configuration and a zero value. Every
 // other fixture here reaches the rule through the decoder and none can see this line.
 func TestNoExtraneousClassFallsBackWhenHandedNilOptions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, NoExtraneousClass, noExtraneousClassFile,
 		"class Foo {}\n", nil)
 	rule_testing.ExpectFindings(t, result, "empty")
@@ -458,6 +468,8 @@ func TestNoExtraneousClassFallsBackWhenHandedNilOptions(t *testing.T) {
 // wanted strings are typed as literals rather than read from the rule's own constants, because a
 // comparison against the constant moves with any mutation of it.
 func TestNoExtraneousClassRendersUpstreamsMessageText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		wantId      string
@@ -511,6 +523,8 @@ func TestNoExtraneousClassRendersUpstreamsMessageText(t *testing.T) {
 // the same run, so a port without the arm reports where upstream does not. The grammar says one
 // thing and the parser does another, and only the parser decides what a rule sees.
 func TestNoExtraneousClassOnIllegalStaticAbstractMembers(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -584,6 +598,8 @@ func TestNoExtraneousClassOnIllegalStaticAbstractMembers(t *testing.T) {
 //
 // Measured against the installed 8.x build with a control in the same run.
 func TestNoExtraneousClassSeparatesADecoratorFromOtherModifiers(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string

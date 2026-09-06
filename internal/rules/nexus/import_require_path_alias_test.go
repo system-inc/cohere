@@ -20,6 +20,8 @@ var pathAliasOptions = ImportRequirePathAliasOptions{
 const aliasImporter = "/repository/source/features/orders/Thing.ts"
 
 func TestImportRequirePathAliasFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -43,6 +45,8 @@ func TestImportRequirePathAliasFires(t *testing.T) {
 }
 
 func TestImportRequirePathAliasStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -87,6 +91,8 @@ func TestImportRequirePathAliasStaysSilent(t *testing.T) {
 // "/foundation/Thing" are the same string, so a fixture using those cannot tell a correct sort from
 // a reversed one. That fixture existed first and a reversed-sort mutation sailed straight past it.
 func TestImportRequirePathAliasPrefersTheLongestRoot(t *testing.T) {
+	t.Parallel()
+
 	options := ImportRequirePathAliasOptions{
 		RepositoryRoot: "/repository",
 		Aliases: []PathAlias{
@@ -108,6 +114,8 @@ func TestImportRequirePathAliasPrefersTheLongestRoot(t *testing.T) {
 
 // The suggestion has to be a path someone can paste, so it is asserted rather than assumed.
 func TestImportRequirePathAliasSuggestsTheAliasedPath(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, ImportRequirePathAlias, aliasImporter,
 		"import { Thing } from '../../foundation/Thing';\n", pathAliasOptions)
 	rule_testing.ExpectFindings(t, result, "useAlias")
@@ -132,6 +140,8 @@ func TestImportRequirePathAliasSuggestsTheAliasedPath(t *testing.T) {
 // test: a suite whose fixtures all name real subdirectories cannot see this, because the bug is in
 // the one directory nobody writes as a subdirectory.
 func TestImportRequirePathAliasAcceptsTheRepositoryRoot(t *testing.T) {
+	t.Parallel()
+
 	rootOptions := ImportRequirePathAliasOptions{
 		RepositoryRoot: "/repository",
 		Aliases: []PathAlias{
@@ -156,6 +166,8 @@ func TestImportRequirePathAliasAcceptsTheRepositoryRoot(t *testing.T) {
 // differ. Normalising once at configuration read is also what keeps the alias matcher and the
 // strict-root matcher from drifting, since both now ask the same function.
 func TestImportRequirePathAliasNormalizesConfiguredDirectories(t *testing.T) {
+	t.Parallel()
+
 	for _, spelling := range []string{"app", "./app", "app/"} {
 		t.Run(spelling, func(t *testing.T) {
 			options := ImportRequirePathAliasOptions{
@@ -180,6 +192,8 @@ func TestImportRequirePathAliasNormalizesConfiguredDirectories(t *testing.T) {
 // as `@project` and no path as `@base`. Aliases are ordered longest-directory-first and the root
 // normalises to the empty string, which is the shortest, so it is consulted last by construction.
 func TestImportRequirePathAliasRootDoesNotShadowASubdirectory(t *testing.T) {
+	t.Parallel()
+
 	rootOptions := ImportRequirePathAliasOptions{
 		RepositoryRoot: "/repository",
 		Aliases: []PathAlias{
@@ -205,6 +219,8 @@ func TestImportRequirePathAliasRootDoesNotShadowASubdirectory(t *testing.T) {
 // single quotes and Prettier would restore them either way, but a fixer that silently changed a byte
 // nobody asked about is a fixer people stop trusting.
 func TestImportRequirePathAliasFixesTheSpecifier(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFixedSource(t,
 		rule_testing.RunWithOptions(t, ImportRequirePathAlias, aliasImporter,
 			"import { Thing } from '../../foundation/Thing';\n", pathAliasOptions),

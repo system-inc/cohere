@@ -20,6 +20,8 @@ const unnecessaryTypeConstraintFile = "/repository/source/no_unnecessary_type_co
 // aligning them against the inputs in order shows `<T extends any, U extends any>` printed
 // twice, once for each parameter. That is the whole of the discrepancy.
 func TestNoUnnecessaryTypeConstraintFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		count      int
@@ -60,6 +62,8 @@ func TestNoUnnecessaryTypeConstraintFires(t *testing.T) {
 // TestNoUnnecessaryTypeConstraintStaysSilent is upstream's twelve passing inputs, verbatim,
 // plus the constraint kinds neighbouring `any` that a reader expects to behave the same way.
 func TestNoUnnecessaryTypeConstraintStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"function data() {}",
 		"function data<T>() {}",
@@ -128,6 +132,8 @@ func TestNoUnnecessaryTypeConstraintStaysSilent(t *testing.T) {
 // here by hand. The application is deliberately trivial: one suggestion carrying one fix, sliced
 // into the source. Anything cleverer would be testing the applier rather than the rule.
 func TestNoUnnecessaryTypeConstraintSuggestionsWriteWhatTheyClaim(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		fileName   string
 		sourceText string
@@ -199,6 +205,8 @@ func TestNoUnnecessaryTypeConstraintSuggestionsWriteWhatTheyClaim(t *testing.T) 
 // rule reports with is equality that looks correct and cannot fail: both sides move together under
 // any edit to the constant, so the assertion tracks the rule instead of guarding it.
 func TestNoUnnecessaryTypeConstraintPointsAtTheParameterName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantTexts  []string

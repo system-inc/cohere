@@ -17,6 +17,8 @@ const defaultCaseLastFile = "/repository/source/DefaultCaseLast.ts"
 // `default` keyword. The cases below were rendered to Go literals by a script reading that file
 // through a stub RuleTester, so no case was retyped and no escape could be cooked on the way.
 func TestDefaultCaseLastStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -58,6 +60,8 @@ func TestDefaultCaseLastStaysSilent(t *testing.T) {
 
 // Every reporting case names one `notLast` and no more, which is upstream's own count per input.
 func TestDefaultCaseLastFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -98,6 +102,8 @@ func TestDefaultCaseLastFires(t *testing.T) {
 // rather than equality is because the reported node is the whole clause, whose text runs to the end
 // of its body.
 func TestDefaultCaseLastReportsTheDefaultClause(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantColumn int
@@ -132,6 +138,8 @@ func TestDefaultCaseLastReportsTheDefaultClause(t *testing.T) {
 // port looping over every clause without returning reports twice. The imported corpus cannot see
 // this because upstream never wrote it.
 func TestDefaultCaseLastReportsOnceForTwoDefaults(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, DefaultCaseLast, defaultCaseLastFile,
 		"switch (foo) { default: break; default: break; case 1: break; }"), "notLast")
 }

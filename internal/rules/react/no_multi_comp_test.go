@@ -18,6 +18,8 @@ const noMultiCompFile = "/repository/source/NoMultiComp.tsx"
 // TestNoMultiCompStaysSilent is every passing case upstream ships, grouped by the options it runs
 // them under.
 func TestNoMultiCompStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -116,6 +118,8 @@ func TestNoMultiCompStaysSilent(t *testing.T) {
 // TestNoMultiCompFires is every reporting case upstream ships. The finding count per case is
 // upstream's own `errors` length, which is 2 for the one file holding three components.
 func TestNoMultiCompFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -271,6 +275,8 @@ func TestNoMultiCompFires(t *testing.T) {
 // which is why the table is kept rather than deleted once green: it is the only thing standing
 // between this rule and a later simplification back to any of them.
 func TestNoMultiCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name            string
 		sourceText      string
@@ -407,6 +413,8 @@ func TestNoMultiCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *test
 // Every expected span was measured against the installed build on 2026-08-27 by slicing its
 // reported range out of the source.
 func TestNoMultiCompAnchorsOnTheComponentNotTheDeclaration(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -473,6 +481,8 @@ func TestNoMultiCompAnchorsOnTheComponentNotTheDeclaration(t *testing.T) {
 // but the text is upstream's own string and a paraphrase would diverge silently. Asserted against a
 // literal typed here rather than against the rule's own constant, so the two cannot move together.
 func TestNoMultiCompMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageOnlyOneComponent.Id != "onlyOneComponent" {
 		t.Errorf("message id is %q, want %q", messageOnlyOneComponent.Id, "onlyOneComponent")
 	}
@@ -490,6 +500,8 @@ func TestNoMultiCompMessage(t *testing.T) {
 // would blind the rule to every `.ts` file in the tree. The source deliberately holds no JSX, so a
 // `.ts` file parses cleanly and the parser's opinion cannot be mistaken for the rule's.
 func TestNoMultiCompHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	// Only the two TypeScript suffixes are listed, and that is a fact about the harness rather than
 	// about the rule. The typed harness builds a real program, and its tsconfig includes only
 	// TypeScript extensions, so a `.js` or `.jsx` fixture fails with TS18003 before any rule runs.
@@ -515,6 +527,8 @@ func TestNoMultiCompHasNoFileSuffixGate(t *testing.T) {
 // bare `"error"` is handed nil, and this asserts that resolves to the documented default rather
 // than to an error or a surprise.
 func TestDecodeNoMultiCompOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		raw     string
@@ -558,6 +572,8 @@ func TestDecodeNoMultiCompOptions(t *testing.T) {
 // which is exactly why this is pinned: nothing else in the suite would notice if the fallback were
 // removed and a later option defaulted the other way.
 func TestNoMultiCompNilOptionsFallsBackToTheDefault(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "function A(){ return <div/>; }\nfunction B(){ return <div/>; }\n"
 	result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, sourceText, nil)
 	rule_testing.ExpectFindings(t, result, "onlyOneComponent")
@@ -571,6 +587,8 @@ func TestNoMultiCompNilOptionsFallsBackToTheDefault(t *testing.T) {
 // checker and, without the guard, would silently answer a narrower question while every quiet
 // fixture passed vacuously. This fails loudly if the guard is ever removed.
 func TestNoMultiCompRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "function A(){ return <div/>; }\nfunction B(){ return <div/>; }\n"
 
 	// The control. On the typed harness this input reports, so a zero below means the guard fired
@@ -596,6 +614,8 @@ func TestNoMultiCompRequiresTheTypedHarness(t *testing.T) {
 // machinery works while being explicit that the pragma dimension is untested. If a settings surface
 // is ever added, this is the case to bring back.
 func TestNoMultiCompCustomPragmaIsNotReproduced(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "import React, { memo, forwardRef } from 'react';\n" +
 		"const Text = forwardRef(({ text }, ref) => {\n" +
 		"  return <div ref={ref}>{text}</div>;\n" +
@@ -618,6 +638,8 @@ func TestNoMultiCompCustomPragmaIsNotReproduced(t *testing.T) {
 // could see it; it surfaced while porting `display-name`, whose corpus has five passing cases of
 // exactly this shape.
 func TestNoMultiCompCurriedFunctionsAreNotComponents(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -655,6 +677,8 @@ func TestNoMultiCompCurriedFunctionsAreNotComponents(t *testing.T) {
 // element is still a component. Without this row, narrowing the arm to decline everything returned
 // by a function would pass the test above while losing a component upstream counts.
 func TestNoMultiCompCurriedInnerReturningJsxIsStillAComponent(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "const make = () => (props) => <div/>;\nfunction Other(){ return <div/>; }\n"
 	result := rule_testing.RunTypedWithOptions(t, NoMultiComp, noMultiCompFile, sourceText,
 		DefaultNoMultiCompOptions())

@@ -27,6 +27,8 @@ const unreachableLoopFile = "/repository/source/Loops.ts"
 // The finding count per input is upstream's rather than assumed: a loop nested in an invalid loop
 // can make both invalid, and eleven cases in the corpus report more than once.
 func TestNoUnreachableLoopFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range unreachableLoopFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			wantIds := make([]string, testCase.findings)
@@ -45,6 +47,8 @@ func TestNoUnreachableLoopFires(t *testing.T) {
 // most of the firing table and fails here on `while (a) { if (foo) break; }`, on every body holding
 // a `continue`, and on the three shapes upstream deliberately declines to evaluate.
 func TestNoUnreachableLoopStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range unreachableLoopCleanCases {
 		t.Run(source, func(t *testing.T) {
 			rule_testing.ExpectClean(t,
@@ -62,6 +66,8 @@ func TestNoUnreachableLoopStaysSilent(t *testing.T) {
 // The JSON here is the bare object. Upstream writes `[{...}]` in its corpus and cohere's config
 // layer unwraps the severity tuple before dispatch, so the array wrapper never reaches a decoder.
 func TestNoUnreachableLoopOptions(t *testing.T) {
+	t.Parallel()
+
 	decode := rule.DecodeOptionsInto[NoUnreachableLoopOptions]()
 
 	for _, testCase := range unreachableLoopOptionCases {
@@ -89,6 +95,8 @@ func TestNoUnreachableLoopOptions(t *testing.T) {
 // inverted under nil would pass every option fixture in the table above, because each of those
 // arrives through the decoder with a real value.
 func TestNoUnreachableLoopHandlesNilOptions(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.RunWithOptions(t, NoUnreachableLoop, unreachableLoopFile, "while (a) break;", nil),
 		"invalid")
@@ -106,6 +114,8 @@ func TestNoUnreachableLoopHandlesNilOptions(t *testing.T) {
 // The nested case is the one worth having twice over: it pins both spans AND their order, and a
 // port emitting findings as its per-root walk discovers them would order these the other way.
 func TestNoUnreachableLoopSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		source  string
@@ -170,6 +180,8 @@ func TestNoUnreachableLoopSpans(t *testing.T) {
 // against the rule's own constant, because comparing a diagnostic to the constant it was built from
 // is an equality that moves in both directions under mutation and cannot fail.
 func TestNoUnreachableLoopMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, "while (a) break;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
@@ -196,6 +208,8 @@ func TestNoUnreachableLoopMessage(t *testing.T) {
 // a whole-rule short circuit rather than a per-loop decision, and a port that dropped it would
 // still pass that corpus case through the per-loop filter.
 func TestNoUnreachableLoopIgnoringEveryKindDisablesTheRule(t *testing.T) {
+	t.Parallel()
+
 	decode := rule.DecodeOptionsInto[NoUnreachableLoopOptions]()
 	decoded, err := decode([]byte(`{"ignore":["WhileStatement","DoWhileStatement","ForStatement","ForInStatement","ForOfStatement"]}`))
 	if err != nil {
@@ -219,6 +233,8 @@ func TestNoUnreachableLoopIgnoringEveryKindDisablesTheRule(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build: both loops report.
 func TestNoUnreachableLoopJudgesEachRootSeparately(t *testing.T) {
+	t.Parallel()
+
 	const source = "function outer() { return; function inner() { while (a) break; } } while (b) break;"
 	result := rule_testing.Run(t, NoUnreachableLoop, unreachableLoopFile, source)
 	rule_testing.ExpectFindings(t, result, "invalid", "invalid")
@@ -240,6 +256,8 @@ func TestNoUnreachableLoopJudgesEachRootSeparately(t *testing.T) {
 // silent on them. Measured against the installed eslint 10.8.1 build at ecmaVersion 2022: both
 // report.
 func TestNoUnreachableLoopInNonFunctionRoots(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

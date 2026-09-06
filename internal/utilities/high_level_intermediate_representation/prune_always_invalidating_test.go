@@ -11,6 +11,8 @@ import (
 // Both directions before any specific claim, because a pass that prunes everything and one that
 // prunes nothing each satisfy an assertion phrased about only one side.
 func TestPruneAlwaysInvalidatingPrunesSomethingAndKeepsSomething(t *testing.T) {
+	t.Parallel()
+
 	functions, scopes, pruned, kept := 0, 0, 0, 0
 
 	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
@@ -54,6 +56,8 @@ func TestPruneAlwaysInvalidatingPrunesSomethingAndKeepsSomething(t *testing.T) {
 // deliberate imprecision and the arm most likely to be "fixed" by someone reasoning from first
 // principles, so it gets a case rather than only a comment.
 func TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		value      InstructionValue
@@ -102,6 +106,8 @@ func TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly(t *testing.T) {
 // and not unmemoized in fact. Losing that distinction makes every array literal anywhere prune every
 // scope reading it, which is the failure mode with no fixture of its own unless one is written.
 func TestPruneAlwaysInvalidatingRespectsWithinScope(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Identifiers: []*Identifier{{Id: 0}, {Id: 1}}}
 	allocation := Place{Identifier: 1}
 
@@ -148,6 +154,8 @@ func TestPruneAlwaysInvalidatingRespectsWithinScope(t *testing.T) {
 // prunes a scope upstream keeps -- the deny direction that made `PruneDeclarationsLastUsedBefore`
 // stop being optional.
 func TestPruneAlwaysInvalidatingPropagatesOutward(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Identifiers: []*Identifier{{Id: 0}, {Id: 1}, {Id: 2}}}
 	seed := Place{Identifier: 1}
 

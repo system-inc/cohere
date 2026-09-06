@@ -68,6 +68,8 @@ func cohereEverywhere(t *testing.T, function *Function) {
 }
 
 func TestSSAMatchesReactSpecFixtures(t *testing.T) {
+	t.Parallel()
+
 	for _, src := range []string{
 		"export function f(){ let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x; }\n",
 		"export function f(){ let x = 1; while (x < 10) { x = x + 1; } return x; }\n",
@@ -89,6 +91,8 @@ func TestSSAMatchesReactSpecFixtures(t *testing.T) {
 // VerifySSA reports each one. A checker that has never been shown to fail is
 // not evidence that the property holds.
 func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
+	t.Parallel()
+
 	build := func() *Function {
 		fn := lowerTypedForSSA(t, "export function f(){ let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x; }\n")
 		Construct(fn)
@@ -209,6 +213,8 @@ func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
 // Constructs the corpus sample did not contain, plus the loop shapes most likely
 // to break a construction that only looks right on straight-line code.
 func TestSSAAcrossEveryControlFlowConstruct(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, code string }{
 		{"for-in", "export function f(o: any){ let n = 0; for (const k in o) { n = n + 1; } return n; }\n"},
 		{"labeled-break", "export function f(){ let n = 0; outer: for (let i = 0; i < 3; i++) { while (true) { n = n + 1; break outer; } } return n; }\n"},
@@ -261,6 +267,8 @@ func TestSSAAcrossEveryControlFlowConstruct(t *testing.T) {
 // Rather than list the variants, which would itself drift, this reflects over a constructed
 // instance of every value the printer knows about, which is the same closed set.
 func TestMutatingVisitorCoversEveryValue(t *testing.T) {
+	t.Parallel()
+
 	place := func(id IdentifierId) Place { return Place{Identifier: id} }
 	values := []InstructionValue{
 		&LoadLocal{Place: place(1)},
@@ -349,6 +357,8 @@ func TestMutatingVisitorCoversEveryValue(t *testing.T) {
 // Phi.Operands is a Go map and Go randomises its iteration order on purpose. Anything that prints
 // or compares phis must read them through PhiOperandsInOrder; this fails if that stops sorting.
 func TestPhiOperandsAreDeterministic(t *testing.T) {
+	t.Parallel()
+
 	phi := &Phi{
 		Place: Place{Identifier: 9},
 		Operands: map[BlockId]Place{
@@ -386,6 +396,8 @@ func TestPhiOperandsAreDeterministic(t *testing.T) {
 // Asserted as a fixpoint rather than a count, because the property that matters is "running it again
 // changes nothing" and that survives every legitimate change to phi placement.
 func TestConstructionIsIdempotent(t *testing.T) {
+	t.Parallel()
+
 	firstPhis, secondPhis := 0, 0
 	firstStale, secondStale := 0, 0
 
@@ -473,6 +485,8 @@ var constructAfterInline = regexp.MustCompile(
 	`(?s)Inline[A-Za-z]*InvokedFunctionExpressions[A-Za-z]*\(function\)[^}]*?Construct\(function\)`)
 
 func TestConstructionIsNotReRunAfterTheInline(t *testing.T) {
+	t.Parallel()
+
 	paths, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)

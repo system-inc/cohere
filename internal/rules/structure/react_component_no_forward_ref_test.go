@@ -9,6 +9,8 @@ import (
 const forwardRefFile = "/repository/source/components/Field.tsx"
 
 func TestReactComponentNoForwardRefFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -69,6 +71,8 @@ func TestReactComponentNoForwardRefFires(t *testing.T) {
 }
 
 func TestReactComponentNoForwardRefStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

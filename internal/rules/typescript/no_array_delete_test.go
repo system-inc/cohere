@@ -29,6 +29,8 @@ const noArrayDeleteFile = "noArrayDelete.ts"
 // silent, and they are silent because none of them is an array rather than through any explicit
 // skip. The last one, `delete console.log()`, is not an access at all.
 func TestNoArrayDeleteStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -98,6 +100,8 @@ func TestNoArrayDeleteStaysSilent(t *testing.T) {
 // when any member is, which is why `number[] & unknown` and `string & Array<number>` both report
 // even though neither is wholly an array.
 func TestNoArrayDeleteFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -183,6 +187,8 @@ func TestNoArrayDeleteFires(t *testing.T) {
 // keyword token is removed and the space after it is not, so a repair that widened its removal by
 // a single byte would fail all twenty two while satisfying every id assertion.
 func TestNoArrayDeleteSuggestions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -301,6 +307,8 @@ func applyNoArrayDeleteSuggestion(t *testing.T, source string, suggestion rule.S
 // The four upstream cases that record no position are covered by the suggestion outputs instead,
 // which pin three exact byte ranges each and are strictly stronger than a span assertion.
 func TestNoArrayDeleteSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -381,6 +389,8 @@ func TestNoArrayDeleteSpans(t *testing.T) {
 // built by hand. This test pins the declaration AND the guard, so losing either one fails loudly
 // rather than going vacuously green.
 func TestNoArrayDeleteRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoArrayDelete.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}

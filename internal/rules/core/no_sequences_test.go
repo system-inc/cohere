@@ -36,6 +36,8 @@ func decodedSequenceOptions(t *testing.T, raw string) any {
 // so no source string in this file was retyped. The columns are upstream's, converted from
 // one-based columns to zero-based byte offsets at the assertion.
 func TestNoSequencesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -163,6 +165,8 @@ func TestNoSequencesFires(t *testing.T) {
 // way: array elements, object properties, argument lists, and the declarators of one `var`. Each is
 // a class of false positive a rule matching on the token would ship.
 func TestNoSequencesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -256,6 +260,8 @@ func TestNoSequencesStaysSilent(t *testing.T) {
 // reporter sorts by position. Asserting the order here would pin the divergence as if it were the
 // decision, which it is not.
 func TestNoSequencesReportsBothHalvesOfANestedPair(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantOffset []int
@@ -298,6 +304,8 @@ func TestNoSequencesReportsBothHalvesOfANestedPair(t *testing.T) {
 // "error" -- must mean allowed. That last one is the case no fixture routed through the decoder can
 // reach, because it is the shape the config layer produces when the decoder is never called.
 func TestNoSequencesOptionDefaultsToAllowingParentheses(t *testing.T) {
+	t.Parallel()
+
 	parenthesized := "var foo = (1, 2);"
 
 	t.Run("nil options, the shape the live config produces", func(t *testing.T) {
@@ -347,6 +355,8 @@ func TestNoSequencesOptionDefaultsToAllowingParentheses(t *testing.T) {
 // on the constant's own fields. Asserted against literals typed here rather than against the rule's
 // own constant, which would move with it under mutation.
 func TestNoSequencesMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageUnexpectedCommaExpression.Id != "unexpectedCommaExpression" {
 		t.Errorf("message id is %q", messageUnexpectedCommaExpression.Id)
 	}
@@ -358,6 +368,8 @@ func TestNoSequencesMessage(t *testing.T) {
 // A guard against the decoder growing a second spelling of the same option, which is how a serde
 // alias silently widens a rule. Upstream's schema names exactly one property and forbids the rest.
 func TestNoSequencesDecoderIgnoresUnknownKeys(t *testing.T) {
+	t.Parallel()
+
 	decoded, err := DecodeNoSequencesOptions([]byte(`{"allowInParenthesis": false}`))
 	if err != nil {
 		t.Fatalf("decoding: %v", err)

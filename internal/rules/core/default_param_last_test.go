@@ -19,6 +19,8 @@ const defaultParamLastFile = "/repository/source/Parameters.ts"
 // carries no repair to check instead. Each span was sliced out of the source by the same script that
 // extracted the case, from the columns the installed rule reported.
 func TestDefaultParamLastFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -236,6 +238,8 @@ func TestDefaultParamLastFires(t *testing.T) {
 // the bodyless shapes the corpus never writes. Every clean case upstream ships is a false positive
 // somebody already hit.
 func TestDefaultParamLastStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -419,6 +423,8 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 // The rule interpolates nothing, so there is no rendered text and no format string to guard; a
 // rule.Message is {Id, Description} and both halves are asserted directly.
 func TestDefaultParamLastMessageReadsAsWritten(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, "function f(a = 5, b) {}")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))

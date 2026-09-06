@@ -8,6 +8,8 @@ import (
 )
 
 func TestBoundaryNoInternalImportFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -55,6 +57,8 @@ func TestBoundaryNoInternalImportFires(t *testing.T) {
 }
 
 func TestBoundaryNoInternalImportStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -111,6 +115,8 @@ func TestBoundaryNoInternalImportStaysSilent(t *testing.T) {
 // trivia, so reporting the declaration anchors the finding at the first comment above the import,
 // where no `eslint-disable-next-line` can reach it.
 func TestBoundaryNoInternalImportReportsAtTheSpecifier(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "// Dependencies\n// a second comment\nimport { Detail } from '../widget/internal/Detail';\\n"
 
 	result := rule_testing.RunWithOptions(t, BoundaryNoInternalImport, "/repo/source/other/Thing.ts", sourceText, nil)

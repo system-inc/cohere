@@ -29,6 +29,8 @@ const unusedExpressionsFile = "/repository/source/UnusedExpressions.tsx"
 
 // TestNoUnusedExpressionsFires runs every fail case upstream lists under default options.
 func TestNoUnusedExpressionsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -127,6 +129,8 @@ func TestNoUnusedExpressionsFires(t *testing.T) {
 // optional-call question, which is the whole typescript-eslint divergence and which TypeScript's AST
 // answers for free because it has no ChainExpression node.
 func TestNoUnusedExpressionsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -199,6 +203,8 @@ func TestNoUnusedExpressionsStaysSilent(t *testing.T) {
 // these cases is that the same source flips verdict with the option: `a ? b() : c()` passes under
 // allowTernary and fails under allowShortCircuit, and reading them apart loses that.
 func TestNoUnusedExpressionsUnderOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -292,6 +298,8 @@ func TestNoUnusedExpressionsUnderOptions(t *testing.T) {
 // neither. A port whose directive carve-out asked only "is this a string statement" would report
 // zero here and pass every other fail case in the corpus.
 func TestNoUnusedExpressionsReportsTwiceInAClassStaticBlock(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile,
 			"class C { static {\n            'foo'\n            'bar'\n             } }"),
@@ -310,6 +318,8 @@ func TestNoUnusedExpressionsReportsTwiceInAClassStaticBlock(t *testing.T) {
 // The statement rather than the expression is the reported node, which is why the trailing
 // semicolon is inside every span that has one.
 func TestNoUnusedExpressionsPointsAtTheStatement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -382,6 +392,8 @@ func TestNoUnusedExpressionsPointsAtTheStatement(t *testing.T) {
 // not cover is the compound and logical assignment operators, which are assignments spelled with a
 // logical operator and which a port discriminating by "is the operator token logical" would report.
 func TestNoUnusedExpressionsSeparatesBinaryOperators(t *testing.T) {
+	t.Parallel()
+
 	silent := []string{
 		"a += b;",
 		"a &&= b;",
@@ -421,6 +433,8 @@ func TestNoUnusedExpressionsSeparatesBinaryOperators(t *testing.T) {
 // tested, and a port using a helper that answered only for `&&` and `||` would differ here with
 // nothing to say so.
 func TestNoUnusedExpressionsTreatsNullishAsShortCircuit(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
 		"a ?? b();", NoUnusedExpressionsOptions{AllowShortCircuit: true}))
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
@@ -435,6 +449,8 @@ func TestNoUnusedExpressionsTreatsNullishAsShortCircuit(t *testing.T) {
 // ternary, and both recursions run through the same call in this port. A port that checked the
 // operand's kind instead of recursing would pass upstream's case and fail these.
 func TestNoUnusedExpressionsRecursesThroughAllowedForms(t *testing.T) {
+	t.Parallel()
+
 	both := NoUnusedExpressionsOptions{AllowShortCircuit: true, AllowTernary: true}
 
 	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnusedExpressions, unusedExpressionsFile,
@@ -459,6 +475,8 @@ func TestNoUnusedExpressionsRecursesThroughAllowedForms(t *testing.T) {
 // under allowTernary alone. A port that recursed into one branch and took the other on trust would
 // need both of these to notice, and they are cheap to state directly.
 func TestNoUnusedExpressionsChecksBothTernaryBranches(t *testing.T) {
+	t.Parallel()
+
 	options := NoUnusedExpressionsOptions{AllowTernary: true}
 	for _, sourceText := range []string{"a ? b() : c;", "a ? b : c();"} {
 		t.Run(sourceText, func(t *testing.T) {
@@ -478,6 +496,8 @@ func TestNoUnusedExpressionsChecksBothTernaryBranches(t *testing.T) {
 // would report it. `<any>foo` is the older assertion spelling, which has its own node kind and
 // which upstream reaches only through ESLint's TSTypeAssertion arm with no case exercising it.
 func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(t *testing.T) {
+	t.Parallel()
+
 	silent := []string{
 		"a() as any;",
 		"a()!;",
@@ -519,6 +539,8 @@ func TestNoUnusedExpressionsUnwrapsTypeOnlyWrappers(t *testing.T) {
 // under a recursing port and passes under both upstreams. Pinned here so a later reader changing
 // this to recurse finds out immediately.
 func TestNoUnusedExpressionsDivergesFromOxcOnSatisfies(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t,
 		rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, "0 satisfies number;"))
 }
@@ -541,6 +563,8 @@ func TestNoUnusedExpressionsDivergesFromOxcOnSatisfies(t *testing.T) {
 // reports and the after-a-declaration cases upstream reports. Building on it would have silenced
 // eight fail cases.
 func TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues(t *testing.T) {
+	t.Parallel()
+
 	silent := []string{
 		// A prologue at the top of each container that has one.
 		"'use client';\nexport const a = 1;",
@@ -604,6 +628,8 @@ func TestNoUnusedExpressionsCarvesOutOnlyRealDirectivePrologues(t *testing.T) {
 // somebody later wired the option to something, and it runs every string-statement case in the file
 // through both settings to show they agree.
 func TestNoUnusedExpressionsIgnoreDirectivesIsInertHere(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		`"use strict";`,
 		`"directive one"; f(); "directive two";`,
@@ -641,6 +667,8 @@ func TestNoUnusedExpressionsIgnoreDirectivesIsInertHere(t *testing.T) {
 // never `typeof`, and never a prefix increment. A mutation flipping the typeof verdict survived the
 // whole corpus before these cases existed.
 func TestNoUnusedExpressionsSeparatesUnaryFormsByKind(t *testing.T) {
+	t.Parallel()
+
 	fires := []string{"typeof a;", "!a;", "+a;", "-a;", "~a;"}
 	for _, sourceText := range fires {
 		t.Run(sourceText, func(t *testing.T) {
@@ -673,6 +701,8 @@ func TestNoUnusedExpressionsSeparatesUnaryFormsByKind(t *testing.T) {
 // mutation flipping the default to `return true` survives the entire corpus, which is how it was
 // found: the mutant compiled, changed bytes, and nothing noticed.
 func TestNoUnusedExpressionsLeavesUnrecognisedFormsAlone(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t,
 		rule_testing.Run(t, NoUnusedExpressions, unusedExpressionsFile, "#x;"))
 }
@@ -684,6 +714,8 @@ func TestNoUnusedExpressionsLeavesUnrecognisedFormsAlone(t *testing.T) {
 // fires. The five names below are ESLint's meta.schema verbatim, which is the authoritative surface
 // and which the inventory got wrong for this rule, recording "options": "no" for a rule with five.
 func TestNoUnusedExpressionsReadsOptionsFromJSON(t *testing.T) {
+	t.Parallel()
+
 	decoded, err := rule.DecodeOptionsInto[NoUnusedExpressionsOptions]()([]byte(
 		`{"allowShortCircuit":true,"allowTernary":true,"allowTaggedTemplates":true,` +
 			`"enforceForJSX":true,"ignoreDirectives":true}`))

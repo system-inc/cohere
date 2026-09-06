@@ -40,6 +40,8 @@ func noUnsafeMemberAccessDecoded(t *testing.T, optionsJson string) any {
 // is pinned here at the verdict this harness can observe rather than deleted, with the other column
 // recorded in the rule's doc comment.
 func TestNoUnsafeMemberAccessStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string
@@ -140,6 +142,8 @@ type noUnsafeMemberAccessFinding struct {
 // innermost property, so `x.a.b.c` underlines `a`; a port without the memoized recursion reports
 // three times, and one recursing the wrong way underlines `c`. Both satisfy every id assertion.
 func TestNoUnsafeMemberAccessFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		optionsJson  string
@@ -484,6 +488,8 @@ func TestNoUnsafeMemberAccessFires(t *testing.T) {
 // must not panic, and under the typed one the same source must report. Without the guard the first
 // half takes the whole run down.
 func TestNoUnsafeMemberAccessRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "declare const x: any;\nx.a;\n"
 
 	// The untyped harness gives the rule no checker. Silence here is the guard working; a panic is

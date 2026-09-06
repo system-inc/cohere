@@ -28,6 +28,8 @@ func noUnsafeArgumentCaseName(index int) string {
 // the shared assignment predicate rather than here. `acceptsMap(new Map())` is silent because of a
 // special case inside that predicate for Map's empty constructor, which is typed `Map<any, any>`.
 func TestNoUnsafeArgumentStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"doesNotExist(1 as any);\n",
 		"const foo = 1;\nfoo(1 as any);\n",
@@ -91,6 +93,8 @@ type noUnsafeArgumentFinding struct {
 // own `errors` array. The corpus states ids and sometimes columns; it does not state the rendered
 // text, and the rendered text is where the signature walk shows itself.
 func TestNoUnsafeArgumentFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []noUnsafeArgumentFinding

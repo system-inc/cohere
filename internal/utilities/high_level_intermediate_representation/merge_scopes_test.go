@@ -102,6 +102,8 @@ func buildMergeCase(t *testing.T, testCase mergeCase) (*Function, *ReactiveScope
 // scopes that overlap without nesting" -- passes `overlapNonNested`, `properlyNested`, `disjoint`
 // and `sameStartSameEnd`, and fails exactly this one.
 func TestMergeMatchesReact(t *testing.T) {
+	t.Parallel()
+
 	cases := []mergeCase{
 		{
 			// Two scopes overlapping without nesting. Scope 1 ends at 5 while scope 2 is open, so
@@ -249,6 +251,8 @@ func TestMergeMatchesReact(t *testing.T) {
 // nesting" cannot do it silently. The two ranges here NEST, so a pairwise rule finds nothing to do
 // and leaves two scopes; React unions them because of the use at instruction 4.
 func TestMergeIsNotAPairwiseOverlapRule(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := buildMergeCase(t, mergeCase{
 		scopes:       []MutableRange{{1, 9}, {3, 5}},
 		instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {4, 0, 1}},
@@ -275,6 +279,8 @@ func TestMergeIsNotAPairwiseOverlapRule(t *testing.T) {
 // avoid. Both halves are asserted: the degenerate scope must survive untouched, and the real scopes
 // around it must merge normally.
 func TestMergeSkipsDegenerateScopes(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := buildMergeCase(t, mergeCase{
 		scopes:       []MutableRange{{0, 0}, {1, 5}, {3, 8}},
 		instructions: [][3]int{{1, 2, 1}, {3, 3, 0}, {4, 0, 2}},
@@ -303,6 +309,8 @@ func TestMergeSkipsDegenerateScopes(t *testing.T) {
 // A merge that loses members would still reach zero overlapping pairs, which is the failure this
 // stage is uniquely positioned to commit, so membership is asserted separately from the ranges.
 func TestMergeConservesMembership(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := buildMergeCase(t, mergeCase{
 		scopes:       []MutableRange{{1, 5}, {3, 8}, {10, 12}},
 		instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {4, 0, 1}, {10, 3, 0}},
@@ -342,6 +350,8 @@ func TestMergeConservesMembership(t *testing.T) {
 // terminates" and it is the one worth pinning, because the natural pairwise spelling of this pass
 // DOES iterate and a reader carrying that model would add a loop.
 func TestMergeIsASingleSweep(t *testing.T) {
+	t.Parallel()
+
 	testCase := mergeCase{
 		scopes:       []MutableRange{{1, 5}, {3, 8}},
 		instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {4, 0, 1}, {5, 0, 2}},
@@ -377,6 +387,8 @@ func TestMergeIsASingleSweep(t *testing.T) {
 
 // TestMergeGapsAreDeclared makes closing a gap a visible event rather than a silent improvement.
 func TestMergeGapsAreDeclared(t *testing.T) {
+	t.Parallel()
+
 	gaps := MergeGaps()
 	if len(gaps) != 2 {
 		t.Fatalf("got %d gaps, want 2; a gap closing or opening should be a deliberate edit", len(gaps))
@@ -388,6 +400,8 @@ func TestMergeGapsAreDeclared(t *testing.T) {
 
 // TestMergeHandlesAnEmptyScopeTable pins the ordinary answer for a function with no entangled values.
 func TestMergeHandlesAnEmptyScopeTable(t *testing.T) {
+	t.Parallel()
+
 	if got := MergeOverlappingReactiveScopes(nil, nil); got.Len() != 0 || got.Unions() != 0 {
 		t.Error("a nil input produced a non-empty result")
 	}
@@ -490,6 +504,8 @@ func countNonNestedPairs(ranges map[ScopeId]MutableRange) int {
 // The thresholds below are looser than those numbers. This guards the SHAPE, not the corpus, which
 // moves when the tree does.
 func TestMergeDrivesNonNestedOverlapToZero(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -542,6 +558,8 @@ func TestMergeDrivesNonNestedOverlapToZero(t *testing.T) {
 // not move at all: 955 instructions before and after. Every scope this pass merged came from the
 // wide multi-member population, which is exactly the population that can overlap.
 func TestMergePreservesScopeWidthAndMembership(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -631,6 +649,8 @@ func classify(width, members int, oneNarrow, oneWide, manyNarrow, manyWide *int)
 // all -- measured with the scope items removed entirely, it is still there -- so it belongs to the
 // lowering rather than to any scope pass.
 func TestMergeLeavesBlockScopeAlignmentUnclosed(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -666,6 +686,8 @@ func TestMergeLeavesBlockScopeAlignmentUnclosed(t *testing.T) {
 // The control is asserted in the same test, because a small delta from a probe that barely fires
 // would not be a useful bound.
 func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -782,6 +804,8 @@ func unionsSkippingFunctionOperands(function *Function, scopes *ReactiveScopes) 
 // this hold, and it is asserted here rather than trusted because it is an assumption about a table
 // `Construct` produces rather than about anything this file does.
 func TestMergeAssumesMonotoneEvaluationOrder(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -829,6 +853,8 @@ func TestMergeAssumesMonotoneEvaluationOrder(t *testing.T) {
 // group on different runs, which is the shape that makes a cache non-reproducible without ever
 // producing a wrong answer.
 func TestMergeIsDeterministic(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -870,6 +896,8 @@ func TestMergeIsDeterministic(t *testing.T) {
 // the moment a pass able to mint coincident starts lands, and this test is what makes the expiry
 // visible instead of silent.
 func TestMergeSortComparatorReachability(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -918,6 +946,8 @@ func TestMergeSortComparatorReachability(t *testing.T) {
 // through a terminal place. The synthetic half of this test asserts the line WORKS anyway, by
 // building a scope whose sole appearance is a terminal operand and checking it reaches the tables.
 func TestMergeRegistersScopesFromTerminals(t *testing.T) {
+	t.Parallel()
+
 	// The synthetic half: a scope that appears nowhere but the terminal must still be registered.
 	function, scopes := buildMergeCase(t, mergeCase{
 		scopes:        []MutableRange{{1, 9}, {3, 12}},

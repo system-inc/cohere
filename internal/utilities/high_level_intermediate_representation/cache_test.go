@@ -53,6 +53,8 @@ func totalPhis(function *Function) int {
 // work. Counting is possible without a hook into `Lower` because a lowering is a distinct pointer
 // every time it runs: three asks returning one pointer is one lowering.
 func TestForFunctionLowersOncePerFunction(t *testing.T) {
+	t.Parallel()
+
 	var results []*Function
 	var directLowering *Function
 
@@ -109,6 +111,8 @@ func TestForFunctionLowersOncePerFunction(t *testing.T) {
 // have caught this at runtime. Asserting the phi count is stable across repeated asks is what
 // pins the design.
 func TestForFunctionConstructsExactlyOnce(t *testing.T) {
+	t.Parallel()
+
 	var firstPhis, lastPhis int
 
 	probe := rule.Rule{
@@ -154,6 +158,8 @@ func TestForFunctionConstructsExactlyOnce(t *testing.T) {
 // Context by hand keeps working. That contract is load-bearing here and easy to break by reaching
 // for `ctx.FileCache` directly.
 func TestForFunctionWithoutCacheStillLowers(t *testing.T) {
+	t.Parallel()
+
 	var withoutCache *Function
 
 	probe := rule.Rule{
@@ -193,6 +199,8 @@ func TestForFunctionWithoutCacheStillLowers(t *testing.T) {
 // back; this shows the cache recorded exactly one FILL for the function, so the work ran once by
 // the cache's own accounting rather than only by identity.
 func TestForFunctionRecordsOneFillPerFunction(t *testing.T) {
+	t.Parallel()
+
 	var fillKeys []string
 	var askedKey string
 

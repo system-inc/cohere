@@ -19,6 +19,8 @@ const nonconstructorFile = "/repository/source/Nonconstructor.ts"
 // would take the nil path and prove nothing while passing. The typed harness fails loudly when it
 // cannot build one, which is what makes these fixtures evidence.
 func TestNoNewNativeNonconstructorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -50,6 +52,8 @@ func TestNoNewNativeNonconstructorFires(t *testing.T) {
 // the callee position would still be wrong about them; and the argument forms are not `new`
 // expressions on these names at all, so they pin that the callee is what is read.
 func TestNoNewNativeNonconstructorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -84,6 +88,8 @@ func TestNoNewNativeNonconstructorStaysSilent(t *testing.T) {
 // because the declaration lives in source rather than in the standard library, and pinning it here
 // is what keeps that generality from being accidental.
 func TestNoNewNativeNonconstructorDeclinesAnImportedShadow(t *testing.T) {
+	t.Parallel()
+
 	const helperFile = "/repository/source/Helper.ts"
 	files := map[string]string{
 		helperFile:         "export class Symbol { constructor(_name: string) {} }\n",

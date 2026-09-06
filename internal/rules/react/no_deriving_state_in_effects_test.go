@@ -66,6 +66,8 @@ func runNoDerivingStateInEffects(t *testing.T, source string) rule_testing.Resul
 }
 
 func TestNoDerivingStateInEffectsFires(t *testing.T) {
+	t.Parallel()
+
 	// Written as a literal rather than referenced through the rule's own message constant, so the
 	// assertion cannot move together with the code it guards.
 	const noDerivingStateInEffects = "noDerivingStateInEffects"
@@ -110,6 +112,8 @@ func TestNoDerivingStateInEffectsFires(t *testing.T) {
 }
 
 func TestNoDerivingStateInEffectsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []derivedEffectCase{
 		{
 			name:   "derivedStateConditionallyInEffect",
@@ -241,6 +245,8 @@ func TestNoDerivingStateInEffectsStaysSilent(t *testing.T) {
 // candidate. Lowering assigns both to temporaries first, so by the time the pass runs they are
 // identifiers. The judgment is not syntactic and this pins it.
 func TestNoDerivingStateInEffectsMeasuredCases(t *testing.T) {
+	t.Parallel()
+
 	const noDerivingStateInEffects = "noDerivingStateInEffects"
 
 	cases := []derivedEffectCase{
@@ -340,6 +346,8 @@ func TestNoDerivingStateInEffectsMeasuredCases(t *testing.T) {
 // leading newline sits one byte off from its literal and an assertion built from the literal reports
 // a span shifted by one while the rule is correct.
 func TestNoDerivingStateInEffectsPointsAtTheSetterCall(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -394,6 +402,8 @@ func TestNoDerivingStateInEffectsPointsAtTheSetterCall(t *testing.T) {
 // comparing a diagnostic to the constant it was reported with is equality that moves on both sides
 // under mutation, which is how a message-text mutant survives a test that looks correct.
 func TestNoDerivingStateInEffectsMessage(t *testing.T) {
+	t.Parallel()
+
 	result := runNoDerivingStateInEffects(t, "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
@@ -420,6 +430,8 @@ func TestNoDerivingStateInEffectsMessage(t *testing.T) {
 // panic. Silence is the more dangerous failure because every StaysSilent case in this file would
 // still pass.
 func TestNoDerivingStateInEffectsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n"
 
 	typed := runNoDerivingStateInEffects(t, source)

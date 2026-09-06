@@ -56,6 +56,8 @@ const jsxKeyFile = "/repository/source/JsxKey.tsx"
 // silence here is a real measurement of our rule rather than an inherited one.
 
 func TestJsxKeyFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -162,6 +164,8 @@ func TestJsxKeyFires(t *testing.T) {
 }
 
 func TestJsxKeyStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -302,6 +306,8 @@ func decodeJsxKeyOptionsForTest(t *testing.T, raw string) any {
 // Every want below is the slice upstream underlines, taken from the installed build's reported
 // columns rather than from reading the source.
 func TestJsxKeySpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -368,6 +374,8 @@ func TestJsxKeySpans(t *testing.T) {
 // Three distinct duplicate groups, so a map with three entries has six possible orders and only one
 // is correct.
 func TestJsxKeyDuplicateOrderIsStable(t *testing.T) {
+	t.Parallel()
+
 	const source = "[<a key=\"one\"/>, <b key=\"two\"/>, <c key=\"one\"/>, <d key=\"three\"/>," +
 		" <e key=\"two\"/>, <f key=\"three\"/>];"
 	want := []string{
@@ -401,6 +409,8 @@ func TestJsxKeyDuplicateOrderIsStable(t *testing.T) {
 // coincidence is not obvious from the code and a later option with a true default would break it
 // silently.
 func TestJsxKeyHandlesNilOptions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, "[<App />];", nil)
 	rule_testing.ExpectFindings(t, result, "missingArrayKey")
 
@@ -421,6 +431,8 @@ func TestJsxKeyHandlesNilOptions(t *testing.T) {
 // because a `.ts` file cannot parse `[<App />]` as JSX at all and its silence would say nothing
 // about the rule.
 func TestJsxKeyHasNoFileGate(t *testing.T) {
+	t.Parallel()
+
 	const source = "[<App />];"
 	for _, fileName := range []string{
 		"/repository/source/Probe.tsx",

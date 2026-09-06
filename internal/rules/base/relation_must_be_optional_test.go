@@ -28,6 +28,8 @@ func asTheRelationHarnessWroteIt(text string) string {
 // reports where `| null | undefined` does not, `void` reports while `any` and `unknown` do not,
 // and a decorator written without parentheses does not match at all.
 func TestRelationMustBeOptional(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		why          string
@@ -197,6 +199,8 @@ func TestRelationMustBeOptional(t *testing.T) {
 // rather than panicking, so a rule missing that guard goes silent rather than crashing. A vacuous
 // green is the more dangerous of the two because nothing announces it.
 func TestRelationMustBeOptionalRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "declare const OrmManyToOne: any;\ndeclare class Profile {}\n" +
 		"class E { @OrmManyToOne() profile: Profile; }\n"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, RelationMustBeOptional,

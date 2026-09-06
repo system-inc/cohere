@@ -66,6 +66,8 @@ func runOnlyThrowError(t *testing.T, sourceText string, options any) rule_testin
 // before being written here, and all 42 agreed with the corpus's own verdict, so these are
 // measured expectations rather than transcribed ones.
 func TestOnlyThrowErrorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -132,6 +134,8 @@ func TestOnlyThrowErrorStaysSilent(t *testing.T) {
 // only counts findings, and it is the one place this rule's two messages can be swapped without
 // any count changing.
 func TestOnlyThrowErrorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -210,6 +214,8 @@ func TestOnlyThrowErrorFires(t *testing.T) {
 // this test is therefore written WITHOUT leading whitespace, so the literal and the file agree and
 // a slice taken against the literal is the slice the rule saw.
 func TestOnlyThrowErrorSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -255,6 +261,8 @@ func TestOnlyThrowErrorSpans(t *testing.T) {
 // from is an equality that looks correct while both sides move together under mutation, so a
 // message-text mutant would survive it.
 func TestOnlyThrowErrorMessages(t *testing.T) {
+	t.Parallel()
+
 	objectResult := runOnlyThrowError(t, "throw 'error';", nil)
 	if len(objectResult.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(objectResult.Diagnostics))
@@ -297,6 +305,8 @@ func TestOnlyThrowErrorMessages(t *testing.T) {
 // the rethrow arm fired rather than for some unrelated reason. Both verdicts were measured against
 // the installed rule before being written here.
 func TestOnlyThrowErrorParenthesizedRethrow(t *testing.T) {
+	t.Parallel()
+
 	source := "try {\n} catch (e) {\n  throw (e);\n}"
 
 	rule_testing.ExpectClean(t, runOnlyThrowError(t, source, nil))
@@ -320,6 +330,8 @@ func TestOnlyThrowErrorParenthesizedRethrow(t *testing.T) {
 // rethrow arm decided. That is the "change the one thing you think makes it pass" check applied
 // before the fixtures were written rather than after.
 func TestOnlyThrowErrorRethrowShape(t *testing.T) {
+	t.Parallel()
+
 	strict := OnlyThrowErrorOptions{
 		AllowRethrowing:      type_checking.Ref(true),
 		AllowThrowingAny:     type_checking.Ref(false),
@@ -389,6 +401,8 @@ func TestOnlyThrowErrorRethrowShape(t *testing.T) {
 // asserts the DIVERGENCE rather than upstream's verdict, so that a later port of the evaluator
 // fails here loudly instead of quietly agreeing.
 func TestOnlyThrowErrorConstFoldedKeyDiverges(t *testing.T) {
+	t.Parallel()
+
 	source := "const k = 'catch';\nPromise.reject('x')[k](e => {\n  throw e;\n});"
 	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
 		AllowRethrowing:      type_checking.Ref(true),
@@ -404,6 +418,8 @@ func TestOnlyThrowErrorConstFoldedKeyDiverges(t *testing.T) {
 // one that reports every `any` and every rethrow in the tree. The three cases below are each
 // silent ONLY because of their own default, which is shown by the paired strict case reporting.
 func TestOnlyThrowErrorDefaultsArePermissive(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		sourceText  string
@@ -449,6 +465,8 @@ func TestOnlyThrowErrorDefaultsArePermissive(t *testing.T) {
 // on a member rather than on the whole. Reading upstream's `isTypeFlagSet` alone would suggest the
 // opposite, so this is measured against the installed rule and pinned here.
 func TestOnlyThrowErrorUndefBeatsTheEscapes(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, runOnlyThrowError(t, "throw undefined;", nil), "undef")
 
 	rule_testing.ExpectFindings(t, runOnlyThrowError(t, "throw undefined;", OnlyThrowErrorOptions{
@@ -466,6 +484,8 @@ func TestOnlyThrowErrorUndefBeatsTheEscapes(t *testing.T) {
 // completely SILENT rather than crash, so every clean fixture would pass vacuously while the rule
 // found nothing at all. A test rather than a comment, so a later revert fails loudly.
 func TestOnlyThrowErrorNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !OnlyThrowError.NeedsTypeChecker {
 		t.Fatal("OnlyThrowError must declare NeedsTypeChecker; every arm reads the argument's type")
 	}
@@ -482,6 +502,8 @@ func TestOnlyThrowErrorNeedsTheTypedHarness(t *testing.T) {
 // enum, and the one heterogeneous `allow` array splitting into two typed fields. Handing
 // `RunTypedFilesWithOptions` a struct would leave both untested.
 func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an empty object leaves every pointer nil so the rule defaults them", func(t *testing.T) {
 		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(`{}`))
 		if err != nil {
@@ -622,6 +644,8 @@ func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
 // green-ed by weakening the rule. Changing the shared harness's tsconfig for one case would move
 // every other typed rule's fixtures, which is a far larger blast radius than one documented row.
 func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(t *testing.T) {
+	t.Parallel()
+
 	files := map[string]string{
 		onlyThrowErrorFile: "import { createError } from 'errors';\nthrow createError();\n",
 		"errors.ts":        "// @ts-ignore\ndeclare module 'errors' {\n  class ErrorLike {}\n\n  export function createError(): ErrorLike;\n}\n",
@@ -668,6 +692,8 @@ func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(t *testing.T) {
 // Both panics were reproduced by applying the mutation and running these exact inputs, so the
 // category is measured rather than argued. Neither input appears anywhere in upstream's corpus.
 func TestOnlyThrowErrorSurvivesMalformedShapes(t *testing.T) {
+	t.Parallel()
+
 	strict := OnlyThrowErrorOptions{
 		AllowRethrowing:      type_checking.Ref(true),
 		AllowThrowingAny:     type_checking.Ref(false),
@@ -702,6 +728,8 @@ func TestOnlyThrowErrorSurvivesMalformedShapes(t *testing.T) {
 // because the receiver test declines it, so it cannot separate the two versions and would have read
 // as coverage while proving nothing.
 func TestOnlyThrowErrorPrivateMethodName(t *testing.T) {
+	t.Parallel()
+
 	strict := OnlyThrowErrorOptions{
 		AllowRethrowing:      type_checking.Ref(true),
 		AllowThrowingAny:     type_checking.Ref(false),
@@ -753,6 +781,8 @@ func TestOnlyThrowErrorPrivateMethodName(t *testing.T) {
 //
 // The middle row is the one that separates `every` from `some`; without it the flip is invisible.
 func TestOnlyThrowErrorSpecifierComposites(t *testing.T) {
+	t.Parallel()
+
 	allowMap := OnlyThrowErrorOptions{
 		Allow:                []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}}},
 		AllowThrowingAny:     type_checking.Ref(false),
@@ -794,6 +824,8 @@ func TestOnlyThrowErrorSpecifierComposites(t *testing.T) {
 // Under the mutation the FIRST row goes silent and the other two do not, which is why the object
 // form is the one that can see this.
 func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(t *testing.T) {
+	t.Parallel()
+
 	source := "import { thing } from './nonexistent-module-xyz';\nthrow thing;"
 
 	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
@@ -831,6 +863,8 @@ func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(t *testing.T) {
 //
 // Neither input is in any corpus, on either side, because neither parses upstream.
 func TestOnlyThrowErrorDeclinesSynthesizedNodes(t *testing.T) {
+	t.Parallel()
+
 	strict := OnlyThrowErrorOptions{
 		AllowThrowingAny:     type_checking.Ref(false),
 		AllowThrowingUnknown: type_checking.Ref(false),
@@ -867,6 +901,8 @@ func TestOnlyThrowErrorDeclinesSynthesizedNodes(t *testing.T) {
 // with that option off does the finding appear, which is why the strict row is the one that puts
 // the nil guard under test.
 func TestOnlyThrowErrorUndeclaredIdentifier(t *testing.T) {
+	t.Parallel()
+
 	strict := OnlyThrowErrorOptions{
 		AllowRethrowing:      type_checking.Ref(true),
 		AllowThrowingAny:     type_checking.Ref(false),
@@ -890,6 +926,8 @@ func TestOnlyThrowErrorUndeclaredIdentifier(t *testing.T) {
 // no heritage, flips the verdict here while this file is untouched, which is exactly the staleness
 // the cache would produce.
 func TestOnlyThrowErrorReadsProgram(t *testing.T) {
+	t.Parallel()
+
 	if !OnlyThrowError.ReadsProgram {
 		t.Fatal("OnlyThrowError must declare ReadsProgram: IsErrorLike and the allow specifiers both read ctx.Program")
 	}

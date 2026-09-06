@@ -11,6 +11,8 @@ const linkImplementationFile = "/repository/source/components/navigation/Link.ts
 const horizontalRuleImplementationFile = "/repository/source/components/layout/HorizontalRule.tsx"
 
 func TestReactNoAnchorElementFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -72,6 +74,8 @@ func TestReactNoAnchorElementFires(t *testing.T) {
 }
 
 func TestReactNoAnchorElementStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -137,6 +141,8 @@ func TestReactNoAnchorElementStaysSilent(t *testing.T) {
 }
 
 func TestReactNoHorizontalRuleElementFires(t *testing.T) {
+	t.Parallel()
+
 	// hr is written self-closing essentially always, so this is the shape that matters most and it
 	// is the one a JsxOpeningElement-only listener misses entirely.
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactNoHorizontalRuleElement, anchorFile,
@@ -147,6 +153,8 @@ func TestReactNoHorizontalRuleElementFires(t *testing.T) {
 }
 
 func TestReactNoHorizontalRuleElementStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string

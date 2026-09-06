@@ -22,6 +22,8 @@ const protoFile = "/repository/source/Proto.ts"
 // All 9 were additionally driven through the installed eslint build and agreed with the file,
 // spans included.
 func TestNoProtoFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -47,6 +49,8 @@ func TestNoProtoFires(t *testing.T) {
 // The fourth contains the name followed by a newline, so any rule matching on source text reports
 // it. The fifth is a private name, which cannot collide because its text carries the leading hash.
 func TestNoProtoStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -74,6 +78,8 @@ func TestNoProtoStaysSilent(t *testing.T) {
 // `rule_testing.Run` does not trim its input, so these offsets index the literal directly. The trimming
 // hazard the brief describes applies to `RunTyped`, which this rule does not use.
 func TestNoProtoReportsTheWholeAccess(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantPos    int
@@ -104,6 +110,8 @@ func TestNoProtoReportsTheWholeAccess(t *testing.T) {
 // The message, asserted against literals typed here rather than against the rule's own constants,
 // which would move with it.
 func TestNoProtoReportsWhyItMatters(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoProto, protoFile, "var a = test.__proto__;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -124,6 +132,8 @@ func TestNoProtoReportsWhyItMatters(t *testing.T) {
 // on "any node naming this property" would report the second and third. All three are clean on the
 // installed build, measured before they were written here.
 func TestNoProtoDeclinesShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -145,6 +155,8 @@ func TestNoProtoDeclinesShapesTheCorpusOmits(t *testing.T) {
 // Both spellings fire upstream. Our parser hangs both off the same two access kinds the rule already
 // listens to, so this pins that no extra arm is needed rather than documenting a limit.
 func TestNoProtoReportsThroughOptionalChaining(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

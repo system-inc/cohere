@@ -27,6 +27,8 @@ func harnessSource(source string) string {
 // unsafe variables and their order, and that list is the rule's actual output. A rule finding the
 // right function while naming the wrong variable passes an id fixture.
 func TestNoLoopFuncFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range loopFuncFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
@@ -50,6 +52,8 @@ func TestNoLoopFuncFires(t *testing.T) {
 // of the firing table and fails here on every `let` case, every `const` case, every undeclared
 // name, every immediately invoked function, and every variable nothing ever writes.
 func TestNoLoopFuncStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range loopFuncCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			rule_testing.ExpectClean(t,
@@ -64,6 +68,8 @@ func TestNoLoopFuncStaysSilent(t *testing.T) {
 // last. No message-id fixture can see this, and the rule carries no fix, so this is the only thing
 // that pins it.
 func TestNoLoopFuncSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -112,6 +118,8 @@ func TestNoLoopFuncSpans(t *testing.T) {
 // comparing a diagnostic to the constant it was built from is an equality both sides of which move
 // together under mutation.
 func TestNoLoopFuncMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, "for (var i=0; i<l; i++) { (function() { i; }) }")
 	rule_testing.ExpectFindings(t, result, "unsafeRefs")
 	message := result.Diagnostics[0].Message
@@ -142,6 +150,8 @@ func TestNoLoopFuncMessage(t *testing.T) {
 // then pass vacuously. This asserts the plain harness produces nothing on an input the typed
 // harness reports, so a later revert of the guard fails loudly rather than going quiet.
 func TestNoLoopFuncRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = "for (var i=0; i<l; i++) { (function() { i; }) }"
 
 	rule_testing.ExpectFindings(t,
@@ -170,6 +180,8 @@ func TestNoLoopFuncRequiresTheTypedHarness(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoLoopFuncBorderIsTheOutermostLoop(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -224,6 +236,8 @@ func TestNoLoopFuncBorderIsTheOutermostLoop(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoLoopFuncLetDeclarationStopsTheBorderClimb(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -275,6 +289,8 @@ func TestNoLoopFuncLetDeclarationStopsTheBorderClimb(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoLoopFuncHeadPositionsThatAreOutsideTheLoop(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -342,6 +358,8 @@ func TestNoLoopFuncHeadPositionsThatAreOutsideTheLoop(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoLoopFuncPropertyNamesAreNotReferences(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -403,6 +421,8 @@ func TestNoLoopFuncPropertyNamesAreNotReferences(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoLoopFuncMergedVariableDeclarations(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -448,6 +468,8 @@ func TestNoLoopFuncMergedVariableDeclarations(t *testing.T) {
 // behaviour itself, a `let` declared in a loop body with a write after the inner loop, measured
 // against the installed eslint 10.8.1 build.
 func TestNoLoopFuncLetStatementRangeIncludesItsSemicolon(t *testing.T) {
+	t.Parallel()
+
 	const source = "for (var a=0;a<3;a++) { let x; for (var b=0;b<3;b++) { (function(){ x; }) } x = 1; }"
 	rule_testing.ExpectFindings(t,
 		rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, source), "unsafeRefs")
@@ -469,6 +491,8 @@ func TestNoLoopFuncLetStatementRangeIncludesItsSemicolon(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoLoopFuncDestructuredBindingsCarryTheirKind(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -528,6 +552,8 @@ func TestNoLoopFuncDestructuredBindingsCarryTheirKind(t *testing.T) {
 // Measured against the installed eslint 10.8.1 build: all eleven rows report, and before the
 // listener was widened cohere reported two of them.
 func TestNoLoopFuncJudgesEveryMethodLikeShape(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -566,6 +592,8 @@ func TestNoLoopFuncJudgesEveryMethodLikeShape(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build: silent on all of them.
 func TestNoLoopFuncMethodLikeShapesStaySilentWhenSafe(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -595,6 +623,8 @@ func TestNoLoopFuncMethodLikeShapesStaySilentWhenSafe(t *testing.T) {
 // Measured against the installed eslint 10.8.1 build: the inner arrow is NOT reported, because its
 // containing function is the method rather than the loop, and only the method itself is.
 func TestNoLoopFuncNestedClosureInsideAMethodAnchorsOnTheMethod(t *testing.T) {
+	t.Parallel()
+
 	const source = "var u; for (var i=0;i<3;i++) { g({ m() { return () => u; } }); } u = 1;"
 	result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, source)
 	rule_testing.ExpectFindings(t, result, "unsafeRefs")
@@ -625,6 +655,8 @@ func TestNoLoopFuncNestedClosureInsideAMethodAnchorsOnTheMethod(t *testing.T) {
 //
 // Asserted here so the choice cannot be quietly narrowed back to upstream's node boundaries.
 func TestNoLoopFuncMethodSpanIncludesTheName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -690,6 +722,8 @@ func TestNoLoopFuncMethodSpanIncludesTheName(t *testing.T) {
 // Measured against the installed eslint 10.8.1 build: the plain arrow is clean and the async one
 // reports, so the condition is load-bearing rather than defensive.
 func TestNoLoopFuncAsyncImmediatelyInvokedIsNotSkipped(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -732,6 +766,8 @@ func TestNoLoopFuncAsyncImmediatelyInvokedIsNotSkipped(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build, both rows.
 func TestNoLoopFuncNamedImmediatelyInvokedReachableByName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

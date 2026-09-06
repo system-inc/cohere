@@ -24,6 +24,8 @@ const buttonThemeSource = "export interface ButtonVariantsInterface {\n" +
 	"}\n"
 
 func TestBoundaryNoProjectThemeValueFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -53,6 +55,8 @@ func TestBoundaryNoProjectThemeValueFires(t *testing.T) {
 }
 
 func TestBoundaryNoProjectThemeValueStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -104,6 +108,8 @@ func TestBoundaryNoProjectThemeValueStaysSilent(t *testing.T) {
 // If the rule were still walking the filesystem, no theme would be found, the cache would be empty,
 // and every one of these would report nothing.
 func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(t *testing.T) {
+	t.Parallel()
+
 	const inMemoryThemePath = "/repository/libraries/structure/source/components/cards/CardTheme.ts"
 	const inMemoryTheme = "export interface CardVariantsInterface {\n    Flat: string;\n}\n"
 
@@ -187,6 +193,8 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(t *te
 // Two runs with different programs must not share an answer, and that is the miss. Two calls within
 // one run must reach the same map, and that is the hit.
 func TestBoundaryNoProjectThemeValueCachesPerProgram(t *testing.T) {
+	t.Parallel()
+
 	// A theme naming `Raised`, so `variant="Flat"` is a violation and `variant="Raised"` is not.
 	firstProgram := map[string]string{
 		"/repository/libraries/structure/source/components/CardTheme.ts": "export interface CardVariantsInterface {\n    Raised: string;\n}\n",

@@ -23,6 +23,8 @@ const childrenPropFile = "/repository/source/Children.tsx"
 // and 15 fail, and the snapshot records 15 diagnostics from those 15 inputs, so one finding per
 // input is measured here rather than assumed.
 func TestNoChildrenPropFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"<div children />;",
 		"<div children=\"Children\" />;",
@@ -59,6 +61,8 @@ func TestNoChildrenPropFires(t *testing.T) {
 // only because the callee is not a createElement call, so a port that forgot the callee gate would
 // report it while every other clean case still passed.
 func TestNoChildrenPropStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"<div />;",
 		"<div></div>;",
@@ -119,6 +123,8 @@ func TestNoChildrenPropStaysSilent(t *testing.T) {
 // The wanted text is `children` in every row, which is the point: it should never widen to
 // `children="Children"` or to the call.
 func TestNoChildrenPropPointsAtTheName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantOffset int
@@ -156,6 +162,8 @@ func TestNoChildrenPropPointsAtTheName(t *testing.T) {
 // interpolation at all, which is itself the thing being pinned, since a later edit adding a `%s`
 // without a value would render a stray verb and every other test here would stay green.
 func TestNoChildrenPropRendersItsMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoChildrenProp, childrenPropFile, `<div children />;`)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
@@ -181,6 +189,8 @@ func TestNoChildrenPropRendersItsMessage(t *testing.T) {
 // reporting. `{[children]: 1}` and `{2: 1}` stayed silent in the same run and are the clean side
 // below.
 func TestNoChildrenPropCoversEveryPropertyKind(t *testing.T) {
+	t.Parallel()
+
 	reports := []string{
 		`React.createElement("div", {children});`,
 		`React.createElement("div", {children() {}});`,
@@ -233,6 +243,8 @@ func TestNoChildrenPropCoversEveryPropertyKind(t *testing.T) {
 // afterwards takes down every file in the tree containing a computed key, and no imported fixture
 // covers one.
 func TestNoChildrenPropSurvivesAComputedKey(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
 		"declare const key: string;\nReact.createElement(\"div\", {[key]: 1});\n"))
 }
@@ -244,6 +256,8 @@ func TestNoChildrenPropSurvivesAComputedKey(t *testing.T) {
 // not the property name, and reading the cooked text of the first chunk would report on a property
 // that is actually called something else at runtime.
 func TestNoChildrenPropDeclinesASubstitutingTemplateKey(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
 		"declare const part: string;\nReact.createElement(\"div\", {[`children${part}`]: 1});\n"))
 }
@@ -256,6 +270,8 @@ func TestNoChildrenPropDeclinesASubstitutingTemplateKey(t *testing.T) {
 // must report, `document.createElement` shares the property name and constructs a DOM node so must
 // not, and a computed member is the same call written differently and must report.
 func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(t *testing.T) {
+	t.Parallel()
+
 	reports := []string{
 		`createElement("div", {children: 1});`,
 		`React["createElement"]("div", {children: 1});`,
@@ -287,6 +303,8 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(t *testing.T) {
 // `JSXAttributeName::Identifier` and returning early on anything else, so the silence is upstream's
 // judgment rather than a gap in ours.
 func TestNoChildrenPropDeclinesANamespacedAttributeName(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
 		`<svg xlink:children="x" />;`))
 }
@@ -297,6 +315,8 @@ func TestNoChildrenPropDeclinesANamespacedAttributeName(t *testing.T) {
 // would be a divergence nothing asked for, and the imported corpus never writes a duplicate key so
 // it cannot say which behavior was ported.
 func TestNoChildrenPropReportsOncePerCall(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
 		`React.createElement("div", {children: 1, "children": 2});`), "noChildrenProp")
 }
@@ -308,6 +328,8 @@ func TestNoChildrenPropReportsOncePerCall(t *testing.T) {
 // exists because "reports once" and "reports per occurrence" are both defensible and only one of
 // them is upstream's, per surface.
 func TestNoChildrenPropReportsPerJsxAttribute(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoChildrenProp, childrenPropFile,
 		`<div children="a" children="b" />;`), "noChildrenProp", "noChildrenProp")
 }
@@ -324,6 +346,8 @@ func TestNoChildrenPropReportsPerJsxAttribute(t *testing.T) {
 // JSX side listens per attribute and a spread is not one, and the call side never runs on JSX at
 // all. It is here so the silence is a recorded decision rather than an unexamined gap.
 func TestNoChildrenPropSurvivesDegenerateInput(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		`React.createElement("div", {});`,
 		`React.createElement();`,

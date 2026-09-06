@@ -9,6 +9,8 @@ import (
 const forbiddenImportFile = "/repository/source/components/Thing.tsx"
 
 func TestNetworkNoForbiddenImportFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -59,6 +61,8 @@ func TestNetworkNoForbiddenImportFires(t *testing.T) {
 }
 
 func TestNetworkNoForbiddenImportStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string

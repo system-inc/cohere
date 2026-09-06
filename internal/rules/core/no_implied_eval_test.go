@@ -99,6 +99,8 @@ func runImpliedEvalWithoutGlobals(t *testing.T, source string) rule_testing.Resu
 // The sources are upstream's, taken by evaluating its test module and rendering each string through
 // a Go quoter, so no case here was retyped and none could have been silently cooked on the way in.
 func TestNoImpliedEvalFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source string
 		ids    []string
@@ -191,6 +193,8 @@ func TestNoImpliedEvalFires(t *testing.T) {
 // upstream declared as a global. These are silent for a reason other than the global test: the
 // argument is a function, the call is not a call at all, or the property name does not match.
 func TestNoImpliedEvalStaysSilentWithGlobalsDeclared(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ source string }{
 		{source: "setTimeout();"},
 		{source: "window.setTimeout;"},
@@ -267,6 +271,8 @@ func TestNoImpliedEvalStaysSilentWithGlobalsDeclared(t *testing.T) {
 // specifically, in every shape that can produce one: a function declaration, a block-scoped const, a
 // parameter, and a nested function whose shadow sits in an enclosing scope.
 func TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ source string }{
 		{source: "setTimeout;"},
 		{source: "setTimeout = foo;"},
@@ -340,6 +346,8 @@ func TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared(t *testing.T) {
 // is already a string by the syntactic test. That covers the first case and not the second, and it
 // is a much smaller thing than the evaluator.
 func TestNoImpliedEvalDivergesFromUpstreamOnStaticValues(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source string
 		// upstreamIds is what eslint reports for this case. It is recorded rather than asserted,
@@ -388,6 +396,8 @@ func TestNoImpliedEvalDivergesFromUpstreamOnStaticValues(t *testing.T) {
 // both shapes are ones upstream itself reports at any current ecma version, which is every version
 // this codebase compiles under.
 func TestNoImpliedEvalReportsGlobalThisUpstreamGatesByEcmaVersion(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source string
 		// upstreamEcmaVersion is the setting that makes upstream call this valid. At 2020 and
@@ -437,6 +447,8 @@ func TestNoImpliedEvalReportsGlobalThisUpstreamGatesByEcmaVersion(t *testing.T) 
 // `top.setTimeout('x')` all report zero, while `window.setTimeout('x')` reports one, with nothing
 // else changed between the runs.
 func TestNoImpliedEvalDeclinesAGlobalReceiverOutsideTheCandidateSet(t *testing.T) {
+	t.Parallel()
+
 	// A program declaring three globals that are NOT global-object candidates, each carrying a
 	// method with an eval-like name. Without these declarations the receiver would be declined for
 	// being undeclared and the case would pass for the wrong reason.
@@ -495,6 +507,8 @@ declare var top: ImpliedEvalOrdinaryObject;
 // Found by mutation: removing the guard survived all 175 imported cases, because the corpus writes
 // no bracketed variable key anywhere.
 func TestNoImpliedEvalDeclinesAVariableBracketKey(t *testing.T) {
+	t.Parallel()
+
 	silent := []string{
 		"window[setTimeout]('x = 1;')",
 		"window[setInterval]('x = 1;')",
@@ -530,6 +544,8 @@ func TestNoImpliedEvalDeclinesAVariableBracketKey(t *testing.T) {
 // `setTimeout` declared: `window.document.setTimeout('x')` and `window.foo.setTimeout('x')` report
 // zero, `window.window.setTimeout('x')` reports one.
 func TestNoImpliedEvalStopsTheReceiverWalkAtANonCandidateLink(t *testing.T) {
+	t.Parallel()
+
 	// The candidate object carries a `document` property so the middle link resolves to a real
 	// settled name rather than to nothing, which is what makes this test the link check and not the
 	// resolution check.
@@ -597,6 +613,8 @@ declare var self: ImpliedEvalChainObject;
 // The unwrap is a loop rather than a single step because the wrapping nests, and the nil check is
 // written out rather than delegated to `ast.SkipParentheses`, which dereferences its argument.
 func TestNoImpliedEvalReadsThroughParenthesesOnTheArgument(t *testing.T) {
+	t.Parallel()
+
 	firing := []string{
 		"setTimeout(('x = 1;'))",
 		"setTimeout((('x = 1;')))",
@@ -641,6 +659,8 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheArgument(t *testing.T) {
 // Only the chain ROOT can carry parentheses. A middle link cannot: `window.(self).setTimeout` is not
 // syntax, so the unwrap inside the walk loop matters on the first turn and is inert afterwards.
 func TestNoImpliedEvalReadsThroughParenthesesOnTheReceiver(t *testing.T) {
+	t.Parallel()
+
 	firing := []string{
 		"(window).setTimeout('x = 1;')",
 		"((window)).setTimeout('x = 1;')",
@@ -676,6 +696,8 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheReceiver(t *testing.T) {
 // still arrives with a nil checker, and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` builds
 // exactly that.
 func TestNoImpliedEvalRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoImpliedEval.NeedsTypeChecker {
 		t.Fatalf("this rule resolves an identifier to its declaration and must declare NeedsTypeChecker")
 	}
@@ -703,6 +725,8 @@ func TestNoImpliedEvalRequiresTheTypedHarness(t *testing.T) {
 // The other shapes here are calls whose callee is a bare keyword rather than a name, which reach the
 // listener as ordinary call expressions and have crashed rules in this tree before.
 func TestNoImpliedEvalDoesNotCrashOnACallWithNoArguments(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		"setTimeout();",
 		"window.setTimeout();",
@@ -727,6 +751,8 @@ func TestNoImpliedEvalDoesNotCrashOnACallWithNoArguments(t *testing.T) {
 // reports the CallExpression rather than the callee or the argument, and this asserts that by
 // slicing the source with the finding's own range.
 func TestNoImpliedEvalReportsTheWholeCallAndSaysWhy(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source      string
 		wantSpan    string

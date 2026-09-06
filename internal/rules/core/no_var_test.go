@@ -9,6 +9,8 @@ import (
 const varFile = "/repository/source/Thing.ts"
 
 func TestNoVarFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -31,6 +33,8 @@ func TestNoVarFires(t *testing.T) {
 }
 
 func TestNoVarStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

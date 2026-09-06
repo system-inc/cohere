@@ -64,6 +64,8 @@ func applyPreferEnumInitializersSuggestion(t *testing.T, source string, suggesti
 // TypeScript compiler rather than by reading it. Every one was additionally run through the
 // installed 8.x build, which reported nothing and produced no parse error on any of them.
 func TestPreferEnumInitializersStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\nenum Direction {}\n    ",
 		"\nenum Direction {\n  Up = 1,\n}\n    ",
@@ -92,6 +94,8 @@ func TestPreferEnumInitializersStaysSilentOnUpstreamPassCases(t *testing.T) {
 // that writes the wrong text passes a message-id check, and a suggestion naming the right value
 // while replacing the wrong range passes a description check.
 func TestPreferEnumInitializersFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []preferEnumInitializersFinding
@@ -223,6 +227,8 @@ func TestPreferEnumInitializersFiresOnUpstreamFailCases(t *testing.T) {
 // nothing in it establishes that the rule tests only whether an initializer is PRESENT rather than
 // what it evaluates to. Both verdicts below were measured against the installed 8.x build.
 func TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -260,6 +266,8 @@ func TestPreferEnumInitializersStaysSilentOnShapesTheCorpusDoesNotWrite(t *testi
 //
 // Every span, message and applied suggestion below was measured against the installed build.
 func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []preferEnumInitializersFinding
@@ -494,6 +502,8 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) 
 // with a computed-key skip, because a skip would be a judgment upstream never made and this input
 // cannot occur in source that compiles.
 func TestPreferEnumInitializersReportsAComputedKeyUpstreamCannotParse(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, PreferEnumInitializers, preferEnumInitializersFile,
 		"enum D {\n  ['computed'],\n}")
 	rule_testing.ExpectFindings(t, result, "defineInitializer")

@@ -37,6 +37,8 @@ func decodeNoInnerDeclarationsForTest(t *testing.T, optionsJson string) any {
 }
 
 func TestNoInnerDeclarationsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		source      string
@@ -97,6 +99,8 @@ func TestNoInnerDeclarationsStaysSilent(t *testing.T) {
 // neither: both slots are filled from the same node, so swapping them renders a sentence that still
 // reads as English and names the wrong scope.
 func TestNoInnerDeclarationsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		source      string
@@ -154,6 +158,8 @@ func TestNoInnerDeclarationsFires(t *testing.T) {
 
 // The span, which no message assertion can see. Upstream reports the whole declaration.
 func TestNoInnerDeclarationsSpan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		source      string
@@ -181,6 +187,8 @@ func TestNoInnerDeclarationsSpan(t *testing.T) {
 
 // The decoder, whose defaults are the two lines most likely to have no upstream counterpart.
 func TestDecodeNoInnerDeclarationsOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name                     string
 		optionsJson              string
@@ -231,6 +239,8 @@ func TestDecodeNoInnerDeclarationsOptions(t *testing.T) {
 // would invert the rule and report every block-scoped function in the tree. Every fixture above
 // routes through the decoder, so nothing there could see it.
 func TestNoInnerDeclarationsHandlesNilOptions(t *testing.T) {
+	t.Parallel()
+
 	// Strict code, default options: a block-scoped function declaration is exempt.
 	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
 		"export {};\nif (test) { function doSomething() { } }", nil))
@@ -257,6 +267,8 @@ func TestNoInnerDeclarationsHandlesNilOptions(t *testing.T) {
 // delete the reading as unreachable, and the verdict would have been correct today and expired the
 // first time anything constructed these options anywhere but the decoder.
 func TestNoInnerDeclarationsPartialOptionsKeepTheDefault(t *testing.T) {
+	t.Parallel()
+
 	checkBoth := true
 	partial := NoInnerDeclarationsOptions{Both: &checkBoth}
 
@@ -275,6 +287,8 @@ func TestNoInnerDeclarationsPartialOptionsKeepTheDefault(t *testing.T) {
 // is pinned separately, because a rule that got only one of them right would pass most of the
 // corpus.
 func TestNoInnerDeclarationsStrictness(t *testing.T) {
+	t.Parallel()
+
 	allow := `["both", {"blockScopedFunctions": "allow"}]`
 
 	exempt := []struct {
@@ -343,6 +357,8 @@ func TestNoInnerDeclarationsStrictness(t *testing.T) {
 // difference rather than a rule difference and is stated so the next reader does not add the gate
 // and find nothing can reach it.
 func TestNoInnerDeclarationsCannotExpressTheEcmaScript5Gate(t *testing.T) {
+	t.Parallel()
+
 	allow := `["both", {"blockScopedFunctions": "allow"}]`
 	// The sloppy half of each pair still reports here, for the ordinary reason.
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",

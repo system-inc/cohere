@@ -23,6 +23,8 @@ const guardForInFile = "/repository/source/GuardForIn.ts"
 // are the guard written as an early `continue`, in both the braced and unbraced spellings, which is
 // the idiom the rule exists to permit rather than to flag.
 func TestGuardForInStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"for (var x in o);",
 		"for (var x in o) {}",
@@ -46,6 +48,8 @@ func TestGuardForInStaysSilent(t *testing.T) {
 // third and fourth guard part of the body and then run `g()` unguarded. The last two have no guard
 // at all, braced and unbraced.
 func TestGuardForInFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"for (var x in o) { if (x) { f(); continue; } g(); }",
 		"for (var x in o) { if (x) { continue; f(); } g(); }",
@@ -69,6 +73,8 @@ func TestGuardForInFires(t *testing.T) {
 // finding covers the whole loop including its head. A port anchoring on the body would pass every
 // assertion above while pointing somewhere the reader was not shown.
 func TestGuardForInReportsOnTheWholeLoop(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "for (var x in o) foo();"
 
 	result := rule_testing.Run(t, GuardForIn, guardForInFile, sourceText)
@@ -96,6 +102,8 @@ func TestGuardForInReportsOnTheWholeLoop(t *testing.T) {
 // a bare `continue`. A port collapsing the two arms into one `continue` test would report the first
 // of these, which upstream accepts. A port collapsing them the other way would accept the second.
 func TestGuardForInSeparatesTheTwoBlockArms(t *testing.T) {
+	t.Parallel()
+
 	// One statement, a non-skipping consequent: clean, because the `if` is the whole body.
 	rule_testing.ExpectClean(t, rule_testing.Run(t, GuardForIn, guardForInFile,
 		"for (var x in o) { if (x) { f(); } }"))
@@ -113,6 +121,8 @@ func TestGuardForInSeparatesTheTwoBlockArms(t *testing.T) {
 // imported fixture can see it: upstream's corpus writes no `for-of` at all, because its parser
 // gives the two different node types and the mistake is not available there.
 func TestGuardForInDeclinesForOf(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, GuardForIn, guardForInFile, "for (var x of o) foo();"))
 
 	// The control: the same body under `for-in` does report, so the silence above is about the
@@ -129,6 +139,8 @@ func TestGuardForInDeclinesForOf(t *testing.T) {
 // each row is a place a port could drift silently. Driven with the ESLint Linter API on
 // `sourceType: "script"`, `ecmaVersion: 2022`.
 func TestGuardForInMatchesTheInstalledBuild(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string

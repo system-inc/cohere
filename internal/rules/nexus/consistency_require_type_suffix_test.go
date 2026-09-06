@@ -9,6 +9,8 @@ import (
 const suffixFile = "/repository/source/Thing.ts"
 
 func TestConsistencyRequireTypeSuffixFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -33,6 +35,8 @@ func TestConsistencyRequireTypeSuffixFires(t *testing.T) {
 }
 
 func TestConsistencyRequireTypeSuffixStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

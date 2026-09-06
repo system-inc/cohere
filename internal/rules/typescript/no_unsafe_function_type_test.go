@@ -9,6 +9,8 @@ import (
 const unsafeFunctionFile = "/repository/source/Thing.ts"
 
 func TestNoUnsafeFunctionTypeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -36,6 +38,8 @@ func TestNoUnsafeFunctionTypeFires(t *testing.T) {
 }
 
 func TestNoUnsafeFunctionTypeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

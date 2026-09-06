@@ -15,6 +15,8 @@ import (
 // they are ordinary rows here and are marked at the line.
 
 func TestNoUnexpectedMultilineStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -70,6 +72,8 @@ func TestNoUnexpectedMultilineStaysSilent(t *testing.T) {
 }
 
 func TestNoUnexpectedMultilineFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		source  string
@@ -112,6 +116,8 @@ func TestNoUnexpectedMultilineFires(t *testing.T) {
 // rule_testing.Run does not trim its input the way RunTyped does, so these offsets index the
 // fixture literal directly.
 func TestNoUnexpectedMultilineSpansAndMessages(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -163,6 +169,8 @@ func TestNoUnexpectedMultilineSpansAndMessages(t *testing.T) {
 // rule's own constants, because comparing a diagnostic to the constant it was built from is an
 // equality that moves in both directions under mutation and guards nothing.
 func TestNoUnexpectedMultilineDescriptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source  string
 		wantId  string
@@ -212,6 +220,8 @@ func TestNoUnexpectedMultilineDescriptions(t *testing.T) {
 //	  new Linter().cohere(CODE,{rules:{"no-unexpected-multiline":"error"},
 //	  languageOptions:{ecmaVersion:2022,sourceType:"script"}})))'
 func TestNoUnexpectedMultilineMeasuredAgainstTheInstalledBuild(t *testing.T) {
+	t.Parallel()
+
 	silent := []struct {
 		name   string
 		source string

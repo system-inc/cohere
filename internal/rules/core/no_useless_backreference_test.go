@@ -24,6 +24,8 @@ const backreferenceFile = "/repository/source/Backreference.ts"
 // sentences and the kind is the diagnosis. A single id would let a port that calls a
 // different-alternative case a forward reference pass every fixture here.
 func TestNoUselessBackreferenceFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		findings   []string
@@ -137,6 +139,8 @@ func TestNoUselessBackreferenceFires(t *testing.T) {
 // the many lookaround shapes where the group does run before the reference; and patterns whose
 // syntax is broken, which upstream skips because its parser refuses them.
 func TestNoUselessBackreferenceStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -255,6 +259,8 @@ func TestNoUselessBackreferenceStaysSilent(t *testing.T) {
 // the flag the same text is a syntax error and the whole pattern is upstream's business, not this
 // rule's.
 func TestNoUselessBackreferenceStillReportsBesideALegacyOctal(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `/\1(a)\2/`)
 	rule_testing.ExpectFindings(t, result, "backreferenceBeforeItsGroup")
 
@@ -279,6 +285,8 @@ func TestNoUselessBackreferenceStillReportsBesideALegacyOctal(t *testing.T) {
 // one of its fail cases, because an unreadable identifier is treated as no flags and the pattern
 // parses without `u`. Only the template form returns early.
 func TestNoUselessBackreferenceHandlesConstructorArgumentShapesUpstreamNeverExercises(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a regex literal argument reports once, not twice", func(t *testing.T) {
 		rule_testing.ExpectFindings(t,
 			rule_testing.Run(t, NoUselessBackreference, backreferenceFile, `RegExp(/\1(a)/, '')`),
@@ -310,6 +318,8 @@ func TestNoUselessBackreferenceHandlesConstructorArgumentShapesUpstreamNeverExer
 // scope. This rule does not take the checker, so it reports. If a later change makes it silent
 // here, that is upstream parity and this test should be deleted rather than worked around.
 func TestNoUselessBackreferenceReportsAShadowedRegExp(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		`let RegExp; new RegExp('\\1(a)');`,
 		`function foo() { var RegExp; RegExp('\\1(a)', 'u'); }`,
@@ -337,6 +347,8 @@ func TestNoUselessBackreferenceReportsAShadowedRegExp(t *testing.T) {
 // escape width would have reported at a plausible-looking wrong offset instead, and no id fixture
 // would have noticed.
 func TestNoUselessBackreferencePointsAtTheBackreference(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		reported   []string
@@ -390,6 +402,8 @@ func TestNoUselessBackreferencePointsAtTheBackreference(t *testing.T) {
 // what makes starting the lowest-common-ancestor walk at 1 rather than 0 the same computation:
 // the comparison at 0 is 0 == 0 for every pair of paths, so it can only ever advance.
 func TestNoUselessBackreferenceEveryPathStartsAtTheRoot(t *testing.T) {
+	t.Parallel()
+
 	patterns := []string{
 		`\1(a)`, `(b)(\2a)`, `(a|\1b)`, `\1(?!(a))`, `(?<=(a)\1)b`, `\k<foo>(?<foo>bar)`,
 		`((?<foo>bar)|\k<foo>(?<foo>baz)|(?<foo>qux))`, `(?<=((?<foo>bar)|(?<foo>baz))\k<foo>)`,
@@ -427,6 +441,8 @@ func TestNoUselessBackreferenceEveryPathStartsAtTheRoot(t *testing.T) {
 // Upstream reaches two of these (`RegExp('\\1(a)[')` is in its pass vector) and stops there, so
 // the unbalanced and trailing-backslash shapes are ours.
 func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -466,6 +482,8 @@ func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *test
 // Declaring the checker would take an exclusive per-file lock for nothing. The one question that
 // would need it, whether a `RegExp` callee is locally shadowed, is the stated divergence above.
 func TestNoUselessBackreferenceIsRegistered(t *testing.T) {
+	t.Parallel()
+
 	var found *rule.Registration
 	for index, registration := range rule.Registered() {
 		if registration.Rule.Name == "no-useless-backreference" {

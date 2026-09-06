@@ -28,6 +28,8 @@ import (
 // `maybeRef` dependency; before this, our nested-function walk produced `maybeRef.current` and the
 // comparison reported a `RefAccessDifference` against the source's `[maybeRef]`.
 func TestRefCurrentReadsTruncateToTheirRoot(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		source     string

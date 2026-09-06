@@ -7,6 +7,8 @@ import (
 )
 
 func TestConsistencyNoUtilsFolderFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		fileName string
 		wantIds  []string
@@ -24,6 +26,8 @@ func TestConsistencyNoUtilsFolderFires(t *testing.T) {
 }
 
 func TestConsistencyNoUtilsFolderStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	// The last two are the ones that matter. A substring match would flag both, and a rule that
 	// fires on the exact spelling it is asking for is worse than no rule at all.
 	cases := []string{

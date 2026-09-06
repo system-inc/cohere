@@ -16,6 +16,8 @@ import (
 // upstream's own conversion has and the property every downstream pass depends on: a pass that reads
 // the tree to decide what a scope depends on cannot see an instruction the converter dropped.
 func TestBuildReactiveFunctionShapes(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name           string
 		valueTerminals int
@@ -91,6 +93,8 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 }
 
 func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -172,6 +176,8 @@ func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
 }
 
 func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -256,6 +262,8 @@ func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
 // LoadLocal; rebuilding only the final value drops the allocation, which in turn removes the scope
 // declaration that the validator needs.
 func TestBuildReactiveFunctionLogicalKeepsRightPrefix(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `
 		function Component(props) {
 			const data = useMemo(() => {
@@ -336,6 +344,8 @@ func TestBuildReactiveFunctionLogicalKeepsRightPrefix(t *testing.T) {
 // `forEachCorpusFunction` performs, WITH terminals built. A number taken from a different
 // denominator, or from a graph at a different pipeline stage, is not comparable to them.
 func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
+	t.Parallel()
+
 	converted, lostWithValueTerminal, lostWithout := 0, 0, 0
 	doubleEmitted, unmatchedGotos := 0, 0
 	elidedScopeBreaks, nonImplicitScopeBreaks := 0, 0
@@ -535,6 +545,8 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 // closes silently is an improvement nobody can point at, and a gap that opens silently is a
 // regression nobody can either.
 func TestReactiveFunctionGapsAreDeclared(t *testing.T) {
+	t.Parallel()
+
 	gaps := ReactiveFunctionGaps()
 	if len(gaps) != 4 {
 		t.Fatalf("expected 4 declared gaps, found %d; a gap was added or closed without this "+

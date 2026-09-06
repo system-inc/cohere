@@ -24,6 +24,8 @@ const voidDomElementsFile = "/repository/source/VoidDomElements.tsx"
 // `createElement` calls, and within the calls both the positional third argument and the two
 // property names that carry children inside the props object.
 func TestVoidDomElementsNoChildrenFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -55,6 +57,8 @@ func TestVoidDomElementsNoChildrenFires(t *testing.T) {
 // arity cases (`createElement('img')` and `createElement()`) and the props-as-a-variable case that
 // upstream declines because it reads only an object literal written at the call site.
 func TestVoidDomElementsNoChildrenStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -91,6 +95,8 @@ func TestVoidDomElementsNoChildrenStaysSilent(t *testing.T) {
 // than inferred: `<br>Foo</br>;` prints 1:2 over two columns, and `React.createElement('br', ...)`
 // prints 1:21 over four, which is `'br'` with its quotes and not `br`.
 func TestVoidDomElementsNoChildrenPointsAtTheElementName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -126,6 +132,8 @@ func TestVoidDomElementsNoChildrenPointsAtTheElementName(t *testing.T) {
 // the `createElement` half is checked against the literal's *value* rather than its source text,
 // which is the one place the two could differ.
 func TestVoidDomElementsNoChildrenNamesTheElementInTheMessage(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		sourceText  string
@@ -155,6 +163,8 @@ func TestVoidDomElementsNoChildrenNamesTheElementInTheMessage(t *testing.T) {
 // the rule quietly narrower on exactly one element and every other fixture would stay green.
 // Upstream's corpus exercises only `br` and `img`, so fourteen of these sixteen are untested there.
 func TestVoidDomElementsNoChildrenCoversEveryVoidElement(t *testing.T) {
+	t.Parallel()
+
 	voidElements := []string{
 		"area", "base", "br", "col", "embed", "hr", "img", "input",
 		"keygen", "link", "menuitem", "meta", "param", "source", "track", "wbr",
@@ -178,6 +188,8 @@ func TestVoidDomElementsNoChildrenCoversEveryVoidElement(t *testing.T) {
 // `<Img>` render whatever those names are bound to, which is not the void HTML element and may
 // legitimately take children. A port that folded case would report on component references.
 func TestVoidDomElementsNoChildrenIsCaseSensitive(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -217,6 +229,8 @@ func TestVoidDomElementsNoChildrenIsCaseSensitive(t *testing.T) {
 // the search either: `<img {...props} children='Foo' />` reports, because the written attribute
 // beside the spread still answers.
 func TestVoidDomElementsNoChildrenDeclinesSpreads(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -249,6 +263,8 @@ func TestVoidDomElementsNoChildrenDeclinesSpreads(t *testing.T) {
 // reading a key and reaching for it here would silently widen the rule past upstream on two inputs
 // no imported fixture covers. The command that established it is in the doc comment on the rule.
 func TestVoidDomElementsNoChildrenReadsOnlyStaticIdentifierKeys(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -283,6 +299,8 @@ func TestVoidDomElementsNoChildrenReadsOnlyStaticIdentifierKeys(t *testing.T) {
 // And an element with no children at all is clean even written with a closing tag, so `<br></br>`
 // is silent while `<br> </br>` reports on the single space.
 func TestVoidDomElementsNoChildrenTreatsAnyChildAsContent(t *testing.T) {
+	t.Parallel()
+
 	reports := []struct {
 		name       string
 		sourceText string
@@ -317,6 +335,8 @@ func TestVoidDomElementsNoChildrenTreatsAnyChildAsContent(t *testing.T) {
 // outright on that kind. The rule asks `jsx.ElementParts` and then checks for `KindIdentifier`, so
 // the kind check is load-bearing against a crash as well as against a wrong verdict.
 func TestVoidDomElementsNoChildrenDeclinesNonIdentifierTags(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -342,6 +362,8 @@ func TestVoidDomElementsNoChildrenDeclinesNonIdentifierTags(t *testing.T) {
 // measured on the release binary and all four report: a bare `createElement`, a dotted member on
 // any object rather than only `React`, a computed member, and `document` excluded by name.
 func TestVoidDomElementsNoChildrenAcceptsEveryCalleeSpellingUpstreamDoes(t *testing.T) {
+	t.Parallel()
+
 	reports := []struct {
 		name       string
 		sourceText string
@@ -390,6 +412,8 @@ func TestVoidDomElementsNoChildrenAcceptsEveryCalleeSpellingUpstreamDoes(t *test
 // is silent, because upstream matches `Argument::StringLiteral` and a parenthesized literal is not
 // one. That needs no special handling here since the rule checks the argument's kind directly.
 func TestVoidDomElementsNoChildrenMatchesUpstreamOnParenthesizedCallees(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -417,6 +441,8 @@ func TestVoidDomElementsNoChildrenMatchesUpstreamOnParenthesizedCallees(t *testi
 // silent upstream, because the second argument must destructure as an `ObjectExpression` before the
 // third is ever consulted. Measured on the release binary, and reproduced rather than improved on.
 func TestVoidDomElementsNoChildrenCountsArgumentsBeforeReadingThem(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -444,6 +470,8 @@ func TestVoidDomElementsNoChildrenCountsArgumentsBeforeReadingThem(t *testing.T)
 // release binary: `<br dangerouslySetInnerHTML={{__html: 'Foo'}}>Foo</br>` reports once, and
 // `React.createElement('br', {children: 'Foo'}, 'Bar')` reports once.
 func TestVoidDomElementsNoChildrenReportsOncePerElement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

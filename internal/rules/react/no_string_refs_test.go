@@ -35,6 +35,8 @@ const stringRefsFile = "/repository/source/StringRefs.tsx"
 // That pair is the whole reason this rule grew a `checkThisRefs` option. Without it the corpus
 // cannot be expressed: two of its cases are the same bytes with opposite verdicts.
 func TestNoStringRefsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name               string
 		sourceText         string
@@ -70,6 +72,8 @@ func TestNoStringRefsFires(t *testing.T) {
 // version gate: byte-identical to the first firing case and clean only because upstream's
 // `18.3.0` setting turns the `this.refs` half off.
 func TestNoStringRefsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name               string
 		sourceText         string
@@ -99,6 +103,8 @@ func TestNoStringRefsStaysSilent(t *testing.T) {
 // through the ESLint Linter API before being written down, so these assert measured upstream
 // behavior rather than a reading of the JavaScript. The reading was wrong about five of them.
 func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
+	t.Parallel()
+
 	fires := []struct {
 		name       string
 		sourceText string
@@ -204,6 +210,8 @@ func TestNoStringRefsDiscriminationsUpstreamDoesNotCover(t *testing.T) {
 // spellings split in a way no reading of the rule name would predict. The previous port of this
 // rule had them exactly inverted.
 func TestNoStringRefsSpellingsOfTheRefsRead(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -282,6 +290,8 @@ func TestNoStringRefsSpellingsOfTheRefsRead(t *testing.T) {
 //
 // Every case measured on the installed build at `settings.react.version` of `18.2.0`.
 func TestNoStringRefsEnclosingComponentIsAScopeWalk(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -458,6 +468,8 @@ func TestNoStringRefsEnclosingComponentIsAScopeWalk(t *testing.T) {
 // The `this.refs` half rather than the attribute half, deliberately: a `.ts` file cannot hold a JSX
 // attribute at all, so gating on a ref attribute would pass whether or not a gate exists.
 func TestNoStringRefsHasNoFileGate(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "class Hello extends React.Component {\n" +
 		"  componentDidMount() {\n" +
 		"    var component = this.refs.hello;\n" +
@@ -485,6 +497,8 @@ func TestNoStringRefsHasNoFileGate(t *testing.T) {
 // one non-upstream key lives. `checkThisRefs` has to be distinguishable as absent, so a struct
 // literal cannot exercise the branch that decides what absence means.
 func TestDecodeNoStringRefsOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -528,6 +542,8 @@ func TestDecodeNoStringRefsOptions(t *testing.T) {
 // because a bare `"error"` in the config hands the rule nil and every fixture reached it through
 // the decoder. This bypasses the decoder entirely, which is the only way to see that.
 func TestNoStringRefsWithNilOptions(t *testing.T) {
+	t.Parallel()
+
 	// The template half is off, so a template ref is clean.
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoStringRefs, stringRefsFile,
 		"const a = <div ref={`hello`} />;\n"))
@@ -549,6 +565,8 @@ func TestNoStringRefsWithNilOptions(t *testing.T) {
 // `no-children-prop` in this same package reports, so the two rules here disagree about where a JSX
 // attribute finding belongs and that disagreement is upstream's rather than ours.
 func TestNoStringRefsPointsAtTheRightNode(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -616,6 +634,8 @@ func TestNoStringRefsPointsAtTheRightNode(t *testing.T) {
 // descriptions also have to stay distinguishable, since this rule's whole structure rests on the
 // two judgments being separately named.
 func TestNoStringRefsMessagesReadCorrectly(t *testing.T) {
+	t.Parallel()
+
 	if messageThisRefsDeprecated.Id != "thisRefsDeprecated" {
 		t.Errorf("this.refs message id is %q", messageThisRefsDeprecated.Id)
 	}
@@ -643,6 +663,8 @@ func TestNoStringRefsMessagesReadCorrectly(t *testing.T) {
 // configuration by name; there is no error channel for that here, so an unknown key is ignored
 // rather than refused. Asserted so the difference is recorded rather than assumed.
 func TestNoStringRefsIgnoresUnknownOptionKeys(t *testing.T) {
+	t.Parallel()
+
 	decoded, err := DecodeNoStringRefsOptions([]byte(`{"bogus":true,"noTemplateLiterals":true}`))
 	if err != nil {
 		t.Fatalf("decoding: %v", err)

@@ -49,6 +49,8 @@ import (
 // So the readable signal is `emptyInside` against `carryingInside`. A memo block whose interior
 // scopes all carry nothing is a block the rule cannot fire on for any reason at all.
 func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
+	t.Parallel()
+
 	fixtures, err := react_conformance.Load("../../react_conformance/testdata/fixtures")
 	if err != nil {
 		t.Fatalf("loading the vendored corpus: %v", err)

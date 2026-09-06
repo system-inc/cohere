@@ -33,6 +33,8 @@ const constructorSuperFile = "/repository/source/Subject.js"
 // Grouped by message id rather than left in corpus order, because the grouping is the rule's real
 // shape: four judgments, and which one an input lands in is the entire question.
 func TestConstructorSuperFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -164,6 +166,8 @@ func TestConstructorSuperFires(t *testing.T) {
 // clean because the loop body may run zero times and the trailing call covers that, which is the
 // same reasoning that makes the loop cases in the fail list fire.
 func TestConstructorSuperStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -291,6 +295,8 @@ func TestConstructorSuperStaysSilent(t *testing.T) {
 // `duplicate` and `badSuper` point at the offending call, because there is one and deleting it is
 // the fix. Upstream's snapshot records both and each expectation below is a column read out of it.
 func TestConstructorSuperPointsAtTheRightNode(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -350,6 +356,8 @@ func TestConstructorSuperPointsAtTheRightNode(t *testing.T) {
 // `class A extends B { constructor() { super(); super(); } }`, which is the second call, and a rule
 // reporting the first would be green under the test above and wrong.
 func TestConstructorSuperReportsTheSecondCallNotTheFirst(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "class A extends B { constructor() { super(); super(); } }"
 	result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
 	if len(result.Diagnostics) != 1 {
@@ -370,6 +378,8 @@ func TestConstructorSuperReportsTheSecondCallNotTheFirst(t *testing.T) {
 // `super() || super()` reports its *right* operand. The left one is the call that actually runs, so
 // deleting it would be the wrong repair, and upstream's snapshot pins column 48 rather than 37.
 func TestConstructorSuperReportsTheRightOperandOfALogicalOr(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "class A extends B { constructor() { super() || super(); } }"
 	result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
 	if len(result.Diagnostics) != 1 {
@@ -389,6 +399,8 @@ func TestConstructorSuperReportsTheRightOperandOfALogicalOr(t *testing.T) {
 // shape that loses a space at a seam, and a `Contains` check on a fragment would stay green through
 // it.
 func TestConstructorSuperRendersItsMessages(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name            string
 		sourceText      string
@@ -452,6 +464,8 @@ func TestConstructorSuperRendersItsMessages(t *testing.T) {
 // This rule uses the whitelist, so it agrees with ESLint here and with oxc everywhere oxc has an
 // opinion the corpus records.
 func TestConstructorSuperClassifiesUnconstructableExtends(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -486,6 +500,8 @@ func TestConstructorSuperClassifiesUnconstructableExtends(t *testing.T) {
 // an `as` cast are both erasures that leave the operand behind at runtime, so a class extending one
 // is constructable exactly when the operand is.
 func TestConstructorSuperAcceptsConstructableExtendsOurCodeWrites(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -515,6 +531,8 @@ func TestConstructorSuperAcceptsConstructableExtendsOurCodeWrites(t *testing.T) 
 // once per constructor would be green across the whole imported corpus, because every duplicate
 // case in it holds exactly two calls.
 func TestConstructorSuperCountsOneFindingPerExtraCall(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, ConstructorSuper, constructorSuperFile,
 			"class A extends B { constructor() { super(); super(); super(); } }"),
@@ -535,6 +553,8 @@ func TestConstructorSuperCountsOneFindingPerExtraCall(t *testing.T) {
 // but our parser produces a tree for it rather than refusing the file, so the rule still has to
 // have the right opinion about it.
 func TestConstructorSuperIgnoresCallsInNestedEvaluationContexts(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -570,6 +590,8 @@ func TestConstructorSuperIgnoresCallsInNestedEvaluationContexts(t *testing.T) {
 // four rows come from the corpus and are asserted again here as a group, because the discrimination
 // only reads as a discrimination when the four sit together.
 func TestConstructorSuperHandlesBaseAndNullExtendsSeparately(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -613,6 +635,8 @@ func TestConstructorSuperHandlesBaseAndNullExtendsSeparately(t *testing.T) {
 // would be a false positive on every overloaded constructor in the tree, and the implementation
 // right below it is the declaration that actually has to call `super()`.
 func TestConstructorSuperDeclinesAConstructorOverloadSignature(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, ConstructorSuper, constructorSuperFile, `
 		class A extends B {
 			constructor(value: string);
@@ -638,6 +662,8 @@ func TestConstructorSuperDeclinesAConstructorOverloadSignature(t *testing.T) {
 // run on this input rather than reasoned about, and it reports `missingAll` on the outer
 // constructor.
 func TestConstructorSuperDoesNotBlameANestedClassForAnUnconstructableExtends(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "class A extends null { constructor() { class C extends D { constructor() { super(); } } } }"
 	result := rule_testing.Run(t, ConstructorSuper, constructorSuperFile, sourceText)
 	rule_testing.ExpectFindings(t, result, "missingAll")
@@ -668,6 +694,8 @@ func TestConstructorSuperDoesNotBlameANestedClassForAnUnconstructableExtends(t *
 // really does yield only its last operand, so `(5, B)` is clean and `(B, 5)` is not, and a
 // classifier treating a comma like an `||` would get the second one wrong.
 func TestConstructorSuperAcceptsAMixedShortCircuit(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -712,6 +740,8 @@ func TestConstructorSuperAcceptsAMixedShortCircuit(t *testing.T) {
 // the loop, so `super(); while (a) super();` reports the loop's call as a duplicate of the earlier
 // one. A walk that discarded everything the body established would miss it.
 func TestConstructorSuperTreatsLoopBodiesAsOneIteration(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -752,6 +782,8 @@ func TestConstructorSuperTreatsLoopBodiesAsOneIteration(t *testing.T) {
 // finding for code that never executes. The corpus has the one-call version of this and it cannot
 // see the difference, because one call is never a duplicate however it is counted.
 func TestConstructorSuperFindsNoDuplicateAmongUnreachableCalls(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, ConstructorSuper, constructorSuperFile,
 			"class A extends B { constructor() { return; super(); super(); } }"),
@@ -771,6 +803,8 @@ func TestConstructorSuperFindsNoDuplicateAmongUnreachableCalls(t *testing.T) {
 // the second call is not a duplicate of a call that was never valid, it is the same error again.
 // Oxc's is the one reproduced.
 func TestConstructorSuperReportsEveryBadCall(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -801,6 +835,8 @@ func TestConstructorSuperReportsEveryBadCall(t *testing.T) {
 // nested function returns from that function rather than from the constructor, so it does not count
 // either. Both report `missingAll`, confirmed by running ESLint on them rather than by reading.
 func TestConstructorSuperRequiresARealValueFromAnExtendsNullConstructor(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

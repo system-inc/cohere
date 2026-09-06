@@ -31,6 +31,8 @@ func decodeMaxNestedCallbacksForTest(t *testing.T, optionsJson string) any {
 }
 
 func TestMaxNestedCallbacksStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		source      string
@@ -69,6 +71,8 @@ type wantSpan struct {
 // rendered message. ExpectFindings would see none of those: the message interpolates two integers
 // that both move, and passing them in the wrong order renders a grammatical sentence.
 func TestMaxNestedCallbacksFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		source      string
@@ -245,6 +249,8 @@ func TestMaxNestedCallbacksFires(t *testing.T) {
 // written here. None of these has a counterpart in upstream's corpus, and each is a line that would
 // pass every imported case while being wrong.
 func TestDecodeMaxNestedCallbacksOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name                              string
 		optionsJson                       string
@@ -297,6 +303,8 @@ func TestDecodeMaxNestedCallbacksOptions(t *testing.T) {
 // zero and reports every callback in the tree, or reads it as nil and reports nothing; either way
 // every fixture above still passes, because all of them route through the decoder.
 func TestMaxNestedCallbacksHandlesNilOptions(t *testing.T) {
+	t.Parallel()
+
 	deepEnoughForTheDefault := "foo(function(){"
 	for depth := 0; depth < 10; depth++ {
 		deepEnoughForTheDefault += " foo(function(){"
@@ -337,6 +345,8 @@ func TestMaxNestedCallbacksHandlesNilOptions(t *testing.T) {
 // The shape that separates them is an immediately invoked function reached through a unary or
 // binary operator instead of parens, where the function really is the direct callee here too.
 func TestMaxNestedCallbacksDirectCalleeIsNotACallback(t *testing.T) {
+	t.Parallel()
+
 	zero := decodeMaxNestedCallbacksForTest(t, "0")
 
 	silent := []struct {
@@ -383,6 +393,8 @@ func TestMaxNestedCallbacksDirectCalleeIsNotACallback(t *testing.T) {
 // the test file textually. It is a real assertion rather than a formality: an id typo would render
 // a correct sentence and every span assertion above would still pass.
 func TestMaxNestedCallbacksReportsTheExceedId(t *testing.T) {
+	t.Parallel()
+
 	source := "foo(function() { bar(thing, function(data) { baz(function() {}); }); });"
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, MaxNestedCallbacks, "file.ts",
 		source, decodeMaxNestedCallbacksForTest(t, "2")), "exceed")

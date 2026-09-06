@@ -12,6 +12,8 @@ const misusedNewFile = "/repository/source/Thing.ts"
 // pin decisions the corpus never exercises. Counts come from partitioning the seven snapshot
 // diagnostics across six inputs by the source line each one prints.
 func TestNoMisusedNewFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -96,6 +98,8 @@ func TestNoMisusedNewFires(t *testing.T) {
 // TestNoMisusedNewStaysSilent carries every passing case from the oxc corpus verbatim, plus the
 // clean side of each decision the fires table exercises.
 func TestNoMisusedNewStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -206,6 +210,8 @@ func TestNoMisusedNewStaysSilent(t *testing.T) {
 // so a port that reported the whole signature would pass every table above while pointing at the
 // wrong span in every case.
 func TestNoMisusedNewPointsAtTheRightToken(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -247,6 +253,8 @@ func TestNoMisusedNewPointsAtTheRightToken(t *testing.T) {
 // here rather than against the rule's own constants, so that a mutation moving a constant moves
 // only one side of the comparison.
 func TestNoMisusedNewMessagesReadAsWritten(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoMisusedNew, misusedNewFile,
 		"interface I { new (): I; constructor(): void;}")
 	if len(result.Diagnostics) != 2 {

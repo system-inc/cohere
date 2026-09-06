@@ -18,6 +18,8 @@ import "testing"
 // The name is the durable half: it is synthesized from the function id, nothing rewrites it, and it
 // survives renumbering. Pinning the round trip here keeps the two halves from drifting apart.
 func TestOutlinedFunctionNameRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Functions: make([]*Function, 8)}
 	for id := FunctionId(0); int(id) < len(function.Functions); id++ {
 		name := outlinedFunctionName(id)
@@ -37,6 +39,8 @@ func TestOutlinedFunctionNameRoundTrip(t *testing.T) {
 // `Object`, `Stringify`, `useMemo`. Answering for one of those would attribute a callback's effects
 // to whatever function happened to sit at that index.
 func TestOutlinedFunctionByNameDeclinesOrdinaryGlobals(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Functions: make([]*Function, 4)}
 	for _, name := range []string{"Object", "Stringify", "useMemo", "", "_tempest", "_temp0",
 		"_temp-1", "_temp99"} {

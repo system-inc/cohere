@@ -31,6 +31,8 @@ const objCallsFile = "/repository/source/ObjCalls.ts"
 // while proving nothing, and every case above would fail looking like a rule bug.
 // `TestNoObjCallsRequiresTheTypedHarness` pins that so a later revert to `Run` fails loudly.
 func TestNoObjCallsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -110,6 +112,8 @@ func TestNoObjCallsFires(t *testing.T) {
 // `JSON.parse(foo)`), calls on a different object that merely ends in the same name
 // (`foo.Math()`), and three cases from upstream bug reports.
 func TestNoObjCallsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -175,6 +179,8 @@ func TestNoObjCallsStaysSilent(t *testing.T) {
 
 // Cases upstream does not carry, each from reading our code rather than oxc's.
 func TestNoObjCallsOurOwnCases(t *testing.T) {
+	t.Parallel()
+
 	t.Run("upstream's TODO misses are reproduced rather than improved on", func(t *testing.T) {
 		// oxc ships these commented out under `// TODO: Fix these.` and `// TODO: Fix.`. They are
 		// known false negatives, and matching upstream means missing them too. Asserted so that a
@@ -324,6 +330,8 @@ func TestNoObjCallsOurOwnCases(t *testing.T) {
 // cannot detect the mistake. This asserts the declaration and the silence together, so a revert to
 // the plain harness fails here rather than passing everywhere.
 func TestNoObjCallsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoObjCalls.NeedsTypeChecker {
 		t.Fatal("NoObjCalls must declare NeedsTypeChecker; the identifier arm resolves nothing without it")
 	}
@@ -340,6 +348,8 @@ func TestNoObjCallsRequiresTheTypedHarness(t *testing.T) {
 
 // The registry entry, so that a rule that passes every fixture and lints zero files fails here.
 func TestNoObjCallsIsRegistered(t *testing.T) {
+	t.Parallel()
+
 	var found *rule.Registration
 	for index, registration := range rule.Registered() {
 		if registration.Rule.Name == "no-obj-calls" {

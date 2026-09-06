@@ -85,6 +85,8 @@ func decodeConsistentTypeExportsOptions(t *testing.T, configuration string) any 
 // Ten of them import from another module and are silent because of what THAT module exports, which
 // is the half of this rule no single-file fixture can reach.
 func TestConsistentTypeExportsStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -206,6 +208,8 @@ func TestConsistentTypeExportsStaysSilentOnUpstreamPassCases(t *testing.T) {
 // applied source says what the edit engine will write unattended, which for the mixed cases is a
 // statement SPLIT into two and is the thing a message-id assertion cannot see at all.
 func TestConsistentTypeExportsFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -432,6 +436,8 @@ func TestConsistentTypeExportsFiresOnUpstreamFailCases(t *testing.T) {
 //
 // Every expectation is what the installed 8.67.0 build produced for that exact input.
 func TestConsistentTypeExportsSplitKeepsWhatTheSpecifierCarries(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantFixed  string
@@ -487,6 +493,8 @@ func TestConsistentTypeExportsSplitKeepsWhatTheSpecifierCarries(t *testing.T) {
 // Each row was run through the installed 8.67.0 build and carries the verdict that build produced,
 // so a row asserting silence asserts upstream's silence rather than this port's.
 func TestConsistentTypeExportsDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -610,6 +618,8 @@ func TestConsistentTypeExportsDiscriminatesOnCasesUpstreamDoesNotWrite(t *testin
 // recovered from its message text, and compared against a literal typed here rather than against
 // the rule's own constant, since a constant moves with the mutation.
 func TestConsistentTypeExportsNamesTheExportsUpstreamNames(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantId     string
@@ -643,6 +653,8 @@ func TestConsistentTypeExportsNamesTheExportsUpstreamNames(t *testing.T) {
 
 // TestConsistentTypeExportsDecoderResolvesTheOption puts the decoder under test.
 func TestConsistentTypeExportsDecoderResolvesTheOption(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		wantInline    bool
@@ -675,6 +687,8 @@ func TestConsistentTypeExportsDecoderResolvesTheOption(t *testing.T) {
 // upstream's default here. Asserted anyway so a later default change fails loudly rather than
 // silently switching which repair the tree gets.
 func TestConsistentTypeExportsNilOptionsUsesTheSplittingRepair(t *testing.T) {
+	t.Parallel()
+
 	source := "import { Type1, value1 } from './consistent-type-exports/index';\nexport { Type1, value1 };"
 	result := rule_testing.RunTypedFilesWithOptions(t, ConsistentTypeExports,
 		consistentTypeExportsFixtureFiles(source), consistentTypeExportsFile, nil)
@@ -689,6 +703,8 @@ func TestConsistentTypeExportsNilOptionsUsesTheSplittingRepair(t *testing.T) {
 // turns that into silence rather than a panic. Silence is the more dangerous failure: every clean
 // case passes vacuously and every reporting case fails in a way that reads as a rule bug.
 func TestConsistentTypeExportsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "import { Type1 } from './consistent-type-exports/index';\nexport { Type1 };"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistentTypeExports,
 		consistentTypeExportsFile, source))

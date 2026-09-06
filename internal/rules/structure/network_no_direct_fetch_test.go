@@ -9,6 +9,8 @@ import (
 const networkFile = "/repository/source/api/Thing.ts"
 
 func TestNetworkNoDirectFetchFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -31,6 +33,8 @@ func TestNetworkNoDirectFetchFires(t *testing.T) {
 }
 
 func TestNetworkNoDirectFetchStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string

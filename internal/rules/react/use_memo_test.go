@@ -49,6 +49,8 @@ type useMemoCase struct {
 }
 
 func TestUseMemoFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []useMemoCase{
 		{
 			name:     "upstreamReassignVariableInUseMemo",
@@ -370,6 +372,8 @@ func TestUseMemoFires(t *testing.T) {
 }
 
 func TestUseMemoStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []useMemoCase{
 		{
 			name:   "inlineArrowWithSimpleDeps",
@@ -542,6 +546,8 @@ func TestUseMemoStaysSilent(t *testing.T) {
 // `RunTyped` must be silent under `Run`, and if a later change makes the plain harness report, this
 // test fails and says the guard moved.
 func TestUseMemoRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "function Component(props) {\n  const x = useMemo(props.fn, [props.a]);\n  return <div>{x}</div>;\n}\n"
 
 	typed := rule_testing.RunTyped(t, UseMemo, useMemoFile, source)
@@ -560,6 +566,8 @@ func TestUseMemoRequiresTheTypedHarness(t *testing.T) {
 // A `rule.Message` is `{Id, Description}` with no interpolation layer, and this rule uses no format
 // verbs, so there is no rendered text to guard beyond these two fields.
 func TestUseMemoMessages(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		message         rule.Message
 		id              string
@@ -601,6 +609,8 @@ func TestUseMemoMessages(t *testing.T) {
 // strips the namespace. So the parity guard reports the same count either way and cannot see the
 // mistake. This is the assertion that can.
 func TestUseMemoRuleName(t *testing.T) {
+	t.Parallel()
+
 	if UseMemo.Name != "react-hooks/use-memo" {
 		t.Errorf("rule name is %q, want %q", UseMemo.Name, "use-memo")
 	}

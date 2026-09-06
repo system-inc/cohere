@@ -23,6 +23,8 @@ const unsafeNegationFile = "/repository/source/UnsafeNegation.ts"
 // clean by default and reports with the option on. That pairing is the whole reason the option
 // cases have to carry their options.
 func TestNoUnsafeNegationFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -67,6 +69,8 @@ func TestNoUnsafeNegationFires(t *testing.T) {
 // The second is the option gate. The four ordering operators are silent by default, including under
 // an explicitly empty options object, and including under an explicit false.
 func TestNoUnsafeNegationStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -117,6 +121,8 @@ func TestNoUnsafeNegationStaysSilent(t *testing.T) {
 // `typeof a === "x"` is the shape a reader worries about most when they hear "negation before a
 // relational operator", and `typeof` is a prefix unary too. It is exempt for both reasons at once.
 func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -155,6 +161,8 @@ func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(t *testing.T) {
 // and walked up to its parent would report twice here, and the message-id fixtures above use inputs
 // where the two designs agree.
 func TestNoUnsafeNegationReportsADoubleNegationOnce(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoUnsafeNegation, unsafeNegationFile, "!!a in b"), "unexpected")
 }
@@ -170,6 +178,8 @@ func TestNoUnsafeNegationReportsADoubleNegationOnce(t *testing.T) {
 // `! a <= b` is the case that catches an anchor on the `!` token alone: the operand is a space away,
 // so the correct span is three characters and a token-only span is one.
 func TestNoUnsafeNegationPointsAtTheNegatedOperand(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -211,6 +221,8 @@ func TestNoUnsafeNegationPointsAtTheNegatedOperand(t *testing.T) {
 // correct rewrite touches only the inner binary and leaves the outer parentheses alone, and a repair
 // that replaced one character too many either way would still carry the text `!(a in b)`.
 func TestNoUnsafeNegationSuggestsBothRewrites(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -286,6 +298,8 @@ func TestNoUnsafeNegationSuggestsBothRewrites(t *testing.T) {
 // that emitted the same message for both, or that built the second from the first, would leave a
 // human choosing between two identical-looking options.
 func TestNoUnsafeNegationLabelsItsSuggestionsDistinctly(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUnsafeNegation, unsafeNegationFile, "!a in b")
 	if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 2 {
 		t.Fatalf("wanted one diagnostic carrying two suggestions")
@@ -305,6 +319,8 @@ func TestNoUnsafeNegationLabelsItsSuggestionsDistinctly(t *testing.T) {
 // Two operators rather than one, because a rule quoting a constant string passes a single-operator
 // assertion.
 func TestNoUnsafeNegationNamesTheOperator(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any

@@ -1572,6 +1572,8 @@ func logicalAssignmentAsWritten(original string, expected string) string {
 // otherwise get away with: `a = (a || b)` is clean because the right side is parenthesized, and
 // `a = (a || b) || c` is clean because the leftmost walk stops at an explicit grouping.
 func TestLogicalAssignmentOperatorsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range logicalAssignmentCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			result := runLogicalAssignment(t, struct {
@@ -1586,6 +1588,8 @@ func TestLogicalAssignmentOperatorsStaysSilent(t *testing.T) {
 // TestLogicalAssignmentOperatorsFires runs upstream's whole invalid list and asserts the message id
 // of each finding.
 func TestLogicalAssignmentOperatorsFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range logicalAssignmentReportingCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			result := runLogicalAssignment(t, struct {
@@ -1604,6 +1608,8 @@ func TestLogicalAssignmentOperatorsFires(t *testing.T) {
 // cases, and each is the exact text the fixer must produce, so a repair landing on the right span
 // with the wrong text fails here rather than passing.
 func TestLogicalAssignmentOperatorsFixes(t *testing.T) {
+	t.Parallel()
+
 	checked := 0
 	for _, testCase := range logicalAssignmentReportingCases {
 		if testCase.fixedSource == "" {
@@ -1636,6 +1642,8 @@ func TestLogicalAssignmentOperatorsFixes(t *testing.T) {
 // rather than a bare identifier, and upstream refuses to rewrite them unattended because reading
 // `a.b` once where the source read it twice can skip a getter call.
 func TestLogicalAssignmentOperatorsSuggestions(t *testing.T) {
+	t.Parallel()
+
 	checked := 0
 	for _, testCase := range logicalAssignmentReportingCases {
 		if len(testCase.suggestions) == 0 {
@@ -1713,6 +1721,8 @@ func applyLogicalAssignmentFixes(source string, fixes []rule.Fix) string {
 // A fixer that repaired one of these would pass every message-id fixture while writing source
 // upstream refuses to write, so the absence is asserted directly.
 func TestLogicalAssignmentOperatorsDeclinesToRepair(t *testing.T) {
+	t.Parallel()
+
 	declined := 0
 	for _, testCase := range logicalAssignmentReportingCases {
 		if testCase.fixedSource != "" || len(testCase.suggestions) != 0 {
@@ -1748,6 +1758,8 @@ func TestLogicalAssignmentOperatorsDeclinesToRepair(t *testing.T) {
 // and every one of its message-id fixtures would stay green, which is why this is asserted as its
 // own property.
 func TestLogicalAssignmentOperatorsSplitsFixesFromSuggestions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		source      string
@@ -1797,6 +1809,8 @@ func TestLogicalAssignmentOperatorsSplitsFixesFromSuggestions(t *testing.T) {
 // Upstream reports the whole assignment, the whole logical expression, and the whole `if` statement
 // respectively, rather than the operator.
 func TestLogicalAssignmentOperatorsSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -1842,6 +1856,8 @@ func TestLogicalAssignmentOperatorsSpans(t *testing.T) {
 // constructors, because comparing a diagnostic to the very function it was built by is an equality
 // whose two sides move together under mutation.
 func TestLogicalAssignmentOperatorsMessages(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source     string
 		options    any
@@ -1888,6 +1904,8 @@ func TestLogicalAssignmentOperatorsMessages(t *testing.T) {
 // The suggestion test above asserts ids and applied text; a wrong description would pass both while
 // telling a human choosing the repair the wrong thing.
 func TestLogicalAssignmentOperatorsSuggestionMessages(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source  string
 		options any
@@ -1933,6 +1951,8 @@ func TestLogicalAssignmentOperatorsSuggestionMessages(t *testing.T) {
 // option means `always`, while the zero value of the setting is the empty string, which matches
 // neither arm and would make the rule silent on every file it exists to catch.
 func TestDecodeLogicalAssignmentOperatorsOptions(t *testing.T) {
+	t.Parallel()
+
 	always := LogicalAssignmentAlways
 	never := LogicalAssignmentNever
 
@@ -1991,6 +2011,8 @@ func TestDecodeLogicalAssignmentOperatorsOptions(t *testing.T) {
 // completely broken this way, with every fixture passing because every fixture reached the rule
 // through the decoder.
 func TestLogicalAssignmentOperatorsHandlesNilOptions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, LogicalAssignmentOperators, "logical.ts", "a = a || b")
 	rule_testing.ExpectFindings(t, result, "assignment")
 	rule_testing.ExpectFixedSource(t, result, logicalAssignmentAsWritten("a = a || b", "a ||= b"))
@@ -2012,6 +2034,8 @@ func TestLogicalAssignmentOperatorsHandlesNilOptions(t *testing.T) {
 // Measured in internal/logical_assignment_operators_probe: the right side of `a || (a = b)` is
 // KindParenthesizedExpression wrapping a KindBinaryExpression.
 func TestLogicalAssignmentOperatorsUnwrapsParenthesesInTheLogicalShape(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "logical.ts",
 		"a || (a = b)", DefaultLogicalAssignmentOperatorsSettings())
 	rule_testing.ExpectFindings(t, result, "logical")
@@ -2033,6 +2057,8 @@ func TestLogicalAssignmentOperatorsUnwrapsParenthesesInTheLogicalShape(t *testin
 // The non-null assertion cases are the ones that matter most, because they sit between the target
 // and the operator, which is exactly where the brief records two fixers losing type information.
 func TestLogicalAssignmentOperatorsTypeScriptShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		source    string
@@ -2104,6 +2130,8 @@ func TestLogicalAssignmentOperatorsTypeScriptShapes(t *testing.T) {
 // annotation, both from fixers that constructed a replacement instead of copying a span. Here the
 // target is written a second time by the repair, so anything inside it is at risk.
 func TestLogicalAssignmentOperatorsNeverExpansionKeepsTheTargetText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source string
 		want   string
@@ -2146,6 +2174,8 @@ func TestLogicalAssignmentOperatorsNeverExpansionKeepsTheTargetText(t *testing.T
 // then reads every `undefined` as the global. That fallback is the right answer for source that does
 // not shadow it, which is why the untyped fixtures above agree.
 func TestLogicalAssignmentOperatorsResolvesUndefinedThroughTheChecker(t *testing.T) {
+	t.Parallel()
+
 	reported := rule_testing.RunTypedWithOptions(t, LogicalAssignmentOperators, "resolve.ts",
 		"if (a === null || a === undefined) a = b;", logicalAssignmentAlwaysIfOptions())
 	rule_testing.ExpectFindings(t, reported, "if")
@@ -2181,6 +2211,8 @@ func TestLogicalAssignmentOperatorsResolvesUndefinedThroughTheChecker(t *testing
 // never needed. The control for that is a shadowing case run untyped, which reports where it should
 // be clean, showing the nil-checker fallback is a real limitation that simply does not reach here.
 func TestLogicalAssignmentOperatorsWithBlocksNeedAScriptSource(t *testing.T) {
+	t.Parallel()
+
 	source := "with (object) a = a || b"
 
 	// Untyped, which is upstream's script source type: the identifier may be a scrutinee property,
@@ -2247,6 +2279,8 @@ func TestLogicalAssignmentOperatorsWithBlocksNeedAScriptSource(t *testing.T) {
 // Every expectation here was measured by driving the installed ESLint rule, not derived from
 // reading. Both readings of the source looked correct and one of them was wrong.
 func TestLogicalAssignmentOperatorsWrapsWhereUpstreamWraps(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

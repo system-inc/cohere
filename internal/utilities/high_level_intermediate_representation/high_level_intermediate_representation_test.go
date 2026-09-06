@@ -21,6 +21,8 @@ import (
 // whose author forgot the visitor. The source cannot be forgotten to update, because the source is
 // where the variant was added.
 func TestEachPlaceCoversEveryInstructionValue(t *testing.T) {
+	t.Parallel()
+
 	declared := markerImplementers(t, "instructionValue")
 	if len(declared) < 40 {
 		t.Fatalf("found only %d instruction values, expected the full set; the source scan is broken", len(declared))
@@ -40,6 +42,8 @@ func TestEachPlaceCoversEveryInstructionValue(t *testing.T) {
 // silently deletes them from the graph. That failure looks like a lowering bug rather than a
 // missing case, which is why this asserts rather than trusting review.
 func TestEachSuccessorCoversEveryTerminal(t *testing.T) {
+	t.Parallel()
+
 	declared := markerImplementers(t, "terminal")
 	if len(declared) < 18 {
 		t.Fatalf("found only %d terminals, expected the full set; the source scan is broken", len(declared))
@@ -58,6 +62,8 @@ func TestEachSuccessorCoversEveryTerminal(t *testing.T) {
 // A terminal with no case returns order zero, which reads as "before everything" to any pass
 // comparing positions, and is wrong in a way that produces plausible answers.
 func TestTerminalOrderCoversEveryTerminal(t *testing.T) {
+	t.Parallel()
+
 	declared := markerImplementers(t, "terminal")
 	covered := typeSwitchCases(t, "visitor.go", "TerminalOrder")
 
@@ -70,6 +76,8 @@ func TestTerminalOrderCoversEveryTerminal(t *testing.T) {
 
 // TestSetTerminalOrderCoversEveryTerminal guards the writer half of the same field.
 func TestSetTerminalOrderCoversEveryTerminal(t *testing.T) {
+	t.Parallel()
+
 	declared := markerImplementers(t, "terminal")
 	covered := typeSwitchCases(t, "graph.go", "setTerminalOrder")
 
@@ -86,6 +94,8 @@ func TestSetTerminalOrderCoversEveryTerminal(t *testing.T) {
 // renders as "<unknown>" makes those tests unable to distinguish it from any other unprinted
 // variant. The printer is test infrastructure and this is what stops it silently degrading.
 func TestPrintValueCoversEveryInstructionValue(t *testing.T) {
+	t.Parallel()
+
 	declared := markerImplementers(t, "instructionValue")
 	covered := typeSwitchCases(t, "print.go", "printValue")
 
@@ -98,6 +108,8 @@ func TestPrintValueCoversEveryInstructionValue(t *testing.T) {
 
 // TestPrintTerminalCoversEveryTerminal is the same for terminals.
 func TestPrintTerminalCoversEveryTerminal(t *testing.T) {
+	t.Parallel()
+
 	declared := markerImplementers(t, "terminal")
 	covered := typeSwitchCases(t, "print.go", "printTerminal")
 
@@ -120,6 +132,8 @@ func TestPrintTerminalCoversEveryTerminal(t *testing.T) {
 // and was added in that same commit -- which is what this guard is for. It went red, was read, and
 // the count was moved deliberately rather than by a compiler error. See the terminal.go header.
 func TestInstructionSetSizeIsWhatWeSaidItIs(t *testing.T) {
+	t.Parallel()
+
 	values := markerImplementers(t, "instructionValue")
 	if len(values) != 43 {
 		t.Errorf("the instruction set holds %d variants, want 43 to match upstream: %v", len(values), values)
@@ -253,6 +267,8 @@ func forEachPackageFile(t *testing.T, visit func(*ast.File)) {
 
 // TestPlaceStringIsStableAcrossIdenticalValues is the property the whole IR exists to provide.
 func TestPlaceStringIsStableAcrossIdenticalValues(t *testing.T) {
+	t.Parallel()
+
 	function := NewFunction(nil, "test", FunctionKindOther)
 	identifier := function.NewIdentifier("x", nil, 0)
 	first := Place{Identifier: identifier.Id}
@@ -268,6 +284,8 @@ func TestPlaceStringIsStableAcrossIdenticalValues(t *testing.T) {
 
 // TestEffectLatticeOrdering pins the order a join depends on.
 func TestEffectLatticeOrdering(t *testing.T) {
+	t.Parallel()
+
 	mutable := []Effect{
 		EffectCapture, EffectStore, EffectConditionallyMutate,
 		EffectConditionallyMutateIterator, EffectMutate,
@@ -285,6 +303,8 @@ func TestEffectLatticeOrdering(t *testing.T) {
 }
 
 func TestClassifyFunction(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		want FunctionKind
@@ -314,6 +334,8 @@ func TestClassifyFunction(t *testing.T) {
 // worse, because a missed edge reads as unreachable while a missed rewrite reads as reachable and
 // wrong.
 func TestEachBlockReferencePointerCoversEveryTerminal(t *testing.T) {
+	t.Parallel()
+
 	declared := markerImplementers(t, "terminal")
 	if len(declared) < 18 {
 		t.Fatalf("found only %d terminals, expected the full set; the source scan is broken",
@@ -335,6 +357,8 @@ func TestEachBlockReferencePointerCoversEveryTerminal(t *testing.T) {
 // read-only walkers actually yield, which is the stronger question. A terminal can have a case here
 // and still miss one of its own fields.
 func TestEachBlockReferencePointerSeesEveryReadOnlyReference(t *testing.T) {
+	t.Parallel()
+
 	terminals := everyTerminalSample(t)
 	if len(terminals) < 18 {
 		t.Fatalf("only %d terminal samples; the comparison below would not cover the set",

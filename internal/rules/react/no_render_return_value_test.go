@@ -26,6 +26,8 @@ const renderReturnValueFile = "/repository/source/RenderReturnValue.tsx"
 // pass cases while being silent on a whole second rule the upstream ships. That second rule is the
 // arrow-expression-body scope check, and the input distinguishing it appears nowhere upstream.
 func TestNoRenderReturnValueFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -86,6 +88,8 @@ func TestNoRenderReturnValueFires(t *testing.T) {
 // use, and upstream reports none of them, because the rule is a fixed list of parent kinds rather
 // than a use analysis. Measured on oxlint: all silent.
 func TestNoRenderReturnValueStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -153,6 +157,8 @@ func TestNoRenderReturnValueStaysSilent(t *testing.T) {
 // has to survive, and collapsing it to one finding would read as a difference on real code. Measured
 // on oxlint: two findings, both at column 21 of the same line.
 func TestNoRenderReturnValueReportsTwiceInsideANestedArrow(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "var f = () => () => ReactDOM.render(<div />, x);"
 	result := rule_testing.Run(t, NoRenderReturnValue, renderReturnValueFile, sourceText)
 	rule_testing.ExpectFindings(t, result, "noRenderReturnValue", "noRenderReturnValue")
@@ -169,6 +175,8 @@ func TestNoRenderReturnValueReportsTwiceInsideANestedArrow(t *testing.T) {
 // parent-kind list is silent on all of it while passing all seventeen upstream cases. Measured on
 // oxlint, one finding each.
 func TestNoRenderReturnValueReachesAnywhereInsideAnArrowExpressionBody(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -201,6 +209,8 @@ func TestNoRenderReturnValueReachesAnywhereInsideAnArrowExpressionBody(t *testin
 // is 18 bytes where `ReactDOM.render` is 15, and both are measured from the oxlint snapshot rather
 // than counted by hand.
 func TestNoRenderReturnValueSpan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

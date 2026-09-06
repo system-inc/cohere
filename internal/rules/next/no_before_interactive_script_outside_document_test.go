@@ -11,6 +11,8 @@ import (
 // than transcribed, and pinned by file name because on this rule the file name is most of the
 // judgment. Ten of the thirteen upstream cases vary only the path over near-identical source.
 func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -63,6 +65,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnUpstreamPassCases(t *
 // The six failing cases from oxc's corpus. The snapshot carries exactly six diagnostics against six
 // inputs, so one finding each, with no discrepancy for the extractor to warn about.
 func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -114,6 +118,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnUpstreamFailCases(t *tes
 // own range and comparing the text. A message id assertion cannot see where a finding points, and
 // this rule carries no fix, so the span is the only thing that can.
 func TestNoBeforeInteractiveScriptOutsideDocumentPointsAtTheStrategyAttribute(t *testing.T) {
+	t.Parallel()
+
 	source := "import Script from \"next/script\";\nexport default function Index() {\n  return <Script src=\"/a.js\" strategy=\"beforeInteractive\" />;\n}\n"
 
 	result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
@@ -135,6 +141,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentPointsAtTheStrategyAttribute(t 
 // the property it guards is not a guard: a `strings.Contains` on an interpolated value stays green
 // while the text around the needle is wrong.
 func TestNoBeforeInteractiveScriptOutsideDocumentRendersItsMessage(t *testing.T) {
+	t.Parallel()
+
 	source := "import Script from \"next/script\";\nexport default function Index() {\n  return <Script strategy=\"beforeInteractive\" />;\n}\n"
 
 	result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)
@@ -166,6 +174,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentRendersItsMessage(t *testing.T)
 // exempted the file, so deleting the strategy comparison entirely would leave every upstream fixture
 // green. The first four cases here close that.
 func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -319,6 +329,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnCasesUpstreamDoesNotW
 
 // The reporting half of the invented cases, measured the same way.
 func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -396,6 +408,8 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnCasesUpstreamDoesNotWrit
 // these checkouts that trips this rule writes a self closing Script and a paired one, and upstream
 // reports both. Measured on the binary at two findings.
 func TestNoBeforeInteractiveScriptOutsideDocumentReportsEveryElement(t *testing.T) {
+	t.Parallel()
+
 	source := "import Script from \"next/script\";\nexport default function Index() {\n  return (\n    <>\n      <Script src=\"/a.js\" strategy=\"beforeInteractive\" />\n      <Script id=\"b\" strategy=\"beforeInteractive\"></Script>\n    </>\n  );\n}\n"
 
 	result := rule_testing.Run(t, NoBeforeInteractiveScriptOutsideDocument, "pages/index.tsx", source)

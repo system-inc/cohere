@@ -30,6 +30,8 @@ const (
 
 // TestNoMisusedSpreadStaysSilent is upstream's valid list, each under its own options.
 func TestNoMisusedSpreadStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -93,6 +95,8 @@ func TestNoMisusedSpreadStaysSilent(t *testing.T) {
 // array is iterable, and a class instance can be, so several of these inputs satisfy two arms at
 // once and the id recorded is the one the earlier arm produces.
 func TestNoMisusedSpreadFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -211,6 +215,8 @@ func TestNoMisusedSpreadFires(t *testing.T) {
 // parentheses in opposite directions, since `{ ...(map) }` must lose them and `{ ...(map, map) }`
 // must keep them.
 func TestNoMisusedSpreadSuggestions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -280,6 +286,8 @@ func TestNoMisusedSpreadSuggestions(t *testing.T) {
 //
 // One row per message id, plus every JSX shape, all taken from upstream's recorded columns.
 func TestNoMisusedSpreadSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -343,6 +351,8 @@ func TestNoMisusedSpreadSpans(t *testing.T) {
 // module reports, which is the control saying the arm works and only the module resolution is
 // missing.
 func TestNoMisusedSpreadCaseThatCannotBeExpressedHere(t *testing.T) {
+	t.Parallel()
+
 	t.Run("the same iterable shape without an ambient module reports", func(t *testing.T) {
 		result := rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
 			"type CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\ndeclare const iterator: CustomIterable;\nconst a = { ...iterator };", nil)
@@ -370,6 +380,8 @@ func TestNoMisusedSpreadCaseThatCannotBeExpressedHere(t *testing.T) {
 // leaving the finding count alone, which every id fixture above would still accept for the wrong
 // reason if it were checking only that something reported.
 func TestNoMisusedSpreadCascadeOrdering(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -417,6 +429,8 @@ func TestNoMisusedSpreadCascadeOrdering(t *testing.T) {
 // TestNoMisusedSpreadRequiresTheTypedHarness asserts the rule declares the checker and that the
 // plain harness cannot prove it, so a later revert to rule_testing.Run fails loudly.
 func TestNoMisusedSpreadRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoMisusedSpread.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
@@ -434,6 +448,8 @@ func TestNoMisusedSpreadRequiresTheTypedHarness(t *testing.T) {
 // expression, its parent, and an object literal's property list, and reads the source text between
 // two computed offsets when building the Map suggestion, so a malformed parse has several ways in.
 func TestNoMisusedSpreadSurvivesMalformedSpreads(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		"const a = [...];\n",
 		"const a = { ... };\n",
@@ -470,6 +486,8 @@ func TestNoMisusedSpreadSurvivesMalformedSpreads(t *testing.T) {
 // bare strings with specifier objects, and `name` is itself either a string or an array of them, so
 // a fixture built from the struct directly leaves all of that untested.
 func TestNoMisusedSpreadDecoder(t *testing.T) {
+	t.Parallel()
+
 	decode := func(t *testing.T, raw string) NoMisusedSpreadOptions {
 		t.Helper()
 		decoded, err := DecodeNoMisusedSpreadOptions([]byte(raw))
@@ -547,6 +565,8 @@ func TestNoMisusedSpreadDecoder(t *testing.T) {
 // The two reporting rows are the controls, and they are what make the silence a measurement rather
 // than an absence: without them a rule that had simply stopped working would pass this test.
 func TestNoMisusedSpreadNewExpressionIsSilent(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a string spread in a new expression is silent, matching upstream", func(t *testing.T) {
 		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
 			"class C {\n  constructor(...a: string[]) {}\n}\ndeclare const s: string;\nconst x = new C(...s);", nil))
@@ -581,6 +601,8 @@ func TestNoMisusedSpreadNewExpressionIsSilent(t *testing.T) {
 // precedence, so it gets parentheses ADDED by this rule regardless, and it would still pass if the
 // keep-existing-parentheses behaviour were lost.
 func TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -629,6 +651,8 @@ func TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses(t *testing.T) {
 // a merged symbol is exactly the shape where a rule asking the wrong declaration goes silent, and
 // these pin that it does not.
 func TestNoMisusedSpreadMergedClassDeclarations(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -12,6 +12,8 @@ const componentDestructuringDeclarations = "import React from 'react';\n" +
 	"declare function useImperativeHandle(reference: unknown, create: () => unknown): void;\n"
 
 func TestReactComponentNoDestructuringFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -95,6 +97,8 @@ func TestReactComponentNoDestructuringFires(t *testing.T) {
 }
 
 func TestReactComponentNoDestructuringStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string

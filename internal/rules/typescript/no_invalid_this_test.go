@@ -21,6 +21,8 @@ const invalidThisFile = "/repository/source/InvalidThis.ts"
 // comment for why they were run under sourceType module, and for the two cases whose declared
 // `globalReturn` turns out not to be what makes them report.
 func TestNoInvalidThisFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source   string
 		settings any
@@ -87,6 +89,8 @@ func TestNoInvalidThisFires(t *testing.T) {
 }
 
 func TestNoInvalidThisStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source   string
 		settings any
@@ -165,6 +169,8 @@ func firstLineOf(source string) string {
 // the tag lookup is the biggest piece of borrowed machinery in this rule and the corpus exercises
 // exactly one of its shapes.
 func TestNoInvalidThisJsDocAttachment(t *testing.T) {
+	t.Parallel()
+
 	silent := []struct {
 		name   string
 		source string
@@ -260,6 +266,8 @@ func TestNoInvalidThisJsDocAttachment(t *testing.T) {
 // arm of the outward walk is reachable through a parenthesized form that upstream never sees. The
 // corpus covers three of these; the rest would be silent divergences.
 func TestNoInvalidThisSeesThroughParentheses(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -302,6 +310,8 @@ func TestNoInvalidThisSeesThroughParentheses(t *testing.T) {
 // the exported decoder rather than by building the struct, because the inversion is exactly what a
 // struct-built fixture cannot see.
 func TestDecodeNoInvalidThisOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -346,6 +356,8 @@ func TestDecodeNoInvalidThisOptions(t *testing.T) {
 // Asserted against a literal rather than against the rule's own constant, because a constant
 // compared to itself moves under mutation.
 func TestNoInvalidThisSpansTheKeyword(t *testing.T) {
+	t.Parallel()
+
 	const source = "function foo() {\n  console.log(this);\n}\n"
 	result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile, source,
 		DefaultNoInvalidThisSettings())
@@ -360,6 +372,8 @@ func TestNoInvalidThisSpansTheKeyword(t *testing.T) {
 // The message carries no format verbs, so there is nothing to render and the assertion is on the
 // value itself.
 func TestNoInvalidThisMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageUnexpectedThis.Id != "unexpectedThis" {
 		t.Fatalf("message id was %q", messageUnexpectedThis.Id)
 	}
@@ -373,6 +387,8 @@ func TestNoInvalidThisMessage(t *testing.T) {
 // nothing for it. Both `this` reads below resolve against the same enclosing function, so a port
 // that pushed for arrows would report the outer one and silently exempt the inner.
 func TestNoInvalidThisArrowsInheritTheBinding(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
 		"function foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}",
 		DefaultNoInvalidThisSettings())
@@ -389,6 +405,8 @@ func TestNoInvalidThisArrowsInheritTheBinding(t *testing.T) {
 // nullish checks were surviving mutants until these landed; each pair below was measured against the
 // installed rule at 8.67.0 before it was written.
 func TestNoInvalidThisNullishReceiversDoNotBind(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -465,6 +483,8 @@ func TestNoInvalidThisNullishReceiversDoNotBind(t *testing.T) {
 // reports. Measured against the installed rule at 8.67.0, which is silent on both shapes below.
 // Written as an escape so this file stays pure ASCII on disk.
 func TestNoInvalidThisTitlecaseNamesReadAsConstructors(t *testing.T) {
+	t.Parallel()
+
 	const titlecase = "\u01C5"
 
 	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInvalidThis, invalidThisFile,
@@ -483,6 +503,8 @@ func TestNoInvalidThisTitlecaseNamesReadAsConstructors(t *testing.T) {
 // The three survivors that the corpus could not see, each pinned by the input that separates the
 // rule from the mutation. All measured against the installed rule at 8.67.0.
 func TestNoInvalidThisBindingShapesBeyondTheCorpus(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string

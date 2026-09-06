@@ -11,6 +11,8 @@ import (
 const abbreviatedFile = "/repository/source/Thing.tsx"
 
 func TestConsistencyNoAbbreviatedIdentifierFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -144,6 +146,8 @@ func TestConsistencyNoAbbreviatedIdentifierFires(t *testing.T) {
 }
 
 func TestConsistencyNoAbbreviatedIdentifierStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	// The exemptions are the rule. Without them it demands renames the author cannot perform, which
 	// is how a naming rule gets switched off.
 	cases := []struct {
@@ -231,6 +235,8 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(t *testing.T) {
 // failure mode an unconfigured one does not: it can guard everything or nothing. Both directions
 // belong in fixtures.
 func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
+	t.Parallel()
+
 	options := ConsistencyNoAbbreviatedIdentifierOptions{
 		FrameworkParameterFilePatterns:  []string{"/app/"},
 		FrameworkConstantFilePatterns:   []string{"/middleware.ts"},
@@ -334,6 +340,8 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(t *testing.T) {
 // guard everything. `boundary-no-project-import` was enabled and inert for months because a missing
 // option made it decline every file, which looks exactly like a clean run.
 func TestConsistencyNoAbbreviatedIdentifierRunsWithoutOptions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ConsistencyNoAbbreviatedIdentifier,
 		"/repository/app/blog/page.tsx", "export default function Page({ params }) {\n    return params;\n}\n")
 	rule_testing.ExpectFindings(t, result, "noParams", "noParams")
@@ -342,6 +350,8 @@ func TestConsistencyNoAbbreviatedIdentifierRunsWithoutOptions(t *testing.T) {
 // The suggested name travels in the message, since there is no fix to carry it. A message naming
 // the wrong replacement is worse than no message, so the text is asserted rather than just the id.
 func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -382,6 +392,8 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(t *testing.T) {
 // rule on. It must stay a superset of the branches, because a false negative here silently stops the
 // rule firing and looks exactly like a clean run.
 func TestConsistencyNoAbbreviatedIdentifierCandidateGateCoversEveryBranch(t *testing.T) {
+	t.Parallel()
+
 	// Every name any branch below the gate can report, one per branch family.
 	reportable := []string{
 		"prop", "props", "param", "params", "ref", "config", "idx", "arg", "args", "acc",
@@ -430,6 +442,8 @@ func TestConsistencyNoAbbreviatedIdentifierCandidateGateCoversEveryBranch(t *tes
 // The column is asserted alongside the line because trivia swallowed within a single line moves only
 // the column, and a line-only assertion cannot see it.
 func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -497,6 +511,8 @@ func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(t *testing.T) 
 // included because the original walks `Identifier` without distinguishing the two member kinds, and
 // a nested type literal because the skip was keyed on the parent node rather than on depth.
 func TestConsistencyNoAbbreviatedIdentifierJudgesTypeMemberKeys(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -537,6 +553,8 @@ func TestConsistencyNoAbbreviatedIdentifierJudgesTypeMemberKeys(t *testing.T) {
 // mutation widening it to "never skip a foreign name" would pass every assertion in the file, since
 // nothing else asserts the remaining exemptions survive.
 func TestConsistencyNoAbbreviatedIdentifierStillSkipsTheRestOfTheForeignFamily(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText string }{
 		{"a property read", "const value = thing.maxAgentsBytes;\n"},
 		{"an object literal key", "const options = { maxAgentsBytes: 1 };\n"},

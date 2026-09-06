@@ -36,6 +36,8 @@ const unsafeFile = "/repository/source/Unsafe.tsx"
 // by React version cannot be, and the two pass halves are recorded as reporting; the reasoning is
 // at the line.
 func TestNoUnsafeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -119,6 +121,8 @@ func TestNoUnsafeFires(t *testing.T) {
 // Two more are clean for the React version, and those two are in the fires list instead. The
 // remaining upstream cases here are the structural ones.
 func TestNoUnsafeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -220,6 +224,8 @@ func TestNoUnsafeStaysSilent(t *testing.T) {
 // predicate weaker than the property it guards is not a guard: a truncated or doubled rendering
 // contains the needle and stays green.
 func TestNoUnsafeReportsAtTheKey(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		sourceText  string
@@ -290,6 +296,8 @@ func TestNoUnsafeReportsAtTheKey(t *testing.T) {
 // is the input that does it: a rule reporting the same identifier three times, or reporting them in
 // the wrong order, passes every other test in this file.
 func TestNoUnsafeNamesTheRightReplacement(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "class Foo extends React.Component {\n" +
 		"  UNSAFE_componentWillMount() {}\n" +
 		"  UNSAFE_componentWillReceiveProps() {}\n" +
@@ -329,6 +337,8 @@ func TestNoUnsafeNamesTheRightReplacement(t *testing.T) {
 //
 // Pinned as a test rather than left in prose so that adding a resolution step later fails here.
 func TestNoUnsafeDeclinesTheUntypedHarnessNothing(t *testing.T) {
+	t.Parallel()
+
 	if NoUnsafe.NeedsTypeChecker {
 		t.Fatal("the rule declares a type checker it does not use")
 	}

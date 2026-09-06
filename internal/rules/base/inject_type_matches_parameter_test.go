@@ -27,6 +27,8 @@ func injectTypeMatchesParameterCaseName(index int) string {
 // found no instrument noise on any of the twelve, which is worth saying because the sibling rule's
 // first measurement produced three false zeros that read exactly like clean results.
 func TestInjectTypeMatchesParameterStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		// The correct pairing. This row is what the undefined-strip exists for: the brand field is
 		// declared optional, so without stripping it the brand reads as `Service | undefined`, which is
@@ -70,6 +72,8 @@ func TestInjectTypeMatchesParameterStaysSilent(t *testing.T) {
 // printing the namespace instead of the member, shows itself. The span is the parameter rather than
 // the decorator, which is the original's choice and is the half a reader changes.
 func TestInjectTypeMatchesParameterFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		wantSpan    string
@@ -142,6 +146,8 @@ func TestInjectTypeMatchesParameterFires(t *testing.T) {
 // second half is the control: without something that fires, a rule which can never report at all
 // satisfies the first half.
 func TestInjectTypeMatchesParameterRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "type TypedParameterDecorator<TResolved> = ParameterDecorator & {\n    readonly __resolvedType?: TResolved;\n};\ndeclare function TypedInject<T>(): TypedParameterDecorator<T>;\nclass Service { serviceMarker = 1; }\nclass Other { otherMarker = 'x'; }\nexport class C { constructor(@TypedInject<Service>() private wrong: Other) {} }\n"
 
 	rule_testing.ExpectClean(t, rule_testing.Run(t, InjectTypeMatchesParameter,

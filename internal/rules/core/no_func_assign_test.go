@@ -19,6 +19,8 @@ const funcAssignFile = "/repository/source/FuncAssign.ts"
 // one Tester block, 7 pass and 9 fail. The snapshot records 9 diagnostics from those 9 inputs, so
 // the extractor reported no discrepancy and one finding per input is right here.
 func TestNoFuncAssignFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -64,6 +66,8 @@ func TestNoFuncAssignFires(t *testing.T) {
 // name at all. Their text is nearly identical to the failing forms and only name resolution
 // separates them, which is why this rule reads the checker.
 func TestNoFuncAssignStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -99,6 +103,8 @@ func TestNoFuncAssignStaysSilent(t *testing.T) {
 // Sliced out of the source with the finding's own range rather than compared against an offset,
 // since an offset computed by the test is wrong in the same direction as the code that produced it.
 func TestNoFuncAssignPointsAtTheWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -147,6 +153,8 @@ func TestNoFuncAssignPointsAtTheWrite(t *testing.T) {
 // `[]string{"foo", "foo"}` is satisfied by a rule reporting the same identifier twice, and a rule
 // looping over the wrong collection does exactly that. This pins that they are distinct offsets.
 func TestNoFuncAssignReportsEachWriteAtItsOwnOffset(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoFuncAssign, funcAssignFile, "function foo() {} foo = 0; foo = 1;")
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
@@ -165,6 +173,8 @@ func TestNoFuncAssignReportsEachWriteAtItsOwnOffset(t *testing.T) {
 // asserts the silence directly, so the vacuous configuration is a named, tested state rather than
 // something a later edit can drift into unnoticed.
 func TestNoFuncAssignNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoFuncAssign.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
 	}
@@ -188,6 +198,8 @@ func TestNoFuncAssignNeedsTheTypedHarness(t *testing.T) {
 // exactly as a real reassignment does, so symbol identity alone reports it. That one is the reason
 // this rule needs structural write detection as well as the checker.
 func TestNoFuncAssignCoversWriteShapesUpstreamNeverExercises(t *testing.T) {
+	t.Parallel()
+
 	fires := []struct {
 		name       string
 		sourceText string

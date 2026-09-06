@@ -26,6 +26,8 @@ func noRedundantTypeConstituentsCaseName(index int) string {
 // it says something there. And `string | number` is clean in both directions: two primitives do not
 // absorb each other at all.
 func TestNoRedundantTypeConstituentsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"type T = any;\ntype U = T;\n",
 		"type T = never;\ntype U = T;\n",
@@ -107,6 +109,8 @@ type noRedundantTypeConstituentsFinding struct {
 // finding's id, rendered text and span taken from the installed 8.67.0 build rather than from the
 // corpus's own `errors` array, which states ids but not the rendered text.
 func TestNoRedundantTypeConstituentsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []noRedundantTypeConstituentsFinding
@@ -707,6 +711,8 @@ func TestNoRedundantTypeConstituentsFires(t *testing.T) {
 // separately. The second half is the control: without something that fires, a rule which can never
 // report at all satisfies the first half.
 func TestNoRedundantTypeConstituentsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "type T = string | any;\n"
 
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoRedundantTypeConstituents,

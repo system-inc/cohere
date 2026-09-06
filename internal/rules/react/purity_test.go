@@ -51,6 +51,8 @@ func runPurityFixture(t *testing.T, source string) rule_testing.Result {
 // strings and what the golden records. The second fixture differs only by a second pragma, and this
 // rule reads no pragma at all, so the two are expected to agree.
 func TestPurityFiresOnTheVendoredCorpus(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -74,6 +76,8 @@ func TestPurityFiresOnTheVendoredCorpus(t *testing.T) {
 // on the way in, so the fixture sits in the suite asserting the opposite of upstream while
 // compiling and going green.
 func TestPurityFixturesMatchTheVendoredCorpusByte(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		constant string
 		fileName string
@@ -106,6 +110,8 @@ func TestPurityFixturesMatchTheVendoredCorpusByte(t *testing.T) {
 // here. The comment on each names what it separates, because a case whose verdict nothing else
 // depends on is a case that will be deleted by the next reader.
 func TestPurityFiresOnMeasuredInputs(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -345,6 +351,8 @@ func TestPurityFiresOnMeasuredInputs(t *testing.T) {
 // back with no diagnostic. Several look like they should report, and the comment says why they do
 // not, because a reader who thinks a silence is a bug will helpfully repair it into a divergence.
 func TestPurityStaysSilentOnMeasuredInputs(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -522,6 +530,8 @@ func TestPurityStaysSilentOnMeasuredInputs(t *testing.T) {
 // rather than built from the rule's own constants, because comparing a diagnostic to the constant
 // it was reported with is an equality both sides of which move together under mutation.
 func TestPurityMessageNamesTheBuiltin(t *testing.T) {
+	t.Parallel()
+
 	result := runPurityFixture(t, "function Component() {\n  const d = Date.now();\n  return <div>{d}</div>;\n}\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -543,6 +553,8 @@ func TestPurityMessageNamesTheBuiltin(t *testing.T) {
 // corpus fixture has all three builtins in one component, so this reads the three rendered messages
 // and requires each name once.
 func TestPurityMessageNamesEachBuiltinSeparately(t *testing.T) {
+	t.Parallel()
+
 	result := runPurityFixture(t, purityImpureFunctionsInRender)
 	if len(result.Diagnostics) != 3 {
 		t.Fatalf("got %d findings, want 3", len(result.Diagnostics))
@@ -569,6 +581,8 @@ func TestPurityMessageNamesEachBuiltinSeparately(t *testing.T) {
 // on that exact input, and this pins it: a merge that took the other operand would still report
 // once and would name the wrong builtin.
 func TestPurityMergesAConditionalAlias(t *testing.T) {
+	t.Parallel()
+
 	result := runPurityFixture(t, "function Component(props: {c: boolean}) {\n  let r = Math.random;\n  if (props.c) { r = Date.now; }\n  const x = r();\n  return <div>{x}</div>;\n}\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -589,6 +603,8 @@ func TestPurityMergesAConditionalAlias(t *testing.T) {
 // byte off its Go literal. Every source here is written without one, and the slice is taken from
 // the same string the harness was handed.
 func TestPurityPointsAtTheCall(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -649,6 +665,8 @@ func TestPurityPointsAtTheCall(t *testing.T) {
 // so this asserts silence on an input the typed harness reports. A revert that dropped the
 // declaration would make the shadow case above red, and this makes the mechanism explicit.
 func TestPurityRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = "function Component() {\n  const d = Date.now();\n  return <div>{d}</div>;\n}\n"
 
 	typed := runPurityFixture(t, source)

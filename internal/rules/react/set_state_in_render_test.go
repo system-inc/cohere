@@ -120,6 +120,8 @@ func runSetStateFixture(t *testing.T, source string) rule_testing.Result {
 // because the goldens come from the compiler harness, which applies pragmas the lint rule has no
 // option surface for: two of the ten expect an error that the shipped rule does not produce.
 func TestSetStateInRenderFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		// prependImport is false only for the one fixture that already imports React. Prepending to
@@ -220,6 +222,8 @@ func TestSetStateInRenderFires(t *testing.T) {
 // takes an untyped prop, so no amount of checking recovers a setter from it. This is the honest
 // answer for both implementations and for different reasons.
 func TestSetStateInRenderStaysSilentOnFixturesTheShippedRuleDoesNotReport(t *testing.T) {
+	t.Parallel()
+
 	// `function Component({setX})` with no type annotation. The prop is `any`, and a setter arriving
 	// as an untyped prop is unrecoverable by any type-directed analysis. Upstream only catches it by
 	// matching the NAME, under a pragma that defaults to off and that the ESLint rule exposes no
@@ -250,6 +254,8 @@ func TestSetStateInRenderStaysSilentOnFixturesTheShippedRuleDoesNotReport(t *tes
 //
 // Both calls report, `setState` and its alias `aliased`, for the same reason as the canonical case.
 func TestSetStateInRenderReportsWhereTheCheckerBeatsReactsInference(t *testing.T) {
+	t.Parallel()
+
 	result := runSetStateFixture(t, reactImport+hookReturn)
 	rule_testing.ExpectFindings(t, result, "setStateInRender", "setStateInRender")
 }
@@ -263,6 +269,8 @@ func TestSetStateInRenderReportsWhereTheCheckerBeatsReactsInference(t *testing.T
 // is the divergence most worth catching, because it would silently widen the rule on every file in
 // the tree that happens to name a callback `setSomething`.
 func TestSetStateInRenderStaysSilentOnTheCorpusAsWritten(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -292,6 +300,8 @@ func TestSetStateInRenderStaysSilentOnTheCorpusAsWritten(t *testing.T) {
 // rule file is a dispatcher with a single pass case. The rest come from probing the shipped rule on
 // inputs that separate this rule's decisions from the ones a reader would assume it makes.
 func TestSetStateInRenderStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -482,6 +492,8 @@ func TestSetStateInRenderStaysSilent(t *testing.T) {
 // there. Measured on React's rule: this exact input reports. Kept as its own test because it is the
 // clearest case of the name being narrower than the behaviour.
 func TestSetStateInRenderFiresInsideAHook(t *testing.T) {
+	t.Parallel()
+
 	result := runSetStateFixture(t, reactImport+
 		"export function useThing() {\n"+
 		"  const [x, setX] = useState(0);\n"+
@@ -497,6 +509,8 @@ func TestSetStateInRenderFiresInsideAHook(t *testing.T) {
 // single-assignment form supplies for free and the reason the rule reads `LoadLocal` and
 // `StoreLocal` rather than matching syntax.
 func TestSetStateInRenderFollowsAnAliasChain(t *testing.T) {
+	t.Parallel()
+
 	result := runSetStateFixture(t, reactImport+
 		"function Component() {\n"+
 		"  const [x, setX] = useState(0);\n"+
@@ -515,6 +529,8 @@ func TestSetStateInRenderFollowsAnAliasChain(t *testing.T) {
 // the setter is identified with no seed data at all. The vendored fixture for this is silent only
 // because it leaves the hook undeclared.
 func TestSetStateInRenderFollowsACustomHook(t *testing.T) {
+	t.Parallel()
+
 	result := runSetStateFixture(t, reactImport+
 		"function useCustomState(init: number) {\n"+
 		"  return useState(init);\n"+
@@ -533,6 +549,8 @@ func TestSetStateInRenderFollowsACustomHook(t *testing.T) {
 // within the callback still reports. Both cases measured on React's rule, which produces `Calling
 // setState from useMemo may trigger an infinite loop` for each.
 func TestSetStateInRenderReportsInsideUseMemo(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an unconditional call inside a useMemo callback", func(t *testing.T) {
 		result := runSetStateFixture(t, "import {useState, useMemo} from 'react';\n"+
 			"function Component() {\n"+
@@ -561,6 +579,8 @@ func TestSetStateInRenderReportsInsideUseMemo(t *testing.T) {
 // whole-file bailout by accident, and no fixture with one component in it could tell the difference.
 // Measured on React: the second component in this file reports while the first is silent.
 func TestSetStateInRenderBailsOutPerFunctionRatherThanPerFile(t *testing.T) {
+	t.Parallel()
+
 	result := runSetStateFixture(t, reactImport+
 		"export function Bailout(...props: number[]) {\n"+
 		"  const [x, setX] = useState(0);\n"+
@@ -587,6 +607,8 @@ func TestSetStateInRenderBailsOutPerFunctionRatherThanPerFile(t *testing.T) {
 // whitespace is one byte offset on disk from the Go string, and slicing the literal reports a span
 // shifted by one. That is transformed here rather than worked around.
 func TestSetStateInRenderPointsAtTheCallee(t *testing.T) {
+	t.Parallel()
+
 	source := reactImport +
 		"function Component() {\n" +
 		"  const [x, setX] = useState(0);\n" +
@@ -618,6 +640,8 @@ func TestSetStateInRenderPointsAtTheCallee(t *testing.T) {
 // than a comparison to the rule's own constant, because a comparison to the constant moves with it
 // under mutation and passes while the message is wrong.
 func TestSetStateInRenderMessagesSayWhy(t *testing.T) {
+	t.Parallel()
+
 	if setStateInRenderMessage.Id != "setStateInRender" {
 		t.Errorf("render message id = %q, want %q", setStateInRenderMessage.Id, "setStateInRender")
 	}
@@ -643,6 +667,8 @@ func TestSetStateInRenderMessagesSayWhy(t *testing.T) {
 // StaysSilent case passes vacuously and only the Fires cases notice. This asserts the declaration is
 // present so a later revert fails loudly here rather than by turning the whole suite green.
 func TestSetStateInRenderRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !SetStateInRender.NeedsTypeChecker {
 		t.Fatal("the rule reads the type checker and must declare NeedsTypeChecker")
 	}
@@ -655,6 +681,8 @@ func TestSetStateInRenderRequiresTheTypedHarness(t *testing.T) {
 // TestSetStateInRenderIsRegistered checks the rule reached the catalog under the name the inventory
 // writes.
 func TestSetStateInRenderIsRegistered(t *testing.T) {
+	t.Parallel()
+
 	if SetStateInRender.Name != "react-hooks/set-state-in-render" {
 		t.Errorf("rule name = %q, want %q", SetStateInRender.Name, "set-state-in-render")
 	}
@@ -681,6 +709,8 @@ func TestSetStateInRenderIsRegistered(t *testing.T) {
 // These constants were generated by reading each file and emitting it through a JSON encoder, so no
 // escape was ever typed. This test is what proves that held.
 func TestFixturesMatchTheVendoredCorpusByte(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		constant string
 		fileName string
@@ -736,6 +766,8 @@ func TestFixturesMatchTheVendoredCorpusByte(t *testing.T) {
 //
 // Measured on React, which reports once at `bar`.
 func TestSetStateInRenderFindsATransitiveSetterCapturedAfterAnother(t *testing.T) {
+	t.Parallel()
+
 	result := runSetStateFixture(t, reactImport+
 		"function Component(props: {a: number}) {\n"+
 		"  const [x, setX] = useState(0);\n"+
@@ -755,6 +787,8 @@ func TestSetStateInRenderFindsATransitiveSetterCapturedAfterAnother(t *testing.T
 // call site inside the lambda without any capture bookkeeping. Two independent routes reach the same
 // verdict here, which is why this input cannot see the index mutation.
 func TestSetStateInRenderFindsADirectlyCapturedSetterAfterAnother(t *testing.T) {
+	t.Parallel()
+
 	result := runSetStateFixture(t, reactImport+
 		"function Component(props: {a: number}) {\n"+
 		"  const [x, setX] = useState(0);\n"+
@@ -787,6 +821,8 @@ func TestSetStateInRenderFindsADirectlyCapturedSetterAfterAnother(t *testing.T) 
 //     tested before the unconditional one
 //   - a nested plain arrow declaring its own setter is CLEAN, because it is not inlined
 func TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo(t *testing.T) {
+	t.Parallel()
+
 	t.Run("declared and called inside a useMemo callback", func(t *testing.T) {
 		result := runSetStateFixture(t, "import {useState, useMemo} from 'react';\n"+
 			"function Component() {\n"+

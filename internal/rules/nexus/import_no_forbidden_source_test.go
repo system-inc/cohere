@@ -11,6 +11,8 @@ import (
 const forbiddenSourceFile = "/repository/source/Thing.tsx"
 
 func TestImportNoForbiddenSourceFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -99,6 +101,8 @@ func TestImportNoForbiddenSourceFires(t *testing.T) {
 // unreachable by any suppression that could be written. A finding at the wrong location is invisible
 // in a findings count and fatal to suppression, so the location is asserted rather than assumed.
 func TestImportNoForbiddenSourceReportsAtTheSpecifier(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "// Dependencies - Frameworks\n" +
 		"// This is the only place this import is valid\n" +
 		"// eslint-disable-next-line nexus/import-no-forbidden-source\n" +
@@ -115,6 +119,8 @@ func TestImportNoForbiddenSourceReportsAtTheSpecifier(t *testing.T) {
 }
 
 func TestImportNoForbiddenSourceStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

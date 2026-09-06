@@ -22,6 +22,8 @@ const noUselessConcatFile = "/repository/source/NoUselessConcat.ts"
 // Two cases carry TWO findings, which is why the expectation is a list rather than a count: a
 // three-literal chain reports at both operators, and so does the parenthesized pair.
 func TestNoUselessConcatFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name              string
 		sourceText        string
@@ -89,6 +91,8 @@ func TestNoUselessConcatFires(t *testing.T) {
 }
 
 func TestNoUselessConcatStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -126,6 +130,8 @@ func TestNoUselessConcatStaysSilent(t *testing.T) {
 // own corpus asserts two findings on `(foo + 'a') + ('b' + 'c')`, and the three simpler shapes below
 // were measured against the installed build at 10.8.1, where all three report.
 func TestNoUselessConcatSkipsParentheses(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -151,6 +157,8 @@ func TestNoUselessConcatSkipsParentheses(t *testing.T) {
 // narrowing it to constant templates would be a silent improvement on upstream, which is the thing
 // a port must not do quietly.
 func TestNoUselessConcatTemplatesWithSubstitutions(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -174,6 +182,8 @@ func TestNoUselessConcatTemplatesWithSubstitutions(t *testing.T) {
 // that starts on line 1, and upstream reports it. Every verdict below was measured against the
 // installed build at 10.8.1.
 func TestNoUselessConcatSameLine(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -202,6 +212,8 @@ func TestNoUselessConcatSameLine(t *testing.T) {
 //
 // Nothing is interpolated, so this is equality on a constant.
 func TestNoUselessConcatMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageUnexpectedConcat.Id != "unexpectedConcat" {
 		t.Fatalf("expected id %q, got %q", "unexpectedConcat", messageUnexpectedConcat.Id)
 	}
@@ -220,6 +232,8 @@ func TestNoUselessConcatMessage(t *testing.T) {
 // would both pass the literal test. Upstream's corpus carries subtraction and multiplication; the
 // comparison forms were added here because they are the shapes most common in real code.
 func TestNoUselessConcatOtherOperators(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"'a' - 'b'",
 		"'a' * 'b'",

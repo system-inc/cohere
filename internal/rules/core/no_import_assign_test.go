@@ -27,6 +27,8 @@ const importAssignFile = "/repository/source/ImportAssign.ts"
 // that pointed at the identifier every time would pass every message-id assertion while being wrong
 // on twelve of these.
 func TestNoImportAssignFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpans  []string
@@ -123,6 +125,8 @@ func TestNoImportAssignFires(t *testing.T) {
 // passes. Each pair was added upstream when somebody hit the bug, and each is a place this port
 // could be silently wide.
 func TestNoImportAssignStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"import mod from 'mod'; mod.prop = 0",
 		"import mod from 'mod'; mod.prop += 0",
@@ -198,6 +202,8 @@ func TestNoImportAssignStaysSilent(t *testing.T) {
 // port asks it directly and these are the shapes where asking it wrongly still passes all 116 cases
 // above.
 func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -312,6 +318,8 @@ func TestNoImportAssignFiresOnCasesUpstreamOmits(t *testing.T) {
 
 // Clean cases upstream does not cover, each with the reason it exists.
 func TestNoImportAssignStaysSilentOnCasesUpstreamOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -382,6 +390,8 @@ func TestNoImportAssignStaysSilentOnCasesUpstreamOmits(t *testing.T) {
 // turning every clean case green vacuously. Without it, that revert makes the rule silent on all 116
 // corpus cases and the suite still passes.
 func TestNoImportAssignNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoImportAssign.NeedsTypeChecker {
 		t.Fatal("the rule no longer declares NeedsTypeChecker, so the fixtures above may be running against a nil checker")
 	}

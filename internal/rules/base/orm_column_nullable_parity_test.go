@@ -30,6 +30,8 @@ type ormColumnNullableParityFinding struct {
 // question mark is already nullable, `any` and `unknown` count as nullable because the claim was
 // never checked, and a non-boolean `nullable` value is a skip rather than a false.
 func TestOrmColumnNullableParityStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		// The same decorator on a METHOD rather than a property. Closes a mutant that accepted any
 		// owner kind, which the rest of the corpus could not see because every other row is
@@ -55,6 +57,8 @@ func TestOrmColumnNullableParityStaysSilent(t *testing.T) {
 }
 
 func TestOrmColumnNullableParityFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []ormColumnNullableParityFinding
@@ -129,6 +133,8 @@ func TestOrmColumnNullableParityFires(t *testing.T) {
 // Pinned because a reader meeting the first row will reasonably want to resolve the binding, and
 // doing that would change what the rule is.
 func TestOrmColumnNullableParityKeysOnTheDecoratorName(t *testing.T) {
+	t.Parallel()
+
 	const preamble = "declare function OrmColumn(o?: any): any;\ndeclare function SerializableField(o?: any): any;\n"
 
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, OrmColumnNullableParity,

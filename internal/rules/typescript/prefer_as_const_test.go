@@ -16,6 +16,8 @@ const preferAsConstFile = "/repository/source/Thing.ts"
 // of the extractor's DISCREPANCY warning, 17 diagnostics against 20 inputs, and it resolves to
 // exactly one finding per reporting input with nothing left to recover.
 func TestPreferAsConstFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -54,6 +56,8 @@ func TestPreferAsConstFires(t *testing.T) {
 // a repair that deleted the wrong range satisfies every assertion in TestPreferAsConstFires,
 // because the finding is byte-identical either way.
 func TestPreferAsConstFixesWriteWhatTheyClaim(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -104,6 +108,8 @@ func TestPreferAsConstFixesWriteWhatTheyClaim(t *testing.T) {
 // ExpectFixedSource returns the source unchanged when a diagnostic carries no fix, so asserting
 // the input back is the assertion that no repair was offered.
 func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -137,6 +143,8 @@ func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(t *testing.T) {
 // The expected text is a literal typed here rather than a reference to the rule's own message or
 // span helper, so that a mutation moving the report site cannot move the assertion with it.
 func TestPreferAsConstPointsAtTheLiteralType(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -167,6 +175,8 @@ func TestPreferAsConstPointsAtTheLiteralType(t *testing.T) {
 }
 
 func TestPreferAsConstStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -255,6 +265,8 @@ func TestPreferAsConstStaysSilent(t *testing.T) {
 // Our NumericLiteral.Text already holds the canonical rendering of the double, so string equality
 // on it reproduces the float comparison without parsing anything.
 func TestPreferAsConstMatchesNumericValuesNotSpellings(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -286,6 +298,8 @@ func TestPreferAsConstMatchesNumericValuesNotSpellings(t *testing.T) {
 // makes the annotation arm's two-part edit safe to ship as a plain fix: the pair can never
 // compete with this rule's own other repair for the same bytes.
 func TestPreferAsConstReportsOnceWhenBothArmsCouldApply(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "let foo: 'bar' = 'bar' as 'bar';"
 	result := rule_testing.Run(t, PreferAsConst, preferAsConstFile, sourceText)
 	rule_testing.ExpectFindings(t, result, "preferAsConst")

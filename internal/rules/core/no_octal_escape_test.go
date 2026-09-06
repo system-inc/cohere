@@ -30,6 +30,8 @@ const octalEscapeFile = "/repository/source/OctalEscape.ts"
 // Copied because a fixture a porter invents encodes the same belief as the port, and the case that
 // catches a bug is the one nobody would think to write.
 func TestNoOctalEscapeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantSequence string
@@ -138,6 +140,8 @@ func TestNoOctalEscapeFires(t *testing.T) {
 // The no-escape group (`'0'`, `'01'`, `'08'`, `'12'`) is digits with no backslash at all, and
 // `'\x51'`, `'\a'`, `'\n'` are escapes that are not numeric.
 func TestNoOctalEscapeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"var foo = \"\\x51\";",
 		"var foo = \"foo \\\\251 bar\";",
@@ -203,6 +207,8 @@ func TestNoOctalEscapeStaysSilent(t *testing.T) {
 // The last two are why the two productions cannot be collapsed into one greedy scan: a value
 // starting 4 through 7 overflows a byte with three digits, so upstream stops at two.
 func TestNoOctalEscapeProductionWidths(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantSequence string
@@ -239,6 +245,8 @@ func TestNoOctalEscapeProductionWidths(t *testing.T) {
 // The offset cases matter more than the shape: a rule reporting the escape itself rather than the
 // literal would pass every message assertion in this file.
 func TestNoOctalEscapeReportsTheWholeLiteral(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantStart  int
@@ -275,6 +283,8 @@ func TestNoOctalEscapeReportsTheWholeLiteral(t *testing.T) {
 // A port reporting every escape would name the right id on every input and double the count on
 // exactly these.
 func TestNoOctalEscapeReportsOncePerLiteral(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -307,6 +317,8 @@ func TestNoOctalEscapeReportsOncePerLiteral(t *testing.T) {
 // port adding a template kind to it would report on a template holding `\1`, which is a syntax error in a
 // template and therefore code that cannot exist rather than code that is wrong.
 func TestNoOctalEscapeDeclinesOtherLiteralKinds(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -329,6 +341,8 @@ func TestNoOctalEscapeDeclinesOtherLiteralKinds(t *testing.T) {
 // The id literal is typed here rather than read from the rule's own constant, so a rename cannot
 // move both sides at once and stay green.
 func TestNoOctalEscapeMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, `'\01'`)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))

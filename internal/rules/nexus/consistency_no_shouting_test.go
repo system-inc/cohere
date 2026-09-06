@@ -10,6 +10,8 @@ import (
 const shoutingFile = "/repository/source/Thing.ts"
 
 func TestConsistencyNoShoutingFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -32,6 +34,8 @@ func TestConsistencyNoShoutingFires(t *testing.T) {
 }
 
 func TestConsistencyNoShoutingStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	// These are the discriminating cases. A rule that only detects capitals would fire on every
 	// one of them, and a rule that fires on ordinary technical prose is a rule people disable.
 	cases := []struct {
@@ -63,6 +67,8 @@ func TestConsistencyNoShoutingStaysSilent(t *testing.T) {
 }
 
 func TestConsistencyNoShoutingRespectsTheAllowOption(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "// the WIDGET subsystem owns this\nexport const Value = 1;\n"
 
 	withoutOption := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, sourceText)
@@ -76,6 +82,8 @@ func TestConsistencyNoShoutingRespectsTheAllowOption(t *testing.T) {
 // The message has to name what it saw. A finding that says only "this comment shouts" makes the
 // reader rescan a paragraph to find the word that tripped it.
 func TestConsistencyNoShoutingNamesTheTokens(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile,
 		"// NEVER cache this, it is REALLY bad\nexport const Value = 1;\n")
 	rule_testing.ExpectFindings(t, result, "shoutingInComment")

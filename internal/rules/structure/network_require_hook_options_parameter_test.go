@@ -16,6 +16,8 @@ const optionsDeclarations = "import { networkService } from './NetworkService.ts
 const optionsFile = "/repository/source/api/UserRequest.ts"
 
 func TestNetworkRequireHookOptionsParameterFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -119,6 +121,8 @@ func TestNetworkRequireHookOptionsParameterFires(t *testing.T) {
 }
 
 func TestNetworkRequireHookOptionsParameterStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

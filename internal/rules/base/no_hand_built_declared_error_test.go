@@ -26,6 +26,8 @@ func noHandBuiltDeclaredErrorCaseName(index int) string {
 // carries or names the option, and widening any of them would report inputs the original is silent
 // on.
 func TestNoHandBuiltDeclaredErrorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		fileName   string
 		sourceText string
@@ -102,6 +104,8 @@ func TestNoHandBuiltDeclaredErrorStaysSilent(t *testing.T) {
 // the original's `node`. Asserting it matters because pointing at the option instead would satisfy
 // every message-id assertion while underlining something the reader was not shown.
 func TestNoHandBuiltDeclaredErrorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		fileName   string
 		sourceText string

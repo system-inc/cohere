@@ -39,6 +39,8 @@ func parameterPropertyCaseName(number int) string {
 // most available wrong conclusion here. Case 23 (a block redeclaring `foo`) is the only case in the
 // corpus that turns on resolving the identifier rather than matching its spelling.
 func TestNoUnnecessaryParameterPropertyAssignmentStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		number     int
 		sourceText string
@@ -84,6 +86,8 @@ func TestNoUnnecessaryParameterPropertyAssignmentStaysSilent(t *testing.T) {
 
 // The reporting cases, with the per-input diagnostic count recovered from the snapshot.
 func TestNoUnnecessaryParameterPropertyAssignmentFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		number     int
 		sourceText string
@@ -132,6 +136,8 @@ func TestNoUnnecessaryParameterPropertyAssignmentFires(t *testing.T) {
 // Upstream ships these as SUGGESTIONS rather than fixes, which is why `ExpectFixedSource` cannot be
 // used at all: it applies `Fixes`, and this rule proposes none. The applier is hand-rolled below.
 func TestNoUnnecessaryParameterPropertyAssignmentSuggestsTheRepair(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		number int
 		before string
@@ -217,6 +223,8 @@ func applyEveryParameterPropertySuggestion(t *testing.T, source string, result r
 // other fixture in this file, because no `ExpectFindings` assertion can observe a panic. This test
 // exists to make that guard visible: it fails by crashing rather than by mismatching.
 func TestNoUnnecessaryParameterPropertyAssignmentSurvivesADestructuredParameterProperty(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t,
 		NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile,
 		"class Foo {\n  constructor(public { a }: { a: string }) {\n    this.a = a;\n  }\n}\n"))
@@ -228,6 +236,8 @@ func TestNoUnnecessaryParameterPropertyAssignmentSurvivesADestructuredParameterP
 // Comparing a diagnostic with the very constant it was reported from is equality that looks correct
 // and moves in lockstep under mutation, so it can never fail. These are literals.
 func TestNoUnnecessaryParameterPropertyAssignmentMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUnnecessaryParameterPropertyAssignment, parameterPropertyFile,
 		"class Foo {\n  constructor(public name: unknown) {\n    this.name = name;\n  }\n}\n")
 
@@ -257,6 +267,8 @@ func TestNoUnnecessaryParameterPropertyAssignmentMessage(t *testing.T) {
 // Upstream's span is the whole assignment expression, which the second case pins in the one shape
 // where that is not obvious: a parenthesized target puts the leading `(` inside the reported range.
 func TestNoUnnecessaryParameterPropertyAssignmentSpan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -303,6 +315,8 @@ func TestNoUnnecessaryParameterPropertyAssignmentSpan(t *testing.T) {
 // The corpus writes no parentheses anywhere and no `override` or `readonly` parameter with a body,
 // so a port could fall either way on all of these and every imported fixture would stay green.
 func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(t *testing.T) {
+	t.Parallel()
+
 	reporting := []struct {
 		name       string
 		sourceText string

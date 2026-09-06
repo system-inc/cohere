@@ -98,6 +98,8 @@ function Outer() {
 `
 
 func TestStaticComponentsFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -157,6 +159,8 @@ func TestStaticComponentsFires(t *testing.T) {
 // exact input gave one finding at line 6, which is what it asserts now. It is the port brief's
 // warning about taking truth from anywhere but the corpus, caught by the dry run rather than here.
 func TestStaticComponentsTreatsTheOutermostComponentAsTheUnit(t *testing.T) {
+	t.Parallel()
+
 	source := `function Outer() {
   function Inner() {
     const Component = createComponent();
@@ -186,6 +190,8 @@ func TestStaticComponentsTreatsTheOutermostComponentAsTheUnit(t *testing.T) {
 // property it guards is not a guard: every message-id assertion in this file stayed green while the
 // reporting layer was wrong.
 func TestStaticComponentsSpanSkipsTriviaBeforeTheTag(t *testing.T) {
+	t.Parallel()
+
 	source := "function O() {\n  const C = mk();\n  return < /*c*/ C />;\n}\n"
 	parsed := strings.TrimSpace(source) + "\n"
 	result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", source)
@@ -199,6 +205,8 @@ func TestStaticComponentsSpanSkipsTriviaBeforeTheTag(t *testing.T) {
 }
 
 func TestStaticComponentsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -310,6 +318,8 @@ function Outer() {
 // off-by-one in the rule and is not one. `rule_testing.Run`, the untyped harness, does not trim, so the
 // trap is invisible to any rule that does not need the checker.
 func TestStaticComponentsSpan(t *testing.T) {
+	t.Parallel()
+
 	parsed := strings.TrimSpace(scTesterFail) + "\n"
 	result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", scTesterFail)
 	if len(result.Diagnostics) != 1 {
@@ -326,6 +336,8 @@ func TestStaticComponentsSpan(t *testing.T) {
 // strings.Contains, because a Contains predicate is weaker than the property it guards and would
 // stay green through a wrong interpolation.
 func TestStaticComponentsMessageNamesCreationSite(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, StaticComponents, "component.tsx", scTesterFail)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
@@ -342,6 +354,8 @@ func TestStaticComponentsMessageNamesCreationSite(t *testing.T) {
 // harness is required, so a later revert to `rule_testing.Run` fails loudly here rather than turning
 // every fixture above into a vacuous pass.
 func TestStaticComponentsRequiresTypeChecker(t *testing.T) {
+	t.Parallel()
+
 	if !StaticComponents.NeedsTypeChecker {
 		t.Fatal("rule must declare NeedsTypeChecker; lowering without one names no values and the rule silently reports nothing")
 	}

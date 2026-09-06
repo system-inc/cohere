@@ -33,6 +33,8 @@ const extraBooleanCastFile = "/repository/source/ExtraBooleanCast.ts"
 // 14 extra inner cases are exactly the shapes ESLint's legacy option would decline.
 
 func TestNoExtraBooleanCastFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -503,6 +505,8 @@ func TestNoExtraBooleanCastFires(t *testing.T) {
 // value is discarded rather than tested. And every `var foo = bar || !!baz` case pins the recursion
 // terminating: the `||` is not itself in a coercing position, so nothing inside it is either.
 func TestNoExtraBooleanCastStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -581,6 +585,8 @@ func TestNoExtraBooleanCastStaysSilent(t *testing.T) {
 // assertion the message-id cases structurally cannot make: a rule reporting the right finding at the
 // wrong span, or writing the right text over the wrong bytes, passes all 441 of them and is broken.
 func TestNoExtraBooleanCastFixesBooleanCalls(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSource string
@@ -807,6 +813,8 @@ func TestNoExtraBooleanCastFixesBooleanCalls(t *testing.T) {
 // Comparing against it is still the right assertion: it says what the offered repair would produce
 // if a human took it, which is exactly what a suggestion promises.
 func TestNoExtraBooleanCastSuggestsTheRightRepairs(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSource string
@@ -1071,6 +1079,8 @@ func applyEveryRepair(sourceText string, result rule_testing.Result) string {
 // everything under it, so reporting the inner negation instead is a span one byte to the right that
 // still lands inside the same expression.
 func TestNoExtraBooleanCastReportsTheRightSpan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -1122,6 +1132,8 @@ func TestNoExtraBooleanCastReportsTheRightSpan(t *testing.T) {
 // which is the only occurrence of that declaration in its 946 rules, so there is no second rule to
 // copy the shape from and nothing else in this package would notice if the two were swapped.
 func TestNoExtraBooleanCastSplitsFixFromSuggestion(t *testing.T) {
+	t.Parallel()
+
 	booleanCall := rule_testing.Run(t, NoExtraBooleanCast, extraBooleanCastFile, "if (Boolean(foo)) {}")
 	if len(booleanCall.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding for the Boolean call, got %d", len(booleanCall.Diagnostics))
@@ -1157,6 +1169,8 @@ func TestNoExtraBooleanCastSplitsFixFromSuggestion(t *testing.T) {
 // or a spread, hits `fixer.noop()`, because there is no single expression `Boolean(...foo)` reduces
 // to without knowing what `foo` holds.
 func TestNoExtraBooleanCastDeclinesToRepairMultipleArguments(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{"!Boolean(...foo);", "!Boolean(foo, bar());"}
 
 	for _, sourceText := range cases {
@@ -1180,6 +1194,8 @@ func TestNoExtraBooleanCastDeclinesToRepairMultipleArguments(t *testing.T) {
 // an already-built options struct. This is the only place the JSON path is exercised, and without it
 // a port that simply dropped `enforceForLogicalOperands` from the decoder passes all 441 fail cases.
 func TestNoExtraBooleanCastAcceptsTheDeprecatedOptionSpelling(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		rawJSON string
@@ -1232,6 +1248,8 @@ func TestNoExtraBooleanCastAcceptsTheDeprecatedOptionSpelling(t *testing.T) {
 // without the guard the repair emits `a ?? b && c`. That does not merely mean something different,
 // it does not parse, which is the one failure an unattended fixer structurally cannot refuse.
 func TestNoExtraBooleanCastParenthesisesLogicalOperandsUnderCoalescing(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "if (a ?? Boolean(b && c)) {}"
 
 	result := rule_testing.RunWithOptions(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText,
@@ -1253,6 +1271,8 @@ func TestNoExtraBooleanCastParenthesisesLogicalOperandsUnderCoalescing(t *testin
 // not compile is the one failure the edit engine structurally cannot refuse, which is what makes
 // this worth a fixture rather than a comment.
 func TestNoExtraBooleanCastPadsTheTrailingTokenBoundary(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "!Boolean()in x"
 
 	result := rule_testing.Run(t, NoExtraBooleanCast, extraBooleanCastFile, sourceText)

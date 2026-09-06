@@ -7,6 +7,8 @@ import (
 )
 
 func TestConsistencyNoEnumFires(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]string{
 		"a plain enum":            "enum Color { Red, Green }\n",
 		"an exported enum":        "export enum Color { Red, Green }\n",
@@ -23,6 +25,8 @@ func TestConsistencyNoEnumFires(t *testing.T) {
 }
 
 func TestConsistencyNoEnumStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]string{
 		"the as-const replacement": "export const ColorKind = { Red: 'Red' } as const;\n" +
 			"export type ColorKindType = (typeof ColorKind)[keyof typeof ColorKind];\n",

@@ -21,6 +21,8 @@ const asyncClientComponentFile = "/repository/app/Component.tsx"
 // measured rather than assumed. The strings were emitted from the extractor's own Rust parse
 // through JSON encoding, so no escape was ever typed on the way here.
 func TestNoAsyncClientComponentFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -52,6 +54,8 @@ func TestNoAsyncClientComponentFires(t *testing.T) {
 // Read as a set they say what the rule is: a directive, a capitalized name, and an async binding
 // that is the default export. Remove any one and the finding goes away.
 func TestNoAsyncClientComponentStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -89,6 +93,8 @@ func TestNoAsyncClientComponentStaysSilent(t *testing.T) {
 // is not a directive. Pinned on the release binary. A port reaching for that predicate alone,
 // which is what the recorded research recommended building on, reports both.
 func TestNoAsyncClientComponentRequiresTheProloguePosition(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -113,6 +119,8 @@ func TestNoAsyncClientComponentRequiresTheProloguePosition(t *testing.T) {
 // with a trailing comment, so a port comparing raw source text would be inert on all of them while
 // the imported corpus, which writes double quotes, stayed green.
 func TestNoAsyncClientComponentReadsTheDirectiveValue(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -132,6 +140,8 @@ func TestNoAsyncClientComponentReadsTheDirectiveValue(t *testing.T) {
 
 // A backtick-quoted string is not a directive per the specification, and the parser agrees.
 func TestNoAsyncClientComponentDeclinesATemplateLiteral(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 		asyncClientComponentFile, "`use client`\nexport default async function MyComponent() { return null }\n"))
 }
@@ -143,6 +153,8 @@ func TestNoAsyncClientComponentDeclinesATemplateLiteral(t *testing.T) {
 // form at all, so guessing either way would have cost nothing at fixture time and shipped a
 // divergence. Measured rather than assumed, in both directions.
 func TestNoAsyncClientComponentDeclinesParenthesizedForms(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -168,17 +180,23 @@ func TestNoAsyncClientComponentDeclinesParenthesizedForms(t *testing.T) {
 // this rule is not on that path, so the helper is simply correct for it. That is the dispatch's
 // warning about the helper checked and found not to apply to this rule.
 func TestNoAsyncClientComponentAcceptsNonAsciiUppercase(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 		asyncClientComponentFile, "\"use client\"\nexport default async function \u0424oo() { return null }\n"), "noAsyncClientComponent")
 }
 
 func TestNoAsyncClientComponentDeclinesNonAsciiLowercase(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 		asyncClientComponentFile, "\"use client\"\nexport default async function \u0444oo() { return null }\n"))
 }
 
 // Shapes the corpus never writes, each silent upstream for a different reason.
 func TestNoAsyncClientComponentDeclinesNearMisses(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -209,6 +227,8 @@ func TestNoAsyncClientComponentDeclinesNearMisses(t *testing.T) {
 // Shapes the corpus never writes that DO report, so the silence above is a discrimination rather
 // than a narrow rule.
 func TestNoAsyncClientComponentReportsShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -237,6 +257,8 @@ func TestNoAsyncClientComponentReportsShapesTheCorpusOmits(t *testing.T) {
 // but the two are different rules and no imported fixture votes on it. Silent on the release
 // binary, and silent here because the checker resolves the export to the top-level declaration.
 func TestNoAsyncClientComponentResolvesThroughShadowing(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 		asyncClientComponentFile, "\"use client\"\nfunction MyComponent() { return null }\n{ async function MyComponent() { return null } }\nexport default MyComponent\n"))
 }
@@ -257,6 +279,8 @@ func TestNoAsyncClientComponentResolvesThroughShadowing(t *testing.T) {
 // declaration is a type or a namespace never reaches the async check at all. A loop reports all
 // four; an index-zero read reports three and is right twice by accident.
 func TestNoAsyncClientComponentReportsWhenTheAsyncDeclarationIsFirst(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -274,6 +298,8 @@ func TestNoAsyncClientComponentReportsWhenTheAsyncDeclarationIsFirst(t *testing.
 }
 
 func TestNoAsyncClientComponentDeclinesWhenTheMergedDeclarationIsFirst(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -298,6 +324,8 @@ func TestNoAsyncClientComponentDeclinesWhenTheMergedDeclarationIsFirst(t *testin
 // async check always-true survived every imported fixture on exactly that gap. This is the input
 // that separates the two conditions.
 func TestNoAsyncClientComponentDeclinesASynchronousCapitalizedArrow(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 		asyncClientComponentFile, "\"use client\"\nconst MyThing = () => { return null }\nexport default MyThing\n"))
 }
@@ -308,12 +336,16 @@ func TestNoAsyncClientComponentDeclinesASynchronousCapitalizedArrow(t *testing.T
 // lives in the parse shape rather than in the rule, and a later reader adding that guard back
 // should see this case already passing without it.
 func TestNoAsyncClientComponentDeclinesADestructuredArrayBinding(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 		asyncClientComponentFile, "\"use client\"\ndeclare const source: Array<() => Promise<null>>\nconst [MyThing] = source\nexport default MyThing\n"))
 }
 
 // A declared binding with no initializer at all, which reaches the arm and must not dereference.
 func TestNoAsyncClientComponentDeclinesABindingWithNoInitializer(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 		asyncClientComponentFile, "\"use client\"\nlet MyThing: unknown\nexport default MyThing\n"))
 }
@@ -325,6 +357,8 @@ func TestNoAsyncClientComponentDeclinesABindingWithNoInitializer(t *testing.T) {
 // the arrow path. A mutant neutralizing the capitalization check in that arm survived every other
 // fixture in this file on exactly that gap. Silent on the release binary.
 func TestNoAsyncClientComponentDeclinesALowercaseAsyncArrow(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoAsyncClientComponent,
 		asyncClientComponentFile, "\"use client\"\nconst myThing = async () => { return null }\nexport default myThing\n"))
 }
@@ -335,6 +369,8 @@ func TestNoAsyncClientComponentDeclinesALowercaseAsyncArrow(t *testing.T) {
 // every silence fixture above would pass vacuously while every firing one failed. That is the more
 // dangerous half: a vacuous green does not announce itself.
 func TestNoAsyncClientComponentNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoAsyncClientComponent.NeedsTypeChecker {
 		t.Fatal("the rule resolves an exported identifier through the checker and must declare it")
 	}
@@ -353,6 +389,8 @@ func TestNoAsyncClientComponentNeedsTheTypedHarness(t *testing.T) {
 // constant. Compared against the constant, both sides move together under mutation and the
 // assertion can never fail.
 func TestNoAsyncClientComponentPointsAtTheIdentifier(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -154,6 +154,8 @@ func arrowBodyStyleSilentCases() []arrowBodyStyleCase {
 }
 
 func TestArrowBodyStyleFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range arrowBodyStyleFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectFindings(t, runArrowBodyStyle(t, testCase), testCase.wantIds...)
@@ -162,6 +164,8 @@ func TestArrowBodyStyleFires(t *testing.T) {
 }
 
 func TestArrowBodyStyleStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range arrowBodyStyleSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t, runArrowBodyStyle(t, testCase))
@@ -182,6 +186,8 @@ func TestArrowBodyStyleStaysSilent(t *testing.T) {
 // on a trailing newline. `Run` does not trim, this rule needs no checker, and transforming here
 // instead broke all 56 rows before the difference was measured rather than assumed.
 func TestArrowBodyStyleFixesTheSource(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range arrowBodyStyleFiresCases() {
 		if testCase.wantFixedSource == "" {
 			continue
@@ -203,6 +209,8 @@ func TestArrowBodyStyleFixesTheSource(t *testing.T) {
 // Asserted as carrying NO fix at all, rather than as a fix that happens to be a no-op: those are
 // different artifacts and only the first is what upstream ships.
 func TestArrowBodyStyleDeclinesToFix(t *testing.T) {
+	t.Parallel()
+
 	declined := 0
 	for _, testCase := range arrowBodyStyleFiresCases() {
 		if testCase.wantFixedSource != "" {
@@ -233,6 +241,8 @@ func TestArrowBodyStyleDeclinesToFix(t *testing.T) {
 // distinction invisible from the message id and easy to get wrong in the direction that still looks
 // plausible: pointing at the whole arrow reads fine in a terminal and puts the caret on `var`.
 func TestArrowBodyStylePointsAtTheBody(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -267,6 +277,8 @@ func TestArrowBodyStylePointsAtTheBody(t *testing.T) {
 // and a rule reporting one id for all four would pass a count-based fixture set. These are the four
 // discriminating shapes, one per id.
 func TestArrowBodyStyleChoosesTheMessageByShape(t *testing.T) {
+	t.Parallel()
+
 	never := ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}
 	cases := []arrowBodyStyleCase{
 		{"var foo = () => {};", never, []string{"unexpectedEmptyBlock"}, ""},
@@ -289,6 +301,8 @@ func TestArrowBodyStyleChoosesTheMessageByShape(t *testing.T) {
 // written here rather than inherited, and neither would be exercised by a fixture that built the
 // options struct directly.
 func TestDecodeArrowBodyStyleOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil input selects upstream's default mode", func(t *testing.T) {
 		decoded, err := DecodeArrowBodyStyleOptions(nil)
 		if err != nil {
@@ -326,6 +340,8 @@ func TestDecodeArrowBodyStyleOptions(t *testing.T) {
 // without the fallback the rule would register on every file and report nothing. Every fixture
 // above reaches the rule through the decoder, so none of them can see this.
 func TestArrowBodyStyleWithNilOptionsUsesAsNeeded(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, ArrowBodyStyle, arrowBodyStyleFile,
 		"var foo = () => { return 0; };"), "unexpectedSingleBlock")
 	// Always and Never both differ from AsNeeded here, so this pins WHICH default was chosen
@@ -346,6 +362,8 @@ func TestArrowBodyStyleWithNilOptionsUsesAsNeeded(t *testing.T) {
 // The three rows separate the two things a `/` can start. Every verdict was measured against the
 // installed rule before it was written down.
 func TestArrowBodyStyleSkipsCommentsWhenCheckingTheNextToken(t *testing.T) {
+	t.Parallel()
+
 	cases := []arrowBodyStyleCase{
 		// A comment then a semicolon: repaired, and the comment survives.
 		{"var foo = () => { return bar } /* c */ ;", nil, []string{"unexpectedSingleBlock"},
@@ -385,6 +403,8 @@ func TestArrowBodyStyleSkipsCommentsWhenCheckingTheNextToken(t *testing.T) {
 // The clause discrimination is the other half: only a for statement's INITIALIZER makes `in`
 // ambiguous, so the same arrow in the condition clause needs no parentheses.
 func TestArrowBodyStyleParenthesizesTheInOperatorLikeUpstream(t *testing.T) {
+	t.Parallel()
+
 	cases := []arrowBodyStyleCase{
 		// The initializer clause: wrapped.
 		{"for (var f = () => { return a in c };;);", nil, []string{"unexpectedSingleBlock"},
@@ -431,6 +451,8 @@ func TestArrowBodyStyleParenthesizesTheInOperatorLikeUpstream(t *testing.T) {
 // preserving branch removes only the tokens and leaves the whitespace, which is why the repaired
 // source carries doubled spaces that the ordinary branch would have collapsed.
 func TestArrowBodyStyleKeepsCommentsOnEitherSide(t *testing.T) {
+	t.Parallel()
+
 	cases := []arrowBodyStyleCase{
 		// Before the return keyword: only the first half of the check sees this.
 		{"var foo = () => { /* leading */ return 5; };", nil, []string{"unexpectedSingleBlock"},
@@ -479,6 +501,8 @@ func TestArrowBodyStyleKeepsCommentsOnEitherSide(t *testing.T) {
 // disjoint. A test that only compared the rewritten source would keep passing under the same defect,
 // which is exactly what happened.
 func TestArrowBodyStyleProposesDisjointFixes(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range arrowBodyStyleFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			result := runArrowBodyStyle(t, testCase)

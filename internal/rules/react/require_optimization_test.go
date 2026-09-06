@@ -35,6 +35,8 @@ const requireOptimizationFile = "/repository/source/RequireOptimization.tsx"
 
 // TestRequireOptimizationFires runs upstream's reporting cases.
 func TestRequireOptimizationFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -66,6 +68,8 @@ func TestRequireOptimizationFires(t *testing.T) {
 // Components cannot be optimized (yet)". That is why this rule is portable without the component
 // registry, and these three are what pin it.
 func TestRequireOptimizationStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -123,6 +127,8 @@ func runRequireOptimization(t *testing.T, sourceText string, rawOptions string) 
 // them and then report on nearly every `createReactClass` in a real codebase. Every row below was
 // measured on the installed build before it was written here.
 func TestRequireOptimizationObjectArmReproducesUpstreamsAccident(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -156,6 +162,8 @@ func TestRequireOptimizationObjectArmReproducesUpstreamsAccident(t *testing.T) {
 // the two property-spelling rows are the ones a port is most likely to get wrong in the widening
 // direction, because all three read as obviously equivalent to a shape upstream does exempt.
 func TestRequireOptimizationMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -237,6 +245,8 @@ func TestRequireOptimizationMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) 
 // which only an Identifier has, so `@pure` exempts and `@pure()` does not. Every verdict measured on
 // the installed build.
 func TestRequireOptimizationDecoratorArms(t *testing.T) {
+	t.Parallel()
+
 	const preamble = "declare const reactMixin: any;\ndeclare const PureRenderMixin: any;\ndeclare const SomeOtherMixin: any;\ndeclare const other: any;\ndeclare const Component: any;\ndeclare const pure: any;\ndeclare const bar: any;\n"
 	cases := []struct {
 		name       string
@@ -273,6 +283,8 @@ func TestRequireOptimizationDecoratorArms(t *testing.T) {
 // not trim, so the two agree here; the slice is taken from the harness output anyway so a later
 // switch to the typed harness cannot silently shift it.
 func TestRequireOptimizationSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -369,6 +381,8 @@ func TestRequireOptimizationSpans(t *testing.T) {
 // comparing a diagnostic to the constant it was reported with is an equality whose two sides move
 // together under mutation.
 func TestRequireOptimizationMessageReadsAsWritten(t *testing.T) {
+	t.Parallel()
+
 	result := runRequireOptimization(t, "declare const React: any;\nclass C extends React.Component {}\n", "")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -388,6 +402,8 @@ func TestRequireOptimizationMessageReadsAsWritten(t *testing.T) {
 // hand-written: `rule.DecodeOptionsInto` errors there, and a bare `"error"` configuration hands a
 // rule exactly that.
 func TestRequireOptimizationDecodesItsOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -425,6 +441,8 @@ func TestRequireOptimizationDecodesItsOptions(t *testing.T) {
 
 // TestRequireOptimizationRejectsMalformedOptions asserts the decoder surfaces bad input.
 func TestRequireOptimizationRejectsMalformedOptions(t *testing.T) {
+	t.Parallel()
+
 	if _, err := DecodeRequireOptimizationOptions([]byte(`{"allowDecorators":`)); err == nil {
 		t.Fatal("truncated JSON decoded without error")
 	}
@@ -440,6 +458,8 @@ func TestRequireOptimizationRejectsMalformedOptions(t *testing.T) {
 // like an absent option object. Asserted rather than assumed, because a rule whose default was not
 // the zero value would be silently inverted on this path.
 func TestRequireOptimizationHandlesNilOptions(t *testing.T) {
+	t.Parallel()
+
 	reporting := rule_testing.RunWithOptions(t, RequireOptimization, requireOptimizationFile,
 		"declare const React: any;\nclass C extends React.Component {}\n", nil)
 	rule_testing.ExpectFindings(t, reporting, "noShouldComponentUpdate")
@@ -463,6 +483,8 @@ func TestRequireOptimizationHandlesNilOptions(t *testing.T) {
 // decorators it carries. The typed harness must therefore produce the identical verdict, and a later
 // reader adding `NeedsTypeChecker` has to explain why this stopped being true.
 func TestRequireOptimizationNeedsNoChecker(t *testing.T) {
+	t.Parallel()
+
 	const source = "declare const React: any;\nclass C extends React.Component {}\n"
 
 	untyped := rule_testing.RunWithOptions(t, RequireOptimization, requireOptimizationFile, source,
@@ -483,6 +505,8 @@ func TestRequireOptimizationNeedsNoChecker(t *testing.T) {
 // The source deliberately carries no JSX, because JSX in a `.ts` file is a syntax error and a case
 // that failed to parse would produce silence for a reason that has nothing to do with a gate.
 func TestRequireOptimizationHasNoFileGate(t *testing.T) {
+	t.Parallel()
+
 	const source = "declare const React: any;\nclass C extends React.Component {}\n"
 	for _, fileName := range []string{
 		"/repository/source/RequireOptimization.tsx",
@@ -512,6 +536,8 @@ func TestRequireOptimizationHasNoFileGate(t *testing.T) {
 // port brief's exact failure: a fixture encoding my belief rather than upstream's behavior, sitting
 // in the silent list asserting the opposite of the truth.
 func TestRequireOptimizationSurvivesShapesThatWouldPanic(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		"declare function createReactClass(spec: any): any;\ncreateReactClass();\n",
 		"declare function createReactClass(spec: any): any;\ncreateReactClass(undefined);\n",
@@ -536,6 +562,8 @@ func TestRequireOptimizationSurvivesShapesThatWouldPanic(t *testing.T) {
 // recording: the object arm's exemptions are a closed list, and "this object is obviously not a
 // real component" is not on it.
 func TestRequireOptimizationObjectArmReportsWithoutAFunction(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -561,6 +589,8 @@ func TestRequireOptimizationObjectArmReportsWithoutAFunction(t *testing.T) {
 // entirely survived the rest of this suite, because nothing in the corpus writes a call to anything
 // other than `createReactClass`. Every verdict below was measured on the installed build.
 func TestRequireOptimizationCreateReactClassSpellings(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

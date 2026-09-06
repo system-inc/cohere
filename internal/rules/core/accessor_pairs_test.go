@@ -386,6 +386,8 @@ func accessorPairsSilentCases() []accessorPairsCase {
 }
 
 func TestAccessorPairsFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range accessorPairsFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectFindings(t, runAccessorPairs(t, testCase), testCase.wantIds...)
@@ -394,6 +396,8 @@ func TestAccessorPairsFires(t *testing.T) {
 }
 
 func TestAccessorPairsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range accessorPairsSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t, runAccessorPairs(t, testCase))
@@ -417,6 +421,8 @@ func TestAccessorPairsStaysSilent(t *testing.T) {
 // TestAccessorPairsDeclinesALocalObjectBinding below, which asks the same question with a local
 // binding, a channel this tree does have. Upstream ships that case too and it is imported above.
 func TestAccessorPairsGlobalShadowing(t *testing.T) {
+	t.Parallel()
+
 	cases := []accessorPairsCase{
 		{"Reflect.defineProperty(foo, 'bar', { get() {} })",
 			AccessorPairsOptions{GetWithoutSet: accessorPairsTrue},
@@ -441,6 +447,8 @@ func TestAccessorPairsGlobalShadowing(t *testing.T) {
 // from a parameter of the same name. Imported from upstream's own corpus and repeated here with a
 // control, because it is the single case standing in for three that could not be imported.
 func TestAccessorPairsDeclinesALocalObjectBinding(t *testing.T) {
+	t.Parallel()
+
 	shadowed := "function f(Object) { Object.defineProperties(foo, { bar: { set(value) {} } }) }"
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, AccessorPairs, accessorPairsFile,
 		shadowed))
@@ -459,6 +467,8 @@ func TestAccessorPairsDeclinesALocalObjectBinding(t *testing.T) {
 // vacuously. This pins the direction: with no checker the descriptor finding disappears, while the
 // object-literal finding, which needs no checker, survives.
 func TestAccessorPairsNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	descriptor := "Object.defineProperty(foo, 'bar', { set(value) {} })"
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, AccessorPairs, accessorPairsFile,
 		descriptor), "missingGetterInPropertyDescriptor")
@@ -479,6 +489,8 @@ func TestAccessorPairsNeedsTheTypedHarness(t *testing.T) {
 //
 // A rule reporting the whole accessor including its body would pass every id fixture above.
 func TestAccessorPairsPointsAtTheAccessorHead(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -540,6 +552,8 @@ func TestAccessorPairsPointsAtTheAccessorHead(t *testing.T) {
 // Upstream reaches those through two different branches, and a port collapsing them to one would
 // render one of the two wrongly while every count stayed right.
 func TestAccessorPairsDescribesTheAccessor(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -596,6 +610,8 @@ func TestAccessorPairsDescribesTheAccessor(t *testing.T) {
 // must override it; and nil input, which is what the config layer hands a rule configured as a bare
 // severity, must produce the defaults rather than the zero value.
 func TestDecodeAccessorPairsOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil input yields upstream's defaults", func(t *testing.T) {
 		decoded, err := DecodeAccessorPairsOptions(nil)
 		if err != nil {
@@ -638,6 +654,8 @@ func TestDecodeAccessorPairsOptions(t *testing.T) {
 // every file and reports nothing. Every fixture above reaches the rule through the decoder, so none
 // of them can see it.
 func TestAccessorPairsWithNilOptionsUsesTheDefaults(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, AccessorPairs, accessorPairsFile,
 		"var o = { set a(v) {} };"), "missingGetterInObjectLiteral")
 	// enforceForClassMembers defaults true, so the class arm must be live with no options at all.
@@ -662,6 +680,8 @@ func TestAccessorPairsWithNilOptionsUsesTheDefaults(t *testing.T) {
 // while this separates them by the node kind. Different mechanisms, and the corpus does not say
 // they agree, so it was measured.
 func TestAccessorPairsSeparatesComputedKeysByShape(t *testing.T) {
+	t.Parallel()
+
 	both := AccessorPairsOptions{
 		GetWithoutSet: accessorPairsTrue,
 		SetWithoutGet: accessorPairsTrue,

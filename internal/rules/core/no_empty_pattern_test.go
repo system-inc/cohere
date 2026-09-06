@@ -12,6 +12,8 @@ import (
 // about: `{ a: {} }` looks so much like `{ a = {} }` that it survives review, and it is the case
 // ESLint's own documentation leads with.
 func TestNoEmptyPatternReportsEmptyPatterns(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		source string
 		wantId string
@@ -43,6 +45,8 @@ func TestNoEmptyPatternReportsEmptyPatterns(t *testing.T) {
 // pattern, and a rule that matched on the characters instead of the position would flag every one
 // of them.
 func TestNoEmptyPatternStaysSilentOnRealBindings(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"const { a } = foo;",
 		"const [a] = foo;",
@@ -72,12 +76,16 @@ func TestNoEmptyPatternStaysSilentOnRealBindings(t *testing.T) {
 // The option defaults off, so a registry that forgets to wire it must produce the strict rule
 // rather than a silent one. This is the fixture that would catch that inversion.
 func TestNoEmptyPatternWithoutOptionsIsStrict(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, NoEmptyPattern, "strict.ts", "function foo({}) {}", nil)
 	rule_testing.ExpectFindings(t, result, "unexpectedObject")
 }
 
 // TestNoEmptyPatternAllowsParameterObjectPatternsWhenConfigured pins what the option turns off.
 func TestNoEmptyPatternAllowsParameterObjectPatternsWhenConfigured(t *testing.T) {
+	t.Parallel()
+
 	options := NoEmptyPatternOptions{AllowObjectPatternsAsParameters: true}
 	for _, source := range []string{
 		"function foo({}) {}",
@@ -99,6 +107,8 @@ func TestNoEmptyPatternAllowsParameterObjectPatternsWhenConfigured(t *testing.T)
 // discarded, not a parameter that takes none. And a non-empty default is evaluated at every call for
 // a pattern that binds nothing, which is a bug wearing the option's clothes.
 func TestNoEmptyPatternKeepsReportingDespiteOption(t *testing.T) {
+	t.Parallel()
+
 	options := NoEmptyPatternOptions{AllowObjectPatternsAsParameters: true}
 	for _, testCase := range []struct {
 		source string

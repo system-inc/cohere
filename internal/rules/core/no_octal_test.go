@@ -46,6 +46,8 @@ const octalFile = "/repository/source/Octal.ts"
 // port that "corrects" this by checking the digits are octal-legal diverges from upstream silently
 // and is the single most likely way to get this rule wrong.
 func TestNoOctalFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -89,6 +91,8 @@ func TestNoOctalFires(t *testing.T) {
 //	            being a number. A rule matching on source text reports it.
 //	the comment likewise, and a comment is not a node at all.
 func TestNoOctalStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -155,6 +159,8 @@ func TestNoOctalStaysSilent(t *testing.T) {
 // not a gap, `tsc` catches the input separately as TS6188, and the case lives in the silent list
 // with the other declines. Written down because the failing fixture was the porter being wrong.
 func TestNoOctalOnSourceOurParserAcceptsAndESLintRejects(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -185,6 +191,8 @@ func TestNoOctalOnSourceOurParserAcceptsAndESLintRejects(t *testing.T) {
 // statement. `-0755` reports at column 10, so the sign is outside the span, which is a consequence
 // of the parser making the minus a unary operator over a positive literal rather than part of it.
 func TestNoOctalReportsTheLiteralSpan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -223,6 +231,8 @@ func TestNoOctalReportsTheLiteralSpan(t *testing.T) {
 // and `0o755` both cook to `493`, so no rule reading cooked text can separate them, and one of them
 // is upstream's recommended fix. That is what makes this a discrimination rather than a restatement.
 func TestNoOctalReadsRawTextRatherThanTheCookedValue(t *testing.T) {
+	t.Parallel()
+
 	// Both cook to "493". The legacy spelling reports and the modern one must not.
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoOctal, octalFile, "var a = 0755;"), "noOctal")
@@ -250,6 +260,8 @@ func TestNoOctalReadsRawTextRatherThanTheCookedValue(t *testing.T) {
 // cached the first raw span it computed and reused it, would pass all of them. This is the case that
 // separates per-node work from per-file work.
 func TestNoOctalReportsEachLiteralSeparately(t *testing.T) {
+	t.Parallel()
+
 	source := "var a = 0755, b = 0o755, c = 07, d = 0, e = 08;"
 	result := rule_testing.Run(t, NoOctal, octalFile, source)
 	rule_testing.ExpectFindings(t, result, "noOctal", "noOctal", "noOctal")

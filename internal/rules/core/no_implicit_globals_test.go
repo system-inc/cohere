@@ -54,6 +54,8 @@ func implicitGlobalsOptions(t *testing.T, lexicalBindings bool) any {
 // these literals from that JSON, so nothing was retyped. The generator refuses a case holding a
 // byte outside printable ASCII.
 func TestNoImplicitGlobalsFiresOnGlobalDeclarations(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText      string
 		lexicalBindings bool
@@ -97,6 +99,8 @@ func TestNoImplicitGlobalsFiresOnGlobalDeclarations(t *testing.T) {
 // from anywhere. Upstream's window.foo = function() { bar = 1; } is the case that says so: the
 // assignment is inside a function and it still reports.
 func TestNoImplicitGlobalsFiresOnLeaks(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		messages   []string
@@ -132,6 +136,8 @@ func TestNoImplicitGlobalsFiresOnLeaks(t *testing.T) {
 // weakening either assertion keeps it a fact about the harness instead of turning it into a
 // fact about the rule.
 func TestNoImplicitGlobalsFiresFromBothHalves(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText       string
 		upstreamMessages []string
@@ -168,6 +174,8 @@ func TestNoImplicitGlobalsFiresFromBothHalves(t *testing.T) {
 // Run through BOTH harnesses, because a clean case must stay clean either way and the two reach
 // different halves of the rule. A case clean only in the harness that cannot fire is not evidence.
 func TestNoImplicitGlobalsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText      string
 		lexicalBindings bool
@@ -265,6 +273,8 @@ func TestNoImplicitGlobalsStaysSilent(t *testing.T) {
 // assertion below is deliberately about the two declaration rows and is skipped where nothing is
 // reported at all.
 func TestNoImplicitGlobalsDeclinesReadonlyGlobals(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		// What upstream reports, recorded so the gap is legible rather than inferred.
@@ -310,6 +320,8 @@ func TestNoImplicitGlobalsDeclinesReadonlyGlobals(t *testing.T) {
 // and this test fails, which is the right direction: the split would no longer be necessary and
 // somebody should notice rather than inherit it as folklore.
 func TestNoImplicitGlobalsHalvesNeedDifferentHarnesses(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -347,6 +359,8 @@ func TestNoImplicitGlobalsHalvesNeedDifferentHarnesses(t *testing.T) {
 // was a live false positive in this port before these cases existed. Every expectation measured
 // against the installed rule.
 func TestNoImplicitGlobalsIsSilentInStrictMode(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -376,6 +390,8 @@ func TestNoImplicitGlobalsIsSilentInStrictMode(t *testing.T) {
 // explicit false stays distinguishable from an absent key, and this test is what would notice if the
 // default ever moved and the pointer were dropped as redundant.
 func TestDecodeNoImplicitGlobalsOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an absent option leaves lexical bindings off", func(t *testing.T) {
 		decoded, err := DecodeNoImplicitGlobalsOptions(nil)
 		if err != nil {
@@ -423,6 +439,8 @@ func TestDecodeNoImplicitGlobalsOptions(t *testing.T) {
 // `foo = 1` rather than on `var foo = 1;`, and every ExpectFindings assertion above is satisfied by
 // either reading.
 func TestNoImplicitGlobalsPointsAtTheDeclaration(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, NoImplicitGlobals, implicitGlobalsFile,
 		"var foo = 1;", implicitGlobalsOptions(t, false))
 	rule_testing.ExpectFindings(t, result, "globalNonLexicalBinding")

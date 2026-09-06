@@ -25,6 +25,8 @@ const explicitAnyFile = "/repository/source/Thing.ts"
 // fixture asserting one finding per input would be wrong on all four, which is what the extractor
 // warns about when the diagnostic count and the input count disagree.
 func TestNoExplicitAnyFires(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -98,6 +100,8 @@ func TestNoExplicitAnyFires(t *testing.T) {
 // are almost all the same shapes as the failing inputs with a real type in place of `any`, which
 // is the point: the rule must key on the keyword and not on the surrounding shape.
 func TestNoExplicitAnyStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -150,6 +154,8 @@ func TestNoExplicitAnyStaysSilent(t *testing.T) {
 // declarations. All forty-five are exempt only because the option is on, which the companion test
 // below pins by running the same inputs with the option off.
 func TestNoExplicitAnyIgnoreRestArgsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -217,6 +223,8 @@ func TestNoExplicitAnyIgnoreRestArgsStaysSilent(t *testing.T) {
 // clean case is only evidence about the thing you think it is when the edit you believe makes it
 // clean is shown to move the verdict.
 func TestNoExplicitAnyIgnoreRestArgsIsWhatSilencesThem(t *testing.T) {
+	t.Parallel()
+
 	testCases := []string{
 		"\n                        function foo(a: number, ...rest: any[]): void {\n                          return;\n                        }\n                      ",
 		"function foo1(...args: any[]) {}",
@@ -284,6 +292,8 @@ func TestNoExplicitAnyIgnoreRestArgsIsWhatSilencesThem(t *testing.T) {
 // `unknown` over a colon or eat the following bracket. Columns cross-checked against oxc's own
 // snapshot, which is one-based where these are zero-based.
 func TestNoExplicitAnyPointsAtTheKeywordItself(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -329,6 +339,8 @@ func TestNoExplicitAnyPointsAtTheKeywordItself(t *testing.T) {
 // measures nothing, because both sides move together under any mutation of the constant. These are
 // literals, so a renamed identifier or a rewritten description fails here.
 func TestNoExplicitAnyReportsOneMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, "const number: any = 1")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -353,6 +365,8 @@ func TestNoExplicitAnyReportsOneMessage(t *testing.T) {
 // pass every message-id fixture in this file while silently rewriting Kirk's tree, which is the
 // exact failure mode an unattended fix has and a suggestion does not.
 func TestNoExplicitAnyOffersNoRepairByDefault(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoExplicitAny, explicitAnyFile, "let x: any = 1")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -373,6 +387,8 @@ func TestNoExplicitAnyOffersNoRepairByDefault(t *testing.T) {
 // stops, so the six in the second block were found by grepping the rule file. A port trusting the
 // tool's count would have asserted a quarter of the repairs upstream pins.
 func TestNoExplicitAnyFixToUnknownRewritesTheKeyword(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		sourceText string
 		wantSource string
@@ -405,6 +421,8 @@ func TestNoExplicitAnyFixToUnknownRewritesTheKeyword(t *testing.T) {
 // limitation, so the case upstream could not write is written here: an exempt `any` must produce no
 // finding and therefore no repair, while a reportable one in the same file is still rewritten.
 func TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArgs(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, NoExplicitAny, explicitAnyFile,
 		"function foo(a: any, ...rest: any[]): void {}",
 		NoExplicitAnyOptions{FixToUnknown: true, IgnoreRestArgs: true})
@@ -421,6 +439,8 @@ func TestNoExplicitAnyFixToUnknownDoesNotDefeatIgnoreRestArgs(t *testing.T) {
 // same batch. Without the gate this rule would report every JSDoc `any` in every JavaScript file in
 // the tree, and no imported fixture could see it because upstream cannot express the input.
 func TestNoExplicitAnyDeclinesJavaScriptFiles(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		fileName   string
 		sourceText string
@@ -448,6 +468,8 @@ func TestNoExplicitAnyDeclinesJavaScriptFiles(t *testing.T) {
 // annotations does not exempt the files that are nothing but type annotations, which is the
 // plausible wrong guess.
 func TestNoExplicitAnyCoversEveryTypeScriptExtension(t *testing.T) {
+	t.Parallel()
+
 	for _, fileName := range []string{
 		"/repository/source/Thing.ts",
 		"/repository/source/Thing.tsx",
@@ -470,6 +492,8 @@ func TestNoExplicitAnyCoversEveryTypeScriptExtension(t *testing.T) {
 // shapes would pass every one of them. These five inputs separate that reading from the real one,
 // and every verdict below was taken from the release binary rather than from reading the Rust.
 func TestNoExplicitAnyIgnoreRestArgsExemptsByContainmentNotByShape(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -510,6 +534,8 @@ func TestNoExplicitAnyIgnoreRestArgsExemptsByContainmentNotByShape(t *testing.T)
 // the port's coverage of real inputs would rest entirely on the assumption that one node kind
 // behaves the same everywhere. Each was confirmed reporting on the release binary.
 func TestNoExplicitAnyReportsPositionsOurTreeActuallyWrites(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -551,6 +577,8 @@ func TestNoExplicitAnyReportsPositionsOurTreeActuallyWrites(t *testing.T) {
 // report all of these. `type Any = any;` is upstream's own case and reports exactly once, which is
 // the same distinction stated from the other side.
 func TestNoExplicitAnyIgnoresIdentifiersNamedAny(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"const any = 1;",
 		"function any() {}",

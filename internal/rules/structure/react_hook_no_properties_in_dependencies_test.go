@@ -9,6 +9,8 @@ import (
 const propertiesInDependenciesFile = "/repository/source/components/Thing.tsx"
 
 func TestReactHookNoPropertiesInDependenciesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -100,6 +102,8 @@ func TestReactHookNoPropertiesInDependenciesFires(t *testing.T) {
 }
 
 func TestReactHookNoPropertiesInDependenciesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -221,6 +225,8 @@ func TestReactHookNoPropertiesInDependenciesStaysSilent(t *testing.T) {
 // test read the parenthesis as a non-identifier and declined. Nobody writes it deliberately, which
 // is exactly why no fixture covered it and the miss was invisible.
 func TestReactHookNoPropertiesInDependenciesSkipsParenthesizedReceiver(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "function Thing(properties: { id: string }) {\n" +
 		"    (React).useEffect(() => { run(properties.id); }, [properties]);\n" +
 		"    return <div />;\n}\n"

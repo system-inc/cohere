@@ -15,6 +15,8 @@ var baseLibraryOptions = BoundaryNoProjectImportOptions{
 }
 
 func TestBoundaryNoProjectImportFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -35,6 +37,8 @@ func TestBoundaryNoProjectImportFires(t *testing.T) {
 }
 
 func TestBoundaryNoProjectImportStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -64,6 +68,8 @@ func TestBoundaryNoProjectImportStaysSilent(t *testing.T) {
 // trivia, so reporting the declaration anchors the finding at the first comment above the import,
 // where no `eslint-disable-next-line` can reach it.
 func TestBoundaryNoProjectImportReportsAtTheSpecifier(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "// Dependencies\n// a second comment\nimport { helper } from '@project/source/Helper';\\n"
 
 	result := rule_testing.RunWithOptions(t, BoundaryNoProjectImport, baseLibraryFile, sourceText, baseLibraryOptions)

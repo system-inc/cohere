@@ -13,6 +13,8 @@ import (
 const noSetStateFile = "/repository/source/NoSetState.tsx"
 
 func TestNoSetStateStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText string }{
 		{"upstream valid 0", "\n        var Hello = function() {\n          this.setState({})\n        };\n      "},
 		{"upstream valid 1", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      "},
@@ -27,6 +29,8 @@ func TestNoSetStateStaysSilent(t *testing.T) {
 }
 
 func TestNoSetStateFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		wantIds          []string
@@ -66,6 +70,8 @@ func TestNoSetStateFires(t *testing.T) {
 // still reports, because the ancestor walk finds the enclosing component and never asks whether a
 // nearer class interrupted it. That is upstream's behaviour, reproduced.
 func TestNoSetStateMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -120,6 +126,8 @@ func TestNoSetStateMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testi
 // its parser folded them away and the member access it reports covers that text. Our parser keeps
 // the node, and reporting on the member access reproduces the same span for a different reason.
 func TestNoSetStateAnchorsOnTheCalleeNotTheCall(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -164,6 +172,8 @@ func TestNoSetStateAnchorsOnTheCalleeNotTheCall(t *testing.T) {
 // own string. Asserted against a literal typed here rather than against the rule's own constant, so
 // the two cannot move together under mutation.
 func TestNoSetStateMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageNoSetState.Id != "noSetState" {
 		t.Errorf("message id is %q, want %q", messageNoSetState.Id, "noSetState")
 	}
@@ -180,6 +190,8 @@ func TestNoSetStateMessage(t *testing.T) {
 // file parses cleanly and the parser's opinion cannot be mistaken for the rule's. The `.ts` row is
 // the one that carries the weight: it is exactly the file a `.tsx` gate would have silenced.
 func TestNoSetStateHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "class H extends React.Component { m(){ this.setState({}); } }\n"
 	for _, fileName := range []string{
 		"/repository/source/Suffix.tsx",

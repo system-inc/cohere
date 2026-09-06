@@ -21,6 +21,8 @@ const preferPromiseRejectErrorsFile = "/repository/source/Rejections.ts"
 // ambient 'errors' module need a second file in the program and run through RunTypedFiles.
 
 func TestPreferPromiseRejectErrorsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"Promise.resolve(5);",
 		"Promise.reject(new Error());",
@@ -95,6 +97,8 @@ func TestPreferPromiseRejectErrorsStaysSilent(t *testing.T) {
 }
 
 func TestPreferPromiseRejectErrorsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		findings   int
@@ -199,6 +203,8 @@ func TestPreferPromiseRejectErrorsFires(t *testing.T) {
 // the struct here would leave both untested, and they are the two pieces with no upstream
 // counterpart to compare against.
 func TestPreferPromiseRejectErrorsWithOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		optionsJson string
 		sourceText  string
@@ -251,6 +257,8 @@ const preferPromiseRejectErrorsErrorsModule = "// @ts-ignore\ndeclare module 'er
 // fire. The rows are pinned here so that a future harness change makes this test fail loudly
 // rather than leaving the divergence unrecorded.
 func TestPreferPromiseRejectErrorsAcrossFiles(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		optionsJson string
 		sourceText  string
@@ -294,6 +302,8 @@ func TestPreferPromiseRejectErrorsAcrossFiles(t *testing.T) {
 // the trimmed source instead lands one line early and reads exactly like an off-by-one in the
 // rule.
 func TestPreferPromiseRejectErrorsSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantText   string
@@ -358,6 +368,8 @@ func TestPreferPromiseRejectErrorsSpans(t *testing.T) {
 //
 // Every row was measured against the installed rule before it was written here.
 func TestPreferPromiseRejectErrorsExecutorReferenceScan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -404,6 +416,8 @@ func TestPreferPromiseRejectErrorsExecutorReferenceScan(t *testing.T) {
 // The upstream source states them as a conjunction, which says nothing about which conjunct is
 // doing the work, so each row here varies exactly one of them against a reporting control.
 func TestPreferPromiseRejectErrorsExecutorShape(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -431,6 +445,8 @@ func TestPreferPromiseRejectErrorsExecutorShape(t *testing.T) {
 // property name. The object-literal row is the one that would report if the name alone were
 // enough, and it is clean upstream.
 func TestPreferPromiseRejectErrorsStaticReceiver(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -463,6 +479,8 @@ func TestPreferPromiseRejectErrorsStaticReceiver(t *testing.T) {
 // unconfigured rule silently permissive here, and no fixture reaching the rule through the decoder
 // could see it.
 func TestPreferPromiseRejectErrorsDefaultsAreOff(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -484,6 +502,8 @@ func TestPreferPromiseRejectErrorsDefaultsAreOff(t *testing.T) {
 // other argument rather than skipped. Upstream reads arguments.at(0) with no kind test, so this
 // reports; a port that guarded on the kind would go silent and no imported case would notice.
 func TestPreferPromiseRejectErrorsSpreadArgumentReports(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile,
 		"declare const args: [unknown];\nPromise.reject(...args);\n")
 	rule_testing.ExpectFindings(t, result, "rejectAnError")
@@ -499,6 +519,8 @@ func TestPreferPromiseRejectErrorsSpreadArgumentReports(t *testing.T) {
 //
 // If the checker ever starts merging them, this test fails and the divergence can be removed.
 func TestPreferPromiseRejectErrorsDuplicateParameterNamesIsADivergence(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile,
 		"new Promise(function (reject, reject) {\n  reject(5);\n});\n")
 	rule_testing.ExpectClean(t, result)
@@ -513,6 +535,8 @@ func TestPreferPromiseRejectErrorsDuplicateParameterNamesIsADivergence(t *testin
 // TestPreferPromiseRejectErrorsMessage asserts the reported id and description against literals
 // typed here rather than against the rule's own constant, which would move with any mutation to it.
 func TestPreferPromiseRejectErrorsMessage(t *testing.T) {
+	t.Parallel()
+
 	message := buildPreferPromiseRejectErrorsMessage()
 	if message.Id != "rejectAnError" {
 		t.Fatalf("message id is %q, want %q", message.Id, "rejectAnError")
@@ -526,6 +550,8 @@ func TestPreferPromiseRejectErrorsMessage(t *testing.T) {
 // guards on it in both listeners. Run through the plain harness the checker is nil, and the shim
 // returns nil rather than panicking, so a missing guard buys a vacuous green rather than a crash.
 func TestPreferPromiseRejectErrorsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !PreferPromiseRejectErrors.NeedsTypeChecker {
 		t.Fatal("rule must declare NeedsTypeChecker")
 	}

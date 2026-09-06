@@ -27,6 +27,8 @@ const jsxNoUndefFile = "/repository/source/JsxNoUndef.tsx"
 // because two of them are multi-line raw strings whose leading newline and eight-space indentation
 // are part of what upstream tests.
 func TestJsxNoUndefFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -86,6 +88,8 @@ func TestJsxNoUndefFires(t *testing.T) {
 }
 
 func TestJsxNoUndefStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -150,6 +154,8 @@ func TestJsxNoUndefStaysSilent(t *testing.T) {
 // exactly like a working rule. A revert of `NeedsTypeChecker`, or a fixture switched to the untyped
 // harness by copying a neighbouring react rule that does not need types, fails here loudly instead.
 func TestJsxNoUndefNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "var React; React.render(<App />);"
 
 	untyped := rule_testing.Run(t, JsxNoUndef, jsxNoUndefFile, source)
@@ -167,6 +173,8 @@ func TestJsxNoUndefNeedsTheTypedHarness(t *testing.T) {
 // cases and underlines the object identifier alone in every one, including the columns for the
 // member cases, so this is upstream's assertion rather than an invented one.
 func TestJsxNoUndefPointsAtTheReferencedIdentifier(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

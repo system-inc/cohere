@@ -64,6 +64,8 @@ type globalsCase struct {
 }
 
 func TestGlobalsFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range globalsFiresCases() {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
@@ -81,6 +83,8 @@ func TestGlobalsFires(t *testing.T) {
 }
 
 func TestGlobalsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range globalsSilentCases() {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTyped(t, Globals, "Subject.tsx", testCase.source)
@@ -268,6 +272,8 @@ func globalsSilentCases() []globalsCase {
 // source, and the parenthesized pair is here because it is where the two spans visibly disagree
 // about the parentheses: `(g) = 1` reports inside them and `(g) += 1` reports from the open paren.
 func TestGlobalsSpans(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name     string
 		source   string
@@ -334,6 +340,8 @@ func TestGlobalsSpans(t *testing.T) {
 // and id both correct while the per-finding text moved. Equality rather than `strings.Contains`,
 // because a weaker predicate than the property it guards is not a guard.
 func TestGlobalsMessageNamesTheBinding(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, Globals, "Subject.tsx",
 		"let renderCount = 0;\nfunction Component() {\n  renderCount = 1;\n  return <div />;\n}\n")
 	if len(result.Diagnostics) != 1 {
@@ -357,6 +365,8 @@ func TestGlobalsMessageNamesTheBinding(t *testing.T) {
 // ever changed, so this asserts the difference directly: the same input reports under `RunTyped`
 // and is silent under `Run`.
 func TestGlobalsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "let g = 0;\nfunction Component() {\n  g = 1;\n  return <div />;\n}\n"
 
 	typed := rule_testing.RunTyped(t, Globals, "Subject.tsx", source)
@@ -382,6 +392,8 @@ func TestGlobalsRequiresTheTypedHarness(t *testing.T) {
 // later widening has to come here and change them deliberately, and so the next reader can see
 // exactly what the subset costs rather than having to rediscover it.
 func TestGlobalsBoundary(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string

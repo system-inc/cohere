@@ -9,6 +9,8 @@ import (
 const requireYieldFile = "/repository/source/Thing.ts"
 
 func TestRequireYieldFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -36,6 +38,8 @@ func TestRequireYieldFires(t *testing.T) {
 }
 
 func TestRequireYieldStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

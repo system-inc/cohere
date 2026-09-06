@@ -141,6 +141,8 @@ func blockScopedVarSilentCases() []blockScopedVarCase {
 }
 
 func TestBlockScopedVarFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range blockScopedVarFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, BlockScopedVar,
@@ -150,6 +152,8 @@ func TestBlockScopedVarFires(t *testing.T) {
 }
 
 func TestBlockScopedVarStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range blockScopedVarSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, BlockScopedVar,
@@ -166,6 +170,8 @@ func TestBlockScopedVarStaysSilent(t *testing.T) {
 //
 // Every expected span and every line/column pair was read off the installed rule's own output.
 func TestBlockScopedVarPointsAtTheUseAndNamesTheDeclaration(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		// The 1-based column each finding must POINT at. Columns rather than the spelled text,
@@ -233,6 +239,8 @@ func TestBlockScopedVarPointsAtTheUseAndNamesTheDeclaration(t *testing.T) {
 // wrong. This closes that: one case, compared against a literal typed here rather than against the
 // rule's own constant, since a comparison to the constant moves with the code under mutation.
 func TestBlockScopedVarRendersTheWholeMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, BlockScopedVar, blockScopedVarFile, "{ var a = 0; } a;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -256,6 +264,8 @@ func TestBlockScopedVarRendersTheWholeMessage(t *testing.T) {
 // no references at all and every silent fixture would pass vacuously while every firing one failed.
 // The guard at the top of the listener makes that explicit, and this pins it.
 func TestBlockScopedVarNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "{ var a = 0; } a;"
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, BlockScopedVar, blockScopedVarFile,
 		source), "outOfScope")
@@ -275,6 +285,8 @@ func TestBlockScopedVarNeedsTheTypedHarness(t *testing.T) {
 // partner rather than passing quietly as coverage. Every verdict was measured against the installed
 // rule.
 func TestBlockScopedVarIgnoresBlockScopedDeclarations(t *testing.T) {
+	t.Parallel()
+
 	cases := []blockScopedVarCase{
 		{"function f(){ { let a = 1; } a; }", []string{}},
 		{"function f(){ { var a = 1; } a; }", []string{"outOfScope"}},

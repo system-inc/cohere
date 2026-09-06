@@ -24,6 +24,8 @@ import (
 // A test that only checked the true cases would pass on a predicate that returns true for
 // everything, which is the failure this file is most likely to have.
 func TestIsAlwaysInvalidatingTypeSeparatesTheFourShapes(t *testing.T) {
+	t.Parallel()
+
 	// The callable forms are here because the predicate is ONE flag check rather than upstream's
 	// two arms. A separate call-signature arm was written, then removed when a mutation sweep
 	// showed deleting it changed no answer: every callable form TypeScript has carries the Object
@@ -83,6 +85,8 @@ func TestIsAlwaysInvalidatingTypeSeparatesTheFourShapes(t *testing.T) {
 // rather than true: declining to merge on missing information is safe, merging on it is not. A
 // predicate that defaulted the other way would still pass the separation test above.
 func TestIsAlwaysInvalidatingTypeDeclinesWithoutAChecker(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `function f() { const a = [1]; return a; }`)
 	if function == nil {
 		t.Fatal("the source did not lower")
@@ -120,6 +124,8 @@ func TestIsAlwaysInvalidatingTypeDeclinesWithoutAChecker(t *testing.T) {
 // nodeless identifier has no type to ask about, and both upstream call sites use a true answer to
 // PERMIT a merge, so the missing-information direction must be false.
 func TestIsAlwaysInvalidatingTypeHandlesNodelessIdentifiers(t *testing.T) {
+	t.Parallel()
+
 	nodeless, answeredTrue := 0, 0
 
 	forEachCorpusFunctionWithChecker(t, 100, func(function *Function, checker *shimchecker.Checker) {

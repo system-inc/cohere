@@ -50,6 +50,8 @@ func hoistableFor(t *testing.T, source string) (*Function, *ReactiveScopes, Scop
 //
 // The thresholds below are far looser than those numbers. This guards the SHAPE, not the corpus.
 func TestHoistableAnalysisDeepensDependencyPaths(t *testing.T) {
+	t.Parallel()
+
 	// # Why this fixture and not a simpler one
 	//
 	// The first two attempts here used a single object literal reading `props.configuration.alpha`, and
@@ -110,6 +112,8 @@ func TestHoistableAnalysisDeepensDependencyPaths(t *testing.T) {
 // for a program where `props.a` can be nullish makes the memoized read throw where the original did
 // not. Measured over 400 corpus files: 564 path entries, 0 naming a property never loaded.
 func TestHoistablePathsAreAlwaysPrefixesOfRealAccesses(t *testing.T) {
+	t.Parallel()
+
 	// The same corpus-derived shape as the headline test, for the reason given there: a fixture
 	// whose root is read bare produces no path entries and would make this assertion vacuous.
 	function, scopes, identity, ranges, _ := hoistableFor(t, `
@@ -173,6 +177,8 @@ func TestHoistablePathsAreAlwaysPrefixesOfRealAccesses(t *testing.T) {
 // so a future change that starts approaching the cap is a visible event rather than a slow drift
 // into silent truncation.
 func TestHoistableConvergenceIsFarInsideTheBound(t *testing.T) {
+	t.Parallel()
+
 	_, _, _, _, analysis := hoistableFor(t, `
 		function Component(props) {
 			let total = props.seed.value;
@@ -206,6 +212,8 @@ func TestHoistableConvergenceIsFarInsideTheBound(t *testing.T) {
 // ordinary input, because a `Converged` that returned false everywhere would be just as useless as
 // one that always returned true.
 func TestHoistableReportsRatherThanHidingNonConvergence(t *testing.T) {
+	t.Parallel()
+
 	_, _, _, _, analysis := hoistableFor(t, `
 		function Component(props) {
 			const object = {a: props.configuration.alpha};
@@ -232,6 +240,8 @@ func TestHoistableReportsRatherThanHidingNonConvergence(t *testing.T) {
 // implicit in upstream's construction rather than stated by it, so it is pinned on the shape that
 // would spin forever if the optional-to-unconditional flip were ever reversible.
 func TestOptionalChainReductionTerminates(t *testing.T) {
+	t.Parallel()
+
 	registry := newPathRegistry()
 	root := ReactiveScopeDependency{Identifier: 7}
 	rootIndex := registry.pathIndex(root)
@@ -267,6 +277,8 @@ func TestOptionalChainReductionTerminates(t *testing.T) {
 // would let one branch's dereference vouch for a path the other branch never took, which is the
 // over-approximating direction that invents crashes.
 func TestForwardPropagationIntersectsRatherThanUnions(t *testing.T) {
+	t.Parallel()
+
 	function, scopes, identity, ranges, _ := hoistableFor(t, `
 		function Component(props) {
 			let value;
@@ -308,6 +320,8 @@ func TestForwardPropagationIntersectsRatherThanUnions(t *testing.T) {
 // A fact from the untaken arm is still unavailable; that is the intersection invariant above, not
 // a reason to erase facts at a scope that genuinely begins inside the taken arm.
 func TestATopLevelScopeInsideABranchUsesItsFacts(t *testing.T) {
+	t.Parallel()
+
 	function, scopes, identity, ranges, _ := hoistableFor(t, `
 		function Component(props) {
 			if (props.flag) {
@@ -339,6 +353,8 @@ func TestATopLevelScopeInsideABranchUsesItsFacts(t *testing.T) {
 
 // TestHoistableHandlesNilInputs pins that the pass declines rather than panicking.
 func TestHoistableHandlesNilInputs(t *testing.T) {
+	t.Parallel()
+
 	if got := analyseHoistableLoads(nil, nil, nil, nil, nil); got != nil {
 		t.Error("a nil function produced an analysis")
 	}
@@ -361,6 +377,8 @@ func TestHoistableHandlesNilInputs(t *testing.T) {
 // This reports instead of raising, because a linter must not panic. Measured at zero conflicts
 // across 400 corpus files, so this pins the zero rather than describing a behaviour that fires.
 func TestHoistableConflictsAreReportedNotSwallowed(t *testing.T) {
+	t.Parallel()
+
 	function, scopes, identity, ranges, _ := hoistableFor(t, `
 		function Component(props) {
 			const object = {a: props.configuration.alpha};
@@ -377,6 +395,8 @@ func TestHoistableConflictsAreReportedNotSwallowed(t *testing.T) {
 
 // TestHoistableCorpusDistribution pins the shape over real code.
 func TestHoistableCorpusDistribution(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}

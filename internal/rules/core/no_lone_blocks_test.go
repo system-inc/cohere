@@ -39,6 +39,8 @@ const noLoneBlocksFile = "/repository/source/NoLoneBlocks.ts"
 // a block-scoped binding -- `let`, `const`, a class, a function declaration, `using` -- which is
 // what the braces exist to contain. The static-block rows are the same question one scope in.
 func TestNoLoneBlocksStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"if (foo) { if (bar) { baz(); } }",
 		"do { bar(); } while (foo)",
@@ -78,6 +80,8 @@ func TestNoLoneBlocksStaysSilent(t *testing.T) {
 // inside another block or inside a static block is `redundantNestedBlock`, everything else is
 // `redundantBlock`. The three-finding case pins both the count and the interleaving.
 func TestNoLoneBlocksFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -126,6 +130,8 @@ func TestNoLoneBlocksFires(t *testing.T) {
 // `sourceType: "module"`, one under `"script"`. A TypeScript file is a module and a module body is
 // always strict, so the block-scoped reading is the only reachable one and the block is clean.
 func TestNoLoneBlocksTreatsEveryFileAsStrict(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, "{ function bar() {} }"))
 
 	// The control, so the silence above is about the function declaration rather than about the
@@ -147,6 +153,8 @@ func TestNoLoneBlocksTreatsEveryFileAsStrict(t *testing.T) {
 // `namespace` inside a block is TS1235 and not legal at all; it is exempted so a recovered parse
 // does not add a finding to source that is already broken.
 func TestNoLoneBlocksExemptsTypeScriptBlockScopedDeclarations(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"{ enum E { A } }",
 		"{ interface I {} }",
@@ -175,6 +183,8 @@ func TestNoLoneBlocksExemptsTypeScriptBlockScopedDeclarations(t *testing.T) {
 // Kept here rather than only in the corpus table, because the corpus rows read as ordinary static
 // block cases and this names what they are actually protecting.
 func TestNoLoneBlocksDoesNotReportAStaticBlockBody(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"class C { static {} }",
 		"class C { static { foo; } }",
@@ -193,6 +203,8 @@ func TestNoLoneBlocksDoesNotReportAStaticBlockBody(t *testing.T) {
 
 // Cases measured against the installed eslint 10.8.1 build that the corpus does not write.
 func TestNoLoneBlocksMatchesTheInstalledBuild(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -245,6 +257,8 @@ func TestNoLoneBlocksMatchesTheInstalledBuild(t *testing.T) {
 // The two-finding case is asserted because it is the one where a port could anchor the outer
 // finding on the inner block and still satisfy every id assertion.
 func TestNoLoneBlocksSpansTheBlock(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "{ {let y = 1;} }"
 
 	result := rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile, sourceText)
@@ -288,6 +302,8 @@ func TestNoLoneBlocksSpansTheBlock(t *testing.T) {
 // statement exempts the block only when the block IS that statement, so `case 1: if (a) { bar; }`
 // is clean throughout while `case 1: { bar; }` is clean for a different reason.
 func TestNoLoneBlocksIdentityNotJustLength(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -332,6 +348,8 @@ func TestNoLoneBlocksIdentityNotJustLength(t *testing.T) {
 // the sibling statement separates them. Without the second row, a reader hitting the first would
 // reasonably conclude the exemption was broken.
 func TestNoLoneBlocksSecondArmOutranksTheBindingExemption(t *testing.T) {
+	t.Parallel()
+
 	// Sole statement of a function body: reports, bindings notwithstanding.
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLoneBlocks, noLoneBlocksFile,
 		"function f() { { let x = 1; void x; } }"), "redundantNestedBlock")

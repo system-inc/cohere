@@ -9,6 +9,8 @@ import (
 const dupeElseIfFile = "/repository/source/Branch.ts"
 
 func TestNoDupeElseIfFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -96,6 +98,8 @@ func TestNoDupeElseIfFires(t *testing.T) {
 }
 
 func TestNoDupeElseIfStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -153,6 +157,8 @@ func TestNoDupeElseIfStaysSilent(t *testing.T) {
 // because the walk continues up the chain after a match unless it returns, and a missing return
 // would produce a finding per ancestor.
 func TestNoDupeElseIfReportsOncePerBranch(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDupeElseIf, dupeElseIfFile,
 		"declare const a: boolean;\nexport function run() { if(a) {} else if(a) {} else if(a) {} }\n"),
 		"unexpected", "unexpected")

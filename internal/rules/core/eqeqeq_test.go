@@ -159,6 +159,8 @@ func eqeqeqSilentCases() []eqeqeqCase {
 }
 
 func TestEqeqeqFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range eqeqeqFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			result := runEqeqeq(t, testCase)
@@ -172,6 +174,8 @@ func TestEqeqeqFires(t *testing.T) {
 }
 
 func TestEqeqeqStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range eqeqeqSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t, runEqeqeq(t, testCase))
@@ -186,6 +190,8 @@ func TestEqeqeqStaysSilent(t *testing.T) {
 // `a == b` becoming `a === b` can change what the program computes. A port that got the judgment
 // right and the ARM wrong would pass every count assertion above while rewriting the tree.
 func TestEqeqeqSplitsFixesFromSuggestions(t *testing.T) {
+	t.Parallel()
+
 	fixArm, suggestionArm := 0, 0
 	for _, testCase := range eqeqeqFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
@@ -240,6 +246,8 @@ func TestEqeqeqSplitsFixesFromSuggestions(t *testing.T) {
 // fixture as `TrimSpace(source)+"\n"` (`rule_testing/program.go`), so a typed rule's expectation
 // must be transformed the same way. This rule needs no checker, so it is compared as written.
 func TestEqeqeqFixesTheSource(t *testing.T) {
+	t.Parallel()
+
 	applied := 0
 	for _, testCase := range eqeqeqFiresCases() {
 		if testCase.wantFixedSource == "" {
@@ -261,6 +269,8 @@ func TestEqeqeqFixesTheSource(t *testing.T) {
 // the source alone. Asserted as carrying NO fix rather than as a fix that happens to be a no-op:
 // those are different artifacts and only the first is what upstream ships.
 func TestEqeqeqDeclinesToApplyASuggestion(t *testing.T) {
+	t.Parallel()
+
 	declined := 0
 	for _, testCase := range eqeqeqFiresCases() {
 		if testCase.wantFixedSource != "" {
@@ -294,6 +304,8 @@ func TestEqeqeqDeclinesToApplyASuggestion(t *testing.T) {
 // the JavaScript oracle, which rejects all of these as parse errors and would have reported a
 // confident zero.
 func TestEqeqeqPreservesTypeSyntax(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -352,6 +364,8 @@ func TestEqeqeqPreservesTypeSyntax(t *testing.T) {
 // cover the operator token and no more. That is the property that makes this rule structurally
 // unable to eat a type annotation, so it is worth stating as a property rather than as six examples.
 func TestEqeqeqRepairSpansOnlyTheOperator(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpan   string
@@ -400,6 +414,8 @@ func TestEqeqeqRepairSpansOnlyTheOperator(t *testing.T) {
 // A fixture that built the options struct directly would leave that line and the rejection of an
 // unknown spelling completely untested.
 func TestDecodeEqeqeqOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("nil input selects upstream's defaults", func(t *testing.T) {
 		decoded, err := DecodeEqeqeqOptions(nil)
 		if err != nil {
@@ -441,6 +457,8 @@ func TestDecodeEqeqeqOptions(t *testing.T) {
 // `options.(T)` on nil yields the zero value, whose empty mode and empty null policy match no arm.
 // Every fixture above reaches the rule through the decoder, so none of them can see this.
 func TestEqeqeqWithNilOptionsUsesTheDefaults(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, Eqeqeq, eqeqeqFile, "a == b"), "unexpected")
 	// The null policy defaults to Always, so a null comparison reports rather than being exempt.
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, Eqeqeq, eqeqeqFile, "a == null"),
@@ -465,6 +483,8 @@ func TestEqeqeqWithNilOptionsUsesTheDefaults(t *testing.T) {
 // measured against the installed rule before the row was written, because reading the code cannot
 // settle whether upstream's `typeof node.value` separates a number from a bigint.
 func TestEqeqeqSeparatesBigIntAndSeesThroughParentheses(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText      string
 		wantRepair      eqeqeqRepair

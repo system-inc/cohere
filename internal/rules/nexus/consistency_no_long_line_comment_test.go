@@ -22,6 +22,8 @@ func lineCommentRun(count int) string {
 }
 
 func TestConsistencyNoLongLineCommentFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -48,6 +50,8 @@ func TestConsistencyNoLongLineCommentFires(t *testing.T) {
 }
 
 func TestConsistencyNoLongLineCommentStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -111,6 +115,8 @@ func TestConsistencyNoLongLineCommentStaysSilent(t *testing.T) {
 // TestConsistencyNoLongLineCommentFixes pins the rewrite, because a fix that lands wrong destroys
 // the comment it was repairing and the finding disappears with it.
 func TestConsistencyNoLongLineCommentFixes(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "// one\n// two\n// three\n// four\n// five\nexport const value = 1;\n"
 	result := rule_testing.Run(t, ConsistencyNoLongLineComment, longCommentFile, sourceText)
 	rule_testing.ExpectFindings(t, result, "longLineComment")
@@ -136,6 +142,8 @@ func TestConsistencyNoLongLineCommentFixes(t *testing.T) {
 // TestConsistencyNoLongLineCommentFixPreservesIndentation checks the indented case separately,
 // since a fix that resets indentation reformats code it was not asked to touch.
 func TestConsistencyNoLongLineCommentFixPreservesIndentation(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "export function thing() {\n" +
 		"    // one\n    // two\n    // three\n    // four\n    // five\n" +
 		"    return 1;\n}\n"
@@ -151,6 +159,8 @@ func TestConsistencyNoLongLineCommentFixPreservesIndentation(t *testing.T) {
 // TestConsistencyNoLongLineCommentWithholdsUnsafeFix covers the one case the fix must refuse: a
 // star-slash in the text would close the block early and change what the rest of the run means.
 func TestConsistencyNoLongLineCommentWithholdsUnsafeFix(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "// one\n// two\n// a */ sequence\n// four\n// five\nexport const value = 1;\n"
 	result := rule_testing.Run(t, ConsistencyNoLongLineComment, longCommentFile, sourceText)
 	rule_testing.ExpectFindings(t, result, "longLineComment")

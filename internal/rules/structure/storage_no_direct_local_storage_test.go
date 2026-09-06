@@ -11,6 +11,8 @@ const localStorageServiceFile = "/repository/source/services/local-storage/Local
 const localStorageInternalFile = "/repository/source/services/local-storage/internal/LocalStorageServiceUtilities.ts"
 
 func TestStorageNoDirectLocalStorageFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -71,6 +73,8 @@ func TestStorageNoDirectLocalStorageFires(t *testing.T) {
 }
 
 func TestStorageNoDirectLocalStorageStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string

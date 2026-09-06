@@ -16,6 +16,8 @@ const eqNullFile = "/repository/source/EqNull.ts"
 // invalid case carries its own line and column assertions, which is why the span test below exists
 // rather than being optional.
 func TestNoEqNullFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -35,6 +37,8 @@ func TestNoEqNullFires(t *testing.T) {
 
 // Both upstream clean cases use `===`, which is the whole point of the rule.
 func TestNoEqNullStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -58,6 +62,8 @@ func TestNoEqNullStaysSilent(t *testing.T) {
 // and it does not, because espree produces no node for parentheses. typescript-go does, so this
 // pair is what pins the `SkipParentheses` call in the rule as fidelity rather than a widening.
 func TestNoEqNullFiresOnCasesBeyondTheCorpus(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -80,6 +86,8 @@ func TestNoEqNullFiresOnCasesBeyondTheCorpus(t *testing.T) {
 // SPELLING rather than about the value compared, which is the part of upstream that reads like an
 // oversight and is not. All four measured clean against the installed build.
 func TestNoEqNullStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -112,6 +120,8 @@ func TestNoEqNullStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
 // because upstream's columns 5 through 16 say the parentheses are INSIDE the reported span even
 // though the null they wrap is what triggered the finding.
 func TestNoEqNullSpansTheWholeComparison(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -141,6 +151,8 @@ func TestNoEqNullSpansTheWholeComparison(t *testing.T) {
 // constant, because comparing a diagnostic to the constant it was built from moves both sides
 // together under mutation and asserts nothing.
 func TestNoEqNullMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoEqNull, eqNullFile, "if (x == null) { }")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))

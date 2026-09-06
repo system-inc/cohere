@@ -54,6 +54,8 @@ func forbidForeignPropTypesOptions(t *testing.T, raw string) any {
 
 // TestForbidForeignPropTypesFires runs the eight failing cases from upstream.
 func TestForbidForeignPropTypesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -146,6 +148,8 @@ func TestForbidForeignPropTypesFires(t *testing.T) {
 
 // TestForbidForeignPropTypesStaysSilent runs the twelve passing cases from upstream.
 func TestForbidForeignPropTypesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -210,6 +214,8 @@ func TestForbidForeignPropTypesStaysSilent(t *testing.T) {
 // untyped harness runs it under any name, but the two suffixes that decide the question are the two
 // here.
 func TestForbidForeignPropTypesHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	for _, suffix := range []string{".tsx", ".ts", ".jsx", ".js"} {
 		t.Run(suffix, func(t *testing.T) {
 			result := rule_testing.Run(
@@ -230,6 +236,8 @@ func TestForbidForeignPropTypesHasNoFileSuffixGate(t *testing.T) {
 // matched property for a destructuring, which are two different choices in one rule, and both were
 // read from upstream's reported columns rather than from its source.
 func TestForbidForeignPropTypesAnchorsOnTheProperty(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -270,6 +278,8 @@ func TestForbidForeignPropTypesAnchorsOnTheProperty(t *testing.T) {
 // of the exemption is entirely unasserted by it. Every case here was measured against the installed
 // build, and two of them are upstream reporting on code that plainly writes rather than reads.
 func TestForbidForeignPropTypesExemptsOnlyAssignmentTargets(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -308,6 +318,8 @@ func TestForbidForeignPropTypesExemptsOnlyAssignmentTargets(t *testing.T) {
 // target, and reports where upstream is silent. No imported fixture can express this: upstream's
 // corpus cannot write the shape, because its parser deleted the node before any test existed.
 func TestForbidForeignPropTypesUnwrapsParentheses(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -338,6 +350,8 @@ func TestForbidForeignPropTypesUnwrapsParentheses(t *testing.T) {
 // The corpus carries the reporting computed-string case and the declining computed-identifier one,
 // and nothing else in this family. The rest were measured against the installed build.
 func TestForbidForeignPropTypesReadsOnlyLiteralKeys(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -378,6 +392,8 @@ func TestForbidForeignPropTypesReadsOnlyLiteralKeys(t *testing.T) {
 // through a closure. The corpus writes one case per walk at one level of nesting, so the depth, the
 // negative case, and the two key-shape declines are all measured rather than imported.
 func TestForbidForeignPropTypesAllowInPropTypesReachesUpward(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -420,6 +436,8 @@ func TestForbidForeignPropTypesAllowInPropTypesReachesUpward(t *testing.T) {
 // still reports even with the option on, and a port that threaded the option through both arms
 // would silence a case upstream reports.
 func TestForbidForeignPropTypesDoesNotApplyTheOptionToPatterns(t *testing.T) {
+	t.Parallel()
+
 	source := `Foo.propTypes = (function () { const { propTypes } = Bar; return propTypes; })();`
 	result := rule_testing.RunWithOptions(
 		t,
@@ -438,6 +456,8 @@ func TestForbidForeignPropTypesDoesNotApplyTheOptionToPatterns(t *testing.T) {
 // default of false, and this asserts that directly rather than through the decoder, which is the
 // one path a fixture routed through the decoder cannot reach.
 func TestForbidForeignPropTypesDefaultsWithoutADecoder(t *testing.T) {
+	t.Parallel()
+
 	source := `Foo.propTypes = { a: Bar.propTypes.b };`
 
 	withoutOptions := rule_testing.RunWithOptions(t, ForbidForeignPropTypes, forbidForeignPropTypesFile, source, nil)
@@ -472,6 +492,8 @@ func TestForbidForeignPropTypesDefaultsWithoutADecoder(t *testing.T) {
 // Asserted against a literal typed here rather than against the rule's own constant, so both sides
 // cannot move together under mutation.
 func TestForbidForeignPropTypesMessageNamesTheProductionFailure(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ForbidForeignPropTypes, forbidForeignPropTypesFile, `const x = Foo.propTypes;`)
 	rule_testing.ExpectFindings(t, result, "forbiddenPropType")
 	if len(result.Diagnostics) != 1 {

@@ -9,6 +9,8 @@ import (
 const staticBlockFile = "/repository/source/Thing.ts"
 
 func TestNoEmptyStaticBlockFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -26,6 +28,8 @@ func TestNoEmptyStaticBlockFires(t *testing.T) {
 }
 
 func TestNoEmptyStaticBlockStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

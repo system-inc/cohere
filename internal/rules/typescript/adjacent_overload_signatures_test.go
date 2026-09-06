@@ -30,6 +30,8 @@ func adjacentOverloadSignaturesCaseName(index int) string {
 // These are the false positives upstream already thought about, and they are most of what this file
 // is for: the reporting half of this rule is easy and the discrimination is not.
 func TestAdjacentOverloadSignaturesStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\nfunction error(a: string);\nfunction error(b: number);\nfunction error(ab: string | number) {}\nexport { error };\n      ",
 		"\nimport { connect } from 'react-redux';\nexport interface ErrorMessageModel {\n  message: string;\n}\nfunction mapStateToProps() {}\nfunction mapDispatchToProps() {}\nexport default connect(mapStateToProps, mapDispatchToProps)(ErrorMessage);\n      ",
@@ -85,6 +87,8 @@ func TestAdjacentOverloadSignaturesStaysSilentOnUpstreamPassCases(t *testing.T) 
 // without the rule doing anything about it. Only a fixture can say that, since no harness knows
 // which node a finding should have pointed at.
 func TestAdjacentOverloadSignaturesFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpans  []string
@@ -301,6 +305,8 @@ func TestAdjacentOverloadSignaturesFiresOnUpstreamFailCases(t *testing.T) {
 //
 // Read as a group these rows are the name-keying table from the rule's doc comment, executable.
 func TestAdjacentOverloadSignaturesDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantCount  int
@@ -495,6 +501,8 @@ func TestAdjacentOverloadSignaturesDiscriminatesOnCasesUpstreamDoesNotWrite(t *t
 // including its `static ` prefix. Each row's expectation is the name the installed build printed for
 // that exact input, recovered from its message text rather than predicted.
 func TestAdjacentOverloadSignaturesNamesTheMemberUpstreamNames(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantName   string
@@ -581,6 +589,8 @@ func TestAdjacentOverloadSignaturesNamesTheMemberUpstreamNames(t *testing.T) {
 // listener wired to the wrong accessor takes the run down here rather than in the real tree. There
 // is no finding to assert; the assertion is that the run completes.
 func TestAdjacentOverloadSignaturesSurvivesContainersWithNoMemberList(t *testing.T) {
+	t.Parallel()
+
 	for name, sourceText := range map[string]string{
 		"enum":         "enum E { A, B }",
 		"mappedType":   "type M<T> = { [K in keyof T]: T[K] };",

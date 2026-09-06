@@ -48,6 +48,8 @@ func redeclareOptions(ignoreDeclarationMerge bool) any {
 // TestNoRedeclareFires covers every reporting case in the corpus that does not need the missing
 // surface, with the message ids upstream states per case.
 func TestNoRedeclareFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -92,6 +94,8 @@ func TestNoRedeclareFires(t *testing.T) {
 // declaration-merge discrimination: an interface pair, a class beside an interface, a namespace
 // beside anything, overload signatures, and the same name bound in scopes that do not overlap.
 func TestNoRedeclareStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -135,6 +139,8 @@ func TestNoRedeclareStaysSilent(t *testing.T) {
 // checker knows. The two assertions below are what our rule does with those inputs today, and both
 // are silence.
 func TestNoRedeclareBuiltinGlobalsIsOutOfScope(t *testing.T) {
+	t.Parallel()
+
 	// Upstream reports this in script mode with `builtinGlobals: true`, and is clean on it in module
 	// mode with the same option. We are silent on both, having no such option.
 	rule_testing.ExpectClean(t,
@@ -159,6 +165,8 @@ func TestNoRedeclareBuiltinGlobalsIsOutOfScope(t *testing.T) {
 // rule a nil checker, the rule returns early, and every StaysSilent case above would keep passing
 // vacuously while every Fires case failed in a way that reads like a rule defect.
 func TestNoRedeclareRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	// The typed harness reports.
 	rule_testing.ExpectFindings(t,
 		rule_testing.RunTyped(t, NoRedeclare, redeclareFile, "var a = 1; var a = 2;"), "redeclared")
@@ -177,6 +185,8 @@ func TestNoRedeclareRequiresTheTypedHarness(t *testing.T) {
 // not weaken the rule, it inverts it: thirteen of upstream's clean cases would start reporting. Both
 // halves are asserted, since a decoder that ignored its input entirely would pass the first alone.
 func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(t *testing.T) {
+	t.Parallel()
+
 	decoded, err := DecodeNoRedeclareOptions(nil)
 	if err != nil {
 		t.Fatalf("DecodeNoRedeclareOptions(nil) errored: %v", err)
@@ -215,6 +225,8 @@ func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(t *testing.T) {
 // carried a leading newline would be off by one byte. These sources are written without one, so the
 // literal and the file agree, and the slice below is taken from the same string the harness wrote.
 func TestNoRedeclareSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -256,6 +268,8 @@ func TestNoRedeclareSpans(t *testing.T) {
 // constant. Comparing to the constant would look correct and would move with any mutation of it,
 // which is how a message-text mutant survives a test written the obvious way.
 func TestNoRedeclareMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "var a = 3;\nvar a = 10;", nil)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -279,6 +293,8 @@ func TestNoRedeclareMessage(t *testing.T) {
 // past two declarations, so without this test the subsumption argument would rest on reading alone.
 // Every verdict below was driven against the installed rule first.
 func TestNoRedeclareMergeSetsSubsumeTheAllOneKindCases(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"interface A {}\ninterface A {}\ninterface A {}",
 		"namespace A {}\nnamespace A {}\nnamespace A {}",

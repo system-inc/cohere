@@ -22,6 +22,8 @@ func noConfusingNonNullAssertionCaseName(index int) string {
 // `tokenAfterLeft !== ')'` test, and they are what keeps this port from reporting a left operand
 // that merely CONTAINS an assertion.
 func TestNoConfusingNonNullAssertionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		// Upstream's valid list, byte for byte.
 		"a == b!;",
@@ -77,6 +79,8 @@ func TestNoConfusingNonNullAssertionStaysSilent(t *testing.T) {
 // rule's wrap suggestion writes two separate edits, so a single-edit applier would pass it while
 // producing the wrong text.
 func TestNoConfusingNonNullAssertionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText      string
 		wantId          string

@@ -34,6 +34,8 @@ const preferConstFile = "/repository/source/PreferConst.ts"
 
 // TestPreferConstFires covers the inputs upstream reports on, with the snapshot's own count.
 func TestPreferConstFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -105,6 +107,8 @@ func TestPreferConstFires(t *testing.T) {
 // positive on correct code carrying a fix that breaks the file. They are not "cases upstream also
 // declines"; they are the rule's entire safety margin.
 func TestPreferConstStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -283,6 +287,8 @@ func TestPreferConstStaysSilent(t *testing.T) {
 // where only some bindings are reassigned DOES report under the default, naming just the
 // never-reassigned ones, and reports nothing under "all".
 func TestPreferConstDestructuringOption(t *testing.T) {
+	t.Parallel()
+
 	anyMode := PreferConstOptions{Destructuring: PreferConstDestructuringAny}
 	allMode := PreferConstOptions{Destructuring: PreferConstDestructuringAll}
 
@@ -355,6 +361,8 @@ func TestPreferConstDestructuringOption(t *testing.T) {
 // option off and stay silent with it on, so a rule ignoring the option fails one half whichever way
 // it errs.
 func TestPreferConstIgnoreReadBeforeAssignOption(t *testing.T) {
+	t.Parallel()
+
 	ignoring := PreferConstOptions{IgnoreReadBeforeAssign: true}
 	notIgnoring := PreferConstOptions{IgnoreReadBeforeAssign: false}
 
@@ -443,6 +451,8 @@ func reportedTextOf(t *testing.T, result rule_testing.Result, index int) string 
 // declaration, which is what makes an `eslint-disable-next-line` above the declaration work and
 // what makes a multi-binding pattern's findings distinguishable from each other.
 func TestPreferConstReportsAtTheBinding(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -489,6 +499,8 @@ func TestPreferConstReportsAtTheBinding(t *testing.T) {
 // only fires where nothing reassigns the binding, so `const` is a strictly more accurate spelling
 // of the same program. It stays a fix, not a suggestion, because there is exactly one valid answer.
 func TestPreferConstFixesTheKeyword(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -528,6 +540,8 @@ func TestPreferConstFixesTheKeyword(t *testing.T) {
 // The finding is still reported in both; only the fix is withheld. That is the honest split: the
 // diagnosis is correct and the repair needs a human to split the declaration.
 func TestPreferConstWithholdsTheFix(t *testing.T) {
+	t.Parallel()
+
 	// A list where one declarator is reassigned. Rewriting the shared keyword would make the
 	// reassigned one a const that is then written to, which is source that parses and does not
 	// compile: the one failure the fix engine structurally cannot refuse.
@@ -571,6 +585,8 @@ func TestPreferConstWithholdsTheFix(t *testing.T) {
 // in a way that reads like a rule bug. This asserts the silence directly, so the failure names its
 // own cause.
 func TestPreferConstNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !PreferConst.NeedsTypeChecker {
 		t.Fatal("PreferConst stopped declaring NeedsTypeChecker; the fixtures below assume it")
 	}
@@ -587,6 +603,8 @@ func TestPreferConstNeedsTheTypedHarness(t *testing.T) {
 // drops. Nothing in the imported corpus catches this, because upstream's shadow cases resolve to
 // declarations that exit through a different path.
 func TestPreferConstUsesNodeIdentityNotDeclarationKind(t *testing.T) {
+	t.Parallel()
+
 	// The outer `a` is never written and must report; the inner `a` is written and must not.
 	result := rule_testing.RunTyped(t, PreferConst, preferConstFile, "let a = 1; { let a = 1; a = 2; }")
 	rule_testing.ExpectFindings(t, result, "preferConst")
@@ -617,6 +635,8 @@ func TestPreferConstUsesNodeIdentityNotDeclarationKind(t *testing.T) {
 // it offered would rewrite correct code into a const that is then written to. This asserts the
 // patched detection directly so a revert to the bare accessor fails here rather than in production.
 func TestPreferConstSeesRestTargets(t *testing.T) {
+	t.Parallel()
+
 	written := []string{
 		"let w; [...w] = [];",
 		"let w; ({...w} = {});",
@@ -660,6 +680,8 @@ func TestPreferConstSeesRestTargets(t *testing.T) {
 // project asking for "all" would silently get the other judgment with nothing reported anywhere.
 // This asserts the decode directly so that a revert fails here rather than in a user's tree.
 func TestPreferConstDecodesItsOptions(t *testing.T) {
+	t.Parallel()
+
 	decode := rule.DecodeOptionsInto[PreferConstOptions]()
 
 	for _, testCase := range []struct {

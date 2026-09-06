@@ -40,6 +40,8 @@ func uselessRenameOptions(t *testing.T, ignoreDestructuring bool, ignoreImport b
 // passing. The generator refuses any byte outside printable ASCII, and TestNoUselessRenameCorpus
 // ByteCheck compares the escape cases against upstream's own bytes.
 func TestNoUselessRenameFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText          string
 		ignoreDestructuring bool
@@ -177,6 +179,8 @@ func TestNoUselessRenameFires(t *testing.T) {
 // option rows are the other half: the same source is a finding without the option and clean with
 // it.
 func TestNoUselessRenameStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText          string
 		ignoreDestructuring bool
@@ -257,6 +261,8 @@ func TestNoUselessRenameStaysSilent(t *testing.T) {
 // let {\\u0061: a} = obj fixes to let {a} = obj. Which side survives is decided by the repair
 // keeping the LOCAL text, and nothing but an output comparison could tell the two apart.
 func TestNoUselessRenameFixes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText          string
 		wantSource          string
@@ -373,6 +379,8 @@ func TestNoUselessRenameFixes(t *testing.T) {
 // result carrying no fixes rather than treating it as an unchanged rewrite. The count is what
 // separates a withheld repair from one that lands and happens to write the same bytes.
 func TestNoUselessRenameDeclinesToFix(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText          string
 		findings            int
@@ -429,6 +437,8 @@ func TestNoUselessRenameDeclinesToFix(t *testing.T) {
 // because a cooked and an uncooked name compare equal through this rule. So the bytes are checked
 // rather than the behaviour: the literal must still contain a backslash-u sequence.
 func TestNoUselessRenameCorpusByteCheck(t *testing.T) {
+	t.Parallel()
+
 	escapeCases := []string{
 		"let {\\u0061: a} = obj;",
 		"let {a: \\u0061} = obj;",
@@ -462,6 +472,8 @@ func TestNoUselessRenameCorpusByteCheck(t *testing.T) {
 // reporting only one of the two names, and on a fixable rule the span is what says the repair lands
 // where the reader was shown.
 func TestNoUselessRenamePointsAtTheWholeRename(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -500,6 +512,8 @@ func TestNoUselessRenamePointsAtTheWholeRename(t *testing.T) {
 // Both rows are upstream's own outputs; this test states them side by side because the asymmetry
 // reads as an inconsistency when the two are pages apart in a generated table.
 func TestNoUselessRenameKeepsTheLocalNameAtBothSites(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -529,6 +543,8 @@ func TestNoUselessRenameKeepsTheLocalNameAtBothSites(t *testing.T) {
 // counting from it withheld seven of upstream's fix vectors. The rows here pin both directions:
 // a comment before the rename fixes, a comment inside the discarded half does not.
 func TestNoUselessRenameCountsOnlyContainedComments(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a comment before the specifier still fixes", func(t *testing.T) {
 		rule_testing.ExpectFixedSource(t, rule_testing.RunWithOptions(t, NoUselessRename,
 			uselessRenameFile, "import {/* comment */foo as foo} from 'foo';",
@@ -553,6 +569,8 @@ func TestNoUselessRenameCountsOnlyContainedComments(t *testing.T) {
 // default-inversion hazard does not apply. They are decoded through pointers anyway, and this test
 // is what would notice if a default moved and the pointers were dropped as redundant.
 func TestDecodeNoUselessRenameOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an absent option leaves all three off", func(t *testing.T) {
 		decoded, err := DecodeNoUselessRenameOptions(nil)
 		if err != nil {
@@ -596,6 +614,8 @@ func TestDecodeNoUselessRenameOptions(t *testing.T) {
 // reports. Written for a surviving mutant, since the imported corpus does not pair a reporting
 // destructuring assignment with a non-target literal of the same shape.
 func TestNoUselessRenameIgnoresAnOrdinaryObjectLiteral(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

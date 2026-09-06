@@ -48,6 +48,8 @@ type unifiedSignaturesCase struct {
 }
 
 func TestUnifiedSignaturesValid(t *testing.T) {
+	t.Parallel()
+
 	cases := []unifiedSignaturesCase{
 		{
 			// Scope containment. Both members are named `f` and neither reports on its own, so this
@@ -326,6 +328,8 @@ func TestUnifiedSignaturesValid(t *testing.T) {
 }
 
 func TestUnifiedSignaturesInvalid(t *testing.T) {
+	t.Parallel()
+
 	cases := []unifiedSignaturesCase{
 		{
 			// Two reporting GROUPS in one scope, which is the only shape that can observe the order

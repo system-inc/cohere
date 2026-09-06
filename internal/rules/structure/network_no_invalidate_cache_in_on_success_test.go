@@ -14,6 +14,8 @@ const cacheDeclarations = "declare const networkService: { cache: { invalidate(k
 	"declare function useMutation(options: unknown): void;\n"
 
 func TestNetworkNoInvalidateCacheInOnSuccessFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -52,6 +54,8 @@ func TestNetworkNoInvalidateCacheInOnSuccessFires(t *testing.T) {
 }
 
 func TestNetworkNoInvalidateCacheInOnSuccessStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -13,6 +13,8 @@ const resultNamingDeclarations = "declare function useAccountQuery(): unknown;\n
 	"declare function useSprings(): unknown;\n"
 
 func TestReactHookRequireResultNamingFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -61,6 +63,8 @@ func TestReactHookRequireResultNamingFires(t *testing.T) {
 }
 
 func TestReactHookRequireResultNamingStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -153,6 +157,8 @@ func TestReactHookRequireResultNamingStaysSilent(t *testing.T) {
 // concrete edit, where the generic message only says the name is thin. Pinned so the order is a
 // decision rather than an accident of how the conditions were written.
 func TestReactHookRequireResultNamingPicksOneComplaint(t *testing.T) {
+	t.Parallel()
+
 	// `dataResult` is generic-adjacent and badly suffixed. The suffix wins.
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactHookRequireResultNaming, resultNamingFile,
 		resultNamingDeclarations+

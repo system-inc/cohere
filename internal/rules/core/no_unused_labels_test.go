@@ -26,6 +26,8 @@ const unusedLabelsFile = "/repository/source/UnusedLabels.ts"
 //
 // 16 remaining inputs report once. 16 + 2 + 3 + 4 + 5 + 2 = 32, which is the snapshot's total.
 func TestNoUnusedLabelsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -79,6 +81,8 @@ func TestNoUnusedLabelsFires(t *testing.T) {
 // that a nested function's own `break label` does not reach the outer label of the same name, while
 // the outer one is separately used and so stays clean.
 func TestNoUnusedLabelsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -113,6 +117,8 @@ func TestNoUnusedLabelsStaysSilent(t *testing.T) {
 // The nested case is the sharper one. The two findings for `A: B: 'foo'` must land on `A` and `B`
 // separately, so a rule reporting the outer LabeledStatement's own range twice is caught here.
 func TestNoUnusedLabelsPointsAtTheLabelOnly(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -157,6 +163,8 @@ func TestNoUnusedLabelsPointsAtTheLabelOnly(t *testing.T) {
 // A fix writing the right string over the wrong span passes a text comparison, so these compare the
 // rewritten source. Every pair is verbatim from upstream's `expect_fix` table.
 func TestNoUnusedLabelsFixRemovesTheLabel(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -215,6 +223,8 @@ func TestNoUnusedLabelsFixRemovesTheLabel(t *testing.T) {
 //
 // The finding still fires in all of these. Only the repair is withheld.
 func TestNoUnusedLabelsDeclinesUnsafeFixes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -267,6 +277,8 @@ func TestNoUnusedLabelsDeclinesUnsafeFixes(t *testing.T) {
 //
 // The finding fires in every case below. Only the repair is withheld.
 func TestNoUnusedLabelsDeclinesFixesInEveryDirectivePosition(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -301,6 +313,8 @@ func TestNoUnusedLabelsDeclinesFixesInEveryDirectivePosition(t *testing.T) {
 // Linter rather than derived: it rewrites `A: B: C: "use strict"` to `C: "use strict"`, removing two
 // labels and refusing the third.
 func TestNoUnusedLabelsFixesOuterLabelsOverADirective(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -332,6 +346,8 @@ func TestNoUnusedLabelsFixesOuterLabelsOverADirective(t *testing.T) {
 // because a rule refusing every string literal passes the whole imported corpus while withholding
 // repairs it should offer.
 func TestNoUnusedLabelsFixesAStringOutsideDirectivePosition(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -370,6 +386,8 @@ func TestNoUnusedLabelsFixesAStringOutsideDirectivePosition(t *testing.T) {
 // suppressed every fix in the file, and the finding would still have fired, so the symptom is a rule
 // that quietly stops repairing rather than one that reports wrongly.
 func TestNoUnusedLabelsFixesDespiteACommentOutsideTheSpan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -401,6 +419,8 @@ func TestNoUnusedLabelsFixesDespiteACommentOutsideTheSpan(t *testing.T) {
 // directive position by checking for a Program or function ancestor: a namespace body is neither,
 // so the fix applies, and the walk has to survive the extra node kind rather than assume it.
 func TestNoUnusedLabelsHandlesTypeScriptContainers(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile,
 		"namespace Outer { A: { foo(); } }")
 	rule_testing.ExpectFindings(t, result, "unusedLabel")
@@ -422,6 +442,8 @@ func TestNoUnusedLabelsHandlesTypeScriptContainers(t *testing.T) {
 // unused, because the jump naming it cannot reach it, and a rule without the boundary calls it used
 // and stays silent.
 func TestNoUnusedLabelsDoesNotLetAJumpEscapeItsFunction(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -467,6 +489,8 @@ func TestNoUnusedLabelsDoesNotLetAJumpEscapeItsFunction(t *testing.T) {
 // matching name rather than marking every label of that name: a rule walking the whole stack and
 // setting each match would call the outer label used and report nothing.
 func TestNoUnusedLabelsMarksOnlyTheNearestMatchingLabel(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUnusedLabels, unusedLabelsFile,
 		"A: { A: { break A; } }")
 	rule_testing.ExpectFindings(t, result, "unusedLabel")
@@ -498,6 +522,8 @@ func TestNoUnusedLabelsMarksOnlyTheNearestMatchingLabel(t *testing.T) {
 // `{ A: (foo) }` to `{ (foo) }` and `foo; A: (bar)` to `foo; (bar)`. Nothing can rejoin across a
 // `{`, a `;`, or a `:`, and at the start of the file there is no previous token to rejoin with.
 func TestNoUnusedLabelsFixesWhenThePrecedingTokenTerminates(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

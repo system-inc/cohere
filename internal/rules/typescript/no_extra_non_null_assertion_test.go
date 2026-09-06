@@ -9,6 +9,8 @@ import (
 const extraNonNullFile = "/repository/source/Thing.ts"
 
 func TestNoExtraNonNullAssertionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -50,6 +52,8 @@ func TestNoExtraNonNullAssertionFires(t *testing.T) {
 // radius is largest: a fix that deleted the wrong byte would satisfy every assertion above, because
 // the finding it is attached to is identical either way.
 func TestNoExtraNonNullAssertionFixesWriteWhatTheyClaim(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -77,6 +81,8 @@ func TestNoExtraNonNullAssertionFixesWriteWhatTheyClaim(t *testing.T) {
 }
 
 func TestNoExtraNonNullAssertionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -28,6 +28,8 @@ func noUnsafeReturnCaseName(index int) string {
 // return annotation is a decision the author made and is respected. And a `Promise<any>` returned
 // from a synchronous function is not this rule's finding.
 func TestNoUnsafeReturnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"function foo() {\n  return;\n}\n",
 		"function foo() {\n  return 1;\n}\n",
@@ -109,6 +111,8 @@ type noUnsafeReturnFinding struct {
 // `unsafeReturnThis` to `unsafeReturn`; it is pinned at ours and the other is recorded in the rule's
 // doc comment so the branch is not read as unported.
 func TestNoUnsafeReturnFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []noUnsafeReturnFinding

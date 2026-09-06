@@ -34,6 +34,8 @@ const noUnusedClassComponentMethodsFile = "/repository/source/NoUnusedClassCompo
 
 // TestNoUnusedClassComponentMethodsFires runs upstream's reporting cases.
 func TestNoUnusedClassComponentMethodsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -83,6 +85,8 @@ func TestNoUnusedClassComponentMethodsFires(t *testing.T) {
 
 // TestNoUnusedClassComponentMethodsStaysSilent runs upstream's clean cases.
 func TestNoUnusedClassComponentMethodsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -150,6 +154,8 @@ func runNoUnusedClassComponentMethods(t *testing.T, sourceText string) rule_test
 // The corpus writes neither, so a port that had grouped all writes together would pass every
 // imported case. Every verdict measured on the installed build.
 func TestNoUnusedClassComponentMethodsDefinitionVersusUse(t *testing.T) {
+	t.Parallel()
+
 	const head = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } "
 	cases := []struct {
 		name       string
@@ -195,6 +201,8 @@ func TestNoUnusedClassComponentMethodsDefinitionVersusUse(t *testing.T) {
 // neither reported nor able to mark anything used, and a method called only from a static method
 // still reports. Both measured.
 func TestNoUnusedClassComponentMethodsStaticIsInvisible(t *testing.T) {
+	t.Parallel()
+
 	const head = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } "
 	cases := []struct {
 		name       string
@@ -221,6 +229,8 @@ func TestNoUnusedClassComponentMethodsStaticIsInvisible(t *testing.T) {
 // arm fires regardless of `computed`, and a private name has its own node type upstream never sees.
 // Every verdict measured on the installed build.
 func TestNoUnusedClassComponentMethodsKeyShapes(t *testing.T) {
+	t.Parallel()
+
 	const head = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } "
 	cases := []struct {
 		name       string
@@ -261,6 +271,8 @@ func TestNoUnusedClassComponentMethodsKeyShapes(t *testing.T) {
 // node has a name. A `createReactClass` object never has one, and neither does an anonymous default
 // export. The two ids carry different interpolations, so this asserts the rendered text as well.
 func TestNoUnusedClassComponentMethodsBothIds(t *testing.T) {
+	t.Parallel()
+
 	named := runNoUnusedClassComponentMethods(t,
 		"declare const React: any;\nclass Foo extends React.Component { render() { return null; } handleClick() {} }\n")
 	rule_testing.ExpectFindings(t, named, "unusedWithClass")
@@ -296,6 +308,8 @@ func TestNoUnusedClassComponentMethodsBothIds(t *testing.T) {
 // mirrors, and a port that merged them would pass every imported case, because the corpus writes
 // each name only on the side where it is exempt. Every verdict measured.
 func TestNoUnusedClassComponentMethodsLifecycleSets(t *testing.T) {
+	t.Parallel()
+
 	const classHead = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } "
 	const objectHead = "declare function createReactClass(spec: any): any;\ncreateReactClass({ render() { return null; }, "
 	cases := []struct {
@@ -328,6 +342,8 @@ func TestNoUnusedClassComponentMethodsLifecycleSets(t *testing.T) {
 // `const { foo: bar } = this` counts the SOURCE name rather than the local one, because it reads
 // `prop.key`. Both measured.
 func TestNoUnusedClassComponentMethodsDestructuringCountsAsUse(t *testing.T) {
+	t.Parallel()
+
 	const head = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } handleClick() {} "
 	cases := []struct {
 		name       string
@@ -353,6 +369,8 @@ func TestNoUnusedClassComponentMethodsDestructuringCountsAsUse(t *testing.T) {
 // points at the name and not at the body. That is invisible to every id assertion above, and it is
 // the difference between a reader seeing one word underlined and seeing twenty lines.
 func TestNoUnusedClassComponentMethodsSpans(t *testing.T) {
+	t.Parallel()
+
 	const head = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } "
 	cases := []struct {
 		name       string
@@ -390,6 +408,8 @@ func TestNoUnusedClassComponentMethodsSpans(t *testing.T) {
 // counts on the object side: the shelf's `react.IsEs5ComponentCall` also accepts `createClass` and
 // the namespaced spelling, and upstream accepts neither. Measured.
 func TestNoUnusedClassComponentMethodsComponentGate(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -431,6 +451,8 @@ func TestNoUnusedClassComponentMethodsComponentGate(t *testing.T) {
 // triggers it, a component declared inside another component's method, is rare. Stated here rather
 // than hidden, so the next reader meets a decision rather than a surprise.
 func TestNoUnusedClassComponentMethodsNestedClass(t *testing.T) {
+	t.Parallel()
+
 	const source = "declare const React: any;\n" +
 		"class Outer extends React.Component {\n" +
 		"  render() { return null; }\n" +
@@ -457,6 +479,8 @@ func TestNoUnusedClassComponentMethodsNestedClass(t *testing.T) {
 
 // TestNoUnusedClassComponentMethodsNeedsNoChecker pins that this rule is syntactic.
 func TestNoUnusedClassComponentMethodsNeedsNoChecker(t *testing.T) {
+	t.Parallel()
+
 	const source = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } handleClick() {} }\n"
 
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnusedClassComponentMethods,
@@ -472,6 +496,8 @@ func TestNoUnusedClassComponentMethodsNeedsNoChecker(t *testing.T) {
 // the opposite. The source carries no JSX, because JSX in a `.ts` file is a syntax error and a case
 // that failed to parse would be silent for a reason unrelated to any gate.
 func TestNoUnusedClassComponentMethodsHasNoFileGate(t *testing.T) {
+	t.Parallel()
+
 	const source = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } handleClick() {} }\n"
 	for _, fileName := range []string{
 		"/repository/source/NoUnusedClassComponentMethods.tsx",
@@ -489,6 +515,8 @@ func TestNoUnusedClassComponentMethodsHasNoFileGate(t *testing.T) {
 // The walk recovers per FILE rather than per rule, so one nil dereference here takes the file away
 // from every rule in the tree, and no `ExpectFindings` fixture can see a panic.
 func TestNoUnusedClassComponentMethodsSurvivesShapesThatWouldPanic(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		"declare function createReactClass(spec: any): any;\ncreateReactClass();\n",
 		"declare function createReactClass(spec: any): any;\ncreateReactClass(1);\n",

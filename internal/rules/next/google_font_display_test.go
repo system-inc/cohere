@@ -7,6 +7,8 @@ import (
 )
 
 func TestGoogleFontDisplayReportsMissing(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -38,6 +40,8 @@ func TestGoogleFontDisplayReportsMissing(t *testing.T) {
 }
 
 func TestGoogleFontDisplayReportsNotRecommended(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -67,6 +71,8 @@ func TestGoogleFontDisplayReportsNotRecommended(t *testing.T) {
 }
 
 func TestGoogleFontDisplayIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

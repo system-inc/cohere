@@ -21,6 +21,8 @@ import (
 // line it prints rather than by walking inputs in order, which is what the brief asks for and
 // what separates a two-finding input from two inputs that happen to be adjacent.
 func TestPreserveCaughtErrorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source  string
 		options any
@@ -193,6 +195,8 @@ func TestPreserveCaughtErrorFires(t *testing.T) {
 // These are the cases that catch a port. Each was added upstream when somebody hit that bug, so
 // a rule that reports on one of them is wrong in a way no invented fixture would have found.
 func TestPreserveCaughtErrorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source  string
 		options any
@@ -226,6 +230,8 @@ func TestPreserveCaughtErrorStaysSilent(t *testing.T) {
 // writes the right characters over the wrong range, and that is the defect this whole test
 // exists to catch.
 func TestPreserveCaughtErrorAppliesUpstreamRepairs(t *testing.T) {
+	t.Parallel()
+
 	vectors := []struct {
 		before string
 		after  string
@@ -375,6 +381,8 @@ func TestPreserveCaughtErrorAppliesUpstreamRepairs(t *testing.T) {
 // in one-line form, so that a mutation replacing the symbol comparison with a text comparison has
 // something small and unambiguous to fail against.
 func TestPreserveCaughtErrorResolvesTheCauseBindingBySymbol(t *testing.T) {
+	t.Parallel()
+
 	rightBinding := `try { a(); } catch (err) { throw new Error("m", { cause: err }); }`
 	if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", rightBinding); len(result.Diagnostics) != 0 {
 		t.Errorf("the caught binding itself must be accepted, got %d findings", len(result.Diagnostics))
@@ -391,6 +399,8 @@ func TestPreserveCaughtErrorResolvesTheCauseBindingBySymbol(t *testing.T) {
 // upstream and two independent early returns here, and a sweep that mutated one while the other's
 // fixture covered the input would score a survivor for the wrong reason.
 func TestPreserveCaughtErrorDoesNotDescendIntoANestedFunction(t *testing.T) {
+	t.Parallel()
+
 	// Measured silent on the release binary in all four shapes.
 	silent := []string{
 		`try { a(); } catch (err) { const f = function () { throw new Error("m"); }; f(); }`,
@@ -415,6 +425,8 @@ func TestPreserveCaughtErrorDoesNotDescendIntoANestedFunction(t *testing.T) {
 // while the four shapes in the test above are silent. Almost certainly an upstream bug; reproduced
 // because the differential harness compares against oxlint.
 func TestPreserveCaughtErrorDoesDescendIntoAnArrowFunction(t *testing.T) {
+	t.Parallel()
+
 	reporting := []string{
 		`try { a(); } catch (err) { const f = () => { throw new Error("m"); }; f(); }`,
 		`try { a(); } catch (err) { const f = async () => { throw new Error("m"); }; f(); }`,
@@ -443,6 +455,8 @@ func TestPreserveCaughtErrorDoesDescendIntoAnArrowFunction(t *testing.T) {
 // The inner catch is analyzed on its own try statement, so its throws are compared against ITS
 // parameter. Without this guard, the first case would report: `errorB` is not `errorA`.
 func TestPreserveCaughtErrorDoesNotDescendIntoANestedCatch(t *testing.T) {
+	t.Parallel()
+
 	inner := `try { a(); } catch (errorA) { try { b(); } catch (errorB) { throw new Error("m", { cause: errorB }); } }`
 	if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", inner); len(result.Diagnostics) != 0 {
 		t.Errorf("a nested catch attaching its own error must be clean, got %d findings", len(result.Diagnostics))
@@ -463,6 +477,8 @@ func TestPreserveCaughtErrorDoesNotDescendIntoANestedCatch(t *testing.T) {
 // reports under ESLint's Linter API on the same input. oxc wins, and this is the fixture that would
 // notice if somebody helpfully widened the list.
 func TestPreserveCaughtErrorRecognizesOnlyThreeConstructors(t *testing.T) {
+	t.Parallel()
+
 	silent := []string{
 		`try { a(); } catch (err) { throw new RangeError("m"); }`,
 		`try { a(); } catch (err) { throw new SyntaxError("m"); }`,
@@ -493,6 +509,8 @@ func TestPreserveCaughtErrorRecognizesOnlyThreeConstructors(t *testing.T) {
 // that would slip past a name-only test, and it is the fixture a mutant removing the global test
 // has to fail against.
 func TestPreserveCaughtErrorRequiresTheGlobalBinding(t *testing.T) {
+	t.Parallel()
+
 	shadowed := []string{
 		"class Error {}\ntry { a(); } catch (err) { throw new Error(\"m\"); }",
 		"let Error = X;\ntry { a(); } catch (err) { throw new Error(\"m\"); }",
@@ -513,6 +531,8 @@ func TestPreserveCaughtErrorRequiresTheGlobalBinding(t *testing.T) {
 // for the same reason at the value position. Adding a paren skip at either site flips a real
 // verdict, and the corpus writes neither form.
 func TestPreserveCaughtErrorSkipsNoParentheses(t *testing.T) {
+	t.Parallel()
+
 	if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts",
 		`try { a(); } catch (err) { throw new (Error)("m"); }`); len(result.Diagnostics) != 0 {
 		t.Errorf("a parenthesized callee is silent upstream, got %d findings", len(result.Diagnostics))
@@ -537,6 +557,8 @@ func TestPreserveCaughtErrorSkipsNoParentheses(t *testing.T) {
 // Upstream returns on the FIRST `cause` key. JavaScript's runtime takes the last. ESLint takes the
 // last too. Measured on the release binary: the first input is silent, the second reports.
 func TestPreserveCaughtErrorReadsTheFirstCauseKey(t *testing.T) {
+	t.Parallel()
+
 	firstIsCorrect := `try { a(); } catch (err) { throw new Error("m", { cause: err, cause: other }); }`
 	if result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", firstIsCorrect); len(result.Diagnostics) != 0 {
 		t.Errorf("upstream reads the first cause key and stops, so this is silent, got %d findings",
@@ -555,6 +577,8 @@ func TestPreserveCaughtErrorReadsTheFirstCauseKey(t *testing.T) {
 // reports it. This also pins the declined fix: upstream's `--fix` writes
 // `{ "cause": err, cause: err }`, a duplicate key, which this port refuses to write.
 func TestPreserveCaughtErrorDoesNotReadAStringLiteralCauseKey(t *testing.T) {
+	t.Parallel()
+
 	source := `try { a(); } catch (err) { throw new Error("m", { "cause": err }); }`
 	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
 	rule_testing.ExpectFindings(t, result, "preserveCaughtError")
@@ -572,6 +596,8 @@ func TestPreserveCaughtErrorDoesNotReadAStringLiteralCauseKey(t *testing.T) {
 // running `oxlint --fix` and reading the file. A fix is applied unattended, so this port reports
 // and proposes nothing rather than writing a duplicate key into a real tree.
 func TestPreserveCaughtErrorWithholdsAFixThatWouldDuplicateTheKey(t *testing.T) {
+	t.Parallel()
+
 	source := `try { a(); } catch (err) { throw new Error("m", { cause: other, cause: err }); }`
 	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
 	rule_testing.ExpectFindings(t, result, "preserveCaughtError")
@@ -589,6 +615,8 @@ func TestPreserveCaughtErrorWithholdsAFixThatWouldDuplicateTheKey(t *testing.T) 
 // All four were measured: they report under `oxlint`, and `oxlint --fix` leaves the file byte
 // identical.
 func TestPreserveCaughtErrorReportsWithoutAFixWhereUpstreamDoes(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		`try { a(); } catch (err) { const o = {}; throw new Error("m", o); }`,
 		`try { a(); } catch (err) { throw new Error("m", 5); }`,
@@ -614,6 +642,8 @@ func TestPreserveCaughtErrorReportsWithoutAFixWhereUpstreamDoes(t *testing.T) {
 // because the decoder is what turns a config into options at runtime and a struct built here would
 // leave both the JSON key and the default untested.
 func TestPreserveCaughtErrorOptionDefaultsToOff(t *testing.T) {
+	t.Parallel()
+
 	bareCatch := `try { a(); } catch { throw new Error("m"); }`
 
 	decode := rule.DecodeOptionsInto[PreserveCaughtErrorOptions]()
@@ -653,6 +683,8 @@ func TestPreserveCaughtErrorOptionDefaultsToOff(t *testing.T) {
 // walked. So the throw inside it, which would otherwise be examined, contributes nothing. The count
 // is the assertion: two findings here would mean the body was walked as well.
 func TestPreserveCaughtErrorOptionSuppressesTheThrowFinding(t *testing.T) {
+	t.Parallel()
+
 	source := `try { a(); } catch { throw new Error("m"); throw new TypeError("n"); }`
 	options := PreserveCaughtErrorOptions{RequireCatchParameter: true}
 	result := rule_testing.RunTypedWithOptions(t, PreserveCaughtError, "input.ts", source, options)
@@ -665,6 +697,8 @@ func TestPreserveCaughtErrorOptionSuppressesTheThrowFinding(t *testing.T) {
 // The span in oxc's snapshot covers the throw statement including its semicolon. The other message
 // points at the catch clause instead, and asserting both is what keeps the two distinguishable.
 func TestPreserveCaughtErrorPointsAtTheWholeThrowStatement(t *testing.T) {
+	t.Parallel()
+
 	source := `try { a(); } catch (err) { throw new Error("m"); }`
 	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
 	if len(result.Diagnostics) != 1 {
@@ -692,6 +726,8 @@ func TestPreserveCaughtErrorPointsAtTheWholeThrowStatement(t *testing.T) {
 // Asserted as literals typed here rather than against the rule's own constants, because a mutation
 // rewriting a message moves both sides of that comparison together and the assertion stays green.
 func TestPreserveCaughtErrorMessagesSayDifferentThings(t *testing.T) {
+	t.Parallel()
+
 	if messagePreserveCaughtError.Id != "preserveCaughtError" {
 		t.Errorf("the throw message id is %q", messagePreserveCaughtError.Id)
 	}
@@ -716,6 +752,8 @@ func TestPreserveCaughtErrorMessagesSayDifferentThings(t *testing.T) {
 // nil rather than panicking, so an untyped run of this rule goes completely SILENT. Every clean
 // fixture would then pass for the wrong reason.
 func TestPreserveCaughtErrorRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !PreserveCaughtError.NeedsTypeChecker {
 		t.Fatalf("this rule resolves symbols and must declare NeedsTypeChecker")
 	}
@@ -754,6 +792,8 @@ func TestPreserveCaughtErrorRequiresTheTypedHarness(t *testing.T) {
 // are this shape. What is added here is the fix half, which the corpus does not assert: there is no
 // name to write, so the finding carries no repair.
 func TestPreserveCaughtErrorHandlesADestructuredParameter(t *testing.T) {
+	t.Parallel()
+
 	source := "try { a(); } catch ({ message }) { throw new Error(message); }"
 	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
 	rule_testing.ExpectFindings(t, result, "preserveCaughtError")
@@ -770,6 +810,8 @@ func TestPreserveCaughtErrorHandlesADestructuredParameter(t *testing.T) {
 // `throw new Error` with no parentheses at all is valid JavaScript. Upstream's fixer looks for an
 // opening parenthesis and returns `noop` when it finds none, so the finding lands with no repair.
 func TestPreserveCaughtErrorHandlesACalleeWithNoArgumentList(t *testing.T) {
+	t.Parallel()
+
 	source := "try { a(); } catch (err) { throw new Error; }"
 	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", source)
 	rule_testing.ExpectFindings(t, result, "preserveCaughtError")
@@ -789,6 +831,8 @@ func TestPreserveCaughtErrorHandlesACalleeWithNoArgumentList(t *testing.T) {
 // Both report, and both repair to the same shape, with the insertion landing inside the real
 // parentheses rather than inside the comment.
 func TestPreserveCaughtErrorScanPastsACommentedParenthesis(t *testing.T) {
+	t.Parallel()
+
 	lineComment := "try { a(); } catch (err) {\n  throw new Error // (\n  ();\n}"
 	result := rule_testing.RunTyped(t, PreserveCaughtError, "input.ts", lineComment)
 	rule_testing.ExpectFindings(t, result, "preserveCaughtError")

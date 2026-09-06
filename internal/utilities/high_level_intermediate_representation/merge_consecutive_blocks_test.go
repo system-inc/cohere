@@ -9,6 +9,8 @@ import "testing"
 // this package key on block structure. The assertion is that the region is one block again and that
 // every instruction survived the join in order.
 func TestMergeCollapsesTheRegionTheSpliceCreated(t *testing.T) {
+	t.Parallel()
+
 	function, inlined := inlinedFixture(t, singleReturnIifeSource, false)
 	if function == nil || inlined != 1 {
 		t.Fatalf("the fixture spliced %d calls, want 1", inlined)
@@ -79,6 +81,8 @@ func TestMergeCollapsesTheRegionTheSpliceCreated(t *testing.T) {
 // the repointing this test is about has nothing left to check and the vacuity guard at the bottom
 // fires. The branch leaves real references behind for the merge to get wrong.
 func TestMergeLeavesTheGraphResolvable(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 		function Component(properties: {items: Array<number>; ready: boolean}) {
 			if (!properties.ready) {
@@ -152,6 +156,8 @@ func TestMergeLeavesTheGraphResolvable(t *testing.T) {
 // arm's instructions into the block before the label and run them unconditionally. Asserted
 // directly, because "nothing merged" is otherwise indistinguishable from a pass that did not run.
 func TestMergeLeavesTheLabeledSpliceAlone(t *testing.T) {
+	t.Parallel()
+
 	function, inlined := inlinedFixture(t, multipleReturnIifeSource, false)
 	if function == nil || inlined != 1 {
 		t.Fatalf("the fixture spliced %d calls, want 1", inlined)
@@ -201,6 +207,8 @@ func TestMergeLeavesTheLabeledSpliceAlone(t *testing.T) {
 // join -- which is the point: a guard is only tested by an input where it is the guard that
 // decides.
 func TestMergeLeavesAJoinBlockAlone(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 		function Component(properties: {flag: boolean; items: Array<number>}) {
 			let out = [];

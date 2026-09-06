@@ -26,6 +26,8 @@ const throwLiteralFile = "/repository/source/ThrowLiteral.ts"
 // its fixtures use `RunTyped`. Handed the plain harness it guards and goes silent, which would make
 // every clean case here pass for the wrong reason.
 func TestNoThrowLiteralStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -66,6 +68,8 @@ func TestNoThrowLiteralStaysSilent(t *testing.T) {
 
 // The sixteen cases upstream reports as `object`.
 func TestNoThrowLiteralFiresObject(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -101,6 +105,8 @@ func TestNoThrowLiteralFiresObject(t *testing.T) {
 // "could be an Error" as far as the syntax knows. A port collapsing the two messages into one
 // passes an id assertion that names either, which is why they are separated here.
 func TestNoThrowLiteralFiresUndef(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -126,6 +132,8 @@ func TestNoThrowLiteralFiresUndef(t *testing.T) {
 // port dereferencing it would crash on. No `ExpectFindings` fixture can see a panic, so this is
 // pinned by asserting the run completes at all.
 func TestNoThrowLiteralHandlesShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	t.Run("?? yields either operand, so an Error on the left is clean", func(t *testing.T) {
 		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
 			"declare const foo: unknown;\nthrow new Error() ?? 'literal';\n"))
@@ -154,6 +162,8 @@ func TestNoThrowLiteralHandlesShapesTheCorpusOmits(t *testing.T) {
 // argument satisfies every assertion above and points a reader past the keyword that makes the line
 // worth reading.
 func TestNoThrowLiteralReportsTheWholeStatement(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "throw 'error';"
 	result := rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile, sourceText)
 	if len(result.Diagnostics) != 1 {
@@ -173,6 +183,8 @@ func TestNoThrowLiteralReportsTheWholeStatement(t *testing.T) {
 // `undefined` name test reports `throw a`. Both halves are asserted here, with the reporting form as
 // the control.
 func TestNoThrowLiteralUndefOnlyForTheGlobal(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
 		"function foo(undefined) { throw undefined; }"))
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoThrowLiteral, throwLiteralFile,
@@ -181,6 +193,8 @@ func TestNoThrowLiteralUndefOnlyForTheGlobal(t *testing.T) {
 
 // The typed harness is required, so a later revert to `rule_testing.Run` fails loudly.
 func TestNoThrowLiteralNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoThrowLiteral.NeedsTypeChecker {
 		t.Fatal("this rule resolves `undefined` through the checker and must declare it")
 	}

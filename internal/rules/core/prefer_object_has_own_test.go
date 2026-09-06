@@ -24,6 +24,8 @@ import (
 // would be the wrong repair.
 
 func TestPreferObjectHasOwnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -101,6 +103,8 @@ func TestPreferObjectHasOwnStaysSilent(t *testing.T) {
 const preferObjectHasOwnDeclinesToFix = "\x00declines"
 
 func TestPreferObjectHasOwnFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		source    string
@@ -160,6 +164,8 @@ func TestPreferObjectHasOwnFires(t *testing.T) {
 // the callee it replaces, and the two are different nodes: a finding on the callee would carry a
 // correct repair while pointing somewhere the reader was never shown.
 func TestPreferObjectHasOwnSpan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -199,6 +205,8 @@ func TestPreferObjectHasOwnSpan(t *testing.T) {
 // every declaration of it is ambient. Both answers were probed on all four shapes before the rule
 // was built on either.
 func TestPreferObjectHasOwnScopeGuard(t *testing.T) {
+	t.Parallel()
+
 	shadowed := []struct {
 		name   string
 		source string
@@ -233,6 +241,8 @@ func TestPreferObjectHasOwnScopeGuard(t *testing.T) {
 // Pinned at the layer that decides it: this is a configuration-surface difference rather than a
 // rule difference, and a port bent to make it clean would be wrong about every other input.
 func TestPreferObjectHasOwnDivergesOnTheGlobalOffDirective(t *testing.T) {
+	t.Parallel()
+
 	source := "/* global Object: off */\n({}).hasOwnProperty.call(a, b);"
 	rule_testing.ExpectFindings(t,
 		rule_testing.RunTyped(t, PreferObjectHasOwn, "file.ts", source), "useHasOwn")
@@ -246,6 +256,8 @@ func TestPreferObjectHasOwnDivergesOnTheGlobalOffDirective(t *testing.T) {
 // upstream's four private-name cases, and no fixture over those cases could tell the two apart.
 // Recorded because building on the helper without knowing this would be building on a coincidence.
 func TestPreferObjectHasOwnPrivateNames(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"class C { #hasOwnProperty: any; foo() { (Object as any).#hasOwnProperty.call(obj, prop) } }",
 		"class C { #call: any; foo() { (Object as any).hasOwnProperty.#call(obj, prop) } }",
@@ -266,6 +278,8 @@ func TestPreferObjectHasOwnPrivateNames(t *testing.T) {
 // corpus has no case for it: `foo.hasOwnProperty.call(obj, prop)` is the nearest, and `foo` is
 // undeclared, which our ambient check already declines for a different reason.
 func TestPreferObjectHasOwnRequiresTheNameObject(t *testing.T) {
+	t.Parallel()
+
 	otherGlobals := []struct {
 		name   string
 		source string

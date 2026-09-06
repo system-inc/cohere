@@ -59,6 +59,8 @@ func containsName(names []string, want string) bool {
 // the failure it guards is silent: a caller that has scopes in the side table but has not built
 // terminals gets an empty result that looks exactly like a function with no dependencies.
 func TestDependenciesRequireScopeTerminals(t *testing.T) {
+	t.Parallel()
+
 	source := `
 		function Component(props) {
 			const object = {a: props.a};
@@ -89,6 +91,8 @@ func TestDependenciesRequireScopeTerminals(t *testing.T) {
 
 // TestDependenciesFindTheRootOfAnAccessPath pins that a scope reading props depends on props.
 func TestDependenciesFindTheRootOfAnAccessPath(t *testing.T) {
+	t.Parallel()
+
 	function, _, deps := dependenciesFor(t, `
 		function Component(props) {
 			const object = {a: props.alpha};
@@ -108,6 +112,8 @@ func TestDependenciesFindTheRootOfAnAccessPath(t *testing.T) {
 // A value created INSIDE a scope is not an input to it. This is `checkValidDependency`'s whole job,
 // and a pass that skipped it would report a scope as depending on its own output.
 func TestDependenciesExcludeValuesTheScopeItselfProduces(t *testing.T) {
+	t.Parallel()
+
 	function, _, deps := dependenciesFor(t, `
 		function Component(props) {
 			const object = {a: props.alpha};
@@ -133,6 +139,8 @@ func TestDependenciesExcludeValuesTheScopeItselfProduces(t *testing.T) {
 // operands are prefixes of the reconstructed dependency, so dependency collection must wait for a
 // phi or another site of use to submit the full path.
 func TestOptionalChainProcessedStoresAreDeferred(t *testing.T) {
+	t.Parallel()
+
 	function := lowerTypedFunctions(t, "optional-processed-store.ts", `
 		function Component(input) {
 			return consume(input?.x.y);
@@ -176,6 +184,8 @@ func TestOptionalChainProcessedStoresAreDeferred(t *testing.T) {
 // inference places the optional join before the call's singleton scope, the full chain need not be
 // an outer memo dependency at all; the invariant here is its depth, not its presence.
 func TestOptionalChainProcessedStoreDoesNotLeakPrefix(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 		// @validatePreserveExistingMemoizationGuarantees
 		import {useMemo} from 'react';
@@ -221,6 +231,8 @@ func TestOptionalChainProcessedStoreDoesNotLeakPrefix(t *testing.T) {
 // comparing only names passes every fixture built from unguarded accesses and silently merges a
 // null-guarded read with an unguarded one, which is a real behaviour change rather than a tidy-up.
 func TestDependencyPathsCompareOptionality(t *testing.T) {
+	t.Parallel()
+
 	guarded := []DependencyPathEntry{{Property: "b", Optional: true}}
 	plain := []DependencyPathEntry{{Property: "b"}}
 	if equalPaths(guarded, plain) {
@@ -240,6 +252,8 @@ func TestDependencyPathsCompareOptionality(t *testing.T) {
 // "Dependency" is a union; "unconditional" is an intersection, so a value read once guarded and once
 // unguarded is unconditional, because the unguarded read already happened.
 func TestMergeAccessIsAUnionOnDependencyAndAnIntersectionOnOptionality(t *testing.T) {
+	t.Parallel()
+
 	if got := mergeAccess(optionalAccess, optionalAccess); got != optionalAccess {
 		t.Errorf("two optional accesses merged to %v, want optionalAccess", got)
 	}
@@ -264,6 +278,8 @@ func TestMergeAccessIsAUnionOnDependencyAndAnIntersectionOnOptionality(t *testin
 // This isolates the tree's nil-input fallback from the real production path, where
 // `CollectHoistablePropertyLoads` supplies the non-null facts.
 func TestDependencyTreeTruncatesWithoutAHoistableSet(t *testing.T) {
+	t.Parallel()
+
 	path := []DependencyPathEntry{{Property: "alpha"}, {Property: "beta"}}
 
 	empty := newDependencyTree(nil)
@@ -299,6 +315,8 @@ func TestDependencyTreeTruncatesWithoutAHoistableSet(t *testing.T) {
 // A scope reading `props.a`, `props.a.b` and `props.a.c` depends on `props.a` once. Without the
 // pruning the scope would report three dependencies that all invalidate together.
 func TestDependencyTreeReducesToTheShallowestPath(t *testing.T) {
+	t.Parallel()
+
 	hoistable := map[IdentifierId]*hoistableNode{
 		7: {nonNull: true, properties: map[string]*hoistableNode{
 			"a": {nonNull: true, properties: map[string]*hoistableNode{}},
@@ -331,6 +349,8 @@ func TestDependencyTreeReducesToTheShallowestPath(t *testing.T) {
 // of them directly would make the output order vary between runs -- invisible in every other test
 // and fatal to a cache keyed on this result.
 func TestDependencyCollectionIsDeterministic(t *testing.T) {
+	t.Parallel()
+
 	source := `
 		function Component(props) {
 			let total = 0;
@@ -373,6 +393,8 @@ func TestDependencyCollectionIsDeterministic(t *testing.T) {
 // upstream of this one each needed a different termination story and a reader should not have to
 // assume this one inherited any of them.
 func TestDependencyCollectionIsASinglePass(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := scopesFor(t, `
 		function Component(props) {
 			const object = {a: props.a, b: props.b};
@@ -427,6 +449,8 @@ func TestDependencyCollectionIsASinglePass(t *testing.T) {
 // mutant collects 12, while the reduced dependency lists happened to coincide. That is why the
 // earlier tests missed it, and why this asserts on the pre-reduction count.
 func TestScopesCloseAtTheirFallthrough(t *testing.T) {
+	t.Parallel()
+
 	function, scopes := scopesFor(t, `
 		function Component(props) {
 			const object = {a: props.a};
@@ -487,6 +511,8 @@ func TestScopesCloseAtTheirFallthrough(t *testing.T) {
 
 // TestDependencyGapsAreDeclared pins the gap list so closing one is a visible event.
 func TestDependencyGapsAreDeclared(t *testing.T) {
+	t.Parallel()
+
 	gaps := DependencyGaps()
 	if len(gaps) != 2 || gaps[0] != DependencyGapOptionalChains ||
 		gaps[1] != DependencyGapTypeExclusions {
@@ -497,6 +523,8 @@ func TestDependencyGapsAreDeclared(t *testing.T) {
 
 // TestDependenciesHandleANilFunction pins that the pass declines rather than panicking.
 func TestDependenciesHandleANilFunction(t *testing.T) {
+	t.Parallel()
+
 	if got := CollectScopeDependencies(nil, MergedScopeIdentity{}); got.Len() != 0 {
 		t.Errorf("a nil function produced %d scopes", got.Len())
 	}
@@ -530,6 +558,8 @@ func TestDependenciesHandleANilFunction(t *testing.T) {
 // The thresholds below are far looser than those numbers. This guards the SHAPE, not the corpus,
 // which moves when the tree does.
 func TestDependencyDistributionIsReal(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -631,6 +661,8 @@ func TestDependencyDistributionIsReal(t *testing.T) {
 // than the one that produced them. Asserted as a nonzero rather than as 28, because the corpus moves
 // and the property that matters is that the two are not the same question.
 func TestDeclarationOriginDiffersFromHoldingScope(t *testing.T) {
+	t.Parallel()
+
 	total, known, differing := 0, 0, 0
 
 	forEachCorpusFunction(t, 200, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
@@ -725,6 +757,8 @@ func TestDeclarationOriginDiffersFromHoldingScope(t *testing.T) {
 // declaration left in that upstream would have dropped prunes a scope upstream keeps. Given that,
 // leaving the helper untested until the case appears is worse than testing it directly.
 func TestPruneDeclarationsLastUsedBefore(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
 	if function == nil {
 		t.Fatal("the source did not lower")

@@ -101,6 +101,8 @@ var consistentReturnFiringCases = []consistentReturnCase{
 // span is asserted because upstream computes four different locations by node kind, and pointing
 // at the whole function instead would also pass every id assertion.
 func TestConsistentReturnFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range consistentReturnFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			result := rule_testing.RunWithOptions(t, ConsistentReturn, consistentReturnFile,
@@ -164,6 +166,8 @@ func consistentReturnLineAndColumn(source string, offset int) (int, int) {
 
 // TestConsistentReturnStaysSilent runs upstream's 23 valid cases.
 func TestConsistentReturnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range consistentReturnCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ConsistentReturn,
@@ -378,6 +382,8 @@ var consistentReturnAddedCases = []struct {
 
 // TestConsistentReturnAddedCases covers what upstream's corpus does not write.
 func TestConsistentReturnAddedCases(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range consistentReturnAddedCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunWithOptions(t, ConsistentReturn, consistentReturnFile,
@@ -403,6 +409,8 @@ func TestConsistentReturnAddedCases(t *testing.T) {
 
 // TestConsistentReturnDecoderRoundTrip pins the option surface through the shipped decoder.
 func TestConsistentReturnDecoderRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name        string
 		optionsJson string
@@ -442,6 +450,8 @@ func TestConsistentReturnDecoderRoundTrip(t *testing.T) {
 // reports at column 18, which is `foo`, while the method node begins at column 11 on `static`.
 // Same for `get`, `async` and the generator asterisk.
 func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		source string
 		// wantText is the source the finding's own range covers.
@@ -478,6 +488,8 @@ func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(t *testing.T) {
 // Measured cost on the ahra tree: 141 findings against the installed rule's 130, with all 130
 // agreeing exactly and nothing missing in the other direction.
 func TestConsistentReturnOverReportsOnATryWithADeclarationAndAFinally(t *testing.T) {
+	t.Parallel()
+
 	reporting := "async function f() { try { const r = g(); return r; } catch (e) { throw e; } finally { k(); } }"
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, ConsistentReturn, consistentReturnFile, reporting), "missingReturn")

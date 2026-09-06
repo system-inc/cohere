@@ -29,6 +29,8 @@ const jsxNoCommentTextnodesFile = "/repository/source/JsxNoCommentTextnodes.tsx"
 
 // TestJsxNoCommentTextnodesFires runs the seven failing cases from upstream, one finding each.
 func TestJsxNoCommentTextnodesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -115,6 +117,8 @@ func TestJsxNoCommentTextnodesFires(t *testing.T) {
 // value would report all three and no fixture written from the corpus could see the difference,
 // because the corpus asserts them as clean either way.
 func TestJsxNoCommentTextnodesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -237,6 +241,8 @@ func TestJsxNoCommentTextnodesStaysSilent(t *testing.T) {
 // because a .ts file cannot hold JSX at all, which makes the gate unobservable there rather than
 // wrong.
 func TestJsxNoCommentTextnodesHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	source := "const a = <div>// invalid</div>;\n"
 	for _, fileName := range []string{
 		"/repository/source/Suffix.tsx",
@@ -258,6 +264,8 @@ func TestJsxNoCommentTextnodesHasNoFileSuffixGate(t *testing.T) {
 // they depend on it incidentally: each would also pass a port that scanned for `//` anywhere. This
 // table separates the two readings, and every row was measured against the installed build.
 func TestJsxNoCommentTextnodesLineAnchoring(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -304,6 +312,8 @@ func TestJsxNoCommentTextnodesLineAnchoring(t *testing.T) {
 // distinction is invisible there, and a port scanning for every match would pass all seven while
 // reporting twice on the first row here.
 func TestJsxNoCommentTextnodesReportsOncePerTextNode(t *testing.T) {
+	t.Parallel()
+
 	t.Run("two comment lines in one text node report once", func(t *testing.T) {
 		source := "const a = <div>\n  // one\n  // two\n</div>;\n"
 		result := rule_testing.Run(t, JsxNoCommentTextnodes, jsxNoCommentTextnodesFile, source)
@@ -330,6 +340,8 @@ func TestJsxNoCommentTextnodesReportsOncePerTextNode(t *testing.T) {
 // none in decision, and these cases are what keeps it honest: if the omission were wrong, they
 // would be the fixtures that said so.
 func TestJsxNoCommentTextnodesIgnoresStringLiterals(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -356,6 +368,8 @@ func TestJsxNoCommentTextnodesIgnoresStringLiterals(t *testing.T) {
 // where the raw text really does hold the slashes, so the pair separates "reads raw" from "reports
 // nothing on a pre element".
 func TestJsxNoCommentTextnodesReadsRawSource(t *testing.T) {
+	t.Parallel()
+
 	t.Run("entity-escaped slashes are clean", func(t *testing.T) {
 		source := "const a = <pre>&#x2F;&#x2F; TODO</pre>;\n"
 		result := rule_testing.Run(t, JsxNoCommentTextnodes, jsxNoCommentTextnodesFile, source)
@@ -377,6 +391,8 @@ func TestJsxNoCommentTextnodesReadsRawSource(t *testing.T) {
 // than the comment. `rule_testing.Run` writes the source verbatim, unlike `RunTyped` which trims
 // it, so the literal here is the file on disk and slicing it directly is correct.
 func TestJsxNoCommentTextnodesSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -416,6 +432,8 @@ func TestJsxNoCommentTextnodesSpans(t *testing.T) {
 // comparing a finding to the constant it was reported with is an equality that moves on both sides
 // under mutation and cannot fail.
 func TestJsxNoCommentTextnodesMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageJsxNoCommentTextnodes.Id != "putCommentInBraces" {
 		t.Errorf("message id = %q", messageJsxNoCommentTextnodes.Id)
 	}

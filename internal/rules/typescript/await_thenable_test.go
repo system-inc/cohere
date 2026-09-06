@@ -53,6 +53,8 @@ export {};
 // Each was additionally driven through `@typescript-eslint` 8.67.0 on a real program before it
 // became a fixture, and both references produced the same verdict on all of them.
 func TestAwaitThenableFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -92,6 +94,8 @@ func TestAwaitThenableFires(t *testing.T) {
 // silent, while `T extends number` reports and sits in the Fires table above. Nothing in the rule
 // file shows that boundary.
 func TestAwaitThenableStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -140,6 +144,8 @@ func TestAwaitThenableStaysSilent(t *testing.T) {
 // finding IS expected, so the failing half is the only reason the gap was visible at all. See the
 // note on disposeGlobals.
 func TestAwaitThenableDisposable(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -176,6 +182,8 @@ func TestAwaitThenableDisposable(t *testing.T) {
 // body begins, not at any single node. The `await using` arm points at the INITIALIZER rather than
 // at the declaration, so five declarators produce findings at five different offsets.
 func TestAwaitThenableSpans(t *testing.T) {
+	t.Parallel()
+
 	t.Run("the await arm spans the whole await expression", func(t *testing.T) {
 		source := "async function f() {\n  await 0;\n}"
 		result := rule_testing.RunTyped(t, AwaitThenable, awaitThenableFile, source)
@@ -255,6 +263,8 @@ func TestAwaitThenableSpans(t *testing.T) {
 // a space follows the keyword, which is what makes them a real test of the range rather than of the
 // intent.
 func TestAwaitThenableSuggestions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -336,6 +346,8 @@ func applySuggestion(t *testing.T, source string, suggestion rule.Suggestion) st
 // Context is built by hand. This test pins the declaration AND the decline, so losing either one
 // fails loudly rather than going vacuously green.
 func TestAwaitThenableRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !AwaitThenable.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}

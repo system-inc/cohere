@@ -20,6 +20,8 @@ const documentFile = "pages/_document.jsx"
 // The snapshot records 3 diagnostics from 2 failing inputs, so one finding per input is wrong for
 // this corpus. The second failing case asserts two ids.
 func TestNoPageCustomFontFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -145,6 +147,8 @@ func TestNoPageCustomFontFires(t *testing.T) {
 
 // The clean cases. Every upstream one, plus the invented twins that pin what makes each pass.
 func TestNoPageCustomFontStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -319,6 +323,8 @@ func TestNoPageCustomFontStaysSilent(t *testing.T) {
 // The literal strings here are typed rather than derived from the rule's own message constants: a
 // comparison against the constant moves with the constant under mutation and passes either way.
 func TestNoPageCustomFontPointsAtTheWholeElement(t *testing.T) {
+	t.Parallel()
+
 	source := "export default function D() {\n  return <div><link href=\"https://fonts.googleapis.com/css2?family=Inter\" rel=\"stylesheet\" /></div>\n}\n"
 	result := rule_testing.Run(t, NoPageCustomFont, "pages/index.tsx", source)
 	if len(result.Diagnostics) != 1 {
@@ -350,6 +356,8 @@ func TestNoPageCustomFontPointsAtTheWholeElement(t *testing.T) {
 // closing tag too. Ours anchors on the opening element, so it does not. Recorded as what our rule
 // decides, with the difference stated rather than left for a reader to find.
 func TestNoPageCustomFontPointsAtTheOpeningTagOfAPairedElement(t *testing.T) {
+	t.Parallel()
+
 	source := "export default function D() {\n  return <div><link href=\"https://fonts.googleapis.com/css2?family=Inter\"></link></div>\n}\n"
 	result := rule_testing.Run(t, NoPageCustomFont, "pages/index.tsx", source)
 	if len(result.Diagnostics) != 1 {
@@ -364,6 +372,8 @@ func TestNoPageCustomFontPointsAtTheOpeningTagOfAPairedElement(t *testing.T) {
 
 // The second finding's span and message, so both message constants are pinned rather than one.
 func TestNoPageCustomFontOutsideDefaultExportMessage(t *testing.T) {
+	t.Parallel()
+
 	source := "function Links() {\n  return <link href=\"https://fonts.googleapis.com/css2?family=Inter\" />\n}\nexport default function D() { return <div><Links /></div> }\n"
 	result := rule_testing.Run(t, NoPageCustomFont, "pages/_document.tsx", source)
 	if len(result.Diagnostics) != 1 {

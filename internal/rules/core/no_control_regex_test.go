@@ -20,6 +20,8 @@ const controlRegexFile = "/repository/source/ControlRegex.ts"
 // calls, and this port watches the literal form only; the constructor arm is a separate surface with
 // its own discrimination and porting half of it silently would be worse than declining it.
 func TestNoControlRegexFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -53,6 +55,8 @@ func TestNoControlRegexFires(t *testing.T) {
 // value and none is reported, because the rule objects to spelling a code out by number rather than
 // to the code point being present.
 func TestNoControlRegexStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -85,6 +89,8 @@ func TestNoControlRegexStaysSilent(t *testing.T) {
 // its 57 failing inputs produce 34. Its corpus proves the batching only indirectly, through a
 // snapshot count a porter has to go and read. This asserts it directly: three escapes, one finding.
 func TestNoControlRegexReportsOncePerPattern(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoControlRegex, controlRegexFile, "export const r = /\\x01\\x02\\x03/;"),
 		"noControlRegex")

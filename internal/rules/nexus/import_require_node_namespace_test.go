@@ -7,6 +7,8 @@ import (
 )
 
 func TestImportRequireNodeNamespaceFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		source  string
@@ -60,6 +62,8 @@ func TestImportRequireNodeNamespaceFires(t *testing.T) {
 }
 
 func TestImportRequireNodeNamespaceStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -106,6 +110,8 @@ func TestImportRequireNodeNamespaceStaysSilent(t *testing.T) {
 }
 
 func TestExpectedAlias(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]string{
 		"node:fs":             "NodeFileSystem",
 		"fs":                  "NodeFileSystem",
@@ -131,6 +137,8 @@ func TestExpectedAlias(t *testing.T) {
 // to the tests. A fix is the one part of a rule that changes source, so it is the one part where an
 // id assertion proves the least.
 func TestTheNodePrefixFixWritesTheSpecifierItPromises(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ImportRequireNodeNamespace, "app/Probe.ts",
 		"import * as NodeFileSystem from 'fs';\n")
 

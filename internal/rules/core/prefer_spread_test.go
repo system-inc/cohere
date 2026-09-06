@@ -11,6 +11,8 @@ import (
 // The two shapes the rule is about: a bare callee given an empty `this`, and a member callee given
 // back the object it was reached through.
 func TestPreferSpreadReportsRedundantThisArgument(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"foo.apply(undefined, args);",
 		"foo.apply(null, args);",
@@ -36,6 +38,8 @@ func TestPreferSpreadReportsRedundantThisArgument(t *testing.T) {
 // `foo['apply'](null, args)` does exactly what `foo.apply(null, args)` does, so a rule that read
 // only the dotted form would have a hole that any minifier output falls into.
 func TestPreferSpreadReadsBothMemberAccessForms(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		`foo["apply"](null, args);`,
 		"foo[`apply`](null, args);",
@@ -57,6 +61,8 @@ func TestPreferSpreadReadsBothMemberAccessForms(t *testing.T) {
 // is the same receiver as one written inline. A comparison over raw source text would miss every
 // one of these, which is the shape real formatted code takes.
 func TestPreferSpreadIgnoresCommentsAndWhitespace(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"obj\n  .foo\n  .apply(obj, args);",
 		"obj /* x */ . foo . apply(obj, args);",
@@ -75,6 +81,8 @@ func TestPreferSpreadIgnoresCommentsAndWhitespace(t *testing.T) {
 // change nothing, so they must not hide the call. This is separate from the optional-chaining case
 // below, where the parentheses do change meaning.
 func TestPreferSpreadSeesThroughGroupingParentheses(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"foo.apply((null), args);",
 		"obj.foo.apply((obj), args);",
@@ -92,6 +100,8 @@ func TestPreferSpreadSeesThroughGroupingParentheses(t *testing.T) {
 // An optional call or an optional property read still ends in the same `.apply()` with the same
 // redundant `this`, so the rewrite is still available and the rule still fires.
 func TestPreferSpreadHandlesOptionalChaining(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"foo.apply?.(undefined, args);",
 		"foo?.apply(undefined, args);",
@@ -112,6 +122,8 @@ func TestPreferSpreadHandlesOptionalChaining(t *testing.T) {
 // receivers; ours keeps the node and stays silent, which is the stricter and the correct reading.
 // A finding here would be a false one.
 func TestPreferSpreadKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"(a?.b).c.foo.apply(a?.b.c, args);",
 		"a?.b.c.foo.apply((a?.b).c, args);",
@@ -127,6 +139,8 @@ func TestPreferSpreadKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
 // Every case here is an `.apply()` that is doing the job `.apply()` exists for: setting a `this`
 // the call would not otherwise have. Rewriting any of them to spread syntax would change behavior.
 func TestPreferSpreadStaysSilentWhenTheThisBindingMatters(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"foo.apply(obj, args);",
 		"obj.foo.apply(null, args);",
@@ -151,6 +165,8 @@ func TestPreferSpreadStaysSilentWhenTheThisBindingMatters(t *testing.T) {
 // it here would give the reader a message about `this` bindings for a call whose `this` is not the
 // problem.
 func TestPreferSpreadLeavesArrayLiteralsToNoUselessCall(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"foo.apply(undefined, [1, 2]);",
 		"foo.apply(null, [1, 2]);",
@@ -169,6 +185,8 @@ func TestPreferSpreadLeavesArrayLiteralsToNoUselessCall(t *testing.T) {
 // and a private `#apply` is a different property that spells the same word. Both must stay silent,
 // and both are shapes a looser check would report.
 func TestPreferSpreadIgnoresCallsThatAreNotApply(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"var apply; foo[apply](null, args);",
 		"class C { #apply; m() { foo.#apply(undefined, args); } }",

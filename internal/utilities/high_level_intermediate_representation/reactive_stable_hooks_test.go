@@ -23,6 +23,8 @@ import (
 // before this landed: six of the twelve fixtures that ungating adds were exactly this, naming
 // `startTransition`, `addOptimistic`, `dispatchAction`, `start`, `start` and `setState`.
 func TestStableHookPositionsAreExemptedFromReactivity(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string

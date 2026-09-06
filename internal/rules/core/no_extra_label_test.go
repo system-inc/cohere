@@ -19,6 +19,8 @@ const extraLabelFile = "/repository/source/ExtraLabel.ts"
 // was retyped and no escape sequence was ever hand-written. The generator refuses any case
 // containing a byte outside printable ASCII, which is what would let a cooked escape through.
 func TestNoExtraLabelFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -61,6 +63,8 @@ func TestNoExtraLabelFires(t *testing.T) {
 // upstream stops the search there and leaves the label alone rather than reporting a jump whose
 // label is load bearing.
 func TestNoExtraLabelStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -97,6 +101,8 @@ func TestNoExtraLabelStaysSilent(t *testing.T) {
 // are the interesting half: a comment before the keyword or after the label sits outside the
 // removal span and the repair is still offered.
 func TestNoExtraLabelFixes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -134,6 +140,8 @@ func TestNoExtraLabelFixes(t *testing.T) {
 // Asserting the source is UNCHANGED is the only thing that can see a port which repairs a case
 // upstream refuses to touch, since the finding itself is identical either way.
 func TestNoExtraLabelDeclinesToFixOverAComment(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -170,6 +178,8 @@ func TestNoExtraLabelDeclinesToFixOverAComment(t *testing.T) {
 // whole `break A;` statement, so the span is the only thing separating the two readings, and a
 // reader shown the statement would not be shown the token the repair deletes.
 func TestNoExtraLabelPointsAtTheLabel(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoExtraLabel, extraLabelFile, "A: while (a) break A;")
 	rule_testing.ExpectFindings(t, result, "unexpected")
 
@@ -206,6 +216,8 @@ func TestNoExtraLabelPointsAtTheLabel(t *testing.T) {
 // reporting cases were checked by column as well as by count: upstream reports at column 52 and 55
 // respectively, which are the labels inside and after the function rather than the outer one.
 func TestNoExtraLabelStopsAtALabeledBlockOfTheSameName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -43,6 +43,8 @@ func forbidDomPropsOptions(t *testing.T, raw string) any {
 
 // TestForbidDomPropsFires runs every case this port reports on.
 func TestForbidDomPropsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -175,6 +177,8 @@ func TestForbidDomPropsFires(t *testing.T) {
 
 // TestForbidDomPropsStaysSilent runs every case this port declines.
 func TestForbidDomPropsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -275,6 +279,8 @@ func TestForbidDomPropsStaysSilent(t *testing.T) {
 // than either alone. A port anchoring on the name node, or on the element, would pass every
 // message-id fixture above while pointing somewhere the reader was never shown.
 func TestForbidDomPropsReportsOnTheWholeAttribute(t *testing.T) {
+	t.Parallel()
+
 	const source = `<div className="foo" />`
 
 	result := rule_testing.RunWithOptions(t, ForbidDomProps, forbidDomPropsFile, source, forbidDomPropsOptions(t, `{"forbid":["className"]}`))
@@ -294,6 +300,8 @@ func TestForbidDomPropsReportsOnTheWholeAttribute(t *testing.T) {
 // falls back to the default rather than reporting an empty finding. All three are asserted against
 // literals typed here rather than against the rule's own constants, which would move under mutation.
 func TestForbidDomPropsMessageText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		rawOptions string
@@ -336,6 +344,8 @@ func TestForbidDomPropsMessageText(t *testing.T) {
 // bracket there as a type assertion, so no JSX attribute node exists for any rule to see. Probed
 // with a control across all four extensions on a sibling rule with the same anchor.
 func TestForbidDomPropsHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	const source = `<div className="foo" />`
 
 	for _, fileName := range []string{
@@ -356,6 +366,8 @@ func TestForbidDomPropsHasNoFileSuffixGate(t *testing.T) {
 // decoder tries the string first. `disallowedFor` needs a pointer on the wire, because an absent
 // key means every tag and an empty array means no tag, and a plain slice cannot tell them apart.
 func TestDecodeForbidDomPropsOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an empty body forbids nothing", func(t *testing.T) {
 		decoded, err := DecodeForbidDomPropsOptions(nil)
 		if err != nil {
@@ -436,6 +448,8 @@ func TestDecodeForbidDomPropsOptions(t *testing.T) {
 // lowercase, and the two disagree on every character with no case. Each expectation here was
 // measured by driving the installed rule on the corresponding tag.
 func TestForbidDomPropsIsDomNodeName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		want bool

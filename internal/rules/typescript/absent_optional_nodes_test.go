@@ -40,6 +40,8 @@ import (
 // from here. When a new rule reaches for something optional in a shape not listed, the fix is to add
 // the shape rather than to trust the green.
 func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		// An assertion as an entire expression statement, so its parent chain is one link deep.
 		"declare const a: any;\na!;\n",

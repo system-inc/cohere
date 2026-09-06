@@ -57,6 +57,8 @@ func runUseBeforeDefineCase(t *testing.T, testCase useBeforeDefineCase) rule_tes
 }
 
 func TestNoUseBeforeDefineFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []useBeforeDefineCase{
 		{
 			name:     "case 106",
@@ -1210,6 +1212,8 @@ func TestNoUseBeforeDefineFires(t *testing.T) {
 }
 
 func TestNoUseBeforeDefineStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []useBeforeDefineCase{
 		{
 			name:     "case 0",
@@ -2155,6 +2159,8 @@ func TestNoUseBeforeDefineStaysSilent(t *testing.T) {
 // wrong line. The two positions are far apart in exactly the cases this rule exists for, and
 // upstream reports on the reference.
 func TestNoUseBeforeDefineReportsTheUseNotTheDeclaration(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name           string
 		source         string
@@ -2203,6 +2209,8 @@ func TestNoUseBeforeDefineReportsTheUseNotTheDeclaration(t *testing.T) {
 // assertion in this file, because ExpectFindings compares the id against the rule's own constant and
 // both sides would move together. The literals below are typed out rather than referenced.
 func TestNoUseBeforeDefineMessageText(t *testing.T) {
+	t.Parallel()
+
 	if messageUsedBeforeDefined.Id != "usedBeforeDefined" {
 		t.Errorf("message id is %q, want %q", messageUsedBeforeDefined.Id, "usedBeforeDefined")
 	}
@@ -2230,6 +2238,8 @@ func TestNoUseBeforeDefineMessageText(t *testing.T) {
 // struct unmarshal rejects outright, so without the string arm the config layer would surface a
 // legal spelling as a configuration error.
 func TestNoUseBeforeDefineDecodesTheStringForm(t *testing.T) {
+	t.Parallel()
+
 	decoded, err := DecodeNoUseBeforeDefineOptions(json.RawMessage(`"nofunc"`))
 	if err != nil {
 		t.Fatalf("decoding the string form: %v", err)
@@ -2256,6 +2266,8 @@ func TestNoUseBeforeDefineDecodesTheStringForm(t *testing.T) {
 // almost nothing, with every fixture above still green because every one of them reaches the rule
 // through the decoder.
 func TestNoUseBeforeDefineDefaultsSurviveAnAbsentConfiguration(t *testing.T) {
+	t.Parallel()
+
 	for _, options := range []any{nil, any(nil), NoUseBeforeDefineOptions{}} {
 		settings := resolveNoUseBeforeDefineSettings(options)
 
@@ -2281,6 +2293,8 @@ func TestNoUseBeforeDefineDefaultsSurviveAnAbsentConfiguration(t *testing.T) {
 // between the rule and either a panic or, worse, a vacuous silence. This case asserts the decline is
 // silent rather than fatal, so a later revert of the guard fails loudly here.
 func TestNoUseBeforeDefineRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;")
 	rule_testing.ExpectClean(t, result)
 
@@ -2314,6 +2328,8 @@ func TestNoUseBeforeDefineRequiresTheTypedHarness(t *testing.T) {
 // separating these is `a(); function a() {}` at top level, which resolves and which this rule
 // reports.
 func TestNoUseBeforeDefineSubstrateDivergences(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -2352,6 +2368,8 @@ func TestNoUseBeforeDefineSubstrateDivergences(t *testing.T) {
 // one of them at column 1; this rule agrees only because of that choice. A mutation replacing it
 // with `Declarations[0]` survives the entire 349-row corpus, which is why these cases exist.
 func TestNoUseBeforeDefineMergedDeclarations(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -2421,6 +2439,8 @@ func TestNoUseBeforeDefineMergedDeclarations(t *testing.T) {
 // Every expectation below was measured by driving the installed ESLint rule through the Linter API
 // with the typescript-eslint parser, not read off the source.
 func TestNoUseBeforeDefineQualifiedNames(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -2468,6 +2488,8 @@ func TestNoUseBeforeDefineQualifiedNames(t *testing.T) {
 // Every expectation was measured against the installed ESLint rule with the typescript-eslint parser
 // and jsx enabled.
 func TestNoUseBeforeDefineJsxAttributes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -2504,6 +2526,8 @@ func TestNoUseBeforeDefineJsxAttributes(t *testing.T) {
 // The corpus writes no shorthand property anywhere in its 354 cases, so nothing imported can see
 // this. On the real tree it was 3,243 findings, and the first three read at source were all this.
 func TestNoUseBeforeDefineShorthandProperties(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -2547,6 +2571,8 @@ func TestNoUseBeforeDefineShorthandProperties(t *testing.T) {
 //
 // Every count below was measured against that rule.
 func TestNoUseBeforeDefineDestructuringPropertyNames(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -2591,6 +2617,8 @@ func TestNoUseBeforeDefineDestructuringPropertyNames(t *testing.T) {
 // shorthand method and one as a function expression, which upstream's parser renders identically and
 // ours does not.
 func TestNoUseBeforeDefineObjectMethodParameters(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"const o = { start(controller) { controller.close(); } };",
 		"function f(controller) { controller.close(); }",

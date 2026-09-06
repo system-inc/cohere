@@ -14,6 +14,8 @@ const duplicateEnumValuesFile = "/repository/source/Values.ts"
 // no backslash escapes, verified byte against byte by the script that wrote this file.
 
 func TestNoDuplicateEnumValuesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\n            enum E {\n              A,\n              B,\n            }\n        ",
 		"\n            enum E {\n              A = 1,\n              B,\n            }\n        ",
@@ -49,6 +51,8 @@ func TestNoDuplicateEnumValuesStaysSilent(t *testing.T) {
 }
 
 func TestNoDuplicateEnumValuesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		findings   int
@@ -82,6 +86,8 @@ func TestNoDuplicateEnumValuesFires(t *testing.T) {
 // input with more than one repeat, so it votes on none of them. Measured: `enum E { A = 1, B = 1,
 // C = 1 }` reports twice and adding `D = 1` makes it three, so it is one per extra copy.
 func TestNoDuplicateEnumValuesReportsOncePerExtraCopy(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile, "enum E { A = 1, B = 1, C = 1 }\n"),
 		"noDuplicateEnumValues", "noDuplicateEnumValues")
@@ -102,6 +108,8 @@ func TestNoDuplicateEnumValuesReportsOncePerExtraCopy(t *testing.T) {
 // so it needs its own assertion. Measured: the release binary prints `2:7` for this input, which is
 // the `1` on line two.
 func TestNoDuplicateEnumValuesPointsAtTheEarlierInitializer(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "enum E {\n  A = 1,\n  B = 1,\n}\n"
 	result := rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile, sourceText)
 	rule_testing.ExpectFindings(t, result, "noDuplicateEnumValues")
@@ -128,6 +136,8 @@ func TestNoDuplicateEnumValuesPointsAtTheEarlierInitializer(t *testing.T) {
 //
 // The imported corpus cannot see this at all, and neither can a fixture asserting only message ids.
 func TestNoDuplicateEnumValuesAnchorsNumbersAtTheFirstAndStringsAtThePrevious(t *testing.T) {
+	t.Parallel()
+
 	numeric := "enum N {\n  A = 1,\n  B = 1,\n  C = 1,\n}\n"
 	numericResult := rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile, numeric)
 	rule_testing.ExpectFindings(t, numericResult, "noDuplicateEnumValues", "noDuplicateEnumValues")
@@ -156,6 +166,8 @@ func TestNoDuplicateEnumValuesAnchorsNumbersAtTheFirstAndStringsAtThePrevious(t 
 // spellings that would separate the two approaches if it were not. `0x10` against `16` is upstream's
 // own fail case; the rest were measured on the release binary and all report.
 func TestNoDuplicateEnumValuesComparesTheParsedValueNotTheSpelling(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"enum E { A = 1, B = 0x1 }\n",
 		"enum E { A = 1, B = 1.0 }\n",
@@ -186,6 +198,8 @@ func TestNoDuplicateEnumValuesComparesTheParsedValueNotTheSpelling(t *testing.T)
 // would be silent here. The escape is built rather than typed, so nothing on the path to this file
 // could cook it early.
 func TestNoDuplicateEnumValuesComparesTheCookedStringValue(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "enum E { A = " + "\"a\\u0041b\"" + ", B = 'aAb' }\n"
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile, sourceText),
@@ -203,6 +217,8 @@ func TestNoDuplicateEnumValuesComparesTheCookedStringValue(t *testing.T) {
 // corpus. This restates it directly because the two-table structure is the thing being guarded and
 // the corpus case reads as being about coercion.
 func TestNoDuplicateEnumValuesKeepsNumbersAndStringsApart(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile,
 		"enum E { A = 1, B = '1', C = 0, D = '0' }\n"))
 }
@@ -214,6 +230,8 @@ func TestNoDuplicateEnumValuesKeepsNumbersAndStringsApart(t *testing.T) {
 // and falls through. All five were measured on the release binary with a firing control in the same
 // run, because a silent probe and a broken probe look identical.
 func TestNoDuplicateEnumValuesDeclinesTheShapesUpstreamDoesNotMatch(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -245,6 +263,8 @@ func TestNoDuplicateEnumValuesDeclinesTheShapesUpstreamDoesNotMatch(t *testing.T
 // A rule gathering into one map for the file would report the second enum's first member. Measured:
 // the release binary reports twice on this input, once inside each enum, rather than three times.
 func TestNoDuplicateEnumValuesScopesToOneEnum(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile,
 			"enum E { A = 1, B = 1 }\nenum F { C = 1, D = 1 }\n"),
@@ -261,6 +281,8 @@ func TestNoDuplicateEnumValuesScopesToOneEnum(t *testing.T) {
 // nothing, but a listener anchored on something narrower would miss them. Measured: the release
 // binary reports on both.
 func TestNoDuplicateEnumValuesReachesConstAndDeclareEnums(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile, "const enum E { A = 1, B = 1 }\n"),
 		"noDuplicateEnumValues")
@@ -278,6 +300,8 @@ func TestNoDuplicateEnumValuesReachesConstAndDeclareEnums(t *testing.T) {
 // binary: `enum E { "A" = 1, ["B"] = 1 }` reports and its help says `Give B a unique value`. This
 // also guards against reading the name with `Node.Text()`, which panics on a ComputedPropertyName.
 func TestNoDuplicateEnumValuesReadsComputedAndQuotedMemberNames(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile, "enum E { \"A\" = 1, [\"B\"] = 1 }\n"),
 		"noDuplicateEnumValues")
@@ -289,6 +313,8 @@ func TestNoDuplicateEnumValuesReadsComputedAndQuotedMemberNames(t *testing.T) {
 // against `messageNoDuplicateEnumValues` would be equality that looks correct and sees nothing: both
 // sides move together under mutation, so a mutant rewriting the message survives.
 func TestNoDuplicateEnumValuesMessageSaysWhyRatherThanRestatingTheName(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoDuplicateEnumValues, duplicateEnumValuesFile, "enum E { A = 1, B = 1 }\n")
 	rule_testing.ExpectFindings(t, result, "noDuplicateEnumValues")
 

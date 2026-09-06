@@ -59,6 +59,8 @@ func scopeOfName(t *testing.T, function *Function, scopes *ReactiveScopes, name 
 // separate the adoption branch from the skip branch, which are two different behaviours sharing one
 // `if/else if`.
 func TestScopeHullMatchesReact(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		ranges []MutableRange
@@ -115,6 +117,8 @@ func TestScopeHullMatchesReact(t *testing.T) {
 // sentinel, and a reader simplifying it would not obviously be wrong. This asserts the specific
 // input on which the two spellings differ, so the simplification cannot land silently.
 func TestScopeHullIsNotAPlainMinimum(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil}}
 	ranges := &MutableRanges{}
 	ranges.set(1, MutableRange{4, 6})
@@ -145,6 +149,8 @@ func TestScopeHullIsNotAPlainMinimum(t *testing.T) {
 // would compile, would assign a scope to everything, and would be wrong in the way that matters --
 // the consumer asks "are these two memoized together" and would always hear no.
 func TestScopeIsOnePerEquivalenceClass(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil, nil, nil}}
 	ranges := &MutableRanges{}
 	for id := IdentifierId(1); id <= 5; id++ {
@@ -176,6 +182,8 @@ func TestScopeIsOnePerEquivalenceClass(t *testing.T) {
 // and the consumer at bundle line 45732 branches on `identifier.scope == null`. Zero is that null
 // here, which is why zero is not a valid ScopeId.
 func TestScopeAbsentValueHasNoScope(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil}}
 	ranges := &MutableRanges{}
 	ranges.set(1, MutableRange{1, 4})
@@ -200,6 +208,8 @@ func TestScopeAbsentValueHasNoScope(t *testing.T) {
 // because entangled values are memoized as one unit and therefore live as one unit. A port that
 // assigned scopes and left ranges alone would satisfy every other test in this file.
 func TestScopeMemberRangesAreRewrittenToTheHull(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil}}
 	ranges := &MutableRanges{}
 	ranges.set(1, MutableRange{3, 5})
@@ -241,6 +251,8 @@ func TestScopeMemberRangesAreRewrittenToTheHull(t *testing.T) {
 // A pass whose partition is right but whose keys move between runs produces a table that differs
 // every time, which is the shape that makes a cache non-reproducible without ever being wrong.
 func TestScopeAssignmentIsDeterministic(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 		function Component(props) {
 			const items = [];
@@ -287,6 +299,8 @@ func TestScopeAssignmentIsDeterministic(t *testing.T) {
 // across scopes equal the set's size. A pass that revisited would double-count; one that iterated to
 // convergence could not finish this test at all.
 func TestScopeAssignmentIsASinglePass(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{}
 	ranges := &MutableRanges{}
 	set := &DisjointSet{}
@@ -335,6 +349,8 @@ func TestScopeAssignmentIsASinglePass(t *testing.T) {
 // is, because it reads two tables and writes a third rather than mutating its input. Asserted rather
 // than assumed, because the property is what makes the input table safe to reuse.
 func TestScopeAssignmentIsIdempotent(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 		function Component(props) {
 			const items = [];
@@ -359,6 +375,8 @@ func TestScopeAssignmentIsIdempotent(t *testing.T) {
 
 // TestScopeHandlesANilFunction pins the degenerate inputs.
 func TestScopeHandlesANilFunction(t *testing.T) {
+	t.Parallel()
+
 	if got := AssignReactiveScopes(nil); got == nil || got.Len() != 0 {
 		t.Error("a nil function must produce an empty table rather than a nil one or a panic")
 	}
@@ -399,6 +417,8 @@ func TestScopeHandlesANilFunction(t *testing.T) {
 // change there would make this load-bearing again with nothing to announce it. This test pins what
 // IS observable -- that membership is stable and complete -- rather than pretending to pin the copy.
 func TestScopeMembersOfIsStableAcrossCalls(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil}}
 	ranges := &MutableRanges{}
 	ranges.set(1, MutableRange{1, 4})
@@ -555,6 +575,8 @@ func corpusScopeStats(t *testing.T, limit int) (functions, scopes, members int, 
 // The thresholds below are far looser than those numbers. This guards the SHAPE, not the corpus,
 // which moves when the tree does.
 func TestScopeWidthAndMembershipAgree(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -620,6 +642,8 @@ func TestScopeWidthAndMembershipAgree(t *testing.T) {
 // population until a whole class falls into it. It fails loudly rather than the pass emitting a
 // scope whose range describes nothing.
 func TestScopeRangesSatisfyUpstreamsInvariant(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -672,6 +696,8 @@ func TestScopeRangesSatisfyUpstreamsInvariant(t *testing.T) {
 // Upstream RAISES here (`CompilerError.invariant`, bundle line 32271). This returns the offenders
 // instead, so the assertion is on which scopes are named rather than on a panic.
 func TestValidateScopesCatchesAnEmptyHull(t *testing.T) {
+	t.Parallel()
+
 	// A function with real instructions, so maxInstruction is non-zero and the third condition is
 	// not what fires. Without this the test would pass for the wrong reason.
 	function, _ := rangesFor(t, `
@@ -739,6 +765,8 @@ func TestValidateScopesCatchesAnEmptyHull(t *testing.T) {
 // Upstream carries the two tests as independent disjuncts for this reason, and reproducing them as
 // one collapsed check would be a silent narrowing.
 func TestValidateScopesCatchesAStartOfZeroWithARealEnd(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `
 		function Component(props) {
 			const items = [];
@@ -771,6 +799,8 @@ func TestValidateScopesCatchesAStartOfZeroWithARealEnd(t *testing.T) {
 // A hull with a real start and a zero end cannot arise from the merge -- the end only ever grows --
 // but the condition is upstream's and is written as two independent tests, so it is scored as two.
 func TestValidateScopesCatchesAnEndOfZero(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `
 		function Component(props) {
 			const items = [];
@@ -791,6 +821,8 @@ func TestValidateScopesCatchesAnEndOfZero(t *testing.T) {
 
 // TestScopeGapsAreDeclared pins the gap list, so closing one is a visible event.
 func TestScopeGapsAreDeclared(t *testing.T) {
+	t.Parallel()
+
 	gaps := ScopeGaps()
 	if len(gaps) != 1 || gaps[0] != ScopeGapPostAlignmentWidening {
 		t.Errorf("ScopeGaps() = %v; a change here means a gap opened or closed and the package "+
@@ -805,6 +837,8 @@ func TestScopeGapsAreDeclared(t *testing.T) {
 // while hulling them would produce plausible ranges and a wrong answer, and no range assertion could
 // see it.
 func TestScopeMatchesTheDisjointSetPartition(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}

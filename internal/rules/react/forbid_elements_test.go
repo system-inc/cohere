@@ -44,6 +44,8 @@ func forbidElementsOptions(t *testing.T, raw string) any {
 
 // TestForbidElementsFires runs the sixteen failing cases from upstream.
 func TestForbidElementsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -86,6 +88,8 @@ func TestForbidElementsFires(t *testing.T) {
 
 // TestForbidElementsStaysSilent runs the fourteen passing cases from upstream.
 func TestForbidElementsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -133,6 +137,8 @@ func TestForbidElementsStaysSilent(t *testing.T) {
 // extensions, which is a fact about the harness rather than about the rule. `.ts` is the extension
 // that separates gated from ungated behaviour and it is the one the tree is mostly made of.
 func TestForbidElementsHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	for _, suffix := range []string{".tsx", ".ts"} {
 		t.Run(suffix, func(t *testing.T) {
 			result := rule_testing.RunTypedWithOptions(
@@ -154,6 +160,8 @@ func TestForbidElementsHasNoFileSuffixGate(t *testing.T) {
 // createElement call, so neither finding covers the whole element or the whole call. Both were read
 // from upstream's reported columns rather than from its source.
 func TestForbidElementsAnchorsOnTheName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -194,6 +202,8 @@ func TestForbidElementsAnchorsOnTheName(t *testing.T) {
 // means an id assertion cannot see which of the two won. The rendered text can, and the mixed
 // spellings were measured against the installed build because the corpus writes neither.
 func TestForbidElementsLaterEntriesWin(t *testing.T) {
+	t.Parallel()
+
 	t.Run("the last of two notes is the one reported", func(t *testing.T) {
 		result := rule_testing.RunTypedWithOptions(
 			t, ForbidElements, forbidElementsFile, `<button />`,
@@ -232,6 +242,8 @@ func TestForbidElementsLaterEntriesWin(t *testing.T) {
 // installed build. A port testing for the key's presence rather than its truthiness would report a
 // message id with an empty tail, and no corpus case writes an empty message.
 func TestForbidElementsEmptyMessageIsNotAMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedWithOptions(
 		t, ForbidElements, forbidElementsFile, `<button />`,
 		forbidElementsOptions(t, `{"forbid":[{"element":"button","message":""}]}`),
@@ -244,6 +256,8 @@ func TestForbidElementsEmptyMessageIsNotAMessage(t *testing.T) {
 // This is where nearly all of upstream's judgment sits and the corpus states only part of it. Every
 // case here was measured against the installed build before it was written.
 func TestForbidElementsArgumentShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -296,6 +310,8 @@ func TestForbidElementsArgumentShapes(t *testing.T) {
 // uses it rather than the shelf's wider `react.IsCreateElementCall`, which accepts a bare call with
 // no import and would report on upstream's own clean case.
 func TestForbidElementsCreateElementResolution(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -330,6 +346,8 @@ func TestForbidElementsCreateElementResolution(t *testing.T) {
 // `NeedsTypeChecker` fails here rather than producing a vacuous green, and the JSX half is what
 // makes this a discrimination rather than a blanket silence.
 func TestForbidElementsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "import {createElement} from 'react';\ncreateElement(\"button\");"
 	options := forbidElementsOptions(t, `{"forbid":["button"]}`)
 
@@ -350,6 +368,8 @@ func TestForbidElementsRequiresTheTypedHarness(t *testing.T) {
 // pre-built struct would leave the whole decoder untested, and the union is the one line most
 // likely to have no upstream counterpart.
 func TestDecodeForbidElementsOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an empty body yields an empty list rather than an error", func(t *testing.T) {
 		decoded, err := DecodeForbidElementsOptions(nil)
 		if err != nil {

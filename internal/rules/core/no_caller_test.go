@@ -15,6 +15,8 @@ const callerFile = "/repository/source/Caller.ts"
 // snapshot records 2 diagnostics from those 2 inputs, so one finding per input holds here rather
 // than being assumed.
 func TestNoCallerFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -38,6 +40,8 @@ func TestNoCallerFires(t *testing.T) {
 // on source text reports it, and one treating a computed access as equivalent to a static member
 // does too.
 func TestNoCallerStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -62,6 +66,8 @@ func TestNoCallerStaysSilent(t *testing.T) {
 // name; the second is the behavior `isIdentifierNamed` gives us for free by skipping parentheses,
 // and upstream's `is_specific_id` does the same, so it is parity rather than divergence.
 func TestNoCallerReadsTheReceiver(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoCaller, callerFile,
 		"declare const options: { callee: number };\nexport const a = options.callee;\n"))
 
@@ -79,6 +85,8 @@ func TestNoCallerReadsTheReceiver(t *testing.T) {
 // Asserted against the source text the range covers, rather than against offsets, because an offset
 // expectation is most likely to be wrong in the same direction as the code that produced it.
 func TestNoCallerReportsTheProperty(t *testing.T) {
+	t.Parallel()
+
 	const source = "var x = arguments.callee"
 	result := rule_testing.Run(t, NoCaller, callerFile, source)
 	if len(result.Diagnostics) != 1 {

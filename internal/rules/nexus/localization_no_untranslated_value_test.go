@@ -107,6 +107,8 @@ const englishTranslations = `export default {
 `
 
 func TestLocalizationNoUntranslatedValueFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		spanish string
@@ -181,6 +183,8 @@ func TestLocalizationNoUntranslatedValueFires(t *testing.T) {
 }
 
 func TestLocalizationNoUntranslatedValueStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		spanish string
@@ -219,6 +223,8 @@ func TestLocalizationNoUntranslatedValueStaysSilent(t *testing.T) {
 // nothing. en.ts is the sharpest: it is the basis of the comparison, so every value in it is
 // identical to English by definition and the rule would report the entire file.
 func TestLocalizationNoUntranslatedValueDeclinesFilesThatAreNotLocaleData(t *testing.T) {
+	t.Parallel()
+
 	// Content identical to English, so any file this rule agrees to read will report. That is what
 	// makes these fixtures discriminate rather than merely pass.
 	const copiedFromEnglish = "export default {\n    Greeting: 'Hello there',\n};\n"
@@ -258,6 +264,8 @@ func TestLocalizationNoUntranslatedValueDeclinesFilesThatAreNotLocaleData(t *tes
 // read rather than skipped. A locale directory this rule silently declines is a locale nobody is
 // checking, which reads exactly like a fully translated one.
 func TestLocalizationNoUntranslatedValueReadsUnderscoreTranslationsDirectories(t *testing.T) {
+	t.Parallel()
+
 	result := runOnTranslations(t, map[string]string{
 		"_translations/en.ts": englishTranslations,
 		"_translations/es.ts": "export default {\n    Greeting: 'Hello there',\n};\n",
@@ -270,6 +278,8 @@ func TestLocalizationNoUntranslatedValueReadsUnderscoreTranslationsDirectories(t
 // The alternative is reporting every key as untranslatable because the comparison basis was absent,
 // which is a wall of findings that says nothing about the translations.
 func TestLocalizationNoUntranslatedValueDeclinesWithoutAnEnglishSibling(t *testing.T) {
+	t.Parallel()
+
 	result := runOnTranslations(t, map[string]string{
 		"translations/es.ts": "export default {\n    Greeting: 'Hello there',\n};\n",
 	}, "translations/es.ts")
@@ -278,6 +288,8 @@ func TestLocalizationNoUntranslatedValueDeclinesWithoutAnEnglishSibling(t *testi
 
 // The rule reports and never rewrites: the repair is a translation, which a rule cannot write.
 func TestLocalizationNoUntranslatedValueProposesNoFix(t *testing.T) {
+	t.Parallel()
+
 	result := runOnTranslations(t, map[string]string{
 		"translations/en.ts": englishTranslations,
 		"translations/es.ts": "export default {\n    Greeting: 'Hello there',\n};\n",
@@ -306,6 +318,8 @@ func TestLocalizationNoUntranslatedValueProposesNoFix(t *testing.T) {
 // behavior behind it. A sweep that returns several survivors at once is the tell: individually they
 // read as several gaps, and they are usually one guard upstream of all of them.
 func TestLocalizationNoUntranslatedValueDeclinesOrdinaryFiles(t *testing.T) {
+	t.Parallel()
+
 	// The subject sits outside any translations directory and carries a value identical to the
 	// English one, so the only reason it reports nothing is the path guard. Placing it inside
 	// `translations/` would make it a locale file by the rule's own definition, which is what the

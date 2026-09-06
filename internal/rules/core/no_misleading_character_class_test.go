@@ -35,6 +35,8 @@ const (
 // 72 without-flag surrogate pairs, 47 joins, 36 combining marks, 9 emoji modifiers, 6 regional
 // indicators and 4 escaped surrogate pairs, which is 174 and matches upstream on every id.
 func TestNoMisleadingCharacterClassFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -180,6 +182,8 @@ func TestNoMisleadingCharacterClassFires(t *testing.T) {
 // run in two; the invalid-regex cases say a pattern that cannot compile gets no finding at all; and
 // the unresolvable-argument cases say a flags argument nobody can read means the rule declines.
 func TestNoMisleadingCharacterClassStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"var r = /[👍]/u",
 		"var r = /[\\uD83D\\uDC4D]/u",
@@ -249,6 +253,8 @@ func TestNoMisleadingCharacterClassStaysSilent(t *testing.T) {
 // Both directions are pinned, so adding the option later flips this test visibly instead of quietly
 // changing what the rule means.
 func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
+	t.Parallel()
+
 	// Clean upstream only when `allowEscape` is on. Every one reports here.
 	cleanOnlyWithTheOption := []struct {
 		sourceText string
@@ -307,6 +313,8 @@ func TestNoMisleadingCharacterClassTakesTheAllowEscapeDefault(t *testing.T) {
 // above because it proves the opposite thing: not every case in upstream's option list depends on
 // the option.
 func TestNoMisleadingCharacterClassIsCleanHereRegardlessOfTheOption(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"/[�d83d\\udc4d]/u // U+D83D + Backslash + \"udc4d\"",
 	} {
@@ -327,6 +335,8 @@ func TestNoMisleadingCharacterClassIsCleanHereRegardlessOfTheOption(t *testing.T
 // The offsets are checked by slicing the source rather than by comparing numbers, because a number
 // computed from the same wrong base as the code that produced it agrees with itself.
 func TestNoMisleadingCharacterClassPointsAtTheOffendingPair(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpans  []string
@@ -379,6 +389,8 @@ func TestNoMisleadingCharacterClassPointsAtTheOffendingPair(t *testing.T) {
 // defect, so the source is rewritten and compared whole. Only the without-flag surrogate finding
 // carries a repair, and only on a regex literal.
 func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSource string
@@ -425,6 +437,8 @@ func TestNoMisleadingCharacterClassSuggestsTheUnicodeFlag(t *testing.T) {
 // So two things are asserted: the rule never proposes an unattended fix, and it withholds even the
 // suggestion when the pattern holds a construct the flag would break.
 func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
 		"var r = /[👍]/")
 	if len(result.Diagnostics) != 1 {
@@ -462,6 +476,8 @@ func TestNoMisleadingCharacterClassNeverProposesAnAutomaticFix(t *testing.T) {
 // The findings that survive the flag are the four that are about code points rather than about code
 // units, so this is the ordinary case for a combining mark rather than an edge.
 func TestNoMisleadingCharacterClassDoesNotSuggestAFlagThatIsAlreadyThere(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{"var r = /[Á]/u", "var r = /[Á]/v"} {
 		t.Run(sourceText, func(t *testing.T) {
 			result := rule_testing.Run(t, NoMisleadingCharacterClass, misleadingCharacterClassFile,
@@ -483,6 +499,8 @@ func TestNoMisleadingCharacterClassDoesNotSuggestAFlagThatIsAlreadyThere(t *test
 // question. Stated per case rather than in a block, because a reader hitting one of these failing
 // needs to know what it was protecting.
 func TestNoMisleadingCharacterClassCoversOurOwnDecisions(t *testing.T) {
+	t.Parallel()
+
 	fires := []struct {
 		name       string
 		sourceText string

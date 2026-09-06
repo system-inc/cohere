@@ -83,6 +83,8 @@ func rangeOfName(t *testing.T, function *Function, name string) MutableRange {
 // TestRangesOpenAtTheDefiningInstruction is the base case: a value's range starts where it is
 // defined and ends one past it, which is upstream's unconditional lvalue rule.
 func TestRangesOpenAtTheDefiningInstruction(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function f() {
   const a = 1;
@@ -108,6 +110,8 @@ export function f() {
 // directly rather than through a consumer because every consumer would hide it behind its own
 // question.
 func TestRangesAreHalfOpen(t *testing.T) {
+	t.Parallel()
+
 	r := MutableRange{Start: 3, End: 6}
 	for _, order := range []EvaluationOrder{3, 4, 5} {
 		if !r.Contains(order) {
@@ -137,6 +141,8 @@ func TestRangesAreHalfOpen(t *testing.T) {
 // case that would silently pass under a set-of-indices implementation while answering upstream's
 // actual question wrongly.
 func TestRangesSpanTheGapBetweenDisjointWrites(t *testing.T) {
+	t.Parallel()
+
 	// Written at 3, written again at 20, nothing between. Upstream's end is one past the last
 	// write.
 	r := MutableRange{Start: 3, End: 21}
@@ -158,6 +164,8 @@ func TestRangesSpanTheGapBetweenDisjointWrites(t *testing.T) {
 // TestRangesRejectAnInvalidInterval pins upstream's `validateMutableRange` invariant: a range is
 // either entirely unset or genuinely non-empty.
 func TestRangesRejectAnInvalidInterval(t *testing.T) {
+	t.Parallel()
+
 	valid := []MutableRange{{}, {Start: 1, End: 2}, {Start: 5, End: 100}}
 	for _, r := range valid {
 		if !r.IsValid() {
@@ -176,6 +184,8 @@ func TestRangesRejectAnInvalidInterval(t *testing.T) {
 // TestRangesProduceNoInvalidIntervalsOnRealCode runs the invariant over a function with branches,
 // a loop, and phis, which is where an off-by-one in the phi rule would show up.
 func TestRangesProduceNoInvalidIntervalsOnRealCode(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function f(c: boolean, items: number[]) {
   let total = 0;
@@ -208,6 +218,8 @@ export function f(c: boolean, items: number[]) {
 // This is also the test that catches a plain harness: with a nil checker `captureOf` cannot resolve
 // and no `StoreContext` is emitted at all, so the assertion below would have nothing to find.
 func TestRangesWidenAStoreIntoACapturedBinding(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `
 export function outer() {
   let n = 0;
@@ -260,6 +272,8 @@ export function outer() {
 // that does not depend on the missing input. Seeding the range by hand is what separates "this
 // branch is correct and waiting" from "this branch is untested".
 func TestRangesPhiOpensBeforeItsBlockWhenWidened(t *testing.T) {
+	t.Parallel()
+
 	if phiOpensBefore(MutableRange{}, 10) {
 		t.Error("an unset range must not open a phi early")
 	}
@@ -283,6 +297,8 @@ func TestRangesPhiOpensBeforeItsBlockWhenWidened(t *testing.T) {
 // unknown call's conditional mutation is discarded when every arm is already frozen or primitive.
 // One mutable arm is the control: it must keep the mutation and pull the phi into the call scope.
 func TestPhiNonMutabilityControlsUnknownCallScopes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		source         string
@@ -374,6 +390,8 @@ func TestPhiNonMutabilityControlsUnknownCallScopes(t *testing.T) {
 // MethodCall after any argument join; Array.push's direct Mutate(receiver) must therefore end the
 // receiver range at call.Order+1 for straight-line, ternary, and optional-chain arguments alike.
 func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name            string
 		source          string
@@ -546,6 +564,8 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(t *testing.T) {
 // asymmetric: a frozen source is pruned, but a primitive source is retained. The latter is a
 // control against simplifying both variants to the same broad "immutable means no edge" rule.
 func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		edge        AliasingEffectKind
@@ -648,6 +668,8 @@ func unknownCallAndArgumentPhi(t *testing.T, function *Function,
 // suspicion. Every guard here tests the range this pass itself wrote, so a second run reads what
 // the first wrote and changes nothing.
 func TestRangesAreIdempotent(t *testing.T) {
+	t.Parallel()
+
 	function, first := rangesFor(t, `
 export function f(c: boolean) {
   let v = 1;
@@ -677,6 +699,8 @@ export function f(c: boolean) {
 // wrong answer wearing the shape of a right one. The pass skips instead, so a caller who forgot
 // `Finalize` gets an empty table they can notice.
 func TestRangesRequireEvaluationOrder(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function f() {
   const a = 1;
@@ -706,6 +730,8 @@ export function f() {
 // when Stage 2.5 closed both. It failed again when property loads and destructuring began emitting
 // CreateFrom, forcing that input gap out of the API too.
 func TestRangeGapsAreNamed(t *testing.T) {
+	t.Parallel()
+
 	gaps := RangeGaps()
 	if len(gaps) != 1 {
 		t.Fatalf("expected exactly the one declared gap, got %d", len(gaps))
@@ -721,6 +747,8 @@ func TestRangeGapsAreNamed(t *testing.T) {
 // source captured; reaching only the source would pass if createdFrom incorrectly preserved the
 // mutation's non-transitive kind.
 func TestCreateFromMutationPropagatesTransitively(t *testing.T) {
+	t.Parallel()
+
 	function := NewFunction(nil, "helper", FunctionKindOther)
 	block := function.NewBlock(BlockKindBlock)
 	function.Entry = block.Id
@@ -787,6 +815,8 @@ func TestCreateFromMutationPropagatesTransitively(t *testing.T) {
 // Upstream's answer, and now this one: `o` is defined at its literal and still being written at the
 // call, so the interval spans both rather than closing at the definition.
 func TestRangesWidenToCoverAMutatingCall(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `
 declare function mutate(target: number[]): void;
 export function f() {
@@ -829,6 +859,8 @@ export function f() {
 // the brief's rule -- when a probe says shipped code is broken, the probe is wrong until a control
 // says otherwise -- is what produced the right diagnosis.
 func TestRangesDoNotWidenWithoutAMutation(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function f() {
   const o: number[] = [];
@@ -870,6 +902,8 @@ export function f() {
 // TestMutationSitesNamesWhatStageOneWouldWiden pins the seam, two-sided: the definite shapes are
 // found and an ordinary definition is not mistaken for one.
 func TestMutationSitesNamesWhatStageOneWouldWiden(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `
 declare function use(x: unknown): void;
 export function f(o: {a: number}, k: string) {
@@ -925,6 +959,8 @@ export function g() {
 // in this file stays green, because every OTHER value is defined by an instruction before it is
 // used and so its range is already open by the time the operand loop sees it.
 func TestRangesLeaveParametersUnset(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function f(p: number) {
   const a = p + 1;
@@ -964,6 +1000,8 @@ export function f(p: number) {
 // `Start != 0` survived the whole suite, because nothing could construct the input that separates
 // the two spellings; the unit test can, and it costs one line.
 func TestRangeIsSetTreatsEitherFieldAsSet(t *testing.T) {
+	t.Parallel()
+
 	if (MutableRange{}).IsSet() {
 		t.Error("the zero range must not read as set")
 	}
@@ -993,6 +1031,8 @@ func TestRangeIsSetTreatsEitherFieldAsSet(t *testing.T) {
 // silent under-report in exactly the shape - a merge point with no instructions - that a loop
 // header most often has.
 func TestBlockFirstOrderFallsBackToTheTerminal(t *testing.T) {
+	t.Parallel()
+
 	function := &Function{}
 	withInstruction := &BasicBlock{
 		Id:           1,
@@ -1023,6 +1063,8 @@ func TestBlockFirstOrderFallsBackToTheTerminal(t *testing.T) {
 // survived every other assertion in this file. The kind assertions could not see it, which is the
 // "fixtures assert the wrong layer" shape: they check that a site was found and never what it says.
 func TestMutationSitesNameTheMutatedValueNotTheStoredOne(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `
 export function f(o: {a: number}) {
   const v = 1;
@@ -1068,6 +1110,8 @@ export function f(o: {a: number}) {
 // whose end Stage 1 widened. A mutation dropping the minus one survived every fixture over real
 // code for exactly that reason.
 func TestPhiOpensOneBeforeItsBlock(t *testing.T) {
+	t.Parallel()
+
 	widened := MutableRange{Start: 0, End: 20}
 	opened, moved := phiOpenedRange(widened, 10)
 	if !moved {
@@ -1102,6 +1146,8 @@ func TestPhiOpensOneBeforeItsBlock(t *testing.T) {
 // state. The assertion is the invariant itself rather than a specific interval, because the exact
 // orders move whenever lowering changes and an assertion on them would fail for the wrong reason.
 func TestRangesStayValidAcrossALoopBackEdge(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 declare function mutate(x: number[]): void;
 export function f(items: number[][]) {
@@ -1212,6 +1258,8 @@ export function f(items: number[][]) {
 // So the assertion is that `p` carries a range at all, plus that the range is genuinely wide. A
 // version of this test asserting only that some range exists would pass without the widening too.
 func TestRangesThirdLoopOpensAWidenedOperand(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 declare function mutate(x: number[]): void;
 export function f(p: number[]) {
@@ -1268,6 +1316,8 @@ export function f(p: number[]) {
 // Measured on the corpus rather than argued: over 959 functions in 200 files, dropping this guard
 // changes 5,010 values, so it is load-bearing rather than an optimization.
 func TestRangesDoNotWidenThroughAnEdgeThatDidNotExistYet(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `
 declare function deep(x: unknown): void;
 export function f() {
@@ -1334,6 +1384,8 @@ export function f() {
 // different output, before writing a fixture -- is what turned this from a survivor into a test. The
 // first four hypotheses about which shape would distinguish them were all wrong.
 func TestRangesFollowCapturesOnlyForATransitiveMutation(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function f(seed: number[]) {
   const m = new Map<string, number[]>();

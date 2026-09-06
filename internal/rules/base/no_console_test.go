@@ -29,6 +29,8 @@ type noConsoleFinding struct {
 // rule, since it is exactly the aliasing the member-access anchor exists to catch, and it is
 // reproduced rather than closed because the rule is the specification.
 func TestNoConsoleStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -71,6 +73,8 @@ func TestNoConsoleStaysSilent(t *testing.T) {
 // ternary only reads an Identifier property and falls back to the literal word. A port that
 // helpfully read the string literal would diverge on a message nobody would think to check.
 func TestNoConsoleFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []noConsoleFinding
@@ -257,6 +261,8 @@ func TestNoConsoleFires(t *testing.T) {
 // The sibling rule `no-global-container` has the same shape and the same behaviour, found the same
 // way. It is a property of every base rule that keys on an identifier's spelling.
 func TestNoConsoleReportsAnyBindingNamedConsole(t *testing.T) {
+	t.Parallel()
+
 	reporting := []string{
 		"function f() { const console = { log(){} }; console.log('x'); }",
 		"import { console } from './shim'; console.log('x');",
@@ -301,5 +307,7 @@ func TestNoConsoleReportsAnyBindingNamedConsole(t *testing.T) {
 // source repository on disk, and a test that silently skips when a path is missing would be worse
 // than a note.
 func TestNoConsoleMatchesTheSourceRepository(t *testing.T) {
+	t.Parallel()
+
 	t.Log("port 567, real rule 560, difference is 7 eslint-disable-next-line sites in 3 files")
 }

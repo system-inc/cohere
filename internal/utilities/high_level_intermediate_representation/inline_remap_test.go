@@ -29,6 +29,8 @@ import (
 // parent owns, every block reference names a block the parent holds, every instruction id indexes
 // the parent's table, and every copied instruction is reachable from the copied entry.
 func TestCopyNestedBodyLeavesNoUnresolvedReference(t *testing.T) {
+	t.Parallel()
+
 	// The closure carries a branch on purpose. A single-block body names no other block, so a
 	// mutation skipping the block remap survives it: measured, and this fixture is what caught it.
 	parent, nested, captures := loweredParentAndNested(t, branchingParentSource)
@@ -167,6 +169,8 @@ func TestCopyNestedBodyLeavesNoUnresolvedReference(t *testing.T) {
 // A capture that gets a fresh identifier reads a different variable than the code around it, which
 // is invisible in the graph's shape: the instruction is there, the value is wrong.
 func TestCopyNestedBodyKeepsCapturesPointingAtTheParent(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 		function Component(properties: {value: number}) {
 			const compute = () => {
@@ -206,6 +210,8 @@ func TestCopyNestedBodyKeepsCapturesPointingAtTheParent(t *testing.T) {
 // for one source binding. IdentifierIds must be renamed into the parent, while DeclarationId
 // equivalence classes must survive the rename for the data-flow passes keyed by declarations.
 func TestCopyNestedBodyPreservesDeclarationEquivalenceClasses(t *testing.T) {
+	t.Parallel()
+
 	parent, nested, captures := loweredParentAndNested(t, branchingParentSource)
 	if parent == nil || nested == nil {
 		t.Fatal("the fixture produced no nested function")
@@ -258,6 +264,8 @@ func TestCopyNestedBodyPreservesDeclarationEquivalenceClasses(t *testing.T) {
 
 // TestCopyNestedBodyDeclinesOnAContextMismatch pins the refusal.
 func TestCopyNestedBodyDeclinesOnAContextMismatch(t *testing.T) {
+	t.Parallel()
+
 	parent := &Function{}
 	nested := &Function{Context: []Place{{Identifier: 1}}}
 	if _, ok := CopyNestedBodyInto(parent, nested, nil); ok {
@@ -345,6 +353,8 @@ func loweredParentAndNested(t *testing.T, source string) (*Function, *Function, 
 // looks at, and the damage only surfaces when something later walks the nested body and finds it
 // pointing at blocks in another function. The nested function is the control here.
 func TestCopyNestedBodyLeavesTheNestedFunctionUntouched(t *testing.T) {
+	t.Parallel()
+
 	parent, nested, captures := loweredParentAndNested(t, branchingParentSource)
 	if nested == nil {
 		t.Fatal("the fixture lowered no nested function")

@@ -7,6 +7,8 @@ import (
 )
 
 func TestNoUselessCatchReportsBareRethrows(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -30,6 +32,8 @@ func TestNoUselessCatchReportsBareRethrows(t *testing.T) {
 }
 
 func TestNoUselessCatchAcceptsClausesThatDoWork(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -59,6 +63,8 @@ func TestNoUselessCatchAcceptsClausesThatDoWork(t *testing.T) {
 // the catch clause is, so the range must start at `catch`. Reporting the wrong node would name a
 // repair that deletes a finally the author needs.
 func TestNoUselessCatchReportsTheNodeMatchingTheRepair(t *testing.T) {
+	t.Parallel()
+
 	const withoutFinally = `try { foo(); } catch (err) { throw err; }`
 	result := rule_testing.Run(t, NoUselessCatch, "file.ts", withoutFinally)
 	rule_testing.ExpectFindings(t, result, "unnecessaryCatch")

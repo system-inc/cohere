@@ -41,6 +41,8 @@ func decodedOperatorAssignmentOptions(t *testing.T, raw string) any {
 // repair. Those are asserted as declines rather than dropped, because a fixer that repairs a case
 // upstream refuses to touch is a defect no message-id fixture can see.
 func TestOperatorAssignmentFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		options      string
@@ -161,6 +163,8 @@ func TestOperatorAssignmentFires(t *testing.T) {
 }
 
 func TestOperatorAssignmentStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		options string
@@ -244,6 +248,8 @@ func TestOperatorAssignmentStaysSilent(t *testing.T) {
 // `x = x + 1 as number`, which asserts the type of the SUM rather than of the addend. The two
 // parses were compared directly to establish that, rather than read off the grammar.
 func TestOperatorAssignmentTypeScriptShapes(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string

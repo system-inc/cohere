@@ -7,6 +7,8 @@ import (
 )
 
 func TestNoCaseDeclarationsReportsLexicalDeclarations(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -38,6 +40,8 @@ func TestNoCaseDeclarationsReportsLexicalDeclarations(t *testing.T) {
 }
 
 func TestNoCaseDeclarationsAcceptsScopedAndHoistedDeclarations(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -69,6 +73,8 @@ func TestNoCaseDeclarationsAcceptsScopedAndHoistedDeclarations(t *testing.T) {
 // range inside the comment above it, which puts the finding on a line a disable comment for the
 // declaration cannot reach.
 func TestNoCaseDeclarationsReportsTheDeclarationWithoutTrivia(t *testing.T) {
+	t.Parallel()
+
 	const source = `switch (a) {
   case 1:
     // explain the binding
@@ -88,6 +94,8 @@ func TestNoCaseDeclarationsReportsTheDeclarationWithoutTrivia(t *testing.T) {
 // last statements rather than at the reported declaration. Anchoring on the reported statement would
 // propose two nested blocks that leave `break` outside the scope it was meant to sit in.
 func TestNoCaseDeclarationsSuggestsWrappingTheWholeClause(t *testing.T) {
+	t.Parallel()
+
 	const source = `switch (a) {
   case 1:
     let first = 1;

@@ -26,6 +26,8 @@ func asTheOrmColumnHarnessWroteIt(text string) string {
 // decorator reports here and is silent there, a namespaced one is silent in both, and a private
 // name reports with its name rendered as a placeholder.
 func TestOrmColumnRequiresDeclare(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		why          string

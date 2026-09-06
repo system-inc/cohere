@@ -21,6 +21,8 @@ const scriptUrlFile = "/repository/source/ScriptUrl.ts"
 // template check from a walk up the ancestors, and cannot see the case fold at all beyond one
 // capital letter.
 func TestNoScriptUrlFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"var a = 'javascript:void(0);';",
 		"var a = 'javascript:';",
@@ -43,6 +45,8 @@ func TestNoScriptUrlFires(t *testing.T) {
 // statically knowable, and it is a different node kind here rather than a helper returning null.
 // A template written foo`javaScript:` is tagged, so the tag decides what the text means.
 func TestNoScriptUrlStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"var a = 'Hello World!';",
 		"var a = 10;",
@@ -77,6 +81,8 @@ func TestNoScriptUrlStaysSilent(t *testing.T) {
 // The `String.raw` case is the same shape with a member-expression tag, confirming the check is on
 // the parent's kind rather than on the tag being a plain identifier.
 func TestNoScriptUrlTaggedTemplateExemptionIsTheDirectParent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -117,6 +123,8 @@ func TestNoScriptUrlTaggedTemplateExemptionIsTheDirectParent(t *testing.T) {
 // the plain one beside it reports. Writing this rule with `EqualFold` would ship a false positive
 // that no imported fixture could see.
 func TestNoScriptUrlComparisonIsAnchoredAndAsciiFolded(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -154,6 +162,8 @@ func TestNoScriptUrlComparisonIsAnchoredAndAsciiFolded(t *testing.T) {
 // `/javascript:/` is clean on the installed build. Here that falls out of the listener map, and
 // this is what pins that the translation did not widen it.
 func TestNoScriptUrlDeclinesOtherLiteralKinds(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -180,6 +190,8 @@ func TestNoScriptUrlDeclinesOtherLiteralKinds(t *testing.T) {
 // 30, which is the string including both quotes. The parenthesized template case pins that the
 // span is the template rather than the parentheses; measured.
 func TestNoScriptUrlReportsTheWholeLiteral(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantStart  int
@@ -212,6 +224,8 @@ func TestNoScriptUrlReportsTheWholeLiteral(t *testing.T) {
 // The id literal is typed here rather than read from the rule's own constant, so a rename cannot
 // move both sides at once and stay green.
 func TestNoScriptUrlMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoScriptUrl, scriptUrlFile, "var a = 'javascript:void(0);';")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))

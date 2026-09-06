@@ -254,6 +254,8 @@ func runRefsFixture(t *testing.T, fixture refsFixture) rule_testing.Result {
 // number honest, because a fix and a regression landing together cannot net to zero the way they
 // can under a threshold.
 func TestRefsMatchesTheImportedCorpus(t *testing.T) {
+	t.Parallel()
+
 	if len(refsCorpus) != 30 {
 		t.Fatalf("the corpus holds %d fixtures, want the 30 non-Flow refs fixtures", len(refsCorpus))
 	}
@@ -276,6 +278,8 @@ func TestRefsMatchesTheImportedCorpus(t *testing.T) {
 // not a subset, and the count is asserted anyway for the same reason: 35 findings over 30 fixtures,
 // which is the number of caret runs in the vendored `.expect.md` files.
 func TestRefsReportsExactlyThisManyFindingsOnTheCorpus(t *testing.T) {
+	t.Parallel()
+
 	total := 0
 	for _, fixture := range refsCorpus {
 		total += len(runRefsFixture(t, fixture).Diagnostics)
@@ -351,6 +355,8 @@ var refsCleanCases = []struct {
 
 // TestRefsStaysSilent asserts the clean cases.
 func TestRefsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range refsCleanCases {
 		t.Run(testCase.Name, func(t *testing.T) {
 			result := runRefsFixture(t, refsFixture{Name: testCase.Name, Source: testCase.Source})
@@ -370,6 +376,8 @@ func TestRefsStaysSilent(t *testing.T) {
 // is taken from that same string rather than from the Go literal, which is the documented way this
 // assertion goes wrong by one byte.
 func TestRefsPointsAtTheAccess(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		Name   string
 		Source string
@@ -416,6 +424,8 @@ func TestRefsPointsAtTheAccess(t *testing.T) {
 // message id assertion cannot see the text, and a Description that drifted into restating the rule
 // name would pass every other test in this file.
 func TestRefsMessagesReadCorrectly(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		Kind         refsFindingKind
 		WantId       string
@@ -451,6 +461,8 @@ func TestRefsMessagesReadCorrectly(t *testing.T) {
 // So `ref` must compare equal across different ids, `refValue` must compare equal when only its
 // origin differs, and `guard` must NOT, because a guard is sound only for the ref it guards.
 func TestRefsConvergenceEqualityIgnoresRefIdentity(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		Name  string
 		A     *refsAccessType
@@ -506,6 +518,8 @@ func TestRefsConvergenceEqualityIgnoresRefIdentity(t *testing.T) {
 // separately: if the join stopped minting, this fails while the equality test still passes, and a
 // reader would otherwise be left wondering why the equality is written so strangely.
 func TestRefsJoinMintsAFreshIdentityForDifferentRefs(t *testing.T) {
+	t.Parallel()
+
 	env := newRefsEnvironment()
 	// The operands take identities the environment's counter has already issued, so a freshly
 	// minted id cannot coincide with one of them by accident. Without this the test can pass or
@@ -532,6 +546,8 @@ func TestRefsJoinMintsAFreshIdentityForDifferentRefs(t *testing.T) {
 // equality above is wrong, so this asserts it never appears; the bound is ten rounds and every
 // fixture here settles well inside it.
 func TestRefsSettlesOnEveryCorpusFixture(t *testing.T) {
+	t.Parallel()
+
 	for _, fixture := range refsCorpus {
 		for _, diagnostic := range runRefsFixture(t, fixture).Diagnostics {
 			if diagnostic.Message.Id == messageRefsDidNotConvergeId {
@@ -548,6 +564,8 @@ func TestRefsSettlesOnEveryCorpusFixture(t *testing.T) {
 // silence test would pass vacuously and every fires test would look like a rule bug. This asserts
 // the rule declares the checker, so a later revert of that field fails here loudly.
 func TestRefsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !Refs.NeedsTypeChecker {
 		t.Error("the rule stopped declaring NeedsTypeChecker; every typed fixture would pass vacuously")
 	}
@@ -560,6 +578,8 @@ func TestRefsRequiresTheTypedHarness(t *testing.T) {
 // `any`, a ref arriving by NAME must still report. If someone deleted the name signal believing the
 // checker was sufficient, the imported corpus would still score 27 of 30 and only this would fail.
 func TestRefsNameSignalWorksWithoutTheChecker(t *testing.T) {
+	t.Parallel()
+
 	source := "function Component(props) {\n  const value = props.ref.current;\n  return <div>{value}</div>;\n}\n"
 	result := rule_testing.RunTypedFiles(t, Refs, map[string]string{"c.tsx": source}, "c.tsx")
 	if len(result.Diagnostics) != 1 {
@@ -586,6 +606,8 @@ func TestRefsNameSignalWorksWithoutTheChecker(t *testing.T) {
 // is a ref: an implementation requiring agreement across predecessors would pass the first case and
 // fail the second.
 func TestRefsJoinsTaintAtABranchMerge(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		Name   string
 		Source string
@@ -628,6 +650,8 @@ func TestRefsJoinsTaintAtABranchMerge(t *testing.T) {
 // tests a checker behaviour that does not occur on real code — the exact failure where the rule and
 // its fixtures share one wrong belief. This fixture is written the real way for that reason.
 func TestRefsExemptsTheMergeRefsShape(t *testing.T) {
+	t.Parallel()
+
 	declarations := "declare module 'react' {\n" +
 		"  export interface RefObject<T> { current: T }\n" +
 		"  export type RefCallback<T> = { bivarianceHack(instance: T | null): void }['bivarianceHack'];\n" +
@@ -672,6 +696,8 @@ func TestRefsExemptsTheMergeRefsShape(t *testing.T) {
 // pins that the ref field itself is still tracked, so a fix that simply stopped seeing refs on
 // props would fail the second half rather than passing this by going blind.
 func TestRefsDoesNotTaintSiblingFieldsOfARefProp(t *testing.T) {
+	t.Parallel()
+
 	declarations := "declare module 'react' {\n  export interface RefObject<T> { current: T }\n  export function useRef<T>(initial: T): RefObject<T>;\n}"
 	source := "import * as React from 'react';\n" +
 		"interface Properties {\n  currentWidth: number;\n  guideElementReference: React.RefObject<HTMLElement | null>;\n}\n" +
@@ -719,6 +745,8 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(t *testing.T) {
 // `PropertyLoad`, which is why matching on the property load did not work either and is worth
 // pinning: the shape is not the one a reader predicts.
 func TestRefsAdmitsNamespacedHookCalls(t *testing.T) {
+	t.Parallel()
+
 	namespaced := runRefsFixture(t, refsFixture{
 		Source: "import * as ReactNamespace from 'react';\n" +
 			"export function useOther() {\n" +

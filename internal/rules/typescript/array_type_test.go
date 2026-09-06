@@ -50,6 +50,8 @@ func decodeArrayTypeOptions(t *testing.T, configuration string) any {
 // The same source appears several times under different options, which is the point: this rule's
 // verdict lives above the code as often as in it.
 func TestArrayTypeStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -453,6 +455,8 @@ func TestArrayTypeStaysSilentOnUpstreamPassCases(t *testing.T) {
 // including the collapse of a non-simple element to the letter `T`, which no id can see. And the
 // applied source says what the edit engine will write into the file unattended.
 func TestArrayTypeFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -1182,6 +1186,8 @@ func TestArrayTypeFiresOnUpstreamFailCases(t *testing.T) {
 // Every expectation here is the triple the installed build produced for that exact input, recovered
 // from its message text rather than predicted.
 func TestArrayTypeRendersTheMessageUpstreamRenders(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -1340,6 +1346,8 @@ func TestArrayTypeRendersTheMessageUpstreamRenders(t *testing.T) {
 // build's verdict, and the last is the control that separates "declined the heritage clause" from
 // "never reached the shape".
 func TestArrayTypeDeclinesAHeritageClause(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantCount  int
@@ -1375,6 +1383,8 @@ func TestArrayTypeDeclinesAHeritageClause(t *testing.T) {
 // which writes no two-argument case at all. All four rows were run through the installed 8.67.0
 // build.
 func TestArrayTypeDeclinesAGenericWithTheWrongArgumentCount(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantCount  int
@@ -1413,6 +1423,8 @@ func TestArrayTypeDeclinesAGenericWithTheWrongArgumentCount(t *testing.T) {
 //
 // All four outputs are what the installed 8.67.0 build's `cohereAndFix` wrote.
 func TestArrayTypeWrapsAReadonlyRewriteOnlyWhenItHasTo(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantId     string
@@ -1472,6 +1484,8 @@ func TestArrayTypeWrapsAReadonlyRewriteOnlyWhenItHasTo(t *testing.T) {
 //
 // Every field is what the installed 8.67.0 build produced for that exact input.
 func TestArrayTypeJudgesSimplicityTheWayUpstreamDoes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -1537,6 +1551,8 @@ func TestArrayTypeJudgesSimplicityTheWayUpstreamDoes(t *testing.T) {
 //
 // Every field is what the installed 8.67.0 build produced for that exact input.
 func TestArrayTypeReadsOnlyTheReadonlyOperator(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -1608,6 +1624,8 @@ func TestArrayTypeReadsOnlyTheReadonlyOperator(t *testing.T) {
 // measurement: it reads identically whether the shadow was seen or the rule simply never reached
 // the shape.
 func TestArrayTypeDeclinesAShadowedName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantCount  int
@@ -1784,6 +1802,8 @@ func TestArrayTypeDeclinesAShadowedName(t *testing.T) {
 // any fixture that builds the options struct directly, which is why every other test in this file
 // routes through the decoder and why this one asserts the decoder's output.
 func TestArrayTypeDecoderResolvesBothAxes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		wantDefault   ArrayTypeSetting
@@ -1828,6 +1848,8 @@ func TestArrayTypeDecoderResolvesBothAxes(t *testing.T) {
 // failure this project has shipped before. So the nil path gets its own row rather than being
 // covered by implication.
 func TestArrayTypeNilOptionsFallsBackToUpstreamDefaults(t *testing.T) {
+	t.Parallel()
+
 	// `array` is the default, so the generic spelling reports and the suffix one does not.
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, ArrayType, arrayTypeFile,
 		"let x: Array<string>;", nil), "errorStringArray")
@@ -1846,6 +1868,8 @@ func TestArrayTypeNilOptionsFallsBackToUpstreamDefaults(t *testing.T) {
 // most of these at all, since its parser rejects what ours recovers from, so asserting a verdict
 // would be inventing one.
 func TestArrayTypeSurvivesMalformedTypes(t *testing.T) {
+	t.Parallel()
+
 	for name, sourceText := range map[string]string{
 		"emptyBrackets":   "let x: [];",
 		"unclosedGeneric": "let x: Array<;",

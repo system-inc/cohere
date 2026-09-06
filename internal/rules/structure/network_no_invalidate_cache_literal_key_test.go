@@ -10,6 +10,8 @@ const cacheKeyDeclarations = "declare const networkService: { cache: { invalidat
 	"declare const UserCacheKey: string;\ndeclare const PostCacheKey: string;\ndeclare const id: string;\n"
 
 func TestNetworkNoInvalidateCacheLiteralKeyFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -68,6 +70,8 @@ func TestNetworkNoInvalidateCacheLiteralKeyFires(t *testing.T) {
 }
 
 func TestNetworkNoInvalidateCacheLiteralKeyStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

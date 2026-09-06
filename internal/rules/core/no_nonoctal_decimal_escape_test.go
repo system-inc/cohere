@@ -13,6 +13,8 @@ const nonoctalDecimalEscapeFile = "/repository/source/Thing.ts"
 // their own fixtures tends to write the parities they already understand.
 
 func TestNoNonoctalDecimalEscapeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -42,6 +44,8 @@ func TestNoNonoctalDecimalEscapeFires(t *testing.T) {
 // pair rather than walking escape by escape fires on most of these.
 
 func TestNoNonoctalDecimalEscapeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -74,6 +78,8 @@ func TestNoNonoctalDecimalEscapeStaysSilent(t *testing.T) {
 // single-violation case above and undercounts the moment a string holds two, which is exactly the
 // shape a scan that stops at the first match produces.
 func TestNoNonoctalDecimalEscapeReportsEachEscape(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -101,6 +107,8 @@ func TestNoNonoctalDecimalEscapeReportsEachEscape(t *testing.T) {
 // rather than fixes. An engine picking one unattended would silently change the string every time
 // the other was intended.
 func TestNoNonoctalDecimalEscapeOffersBothReadings(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = 'foo\\8bar';\n")
 	if len(result.Diagnostics) != 1 {
@@ -127,6 +135,8 @@ func TestNoNonoctalDecimalEscapeOffersBothReadings(t *testing.T) {
 // above, and the engine applies Fixes unattended. That would turn a repair only the author can
 // choose into a silent rewrite of their string.
 func TestNoNonoctalDecimalEscapeProposesNoAutomaticFix(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = '\\8';\n")
 	if len(result.Diagnostics) != 1 {
@@ -141,6 +151,8 @@ func TestNoNonoctalDecimalEscapeProposesNoAutomaticFix(t *testing.T) {
 // is a legacy octal escape, so fixing one legacy escape would produce another. The suggestion set
 // changes shape here rather than the rule declining to help.
 func TestNoNonoctalDecimalEscapeAvoidsCreatingAnOctalEscape(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = '\\0\\8';\n")
 	if len(result.Diagnostics) != 1 {
@@ -162,6 +174,8 @@ func TestNoNonoctalDecimalEscapeAvoidsCreatingAnOctalEscape(t *testing.T) {
 // escape of a different kind. Getting this wrong is invisible: the finding still fires and only the
 // suggested repair is wrong.
 func TestNoNonoctalDecimalEscapeTreatsOctalZeroAsOrdinary(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile,
 		"export const A = '\\01\\8';\n")
 	if len(result.Diagnostics) != 1 {
@@ -181,6 +195,8 @@ func TestNoNonoctalDecimalEscapeTreatsOctalZeroAsOrdinary(t *testing.T) {
 // suggestion that rewrites a `\1` nobody asked about. A finding with a wrong repair still reads as
 // a correct finding, so this needs asserting directly.
 func TestNoNonoctalDecimalEscapeOffersTheNullShapeOnlyAfterNull(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

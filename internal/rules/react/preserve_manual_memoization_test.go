@@ -415,6 +415,8 @@ func runPreserveManualMemoization(t *testing.T, name string, source string) rule
 // still goes green. Three porters have lost a case to a cooked escape. This is that check, and it
 // covers the two interpreted literals as well, which are the ones most exposed to it.
 func TestFixturesMatchTheVendoredCorpus(t *testing.T) {
+	t.Parallel()
+
 	const corpus = "../../react_conformance/testdata/fixtures"
 	copies := map[string]string{
 		"new-mutability/error.invalid-useCallback-captures-reassigned-context.js":      reassignedContextCapture,
@@ -464,6 +466,8 @@ func TestFixturesMatchTheVendoredCorpus(t *testing.T) {
 // golden files: the corpus goldens are produced by the babel plugin under fixture pragmas, and the
 // ESLint surface this gate replaces does not read those pragmas, so the two populations differ.
 func TestPreserveManualMemoizationFires(t *testing.T) {
+	t.Parallel()
+
 	// Both conditions in one program, which is what makes this the load-bearing case: upstream
 	// reports the value condition on the callback and the dependency condition on the identifier
 	// inside the array, at 11:26 and 11:38.
@@ -498,6 +502,8 @@ func TestPreserveManualMemoizationFires(t *testing.T) {
 // test held this rule's registration: a gate that reports a lost memoization on a program upstream
 // compiles clean gets switched off. That rate is now zero over all 69 clean corpus fixtures.
 func TestPreserveManualMemoizationStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for name, source := range map[string]string{
 		"stableBuiltIns":        preserveManualMemoizationClean1,
 		"refMissingOk":          preserveManualMemoizationClean2,
@@ -523,6 +529,8 @@ func TestPreserveManualMemoizationStaysSilent(t *testing.T) {
 // reports both on the same place. The spans below were read out of upstream's own output on the same
 // fixture: 11:26 for the callback and 11:38 for the dependency, one-based.
 func TestPreserveManualMemoizationSpans(t *testing.T) {
+	t.Parallel()
+
 	result := runPreserveManualMemoization(t, "reassigned.tsx", reassignedContextCapture)
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("findings = %d, want 2; the span assertions below have nothing to read", len(result.Diagnostics))
@@ -561,6 +569,8 @@ func TestPreserveManualMemoizationSpans(t *testing.T) {
 // it, and a mutation removing that guard survives. The guard is a cost decline rather than a
 // correctness one; the reasoning is recorded at the guard itself.
 func TestPreserveManualMemoizationRequiresTheTypeChecker(t *testing.T) {
+	t.Parallel()
+
 	if !PreserveManualMemoization.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker; lowering resolves every binding " +
 			"through the checker and the untyped harness hands it nil")
@@ -580,6 +590,8 @@ func TestPreserveManualMemoizationRequiresTheTypeChecker(t *testing.T) {
 // are what a reader acts on and an id assertion cannot see a description that was edited into
 // saying something false.
 func TestPreserveManualMemoizationMessages(t *testing.T) {
+	t.Parallel()
+
 	if got, want := messagePreserveManualMemoizationValueUnmemoized.Id,
 		"preserveManualMemoizationValueUnmemoized"; got != want {
 		t.Errorf("value message id = %q, want %q", got, want)
@@ -607,6 +619,8 @@ func TestPreserveManualMemoizationMessages(t *testing.T) {
 // guard prevents is a panic, and a panic is invisible to `ExpectFindings`. This asserts the
 // mechanism directly instead, so a later reader deleting the guard as dead code fails here.
 func TestPreserveManualMemoizationNilNodeGuardIsCrashProtection(t *testing.T) {
+	t.Parallel()
+
 	panicked := false
 	func() {
 		defer func() {
@@ -636,6 +650,8 @@ func TestPreserveManualMemoizationNilNodeGuardIsCrashProtection(t *testing.T) {
 // behaviour was instead of having to reconstruct it. And it fails if the COUNT ever drifts, which
 // would be a real defect hiding behind a divergence that is currently only cosmetic.
 func TestPreserveManualMemoizationCollapsesAnchorsAcrossMemoBlocks(t *testing.T) {
+	t.Parallel()
+
 	const source = `import {useCallback} from 'react';
 import {makeArray} from 'shared-runtime';
 function Foo(props) {

@@ -35,6 +35,8 @@ type voidUseMemoCase struct {
 }
 
 func TestVoidUseMemoFires(t *testing.T) {
+	t.Parallel()
+
 	// Message ids are written as literals rather than referenced through the rule's own message
 	// constants, so an assertion cannot move together with the code it guards.
 	const voidReturn = "useMemoCallbackReturnsNothing"
@@ -249,6 +251,8 @@ func TestVoidUseMemoFires(t *testing.T) {
 }
 
 func TestVoidUseMemoStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []voidUseMemoCase{
 		// oxc's only pass case. A concise arrow body lowers to an Implicit return.
 		{
@@ -514,6 +518,8 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 // callback reports at column 22 rather than 21, and the parenthesized callee at column 4 rather
 // than 3.
 func TestVoidUseMemoSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -570,6 +576,8 @@ func TestVoidUseMemoSpans(t *testing.T) {
 // to guard and the assertion is on the two fields directly. Literals are typed here rather than
 // compared against the rule's own constants, which would move together with the code.
 func TestVoidUseMemoMessages(t *testing.T) {
+	t.Parallel()
+
 	if messageUseMemoCallbackReturnsNothing.Id != "useMemoCallbackReturnsNothing" {
 		t.Errorf("void-return id is %q", messageUseMemoCallbackReturnsNothing.Id)
 	}
@@ -594,6 +602,8 @@ func TestVoidUseMemoMessages(t *testing.T) {
 // collection order was asserted here first and the measurement corrected it, which is why the
 // claim is now about source order.
 func TestVoidUseMemoReportsBothKindsInSourceOrder(t *testing.T) {
+	t.Parallel()
+
 	unusedFirst := "function Component() {\n  useMemo(() => { return 1; }, []);\n  const x = useMemo(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n"
 	result := rule_testing.Run(t, VoidUseMemo, "component.tsx", unusedFirst)
 	rule_testing.ExpectFindings(t, result, "useMemoResultUnused", "useMemoCallbackReturnsNothing")

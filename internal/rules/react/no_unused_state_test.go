@@ -21,6 +21,8 @@ import (
 const noUnusedStateFile = "/repository/source/NoUnusedState.tsx"
 
 func TestNoUnusedStateStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText string }{
 		{"upstream valid 0", "\n        function StatelessFnUnaffectedTest(props) {\n          return <SomeComponent foo={props.foo} />;\n        };\n      "},
 		{"upstream valid 1", "\n        var NoStateTest = createReactClass({\n          render: function() {\n            return <SomeComponent />;\n          }\n        });\n      "},
@@ -104,6 +106,8 @@ func TestNoUnusedStateStaysSilent(t *testing.T) {
 }
 
 func TestNoUnusedStateFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		messageIds       []string
@@ -155,6 +159,8 @@ func TestNoUnusedStateFires(t *testing.T) {
 //
 // All four measured against the installed build on 2026-08-27, each beside a control that reports.
 func TestNoUnusedStateGiveUpConditions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		findings         int
@@ -204,6 +210,8 @@ func TestNoUnusedStateGiveUpConditions(t *testing.T) {
 // reading `"b"` still reports `a`. Without that row a rule that treated every computed access as a
 // blanket give-up would pass the first two.
 func TestNoUnusedStateComputedLiteralIsARead(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		findings         int
@@ -246,6 +254,8 @@ func TestNoUnusedStateComputedLiteralIsARead(t *testing.T) {
 // The renaming row is the one that separates the two designs: reading Name would record `z` rather
 // than `a`, so `a` would report as unused. Measured silent upstream.
 func TestNoUnusedStateDestructuringIsARead(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText string }{
 		{
 			"a shorthand destructuring is a read",
@@ -287,6 +297,8 @@ func TestNoUnusedStateDestructuringIsARead(t *testing.T) {
 // with a pattern in the position a name is expected. No `ExpectFindings` assertion can see a panic,
 // so the assertion here is simply that the run completes.
 func TestNoUnusedStateDoesNotPanicOnBindingPatterns(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText string }{
 		{
 			"an array pattern as the setState updater parameter",
@@ -329,6 +341,8 @@ func TestNoUnusedStateDoesNotPanicOnBindingPatterns(t *testing.T) {
 // The lifecycle list is EXACT. A method with the same two-parameter shape and a different name does
 // not alias its second parameter, so a read through it does not count. Measured.
 func TestNoUnusedStateUpdaterAndLifecycleParameters(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		findings         int
@@ -390,6 +404,8 @@ func TestNoUnusedStateUpdaterAndLifecycleParameters(t *testing.T) {
 //
 // All five measured against the installed build on 2026-08-27.
 func TestNoUnusedStateLiteralKeyKinds(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		findings         int
@@ -444,6 +460,8 @@ func TestNoUnusedStateLiteralKeyKinds(t *testing.T) {
 // updater's arrow BODY, and the assertion on the setState RECEIVER inside an already-unwrapped
 // callee. Each row was measured reporting against the installed build.
 func TestNoUnusedStateTypeAssertionsAreUnwrapped(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText string }{
 		{
 			"an assertion on the assigned object",
@@ -485,6 +503,8 @@ func TestNoUnusedStateTypeAssertionsAreUnwrapped(t *testing.T) {
 // text is asserted in full against a literal typed here rather than against the rule's own builder,
 // which would move both sides together under mutation.
 func TestNoUnusedStateSpanAndMessage(t *testing.T) {
+	t.Parallel()
+
 	source := "class C extends React.Component { constructor(p){ super(p); this.state = { alpha: 1 }; } render(){ return null; } }"
 	result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, source)
 	if len(result.Diagnostics) != 1 {
@@ -516,6 +536,8 @@ func TestNoUnusedStateSpanAndMessage(t *testing.T) {
 // depend on Go's randomisation, which produces a test that passes most of the time and is therefore
 // worse than no test.
 func TestNoUnusedStateFindingOrderIsSourceOrder(t *testing.T) {
+	t.Parallel()
+
 	source := "class C extends React.Component { state = { zeta: 1, alpha: 2, mid: 3 }; render(){ return null; } }"
 	result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, source)
 	rule_testing.ExpectFindings(t, result, "unusedStateField", "unusedStateField", "unusedStateField")
@@ -535,6 +557,8 @@ func TestNoUnusedStateFindingOrderIsSourceOrder(t *testing.T) {
 // name comes from a setting whose default is `createReactClass` and upstream's own harness never
 // sets it, which is the same measurement this package's `no-access-state-in-setstate` records.
 func TestNoUnusedStateWhichComponentsAreJudged(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		findings         int
@@ -603,6 +627,8 @@ func TestNoUnusedStateWhichComponentsAreJudged(t *testing.T) {
 // is the constructor, so the same assignment written in another method contributes nothing.
 // Measured both ways against the installed build.
 func TestNoUnusedStateStateAssignmentOnlyCountsInTheConstructor(t *testing.T) {
+	t.Parallel()
+
 	inConstructor := rule_testing.Run(t, NoUnusedState, noUnusedStateFile,
 		"class C extends React.Component { constructor(p){ super(p); this.state = { a: 1 }; } render(){ return null; } }")
 	rule_testing.ExpectFindings(t, inConstructor, "unusedStateField")
@@ -625,6 +651,8 @@ func TestNoUnusedStateStateAssignmentOnlyCountsInTheConstructor(t *testing.T) {
 // All three rows report upstream, which means each guard is what keeps the port from being wider
 // than the rule it reproduces.
 func TestNoUnusedStateLifecycleParameterGates(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		findings         int
@@ -674,6 +702,8 @@ func TestNoUnusedStateLifecycleParameterGates(t *testing.T) {
 // All four measured against the installed build on 2026-08-27. The static requirement, the two
 // parameter minimum, and the name comparison are each load-bearing on this path.
 func TestNoUnusedStateDerivedStateAsAClassProperty(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		findings         int
@@ -725,6 +755,8 @@ func TestNoUnusedStateDerivedStateAsAClassProperty(t *testing.T) {
 // A mutation reading the FIRST statement instead survived the whole imported corpus, because every
 // one of upstream's factory cases has a single-statement body.
 func TestNoUnusedStateGetInitialStateReadsOnlyTheLastStatement(t *testing.T) {
+	t.Parallel()
+
 	earlyReturn := rule_testing.Run(t, NoUnusedState, noUnusedStateFile,
 		"var C = createReactClass({ getInitialState: function(){ if (x) { return { early: 1 }; } return { late: 1 }; }, render: function(){ return null; } });")
 	rule_testing.ExpectFindings(t, earlyReturn, "unusedStateField")
@@ -744,6 +776,8 @@ func TestNoUnusedStateGetInitialStateReadsOnlyTheLastStatement(t *testing.T) {
 // The static row matters separately: `static state = {}` is a class-level constant rather than
 // component state, and reporting its keys as unused state would be wrong about what the code means.
 func TestNoUnusedStateClassPropertyGates(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		findings         int
@@ -784,6 +818,8 @@ func TestNoUnusedStateClassPropertyGates(t *testing.T) {
 // `state` would silence this rule, which is a false negative rather than a false positive and
 // therefore invisible in a findings count.
 func TestNoUnusedStateReceiverMustBeThis(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		findings         int

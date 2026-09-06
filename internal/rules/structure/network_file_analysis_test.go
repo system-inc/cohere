@@ -37,6 +37,8 @@ var networkAnalysisProbe = rule.Rule{
 const networkImport = "import { networkService } from '@structure/source/services/network/NetworkService';\n"
 
 func TestNetworkFileAnalysisFindsHooks(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -79,6 +81,8 @@ func TestNetworkFileAnalysisFindsHooks(t *testing.T) {
 }
 
 func TestNetworkFileAnalysisStaysEmpty(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -134,6 +138,8 @@ func TestNetworkFileAnalysisStaysEmpty(t *testing.T) {
 // Export detection and parameter capture are what the dependent rules read, so they are pinned here
 // rather than discovered three times.
 func TestNetworkFileAnalysisRecordsShape(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

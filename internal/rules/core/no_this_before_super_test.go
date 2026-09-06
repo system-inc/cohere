@@ -24,6 +24,8 @@ const thisBeforeSuperFile = "/repository/source/Derived.tsx"
 // That per-constructor granularity is the sharpest divergence between the two upstreams and it is
 // resolved in favour of oxc deliberately. See the rule's doc comment.
 func TestNoThisBeforeSuperFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -119,6 +121,8 @@ func TestNoThisBeforeSuperFires(t *testing.T) {
 //   - a field initializer always evaluates after `super()` regardless of where it is written
 //   - `super()` reached on *every* path counts, even when it is written twice
 func TestNoThisBeforeSuperStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -231,6 +235,8 @@ func TestNoThisBeforeSuperStaysSilent(t *testing.T) {
 // The expected text is taken from oxc's snapshot, which renders the caret under the whole method
 // definition starting at `constructor`.
 func TestNoThisBeforeSuperReportsAtTheConstructor(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -274,6 +280,8 @@ func TestNoThisBeforeSuperReportsAtTheConstructor(t *testing.T) {
 // port building the range from `node.Pos()` directly passes every other test in this file and
 // breaks `-next-line` suppressions written above the constructor.
 func TestNoThisBeforeSuperSkipsLeadingTrivia(t *testing.T) {
+	t.Parallel()
+
 	source := "class A extends B {\n  // build it\n  constructor() { this.c = 0; }\n}"
 	result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, source)
 	if len(result.Diagnostics) != 1 {
@@ -292,6 +300,8 @@ func TestNoThisBeforeSuperSkipsLeadingTrivia(t *testing.T) {
 // outermost constructor unconditionally produces the right count on both and the right span on
 // exactly one, so counting cannot see this and only the span can.
 func TestNoThisBeforeSuperPicksTheOffendingNestedConstructor(t *testing.T) {
+	t.Parallel()
+
 	outerOffends := "class A extends B { constructor() { class C extends D { constructor() { super(); this.e(); } } this.f(); super(); } }"
 	result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, outerOffends)
 	if len(result.Diagnostics) != 1 {
@@ -318,6 +328,8 @@ func TestNoThisBeforeSuperPicksTheOffendingNestedConstructor(t *testing.T) {
 // `ExpectFindings` matches the id, so a rule reporting the right id with a description that says
 // the wrong thing, or renders a placeholder unsubstituted, passes everything else here.
 func TestNoThisBeforeSuperMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile,
 		"class A extends B { constructor() { this.c = 0; } }")
 	if len(result.Diagnostics) != 1 {
@@ -340,6 +352,8 @@ func TestNoThisBeforeSuperMessage(t *testing.T) {
 // about the rest of the statement grammar. Every case below names a construct the scanner routes
 // deliberately, and each one exists because the routing is a choice rather than a consequence.
 func TestNoThisBeforeSuperFiresOnCasesUpstreamOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -435,6 +449,8 @@ func TestNoThisBeforeSuperFiresOnCasesUpstreamOmits(t *testing.T) {
 // These are the ones that catch an over-eager scanner, and three of them guard a specific way this
 // port could have gone wrong that upstream's corpus does not reach.
 func TestNoThisBeforeSuperStaysSilentOnCasesUpstreamOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

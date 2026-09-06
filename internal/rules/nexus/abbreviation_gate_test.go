@@ -20,6 +20,8 @@ import (
 // `[a-z]Ms($|[A-Z])` arm tests. A list somebody wrote from reading the pattern does not contain the
 // case they misread.
 func TestAbbreviationGateHasNoFalseNegatives(t *testing.T) {
+	t.Parallel()
+
 	corpus := loadIdentifierCorpus(t)
 
 	falseNegatives := []string{}
@@ -45,6 +47,8 @@ func TestAbbreviationGateHasNoFalseNegatives(t *testing.T) {
 // is worthless, and the test above would call it correct. Measuring the over-approximation rate
 // turns "no false negatives" into a claim about a real filter.
 func TestAbbreviationGateStaysSelective(t *testing.T) {
+	t.Parallel()
+
 	corpus := loadIdentifierCorpus(t)
 
 	admitted := 0
@@ -74,6 +78,8 @@ func TestAbbreviationGateStaysSelective(t *testing.T) {
 // addition to the corpus test, not instead of it: the corpus proves the gate today, and these say
 // which shapes were historically easy to drop.
 func TestAbbreviationGateCoversTheArmsThatWereLost(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		// The `[a-z]Ms($|[A-Z])` arm. Splitting at uppercase discards the lowercase letter before
 		// `Ms`, which is the boundary the arm tests.

@@ -22,6 +22,8 @@ const newWrappersFile = "/repository/source/NewWrappers.ts"
 // `resolvesToAGlobal` answers false for every input. Every Fires case would fail and every
 // StaysSilent case would pass vacuously, so the syntax-only harness cannot prove this rule.
 func TestNoNewWrappersFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -53,6 +55,8 @@ func TestNoNewWrappersFires(t *testing.T) {
 // The import case needs a second file, since a bare unresolvable import leaves the checker with no
 // declaration to find and the case would pass for the wrong reason. Its module is written here.
 func TestNoNewWrappersStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -81,6 +85,8 @@ func TestNoNewWrappersStaysSilent(t *testing.T) {
 // the one thing believed to make it pass has to move the verdict, and here it does, since deleting
 // the import makes this report.
 func TestNoNewWrappersDeclinesAnImportedShadow(t *testing.T) {
+	t.Parallel()
+
 	const stringModule = "/repository/source/string.ts"
 	files := map[string]string{
 		stringModule:    "export default class Str { constructor(_value: number) {} }\n",
@@ -101,6 +107,8 @@ func TestNoNewWrappersDeclinesAnImportedShadow(t *testing.T) {
 // The global comment is carried verbatim so that if a global-comment reader ever lands, this test
 // fails and names the case rather than the case quietly disappearing.
 func TestNoNewWrappersReportsWhereUpstreamsGlobalsConfigWouldNot(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -130,6 +138,8 @@ func TestNoNewWrappersReportsWhereUpstreamsGlobalsConfigWouldNot(t *testing.T) {
 // out of the Go literal is offset by one on any case with a leading newline. The expectation is
 // transformed the same way the harness transforms the input rather than sliced from the literal.
 func TestNoNewWrappersReportsTheWholeNewExpression(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -164,6 +174,8 @@ func TestNoNewWrappersReportsTheWholeNewExpression(t *testing.T) {
 // format string does. Comparing against the rule's own constant would be equality that moves on
 // both sides under mutation, so the expected text is written out rather than referenced.
 func TestNoNewWrappersRendersTheName(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedFiles(t, NoNewWrappers,
 		map[string]string{newWrappersFile: "var a = new Boolean(false);"}, newWrappersFile)
 	if len(result.Diagnostics) != 1 {
@@ -188,6 +200,8 @@ func TestNoNewWrappersRendersTheName(t *testing.T) {
 // `eslint@9` through the Linter API on each input; the verdicts recorded beside them are that
 // measurement rather than a reading of the source.
 func TestNoNewWrappersOnFormsUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -224,6 +238,8 @@ func TestNoNewWrappersOnFormsUpstreamDoesNotWrite(t *testing.T) {
 // `ExpectFindings` asserts the count as well as the ids, so a rule reporting once on a file with
 // two violations fails here and passes every single-finding fixture above.
 func TestNoNewWrappersReportsEachViolation(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.RunTypedFiles(t, NoNewWrappers,
 			map[string]string{newWrappersFile: "var a = new Number(1); var b = new Boolean(0);"},
@@ -238,6 +254,8 @@ func TestNoNewWrappersReportsEachViolation(t *testing.T) {
 // which is the more dangerous failure of the two the brief names, so it is pinned rather than left
 // to be rediscovered.
 func TestNoNewWrappersIsSilentWithoutAChecker(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t,
 		rule_testing.Run(t, NoNewWrappers, newWrappersFile, "var a = new String('hello');"))
 }

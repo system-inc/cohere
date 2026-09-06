@@ -23,6 +23,8 @@ const duplicatePropsFile = "/repository/source/Duplicate.tsx"
 // and the snapshot records 9 diagnostics from those 9 inputs, so one finding per input is measured
 // here rather than assumed.
 func TestJsxNoDuplicatePropsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"<App a a />;",
 		"<App A b c A />;",
@@ -58,6 +60,8 @@ func TestJsxNoDuplicatePropsFires(t *testing.T) {
 // And `<App />` with no attributes at all checks the empty path, which is the one an
 // over-eager index would crash on rather than decline.
 func TestJsxNoDuplicatePropsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"<App />;",
 		"<App {...this.props} />;",
@@ -91,6 +95,8 @@ func TestJsxNoDuplicatePropsStaysSilent(t *testing.T) {
 // one as the diagnostic's position, which is what the imported snapshot prints and what the release
 // oxlint binary prints for the same inputs.
 func TestJsxNoDuplicatePropsReportsEarlierOccurrence(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		// The byte offset each finding should point at, in order. Offsets rather than substrings,
@@ -134,6 +140,8 @@ func TestJsxNoDuplicatePropsReportsEarlierOccurrence(t *testing.T) {
 // the text and our harness renders a fixed Description, so a later change that started
 // interpolating would need to update this assertion rather than sliding past it.
 func TestJsxNoDuplicatePropsMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, "<App a a />;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
@@ -154,6 +162,8 @@ func TestJsxNoDuplicatePropsMessageText(t *testing.T) {
 // the ones that separate them, and each was measured against the release oxlint binary at
 // `~/Projects/system/oxc/target/release/oxlint` before being written down.
 func TestJsxNoDuplicatePropsBeyondUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -243,6 +253,8 @@ func TestJsxNoDuplicatePropsBeyondUpstreamCorpus(t *testing.T) {
 // apart; only the offsets can. Upstream rewrites the map entry on every insert, so the second
 // finding points at the second `a` rather than at the first again.
 func TestJsxNoDuplicatePropsThirdCopyComparesAgainstSecond(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "<App a a a />;"
 	result := rule_testing.Run(t, JsxNoDuplicateProps, duplicatePropsFile, sourceText)
 	if len(result.Diagnostics) != 2 {

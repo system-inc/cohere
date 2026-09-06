@@ -29,6 +29,8 @@ const noNamespaceFile = "/repository/source/Namespace.tsx"
 // a member expression would not. Three more are React.createElement called with null, true and an
 // object literal, which pin that the first argument must be a string literal specifically.
 func TestNoNamespaceFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		findings   []string
@@ -59,6 +61,8 @@ func TestNoNamespaceFires(t *testing.T) {
 }
 
 func TestNoNamespaceStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"<testcomponent />",
 		"React.createElement(\"testcomponent\")",
@@ -110,6 +114,8 @@ func TestNoNamespaceStaysSilent(t *testing.T) {
 // Not one case in the imported corpus writes any of these spellings, so all 43 of them stay green
 // under either predicate. Measured verdicts, all from the installed build.
 func TestNoNamespaceCreateElementBoundary(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -142,6 +148,8 @@ func TestNoNamespaceCreateElementBoundary(t *testing.T) {
 // kind with no opening element inside it. So a rule listening on only one of the two kinds passes
 // either the whole imported corpus or none of it, and this is what separates the two.
 func TestNoNamespaceReadsBothElementForms(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -169,6 +177,8 @@ func TestNoNamespaceReadsBothElementForms(t *testing.T) {
 //
 // A dotted tag name is ordinary code, so this is reachable rather than defensive.
 func TestNoNamespaceDoesNotPanicOnDottedTagNames(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"<a.b />;",
 		"<a.b.c.d />;",
@@ -196,6 +206,8 @@ func TestNoNamespaceDoesNotPanicOnDottedTagNames(t *testing.T) {
 // RunTyped trims its input, so a slice taken from an untrimmed Go literal is off by one and reads
 // exactly like an off-by-one in the rule.
 func TestNoNamespaceSpanAndMessage(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a self closing element reports on the element", func(t *testing.T) {
 		const sourceText = "const a = <ns:x />;"
 		result := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
@@ -259,6 +271,8 @@ func TestNoNamespaceSpanAndMessage(t *testing.T) {
 // The JavaScript half of the claim is covered by `TestNoNamespaceHasNoFileSuffixGateUntyped` below,
 // which reaches all four suffixes because the untyped harness needs no program.
 func TestNoNamespaceHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "React.createElement(\"ns:x\");"
 	for _, fileName := range []string{
 		"/repository/source/Namespace.ts",
@@ -277,6 +291,8 @@ func TestNoNamespaceHasNoFileSuffixGate(t *testing.T) {
 // four suffixes. This is what pins the absence of the gate on JavaScript files specifically, which
 // is the half the typed test above structurally cannot reach.
 func TestNoNamespaceHasNoFileSuffixGateUntyped(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "<ns:x />;"
 	for _, fileName := range []string{
 		"/repository/source/Namespace.tsx",
@@ -300,6 +316,8 @@ func TestNoNamespaceHasNoFileSuffixGateUntyped(t *testing.T) {
 // `React.createElement` member arm both answer identically either way, which is deliberate: a nil
 // checker costs this rule one spelling rather than every finding.
 func TestNoNamespaceNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "import {createElement} from \"react\";\ncreateElement(\"ns:x\");"
 
 	typed := rule_testing.RunTyped(t, NoNamespace, noNamespaceFile, sourceText)
@@ -332,6 +350,8 @@ func TestNoNamespaceNeedsTheTypedHarness(t *testing.T) {
 // prevents rather than another silent row in a boundary table. Reaching this test at all is the
 // assertion; the verdicts are pinned elsewhere.
 func TestNoNamespaceDoesNotPanicOnNonLiteralArguments(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -20,6 +20,8 @@ const upstreamFail1 = "\n\t\t\t      import Document, { Html, Main, NextScript }
 const upstreamFail2 = "\n\t\t\t      import Document, { Html, Main, NextScript } from 'next/document'\n\t\t\t      import Head from 'next/head'\n\n\t\t\t      class MyDocument extends Document {\n\t\t\t        render() {\n\t\t\t          return (\n\t\t\t            <Html>\n\t\t\t              <Head>\n\t\t\t                <meta charSet=\"utf-8\" />\n\t\t\t                <link\n\t\t\t                  href=\"https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,400;0,700;1,400;1,700&display=swap\"\n\t\t\t                  rel=\"stylesheet\"\n\t\t\t                />\n\t\t\t              </Head>\n\t\t\t              <body>\n\t\t\t                <Main />\n\t\t\t                <NextScript />\n\t\t\t              </body>\n\t\t\t              <Head>\n\t\t\t                <script\n\t\t\t                  dangerouslySetInnerHTML={{\n\t\t\t                    __html: '',\n\t\t\t                  }}\n\t\t\t                />\n\t\t\t              </Head>\n\t\t\t            </Html>\n\t\t\t          )\n\t\t\t        }\n\t\t\t      }\n\n\t\t\t      export default MyDocument\n\t\t\t      "
 
 func TestNoDuplicateHeadReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -122,6 +124,8 @@ func TestNoDuplicateHeadReports(t *testing.T) {
 }
 
 func TestNoDuplicateHeadIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -233,6 +237,8 @@ func TestNoDuplicateHeadIsSilent(t *testing.T) {
 // disagree at three: one, two, and three respectively. Measured on the release oxlint binary at
 // three copies and again at four, both producing a single diagnostic.
 func TestNoDuplicateHeadReportsOncePerFile(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -272,6 +278,8 @@ func TestNoDuplicateHeadReportsOncePerFile(t *testing.T) {
 // above. oxc's diagnostic renders at the first `<Head`: the snapshot for the three-copy fail prints
 // `9:19`, and the underline is four bytes wide, the tag name alone.
 func TestNoDuplicateHeadPointsAtTheFirstOccurrence(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -318,6 +326,8 @@ func TestNoDuplicateHeadPointsAtTheFirstOccurrence(t *testing.T) {
 // guards, so equality is asserted here. This message interpolates nothing, which is itself worth
 // pinning: a later edit adding a name into it would need this assertion updated deliberately.
 func TestNoDuplicateHeadMessageText(t *testing.T) {
+	t.Parallel()
+
 	source := "import { Head } from 'next/document'\nconst a = <div><Head/><Head/></div>\n"
 	result := rule_testing.RunTyped(t, NoDuplicateHead, "components/Shell.tsx", source)
 	if len(result.Diagnostics) != 1 {
@@ -338,6 +348,8 @@ func TestNoDuplicateHeadMessageText(t *testing.T) {
 // would fail looking like a rule defect. A later revert of `NeedsTypeChecker` fails here loudly
 // instead.
 func TestNoDuplicateHeadNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoDuplicateHead.NeedsTypeChecker {
 		t.Fatal("rule must declare NeedsTypeChecker; symbol identity is what separates a shadow from the import")
 	}

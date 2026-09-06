@@ -18,6 +18,8 @@ const newFile = "/repository/source/New.ts"
 // statement". Every additional case below was driven through the installed eslint 10.8.1 build
 // first, and the verdict recorded here is the one that build gave.
 func TestNoNewFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -34,6 +36,8 @@ func TestNoNewFires(t *testing.T) {
 }
 
 func TestNoNewStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -59,6 +63,8 @@ func TestNoNewStaysSilent(t *testing.T) {
 // The nesting row pins that `new new Foo();` is one finding rather than two: only the outer `new` is
 // the statement's expression.
 func TestNoNewFiresOnShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -94,6 +100,8 @@ func TestNoNewFiresOnShapesTheCorpusOmits(t *testing.T) {
 // because the statement's expression is the comma rather than either `new`. That reads like a gap in
 // the rule and it is upstream's, reproduced here rather than improved on.
 func TestNoNewDeclinesShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -123,6 +131,8 @@ func TestNoNewDeclinesShapesTheCorpusOmits(t *testing.T) {
 // A port anchored on the `new` expression instead passes every message-id fixture in this file and
 // is wrong on every row here.
 func TestNoNewReportsTheWholeStatement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantPos    int
@@ -156,6 +166,8 @@ func TestNoNewReportsTheWholeStatement(t *testing.T) {
 
 // The message, asserted against literals typed here rather than the rule's own constants.
 func TestNoNewReportsWhyItMatters(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoNew, newFile, "new Date()")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))

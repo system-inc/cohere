@@ -13,6 +13,8 @@ const hookDestructuringDeclarations = "declare function useQuery(): { data: unkn
 	"declare function subscribe(handler: () => void): void;\n"
 
 func TestReactHookNoDestructuringFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -75,6 +77,8 @@ func TestReactHookNoDestructuringFires(t *testing.T) {
 }
 
 func TestReactHookNoDestructuringStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

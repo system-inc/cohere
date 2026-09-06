@@ -15,6 +15,8 @@ const uselessEmptyExportFile = "/repository/source/Thing.ts"
 // The snapshot records eleven diagnostics against these eleven inputs, so each reports exactly
 // once and a fixture asserting one finding per input is the right shape.
 func TestNoUselessEmptyExportFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -46,6 +48,8 @@ func TestNoUselessEmptyExportFires(t *testing.T) {
 // `export = 3;` both read as exports and neither makes the file a module for this rule's purposes,
 // so a predicate written from the phrase "any top-level import or export" breaks precisely here.
 func TestNoUselessEmptyExportStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -87,6 +91,8 @@ func TestNoUselessEmptyExportStaysSilent(t *testing.T) {
 // never wrote a failing case for. Each was measured against the release binary before it was
 // written here, and each pairs with a silent case above that differs by one token.
 func TestNoUselessEmptyExportFiresOnFormsTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -115,6 +121,8 @@ func TestNoUselessEmptyExportFiresOnFormsTheCorpusOmits(t *testing.T) {
 // TestNoUselessEmptyExportReportsEachEmptyExportSeparately pins that the gather-then-report shape
 // reports per statement rather than once per file. Measured: two diagnostics upstream.
 func TestNoUselessEmptyExportReportsEachEmptyExportSeparately(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile,
 		"export const _ = {};\nexport {};\nexport {};\n")
 	rule_testing.ExpectFindings(t, result, "uselessEmptyExport", "uselessEmptyExport")
@@ -128,6 +136,8 @@ func TestNoUselessEmptyExportReportsEachEmptyExportSeparately(t *testing.T) {
 // The vectors are upstream's own, which is what makes them worth more than invented pairs: they
 // pin that the deletion takes the statement and not the whitespace around it, in both orders.
 func TestNoUselessEmptyExportFixesWriteWhatTheyClaim(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -160,6 +170,8 @@ func TestNoUselessEmptyExportFixesWriteWhatTheyClaim(t *testing.T) {
 // both exports, so a rule anchoring on the wrong one produces an identical id and count. The
 // second case puts the empty export first so that pointing at "the first export" fails.
 func TestNoUselessEmptyExportPointsAtTheEmptyExport(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -187,6 +199,8 @@ func TestNoUselessEmptyExportPointsAtTheEmptyExport(t *testing.T) {
 // than against the rule's own message constant. Comparing to the constant is equality that looks
 // correct and cannot fail, because a mutation moves both sides together.
 func TestNoUselessEmptyExportReportsTheMessageItClaims(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUselessEmptyExport, uselessEmptyExportFile,
 		"export const _ = {};\nexport {};\n")
 	if len(result.Diagnostics) != 1 {
@@ -210,6 +224,8 @@ func TestNoUselessEmptyExportReportsTheMessageItClaims(t *testing.T) {
 // twice here, silent under the declaration extension and reporting under `.ts`, because a gate
 // tested only on its silent side passes just as well when the rule is broken outright.
 func TestNoUselessEmptyExportExemptsDeclarationFiles(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

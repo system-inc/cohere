@@ -23,6 +23,8 @@ const noLabelsFile = "/repository/source/NoLabels.ts"
 // statement, and a rule matching on the identifier reports it. The next three are unlabeled loop
 // jumps, which this rule never touches. The last four are labels the options permit.
 func TestNoLabelsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -53,6 +55,8 @@ func TestNoLabelsStaysSilent(t *testing.T) {
 // default: break; };` is the case that pins it: two `unexpectedLabel` then one
 // `unexpectedLabelInBreak`, which only comes out in that order if the label reports on exit.
 func TestNoLabelsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -101,6 +105,8 @@ func TestNoLabelsFires(t *testing.T) {
 // instead, so a port taking its shape from that neighbour would anchor wrong and pass every id
 // fixture. That is exactly the "read siblings for shape, never for semantics" trap.
 func TestNoLabelsSpansTheWholeStatement(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "A: if (a) { break A; }"
 
 	result := rule_testing.Run(t, NoLabels, noLabelsFile, sourceText)
@@ -131,6 +137,8 @@ func TestNoLabelsSpansTheWholeStatement(t *testing.T) {
 // A continue's span, asserted separately because it reports through a different arm and a different
 // message than break.
 func TestNoLabelsSpansAContinue(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "A: while (a) { B: while (b) { continue A; } }"
 
 	result := rule_testing.Run(t, NoLabels, noLabelsFile, sourceText)
@@ -155,6 +163,8 @@ func TestNoLabelsSpansAContinue(t *testing.T) {
 // strict setting, because that is upstream's default. Passing nil directly bypasses the decoder the
 // way the live config does.
 func TestNoLabelsDefaultsWithoutTheDecoder(t *testing.T) {
+	t.Parallel()
+
 	// Under the default, a label wrapping a loop still reports, and so does the break naming it.
 	rule_testing.ExpectFindings(t,
 		rule_testing.RunWithOptions(t, NoLabels, noLabelsFile, "A: while (a) { break A; }", nil),
@@ -173,6 +183,8 @@ func TestNoLabelsDefaultsWithoutTheDecoder(t *testing.T) {
 // tag reads as "the option does nothing" and every fixture above would still pass by constructing
 // the struct directly.
 func TestNoLabelsDecodesItsOptionNames(t *testing.T) {
+	t.Parallel()
+
 	decode := rule.DecodeOptionsInto[NoLabelsOptions]()
 
 	cases := []struct {
@@ -202,6 +214,8 @@ func TestNoLabelsDecodesItsOptionNames(t *testing.T) {
 // opposite verdicts, and the only difference is which option is set, which is what makes them the
 // pair that separates a correct port from one asking "is this jump inside a loop".
 func TestNoLabelsPermissionFollowsTheLabelNotTheJump(t *testing.T) {
+	t.Parallel()
+
 	const nested = "A: for (var a in obj) { for (;;) { switch (a) { case 0: continue A; } } }"
 
 	// `A` labels a `for`, so allowLoop exempts it even though the jump sits inside a switch.
@@ -221,6 +235,8 @@ func TestNoLabelsPermissionFollowsTheLabelNotTheJump(t *testing.T) {
 // `B` alone. A port passing `true` goes silent on both findings and no imported fixture sees it,
 // because the corpus writes no doubled label under an option.
 func TestNoLabelsDoesNotSeeThroughANestedLabel(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile,
 		"A: B: while (a) { break A; }", NoLabelsOptions{AllowLoop: true}),
 		"unexpectedLabel", "unexpectedLabelInBreak")
@@ -253,6 +269,8 @@ func TestNoLabelsDoesNotSeeThroughANestedLabel(t *testing.T) {
 // A mutant reversing the stack search direction and a mutant making an unresolved name permitted
 // both survived the whole imported corpus, which is how these were found.
 func TestNoLabelsAnswersShapesEslintRefusesToParse(t *testing.T) {
+	t.Parallel()
+
 	// Duplicate label: the inner `A` names the switch, so `allowSwitch` exempts the break while
 	// `allowLoop` does not. Reversing the stack search flips both rows.
 	const duplicate = "A: while (a) { A: switch (b) { case 0: break A; } }"
@@ -304,6 +322,8 @@ func TestNoLabelsAnswersShapesEslintRefusesToParse(t *testing.T) {
 // that the stack does not GROW without bound across siblings, which is what the second assertion
 // measures.
 func TestNoLabelsPopsTheStackWhenScopeEnds(t *testing.T) {
+	t.Parallel()
+
 	// Sequential same-name labels, both wrapping loops: clean under allowLoop. Measured on eslint
 	// 10.8.1, which parses this without a fatal and reports nothing.
 	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile,

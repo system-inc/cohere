@@ -9,6 +9,8 @@ import (
 
 // The gates must not change what masking produces, only how fast it gets there.
 func TestShoutingMaskGatesPreserveOutput(t *testing.T) {
+	t.Parallel()
+
 	var texts []string
 	root := "/Users/kirkouimet/Projects/ahra/libraries/structure/source"
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -75,6 +77,8 @@ func TestShoutingMaskGatesPreserveOutput(t *testing.T) {
 
 // The gates must actually skip work, or they are pure overhead.
 func TestShoutingMaskGatesActuallySkip(t *testing.T) {
+	t.Parallel()
+
 	plain := "// just some ordinary prose about the thing\n// with no commands and no tags\n"
 	if containsAnyCommandStarter(plain) {
 		t.Fatalf("command gate admits plain prose")
@@ -104,6 +108,8 @@ func TestShoutingMaskGatesActuallySkip(t *testing.T) {
 // Compared token by token rather than by count, for the same reason the comment guard is: a gate
 // that lost one shout and gained another would hold a count stable while silencing a real finding.
 func TestShoutingUppercaseGatePreservesTokens(t *testing.T) {
+	t.Parallel()
+
 	comments := realCommentCorpus(t)
 
 	ungated := func(body string) []string {
@@ -138,6 +144,8 @@ func TestShoutingUppercaseGatePreservesTokens(t *testing.T) {
 
 // The cases a corpus cannot be relied on to hold, written out because that lesson has now cost twice.
 func TestShoutingUppercaseGateAdmitsRealShouts(t *testing.T) {
+	t.Parallel()
+
 	// Every one of these must reach the expensive path.
 	admitted := []string{
 		"NEVER do this", "this is REALLY bad", "DO NOT EDIT",

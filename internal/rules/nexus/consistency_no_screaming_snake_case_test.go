@@ -10,6 +10,8 @@ import (
 const screamingFile = "/repository/source/Thing.ts"
 
 func TestConsistencyNoScreamingSnakeCaseFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -37,6 +39,8 @@ func TestConsistencyNoScreamingSnakeCaseFires(t *testing.T) {
 }
 
 func TestConsistencyNoScreamingSnakeCaseStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -68,6 +72,8 @@ func TestConsistencyNoScreamingSnakeCaseStaysSilent(t *testing.T) {
 }
 
 func TestConsistencyNoScreamingSnakeCaseRespectsTheAllowOption(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "const STRIPE_WEBHOOK_SECRET = readSecret();\n"
 
 	withoutOption := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, sourceText)
@@ -86,6 +92,8 @@ func TestConsistencyNoScreamingSnakeCaseRespectsTheAllowOption(t *testing.T) {
 
 // The message has to carry a name the author can actually use, and the two forms differ by export.
 func TestConsistencyNoScreamingSnakeCaseSuggestsTheRightCasing(t *testing.T) {
+	t.Parallel()
+
 	local := rule_testing.Run(t, ConsistencyNoScreamingSnakeCase, screamingFile, "const MAX_RETRY_COUNT = 3;\n")
 	rule_testing.ExpectFindings(t, local, "noScreamingSnakeCaseLocal")
 	if !strings.Contains(local.Diagnostics[0].Message.Description, `"maxRetryCount"`) {

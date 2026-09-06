@@ -10,6 +10,8 @@ import (
 //
 // All four statement kinds, each in the position where its jump actually leaves the finally block.
 func TestNoUnsafeFinallyReportsEscapingControlFlow(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		source string
 		wantId string
@@ -37,6 +39,8 @@ func TestNoUnsafeFinallyReportsEscapingControlFlow(t *testing.T) {
 // return. A rule that stopped at any enclosing statement rather than at the ones that actually
 // absorb this kind of jump would go silent on every one of these.
 func TestNoUnsafeFinallyReportsThroughNestedStatements(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		source string
 		wantId string
@@ -57,6 +61,8 @@ func TestNoUnsafeFinallyReportsThroughNestedStatements(t *testing.T) {
 // A labeled break is absorbed by the labeled statement it names, so whether it escapes depends
 // entirely on where that label sits. Here every label is outside the finally block.
 func TestNoUnsafeFinallyReportsLabeledJumpsLeavingFinally(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		source string
 		wantId string
@@ -80,6 +86,8 @@ func TestNoUnsafeFinallyReportsLabeledJumpsLeavingFinally(t *testing.T) {
 // absorbs one and not the other. A rule that used one stopping set for both would go silent here
 // while every other fixture stayed green.
 func TestNoUnsafeFinallyReportsContinueThroughSwitch(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUnsafeFinally, "switch.ts",
 		"while (true) try {} finally { switch (true) { case true: continue; } }")
 	rule_testing.ExpectFindings(t, result, "unsafeContinue")
@@ -92,6 +100,8 @@ func TestNoUnsafeFinallyReportsContinueThroughSwitch(t *testing.T) {
 // whether a statement sits inside a finally block: a callback defined in finally is its own control
 // flow, and its `return` belongs to it.
 func TestNoUnsafeFinallyStaysSilentWhenTheJumpIsAbsorbed(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		`var foo = function() { try { return 1; } catch (err) { return 2; } finally { console.log("done"); } };`,
 		"var foo = function() { try {} finally { function a(x) { return x; } } };",

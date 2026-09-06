@@ -36,6 +36,8 @@ func decodedGroupedAccessorPairsOptions(t *testing.T, raw string) any {
 // this port does not implement; they are recorded in
 // `TestGroupedAccessorPairsTypeMembersAreNotChecked` rather than silently dropped.
 func TestGroupedAccessorPairsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -132,6 +134,8 @@ func TestGroupedAccessorPairsStaysSilent(t *testing.T) {
 // Every reporting case, with its own message ids in upstream's own order. Nine of them report
 // more than once, so the counts are upstream data rather than an assumption.
 func TestGroupedAccessorPairsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -218,6 +222,8 @@ func TestGroupedAccessorPairsFires(t *testing.T) {
 // this rule. Pointing at the whole member instead is a defensible reading of the same rule with
 // an identical message id, and no id fixture could tell the two apart.
 func TestGroupedAccessorPairsSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -306,6 +312,8 @@ func TestGroupedAccessorPairsSpans(t *testing.T) {
 // ungrouped accessor pair stays clean, which is upstream's behaviour too. If somebody later wants
 // the option, these are the cases to import.
 func TestGroupedAccessorPairsTypeMembersAreNotChecked(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"interface I { get a(): any, between: true, set a(value: any): void }",
 		"interface I { get a(): any, set a(value: any): void }",
@@ -342,6 +350,8 @@ func TestGroupedAccessorPairsTypeMembersAreNotChecked(t *testing.T) {
 // warns about: the first option is a bare string whose default is "anyOrder", so a decoder
 // yielding a zero value hands the rule an empty string matching no arm.
 func TestDecodeGroupedAccessorPairsOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -376,6 +386,8 @@ func TestDecodeGroupedAccessorPairsOptions(t *testing.T) {
 // so it lives in the decoder, and a rule silently reading an unknown string as "anyOrder" would
 // be the inert shape the config layer's own doc comment describes.
 func TestDecodeGroupedAccessorPairsOptionsRefusesAValueOutsideTheEnum(t *testing.T) {
+	t.Parallel()
+
 	for _, raw := range []string{`["sideways"]`, `["GetBeforeSet"]`, `[""]`, `[123]`} {
 		t.Run(raw, func(t *testing.T) {
 			if _, err := DecodeGroupedAccessorPairsOptions(json.RawMessage(raw)); err == nil {
@@ -389,6 +401,8 @@ func TestDecodeGroupedAccessorPairsOptionsRefusesAValueOutsideTheEnum(t *testing
 // asserts nil behaves as "anyOrder" rather than as no arm at all, which is the defect the
 // hand-rolled decoder exists to prevent and which no fixture routing through the decoder can see.
 func TestGroupedAccessorPairsWithNilOptionsDefaultsToAnyOrder(t *testing.T) {
+	t.Parallel()
+
 	// Ungrouped reports under every order, including the default.
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, GroupedAccessorPairs,
 		groupedAccessorPairsFile, "({ get a(){}, b:1, set a(foo){} })", nil), "notGrouped")
@@ -408,6 +422,8 @@ func TestGroupedAccessorPairsWithNilOptionsDefaultsToAnyOrder(t *testing.T) {
 // bare `getter` when the key is computed and cannot be named, a `static setter 'a'`, and a
 // `private getter #p` which carries no quotes at all.
 func TestGroupedAccessorPairsMessageText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -515,6 +531,8 @@ func TestGroupedAccessorPairsMessageText(t *testing.T) {
 // token-list comparison, so a rule that simply declined every computed key would pass the first
 // three for the wrong reason.
 func TestGroupedAccessorPairsComputedKeysDoNotPairWithStaticOnes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string

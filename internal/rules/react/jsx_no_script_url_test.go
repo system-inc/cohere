@@ -48,6 +48,8 @@ func jsxNoScriptUrlOptions(t *testing.T, raw string) any {
 
 // TestJsxNoScriptUrlFires runs every case this port reports on.
 func TestJsxNoScriptUrlFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -125,6 +127,8 @@ func TestJsxNoScriptUrlFires(t *testing.T) {
 
 // TestJsxNoScriptUrlStaysSilent runs every case this port declines.
 func TestJsxNoScriptUrlStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -199,6 +203,8 @@ func TestJsxNoScriptUrlStaysSilent(t *testing.T) {
 // column 4 through the closing quote. A port anchoring on the value node, or on the element, would
 // pass every message-id fixture above while pointing somewhere the reader was never shown.
 func TestJsxNoScriptUrlReportsOnTheWholeAttribute(t *testing.T) {
+	t.Parallel()
+
 	const source = `<a href="javascript:void(0)"></a>`
 
 	result := rule_testing.RunWithOptions(t, JsxNoScriptUrl, jsxNoScriptUrlFile, source, jsxNoScriptUrlOptions(t, ``))
@@ -219,6 +225,8 @@ func TestJsxNoScriptUrlReportsOnTheWholeAttribute(t *testing.T) {
 // equality against a literal typed here rather than against the rule's own constant, which would
 // move with any mutation of it.
 func TestJsxNoScriptUrlMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, JsxNoScriptUrl, jsxNoScriptUrlFile, `<a href="javascript:"></a>`, jsxNoScriptUrlOptions(t, ``))
 	rule_testing.ExpectFindings(t, result, "noScriptURL")
 
@@ -247,6 +255,8 @@ func TestJsxNoScriptUrlMessageText(t *testing.T) {
 // needs no JSX; this rule anchors on a JSX attribute and has no such arm, so the honest coverage is
 // the three extensions where the node can exist.
 func TestJsxNoScriptUrlHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	const source = `<a href="javascript:"></a>`
 
 	for _, fileName := range []string{
@@ -268,6 +278,8 @@ func TestJsxNoScriptUrlHasNoFileSuffixGate(t *testing.T) {
 // body must yield the built-in pair rather than an error, which is the nil-options path a rule
 // configured as a bare severity takes.
 func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an empty body keeps the built-in pair", func(t *testing.T) {
 		decoded, err := DecodeJsxNoScriptUrlOptions(nil)
 		if err != nil {
@@ -355,6 +367,8 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 // separates: upstream writes only one interleaved case and no prefix case at all. Every expectation
 // here was measured by driving the installed rule on the same value.
 func TestJsxNoScriptUrlProtocolScan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		value string
 		want  bool

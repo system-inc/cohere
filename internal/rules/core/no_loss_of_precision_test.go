@@ -15,6 +15,8 @@ const lossOfPrecisionFile = "/repository/source/Numbers.ts"
 // inputs. One finding per input holds throughout, which is unusual enough to be worth stating: no
 // input here reports twice, so every fail case asserts exactly one message id.
 func TestNoLossOfPrecisionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -97,6 +99,8 @@ func TestNoLossOfPrecisionFires(t *testing.T) {
 // subnormal territory, where a formatter with a fixed fractional width runs out of digits before it
 // reaches a significant one.
 func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -208,6 +212,8 @@ func TestNoLossOfPrecisionStaysSilent(t *testing.T) {
 // decision: each one is a literal whose normalized text and source text differ, and a rule reading
 // `.Text` reports the wrong answer on all of them.
 func TestNoLossOfPrecisionReadsRawSourceText(t *testing.T) {
+	t.Parallel()
+
 	fires := []struct {
 		name       string
 		sourceText string

@@ -24,6 +24,8 @@ const preferExponentiationOperatorFile = "/repository/source/PreferExponentiatio
 // call. Those are asserted as declines, because a fixer that repairs a case upstream refuses to
 // touch is a defect no message-id fixture can see.
 func TestPreferExponentiationOperatorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		wantCount int
@@ -249,6 +251,8 @@ func TestPreferExponentiationOperatorFires(t *testing.T) {
 }
 
 func TestPreferExponentiationOperatorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"Object.pow(a, b)",
 		"Math.max(a, b)",
@@ -291,6 +295,8 @@ func TestPreferExponentiationOperatorStaysSilent(t *testing.T) {
 // as-expression parent has to be wrapped. The shared precedence table used by the fixer carries
 // that correction, and if it were ever reverted this case would fail.
 func TestPreferExponentiationOperatorTypeScriptShapes(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name      string
 		wantFixed string
@@ -329,6 +335,8 @@ func TestPreferExponentiationOperatorTypeScriptShapes(t *testing.T) {
 // These rows assert SILENCE, so if resolution ever gains the ability to follow an alias, this test
 // fails and the divergence note above is what needs revisiting.
 func TestPreferExponentiationOperatorAliasDivergence(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"const {pow} = Math; pow(a, b);",
 		"const {pow: p} = Math; p(a, b);",
@@ -355,6 +363,8 @@ func TestPreferExponentiationOperatorAliasDivergence(t *testing.T) {
 // was reading a symbol the rule never consults. Recorded here as reporting-silence rather than
 // quietly deleted, because a wrong claim in a test is worse than a missing one.
 func TestPreferExponentiationOperatorObjectAliasDiverges(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"const M = Math; M.pow(a, b);",
 		"var M = Math; M.pow(a, b);",
@@ -380,6 +390,8 @@ func TestPreferExponentiationOperatorObjectAliasDiverges(t *testing.T) {
 // outer call only, leaving the inner ones for the next pass, which is what its `output` field
 // records.
 func TestPreferExponentiationOperatorNestedCallsReportSeparately(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, PreferExponentiationOperator,
 		preferExponentiationOperatorFile, "Math.pow(Math.pow(a, b), Math.pow(c, d))")
 	rule_testing.ExpectFindings(t, result, "useExponentiation", "useExponentiation", "useExponentiation")

@@ -22,6 +22,8 @@ const newFuncFile = "/repository/source/NewFunc.ts"
 // every silent case would pass vacuously and every reporting case would fail in a way that reads
 // like a rule defect. `TestNoNewFuncNeedsTheTypedHarness` at the bottom pins that.
 func TestNoNewFuncFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -54,6 +56,8 @@ func TestNoNewFuncFires(t *testing.T) {
 // inner scope. The rest pin that a mention of the global is not an invocation of it: passed as an
 // argument, used as a computed key, or reached through a method that does not construct.
 func TestNoNewFuncStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -93,6 +97,8 @@ func TestNoNewFuncStaysSilent(t *testing.T) {
 // text rather than the literal so that a later edit adding a blank line fails loudly instead of
 // silently sliding.
 func TestNoNewFuncReportsTheInvokingExpression(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantPos    int
@@ -128,6 +134,8 @@ func TestNoNewFuncReportsTheInvokingExpression(t *testing.T) {
 // `(Function?.call)(null, ...)` but never a plain `(Function).call()`, and our tree keeps the
 // parenthesis node that ESTree discards, so both need the skip.
 func TestNoNewFuncFiresOnShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -153,6 +161,8 @@ func TestNoNewFuncFiresOnShapesTheCorpusOmits(t *testing.T) {
 // even when nothing calls the result, so a reader could reasonably conclude the rule anchors on the
 // member access. It does not, and this is the case that separates them.
 func TestNoNewFuncDeclinesShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -175,6 +185,8 @@ func TestNoNewFuncDeclinesShapesTheCorpusOmits(t *testing.T) {
 // panicking. Silence is the more dangerous failure: every StaysSilent case above would pass
 // vacuously. This asserts the difference directly on an input the rule certainly reports.
 func TestNoNewFuncNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = "var a = new Function(\"b\", \"c\", \"return b+c\");"
 
 	rule_testing.ExpectFindings(t,
@@ -188,6 +200,8 @@ func TestNoNewFuncNeedsTheTypedHarness(t *testing.T) {
 
 // The message, asserted against literals typed here rather than the rule's own constants.
 func TestNoNewFuncReportsWhyItMatters(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoNewFunc, newFuncFile,
 		"var a = new Function(\"b\", \"c\", \"return b+c\");")
 	if len(result.Diagnostics) != 1 {
@@ -211,6 +225,8 @@ func TestNoNewFuncReportsWhyItMatters(t *testing.T) {
 //
 // All four rows measured clean on eslint 10.8.1 before being written here.
 func TestNoNewFuncDeclinesAShadowReachedThroughAMethod(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -239,6 +255,8 @@ func TestNoNewFuncDeclinesAShadowReachedThroughAMethod(t *testing.T) {
 // The numeric row is the other side of the same set: `Function[0]` names no method and is clean on
 // the same build, which is what makes the wider set safe rather than merely wider.
 func TestNoNewFuncReadsATemplateMethodName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -257,6 +275,8 @@ func TestNoNewFuncReadsATemplateMethodName(t *testing.T) {
 }
 
 func TestNoNewFuncDeclinesANumericMethodSubscript(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -284,6 +304,8 @@ func TestNoNewFuncDeclinesANumericMethodSubscript(t *testing.T) {
 // All four are clean on eslint 10.8.1: upstream reaches the global through its scope analysis rather
 // than by reading a receiver's text, so a qualified name never enters its loop at all.
 func TestNoNewFuncSurvivesANonIdentifierReceiver(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

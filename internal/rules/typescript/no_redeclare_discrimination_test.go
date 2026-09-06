@@ -24,6 +24,8 @@ import (
 // The `want` column is what the installed @typescript-eslint 8.67.0 rule does, driven case by case
 // through the ESLint Linter API with a control firing.
 func TestPartitionAndKindSeparatesAllTwentyThree(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		label      string
 		sourceText string
@@ -94,6 +96,8 @@ func TestPartitionAndKindSeparatesAllTwentyThree(t *testing.T) {
 // `ignoreDeclarationMerge` off, so its verdict moves with the option. A type alias has no exemption
 // to turn off, so both columns below are the same.
 func TestNoRedeclareTypeAliasBelongsToNoMergeSet(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		label      string
 		sourceText string

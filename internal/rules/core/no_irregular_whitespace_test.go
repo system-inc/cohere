@@ -38,6 +38,8 @@ func boolOf(value bool) *bool { return &value }
 // very rule on the file that tests it.
 
 func TestNoIrregularWhitespaceFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    NoIrregularWhitespaceOptions
@@ -118,6 +120,8 @@ func TestNoIrregularWhitespaceFires(t *testing.T) {
 }
 
 func TestNoIrregularWhitespaceStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    NoIrregularWhitespaceOptions
@@ -301,6 +305,8 @@ func TestNoIrregularWhitespaceStaysSilent(t *testing.T) {
 // one inside a hashbang. Their diagnostic counts are stated nowhere upstream, so these two are read
 // from the code rather than from a snapshot, which is the reason the block exists at all.
 func TestNoIrregularWhitespaceCoversTheUnsnapshottedBlock(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -334,6 +340,8 @@ func TestNoIrregularWhitespaceCoversTheUnsnapshottedBlock(t *testing.T) {
 // built by counting characters rather than bytes points at a prefix of it, and a span of fixed width
 // one is wrong the same way. Byte offsets are what a range holds here.
 func TestNoIrregularWhitespaceReportsTheCharacterItself(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -400,6 +408,8 @@ func TestNoIrregularWhitespaceReportsTheCharacterItself(t *testing.T) {
 // oxc adds by hand on top of its parser predicate, and the one character the near-miss helper in
 // this tree omits, so taking the set from the wrong source drops it silently.
 func TestNoIrregularWhitespaceCoversCharactersUpstreamNeverFails(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -429,6 +439,8 @@ func TestNoIrregularWhitespaceCoversCharactersUpstreamNeverFails(t *testing.T) {
 // never wrote a case for code containing an ordinary space; every clean case it does have would go
 // red, but only once somebody ran them.
 func TestNoIrregularWhitespaceAllowsOrdinaryWhitespace(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"const first = 1;\n\tconst second = 2;\r\nconst third = 3;\n"))
 }
@@ -440,6 +452,8 @@ func TestNoIrregularWhitespaceAllowsOrdinaryWhitespace(t *testing.T) {
 // U+FEFF at offset zero" passes the imported case and then silently stops reporting the character
 // everywhere else in the file.
 func TestNoIrregularWhitespaceExcusesOnlyTheLeadingByteOrderMark(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"\ufeffconsole.log('hello BOM');"))
 
@@ -455,6 +469,8 @@ func TestNoIrregularWhitespaceExcusesOnlyTheLeadingByteOrderMark(t *testing.T) {
 // reach backwards over it. Upstream has no case for this because oxc never computes a skip region at
 // all, so nothing on that side could have caught it.
 func TestNoIrregularWhitespaceDoesNotExcuseTriviaBeforeASkippedLiteral(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"const value =\u3000'text';"), "noIrregularWhitespace")
 }
@@ -466,6 +482,8 @@ func TestNoIrregularWhitespaceDoesNotExcuseTriviaBeforeASkippedLiteral(t *testin
 // at a time and never sees the template expression as a unit, while this walks the tree and could
 // excuse the whole span in a single line. That version passes every other template case here.
 func TestNoIrregularWhitespaceReportsInsideASkippedTemplatesInterpolation(t *testing.T) {
+	t.Parallel()
+
 	skipTemplates := NoIrregularWhitespaceOptions{SkipTemplates: boolOf(true)}
 
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
@@ -483,6 +501,8 @@ func TestNoIrregularWhitespaceReportsInsideASkippedTemplatesInterpolation(t *tes
 // being deleted entirely; skipStrings is the one that would not, and it is the one where "the config
 // said false" and "the config said nothing" mean opposite things.
 func TestNoIrregularWhitespaceDefaults(t *testing.T) {
+	t.Parallel()
+
 	// skipStrings defaults to on, so a string stays quiet.
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"var any = '\u3000';"))
@@ -506,6 +526,8 @@ func TestNoIrregularWhitespaceDefaults(t *testing.T) {
 // ideographic space here is inside a string and nothing else. Under skipComments with skipStrings
 // off it must still report, which a rule finding its comments by scanning text would get wrong.
 func TestNoIrregularWhitespaceDoesNotTreatACommentOpenerInAStringAsAComment(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoIrregularWhitespace,
 		irregularWhitespaceFile, "var s = '// not a comment \u3000';",
 		NoIrregularWhitespaceOptions{SkipComments: boolOf(true), SkipStrings: boolOf(false)}),
@@ -526,6 +548,8 @@ func TestNoIrregularWhitespaceDoesNotTreatACommentOpenerInAStringAsAComment(t *t
 // exactly at the byte an off-by-one guard skips. Every other case in this file puts ASCII in front
 // of its irregular character, where a mis-stepped index happens to land correctly.
 func TestNoIrregularWhitespaceFindsAnIrregularCharacterAbuttingAMultiByteOne(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoIrregularWhitespace, irregularWhitespaceFile,
 		"const \u00e9\u3000x = 1;"), "noIrregularWhitespace")
 

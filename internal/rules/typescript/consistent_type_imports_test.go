@@ -543,6 +543,8 @@ var consistentTypeImportsReportingCases = []consistentTypeImportsCase{
 // These are the cases that catch a port, because each one was added upstream when somebody hit the
 // bug it describes. Four of them differ from a reporting case only in what a name resolves to.
 func TestConsistentTypeImportsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for index, testCase := range consistentTypeImportsCleanCases {
 		t.Run(fmt.Sprintf("case%02d", index), func(t *testing.T) {
 			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
@@ -556,6 +558,8 @@ func TestConsistentTypeImportsStaysSilent(t *testing.T) {
 // TestConsistentTypeImportsFires runs upstream's reporting corpus, asserting the message ids in
 // source order.
 func TestConsistentTypeImportsFires(t *testing.T) {
+	t.Parallel()
+
 	for index, testCase := range consistentTypeImportsReportingCases {
 		t.Run(fmt.Sprintf("case%02d", index), func(t *testing.T) {
 			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
@@ -773,6 +777,8 @@ var consistentTypeImportsMeasuredCases = []struct {
 
 // TestConsistentTypeImportsMeasuredCases runs the cases written here rather than imported.
 func TestConsistentTypeImportsMeasuredCases(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range consistentTypeImportsMeasuredCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
@@ -795,6 +801,8 @@ func TestConsistentTypeImportsMeasuredCases(t *testing.T) {
 // finding's own range and compared against a literal typed here rather than against anything the
 // rule computes.
 func TestConsistentTypeImportsPointsAtTheRightNode(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name    string
 		source  string
@@ -859,6 +867,8 @@ func TestConsistentTypeImportsPointsAtTheRightNode(t *testing.T) {
 // The three shapes are upstream's own: one name bare, two joined with `and` and no comma, three or
 // more with an Oxford comma. The three-name form is the one a reimplementation gets wrong.
 func TestConsistentTypeImportsRendersTheNameList(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -909,6 +919,8 @@ func TestConsistentTypeImportsRendersTheNameList(t *testing.T) {
 // a nil checker does not panic here, so a rule missing its guard buys a vacuous green rather than an
 // obvious crash.
 func TestConsistentTypeImportsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !ConsistentTypeImports.NeedsTypeChecker {
 		t.Fatal("the rule resolves every name through the checker and must declare it")
 	}
@@ -963,6 +975,8 @@ func TestConsistentTypeImportsRequiresTheTypedHarness(t *testing.T) {
 // and every fixture reaching the rule through the decoder would still pass, which is why this
 // asserts the decoded values directly.
 func TestConsistentTypeImportsDecoderDefaults(t *testing.T) {
+	t.Parallel()
+
 	defaults := DefaultConsistentTypeImportsOptions()
 	if defaults.Prefer != "type-imports" {
 		t.Errorf("prefer defaults to %q, want %q", defaults.Prefer, "type-imports")
@@ -1035,6 +1049,8 @@ func TestConsistentTypeImportsDecoderDefaults(t *testing.T) {
 // mutual overlap, applying neither. See the rule's doc comment. If a fix lands here later this test
 // is what makes that a choice somebody made rather than something that happened.
 func TestConsistentTypeImportsProposesNoRepair(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{"import Foo from 'foo';\nlet foo: Foo;\n", "import { A, B } from 'foo';\nconst foo: A = B();\n", "type T = import('foo');\n"} {
 		result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 			"consistent_type_imports.tsx", source, DefaultConsistentTypeImportsOptions())
@@ -1064,6 +1080,8 @@ func TestConsistentTypeImportsProposesNoRepair(t *testing.T) {
 // nil. The `import()` case below is the input that separates the two versions, and the import case
 // beside it is the control proving the harness is passing nil rather than failing to run.
 func TestConsistentTypeImportsWithNilOptions(t *testing.T) {
+	t.Parallel()
+
 	annotations := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 		"consistent_type_imports.tsx", "type T = import('foo');\n", nil)
 	rule_testing.ExpectFindings(t, annotations, "noImportTypeAnnotations")

@@ -24,6 +24,8 @@ const unmodifiedLoopFile = "/repository/source/LoopConditions.ts"
 // two different names, and a rule finding the right number of problems while naming the wrong
 // binding passes a count fixture.
 func TestNoUnmodifiedLoopConditionFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range unmodifiedLoopFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, testCase.source)
@@ -51,6 +53,8 @@ func TestNoUnmodifiedLoopConditionFires(t *testing.T) {
 // body passes most of the firing table and fails here on every call, every member access, every
 // group with one changing member, and the function called from inside the loop.
 func TestNoUnmodifiedLoopConditionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range unmodifiedLoopCleanCases {
 		t.Run(source, func(t *testing.T) {
 			rule_testing.ExpectClean(t,
@@ -72,6 +76,8 @@ func TestNoUnmodifiedLoopConditionStaysSilent(t *testing.T) {
 //
 // When the installed build moves to 10.9, this test is the marker for the follow-up.
 func TestNoUnmodifiedLoopConditionOptionOnlyCasesAreRecordedNotAsserted(t *testing.T) {
+	t.Parallel()
+
 	if len(unmodifiedLoopOptionOnlyCases) == 0 {
 		t.Fatal("the option-only table is empty, so the version gap it records has gone unnoticed")
 	}
@@ -89,6 +95,8 @@ func TestNoUnmodifiedLoopConditionOptionOnlyCasesAreRecordedNotAsserted(t *testi
 // Upstream reports on the IDENTIFIER inside the condition, not on the loop and not on the
 // condition, so the span is one name. The two-finding case pins both spans and their order.
 func TestNoUnmodifiedLoopConditionSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		source  string
@@ -144,6 +152,8 @@ func TestNoUnmodifiedLoopConditionSpans(t *testing.T) {
 // constant, because comparing a diagnostic to the constant it was built from is an equality both
 // sides of which move together under mutation.
 func TestNoUnmodifiedLoopConditionMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile,
 		"var foo = 0; while (foo) { } foo = 1;")
 	rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
@@ -173,6 +183,8 @@ func TestNoUnmodifiedLoopConditionMessage(t *testing.T) {
 // guard goes silently inert instead of announcing itself, and every StaysSilent case would then
 // pass vacuously.
 func TestNoUnmodifiedLoopConditionRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = "var foo = 0; while (foo) { } foo = 1;"
 
 	rule_testing.ExpectFindings(t,
@@ -196,6 +208,8 @@ func TestNoUnmodifiedLoopConditionRequiresTheTypedHarness(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build: silent on both.
 func TestNoUnmodifiedLoopConditionForInAndForOfAreNeverJudged(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"var foo = {}; for (var key in foo) { } foo = 1;",
 		"var foo = []; for (var item of foo) { } foo = 1;",
@@ -220,6 +234,8 @@ func TestNoUnmodifiedLoopConditionForInAndForOfAreNeverJudged(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoUnmodifiedLoopConditionUnnamedFunctionDeclarationHasNoNameToReach(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -271,6 +287,8 @@ func TestNoUnmodifiedLoopConditionUnnamedFunctionDeclarationHasNoNameToReach(t *
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoUnmodifiedLoopConditionClimbStopsAtTheNearestFunctionDeclaration(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -320,6 +338,8 @@ func TestNoUnmodifiedLoopConditionClimbStopsAtTheNearestFunctionDeclaration(t *t
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoUnmodifiedLoopConditionDynamicCheckDoesNotDescendIntoFunctions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		source  string
@@ -372,6 +392,8 @@ func TestNoUnmodifiedLoopConditionDynamicCheckDoesNotDescendIntoFunctions(t *tes
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoUnmodifiedLoopConditionVarInitializerCountsAsAWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -421,6 +443,8 @@ func TestNoUnmodifiedLoopConditionVarInitializerCountsAsAWrite(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build, every row.
 func TestNoUnmodifiedLoopConditionModifierReachedThroughACall(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

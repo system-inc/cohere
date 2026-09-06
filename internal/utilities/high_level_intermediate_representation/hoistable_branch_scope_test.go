@@ -3,6 +3,8 @@ package high_level_intermediate_representation
 import "testing"
 
 func TestBranchLocalHoistableFactsRespectDominatingReactiveScope(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name         string
 		source       string

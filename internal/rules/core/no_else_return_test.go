@@ -56,6 +56,8 @@ func elseReturnOptions(t *testing.T, allowElseIf *bool) any {
 // The typed harness is used throughout because the collision check asks resolution what is in
 // scope. The rule reports without a checker and declines to repair, which a fixture asserts.
 func TestNoElseReturnFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		allowElseIf *bool
@@ -152,6 +154,8 @@ func TestNoElseReturnFires(t *testing.T) {
 
 // The clean cases.
 func TestNoElseReturnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		allowElseIf *bool
@@ -198,6 +202,8 @@ func TestNoElseReturnStaysSilent(t *testing.T) {
 // The typed harness writes strings.TrimSpace(source)+newline, so the expectation is transformed
 // the same way the input was rather than the rule being padded to match.
 func TestNoElseReturnFixes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		wantSource  string
@@ -256,6 +262,8 @@ func trailingNewlineOn(want string) string {
 // Asserted as the ABSENCE of a proposal rather than through ExpectFixedSource, which refuses a
 // result carrying no fixes rather than treating it as an unchanged rewrite.
 func TestNoElseReturnDeclinesToFix(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		allowElseIf *bool
@@ -339,6 +347,8 @@ func TestNoElseReturnDeclinesToFix(t *testing.T) {
 // Recorded as reporting-without-a-fix rather than deleted, so the gap is legible and a later
 // scope-depth answer turns these five green rather than leaving no trace they existed.
 func TestNoElseReturnDivergesOnScopeDepth(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText     string
 		upstreamOutput string
@@ -380,6 +390,8 @@ func TestNoElseReturnDivergesOnScopeDepth(t *testing.T) {
 // a satisfies expression, a type assertion, a definite-assignment marker and a decorator, and the
 // guard was mutated to confirm they fail without it.
 func TestNoElseReturnFixPreservesTypeScript(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -422,6 +434,8 @@ func TestNoElseReturnFixPreservesTypeScript(t *testing.T) {
 // right direction: a repair that lifts a binding into a scope where the name is taken parses and
 // means something else, which the edit engine's parse check structurally cannot refuse.
 func TestNoElseReturnReportsWithoutACheckerAndDeclinesToFix(t *testing.T) {
+	t.Parallel()
+
 	source := "function f() { if (a) { return 1; } else { let b = 2; g(b); } }"
 
 	typed := rule_testing.RunTypedWithOptions(t, NoElseReturn, elseReturnFile, source,
@@ -447,6 +461,8 @@ func TestNoElseReturnReportsWithoutACheckerAndDeclinesToFix(t *testing.T) {
 // reporting the whole if statement instead, and on a fixable rule the span is what says the repair
 // lands where the reader was shown.
 func TestNoElseReturnPointsAtTheElse(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedWithOptions(t, NoElseReturn, elseReturnFile,
 		"function f() { if (a) { return 1; } else { return 2; } }", elseReturnOptions(t, nil))
 	rule_testing.ExpectFindings(t, result, "unexpected")
@@ -466,6 +482,8 @@ func TestNoElseReturnPointsAtTheElse(t *testing.T) {
 // distinct by carrying the same source in its valid list under true and its invalid list under
 // false.
 func TestDecodeNoElseReturnOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an absent option allows else if", func(t *testing.T) {
 		decoded, err := DecodeNoElseReturnOptions(nil)
 		if err != nil {
@@ -521,6 +539,8 @@ func TestDecodeNoElseReturnOptions(t *testing.T) {
 // counts here were measured against the installed rule: the first two report ONCE and the control
 // reports twice.
 func TestNoElseReturnLooksAtTheLastStatementOnly(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

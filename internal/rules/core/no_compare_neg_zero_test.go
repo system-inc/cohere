@@ -12,6 +12,8 @@ import (
 // does not matter: all eight treat the two zeros alike, and a rule that checked only `===` would
 // miss the relational cases that read as the most deliberate.
 func TestNoCompareNegZeroReportsComparisons(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"x === -0;",
 		"-0 === x;",
@@ -41,6 +43,8 @@ func TestNoCompareNegZeroReportsComparisons(t *testing.T) {
 // original. Ours has the node, so the equivalence has to be written explicitly, and it has to hold
 // at both levels: around the negation and around the literal.
 func TestNoCompareNegZeroSeesThroughParentheses(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"x === (-0);",
 		"((-0)) === x;",
@@ -58,6 +62,8 @@ func TestNoCompareNegZeroSeesThroughParentheses(t *testing.T) {
 // `-0x0` is the same number as `-0` and carries the same defect, so a text comparison against "0"
 // would be a hole exactly where an author reaching for a hex mask is most likely to fall in.
 func TestNoCompareNegZeroMatchesEveryZeroSpelling(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"x === -0.0;",
 		"x === -0e10;",
@@ -79,6 +85,8 @@ func TestNoCompareNegZeroMatchesEveryZeroSpelling(t *testing.T) {
 // would report `-0 === -0` twice for one defect, which is the failure mode this test exists to
 // hold shut.
 func TestNoCompareNegZeroReportsOncePerComparison(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoCompareNegZero, "both.ts", "-0 === -0;")
 	rule_testing.ExpectFindings(t, result, "unexpected")
 
@@ -93,6 +101,8 @@ func TestNoCompareNegZeroReportsOncePerComparison(t *testing.T) {
 // correct form would be worse than no rule. `-0n` is here because BigInt has no negative zero, and
 // `x ** -0` because exponentiation is not a comparison however the operand is spelled.
 func TestNoCompareNegZeroStaysSilentOnCorrectCode(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"x === 0;",
 		"0 === x;",

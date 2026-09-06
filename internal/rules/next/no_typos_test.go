@@ -13,6 +13,8 @@ import (
 // The corpus is nine passing inputs and four failing ones producing five diagnostics, because one
 // failing input declares two typo'd exports.
 func TestNoTyposReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -84,6 +86,8 @@ func TestNoTyposReports(t *testing.T) {
 }
 
 func TestNoTyposIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -197,6 +201,8 @@ func TestNoTyposIsSilent(t *testing.T) {
 // statement would underline `export const a = 1, getStaticPropss = 2` entirely, which names the
 // clean declarator as part of the problem.
 func TestNoTyposPointsAtTheIdentifier(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -245,6 +251,8 @@ func TestNoTyposPointsAtTheIdentifier(t *testing.T) {
 // while withholding the one thing the reader needs. Equality rather than `strings.Contains`, because
 // a predicate weaker than the property it guards is not a guard.
 func TestNoTyposNamesBothTheTypoAndTheCorrection(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		source string
 		want   string
@@ -283,6 +291,8 @@ func TestNoTyposNamesBothTheTypoAndTheCorrection(t *testing.T) {
 // variable declarator whose binding is a plain identifier, and nothing else. None of these is
 // implied by the others and a port can plausibly get any of them wrong in either direction.
 func TestNoTyposOnlyReadsNamedExportsOfTwoShapes(t *testing.T) {
+	t.Parallel()
+
 	reports := []struct {
 		name   string
 		source string
@@ -382,6 +392,8 @@ func TestNoTyposOnlyReadsNamedExportsOfTwoShapes(t *testing.T) {
 // it under Damerau and does not, so a port reaching for a nicer-looking distance function changes
 // the rule here and nowhere the imported corpus can see.
 func TestNoTyposAppliesThresholdOne(t *testing.T) {
+	t.Parallel()
+
 	reports := []struct {
 		name   string
 		source string
@@ -443,6 +455,8 @@ func TestNoTyposAppliesThresholdOne(t *testing.T) {
 // oxlint binary. Upstream's own corpus covers only three of these shapes, and the two that separate
 // oxc from ESLint appear in neither corpus.
 func TestNoTyposGatesOnThePagesDirectory(t *testing.T) {
+	t.Parallel()
+
 	const typo = "export const getStaticpaths = async () => {};"
 
 	reports := []struct {

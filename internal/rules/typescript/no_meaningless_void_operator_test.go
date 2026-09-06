@@ -69,6 +69,8 @@ func applyNoMeaninglessVoidOperatorSuggestion(t *testing.T, source string, sugge
 // program, and they pin the boundary of the type test in both directions: a number, `any`,
 // `unknown`, a Promise of void, a union with a non-void member, and `never` with the option off.
 func TestNoMeaninglessVoidOperatorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string
@@ -130,6 +132,8 @@ func TestNoMeaninglessVoidOperatorStaysSilent(t *testing.T) {
 // The harness writes each fixture as `strings.TrimSpace(source)+"\n"`, so both the span slices and
 // the expected rewrites are against that trimmed text rather than the Go literal.
 func TestNoMeaninglessVoidOperatorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText      string
 		optionsJson     string
@@ -379,6 +383,8 @@ func TestNoMeaninglessVoidOperatorFires(t *testing.T) {
 // coincidence is not a property of the option surface: adding one default-true key would make the
 // generic path silently wrong, and this test is what would notice.
 func TestDecodeNoMeaninglessVoidOperatorOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -412,6 +418,8 @@ func TestDecodeNoMeaninglessVoidOperatorOptions(t *testing.T) {
 // rule through the decoder, so nothing there can see the fallback. The separating input is a
 // `never` argument: silent under the default, reporting when checkNever is on.
 func TestNoMeaninglessVoidOperatorFallsBackToTheDefaultOnNilOptions(t *testing.T) {
+	t.Parallel()
+
 	const neverArgument = "declare const x: never;\nvoid x;"
 
 	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMeaninglessVoidOperator,
@@ -431,6 +439,8 @@ func TestNoMeaninglessVoidOperatorFallsBackToTheDefaultOnNilOptions(t *testing.T
 // fixture would pass having proven nothing. Asserting the declaration means a later revert fails
 // loudly rather than going vacuously green.
 func TestNoMeaninglessVoidOperatorNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoMeaninglessVoidOperator.NeedsTypeChecker {
 		t.Fatal("the rule resolves the argument's type, so it must declare NeedsTypeChecker")
 	}

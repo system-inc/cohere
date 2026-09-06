@@ -26,6 +26,8 @@ func noUnusedPrivateClassMembersCaseName(index int) string {
 // through an alias of that alias, a write to a setter (which calls a body and so is a read), a
 // destructuring read, and a computed key that reads the member to decide which property to take.
 func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"class Foo {}\n",
 		"class Foo {\n  publicMember = 42;\n}\n",
@@ -102,6 +104,8 @@ type noUnusedPrivateClassMembersFinding struct {
 // TestNoUnusedPrivateClassMembersFires is upstream's reporting cases verbatim, with every finding's
 // rendered text and span taken from the installed 8.67.0 build.
 func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []noUnusedPrivateClassMembersFinding
@@ -622,6 +626,8 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 // the verdict this rule actually produces. For an unused-thing rule the direction matters: a false
 // positive asks a reader to delete working code, which is the expensive failure.
 func TestNoUnusedPrivateClassMembersDivergesOnReceiverReach(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"class Foo {\n  private prop: number = 1;\n  method() {\n    const self1 = this;\n    return self1.prop;\n  }\n}\n",
 		"class Foo {\n  private prop: number = 1;\n  method() {\n    const self1 = this;\n    const self2 = self1;\n    return self2.prop;\n  }\n}\n",

@@ -30,6 +30,8 @@ func noBareThrowCaseName(index int) string {
 // file throwing two different built-ins produces two findings under one id that nothing else
 // separates.
 func TestNoBareThrowFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		fileName   string
 		sourceText string
@@ -171,6 +173,8 @@ func TestNoBareThrowFires(t *testing.T) {
 // path's filename without its separator. All four report, which is what proves these gates are
 // segment tests rather than substring ones.
 func TestNoBareThrowStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		fileName   string
 		sourceText string
@@ -328,6 +332,8 @@ func TestNoBareThrowStaysSilent(t *testing.T) {
 // The malformed rows are ours rather than the original's. Its parser refuses those files outright,
 // so it never meets a throw with nothing thrown; ours recovers and hands the walk one.
 func TestNoBareThrowSurvivesThrownShapesThatCannotBeRead(t *testing.T) {
+	t.Parallel()
+
 	for name, sourceText := range map[string]string{
 		"propertyAccess": "export function f(): void { throw someError.message; }",
 		"callExpression": "export function f(): void { throw makeError(); }",
@@ -357,6 +363,8 @@ func TestNoBareThrowSurvivesThrownShapesThatCannotBeRead(t *testing.T) {
 // reach the rule with a backslash path and this cannot be proven through `Run`. It is asserted
 // against the helper instead, which is the layer that actually decides it.
 func TestNoBareThrowNormalizesThePathSeparator(t *testing.T) {
+	t.Parallel()
+
 	// A file that MUST be exempt, spelled both ways. The forward-slash spelling is the one a real
 	// run produces and is covered by the silent corpus above; this asserts the gate itself rather
 	// than the harness.

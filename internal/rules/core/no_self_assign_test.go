@@ -12,6 +12,8 @@ const selfAssignDeclarations = "declare let a: any, b: any, c: any, i: number;\n
 	"declare const o: any;\ndeclare function f(): any;\n"
 
 func TestNoSelfAssignFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -68,6 +70,8 @@ func TestNoSelfAssignFires(t *testing.T) {
 }
 
 func TestNoSelfAssignStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

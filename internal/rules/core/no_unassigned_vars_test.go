@@ -21,6 +21,8 @@ const unassignedVarsFile = "/repository/source/UnassignedVars.ts"
 // The extra diagnostic belongs to `let x; let a = x, b; log(x, a, b);`, which declares two
 // never-assigned readable bindings and reports twice.
 func TestNoUnassignedVarsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -78,6 +80,8 @@ func TestNoUnassignedVarsFires(t *testing.T) {
 // `one = two` inside an `if` is the only shape its corpus covers, which is why the invented cases
 // below enumerate the rest.
 func TestNoUnassignedVarsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -128,6 +132,8 @@ func TestNoUnassignedVarsStaysSilent(t *testing.T) {
 // Sliced out of the source with the finding's own range rather than compared against an offset,
 // since an offset computed by the test is wrong in the same direction as the code that produced it.
 func TestNoUnassignedVarsPointsAtTheDeclaredName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -163,6 +169,8 @@ func TestNoUnassignedVarsPointsAtTheDeclaredName(t *testing.T) {
 // `[]string{"x", "b"}` would also be satisfied by a rule that happened to order them that way while
 // reporting one of them at the other's offset. This pins that they are distinct.
 func TestNoUnassignedVarsReportsEachDeclarationAtItsOwnOffset(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile,
 		"let x; let a = x, b; log(x, a, b);")
 	if len(result.Diagnostics) != 2 {
@@ -182,6 +190,8 @@ func TestNoUnassignedVarsReportsEachDeclarationAtItsOwnOffset(t *testing.T) {
 // asserts the silence directly, so the vacuous configuration is a named, tested state rather than
 // something a later edit can drift into unnoticed.
 func TestNoUnassignedVarsNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoUnassignedVars.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
 	}
@@ -201,6 +211,8 @@ func TestNoUnassignedVarsNeedsTheTypedHarness(t *testing.T) {
 // The sibling rule `no-ex-assign` shipped for weeks missing `x++` entirely because neither corpus
 // tested it. Each arm below exists so that gap cannot recur silently here.
 func TestNoUnassignedVarsFindsEveryWriteShape(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -248,6 +260,8 @@ func TestNoUnassignedVarsFindsEveryWriteShape(t *testing.T) {
 // detector that is too eager goes silent on real findings, which is the quiet failure: nothing in
 // the corpus notices a rule that stopped firing.
 func TestNoUnassignedVarsDoesNotMistakeReadsForWrites(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -286,6 +300,8 @@ func TestNoUnassignedVarsDoesNotMistakeReadsForWrites(t *testing.T) {
 // assigned must report the inner binding, and a rule anchoring on the wrong declaration reports
 // nothing or reports the wrong one.
 func TestNoUnassignedVarsSeparatesShadowedBindings(t *testing.T) {
+	t.Parallel()
+
 	fires := []struct {
 		name       string
 		sourceText string
@@ -324,6 +340,8 @@ func TestNoUnassignedVarsSeparatesShadowedBindings(t *testing.T) {
 // stays quiet about the outer `x`, which is not. Only the offset separates the two behaviors, so
 // the count assertion alone would ship the kind comparison.
 func TestNoUnassignedVarsNamesTheOuterBindingWhenOnlyTheInnerIsWritten(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "let x; log(x); { let x; x = 1; log(x); }"
 	result := rule_testing.RunTyped(t, NoUnassignedVars, unassignedVarsFile, sourceText)
 	if len(result.Diagnostics) != 1 {
@@ -345,6 +363,8 @@ func TestNoUnassignedVarsNamesTheOuterBindingWhenOnlyTheInnerIsWritten(t *testin
 // where oxc exempts any enclosing module declaration whether or not it carries `declare`, and our
 // checker's ambient flag alone would not.
 func TestNoUnassignedVarsExemptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -395,6 +415,8 @@ func TestNoUnassignedVarsExemptions(t *testing.T) {
 // which is a large and entirely duplicate finding set. The corpus covers it with `let x;` alone, at
 // the top level of a file, which is also the shape a rule could decline for unrelated reasons.
 func TestNoUnassignedVarsRequiresARead(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

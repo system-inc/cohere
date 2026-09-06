@@ -9,6 +9,8 @@ import (
 const displayNameFile = "/repository/source/components/Field.tsx"
 
 func TestReactComponentNoDisplayNameFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -62,6 +64,8 @@ func TestReactComponentNoDisplayNameFires(t *testing.T) {
 }
 
 func TestReactComponentNoDisplayNameStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -132,6 +136,8 @@ func TestReactComponentNoDisplayNameStaysSilent(t *testing.T) {
 // The limit is the right one: an assignment above `const Field = memo(...)` is a temporal dead
 // zone error at runtime, so exempting it would excuse code that cannot run.
 func TestReactComponentNoDisplayNameDependsOnDeclarationOrder(t *testing.T) {
+	t.Parallel()
+
 	declaredFirst := "declare function memo(component: unknown): unknown;\n" +
 		"export const Field = memo(function () { return null; });\nField.displayName = 'Field';\n"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, ReactComponentNoDisplayName, displayNameFile, declaredFirst))

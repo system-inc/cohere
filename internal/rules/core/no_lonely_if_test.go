@@ -22,6 +22,8 @@ const noLonelyIfFile = "/repository/source/NoLonelyIf.ts"
 // escape on the way in, and every verdict and every output was reproduced by driving the installed
 // eslint at 10.8.1 first.
 func TestNoLonelyIfFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -73,6 +75,8 @@ func TestNoLonelyIfFires(t *testing.T) {
 }
 
 func TestNoLonelyIfStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -102,6 +106,8 @@ func TestNoLonelyIfStaysSilent(t *testing.T) {
 // Both spellings were measured against the installed build at 10.8.1, which writes the space in
 // each, including the case where the whole construct is written without any spaces at all.
 func TestNoLonelyIfInsertsASpaceWhenElseTouchesTheBrace(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -131,6 +137,8 @@ func TestNoLonelyIfInsertsASpaceWhenElseTouchesTheBrace(t *testing.T) {
 // braces, so they separate the two readings. All three were measured against the installed build at
 // 10.8.1, which reports and fixes each one.
 func TestNoLonelyIfBracedConsequentIsExemptFromTheSemicolonInsertionTest(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -160,6 +168,8 @@ func TestNoLonelyIfBracedConsequentIsExemptFromTheSemicolonInsertionTest(t *test
 // in an `else if` chain and they differ only in whether the chain's final link has an `else` of its
 // own, which is exactly what the recursion walks to find.
 func TestNoLonelyIfDanglingElse(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -187,6 +197,8 @@ func TestNoLonelyIfDanglingElse(t *testing.T) {
 // against the enclosing statement's ALTERNATE specifically, and a kind test in its place would
 // report every `if (a) { if (b) {} }` in the tree, which is ordinary code.
 func TestNoLonelyIfThenBranchIsNotTheSubject(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"if (a) { if (b) {} }",
 		"if (a) { if (b) {} } else {}",
@@ -222,6 +234,8 @@ func TestNoLonelyIfThenBranchIsNotTheSubject(t *testing.T) {
 // against the installed build: the rule reports in both, which is what a token comparison gives and
 // what a prefix test would get wrong for the first.
 func TestNoLonelyIfElseLookaheadIsATokenNotAPrefix(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -242,6 +256,8 @@ func TestNoLonelyIfElseLookaheadIsATokenNotAPrefix(t *testing.T) {
 // statement. Getting this wrong points the reader at the outer `if`, which is the one line in the
 // construct that is not the problem, and no message-id fixture can see the difference.
 func TestNoLonelyIfSpansTheInnerIf(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "if (a) {;} else { if (b) {;} }"
 	result := rule_testing.Run(t, NoLonelyIf, noLonelyIfFile, sourceText)
 	if len(result.Diagnostics) != 1 {
@@ -255,6 +271,8 @@ func TestNoLonelyIfSpansTheInnerIf(t *testing.T) {
 
 // TestNoLonelyIfMessage asserts the message.
 func TestNoLonelyIfMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageUnexpectedLonelyIf.Id != "unexpectedLonelyIf" {
 		t.Fatalf("expected id %q, got %q", "unexpectedLonelyIf", messageUnexpectedLonelyIf.Id)
 	}

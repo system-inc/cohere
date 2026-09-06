@@ -215,6 +215,8 @@ var yodaFiringCases = []yodaCase{
 // says. The last is the one that matters most for a fixer, because a repair anchored correctly can
 // still write the wrong bytes and no message assertion can see it.
 func TestYodaFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range yodaFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			result := rule_testing.RunWithOptions(t, Yoda, yodaFile, testCase.source,
@@ -258,6 +260,8 @@ func TestYodaFires(t *testing.T) {
 // bounds, and requires the whole thing to be parenthesised, and a port getting any of the three
 // wrong passes the other cases.
 func TestYodaStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range yodaCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, Yoda, yodaFile,
@@ -354,6 +358,8 @@ var yodaTypeScriptCases = []struct {
 
 // TestYodaTypeScriptOperandsSurviveTheFix covers what upstream's corpus structurally cannot.
 func TestYodaTypeScriptOperandsSurviveTheFix(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range yodaTypeScriptCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunWithOptions(t, Yoda, yodaFile, testCase.source,
@@ -375,6 +381,8 @@ func TestYodaTypeScriptOperandsSurviveTheFix(t *testing.T) {
 // corpus cases: upstream writes no `>` range anywhere, so nothing imported can tell a working
 // restriction from an absent one. Each verdict was measured against the installed rule.
 func TestYodaRangeTestRequiresLessThanOperators(t *testing.T) {
+	t.Parallel()
+
 	options := decodeYodaOptionsForTest(t, `["never",{"exceptRange":true}]`)
 
 	// The control: a genuine range test, exempt.

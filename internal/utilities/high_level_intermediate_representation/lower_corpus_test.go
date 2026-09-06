@@ -42,6 +42,8 @@ const corpusRoot = "/Users/kirkouimet/Projects/ahra/libraries/structure/source"
 // increasing, every place naming a real identifier. Those are the properties every pass built on
 // this will assume, and they are the ones a construct nobody anticipated will break.
 func TestLowerRealCodebase(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}
@@ -146,6 +148,8 @@ func TestLowerRealCodebase(t *testing.T) {
 // downstream. The usual source is map iteration order leaking into block or identifier numbering,
 // which this package avoids by allocating ids from counters rather than from map walks.
 func TestLowerRealCodebaseIsDeterministic(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}

@@ -13,6 +13,8 @@ const wrapperObjectFile = "/repository/source/Thing.ts"
 // porter's beliefs; the upstream corpus is the only source of cases independent of them.
 
 func TestNoWrapperObjectTypesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -48,6 +50,8 @@ func TestNoWrapperObjectTypesFires(t *testing.T) {
 // One report for the whole annotation would leave the second name unfixed and the author would
 // repair half the problem, so the count is asserted rather than assumed.
 func TestNoWrapperObjectTypesReportsEachWrapper(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, "export type MyType = Number & String;\n"),
 		"bannedWrapperObjectType", "bannedWrapperObjectType")
@@ -59,6 +63,8 @@ func TestNoWrapperObjectTypesReportsEachWrapper(t *testing.T) {
 // something else silently. Each wrapper maps to its own primitive, and getting that mapping wrong
 // would produce code that compiles and means something different.
 func TestNoWrapperObjectTypesFixesToThePrimitive(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -87,6 +93,8 @@ func TestNoWrapperObjectTypesFixesToThePrimitive(t *testing.T) {
 // `class C implements number {}` does not compile, so replacing the name there would hand the author
 // a repair that breaks the build. oxc makes the same distinction.
 func TestNoWrapperObjectTypesOffersNoFixForImplements(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoWrapperObjectTypes, wrapperObjectFile, "export class MyClass implements Number {}\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -97,6 +105,8 @@ func TestNoWrapperObjectTypesOffersNoFixForImplements(t *testing.T) {
 }
 
 func TestNoWrapperObjectTypesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

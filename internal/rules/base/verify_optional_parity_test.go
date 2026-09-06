@@ -29,6 +29,8 @@ const verifyDecoratorPreamble = "declare function VerifyIsOptional(): PropertyDe
 // port, so each case below states which half of the rule it exercises, and the whole set was
 // checked against the existing ESLint rule running over api-phi-health.
 func TestVerifyOptionalParityFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name      string
 		source    string
@@ -143,6 +145,8 @@ func TestVerifyOptionalParityFires(t *testing.T) {
 // These are the false positives the rule has to avoid, and several encode a distinction nothing
 // else would suggest.
 func TestVerifyOptionalParityStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -225,6 +229,8 @@ func TestVerifyOptionalParityStaysSilent(t *testing.T) {
 // StaysSilent case pass vacuously and every Fires case look like a rule defect. The control below
 // is what separates "correctly guarded" from "cannot fire at all".
 func TestVerifyOptionalParityRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = "class Entity { @VerifyIsOptional() name: string; }"
 
 	rule_testing.ExpectClean(t, rule_testing.Run(t, VerifyOptionalParity,

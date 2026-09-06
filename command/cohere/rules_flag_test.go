@@ -13,6 +13,8 @@ import (
 // The flag exists so a caller can tell a binary that lacks a rule from one whose rule found
 // nothing. Those produce identical finding lists, and only this can separate them.
 func TestRulesFlagListsEveryRegisteredRule(t *testing.T) {
+	t.Parallel()
+
 	binary := t.TempDir() + "/cohere"
 	build := exec.Command("go", "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
@@ -55,6 +57,8 @@ func TestRulesFlagListsEveryRegisteredRule(t *testing.T) {
 // The split matters as much as the note. The list stays on stdout so two binaries can still be
 // diffed directly, and the note goes to stderr so it cannot corrupt that diff.
 func TestRulesFlagDisclosesADevelopmentBuildBesideTheList(t *testing.T) {
+	t.Parallel()
+
 	binary := t.TempDir() + "/cohere"
 	build := exec.Command("go", "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {

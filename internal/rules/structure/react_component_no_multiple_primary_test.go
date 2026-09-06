@@ -38,6 +38,8 @@ func itoa(value int) string {
 }
 
 func TestReactComponentNoMultiplePrimaryFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -137,6 +139,8 @@ func TestReactComponentNoMultiplePrimaryFires(t *testing.T) {
 }
 
 func TestReactComponentNoMultiplePrimaryStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -278,6 +282,8 @@ func TestReactComponentNoMultiplePrimaryStaysSilent(t *testing.T) {
 // block, which stayed small either way, so breaking the counter left it green. A control that cannot
 // move a component across a band boundary measures nothing.
 func TestReactComponentNoMultiplePrimaryCountsCodeLinesOnly(t *testing.T) {
+	t.Parallel()
+
 	// Ten code lines, which is exactly maximumHelperLines and the largest a helper may be.
 	helperBody := "export function Helper(properties: { value: number }) {\n"
 	for filler := 0; filler < 7; filler++ {
@@ -316,6 +322,8 @@ func TestReactComponentNoMultiplePrimaryCountsCodeLinesOnly(t *testing.T) {
 // The nesting here is deliberate rather than realistic: this shape does not occur on our tree, which
 // is exactly why it needs a fixture. Nothing else would notice if the limit were removed.
 func TestReactComponentNoMultiplePrimaryRespectsTheDepthLimit(t *testing.T) {
+	t.Parallel()
+
 	// JSX wrapped in enough parentheses to sit past depth 20.
 	deeplyBuried := "export function Buried(properties: { value: number }) {\n" +
 		strings.Repeat("    const filler = properties.value;\n", 28) +
@@ -338,6 +346,8 @@ func TestReactComponentNoMultiplePrimaryRespectsTheDepthLimit(t *testing.T) {
 // The thresholds are options, so a project may move them. This proves they are read rather than
 // ignored, in both directions.
 func TestReactComponentNoMultiplePrimaryOptions(t *testing.T) {
+	t.Parallel()
+
 	source := component("Primary", 80) + component("Secondary", 30)
 
 	// Raising the helper ceiling above the secondary's size makes it a helper, and one large

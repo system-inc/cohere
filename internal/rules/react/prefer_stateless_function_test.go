@@ -46,6 +46,8 @@ func runPreferStatelessFunction(t *testing.T, sourceText string, rawOptions stri
 // Seven valid cases carry ignorePureComponents, and cases 2 and 3 are the same shape as invalid
 // cases 2 and 3 with only the option flipped, which is what pins the option rather than the rule.
 func TestPreferStatelessFunctionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -101,6 +103,8 @@ func TestPreferStatelessFunctionFires(t *testing.T) {
 // failed, and the failure read like a rule defect until the corpus was re-read with that field
 // rendered.
 func TestPreferStatelessFunctionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -152,6 +156,8 @@ func TestPreferStatelessFunctionStaysSilent(t *testing.T) {
 // final filter is isES5Component or isES6Component. If that is wrong, this port is wrong in a way no
 // other fixture would show, so it is pinned directly.
 func TestPreferStatelessFunctionOnlyClassesAndFactoriesReport(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -181,6 +187,8 @@ func TestPreferStatelessFunctionOnlyClassesAndFactoriesReport(t *testing.T) {
 // this list is the allowed set and anything outside it exempts. Read by NAME rather than by member
 // kind, which is why a getter and a static field with the same name give the same answer.
 func TestPreferStatelessFunctionMemberBoundary(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -210,6 +218,8 @@ func TestPreferStatelessFunctionMemberBoundary(t *testing.T) {
 // directions. Upstream reads `property.name || property.value`, so an identifier and a string
 // subscript both answer with a name while a computed key answers undefined, which is not props.
 func TestPreferStatelessFunctionThisBoundary(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -238,6 +248,8 @@ func TestPreferStatelessFunctionThisBoundary(t *testing.T) {
 // case caught that, which is exactly why step 5 exists. The branch turns out to be a name
 // comparison, and these four rows are the measurements that bound it.
 func TestPreferStatelessFunctionChildContextTypes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -262,6 +274,8 @@ func TestPreferStatelessFunctionChildContextTypes(t *testing.T) {
 // the null branch is live. Three of upstream's corpus cases exist twice with opposite verdicts on
 // exactly this axis; see the note above the silent table.
 func TestPreferStatelessFunctionReturnBoundary(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -292,6 +306,8 @@ func TestPreferStatelessFunctionReturnBoundary(t *testing.T) {
 // suite reached that path. Every fixture above goes through the decoder, so this covers the nil
 // input and the wire name.
 func TestPreferStatelessFunctionDecodesOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("absent options give the documented default", func(t *testing.T) {
 		decoded, err := DecodePreferStatelessFunctionOptions(nil)
 		if err != nil {
@@ -342,6 +358,8 @@ func TestPreferStatelessFunctionDecodesOptions(t *testing.T) {
 // and for a class expression is the expression rather than the declaration. ExpectFindings cannot
 // see any of this.
 func TestPreferStatelessFunctionSpan(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a class declaration reports on the whole class", func(t *testing.T) {
 		const sourceText = "class Foo extends React.Component { render() { return <div/>; } }"
 		result := runPreferStatelessFunction(t, sourceText, "")
@@ -388,6 +406,8 @@ func TestPreferStatelessFunctionSpan(t *testing.T) {
 // returning null, which is legal TypeScript and which upstream reports, so all four suffixes are
 // genuinely exercised rather than passing vacuously.
 func TestPreferStatelessFunctionHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "class Foo extends React.Component { render() { return null; } }"
 	for _, fileName := range []string{
 		"/repository/source/Pure.ts",

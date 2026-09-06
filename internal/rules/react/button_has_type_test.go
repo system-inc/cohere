@@ -62,6 +62,8 @@ const buttonHasTypeFile = "/repository/source/ButtonHasType.tsx"
 
 // TestButtonHasTypeFires asserts ids, count, order, and rendered text.
 func TestButtonHasTypeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -123,6 +125,8 @@ func TestButtonHasTypeFires(t *testing.T) {
 
 // TestButtonHasTypeStaysSilent runs upstream's clean cases.
 func TestButtonHasTypeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -189,6 +193,8 @@ func runButtonHasType(t *testing.T, sourceText string, rawOptions string) rule_t
 // case, the only one whose `<button>` sits inside a fragment inside a map callback, and the only one
 // where a spread follows a valid `type`.
 func TestButtonHasTypeAcceptsTheTypedUpstreamCase(t *testing.T) {
+	t.Parallel()
+
 	const source = "declare type ReactElement = unknown;\ndeclare type Attributes = { key?: string };\ndeclare type ButtonHTMLAttributes<T> = { children?: unknown; onClick?: () => void };\n\n        function MyComponent(): ReactElement {\n          const buttonProps: (Required<Attributes> & ButtonHTMLAttributes<HTMLButtonElement>)[] = [\n            {\n              children: 'test',\n              key: 'test',\n              onClick: (): void => {\n                return;\n              },\n            },\n          ];\n\n          return <>\n            {\n              buttonProps.map(\n                ({ key, ...props }: Required<Attributes> & ButtonHTMLAttributes<HTMLButtonElement>): ReactElement =>\n                  <button key={key} type=\"button\" {...props} />\n              )\n            }\n          </>;\n        }\n      "
 	rule_testing.ExpectClean(t, runButtonHasType(t, source, ""))
 }
@@ -204,6 +210,8 @@ func TestButtonHasTypeAcceptsTheTypedUpstreamCase(t *testing.T) {
 // with settings removed it goes clean, and clean is what this port produces. The first is clean
 // either way and is here as the control, so a reader can see the pair rather than one row.
 func TestButtonHasTypePragmaIsFixedAtReact(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -230,6 +238,8 @@ func TestButtonHasTypePragmaIsFixedAtReact(t *testing.T) {
 // canonical rendering of the double, so `0x10` is `16` and `1.50` is `1.5` without any arithmetic.
 // A BigInt is the one place the two disagree, keeping its `n` suffix here, and the rule trims it.
 func TestButtonHasTypeReadsStaticValuesUpstreamsWay(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -281,6 +291,8 @@ func TestButtonHasTypeReadsStaticValuesUpstreamsWay(t *testing.T) {
 // and no nested ternary at all, so a rule that reported once per element would pass every imported
 // case. Both verdicts measured on the installed build.
 func TestButtonHasTypeRecursesThroughTernaries(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -346,6 +358,8 @@ func TestButtonHasTypeRecursesThroughTernaries(t *testing.T) {
 // The text is sliced from the source the harness WROTE rather than from the literal above, because
 // `RunTyped` trims the fixture and a span sliced from an untrimmed literal is off by one.
 func TestButtonHasTypeSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -428,6 +442,8 @@ func TestButtonHasTypeSpans(t *testing.T) {
 // unmistakably `type` to a reader and the rule cannot see it, and that is reproduced rather than
 // improved, because widening it would report where upstream is quiet.
 func TestButtonHasTypeMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -507,6 +523,8 @@ func TestButtonHasTypeMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
 // empty-object rows are the ones that catch it, and the explicit-false rows are what prove the
 // pointer wire type is doing its job rather than the defaults simply always winning.
 func TestButtonHasTypeDecodesItsOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name                        string
 		raw                         string
@@ -543,6 +561,8 @@ func TestButtonHasTypeDecodesItsOptions(t *testing.T) {
 
 // TestButtonHasTypeRejectsMalformedOptions asserts the decoder surfaces bad input.
 func TestButtonHasTypeRejectsMalformedOptions(t *testing.T) {
+	t.Parallel()
+
 	if _, err := DecodeButtonHasTypeOptions([]byte(`{"button":`)); err == nil {
 		t.Fatal("truncated JSON decoded without error")
 	}
@@ -558,6 +578,8 @@ func TestButtonHasTypeRejectsMalformedOptions(t *testing.T) {
 // `forbiddenValue` on `<button type="button"/>`. The rule restores the defaults explicitly on that
 // path and this asserts it, because no fixture routed through the decoder can ever see it.
 func TestButtonHasTypeHandlesNilOptions(t *testing.T) {
+	t.Parallel()
+
 	clean := rule_testing.RunTypedWithOptions(t, ButtonHasType, buttonHasTypeFile,
 		"const a = <button type=\"button\"/>;\n", nil)
 	rule_testing.ExpectClean(t, clean)
@@ -575,6 +597,8 @@ func TestButtonHasTypeHandlesNilOptions(t *testing.T) {
 // all, the second means it is one and this configuration turned it off. The pair below is the same
 // element under two configurations, which is the only way to see the difference.
 func TestButtonHasTypeSeparatesInvalidFromForbidden(t *testing.T) {
+	t.Parallel()
+
 	const element = "const a = <button type=\"reset\"/>;\n"
 
 	rule_testing.ExpectClean(t, runButtonHasType(t, element, ""))
@@ -617,6 +641,8 @@ func TestButtonHasTypeSeparatesInvalidFromForbidden(t *testing.T) {
 // under `RunTyped` and is silent under `Run`, with the JSX arm as the control that must report under
 // both. Without the control this would pass against a broken harness.
 func TestButtonHasTypeNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const bareCall = "import { createElement } from 'react';\ncreateElement('button');\n"
 
 	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, ButtonHasType,
@@ -637,6 +663,8 @@ func TestButtonHasTypeNeedsTheTypedHarness(t *testing.T) {
 // can actually distinguish the two extensions, and `.jsx` is unavailable because the typed harness
 // writes a tsconfig including only `**/*.ts` and `**/*.tsx`.
 func TestButtonHasTypeHasNoFileGate(t *testing.T) {
+	t.Parallel()
+
 	const source = "declare const React: any;\nReact.createElement('button');\n"
 	for _, fileName := range []string{
 		"/repository/source/ButtonHasType.tsx",
@@ -657,6 +685,8 @@ func TestButtonHasTypeHasNoFileGate(t *testing.T) {
 // code: a `super()` whose callee is a bare keyword, a dynamic `import()`, an optional call, and a
 // JSX element with a malformed attribute list.
 func TestButtonHasTypeSurvivesShapesThatWouldPanic(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		"(()=>{})();\n",
 		"class Base { constructor() {} }\nclass Derived extends Base { constructor() { super(); } }\n",
@@ -687,6 +717,8 @@ func TestButtonHasTypeSurvivesShapesThatWouldPanic(t *testing.T) {
 // their upstream wording is identical, so this pins that the port keeps them identical and that the
 // value is the only thing that differs between two findings on one element.
 func TestButtonHasTypeMessagesReadAsWritten(t *testing.T) {
+	t.Parallel()
+
 	missing := runButtonHasType(t, "const a = <button/>;\n", "")
 	if len(missing.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(missing.Diagnostics))

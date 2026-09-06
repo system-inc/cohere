@@ -66,6 +66,8 @@ func classOfName(t *testing.T, function *Function, set *DisjointSet, name string
 // chain-rewriting loop inside `Union`; a naive implementation that simply repoints the item and not
 // its ancestors passes every other case here.
 func TestDisjointSetMatchesReact(t *testing.T) {
+	t.Parallel()
+
 	const (
 		a IdentifierId = 1
 		b IdentifierId = 2
@@ -179,6 +181,8 @@ func TestDisjointSetMatchesReact(t *testing.T) {
 // `IdentifierId` zero is a usable value, so a `Find` returning only an id would make an absent value
 // indistinguishable from a member of class zero. Upstream returns null; the boolean is that null.
 func TestDisjointSetAbsentValueIsNotClassZero(t *testing.T) {
+	t.Parallel()
+
 	set := &DisjointSet{}
 	set.Union([]IdentifierId{0, 1})
 
@@ -202,6 +206,8 @@ func TestDisjointSetAbsentValueIsNotClassZero(t *testing.T) {
 // conditionally, so an empty list is the ordinary outcome for an instruction that entangles nothing
 // rather than a bug, and raising would turn the common case into a crash.
 func TestDisjointSetEmptyUnionIsANoOp(t *testing.T) {
+	t.Parallel()
+
 	set := &DisjointSet{}
 	set.Union(nil)
 	set.Union([]IdentifierId{})
@@ -220,6 +226,8 @@ func TestDisjointSetEmptyUnionIsANoOp(t *testing.T) {
 // and it is pinned so a later "optimization" that reuses a buffer cannot silently reintroduce the
 // aliasing hazard.
 func TestDisjointSetDoesNotMutateTheCallersSlice(t *testing.T) {
+	t.Parallel()
+
 	items := []IdentifierId{7, 8, 9}
 	set := &DisjointSet{}
 	set.Union(items)
@@ -237,6 +245,8 @@ func TestDisjointSetDoesNotMutateTheCallersSlice(t *testing.T) {
 // compression actually happened, by requiring the SECOND walk to see a flat structure: without
 // compression the chain would still be 10,000 deep on the way back.
 func TestDisjointFindTerminatesOnALongChain(t *testing.T) {
+	t.Parallel()
+
 	const length = 10000
 	set := &DisjointSet{parent: map[IdentifierId]IdentifierId{}}
 
@@ -272,6 +282,8 @@ func TestDisjointFindTerminatesOnALongChain(t *testing.T) {
 // one object, so memoizing them independently would hand back a stale value, and upstream's answer
 // is to put them in one class.
 func TestDisjointUnifiesAMutatedObjectWithItsAlias(t *testing.T) {
+	t.Parallel()
+
 	function, set := disjointFor(t, `
 export function build(seed: number) {
   const items: number[] = [];
@@ -303,6 +315,8 @@ export function build(seed: number) {
 // Without this, a pass that unioned EVERYTHING would pass the aliasing test and read as correct. Two
 // values that never meet must land in different classes.
 func TestDisjointLeavesIndependentValuesApart(t *testing.T) {
+	t.Parallel()
+
 	function, set := disjointFor(t, `
 export function separate() {
   const left: number[] = [];
@@ -344,6 +358,8 @@ export function separate() {
 // looked for allocations on named bindings, and both would have agreed. So this anchors on the
 // instruction VALUE rather than on a name.
 func TestDisjointAllocationGetsItsOwnClass(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function make() {
   const value = {a: 1};
@@ -389,6 +405,8 @@ export function make() {
 // class. Without this, a mayAllocate that returned true unconditionally would pass the allocation
 // test and read as correct.
 func TestDisjointPrimitiveDoesNotAllocate(t *testing.T) {
+	t.Parallel()
+
 	source := `
 export function plain() {
   const n = 1;
@@ -422,6 +440,8 @@ export function plain() {
 // instruction per kind. The call cases here have no known signature, corresponding to an unresolved
 // inferred result type; represented primitive and mutable signatures are exercised separately.
 func TestDisjointMayAllocateMatchesReact(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		value InstructionValue
@@ -490,6 +510,8 @@ func TestDisjointMayAllocateMatchesReact(t *testing.T) {
 // is the source of that same result-kind fact in this IR: method, global, and tagged primitive
 // results are excluded, while mutable and unresolved results allocate.
 func TestDisjointCallAllocationUsesTheEffectSignature(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `
 export function classify(list: number[]) {
   const methodPrimitive = list.includes(1);
@@ -539,6 +561,8 @@ export function classify(list: number[]) {
 // real function: a plain object pattern is false, a pattern with a rest element is true. A rest
 // binding allocates a fresh object to hold the remainder; a plain binding only names existing values.
 func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
+	t.Parallel()
+
 	place := Place{Identifier: 1}
 
 	plain := &Destructure{Pattern: &ObjectPattern{
@@ -579,6 +603,8 @@ func TestDisjointDestructureAllocatesOnlyWithSpread(t *testing.T) {
 // property joins on its identity alone, with no range test at all (React line 32411). It is the
 // single exception in the pass and a reader would otherwise assume the guard was forgotten.
 func TestDisjointMethodCallAddsThePropertyUnconditionally(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function call(target: {run(): void}) {
   target.run();
@@ -616,6 +642,8 @@ export function call(target: {run(): void}) {
 // while `end > start + 1` is false; the second term is what rejects it. Transcribing the tidier form
 // would change which phis are considered, so both spellings are exercised here.
 func TestDisjointPhiUsesReactsTwoTermTest(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		phiRange   MutableRange
@@ -651,6 +679,8 @@ func TestDisjointPhiUsesReactsTwoTermTest(t *testing.T) {
 // values. When the phi's range is wider than one and outlives its block, upstream unions the phi,
 // its declaration and every operand, so the loop's scope owns the whole variable rather than half.
 func TestDisjointUnifiesALoopCarriedPhi(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function count(limit: number) {
   const seen: number[] = [];
@@ -715,6 +745,8 @@ export function count(limit: number) {
 // the shape of the whole result. Measured on this input: the real pass produces 16 members in 2
 // classes and the Contains-free variant produces 24 in 6.
 func TestDisjointOperandGateNeedsBothHalves(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function loopy(limit: number) {
   const seen: number[] = [];
@@ -768,6 +800,8 @@ export function loopy(limit: number) {
 // allocation and alias refinement legitimately add or remove unrelated members; neither may make a
 // phi stop sharing a class with the first value of its declaration.
 func TestDisjointPhiUnionIncludesTheDeclaration(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		binding string
@@ -890,6 +924,8 @@ export function gather(limit: number) {
 // last value would union the phi with a value defined AFTER it in evaluation order, which is a
 // different claim about what the scope owns than upstream makes.
 func TestDisjointDeclarationKeepsTheFirstValue(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function reassign(limit: number) {
   let acc;
@@ -959,6 +995,8 @@ export function reassign(limit: number) {
 // Union-find is monotone, so a second pass over the same function must not merge anything further.
 // A pass that read its own output would drift, and the drift would be invisible to any single run.
 func TestDisjointIsIdempotent(t *testing.T) {
+	t.Parallel()
+
 	function, ranges := rangesFor(t, `
 export function repeat(seed: number) {
   const values: number[] = [];
@@ -1000,6 +1038,8 @@ export function repeat(seed: number) {
 // a table on the representative would get a different table per run. Repeated here rather than
 // argued, because a randomised map is exactly the input that makes a single run look stable.
 func TestDisjointIsDeterministic(t *testing.T) {
+	t.Parallel()
+
 	source := `
 export function shuffle(limit: number) {
   let total = 0;
@@ -1037,6 +1077,8 @@ export function shuffle(limit: number) {
 
 // TestDisjointHandlesANilFunction pins the guard every entry point carries.
 func TestDisjointHandlesANilFunction(t *testing.T) {
+	t.Parallel()
+
 	if set := FindDisjointMutableValues(nil); set == nil || set.Size() != 0 {
 		t.Fatal("a nil function must produce an empty set rather than a nil pointer")
 	}
@@ -1050,6 +1092,8 @@ func TestDisjointHandlesANilFunction(t *testing.T) {
 // A test reading this list fails when the set changes, which is what makes closing a gap a visible
 // event rather than a silent improvement. Same mechanism as `RangeGaps` and `ReactiveGaps`.
 func TestDisjointGapsAreDeclared(t *testing.T) {
+	t.Parallel()
+
 	gaps := DisjointGaps()
 	if len(gaps) != 1 || gaps[0] != DisjointGapPrimitiveCallResult {
 		t.Fatalf("DisjointGaps() = %v; the only declared gap is the partial, name-keyed projection "+
@@ -1085,6 +1129,8 @@ func TestDisjointGapsAreDeclared(t *testing.T) {
 // The thresholds below are deliberately far looser than those numbers. This guards the SHAPE -- that
 // real multi-member classes are being formed -- not the exact corpus, which moves when the tree does.
 func TestDisjointClassSizesAreNotAllSingletons(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(corpusRoot); err != nil {
 		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
 	}

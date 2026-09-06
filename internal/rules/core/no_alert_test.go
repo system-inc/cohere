@@ -22,6 +22,8 @@ const alertFile = "/repository/source/Alert.ts"
 // {}; window.alert(foo)` REPORTS while `var alert = function() {}; alert();` is clean, because
 // shadowing the name `alert` says nothing about the property `window.alert`.
 func TestNoAlertStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -53,6 +55,8 @@ func TestNoAlertStaysSilent(t *testing.T) {
 
 // The twenty reporting cases this port reproduces exactly.
 func TestNoAlertFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -102,6 +106,8 @@ func TestNoAlertFires(t *testing.T) {
 // read the missing `this` arm as an oversight and helpfully add one. The control is `window.alert`,
 // which reports in both source types.
 func TestNoAlertLeavesGlobalThisToScriptFiles(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -143,6 +149,8 @@ func TestNoAlertLeavesGlobalThisToScriptFiles(t *testing.T) {
 //
 // The control is the shadowed form, which upstream reports clean at every version and so does this.
 func TestNoAlertReportsGlobalThisAtOurTarget(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -167,6 +175,8 @@ func TestNoAlertReportsGlobalThisAtOurTarget(t *testing.T) {
 // A `confirm` finding whose sentence says `alert` has the right id and the right span while naming
 // something that is not on the line.
 func TestNoAlertNamesTheFunction(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantName   string
@@ -196,6 +206,8 @@ func TestNoAlertNamesTheFunction(t *testing.T) {
 // Upstream passes `node`, the CallExpression, for both shapes. A port anchoring on the callee
 // satisfies every assertion above while pointing past the arguments.
 func TestNoAlertReportsTheWholeCall(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpan   string
@@ -230,6 +242,8 @@ func TestNoAlertReportsTheWholeCall(t *testing.T) {
 // clean case because the receiver is not the global object; the control beside it changes only the
 // receiver and reports.
 func TestNoAlertHandlesShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	t.Run("globalThis with an optional chain reports", func(t *testing.T) {
 		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoAlert, alertFile,
 			"globalThis?.alert(foo)"), "unexpected")
@@ -251,6 +265,8 @@ func TestNoAlertHandlesShapesTheCorpusOmits(t *testing.T) {
 
 // The typed harness is required, so a later revert to `rule_testing.Run` fails loudly.
 func TestNoAlertNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoAlert.NeedsTypeChecker {
 		t.Fatal("this rule resolves shadowing through the checker and must declare it")
 	}
@@ -276,6 +292,8 @@ func TestNoAlertNeedsTheTypedHarness(t *testing.T) {
 // same tree and same flags, differing only in this file: 167 crashed files before, 0 after. Anyone
 // changing this branch should re-run that rather than trust the green below.
 func TestNoAlertSurvivesACalleeThatIsNotAMemberAccess(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

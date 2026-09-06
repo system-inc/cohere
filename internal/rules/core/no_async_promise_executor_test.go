@@ -19,6 +19,8 @@ const asyncPromiseExecutorFile = "/repository/source/AsyncPromiseExecutor.ts"
 //
 // This is the smallest corpus in the lane, which is why the added cases below outnumber it.
 func TestNoAsyncPromiseExecutorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -43,6 +45,8 @@ func TestNoAsyncPromiseExecutorFires(t *testing.T) {
 // async function in argument *position 1* is somebody else's callback, not the executor, so a rule
 // scanning all arguments reports it. The third pins that the callee name is part of the predicate.
 func TestNoAsyncPromiseExecutorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -66,6 +70,8 @@ func TestNoAsyncPromiseExecutorStaysSilent(t *testing.T) {
 // floor and a low one. Each case below covers a decision this rule makes that no upstream fixture
 // touches, and each is a spelling a plausible port gets wrong.
 func TestNoAsyncPromiseExecutorFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -101,6 +107,8 @@ func TestNoAsyncPromiseExecutorFiresOnCasesUpstreamDoesNotCover(t *testing.T) {
 
 // Clean cases written from reading our code, for decisions upstream's three pass cases do not reach.
 func TestNoAsyncPromiseExecutorStaysSilentOnCasesUpstreamDoesNotCover(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -166,6 +174,8 @@ func TestNoAsyncPromiseExecutorStaysSilentOnCasesUpstreamDoesNotCover(t *testing
 // Sliced out of the source with the finding's own range and compared as text, so the assertion
 // cannot agree with the rule by sharing its arithmetic.
 func TestNoAsyncPromiseExecutorPointsAtTheKeyword(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

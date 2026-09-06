@@ -21,6 +21,8 @@ const selfCompareFile = "/repository/source/SelfCompare.ts"
 // are different tokens, accessing different things. Both orderings are written, which is upstream
 // pinning that the distinction is not an artifact of which side the private name sits on.
 func TestNoSelfCompareStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -47,6 +49,8 @@ func TestNoSelfCompareStaysSilent(t *testing.T) {
 // `this.#field === this.#field` reports while the two clean private-name cases above do not, which
 // is the pair that separates token equality from character equality.
 func TestNoSelfCompareFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -85,6 +89,8 @@ func TestNoSelfCompareFires(t *testing.T) {
 //
 // The equality operators are the control: same shape, same identical operands, and they report.
 func TestNoSelfCompareDeclinesInAndInstanceof(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -111,6 +117,8 @@ func TestNoSelfCompareDeclinesInAndInstanceof(t *testing.T) {
 // port anchoring on the operator satisfies every assertion above and points a reader at two
 // characters in the middle of an expression.
 func TestNoSelfCompareReportsTheWholeComparison(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "if (foo.bar >= foo.bar) { }"
 	result := rule_testing.Run(t, NoSelfCompare, selfCompareFile, sourceText)
 	if len(result.Diagnostics) != 1 {

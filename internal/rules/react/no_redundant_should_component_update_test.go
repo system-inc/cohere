@@ -29,6 +29,8 @@ const noRedundantShouldComponentUpdateFile = "/repository/source/Pure.tsx"
 // The three valid cases are all the same shape with Component in place of PureComponent, which is
 // exactly the distinction the shelf's IsEs6ComponentClass would erase.
 func TestNoRedundantShouldComponentUpdateFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText    string
 		findings      []string
@@ -58,6 +60,8 @@ func TestNoRedundantShouldComponentUpdateFires(t *testing.T) {
 }
 
 func TestNoRedundantShouldComponentUpdateStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\n        class Foo extends React.Component {\n          shouldComponentUpdate() {\n            return true;\n          }\n        }\n      ",
 		"\n        class Foo extends React.Component {\n          shouldComponentUpdate = () => {\n            return true;\n          }\n        }\n      ",
@@ -81,6 +85,8 @@ func TestNoRedundantShouldComponentUpdateStaysSilent(t *testing.T) {
 // and PureComponent alike. Routing through the shelf would report upstream's first valid case, and
 // the three imported valid cases are all one shape, so they cannot show the boundary on their own.
 func TestNoRedundantShouldComponentUpdateBaseClassBoundary(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -140,6 +146,8 @@ func TestNoRedundantShouldComponentUpdateBaseClassBoundary(t *testing.T) {
 // getPropertyName reads nameNode.name, a field only an Identifier and a PrivateIdentifier carry, so
 // a string key and a computed key both yield the empty string mechanically.
 func TestNoRedundantShouldComponentUpdateMemberShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -174,6 +182,8 @@ func TestNoRedundantShouldComponentUpdateMemberShapes(t *testing.T) {
 // The message is compared against a literal built here rather than against the rule's own format
 // string, because a comparison to the rule's own constant moves with it under mutation.
 func TestNoRedundantShouldComponentUpdateNameDerivation(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -205,6 +215,8 @@ func TestNoRedundantShouldComponentUpdateNameDerivation(t *testing.T) {
 // declaration prefix. A rule anchoring on the method would pass every fixture above while pointing
 // somewhere the reader was never shown.
 func TestNoRedundantShouldComponentUpdateSpan(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a declaration reports on the whole class", func(t *testing.T) {
 		const sourceText = "class Foo extends PureComponent { shouldComponentUpdate() {} }"
 		result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
@@ -236,6 +248,8 @@ func TestNoRedundantShouldComponentUpdateSpan(t *testing.T) {
 // This rule never touches JSX, so all four are reachable here, unlike no_namespace.go where the
 // typed harness cannot build a JavaScript program.
 func TestNoRedundantShouldComponentUpdateHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "class Foo extends PureComponent { shouldComponentUpdate() { return true; } }"
 	for _, fileName := range []string{
 		"/repository/source/Pure.ts",
@@ -265,6 +279,8 @@ func TestNoRedundantShouldComponentUpdateHasNoFileSuffixGate(t *testing.T) {
 // The computed keys here are deliberately mixed with a real reporting member in the second case, so
 // the test also shows the walk reaching past the computed member rather than merely surviving it.
 func TestNoRedundantShouldComponentUpdateDoesNotPanicOnComputedMembers(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

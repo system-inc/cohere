@@ -9,6 +9,8 @@ import (
 const jsDocFile = "/repository/source/Thing.ts"
 
 func TestConsistencyNoSingleLineJsDocFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -33,6 +35,8 @@ func TestConsistencyNoSingleLineJsDocFires(t *testing.T) {
 }
 
 func TestConsistencyNoSingleLineJsDocStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -66,6 +70,8 @@ func TestConsistencyNoSingleLineJsDocStaysSilent(t *testing.T) {
 // TestConsistencyNoSingleLineJsDocFixes pins the fix text, because a fix that lands wrong is worse
 // than no fix: the finding disappears and the damage is committed.
 func TestConsistencyNoSingleLineJsDocFixes(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ConsistencyNoSingleLineJsDoc, jsDocFile, "/** Does the thing. */\nexport const value = 1;\n")
 	rule_testing.ExpectFindings(t, result, "useSimpleComment")
 
@@ -81,6 +87,8 @@ func TestConsistencyNoSingleLineJsDocFixes(t *testing.T) {
 // TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes covers the two cases where the rule reports
 // but must not repair. Both would produce a file that no longer says what the author wrote.
 func TestConsistencyNoSingleLineJsDocWithholdsUnsafeFixes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -12,6 +12,8 @@ import (
 // opaque-spread case also carries an id, so it cannot isolate the abandonment it is really
 // testing. The invented case below supplies that half.
 func TestInlineScriptIdIsSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -62,6 +64,8 @@ func TestInlineScriptIdIsSilentOnUpstreamPassCases(t *testing.T) {
 // four inputs, so one finding each, and the extractor reports no discrepancy. The four are the two
 // by two of children against dangerouslySetInnerHTML crossed with the plain and renamed imports.
 func TestInlineScriptIdFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -97,6 +101,8 @@ func TestInlineScriptIdFiresOnUpstreamFailCases(t *testing.T) {
 // from next/script, so a port that skipped resolution entirely and matched the bare word Script
 // would pass every one of them. The first six here are that missing half.
 func TestInlineScriptIdIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -164,6 +170,8 @@ func TestInlineScriptIdIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
 // that spell id without being a static identifier. Each was run against the release binary rather
 // than reasoned about, because each reads as though it should fall the other way.
 func TestInlineScriptIdFiresOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -220,6 +228,8 @@ func TestInlineScriptIdFiresOnCasesUpstreamDoesNotWrite(t *testing.T) {
 // constant. Comparing a finding against the constant it was reported with is an equality that both
 // sides of a mutation move together, so it looks correct and guards nothing.
 func TestInlineScriptIdPointsAtTheTagName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		source       string
@@ -265,6 +275,8 @@ func TestInlineScriptIdPointsAtTheTagName(t *testing.T) {
 // it guards is not a guard: a rule rendering a doubled word or a stray placeholder still contains
 // any needle short enough to look right.
 func TestInlineScriptIdRendersItsMessageExactly(t *testing.T) {
+	t.Parallel()
+
 	source := "import Script from 'next/script';\nexport default function TestPage() {\n  return (<Script>{`console.log('x');`}</Script>)\n}\n"
 	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
 	rule_testing.ExpectFindings(t, result, "inlineScriptId")
@@ -285,6 +297,8 @@ func TestInlineScriptIdRendersItsMessageExactly(t *testing.T) {
 // this fixture records which upstream was ported. It is also the case that a single-name
 // implementation passes every other fixture in this file while getting wrong.
 func TestInlineScriptIdArmsOnEveryDefaultImportRatherThanTheLastOne(t *testing.T) {
+	t.Parallel()
+
 	source := "import Script from 'next/script';\nimport Other from 'next/script';\nexport default function TestPage() {\n  return (<div><Script>{`a`}</Script><Other>{`b`}</Other></div>)\n}\n"
 	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
 	rule_testing.ExpectFindings(t, result, "inlineScriptId", "inlineScriptId")
@@ -301,6 +315,8 @@ func TestInlineScriptIdArmsOnEveryDefaultImportRatherThanTheLastOne(t *testing.T
 // and ordered, so a listener on KindImportDeclaration setting a variable would answer differently.
 // This fixture is what fails if the scan is ever moved out of Run into a listener.
 func TestInlineScriptIdSeesAnImportWrittenAfterTheJsx(t *testing.T) {
+	t.Parallel()
+
 	source := "export default function TestPage() {\n  return (<Script>{`console.log('x');`}</Script>)\n}\nimport Script from 'next/script';\n"
 	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
 	rule_testing.ExpectFindings(t, result, "inlineScriptId")
@@ -319,6 +335,8 @@ func TestInlineScriptIdSeesAnImportWrittenAfterTheJsx(t *testing.T) {
 // already dropped it, probed rather than assumed, so the skip is load bearing here in a way the Rust
 // does not make obvious.
 func TestInlineScriptIdReadsThroughParenthesesRatherThanAbandoningTheElement(t *testing.T) {
+	t.Parallel()
+
 	source := "import Script from 'next/script';\nexport default function TestPage() {\n  return (<Script {...({ strategy: \"lazyOnload\" })}>{`console.log('x');`}</Script>)\n}\n"
 	result := rule_testing.Run(t, InlineScriptId, "pages/index.tsx", source)
 	rule_testing.ExpectFindings(t, result, "inlineScriptId")

@@ -12,6 +12,8 @@ import (
 const noObjectTypeAsDefaultPropFile = "/repository/source/NoObjectTypeAsDefaultProp.tsx"
 
 func TestNoObjectTypeAsDefaultPropStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ name, sourceText string }{
 		{"upstream valid 0", "\n      function Foo({\n        bar = emptyFunction,\n      }) {\n        return null;\n      }\n    "},
 		{"upstream valid 1", "\n      function Foo({\n        bar = emptyFunction,\n        ...rest\n      }) {\n        return null;\n      }\n    "},
@@ -37,6 +39,8 @@ func TestNoObjectTypeAsDefaultPropStaysSilent(t *testing.T) {
 // count stay right while the text goes wrong. Each expected string was captured from the
 // installed build rather than composed here.
 func TestNoObjectTypeAsDefaultPropFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		wantMessages     []string
@@ -112,6 +116,8 @@ func TestNoObjectTypeAsDefaultPropFires(t *testing.T) {
 // The parenthesized rows exist because our parser keeps a node upstream's parser folds away, so
 // they are a shape upstream's corpus structurally cannot express.
 func TestNoObjectTypeAsDefaultPropMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -187,6 +193,8 @@ func TestNoObjectTypeAsDefaultPropMatchesTheInstalledRuleOnInputsTheCorpusDoesNo
 // offending value, so the span covers the name, the equals sign and the default. Measured by
 // slicing the installed build's reported range out of the source on 2026-08-27.
 func TestNoObjectTypeAsDefaultPropAnchorsOnTheWholeAssignment(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "function C({a = {}, b = []}) { return <div/>; }"
 	wantSpans := []string{"a = {}", "b = []"}
 
@@ -210,6 +218,8 @@ func TestNoObjectTypeAsDefaultPropAnchorsOnTheWholeAssignment(t *testing.T) {
 // through the checker. A typed rule run on the plain harness receives a nil checker and, without
 // the guard, would answer a narrower question while every quiet fixture passed vacuously.
 func TestNoObjectTypeAsDefaultPropRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "function C({a = {}}) { return <div/>; }"
 
 	// The control. On the typed harness this reports, so the zero below means the guard fired
@@ -231,6 +241,8 @@ func TestNoObjectTypeAsDefaultPropRequiresTheTypedHarness(t *testing.T) {
 // file parses cleanly and the parser's opinion cannot be mistaken for the rule's; the `.ts` row is
 // exactly the file a `.tsx` gate would have silenced.
 func TestNoObjectTypeAsDefaultPropHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "function C({a = {}}) { return null; }\n"
 	for _, fileName := range []string{
 		"/repository/source/Suffix.tsx",
@@ -261,6 +273,8 @@ func TestNoObjectTypeAsDefaultPropHasNoFileSuffixGate(t *testing.T) {
 // finding. If this is ever judged wrong, the fix is in `destructuredPropertyName` and this test is
 // the record of what upstream actually did.
 func TestNoObjectTypeAsDefaultPropRendersRealKeyNamesWhereUpstreamSaysUndefined(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name             string
 		sourceText       string

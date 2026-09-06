@@ -48,6 +48,8 @@ func noDuplicateTypeConstituentsOptionsFor(t *testing.T, optionsJson string) any
 // Two of the thirty-four carry options, one per key, so both halves of the option surface are
 // exercised in the direction that turns the rule off.
 func TestNoDuplicateTypeConstituentsStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string
@@ -112,6 +114,8 @@ func TestNoDuplicateTypeConstituentsStaysSilentOnUpstreamPassCases(t *testing.T)
 // of two states because its repairs converge over two passes; the harness applies one pass, so that
 // row asserts the first state and is called out at its line.
 func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		optionsJson  string
@@ -575,6 +579,8 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(t *testing.T) {
 // Every verdict, span, message and rewrite below was measured against the installed 8.x build over
 // a real program, and all fifteen agree with this port on all four.
 func TestNoDuplicateTypeConstituentsStaysSilentOnTypeScriptShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -593,6 +599,8 @@ func TestNoDuplicateTypeConstituentsStaysSilentOnTypeScriptShapes(t *testing.T) 
 }
 
 func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFixed    string
@@ -748,6 +756,8 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(t *testing.T) {
 // rather than of the option surface, and a sibling rule in this package had to be repaired for
 // exactly the inverse case.
 func TestDecodeNoDuplicateTypeConstituentsOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name              string
 		raw               string
@@ -788,6 +798,8 @@ func TestDecodeNoDuplicateTypeConstituentsOptions(t *testing.T) {
 // its options entirely would too, which is why the controls below turn each half OFF and confirm
 // the silence moves.
 func TestNoDuplicateTypeConstituentsFallsBackToTheDefaultOnNilOptions(t *testing.T) {
+	t.Parallel()
+
 	const union = "type T = A | A;\ntype A = string;"
 	const intersection = "type T = A & A;\ntype A = { a: 1 };"
 
@@ -812,6 +824,8 @@ func TestNoDuplicateTypeConstituentsFallsBackToTheDefaultOnNilOptions(t *testing
 // fixtures would pass having proven nothing. The syntactic comparison alone would still catch
 // `A | A`, which makes the vacuous green here especially convincing.
 func TestNoDuplicateTypeConstituentsNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoDuplicateTypeConstituents.NeedsTypeChecker {
 		t.Fatal("the rule compares constituent types by identity, so it must declare NeedsTypeChecker")
 	}

@@ -49,6 +49,8 @@ declare namespace Namespace {
 // rather than a broken instrument: the same run linted 2310 files and reported 44 findings from
 // other rules. A clean tree cannot validate a port, which is why the seeded file exists.
 func TestProviderReturnMatchesTokenFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		method string
@@ -83,6 +85,8 @@ func TestProviderReturnMatchesTokenFires(t *testing.T) {
 // The any and unknown rows pin the other skip: a brand whose type argument is not concrete carries
 // no contract, and checking it would be theatre because assignability answers yes for everything.
 func TestProviderReturnMatchesTokenStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		method string
@@ -117,6 +121,8 @@ func TestProviderReturnMatchesTokenStaysSilent(t *testing.T) {
 // this listener. The original requires a MethodDefinition parent and so does this. Each of these
 // carries a real brand, so they would report if the parent test were dropped.
 func TestProviderReturnMatchesTokenOnlyJudgesMethods(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		classMember string
@@ -159,6 +165,8 @@ func TestProviderReturnMatchesTokenOnlyJudgesMethods(t *testing.T) {
 // Asserted against literals typed here rather than against the rule's own constant, since comparing
 // to the constant moves both sides together under mutation.
 func TestProviderReturnMatchesTokenRendersBothTypes(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, ProviderReturnMatchesToken, providerReturnFile,
 		providerReturnPreamble+"class C { @Provider(stringToken) bad(): number { return 1; } }")
 	rule_testing.ExpectFindings(t, result, "mismatch")
@@ -196,6 +204,8 @@ func TestProviderReturnMatchesTokenRendersBothTypes(t *testing.T) {
 // author has to change. Every assertion above is satisfied by a rule reporting the decorator
 // instead, and pointing at the decorator would show the reader the line they must NOT edit.
 func TestProviderReturnMatchesTokenPointsAtTheMethod(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, ProviderReturnMatchesToken, providerReturnFile,
 		providerReturnPreamble+"class C { @Strict() m(): number { return 1; } }")
 	rule_testing.ExpectFindings(t, result, "mismatch")
@@ -218,6 +228,8 @@ func TestProviderReturnMatchesTokenPointsAtTheMethod(t *testing.T) {
 // the more dangerous of the two failure modes: a later revert to rule_testing.Run would leave every
 // Fires case above passing for no reason. This asserts the guard is doing what its comment says.
 func TestProviderReturnMatchesTokenNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := providerReturnPreamble + "class C { @Strict() m(): number { return 1; } }"
 
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, ProviderReturnMatchesToken,

@@ -9,6 +9,8 @@ import (
 const assignModuleFile = "/repository/source/Thing.ts"
 
 func TestNoAssignModuleVariableFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -33,6 +35,8 @@ func TestNoAssignModuleVariableFires(t *testing.T) {
 }
 
 func TestNoAssignModuleVariableStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

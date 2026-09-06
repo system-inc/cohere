@@ -26,6 +26,8 @@ var exceptParensReturnOptions = NoReturnAssignOptions(NoReturnAssignExceptParens
 // explicit fallback, and keeping the nil here rather than substituting the default keeps the
 // fallback under test through fourteen of these rows.
 func TestNoReturnAssignFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -64,6 +66,8 @@ func TestNoReturnAssignFires(t *testing.T) {
 // rows under the default mode are the idiom the option exists to permit, and the two function-body
 // rows are the ancestor walk stopping where it should.
 func TestNoReturnAssignStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -104,6 +108,8 @@ func TestNoReturnAssignStaysSilent(t *testing.T) {
 //
 // Measured against the installed build, whose columns give the same two spans.
 func TestNoReturnAssignReportsTheEnclosingNode(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -185,6 +191,8 @@ func TestNoReturnAssignReportsTheEnclosingNode(t *testing.T) {
 // would not be, since nothing above reads one. `rule.Message` is `{Id, Description}` with no
 // interpolation, so this asserts the two values directly rather than any rendered text.
 func TestNoReturnAssignMessagesAreDistinct(t *testing.T) {
+	t.Parallel()
+
 	if messageReturnAssignment.Id != "returnAssignment" {
 		t.Fatalf("the return message id is %q", messageReturnAssignment.Id)
 	}
@@ -213,6 +221,8 @@ func TestNoReturnAssignMessagesAreDistinct(t *testing.T) {
 // Every verdict below was taken by running eslint 10.8.1's own rule, whose file is byte-identical
 // to the clone, through the Linter API from ~/Projects/ahra. None was reasoned out from the source.
 func TestNoReturnAssignBeyondTheUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no options at all falls back to except-parens", func(t *testing.T) {
 		// The registry hands a rule its decoded options, and a rule configured with a bare severity
 		// gets nothing at all. Upstream's corpus supplies `undefined` on most cases, which its own

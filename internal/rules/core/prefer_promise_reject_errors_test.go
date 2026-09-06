@@ -19,6 +19,8 @@ import (
 // TestGlobalsOffCasesHaveNoHarnessCounterpart below.
 
 func TestPreferPromiseRejectErrorsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		// ---- upstream valid, no options: 31 cases ----
 		"Promise.resolve(5)",
@@ -59,6 +61,8 @@ func TestPreferPromiseRejectErrorsStaysSilent(t *testing.T) {
 }
 
 func TestPreferPromiseRejectErrorsFires(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		// ---- upstream invalid, no options: 36 cases ----
 		"Promise.reject(5)",
@@ -122,6 +126,8 @@ func decodePreferPromiseRejectErrorsOptions(t *testing.T, wire string) any {
 }
 
 func TestPreferPromiseRejectErrorsAllowEmptyReject(t *testing.T) {
+	t.Parallel()
+
 	allowed := decodePreferPromiseRejectErrorsOptions(t, `{"allowEmptyReject": true}`)
 	denied := decodePreferPromiseRejectErrorsOptions(t, `{"allowEmptyReject": false}`)
 
@@ -155,6 +161,8 @@ func TestPreferPromiseRejectErrorsAllowEmptyReject(t *testing.T) {
 // zero value. That is correct here only because upstream's default for allowEmptyReject is false,
 // so this pins the coincidence rather than trusting it.
 func TestPreferPromiseRejectErrorsDefaultsWithoutADecoder(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject()")
 	rule_testing.ExpectFindings(t, result, "rejectAnError")
 
@@ -181,6 +189,8 @@ func TestPreferPromiseRejectErrorsDefaultsWithoutADecoder(t *testing.T) {
 // Recorded as a test rather than dropped, so the next reader sees which two cases are missing and
 // why, instead of counting 33 against upstream's 35 and wondering.
 func TestGlobalsOffCasesHaveNoHarnessCounterpart(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, core.PreferPromiseRejectErrors, "input.ts",
 		"/* global Promise:off */ Promise.reject('x');")
 	if len(result.Diagnostics) != 1 {
@@ -202,6 +212,8 @@ func TestGlobalsOffCasesHaveNoHarnessCounterpart(t *testing.T) {
 // CallExpression rather than on the argument, which is worth pinning because the argument is the
 // thing at fault and is the natural place to point.
 func TestPreferPromiseRejectErrorsSpanAndMessage(t *testing.T) {
+	t.Parallel()
+
 	rows := []struct {
 		source string
 		want   string
@@ -251,6 +263,8 @@ func TestPreferPromiseRejectErrorsSpanAndMessage(t *testing.T) {
 // silent rather than crashing, so every Fires case would fail and every StaysSilent case would pass
 // vacuously. Pinned so a later revert of the guard fails loudly.
 func TestPreferPromiseRejectErrorsDeclinesWithoutAChecker(t *testing.T) {
+	t.Parallel()
+
 	if !core.PreferPromiseRejectErrors.NeedsTypeChecker {
 		t.Errorf("the rule stopped declaring NeedsTypeChecker, so the registration path will hand it files with no checker")
 	}
@@ -270,6 +284,8 @@ func TestPreferPromiseRejectErrorsDeclinesWithoutAChecker(t *testing.T) {
 // that upstream's deletes before its rule ever sees it, so an unwrap that upstream has no reason to
 // write is load bearing here, in a place no imported fixture can reach.
 func TestPreferPromiseRejectErrorsShapesUpstreamCannotWrite(t *testing.T) {
+	t.Parallel()
+
 	reports := []string{
 		"(Promise).reject(5);",
 		"((Promise)).reject(5);",
@@ -318,6 +334,8 @@ func TestPreferPromiseRejectErrorsShapesUpstreamCannotWrite(t *testing.T) {
 // without the name test each of these reports. Upstream is silent on all six, confirmed by driving
 // the installed rule.
 func TestPreferPromiseRejectErrorsOtherAmbientGlobalsAreNotPromise(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"Reflect.reject(5);",
 		"JSON.reject(5);",
@@ -350,6 +368,8 @@ func TestPreferPromiseRejectErrorsOtherAmbientGlobalsAreNotPromise(t *testing.T)
 // No ExpectFindings fixture can see a panic, which is why removing the guard survived the whole
 // imported corpus. These cases exist so a later revert crashes the suite instead of the tree.
 func TestPreferPromiseRejectErrorsSurvivesANonFunctionExecutor(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"new Promise(executor);",
 		"new Promise({ a: 1, b: 2 });",
@@ -376,6 +396,8 @@ func TestPreferPromiseRejectErrorsSurvivesANonFunctionExecutor(t *testing.T) {
 // where the deciding side could be an Error against one where it could not, so a mutation reading
 // the wrong side of any of the three fails here.
 func TestPreferPromiseRejectErrorsOperatorArmsUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	reports := []string{
 		// A sequence takes its LAST expression's value, so a trailing literal reports even when the
 		// leading operand is opaque.
@@ -417,6 +439,8 @@ func TestPreferPromiseRejectErrorsOperatorArmsUpstreamDoesNotWrite(t *testing.T)
 // Before the unwrap covered them, `reject(error as Error)` in modules/kingdom/pentair/PentairApi.ts
 // was reported: source asserting the value IS an Error, flagged for not being one.
 func TestPreferPromiseRejectErrorsSeesThroughTypeOnlyWrappers(t *testing.T) {
+	t.Parallel()
+
 	// An opaque inner value stays clean through every wrapper.
 	for _, source := range []string{
 		"declare const error: unknown; Promise.reject(error as Error);",

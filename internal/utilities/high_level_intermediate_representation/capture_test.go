@@ -81,6 +81,8 @@ func instructionNames(function *Function) string {
 // stopped holding, every capture would silently revert to `LoadGlobal` and every test below would
 // still be able to pass for the wrong reason.
 func TestCaptureSymbolIdentityCrossesFunctions(t *testing.T) {
+	t.Parallel()
+
 	const code = `
 export function Outer() {
   const captured = 1;
@@ -131,6 +133,8 @@ export function Outer() {
 // from a nested arrow. Before captures existed the arrow's reference lowered to `LoadGlobal C`,
 // indistinguishable from a true global, and the rule lost the shape.
 func TestCaptureAcceptanceCase(t *testing.T) {
+	t.Parallel()
+
 	const code = `
 export function Outer() {
   const C = makeIt();
@@ -169,6 +173,8 @@ export function Outer() {
 // unresolved name as a capture would make a real global write invisible. Each name here is free in
 // the nested function and must NOT become a capture.
 func TestCaptureDoesNotClaimGlobals(t *testing.T) {
+	t.Parallel()
+
 	const code = `
 import defaultExport from "./module";
 import { named } from "./module";
@@ -216,6 +222,8 @@ export function Outer() {
 // instruction as evidence of a global write was wrong on every closure that assigns to an enclosing
 // variable. It must now be a StoreContext and no StoreGlobal may remain.
 func TestCaptureWriteIsNotAGlobalWrite(t *testing.T) {
+	t.Parallel()
+
 	const code = `
 export function Outer() {
   let n = 0;
@@ -247,6 +255,8 @@ export function Outer() {
 // This is the case a name-based implementation gets wrong and a symbol-based one gets right for
 // free, which is the argument for resolving through the checker rather than by string.
 func TestCaptureShadowingIsNotCaptured(t *testing.T) {
+	t.Parallel()
+
 	const code = `
 export function Outer() {
   const value = 1;
@@ -270,6 +280,8 @@ export function Outer() {
 // function too. Without that, the middle function's `Captures` would name an identifier that does
 // not exist in its own table, which is a malformed graph rather than merely an imprecise one.
 func TestCaptureThroughTwoBoundaries(t *testing.T) {
+	t.Parallel()
+
 	const code = `
 export function Outer() {
   const deep = 1;
@@ -323,6 +335,8 @@ export function Outer() {
 // If the two orders ever diverged, a pass following a value into a closure would silently follow
 // the WRONG value, which no structural check would catch.
 func TestCaptureIndicesPairAcrossTheBoundary(t *testing.T) {
+	t.Parallel()
+
 	const code = `
 export function Outer() {
   const first = 1;
@@ -369,6 +383,8 @@ export function Outer() {
 // not treated as live on entry. That it passes is asserted here; that the checker could still fail
 // is asserted by TestCaptureVerifierStillDetectsAViolation below.
 func TestCaptureKeepsSSAValid(t *testing.T) {
+	t.Parallel()
+
 	sources := map[string]string{
 		"read": `export function Outer(flag: boolean) {
   let n = 1;
@@ -421,6 +437,8 @@ func TestCaptureKeepsSSAValid(t *testing.T) {
 // the checker can fail on the same shape. This breaks a nested function that holds captures and
 // requires the verifier to notice.
 func TestCaptureVerifierStillDetectsAViolation(t *testing.T) {
+	t.Parallel()
+
 	const code = `
 export function Outer(flag: boolean) {
   let n = 1;

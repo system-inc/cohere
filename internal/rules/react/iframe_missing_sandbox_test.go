@@ -27,6 +27,8 @@ const iframeMissingSandboxFile = "/repository/source/IframeMissingSandbox.tsx"
 
 // TestIframeMissingSandboxFires runs the twelve failing cases from upstream.
 func TestIframeMissingSandboxFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -59,6 +61,8 @@ func TestIframeMissingSandboxFires(t *testing.T) {
 
 // TestIframeMissingSandboxStaysSilent runs the thirty three passing cases from upstream.
 func TestIframeMissingSandboxStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -124,6 +128,8 @@ func TestIframeMissingSandboxStaysSilent(t *testing.T) {
 // writing all four and reading which two failed and how. A fixture for those suffixes would be
 // unreachable through the harness rather than covered, which reads as coverage and is not.
 func TestIframeMissingSandboxHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	for _, suffix := range []string{".tsx", ".ts"} {
 		t.Run(suffix, func(t *testing.T) {
 			result := rule_testing.RunTyped(
@@ -144,6 +150,8 @@ func TestIframeMissingSandboxHasNoFileSuffixGate(t *testing.T) {
 // element, so a paired tag points at the opening tag alone and its closing tag is outside the span.
 // The createElement arm reports on the whole call.
 func TestIframeMissingSandboxAnchorsOnTheOpeningTag(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -188,6 +196,8 @@ func TestIframeMissingSandboxAnchorsOnTheOpeningTag(t *testing.T) {
 // no visible cause unless the rendered text is asserted, and it is asserted against a literal typed
 // here rather than against the rule's own constant, so both sides cannot move together.
 func TestIframeMissingSandboxRendersTheRejectedToken(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(
 		t,
 		IframeMissingSandbox,
@@ -216,6 +226,8 @@ func TestIframeMissingSandboxRendersTheRejectedToken(t *testing.T) {
 // one whose value it cannot read, and this rule reports on exactly one of those two. Every case
 // here was measured against the installed build.
 func TestIframeMissingSandboxSeparatesPresentFromReadable(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -265,6 +277,8 @@ func TestIframeMissingSandboxSeparatesPresentFromReadable(t *testing.T) {
 // The trim is what keeps a leading tab clean, and it is why `"\tallow-forms"` is silent while
 // `"allow-forms\tallow-modals"` is not: trimming acts on the ends of a token, not on its middle.
 func TestIframeMissingSandboxSplitsOnSpacesOnly(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -310,6 +324,8 @@ func TestIframeMissingSandboxSplitsOnSpacesOnly(t *testing.T) {
 // and its value is an identifier rather than a literal, so it is present and unvalidated. All
 // measured against the installed build; none of these shapes is in the corpus.
 func TestIframeMissingSandboxReadsOnlyIdentifierKeys(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -356,6 +372,8 @@ func TestIframeMissingSandboxReadsOnlyIdentifierKeys(t *testing.T) {
 // build. This pins the narrower reading, so a later reader swapping in the shelf helper because its
 // name matches fails here rather than starting to report where upstream is silent.
 func TestIframeMissingSandboxMatchesUpstreamCreateElementResolution(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -394,6 +412,8 @@ func TestIframeMissingSandboxMatchesUpstreamCreateElementResolution(t *testing.T
 // that does not announce itself. The JSX arm needs no checker and keeps reporting either way, which
 // is what makes this a discrimination rather than a blanket silence.
 func TestIframeMissingSandboxRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	untyped := rule_testing.Run(
 		t,
 		IframeMissingSandbox,

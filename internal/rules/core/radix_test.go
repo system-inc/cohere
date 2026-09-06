@@ -23,6 +23,8 @@ const radixFile = "/repository/source/Radix.ts"
 // Run through the TYPED harness because the shadow question is resolution: a local parseInt is
 // not the global one, and only the checker can say which a name is.
 func TestRadixFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		messages   []string
@@ -87,6 +89,8 @@ func TestRadixFires(t *testing.T) {
 // the call. A shadowed parseInt or Number is not the global one. And a private name or a computed
 // key that is not a literal string is not Number.parseInt at all.
 func TestRadixStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"parseInt(\"10\", 10);",
 		"parseInt(\"10\", 2);",
@@ -152,6 +156,8 @@ func TestRadixStaysSilent(t *testing.T) {
 // already present upstream writes " 10," rather than ", 10", so parseInt("10",) becomes
 // parseInt("10", 10,) and not parseInt("10",, 10).
 func TestRadixSuggestsARadixOfTen(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSource string
@@ -235,6 +241,8 @@ func applyRadixSuggestion(t *testing.T, result rule_testing.Result,
 // and it matters here because the suggestion's insertion point is computed relative to the reported
 // node's end.
 func TestRadixPointsAtTheWholeCall(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		want       string
@@ -271,6 +279,8 @@ func TestRadixPointsAtTheWholeCall(t *testing.T) {
 // The rows around it pin the cases where the two agree, so this test would notice a port that had
 // simply stopped checking for shadows at all.
 func TestRadixResolvesShadowsPerCallSite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -303,6 +313,8 @@ func TestRadixResolvesShadowsPerCallSite(t *testing.T) {
 // Asserted through the rule with options handed to it, since the registration carries no decoder and
 // nothing else in the suite would notice a decoder appearing later.
 func TestRadixIgnoresItsDeprecatedOption(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{`parseInt("10", 8);`, `parseInt("10", foo);`} {
 		t.Run(sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, Radix, radixFile, sourceText))

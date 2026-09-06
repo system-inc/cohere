@@ -158,6 +158,8 @@ var noUselessComputedKeyFiringCases = []noUselessComputedKeyCase{
 // where that matters -- a fixer replacing a constructed span can be anchored correctly, report the
 // right id, and still write the wrong bytes.
 func TestNoUselessComputedKeyFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noUselessComputedKeyFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			result := rule_testing.RunWithOptions(t, NoUselessComputedKey, uselessComputedKeyFile,
@@ -204,6 +206,8 @@ func TestNoUselessComputedKeyFires(t *testing.T) {
 // nothing else would suggest: the four reserved names, the position dependence between a static and
 // an instance member, the bigint decline, and the plain `[x]` that computes something real.
 func TestNoUselessComputedKeyStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noUselessComputedKeyCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUselessComputedKey,
@@ -396,6 +400,8 @@ var noUselessComputedKeyAddedCases = []struct {
 
 // TestNoUselessComputedKeyAddedCases covers what upstream's corpus structurally cannot.
 func TestNoUselessComputedKeyAddedCases(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noUselessComputedKeyAddedCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunWithOptions(t, NoUselessComputedKey, uselessComputedKeyFile,
@@ -428,6 +434,8 @@ func TestNoUselessComputedKeyAddedCases(t *testing.T) {
 // `['x']: 0` and not at `'x'`. A message-id fixture cannot see this, and the choice between the two
 // is exactly the kind that stays green over the wrong answer.
 func TestNoUselessComputedKeySpan(t *testing.T) {
+	t.Parallel()
+
 	const source = "({ ['x']: 0 });"
 	result := rule_testing.Run(t, NoUselessComputedKey, uselessComputedKeyFile, source)
 	rule_testing.ExpectFindings(t, result, "unnecessarilyComputedProperty")
@@ -447,6 +455,8 @@ func TestNoUselessComputedKeySpan(t *testing.T) {
 // changes what the repair writes into the file and is invisible to every other assertion here:
 // the id is the same, the count is the same, and the span is the same.
 func TestNoUselessComputedKeyReportsRawTextNotCookedText(t *testing.T) {
+	t.Parallel()
+
 	const source = "({ ['\\u0041']: 0 });"
 	result := rule_testing.Run(t, NoUselessComputedKey, uselessComputedKeyFile, source)
 	rule_testing.ExpectFindings(t, result, "unnecessarilyComputedProperty")
@@ -465,6 +475,8 @@ func TestNoUselessComputedKeyReportsRawTextNotCookedText(t *testing.T) {
 // must all enforce, while only an explicit false narrows. A `DecodeOptionsInto` would answer the
 // zero value for the first two and silently disagree with upstream on both.
 func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name        string
 		optionsJson string
@@ -517,6 +529,8 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T
 // No fixture asserting a message id can see this, because the id is identical either way. The
 // assertion has to be on what the finding OFFERS.
 func TestNoUselessComputedKeyDeclinesToRepairARecoveredParse(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"({ ['x' });",
 		"({ ['x': 0 });",

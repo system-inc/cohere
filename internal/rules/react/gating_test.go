@@ -66,6 +66,8 @@ const (
 // in the opposite direction. `rule_testing.Run` has no panic-threshold layer, so the honest recording
 // is the finding, with the reason at the line.
 func TestGatingFiresOnUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -98,6 +100,8 @@ func TestGatingFiresOnUpstreamCorpus(t *testing.T) {
 // must not report, and they are the only inputs in the corpus that prove the grammar is being
 // matched rather than every `use memo` prefix being flagged.
 func TestGatingStaysSilentOnUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -117,6 +121,8 @@ func TestGatingStaysSilentOnUpstreamCorpus(t *testing.T) {
 // neighbouring rule. The imported corpus writes exactly four inputs and covers none of the
 // boundaries below, so without these the rule's discriminations are untested.
 func TestGatingFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -241,6 +247,8 @@ func TestGatingFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
 // The silent side of the boundaries. Every case here is a string that either fails the grammar or
 // is not a directive at all, and each one would report under a plausible wrong implementation.
 func TestGatingStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -390,6 +398,8 @@ func TestGatingStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 // semicolon. Both message ids are identical under either choice, so nothing above this test can see
 // which one shipped.
 func TestGatingReportsTheWholeDirectiveIncludingTheSemicolon(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -429,6 +439,8 @@ func TestGatingReportsTheWholeDirectiveIncludingTheSemicolon(t *testing.T) {
 // Each invalid directive points at itself rather than all findings landing on the first one, which
 // a loop reporting the wrong variable would produce with the right count and the right ids.
 func TestGatingPointsEachInvalidFindingAtItsOwnDirective(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "function Foo() {\n  'use memo if(true)';\n  'use memo if(false)';\n  return 1;\n}\n"
 
 	result := rule_testing.Run(t, Gating, gatingFile, sourceText)
@@ -447,6 +459,8 @@ func TestGatingPointsEachInvalidFindingAtItsOwnDirective(t *testing.T) {
 // own message constants. Comparing to the constants is equality, it looks correct, and both sides
 // move together under mutation, so it guards nothing.
 func TestGatingMessageText(t *testing.T) {
+	t.Parallel()
+
 	invalid := rule_testing.Run(t, Gating, gatingFile, gatingUpstreamInvalidIdentifier)
 	if len(invalid.Diagnostics) != 1 {
 		t.Fatalf("want 1 diagnostic, got %d", len(invalid.Diagnostics))
@@ -485,6 +499,8 @@ func TestGatingMessageText(t *testing.T) {
 // so the default is the single line most likely to have no upstream counterpart, and handing
 // `RunWithOptions` a struct directly would leave the decode path unexercised.
 func TestGatingOptionDecodesAndDefaultsToChecking(t *testing.T) {
+	t.Parallel()
+
 	decode := rule.DecodeOptionsInto[GatingOptions]()
 
 	// A bare severity hands the rule nil options, which is how it is configured in practice. The
@@ -538,6 +554,8 @@ func TestGatingOptionDecodesAndDefaultsToChecking(t *testing.T) {
 // directive text, spelled with the quote style upstream used, and the two multi-directive bodies
 // must hold two distinct conditions rather than one repeated.
 func TestGatingTranscriptionsStillHoldTheirDirectives(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name     string
 		body     string

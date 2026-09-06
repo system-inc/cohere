@@ -14,6 +14,8 @@ import (
 const displayNameFile = "/repository/source/DisplayName.tsx"
 
 func TestDisplayNameStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		options          DisplayNameOptions
@@ -92,6 +94,8 @@ func TestDisplayNameStaysSilent(t *testing.T) {
 }
 
 func TestDisplayNameFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		options          DisplayNameOptions
@@ -149,6 +153,8 @@ func TestDisplayNameFires(t *testing.T) {
 // than about the gate, and they belong in the suite. The four that do move are recorded in
 // TestDisplayNameSettingsGatedCasesThisPortCannotExpress instead.
 func TestDisplayNameSettingsGatedCasesUnderDefaultSettings(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -195,6 +201,8 @@ func TestDisplayNameSettingsGatedCasesUnderDefaultSettings(t *testing.T) {
 //
 // Each row asserts what this port does, so the record fails loudly if any of it changes.
 func TestDisplayNameSettingsGatedCasesThisPortCannotExpress(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name             string
 		sourceText       string
@@ -243,6 +251,8 @@ func TestDisplayNameSettingsGatedCasesThisPortCannotExpress(t *testing.T) {
 // installed plugin is ever upgraded past this release these rows flip, and this test is where that
 // will surface.
 func TestDisplayNameCloneAheadOfTheInstalledBuildOnMemberShadowing(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "import React, { memo, forwardRef } from 'react'\n\n" +
 		"const TestComponent = function () {\n" +
 		"  const memo = (cb) => cb()\n" +
@@ -262,6 +272,8 @@ func TestDisplayNameCloneAheadOfTheInstalledBuildOnMemberShadowing(t *testing.T)
 // The bare half of shadowing IS in the installed build, so a shadowed `memo(...)` is silent. Without
 // this row the test above reads as "shadowing is unimplemented" rather than as "one half of it is".
 func TestDisplayNameBareWrapperShadowingIsExempt(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "import { memo } from 'react'\n\n" +
 		"const TestComponent = function () {\n" +
 		"  const memo = (cb) => cb()\n" +
@@ -292,6 +304,8 @@ func TestDisplayNameBareWrapperShadowingIsExempt(t *testing.T) {
 //	the context surface      only reachable under `checkContextObjects`, and `other.createContext()`
 //	                         counts because upstream matches the callee name without the receiver
 func TestDisplayNameMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -374,6 +388,8 @@ func TestDisplayNameMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *test
 // That is the distinguishing input, and it is why a surviving mutant on this branch was a real
 // defect rather than an equivalent rewrite.
 func TestDisplayNameMergedDeclarationsAreAllOffered(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -402,6 +418,8 @@ func TestDisplayNameMergedDeclarationsAreAllOffered(t *testing.T) {
 // Without it, narrowing the lookup to "always find something" would pass that test while silencing
 // the rule everywhere. The same merged shape with no `displayName` write must still report.
 func TestDisplayNameMergedDeclarationsStillReportWhenUnnamed(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "import {memo} from 'react';\ninterface C { x: number }\nconst C = memo(() => <div/>);\n"
 	result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, sourceText,
 		DefaultDisplayNameOptions())
@@ -419,6 +437,8 @@ func TestDisplayNameMergedDeclarationsStillReportWhenUnnamed(t *testing.T) {
 // pointer fields. That is worth stating because the sibling `self-closing-comp` defaults both of
 // its options to true and the same shape there would silently disable the rule.
 func TestDecodeDisplayNameOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name             string
 		raw              string
@@ -469,6 +489,8 @@ func TestDecodeDisplayNameOptions(t *testing.T) {
 // the zero value. Both defaults are false so the zero value is right, and this pins that rather
 // than leaving it to luck.
 func TestDisplayNameNilOptionsFallsBackToTheDefault(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "import {memo} from 'react';\nconst C = memo(() => <div/>);\n"
 	result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, sourceText, nil)
 	rule_testing.ExpectFindings(t, result, "noDisplayName")
@@ -486,6 +508,8 @@ func TestDisplayNameNilOptionsFallsBackToTheDefault(t *testing.T) {
 // function itself for an anonymous default export, and the class for a class component. Every span
 // below was measured against the installed build on 2026-08-27 by slicing its reported range.
 func TestDisplayNameAnchorsOnTheComponent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -539,6 +563,8 @@ func TestDisplayNameAnchorsOnTheComponent(t *testing.T) {
 // own strings and a paraphrase would diverge silently. Asserted against literals typed here rather
 // than against the rule's own constants, so the two cannot move together under mutation.
 func TestDisplayNameMessages(t *testing.T) {
+	t.Parallel()
+
 	if messageNoDisplayName.Id != "noDisplayName" {
 		t.Errorf("id is %q, want %q", messageNoDisplayName.Id, "noDisplayName")
 	}
@@ -561,6 +587,8 @@ func TestDisplayNameMessages(t *testing.T) {
 // to its declaration. Run on the plain harness it receives a nil checker and, without the guard,
 // would answer a narrower question while every quiet fixture passed vacuously.
 func TestDisplayNameRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "import {memo} from 'react';\nconst C = memo(() => <div/>);\n"
 
 	// The control. On the typed harness this reports, so the zero below means the guard fired

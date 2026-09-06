@@ -27,6 +27,8 @@ func banTslintCommentCaseName(index int) string {
 // or a keyboard on the way here. Every one was additionally run through the installed 8.67.0 build
 // driven by the ESLint 10.8.1 Linter API, which reported nothing on all five.
 func TestBanTslintCommentStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"let a: readonly any[] = [];",
 		"let a = new Array();",
@@ -53,6 +55,8 @@ func TestBanTslintCommentStaysSilentOnUpstreamPassCases(t *testing.T) {
 // All four assertions run on each row, which is the point. A finding at the right span with the
 // wrong rewrite, and a rewrite at the right span with the wrong text, both pass a message-id check.
 func TestBanTslintCommentFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpan   string
@@ -140,6 +144,8 @@ func TestBanTslintCommentFiresOnUpstreamFailCases(t *testing.T) {
 // here was run through the installed 8.67.0 build and carries the verdict that build produced, so a
 // row asserting silence is asserting upstream's silence rather than this port's.
 func TestBanTslintCommentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -225,6 +231,8 @@ func TestBanTslintCommentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) 
 // interpolates, so a port dropping the trim would agree with every other fixture in this file. Each
 // row's expectation is the text the installed build printed for that exact input.
 func TestBanTslintCommentRendersTheCommentUpstreamRenders(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantText   string
@@ -265,6 +273,8 @@ func TestBanTslintCommentRendersTheCommentUpstreamRenders(t *testing.T) {
 // predicted, so the row stays honest if upstream ever narrows this itself. `wantFixed` is what this
 // port writes.
 func TestBanTslintCommentFixDeclinesToDeleteCode(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText    string
 		upstreamFixed string
@@ -311,6 +321,8 @@ func TestBanTslintCommentFixDeclinesToDeleteCode(t *testing.T) {
 // difference is pinned rather than left to a doc comment. Measured on the installed build: the same
 // input reports in every one of these extensions.
 func TestBanTslintCommentHasNoFileGate(t *testing.T) {
+	t.Parallel()
+
 	for _, fileName := range []string{
 		"/repository/source/Thing.ts",
 		"/repository/source/Thing.tsx",
@@ -340,6 +352,8 @@ func TestBanTslintCommentHasNoFileGate(t *testing.T) {
 // test asserts an absence of panic, and asserting a verdict would be inventing one upstream never
 // gave.
 func TestBanTslintCommentSurvivesAnUnterminatedBlockComment(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{"/*", "/*/", "/**", "/* tslint:disable"} {
 		t.Run(sourceText, func(t *testing.T) {
 			rule_testing.Run(t, BanTslintComment, banTslintCommentFile, sourceText)

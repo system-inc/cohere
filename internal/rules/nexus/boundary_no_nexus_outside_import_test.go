@@ -9,6 +9,8 @@ import (
 const nexusFile = "/repository/libraries/nexus/code-quality/Thing.ts"
 
 func TestBoundaryNoNexusOutsideImportFires(t *testing.T) {
+	t.Parallel()
+
 	// All three import shapes, because a boundary that only guards the static form is a boundary
 	// with a documented way around it.
 	cases := []struct {
@@ -30,6 +32,8 @@ func TestBoundaryNoNexusOutsideImportFires(t *testing.T) {
 }
 
 func TestBoundaryNoNexusOutsideImportStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -85,6 +89,8 @@ func TestBoundaryNoNexusOutsideImportStaysSilent(t *testing.T) {
 // it. A `-next-line` directive matches the line after itself, so the finding was unreachable by any
 // suppression the author could write, and it read as a real finding in every count.
 func TestBoundaryNoNexusOutsideImportReportsTheSpecifier(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string

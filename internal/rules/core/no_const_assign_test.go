@@ -21,6 +21,8 @@ const constAssignFile = "/repository/source/ConstAssign.ts"
 // twice. Recovered from the snapshot by source line rather than by an in-order walk, since that
 // case prints two entries with byte-identical source text.
 func TestNoConstAssignFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -143,6 +145,8 @@ func TestNoConstAssignFires(t *testing.T) {
 // The rest are the structural half. `x.key = 1` and `foo(x)` both resolve to the const binding and
 // neither reassigns it, so a rule built on symbol identity alone reports both.
 func TestNoConstAssignStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -230,6 +234,8 @@ func TestNoConstAssignStaysSilent(t *testing.T) {
 // likely to report the enclosing pattern or the whole assignment rather than the identifier, and the
 // text of a one-character binding makes that invisible unless the span is checked.
 func TestNoConstAssignPointsAtTheWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -283,6 +289,8 @@ func TestNoConstAssignPointsAtTheWrite(t *testing.T) {
 // reported twice from two writes reported once each. A rule looping over the wrong collection
 // produces exactly that: the right count, the right ids, and the same span twice.
 func TestNoConstAssignReportsDistinctWrites(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoConstAssign, constAssignFile, "const x = 0; x = 1; x = 2;")
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("expected 2 findings, got %d", len(result.Diagnostics))
@@ -299,6 +307,8 @@ func TestNoConstAssignReportsDistinctWrites(t *testing.T) {
 // returns early in that case, so every StaysSilent fixture would pass vacuously and the whole clean
 // table would stop measuring anything. Asserting the silence directly is what makes that visible.
 func TestNoConstAssignNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoConstAssign, constAssignFile, "const x = 0; x = 1;"))
 	rule_testing.ExpectFindings(t,
 		rule_testing.RunTyped(t, NoConstAssign, constAssignFile, "const x = 0; x = 1;"),

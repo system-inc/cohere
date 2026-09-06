@@ -21,6 +21,8 @@ const templateCurlyInStringFile = "/repository/source/TemplateCurlyInString.ts"
 // Copied because a fixture a porter invents encodes the same belief as the port, and the case that
 // catches a bug is the one nobody would think to write.
 func TestNoTemplateCurlyInStringFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -56,6 +58,8 @@ func TestNoTemplateCurlyInStringFires(t *testing.T) {
 // `'$}'` closes without opening. `'{foo}'` has braces without a dollar. Those four are why the
 // scan cannot be a search for `$` or for `{`.
 func TestNoTemplateCurlyInStringStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -100,6 +104,8 @@ func TestNoTemplateCurlyInStringStaysSilent(t *testing.T) {
 // the finding's own range, so a span short by one on either side slices to something that is not a
 // complete literal.
 func TestNoTemplateCurlyInStringReportsTheWholeLiteral(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantStart  int
@@ -141,6 +147,8 @@ func TestNoTemplateCurlyInStringReportsTheWholeLiteral(t *testing.T) {
 // The second pair is the same property across separate literals: two strings in one file are two
 // findings, which is what distinguishes "once per literal" from "once per file".
 func TestNoTemplateCurlyInStringReportsOncePerLiteral(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -181,6 +189,8 @@ func TestNoTemplateCurlyInStringReportsOncePerLiteral(t *testing.T) {
 // and the only one is a line continuation, which cannot sit between the dollar and the brace and
 // still leave them adjacent in the value.
 func TestNoTemplateCurlyInStringMatchesTheCookedValue(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		// Raw-quoted so the backslash reaches the fixture rather than being read by Go's unquoter.
@@ -214,6 +224,8 @@ func TestNoTemplateCurlyInStringMatchesTheCookedValue(t *testing.T) {
 // because a later opening may succeed, and a scan that gave up at the first failure would be silent
 // on both.
 func TestNoTemplateCurlyInStringPatternEdges(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -252,6 +264,8 @@ func TestNoTemplateCurlyInStringPatternEdges(t *testing.T) {
 // The template cases matter most: a template is where a placeholder belongs, so reporting one would
 // be a false positive on correct code rather than a missed finding.
 func TestNoTemplateCurlyInStringDeclinesOtherLiteralKinds(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -280,6 +294,8 @@ func TestNoTemplateCurlyInStringDeclinesOtherLiteralKinds(t *testing.T) {
 // The literal below is typed here rather than read from the rule's own constant, so both sides
 // cannot move together.
 func TestNoTemplateCurlyInStringMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoTemplateCurlyInString, templateCurlyInStringFile, "'${a}'")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))

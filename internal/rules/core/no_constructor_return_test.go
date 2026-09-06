@@ -32,6 +32,8 @@ const constructorReturnFile = "/repository/source/ConstructorReturn.ts"
 // carry their own reasoning and every one of them was measured against the installed ESLint 10.8.1
 // rule through the Linter API, under both the default parser and `@typescript-eslint/parser`.
 func TestNoConstructorReturnFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		findings   int
@@ -106,6 +108,8 @@ func TestNoConstructorReturnFires(t *testing.T) {
 // `IsConstructorDeclaration` reports `static constructor`, which our parser calls a constructor and
 // upstream does not.
 func TestNoConstructorReturnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		// upstream, valid
 		"function fn() { return }",
@@ -176,6 +180,8 @@ func TestNoConstructorReturnStaysSilent(t *testing.T) {
 // because comparing a diagnostic to the constant it was built from is an equality that moves on both
 // sides under mutation and cannot fail.
 func TestNoConstructorReturnSpansTheWholeStatement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpans  []string
@@ -209,6 +215,8 @@ func TestNoConstructorReturnSpansTheWholeStatement(t *testing.T) {
 // above passes, and an id assertion comparing against the constant the rule reports with is an
 // equality whose two sides move together under mutation. Both are typed out here.
 func TestNoConstructorReturnReportsItsOwnMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoConstructorReturn, constructorReturnFile,
 		"class C { constructor() { return 1 } }")
 	if len(result.Diagnostics) != 1 {

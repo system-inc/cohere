@@ -44,6 +44,8 @@ func stylePropObjectOptions(t *testing.T, raw string) any {
 
 // TestStylePropObjectFires runs every case this port reports on.
 func TestStylePropObjectFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -137,6 +139,8 @@ func TestStylePropObjectFires(t *testing.T) {
 
 // TestStylePropObjectStaysSilent runs every case this port declines.
 func TestStylePropObjectStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -298,6 +302,8 @@ func TestStylePropObjectStaysSilent(t *testing.T) {
 // cases. The identifier arm reports on the identifier in the value position, not on its
 // declaration, which is a third anchor again.
 func TestStylePropObjectAnchors(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -331,6 +337,8 @@ func TestStylePropObjectAnchors(t *testing.T) {
 // The message carries no format verbs, so the assertion is equality against a literal typed here
 // rather than against the rule's own constant, which would move with any mutation of it.
 func TestStylePropObjectMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedWithOptions(t, StylePropObject, stylePropObjectFile, `<div style="x" />`, stylePropObjectOptions(t, ``))
 	rule_testing.ExpectFindings(t, result, "stylePropNotObject")
 
@@ -352,6 +360,8 @@ func TestStylePropObjectMessageText(t *testing.T) {
 // state the point on `.ts` directly, where TypeScript would read an opening angle bracket as a type
 // assertion rather than as an element.
 func TestStylePropObjectHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	const source = `React.createElement("div", { style: "x" });`
 
 	for _, suffix := range []string{".tsx", ".ts"} {
@@ -369,6 +379,8 @@ func TestStylePropObjectHasNoFileSuffixGate(t *testing.T) {
 // fixture. This asserts the difference directly, so a later revert of the declaration fails loudly
 // instead of turning every Fires case into a vacuous pass.
 func TestStylePropObjectRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = `React.createElement("div", { style: "x" });`
 	options := stylePropObjectOptions(t, ``)
 
@@ -391,6 +403,8 @@ func TestStylePropObjectRequiresTheTypedHarness(t *testing.T) {
 // most likely to get wrong, a regular expression and a bigint, are written nowhere in the corpus.
 // Each expectation was measured by driving the installed rule on the corresponding value.
 func TestStylePropObjectIsNonNullLiteral(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -424,6 +438,8 @@ func TestStylePropObjectIsNonNullLiteral(t *testing.T) {
 
 // TestDecodeStylePropObjectOptions covers the allow list and the nil-options path.
 func TestDecodeStylePropObjectOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an empty body allows nothing", func(t *testing.T) {
 		decoded, err := DecodeStylePropObjectOptions(nil)
 		if err != nil {

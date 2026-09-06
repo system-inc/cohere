@@ -38,6 +38,8 @@ func strictVoidReturnOptionsFor(t *testing.T, optionsJson string) any {
 // position, and a rule that answers that question too broadly reports on ordinary callbacks
 // everywhere. Every one of these is a false positive somebody already thought about.
 func TestStrictVoidReturnStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string
@@ -172,6 +174,8 @@ func TestStrictVoidReturnStaysSilentOnUpstreamPassCases(t *testing.T) {
 // the shape of the value it found, and a rule that reported the right count with the wrong id would
 // pass a count-only assertion while telling the reader the wrong thing.
 func TestStrictVoidReturnFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string
@@ -310,6 +314,8 @@ func TestStrictVoidReturnFiresOnUpstreamFailCases(t *testing.T) {
 // Under the plain harness the checker is nil and every listener returns immediately, so the clean
 // fixtures would pass having proven nothing.
 func TestStrictVoidReturnNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !StrictVoidReturn.NeedsTypeChecker {
 		t.Fatal("every finding comes from a contextual type, so the checker is required")
 	}
@@ -323,6 +329,8 @@ func TestStrictVoidReturnNeedsTheTypedHarness(t *testing.T) {
 
 // TestDecodeStrictVoidReturnOptions pins the decoder against its default.
 func TestDecodeStrictVoidReturnOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -356,6 +364,8 @@ func TestDecodeStrictVoidReturnOptions(t *testing.T) {
 // rule through the decoder, so nothing there can see the fallback. An `any`-returning callback is
 // the separating input: it reports under the default and is clean when the option is on.
 func TestStrictVoidReturnFallsBackToTheDefaultOnNilOptions(t *testing.T) {
+	t.Parallel()
+
 	const anyReturning = "declare function takes(cb: () => void): void;\ndeclare function makeAny(): any;\ntakes(() => makeAny());"
 
 	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, StrictVoidReturn,
@@ -377,6 +387,8 @@ func TestStrictVoidReturnFallsBackToTheDefaultOnNilOptions(t *testing.T) {
 // against the installed 8.x build before being written here, with the control confirming the same
 // callback reports when the return is its own.
 func TestStrictVoidReturnDoesNotClaimANestedFunctionsReturns(t *testing.T) {
+	t.Parallel()
+
 	clean := []string{
 		"declare function takes(cb: () => void): void;\ntakes(() => {\n  function inner() { return 1; }\n  inner();\n});",
 		"declare function takes(cb: () => void): void;\ntakes(() => {\n  const inner = () => 2;\n  inner();\n});",
@@ -419,6 +431,8 @@ func TestStrictVoidReturnDoesNotClaimANestedFunctionsReturns(t *testing.T) {
 // Their expected message ids were measured the same way as the rest, by replaying each through the
 // installed 8.x build against a real program, with the tsconfig set to preserve JSX.
 func TestStrictVoidReturnFiresOnJsxCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string

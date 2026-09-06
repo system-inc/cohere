@@ -38,6 +38,8 @@ func preferIncludesOnDisk(sourceText string) string {
 // source text rather than on types: a user type declaring `indexOf(x, fromIndex?)` beside
 // `includes(x)` is clean, and so is one whose `includes` is a boolean property rather than a method.
 func TestPreferIncludesStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\nfunction f(a: string): void {\n  a.indexOf(b);\n}\n    ",
 		"\nfunction f(a: string): void {\n  a.indexOf(b) + 0;\n}\n    ",
@@ -74,6 +76,8 @@ func TestPreferIncludesStaysSilentOnUpstreamPassCases(t *testing.T) {
 // And the applied source says what the edit engine will write unattended, which no message-id
 // assertion can see.
 func TestPreferIncludesFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -296,6 +300,8 @@ func TestPreferIncludesFiresOnUpstreamFailCases(t *testing.T) {
 // says a caller wanting alternation should do. These rows are what proves it discriminates. Every
 // verdict is the installed 8.67.0 build's, measured over a real program.
 func TestPreferIncludesReadsAPatternTheShelfCannot(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantCount  int
@@ -414,6 +420,8 @@ func TestPreferIncludesReadsAPatternTheShelfCannot(t *testing.T) {
 // receiver for the regex half. Each row was run through the installed build and carries the verdict
 // that build produced.
 func TestPreferIncludesDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -501,6 +509,8 @@ func TestPreferIncludesDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
 // clean case passes vacuously and every reporting case fails in a way that reads as a rule bug. This
 // asserts the guard holds, so a later revert fails loudly here rather than going quiet everywhere.
 func TestPreferIncludesRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "function f(a: string): void {\n  a.indexOf(b) !== -1;\n}"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, PreferIncludes, preferIncludesFile, source))
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferIncludes, preferIncludesFile, source),

@@ -38,6 +38,8 @@ const arrayCallbackReturnCorpusProvenance = "eslint/tests/lib/rules/array-callba
 // method-name set is permissive by design, so any widening of the argument-position or async tests
 // reports on correct code while every reporting case stays green.
 func TestArrayCallbackReturnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range arrayCallbackReturnCleanCases {
 		result := rule_testing.RunWithOptions(
 			t, ArrayCallbackReturn, "clean.ts", testCase.source, testCase.options)
@@ -55,6 +57,8 @@ func TestArrayCallbackReturnStaysSilent(t *testing.T) {
 // finding before the per-return one because ESLint sorts its messages by position. A port emitting
 // in traversal order gets the reverse and every count assertion still passes.
 func TestArrayCallbackReturnFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range arrayCallbackReturnReportingCases {
 		result := rule_testing.RunWithOptions(
 			t, ArrayCallbackReturn, "fires.ts", testCase.source, testCase.options)
@@ -85,6 +89,8 @@ func TestArrayCallbackReturnFires(t *testing.T) {
 // concise arrow under `checkForEach` offers one suggestion or two depending on `allowVoid`, so the
 // count per finding is asserted rather than only the ids.
 func TestArrayCallbackReturnSuggestions(t *testing.T) {
+	t.Parallel()
+
 	checked := 0
 	for _, testCase := range arrayCallbackReturnReportingCases {
 		if testCase.suggestions == nil {
@@ -156,6 +162,8 @@ func applyArrayCallbackFixes(source string, fixes []rule.Fix) string {
 // A port reporting on the whole function passes every id fixture in this file while highlighting the
 // entire callback.
 func TestArrayCallbackReturnSpan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -218,6 +226,8 @@ func TestArrayCallbackReturnSpan(t *testing.T) {
 // same words. Asserted against literals typed here rather than against the rule's message constants,
 // because comparing to the constant moves both sides together under mutation.
 func TestArrayCallbackReturnMessageText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -288,6 +298,8 @@ func TestArrayCallbackReturnMessageText(t *testing.T) {
 // in this tree before: a rule configured as a bare severity is handed nil, and a port relying on the
 // zero value arriving by accident cannot tell that from a decoder that never ran.
 func TestArrayCallbackReturnOptionsDecode(t *testing.T) {
+	t.Parallel()
+
 	decode := rule.DecodeOptionsInto[ArrayCallbackReturnOptions]()
 
 	t.Run("allowImplicit accepts a bare return", func(t *testing.T) {
@@ -375,6 +387,8 @@ func TestArrayCallbackReturnOptionsDecode(t *testing.T) {
 //
 // The third case is the one a naive "does the body end with a return" test gets wrong.
 func TestArrayCallbackReturnReachability(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -419,6 +433,8 @@ func TestArrayCallbackReturnReachability(t *testing.T) {
 // rule that decides whether to judge at all, and a widening there reports on correct code while
 // every reporting fixture stays green.
 func TestArrayCallbackReturnCalleeShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -500,6 +516,8 @@ func TestArrayCallbackReturnCalleeShapes(t *testing.T) {
 // upstream's `!node.async` guard wraps the `Array.from` and prototype-method arms and leaves the
 // `fromAsync` arm outside it. Measured against the installed rule in all four directions.
 func TestArrayCallbackReturnAsyncAndGenerator(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -559,6 +577,8 @@ func TestArrayCallbackReturnAsyncAndGenerator(t *testing.T) {
 // The last row is the control: a tight expression must NOT gain parentheses, which is what keeps a
 // port that always wraps from passing the first three.
 func TestArrayCallbackReturnVoidParenthesization(t *testing.T) {
+	t.Parallel()
+
 	decode := rule.DecodeOptionsInto[ArrayCallbackReturnOptions]()
 	options, err := decode(json.RawMessage(`{"checkForEach": true, "allowVoid": true}`))
 	if err != nil {

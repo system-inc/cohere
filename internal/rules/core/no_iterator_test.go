@@ -16,6 +16,8 @@ const iteratorFile = "/repository/source/Iterator.ts"
 // input is right here rather than assumed. Copied because a fixture a porter invents encodes the
 // same belief as the port, and the case that catches a bug is the one nobody would think to write.
 func TestNoIteratorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -42,6 +44,8 @@ func TestNoIteratorFires(t *testing.T) {
 // is a different key that merely starts the same. The fourth is the sharpest: its text does contain
 // `__iterator__`, followed by a newline, so any rule matching on source text reports it.
 func TestNoIteratorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -65,6 +69,8 @@ func TestNoIteratorStaysSilent(t *testing.T) {
 // port reading a template's cooked text without checking for substitutions would report this while
 // upstream does not. `staticPropertyName` declines it by kind, and this pins that.
 func TestNoIteratorDeclinesASubstitutingTemplate(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoIterator, iteratorFile,
 		"declare const part: string;\nexport const a = test[`__iterator${part}__`];\n"))
 }
@@ -78,6 +84,8 @@ func TestNoIteratorDeclinesASubstitutingTemplate(t *testing.T) {
 // Asserted by applying the suggestion rather than by comparing offsets: offsets are the thing most
 // likely to be wrong in the same direction as the code that produced them.
 func TestNoIteratorSuggestsTheRightSpan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

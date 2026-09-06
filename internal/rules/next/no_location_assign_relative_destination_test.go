@@ -18,6 +18,8 @@ const locationAssignFile = "/repository/source/Navigate.tsx"
 // global check reads the global scope's binding set; without them every input is silent and a
 // silent probe is indistinguishable from a decline.
 func TestNoLocationAssignRelativeDestinationFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -83,6 +85,8 @@ func TestNoLocationAssignRelativeDestinationFires(t *testing.T) {
 // report: a value it cannot resolve, a receiver that is not the global, and the two navigation
 // forms upstream simply does not handle.
 func TestNoLocationAssignRelativeDestinationStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -164,6 +168,8 @@ func TestNoLocationAssignRelativeDestinationStaysSilent(t *testing.T) {
 // derived from the rule, so a change to what the rule reports cannot quietly move the expectation
 // with it.
 func TestNoLocationAssignRelativeDestinationPointsAtTheNavigation(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -219,6 +225,8 @@ func TestNoLocationAssignRelativeDestinationPointsAtTheNavigation(t *testing.T) 
 // constant would move with the rule under any edit, so an assertion against it can never fail and
 // reads as a guard while guarding nothing.
 func TestNoLocationAssignRelativeDestinationRendersItsMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoLocationAssignRelativeDestination,
 		locationAssignFile, "location.assign('/dashboard');\n")
 	if len(result.Diagnostics) != 1 {

@@ -35,6 +35,8 @@ const unusedPrivateClassMembersFile = "/repository/source/PrivateMembers.ts"
 // TypeScript syntax ESLint's own parser rejects. This follows ESLint, and the four live in
 // `TestNoUnusedPrivateClassMembersDivergesFromOxcOnDiscardedConditionals` with the reasoning.
 func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -256,6 +258,8 @@ func TestNoUnusedPrivateClassMembersFires(t *testing.T) {
 }
 
 func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -590,6 +594,8 @@ func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
 // If this is ever revisited, the decision to revisit is which of the two upstreams to follow, not
 // whether the rule has a bug.
 func TestNoUnusedPrivateClassMembersDivergesFromOxcOnDiscardedConditionals(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -619,6 +625,8 @@ func TestNoUnusedPrivateClassMembersDivergesFromOxcOnDiscardedConditionals(t *te
 // `declaredNode.key.loc`, the same node. Both upstreams agree, so this is measured against them
 // rather than chosen.
 func TestNoUnusedPrivateClassMembersPointsAtThePrivateName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -667,6 +675,8 @@ func TestNoUnusedPrivateClassMembersPointsAtThePrivateName(t *testing.T) {
 // rule silently deleting code while nobody is looking, and it would pass every other test in this
 // file.
 func TestNoUnusedPrivateClassMembersProposesNoRepair(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoUnusedPrivateClassMembers, unusedPrivateClassMembersFile,
 		`class A { #unused = 1; }`)
 	if len(result.Diagnostics) != 1 {
@@ -694,6 +704,8 @@ func TestNoUnusedPrivateClassMembersProposesNoRepair(t *testing.T) {
 // string with two hashes. The dry run against the real tree caught it; this test did not. A test
 // whose predicate is weaker than the property it is guarding is how that happens.
 func TestNoUnusedPrivateClassMembersNamesTheMember(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -15,6 +15,8 @@ import (
 const booleanPropNamingFile = "/repository/source/BooleanPropNaming.tsx"
 
 func TestBooleanPropNamingStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		options          BooleanPropNamingOptions
@@ -64,6 +66,8 @@ func TestBooleanPropNamingStaysSilent(t *testing.T) {
 // message interpolates the prop name and the pattern, so a message-id assertion could not see
 // an interpolation defect at all.
 func TestBooleanPropNamingFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		options          BooleanPropNamingOptions
@@ -201,6 +205,8 @@ func TestBooleanPropNamingFires(t *testing.T) {
 //	the type shapes           an interface, an inline literal, a type alias, an intersection, a
 //	                          union, and a PARENTHESIZED intersection all reach their members
 func TestBooleanPropNamingMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -273,6 +279,8 @@ func TestBooleanPropNamingMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t
 // string is "", and an empty pattern matches every name, so a rule decoded that way reports nothing
 // while looking configured.
 func TestDecodeBooleanPropNamingOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name              string
 		raw               string
@@ -373,6 +381,8 @@ func TestDecodeBooleanPropNamingOptions(t *testing.T) {
 // reproducing it. The harness can still reach `Run` with nil, and declining there is what keeps the
 // rule from inventing a default nobody configured.
 func TestBooleanPropNamingDeclinesWithoutOptions(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool };"
 
 	// The control. With options this input reports, so the zero below means the decline fired
@@ -393,6 +403,8 @@ func TestBooleanPropNamingDeclinesWithoutOptions(t *testing.T) {
 // nil checker, and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` does exactly that. The guard
 // lives in Run rather than in the listener so the file is declined once instead of once per node.
 func TestBooleanPropNamingRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool };"
 
 	typed := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
@@ -410,6 +422,8 @@ func TestBooleanPropNamingRequiresTheTypedHarness(t *testing.T) {
 // property node, so the span covers the name, the colon and the declared type rather than the name
 // alone. Measured against the installed build on 2026-08-28 by slicing its reported range.
 func TestBooleanPropNamingAnchorsOnTheWholeProperty(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -460,6 +474,8 @@ func TestBooleanPropNamingAnchorsOnTheWholeProperty(t *testing.T) {
 // Asserted against a literal built here from the same escape rather than against the rule's own
 // constant, because a message-text mutation would move both together.
 func TestBooleanPropNamingMessageUsesUpstreamsApostrophe(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool };"
 	result := rule_testing.RunTypedWithOptions(t, BooleanPropNaming, booleanPropNamingFile,
 		sourceText, DefaultBooleanPropNamingOptions())
@@ -489,6 +505,8 @@ func TestBooleanPropNamingMessageUsesUpstreamsApostrophe(t *testing.T) {
 // The row set was checked against a control: making the rule read a raw name without a kind guard
 // makes the destructured-parameter rows fail, so these are not passing vacuously.
 func TestBooleanPropNamingDoesNotPanicOnNameShapesThatCannotBeRead(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		// A destructured parameter, whose name node is a binding pattern.
 		"interface Props { enabled: boolean }\nfunction C({ enabled }: Props) { return <div/>; }",

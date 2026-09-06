@@ -10,6 +10,8 @@ const apiParameterPageFile = "/repository/app/account/page.tsx"
 const apiParameterLayoutFile = "/repository/app/account/layout.tsx"
 
 func TestNextRequireApiParameterNameFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -68,6 +70,8 @@ func TestNextRequireApiParameterNameFires(t *testing.T) {
 }
 
 func TestNextRequireApiParameterNameStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -147,6 +151,8 @@ func TestNextRequireApiParameterNameStaysSilent(t *testing.T) {
 // wrong range here silently rewrites something else, and no fixture that only checks message ids
 // would notice.
 func TestNextRequireApiParameterNameFixesTheFieldName(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NextRequireApiParameterName, apiParameterPageFile,
 		"export async function generateMetadata(argument: { parameters: unknown }) {\n    return argument;\n}\n")
 

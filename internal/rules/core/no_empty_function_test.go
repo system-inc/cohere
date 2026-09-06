@@ -44,6 +44,8 @@ func decodedEmptyFunctionOptions(t *testing.T, raw string) any {
 // TypeScript parser. Both are imported here as one set, because our parser reads TypeScript
 // natively and the split is a fact about espree rather than about the rule.
 func TestNoEmptyFunctionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -638,6 +640,8 @@ func TestNoEmptyFunctionStaysSilent(t *testing.T) {
 // message-id assertion cannot see most of what the rule decides. The text below is upstream's own
 // `data` rendered through its own template.
 func TestNoEmptyFunctionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -2450,6 +2454,8 @@ func applyEmptyFunctionSuggestion(t *testing.T, source string, suggestion rule.S
 // The multi-line row is the one that pins the end: a body spanning a newline reports through to
 // the closing brace on the next line rather than stopping at the first.
 func TestNoEmptyFunctionSpansTheBody(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantReported string
@@ -2482,6 +2488,8 @@ func TestNoEmptyFunctionSpansTheBody(t *testing.T) {
 // the zero value happens to be right, and the fallback is written out anyway so a later default
 // change cannot silently switch every kind off.
 func TestDecodeNoEmptyFunctionOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -2519,6 +2527,8 @@ func TestDecodeNoEmptyFunctionOptions(t *testing.T) {
 // both. Measured: eslint 10.8.1 refuses to load a config naming either. This port is the core
 // rule, so it refuses them too, and the extension is where the kebab spellings belong.
 func TestDecodeNoEmptyFunctionOptionsRefusesAnUnknownKind(t *testing.T) {
+	t.Parallel()
+
 	for _, raw := range []string{
 		`{"allow": ["nonsense"]}`,
 		`{"allow": ["private-constructors"]}`,
@@ -2535,6 +2545,8 @@ func TestDecodeNoEmptyFunctionOptionsRefusesAnUnknownKind(t *testing.T) {
 
 // A rule configured as bare "error" reaches Run with nil rather than with an options struct.
 func TestNoEmptyFunctionWithNilOptionsAllowsNothing(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoEmptyFunction,
 		emptyFunctionFile, "function a() {}", nil), "unexpected")
 	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoEmptyFunction,
@@ -2552,6 +2564,8 @@ func TestNoEmptyFunctionWithNilOptionsAllowsNothing(t *testing.T) {
 // Measured against the installed eslint at 10.8.1 with the TypeScript parser: this REPORTS, and the
 // same class with `get foo()` in place of the constructor is clean.
 func TestNoEmptyFunctionOverrideDoesNotExemptAConstructor(t *testing.T) {
+	t.Parallel()
+
 	allowOverride := decodedEmptyFunctionOptions(t, `{"allow": ["overrideMethods"]}`)
 
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoEmptyFunction, emptyFunctionFile,

@@ -220,6 +220,8 @@ func describeNoDeprecated(result rule_testing.Result) string {
 // against upstream's own declared expectations. 259 of the 264 agreed; the five that did not are
 // marked environmentDependent where they appear and carry upstream's declaration instead.
 func TestNoDeprecatedAgainstUpstreamOrdinaryCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []noDeprecatedCase{
 		{
 			name:       "valid:0",
@@ -2722,6 +2724,8 @@ func TestNoDeprecatedAgainstUpstreamOrdinaryCases(t *testing.T) {
 // of a function whose other overloads are clean. The middle position is invisible to a resolve,
 // which jumps to the declaration and finds nothing, and is why deprecationInAliasChain walks.
 func TestNoDeprecatedAcrossFiles(t *testing.T) {
+	t.Parallel()
+
 	cases := []noDeprecatedCase{
 		{
 			name: "valid:43",
@@ -3329,6 +3333,8 @@ func TestNoDeprecatedAcrossFiles(t *testing.T) {
 // attribute itself resolves to, so this arm shares no code with the identifier arm and would be
 // silent if only that one worked.
 func TestNoDeprecatedInJsx(t *testing.T) {
+	t.Parallel()
+
 	cases := []noDeprecatedCase{
 		{
 			name: "valid:68",
@@ -3558,6 +3564,8 @@ func TestNoDeprecatedInJsx(t *testing.T) {
 // They carry upstream's declared expectations and are skipped rather than asserted, because a
 // machine with different types would fail them for a reason that says nothing about the rule.
 func TestNoDeprecatedAgainstNodeTypes(t *testing.T) {
+	t.Parallel()
+
 	cases := []noDeprecatedCase{
 		{
 			name: "valid:52",
@@ -3618,6 +3626,8 @@ func TestNoDeprecatedAgainstNodeTypes(t *testing.T) {
 // reaching the intrinsic attribute type but reporting unconditionally would pass the first row and
 // fail only this one.
 func TestNoDeprecatedOnIntrinsicJsxAttributes(t *testing.T) {
+	t.Parallel()
+
 	const intrinsicElements = "declare global {\n" +
 		"  namespace JSX {\n" +
 		"    interface IntrinsicElements {\n" +
@@ -3659,6 +3669,8 @@ func TestNoDeprecatedOnIntrinsicJsxAttributes(t *testing.T) {
 // fail the second and a rule that reported on nothing would fail the first. Neither can be passed by
 // accident.
 func TestNoDeprecatedFiresAndStaysQuiet(t *testing.T) {
+	t.Parallel()
+
 	const source = "/** @deprecated Use b instead. */\n" +
 		"declare function a(): void;\n" +
 		"declare function b(): void;\n"

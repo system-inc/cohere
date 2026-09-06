@@ -18,6 +18,8 @@ import (
 // under that one header is organized. A header naming the right group is silent and any other header
 // reports, so a disagreement about classification surfaces as a finding rather than as silence.
 func TestConsistencyOrganizeImportsClassification(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		importLine string
 		group      string

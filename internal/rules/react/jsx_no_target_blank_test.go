@@ -53,6 +53,8 @@ const jsxNoTargetBlankFile = "/repository/source/JsxNoTargetBlank.tsx"
 // output are cases upstream reports and declines to fix, and their empty column asserts that
 // decline rather than skipping the question.
 func TestJsxNoTargetBlankFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -226,6 +228,8 @@ func TestJsxNoTargetBlankFires(t *testing.T) {
 }
 
 func TestJsxNoTargetBlankStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -376,6 +380,8 @@ func decodeTargetBlankOptionsForTest(t *testing.T, raw string) any {
 // This matters twice for this rule, because 42 of its fixtures carry a repair: a finding anchored
 // on the wrong node while carrying a fix means the edit lands somewhere the reader was never shown.
 func TestJsxNoTargetBlankSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -414,6 +420,8 @@ func TestJsxNoTargetBlankSpans(t *testing.T) {
 // enum inverted into a bool, and `links` defaults to true. A fixture that built the options struct
 // by hand would exercise neither, which is why every table above routes through this function.
 func TestDecodeJsxNoTargetBlankOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -467,6 +475,8 @@ func TestDecodeJsxNoTargetBlankOptions(t *testing.T) {
 // a verdict; the test exists because the rule restores the default explicitly and a later reader
 // deleting that restoration should fail here rather than ship a silent change.
 func TestJsxNoTargetBlankHandlesNilOptions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
 		"<a target=\"_blank\" href=\"http://x.com\"></a>", nil)
 	rule_testing.ExpectFindings(t, result, "noTargetBlankWithoutNoreferrer")
@@ -484,6 +494,8 @@ func TestJsxNoTargetBlankHandlesNilOptions(t *testing.T) {
 // because a `.ts` file cannot parse `<a ... />` as JSX at all and its silence would say nothing
 // about the rule.
 func TestJsxNoTargetBlankHasNoFileGate(t *testing.T) {
+	t.Parallel()
+
 	const source = "<a target=\"_blank\" href=\"http://x.com\"></a>"
 	for _, fileName := range []string{
 		"/repository/source/Probe.tsx",

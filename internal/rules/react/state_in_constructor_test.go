@@ -35,6 +35,8 @@ const stateInConstructorFile = "/repository/source/StateInConstructor.tsx"
 // and the corpus makes that the point rather than an edge: three of these inputs are byte-identical
 // to cases in the valid table, separated only by the option.
 func TestStateInConstructorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		mode       StateInConstructorMode
@@ -147,6 +149,8 @@ func TestStateInConstructorFires(t *testing.T) {
 // which is how the corpus says the rule keys on the name rather than on the presence of any
 // property at all.
 func TestStateInConstructorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		mode       StateInConstructorMode
@@ -351,6 +355,8 @@ func runStateInConstructor(t *testing.T, mode StateInConstructorMode, sourceText
 // brief describes. Every other fixture here reaches the rule through the decoder, so nothing else
 // in this file can see it.
 func TestStateInConstructorReportsWithoutOptions(t *testing.T) {
+	t.Parallel()
+
 	source := `
 class Foo extends React.Component {
   state = { bar: 0 };
@@ -369,6 +375,8 @@ class Foo extends React.Component {
 // reported. The source deliberately holds no JSX, so a `.ts` file parses and the parser's opinion
 // cannot be confused with the rule's.
 func TestStateInConstructorHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	source := `
 class Foo extends React.Component {
   state = { bar: 0 };
@@ -396,6 +404,8 @@ class Foo extends React.Component {
 // `#state` where upstream reports, and reporting on `"state"` where upstream is silent. Every
 // verdict below was measured by driving the installed rule.
 func TestStateInConstructorKeyShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		member  string
@@ -445,6 +455,8 @@ func TestStateInConstructorKeyShapes(t *testing.T) {
 // without the unwrapping both would go silent on inputs upstream reports. Every verdict measured
 // on the installed rule, and none of these shapes is in the corpus.
 func TestStateInConstructorNeverTargets(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		statement string
@@ -486,6 +498,8 @@ func TestStateInConstructorNeverTargets(t *testing.T) {
 // about initialization style rather than about state mutation. `no-direct-mutation-state` is the
 // rule that watches the other methods.
 func TestStateInConstructorNeverRequiresTheConstructor(t *testing.T) {
+	t.Parallel()
+
 	source := `
 class Foo extends React.Component {
   someMethod() { this.state = { bar: 0 }; }
@@ -504,6 +518,8 @@ class Foo extends React.Component {
 // report on both of these, which is why this rule walks to the nearest class itself. Both measured
 // silent on the installed rule.
 func TestStateInConstructorNearestClassDecides(t *testing.T) {
+	t.Parallel()
+
 	t.Run("plain class inside a component, Always", func(t *testing.T) {
 		source := `
 class Foo extends React.Component {
@@ -555,6 +571,8 @@ class Foo extends React.Component {
 // possible divergence measured on a different rule. Measured against THIS rule's authority,
 // `extends (React.Component)` reports, so the skip is correct here rather than a divergence.
 func TestStateInConstructorComponentGate(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		heritage string
@@ -607,6 +625,8 @@ func TestStateInConstructorComponentGate(t *testing.T) {
 // will not fit, and upstream's scope walk finds a class scope either way. Measured reporting on the
 // installed rule in both arms.
 func TestStateInConstructorClassExpression(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Always", func(t *testing.T) {
 		source := `
 const Foo = class extends React.Component {
@@ -638,6 +658,8 @@ const Foo = class extends React.Component {
 // the source the harness actually wrote rather than out of the Go literal, because `rule_testing`
 // trims the fixture and a slice of the literal would be off by one byte.
 func TestStateInConstructorSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		mode       StateInConstructorMode
@@ -696,6 +718,8 @@ func TestStateInConstructorSpans(t *testing.T) {
 // rather than against the rule's own constant is deliberate: comparing a finding to the constant it
 // was reported with is an equality that moves on both sides under mutation and cannot fail.
 func TestStateInConstructorMessages(t *testing.T) {
+	t.Parallel()
+
 	if messageStateInConstructorInConstructor.Id != "stateInitConstructor" {
 		t.Errorf("Always arm id = %q", messageStateInConstructorInConstructor.Id)
 	}
@@ -718,6 +742,8 @@ func TestStateInConstructorMessages(t *testing.T) {
 // default, the empty input, the empty string and the rejection of an unknown mode are all lines
 // this tree wrote, so they are all tested here rather than inferred from a rule fixture.
 func TestDecodeStateInConstructorOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no options at all means Always", func(t *testing.T) {
 		decoded, err := DecodeStateInConstructorOptions(nil)
 		if err != nil {
@@ -779,6 +805,8 @@ func TestDecodeStateInConstructorOptions(t *testing.T) {
 // proves the walk crosses the class rather than something else explaining the verdict. The third
 // keeps the walk from being vacuous by showing a constructor is still required somewhere.
 func TestStateInConstructorWalkCrossesAClassBoundary(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -846,6 +874,8 @@ class Outer extends React.Component {
 // Every row measured against the installed build: the assignment reports and none of the seven
 // comparisons does.
 func TestStateInConstructorNeverRequiresAnAssignment(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		statement string

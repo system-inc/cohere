@@ -7,6 +7,8 @@ import (
 )
 
 func TestNoDuplicateCaseReportsRepeatedTest(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -42,6 +44,8 @@ func TestNoDuplicateCaseReportsRepeatedTest(t *testing.T) {
 // begin inside the preceding trivia, which puts the finding on the comment above it and out of reach
 // of a disable comment on the offending line.
 func TestNoDuplicateCaseReportsTheTestExpressionWithoutTrivia(t *testing.T) {
+	t.Parallel()
+
 	const source = `switch (a) {
   case 1:
     break;
@@ -59,6 +63,8 @@ func TestNoDuplicateCaseReportsTheTestExpressionWithoutTrivia(t *testing.T) {
 }
 
 func TestNoDuplicateCaseAcceptsDistinctTests(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string

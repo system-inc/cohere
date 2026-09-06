@@ -35,6 +35,8 @@ const noImpliedEvalFile = "noImpliedEval.ts"
 //     call, and an element access resolving to a method all pass.
 //   - A callee DECLARED IN THIS FILE is exempt, which is what makes the shadowing cases clean.
 func TestNoImpliedEvalStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -105,6 +107,8 @@ func TestNoImpliedEvalStaysSilent(t *testing.T) {
 // They are not alternatives: `new Function('x')` can only be the constructor arm, while the four
 // eval-like callees only ever produce the other, and one case produces both.
 func TestNoImpliedEvalFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		sourceText  string
@@ -154,6 +158,8 @@ func TestNoImpliedEvalFires(t *testing.T) {
 // `Function` still reports, so the silence below is the shadowing doing work rather than the
 // multi-file harness swallowing the rule.
 func TestNoImpliedEvalExemptsAShadowingDeclarationFromAnotherFile(t *testing.T) {
+	t.Parallel()
+
 	const shadowed = "export class Function {}\n"
 	const unrelated = "export class NotFunction {}\n"
 	const subject = "\nimport { Function } from './class';\nnew Function('foo');\n    "
@@ -180,6 +186,8 @@ func TestNoImpliedEvalExemptsAShadowingDeclarationFromAnotherFile(t *testing.T) 
 // silent ones each have a reporting neighbour so that no zero is a zero for a reason other than
 // the one claimed.
 func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(t *testing.T) {
+	t.Parallel()
+
 	reporting := []struct{ name, sourceText string }{
 		// The three receivers upstream hardcodes, plus the bare form.
 		{"a bare global", "setTimeout('x=1', 0);"},
@@ -231,6 +239,8 @@ func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(t *testing
 // handler is callable and reports everything that is not, so a number, `null`, `unknown` and
 // `any` all report while a `.bind()` call and a `Function`-typed variable do not.
 func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(t *testing.T) {
+	t.Parallel()
+
 	reporting := []struct{ name, sourceText string }{
 		{"a number literal", "setTimeout(1, 0);"},
 		{"null", "setTimeout(null, 0);"},
@@ -283,6 +293,8 @@ func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(t *testing.T) {
 // parens there either, but the checker sees through them, so a parenthesized string still reports
 // and a parenthesized arrow is still silent.
 func TestNoImpliedEvalDoesNotSkipParenthesesOnTheCallee(t *testing.T) {
+	t.Parallel()
+
 	silent := []struct{ name, sourceText string }{
 		{"a parenthesized bare callee", "(setTimeout)('x=1', 0);"},
 		{"a doubly parenthesized bare callee", "((setTimeout))('x=1', 0);"},
@@ -328,6 +340,8 @@ func TestNoImpliedEvalDoesNotSkipParenthesesOnTheCallee(t *testing.T) {
 // own message constants, because a comparison to the constant moves with the rule under mutation
 // and therefore guards nothing.
 func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(t *testing.T) {
+	t.Parallel()
+
 	t.Run("the eval-like arm points at the HANDLER", func(t *testing.T) {
 		const sourceText = "declare const window: any;\nwindow.setTimeout('x = 1', 0);"
 		result := rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, sourceText)
@@ -399,6 +413,8 @@ func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(t *testing.T) {
 // each one through on a nil symbol. That is a vacuous RED rather than a vacuous green, and it is
 // what the guard below prevents.
 func TestNoImpliedEvalDeclaresItNeedsTheTypeChecker(t *testing.T) {
+	t.Parallel()
+
 	if !NoImpliedEval.NeedsTypeChecker {
 		t.Error("NoImpliedEval must declare NeedsTypeChecker: every listener reads ctx.TypeChecker")
 	}

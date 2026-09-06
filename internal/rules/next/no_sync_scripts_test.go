@@ -7,6 +7,8 @@ import (
 )
 
 func TestNoSyncScriptsReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -43,6 +45,8 @@ func TestNoSyncScriptsReports(t *testing.T) {
 }
 
 func TestNoSyncScriptsIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

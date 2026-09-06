@@ -26,6 +26,8 @@ const extraBindFile = "/repository/source/ExtraBind.ts"
 // one-based line and column to a byte offset, which two of these cases need because their span sits
 // on the second line.
 func TestNoExtraBindFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		spanStart   int
@@ -141,6 +143,8 @@ func TestNoExtraBindFires(t *testing.T) {
 // The clean cases are what separate a pointless bind from a useful one, and every one of them is a
 // false positive this rule would otherwise ship.
 func TestNoExtraBindStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ sourceText string }{
 		{"var a = function(b) { return b }.bind(c, d)"},
 		{"var a = function(b) { return b }.bind(...c)"},
@@ -223,6 +227,8 @@ func TestNoExtraBindStaysSilent(t *testing.T) {
 // that has to survive. Upstream's comment names the shape that does, and it is the reason the fixer
 // is built as a pair, so it is written here.
 func TestNoExtraBindRepairKeepsWhatSitsBetweenTheTwoSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		fixedSource string
@@ -245,6 +251,8 @@ func TestNoExtraBindRepairKeepsWhatSitsBetweenTheTwoSpans(t *testing.T) {
 // The message is a value with no interpolation, so the assertion is on the constant's own fields,
 // compared against literals typed here rather than against the rule's own constant.
 func TestNoExtraBindMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageUnnecessaryBind.Id != "unexpected" {
 		t.Errorf("message id is %q", messageUnnecessaryBind.Id)
 	}

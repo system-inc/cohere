@@ -63,6 +63,8 @@ func runReactHookAnyTypeWithoutReact(t *testing.T, source string) rule_testing.R
 
 // TestReactHookAnyTypeFires covers every arrangement that costs the type-based rules their sight.
 func TestReactHookAnyTypeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -172,6 +174,8 @@ export function Widget() {
 
 // TestReactHookAnyTypeStaysSilent covers healthy code and the near neighbours that must not report.
 func TestReactHookAnyTypeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		source    string
@@ -335,6 +339,8 @@ export function Widget() {
 // whitespace sits one byte off its Go literal and a hand-computed offset reports the wrong text.
 // Trimming the same way is what keeps the two aligned.
 func TestReactHookAnyTypeSpan(t *testing.T) {
+	t.Parallel()
+
 	source := `import React from 'react';
 export function Widget() {
     const [count, setCount] = React.useState(0);
@@ -355,6 +361,8 @@ export function Widget() {
 
 // TestReactHookAnyTypeSpanOnABareCall pins the other callee spelling.
 func TestReactHookAnyTypeSpanOnABareCall(t *testing.T) {
+	t.Parallel()
+
 	source := `declare function useState<T>(initial: T): any;
 export function Widget() {
     const [count, setCount] = useState(0);
@@ -384,6 +392,8 @@ export function Widget() {
 // Asserted against literal strings typed here rather than against the rule's own builder, so that a
 // mutation moving the text fails rather than moving both sides together.
 func TestReactHookAnyTypeMessageNamesTheHook(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		source     string
@@ -466,6 +476,8 @@ func init() {
 // this same package, and declares neither `NeedsTypeChecker` nor the flag. If the derivation were
 // reading the whole catalog rather than the flag, its name would appear.
 func TestReactHookAnyTypeNamesTheBlindedRulesFromTheCatalog(t *testing.T) {
+	t.Parallel()
+
 	blinded := reactHookAnyTypeBlindedRules()
 	if len(blinded) == 0 {
 		t.Fatal("the stand-in rule declaring ResolvesReactValueTypes is not in the catalog, so " +
@@ -501,6 +513,8 @@ export function Widget() {
 // defect under two names wastes a reader's time. This one says the derivation reads the flag; that
 // one says the message renders what the derivation returned.
 func TestReactHookAnyTypeBlindedRuleDerivationReadsTheFlag(t *testing.T) {
+	t.Parallel()
+
 	blinded := reactHookAnyTypeBlindedRules()
 
 	named := map[string]bool{}
@@ -523,6 +537,8 @@ func TestReactHookAnyTypeBlindedRuleDerivationReadsTheFlag(t *testing.T) {
 // vacuously while proving nothing. This makes that state a failure rather than a green suite, so a
 // later revert of `NeedsTypeChecker` or of the guard fails loudly instead of quietly.
 func TestReactHookAnyTypeRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := `declare function useState<T>(initial: T): any;
 export function Widget() {
     return useState(0);
@@ -550,6 +566,8 @@ export function Widget() {
 // would satisfy them all. This one cannot be satisfied that way, because the bytes of the subject
 // file are identical in both runs.
 func TestReactHookAnyTypeSeesTheDifferenceTheDeclarationsMake(t *testing.T) {
+	t.Parallel()
+
 	source := `import React from 'react';
 export function Widget() {
     const [count, setCount] = React.useState(0);
@@ -580,6 +598,8 @@ export function Widget() {
 // Asserted against literal strings typed here rather than against the joiner's own output, so a
 // mutation moves one side and not both.
 func TestReactHookAnyTypeJoinRendersEveryArity(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name  string
 		names []string
@@ -621,6 +641,8 @@ func TestReactHookAnyTypeJoinRendersEveryArity(t *testing.T) {
 // upstream reordering that moves `flags` off zero would silently turn this rule into one that
 // reports nothing, or reports on everything, and nothing else in the tree would notice.
 func TestReactHookAnyTypeFlagReadAgreesWithTheCheckersOwnName(t *testing.T) {
+	t.Parallel()
+
 	subjects := []struct {
 		name string
 		// source declares a hook whose return type is spelled in `wantTypeName`.

@@ -24,6 +24,8 @@ func noDupeClassMembersCaseName(index int) string {
 // from the bare core on all twenty-one cases, because it writes no literal computed key anywhere.
 // Everything below the imported cases is measured for that reason.
 func TestNoDupeClassMembersStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"class A {\n  foo() {}\n  bar() {}\n}\n",
 		"class A {\n  static foo() {}\n  foo() {}\n}\n",
@@ -84,6 +86,8 @@ type noDupeClassMembersFinding struct {
 // TestNoDupeClassMembersFires is upstream's ten reporting cases verbatim, plus measured rows where
 // a computed member sits beside a real duplicate.
 func TestNoDupeClassMembersFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []noDupeClassMembersFinding
@@ -203,6 +207,8 @@ func TestNoDupeClassMembersFires(t *testing.T) {
 // control: a class with nothing computed takes the no-swap path, and without it this test would
 // pass against a rule that never swapped at all.
 func TestNoDupeClassMembersRestoresTheMemberList(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		sourceText  string

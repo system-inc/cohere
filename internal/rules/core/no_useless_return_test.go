@@ -23,6 +23,8 @@ import (
 const noUselessReturnDeclinesToFix = "\x00declines"
 
 func TestNoUselessReturnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -67,6 +69,8 @@ func TestNoUselessReturnStaysSilent(t *testing.T) {
 }
 
 func TestNoUselessReturnFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		source    string
@@ -140,6 +144,8 @@ func TestNoUselessReturnFires(t *testing.T) {
 // return statement, which is also the span the repair deletes, so a wrong anchor here means an
 // unattended edit lands somewhere the reader was never shown.
 func TestNoUselessReturnSpanAndMessage(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -186,6 +192,8 @@ func TestNoUselessReturnSpanAndMessage(t *testing.T) {
 // Both halves matter. Losing the first means the repair eats a developer's comment unattended;
 // losing the second means the rule stops repairing ordinary code because a comment sits beside it.
 func TestNoUselessReturnComments(t *testing.T) {
+	t.Parallel()
+
 	declines := []struct {
 		name   string
 		source string
@@ -229,6 +237,8 @@ func TestNoUselessReturnComments(t *testing.T) {
 // The removability guard, upstream's third `output: null`. A return that is not a member of a
 // statement list cannot be deleted, because removing it leaves a construct with no body.
 func TestNoUselessReturnRemovability(t *testing.T) {
+	t.Parallel()
+
 	declines := []string{
 		"function foo() { if (foo) return; }",
 		"function foo() { if (foo) return; else bar(); }",
@@ -257,6 +267,8 @@ func TestNoUselessReturnRemovability(t *testing.T) {
 // pin that: a return inside a typed function, a generic one, and a method still reports and the
 // repair leaves every annotation untouched.
 func TestNoUselessReturnTypeScriptShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		source    string
@@ -289,6 +301,8 @@ func TestNoUselessReturnTypeScriptShapes(t *testing.T) {
 // before this was corrected the rule reported 51 such sites across 33 files on this tree, and every
 // one was a false positive. Each row measured against the installed build at 10.8.1.
 func TestNoUselessReturnTryBoundary(t *testing.T) {
+	t.Parallel()
+
 	clean := []struct {
 		name   string
 		source string

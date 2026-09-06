@@ -16,6 +16,8 @@ import (
 const defaultPropsMatchPropTypesFile = "/repository/source/DefaultPropsMatchPropTypes.tsx"
 
 func TestDefaultPropsMatchPropTypesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		options          DefaultPropsMatchPropTypesOptions
@@ -84,6 +86,8 @@ func TestDefaultPropsMatchPropTypesStaysSilent(t *testing.T) {
 // finding. Both messages interpolate the prop name, so a message-id assertion could not see an
 // interpolation defect, and the two arms differ only by which id fires on which input.
 func TestDefaultPropsMatchPropTypesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, sourceText string
 		options          DefaultPropsMatchPropTypesOptions
@@ -215,6 +219,8 @@ func TestDefaultPropsMatchPropTypesFires(t *testing.T) {
 // ever changes. The `wantUpstream` column is what the installed build reports, kept beside it so
 // the size of the gap is on the page rather than in a commit message.
 func TestDefaultPropsMatchPropTypesCasesThisPortCannotExpress(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -261,6 +267,8 @@ func TestDefaultPropsMatchPropTypesCasesThisPortCannotExpress(t *testing.T) {
 //	component separation     two components in one file do not share props, which is what keeps one
 //	                         component's propTypes from satisfying another's defaults
 func TestDefaultPropsMatchPropTypesMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string

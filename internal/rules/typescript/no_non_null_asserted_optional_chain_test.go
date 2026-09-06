@@ -12,6 +12,8 @@ const assertedOptionalChainFile = "/repository/source/Thing.ts"
 // is the only answer key this rule has: the tree cohere gates contains zero non-null assertions, so
 // a clean run over it cannot distinguish a working port from an inert one.
 func TestNoNonNullAssertedOptionalChainFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -39,6 +41,8 @@ func TestNoNonNullAssertedOptionalChainFires(t *testing.T) {
 }
 
 func TestNoNonNullAssertedOptionalChainStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -92,6 +96,8 @@ func TestNoNonNullAssertedOptionalChainStaysSilent(t *testing.T) {
 // neither a catch nor a survival, so this gap stood unmeasured rather than cleared until somebody
 // read the test file and saw only ExpectFindings and ExpectClean in it.
 func TestNoNonNullAssertedOptionalChainSuggestsRemovingTheOperator(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

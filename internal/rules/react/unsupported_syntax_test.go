@@ -34,6 +34,8 @@ const upstreamEvalFixture = `function Component(props) {
 // `with` statement or an inline class declaration inside a component, checked by grepping the
 // full 1,835-input fixture list at the pinned sha rather than only the 453 vendored here.
 func TestUnsupportedSyntaxFiresOnUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
 	rule_testing.ExpectFindings(t, result, "unsupportedEval")
 
@@ -65,6 +67,8 @@ func TestUnsupportedSyntaxFiresOnUpstreamCorpus(t *testing.T) {
 // fixture can cook an escape without anything going red. Reading the bytes removes the
 // transcription step instead of verifying it.
 func TestUnsupportedSyntaxStaysSilentOnUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
 	path := filepath.Join("..", "..", "react_conformance", "testdata", "fixtures", "error.todo-kitchensink.js")
 	sourceBytes, err := os.ReadFile(path)
 	if err != nil {
@@ -85,6 +89,8 @@ func TestUnsupportedSyntaxStaysSilentOnUpstreamCorpus(t *testing.T) {
 // than a prediction from reading the bundle. Three of them contradicted what the source alone
 // suggested, and those are called out at the case.
 func TestUnsupportedSyntaxFires(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -415,6 +421,8 @@ function Component(props: Props) {
 // the entire rule, so most of these assert the gate rather than the diagnostics. Each was run
 // through React's own rule and came back silent.
 func TestUnsupportedSyntaxStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -771,6 +779,8 @@ func TestUnsupportedSyntaxStaysSilent(t *testing.T) {
 // rule whose upstream fixtures were fetched at write time would have nothing to compare against
 // later, which is the argument for the vendoring rather than an incidental convenience of it.
 func TestUnsupportedSyntaxTranscriptionMatchesTheVendoredCorpus(t *testing.T) {
+	t.Parallel()
+
 	path := filepath.Join("..", "..", "react_conformance", "testdata", "fixtures", "error.invalid-eval-unsupported.js")
 	sourceBytes, err := os.ReadFile(path)
 	if err != nil {
@@ -794,6 +804,8 @@ func TestUnsupportedSyntaxTranscriptionMatchesTheVendoredCorpus(t *testing.T) {
 // checker, so both still report under the plain harness, and asserting silence for them would
 // assert the opposite of the truth.
 func TestUnsupportedSyntaxRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	// The control first. Under the typed harness this input reports, which is what makes the
 	// silence below a measurement of the harness rather than of the input.
 	typed := rule_testing.RunTyped(t, UnsupportedSyntax, unsupportedSyntaxFile, upstreamEvalFixture)
@@ -823,6 +835,8 @@ func TestUnsupportedSyntaxRequiresTheTypedHarness(t *testing.T) {
 // carets under `eval`, and running React's rule on the other two reports columns 3 through 18 for
 // `with (props) {}` and 3 through 15 for `class Foo {}`, which are the two spans below.
 func TestUnsupportedSyntaxPointsAtTheRightNode(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name       string
 		sourceText string
@@ -879,6 +893,8 @@ func TestUnsupportedSyntaxPointsAtTheRightNode(t *testing.T) {
 // arms report three DIFFERENT messages: a mutation routing all three to one message would leave
 // every count assertion green while telling a reader the wrong thing about their code.
 func TestUnsupportedSyntaxMessagesAreDistinct(t *testing.T) {
+	t.Parallel()
+
 	if messageUnsupportedEval.Id != "unsupportedEval" {
 		t.Errorf("eval message id is %q", messageUnsupportedEval.Id)
 	}

@@ -9,6 +9,8 @@ import (
 const isNaNFile = "/repository/source/Thing.ts"
 
 func TestUseIsNaNFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -50,6 +52,8 @@ func TestUseIsNaNFires(t *testing.T) {
 // before writing the listener. A NaN comparison reaches the tree as a binary expression and as a
 // switch, and the binary listener alone is silent on the second.
 func TestUseIsNaNFiresOnSwitches(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -83,6 +87,8 @@ func TestUseIsNaNFiresOnSwitches(t *testing.T) {
 
 // The option is read rather than ignored, in both directions.
 func TestUseIsNaNSwitchOption(t *testing.T) {
+	t.Parallel()
+
 	source := "declare const value: number;\nexport function run() {\n    switch(value) {\n        case NaN: return 1;\n    }\n    return 0;\n}\n"
 
 	// Default is on, so a config that says nothing gets the rule rather than half of it.
@@ -98,6 +104,8 @@ func TestUseIsNaNSwitchOption(t *testing.T) {
 }
 
 func TestUseIsNaNStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

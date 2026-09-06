@@ -30,6 +30,8 @@ const didUpdateSetStateFile = "/repository/source/DidUpdate.tsx"
 // The option column is the raw upstream spelling: "" for an absent option, and otherwise the single
 // string upstream passes positionally.
 func TestNoDidUpdateSetStateFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -81,6 +83,8 @@ func TestNoDidUpdateSetStateFires(t *testing.T) {
 // component gate. One is an empty lifecycle body, which is the corpus checking the rule does not
 // fire on the method itself.
 func TestNoDidUpdateSetStateStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -197,6 +201,8 @@ func TestNoDidUpdateSetStateStaysSilent(t *testing.T) {
 // spellings, so the count of things that have to be right here is larger on our side than on
 // upstream's and none of it is visible from the imported corpus.
 func TestNoDidUpdateSetStateFiresOnShapesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -275,6 +281,8 @@ func TestNoDidUpdateSetStateFiresOnShapesUpstreamDoesNotWrite(t *testing.T) {
 // fail rather than pass half of them vacuously. Upstream ships the halves separately, which cannot
 // see a port that hardcodes either mode.
 func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
+	t.Parallel()
+
 	nestedCallback := "\nclass Hello extends React.Component {\n  componentDidUpdate() {\n    someClass.on(function() {\n      this.setState({ data: 123 });\n    });\n  }\n}\n"
 
 	t.Run("silent by default", func(t *testing.T) {
@@ -334,6 +342,8 @@ func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
 // every one of its eighteen diagnostics. A rule reporting the whole call passes every fixture above
 // while pointing at the wrong range, and a rule reporting only `setState` passes them too.
 func TestNoDidUpdateSetStatePointsAtTheCallee(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -376,6 +386,8 @@ func TestNoDidUpdateSetStatePointsAtTheCallee(t *testing.T) {
 // exact defect that shipped from another rule in this tree. There is nothing interpolated into this
 // message, which is precisely why the assertion is cheap enough to have no excuse.
 func TestNoDidUpdateSetStateMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
 		"\nclass Hello extends React.Component {\n  componentDidUpdate() {\n    this.setState({ data: 123 });\n  }\n}\n",
 		NoDidUpdateSetStateOptions{Mode: ""})

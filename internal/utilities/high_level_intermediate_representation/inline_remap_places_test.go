@@ -21,6 +21,8 @@ import "testing"
 // nested function is the control: `CopyNestedBodyInto` promises to copy, and a copy that renames its
 // source has not copied.
 func TestCopyNestedBodyLeavesTheNestedFunctionsPlacesUntouched(t *testing.T) {
+	t.Parallel()
+
 	// The body must hold a value with a SLICE of places -- a method call's arguments here. A
 	// one-level struct copy duplicates a slice header while both headers point at one backing
 	// array, so a body of only single-place values would be copied correctly by a shallow copier

@@ -30,6 +30,8 @@ func decodeThisAliasOptionsForTest(t *testing.T, configuration string) any {
 // as a discrepancy. It is not one: nine inputs report once and the class case reports seven, which
 // the snapshot's own line headers confirm (lines 3, 4, 12, 13, 14, 15 and 16 of that input).
 func TestNoThisAliasFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		sourceText    string
@@ -92,6 +94,8 @@ func TestNoThisAliasFires(t *testing.T) {
 // TestNoThisAliasStaysSilent is the corpus's seven passing inputs plus the cases our own tree makes
 // reachable.
 func TestNoThisAliasStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		sourceText    string
@@ -149,6 +153,8 @@ func TestNoThisAliasStaysSilent(t *testing.T) {
 // `.ts` file and is silent in a `.js` one, so dropping the gate would report every `const self =
 // this` in every JavaScript file in a tree upstream leaves alone.
 func TestNoThisAliasDeclinesJavaScript(t *testing.T) {
+	t.Parallel()
+
 	const source = "const self = this;"
 
 	rule_testing.ExpectFindings(t,
@@ -170,6 +176,8 @@ func TestNoThisAliasDeclinesJavaScript(t *testing.T) {
 // value read back off the rule, so a mutation moving the report site cannot move the assertion with
 // it.
 func TestNoThisAliasPointsAtTheAliasItself(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		sourceText    string
@@ -214,6 +222,8 @@ func TestNoThisAliasPointsAtTheAliasItself(t *testing.T) {
 // because comparing a finding to the constant it was built from is an equality that moves with any
 // mutation of that constant and therefore guards nothing.
 func TestNoThisAliasMessagesSayWhichJudgmentFired(t *testing.T) {
+	t.Parallel()
+
 	identifier := rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile, "const self = this;",
 		NoThisAliasOptions{})
 	if len(identifier.Diagnostics) != 1 {
@@ -242,6 +252,8 @@ func TestNoThisAliasMessagesSayWhichJudgmentFired(t *testing.T) {
 // The inversion and the alias are the two lines in this port with no counterpart upstream, so they
 // get assertions of their own rather than only being exercised through fixtures.
 func TestNoThisAliasDecodeMapsUpstreamSpellings(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name                    string
 		configuration           string

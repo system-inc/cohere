@@ -13,6 +13,8 @@ const pageStateDeclarations = "import React from 'react';\n" +
 	"declare function useReducer(reducer: unknown, initial?: unknown): [unknown, unknown];\n"
 
 func TestNextNoPageStateFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -54,6 +56,8 @@ func TestNextNoPageStateFires(t *testing.T) {
 }
 
 func TestNextNoPageStateStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string

@@ -33,6 +33,8 @@ const globalAssignFile = "/repository/source/GlobalAssign.ts"
 // in a declaration file is a global, a name declared in source is a shadow. That covers every
 // builtin upstream's `GLOBALS_BUILTIN` covers and nothing that depends on an `env`.
 func TestNoGlobalAssignFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -95,6 +97,8 @@ func TestNoGlobalAssignFires(t *testing.T) {
 // every visible clean case and still reports `function f(Object) { Object = 1; }`, which is correct
 // code. The absent test is the hazard here, so it is written below rather than imported.
 func TestNoGlobalAssignStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -152,6 +156,8 @@ func TestNoGlobalAssignStaysSilent(t *testing.T) {
 // `schema: [{ properties: { exceptions: { type: "array", items: { type: "string" } } } }]` in
 // ESLint. Upstream exercises it with one pass case, which is the first below.
 func TestNoGlobalAssignExceptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a listed name is not reported", func(t *testing.T) {
 		// Upstream pass case 3, verbatim source and options.
 		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoGlobalAssign, globalAssignFile,
@@ -189,6 +195,8 @@ func TestNoGlobalAssignExceptions(t *testing.T) {
 // Sliced out of the source with the finding's own range rather than compared against an offset the
 // test computes, since a computed offset is wrong in the same direction as the code that produced it.
 func TestNoGlobalAssignPointsAtTheWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -229,6 +237,8 @@ func TestNoGlobalAssignPointsAtTheWrite(t *testing.T) {
 // points both findings at the same place. `no-class-assign` carries the same guard for the same
 // reason.
 func TestNoGlobalAssignShorthandFindingsHaveDistinctSpans(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoGlobalAssign, globalAssignFile, "({Object = 0, String = 0} = {});")
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
@@ -245,6 +255,8 @@ func TestNoGlobalAssignShorthandFindingsHaveDistinctSpans(t *testing.T) {
 // nothing without one, so under `rule_testing.Run` it goes completely silent: every clean case above
 // would pass vacuously and the whole suite would look green over a rule that reports nothing.
 func TestNoGlobalAssignRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoGlobalAssign.NeedsTypeChecker {
 		t.Fatal("NoGlobalAssign must declare NeedsTypeChecker; without it the checker is nil and " +
 			"the rule reports nothing while every StaysSilent fixture passes vacuously")
@@ -280,6 +292,8 @@ func TestNoGlobalAssignRequiresTheTypedHarness(t *testing.T) {
 // That is the conservative direction: a name this tree cannot prove is a read-only global is left
 // alone. The test below pins that behavior so it is a decision rather than a drift.
 func TestNoGlobalAssignBoundary(t *testing.T) {
+	t.Parallel()
+
 	// Each of these is a name with no declaration anywhere the program can see. Upstream would
 	// report the ones its env tables cover; this port does not, and asserting that keeps the
 	// boundary visible if a globals table ever lands.

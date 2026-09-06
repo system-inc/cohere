@@ -28,6 +28,8 @@ const paginationDecoratorFile = "/repository/source/PaginationDecorator.ts"
 // of that tree rather than a broken instrument: the control said 2310 files linted and 44 findings
 // from other rules, so the run happened and this rule genuinely has nothing to say there.
 func TestPaginationDecoratorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -68,6 +70,8 @@ func TestPaginationDecoratorFires(t *testing.T) {
 // in this package every finding in that file, and both a qualified type name and a member-expression
 // arrow body are property accesses. Each is measured clean against the original rather than assumed.
 func TestPaginationDecoratorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -113,6 +117,8 @@ func TestPaginationDecoratorStaysSilent(t *testing.T) {
 // reporting the whole decorator instead. Measured against the original: it reports column 24 for the
 // literal form and column 26 for the parameter form on the seeded file, which are those two tokens.
 func TestPaginationDecoratorPointsAtTheName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -146,6 +152,8 @@ func TestPaginationDecoratorPointsAtTheName(t *testing.T) {
 // without a list of them existing anywhere. Anchoring matters in both directions: a type merely
 // containing the word is not a paginator, and the base type itself is.
 func TestPaginationDecoratorMatchesTheTypeSuffix(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -179,6 +187,8 @@ func TestPaginationDecoratorMatchesTheTypeSuffix(t *testing.T) {
 // api-phi-health's tsconfig: it reports all three of these at the same columns this port does.
 // `pagination` exactly and a name ending in `Pagination` are the only two accepted spellings.
 func TestPaginationDecoratorAnchorsTheNameSuffix(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -223,6 +233,8 @@ func TestPaginationDecoratorAnchorsTheNameSuffix(t *testing.T) {
 // of it: no ExpectFindings assertion can see a panic. The clean assertion here is what would fail,
 // by taking the whole run down rather than by disagreeing.
 func TestPaginationDecoratorDeclinesAQualifiedTypeName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

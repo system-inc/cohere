@@ -26,6 +26,8 @@ const undefInitFile = "/repository/source/UndefInit.ts"
 // guards and goes completely silent, which would make every clean case below pass for the wrong
 // reason.
 func TestNoUndefInitStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -48,6 +50,8 @@ func TestNoUndefInitStaysSilent(t *testing.T) {
 
 // Every reporting case names one `unnecessaryUndefinedInit`, which is upstream's own count.
 func TestNoUndefInitFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -94,6 +98,8 @@ func TestNoUndefInitFires(t *testing.T) {
 // The definite-assignment case is the same hazard one field over: `!` is a sibling of the name too,
 // and dropping it changes what the compiler will accept.
 func TestNoUndefInitKeepsTheTypeAnnotation(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSource string
@@ -123,6 +129,8 @@ func TestNoUndefInitKeepsTheTypeAnnotation(t *testing.T) {
 // comment after the initializer is also outside it and survives, while a comment between them
 // blocks the fix entirely and appears in the declined list below.
 func TestNoUndefInitFixes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSource string
@@ -161,6 +169,8 @@ func TestNoUndefInitFixes(t *testing.T) {
 // Asserted as "reports, and offers no fix", which is the pair. Asserting only the finding would pass
 // for a rule that fixes all thirteen.
 func TestNoUndefInitDeclinesToFix(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -198,6 +208,8 @@ func TestNoUndefInitDeclinesToFix(t *testing.T) {
 // nothing between the format string and the reader checks it. A verb swapped into the name's slot
 // produces a finding with the right id, the right span and a sentence naming the wrong thing.
 func TestNoUndefInitNamesTheBinding(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoUndefInit, undefInitFile, "let someBinding = undefined;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -219,6 +231,8 @@ func TestNoUndefInitNamesTheBinding(t *testing.T) {
 // finding points. A finding carrying a correct fix while pointing at the wrong span is the failure
 // this closes: the edit lands somewhere the reader was never shown.
 func TestNoUndefInitReportsTheWholeDeclarator(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpan   string
@@ -255,6 +269,8 @@ func TestNoUndefInitReportsTheWholeDeclarator(t *testing.T) {
 // Three shadow shapes, each a different binding kind, and all three confirmed silent on the
 // installed ESLint build. The control is the same file shape with no shadow, which reports.
 func TestNoUndefInitDeclinesAShadowedUndefined(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -295,6 +311,8 @@ func TestNoUndefInitDeclinesAShadowedUndefined(t *testing.T) {
 // The control is the same two-file shape with the declaration written in source instead, which is a
 // real shadow and does suppress it.
 func TestNoUndefInitIgnoresAnAmbientDeclaration(t *testing.T) {
+	t.Parallel()
+
 	reporting := map[string]string{
 		"/repository/source/Ambient.d.ts": "declare var undefined: any;\n",
 		"/repository/source/Use.ts":       "let a = undefined;\n",
@@ -318,6 +336,8 @@ func TestNoUndefInitIgnoresAnAmbientDeclaration(t *testing.T) {
 // silent: every clean case passes vacuously and every reporting case fails in a way that reads as a
 // rule defect rather than as a harness choice.
 func TestNoUndefInitNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoUndefInit.NeedsTypeChecker {
 		t.Fatal("this rule resolves `undefined` through the checker and must declare it")
 	}

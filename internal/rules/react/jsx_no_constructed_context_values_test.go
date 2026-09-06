@@ -32,6 +32,8 @@ const jsxNoConstructedContextValuesFile = "/repository/source/Providers.tsx"
 
 // TestJsxNoConstructedContextValuesFires runs the twenty-three failing cases from upstream.
 func TestJsxNoConstructedContextValuesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -114,6 +116,8 @@ func TestJsxNoConstructedContextValuesFires(t *testing.T) {
 // judgments: the rule does not look through a JSX spread attribute, and it cannot statically check
 // a default parameter value. Reproduced as silence rather than improved on.
 func TestJsxNoConstructedContextValuesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -251,6 +255,8 @@ func TestJsxNoConstructedContextValuesStaysSilent(t *testing.T) {
 // rather than crashing. That is the more dangerous of the two failure modes: a StaysSilent case
 // would pass vacuously under a later revert of the declaration and nothing else here would notice.
 func TestJsxNoConstructedContextValuesRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "const MyContext = createContext();\n" +
 		"function Component() { return <MyContext value={{a: 1}} />; }\n"
 
@@ -284,6 +290,8 @@ func TestJsxNoConstructedContextValuesRequiresTheTypedHarness(t *testing.T) {
 // absence of a gate is pinned instead by there being no filename test anywhere in the rule, which a
 // mutation over the classifier cannot fake.
 func TestJsxNoConstructedContextValuesHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	source := "function Component() { return <Ctx.Provider value={{a: 1}} />; }\n"
 	result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 		"/repository/source/Suffix.tsx", source)
@@ -298,6 +306,8 @@ func TestJsxNoConstructedContextValuesHasNoFileSuffixGate(t *testing.T) {
 // `Context.Provider` almost throughout and never tests an arbitrary receiver, so every row here was
 // measured against the installed build.
 func TestJsxNoConstructedContextValuesProviderShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -368,6 +378,8 @@ func TestJsxNoConstructedContextValuesProviderShapes(t *testing.T) {
 //
 // All three measured silent on the installed build, and none is in the corpus as a distinct case.
 func TestJsxNoConstructedContextValuesValueAttributeShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -404,6 +416,8 @@ func TestJsxNoConstructedContextValuesValueAttributeShapes(t *testing.T) {
 // installed build, including the four silent rows, which are the false positives a wider switch
 // would ship.
 func TestJsxNoConstructedContextValuesConstructionKinds(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		value   string
@@ -468,6 +482,8 @@ func TestJsxNoConstructedContextValuesConstructionKinds(t *testing.T) {
 // it is a variable or a function name. A parameter is what that bail-out is for, and it is the row
 // that separates this from a rule that reports every identifier.
 func TestJsxNoConstructedContextValuesIdentifierFollowing(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		body    string
@@ -502,6 +518,8 @@ func TestJsxNoConstructedContextValuesIdentifierFollowing(t *testing.T) {
 // this rule would report every provider handed a prop, which is the single largest false-positive
 // class available to it.
 func TestJsxNoConstructedContextValuesParameterIsSilent(t *testing.T) {
+	t.Parallel()
+
 	source := "function Component(v: any) { return <Ctx.Provider value={v} />; }\n"
 	result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
 		jsxNoConstructedContextValuesFile, source)
@@ -521,6 +539,8 @@ func TestJsxNoConstructedContextValuesParameterIsSilent(t *testing.T) {
 // function expression's own name over its binding, and it answers a method's name where the class
 // is what decides.
 func TestJsxNoConstructedContextValuesEnclosingComponent(t *testing.T) {
+	t.Parallel()
+
 	const provider = "<Ctx.Provider value={{a: 1}} />"
 	cases := []struct {
 		name       string
@@ -645,6 +665,8 @@ func TestJsxNoConstructedContextValuesEnclosingComponent(t *testing.T) {
 // `RunTyped` writes `strings.TrimSpace(source) + "\n"` to disk, so the expectation is sliced from
 // the same transform rather than from the Go literal, which would be one byte off.
 func TestJsxNoConstructedContextValuesSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -728,6 +750,8 @@ func TestJsxNoConstructedContextValuesSpans(t *testing.T) {
 // Asserted by equality against a literal typed here rather than against the rule's own constants,
 // which would move on both sides under mutation and could not fail.
 func TestJsxNoConstructedContextValuesMessageText(t *testing.T) {
+	t.Parallel()
+
 	t.Run("the default message names the construction line", func(t *testing.T) {
 		source := "function Component() {\n  return <Ctx.Provider value={{a: 1}} />;\n}\n"
 		result := rule_testing.RunTyped(t, JsxNoConstructedContextValues,
@@ -798,6 +822,8 @@ func TestJsxNoConstructedContextValuesMessageText(t *testing.T) {
 // Measured against the installed build: upstream renders line 4 for the construction here, and the
 // port rendered line 2 before the line numbers were routed through TokenRange as well.
 func TestJsxNoConstructedContextValuesLineNumbersSkipTrivia(t *testing.T) {
+	t.Parallel()
+
 	source := "function Component() {\n" +
 		"  // a comment that occupies the line above the construction\n" +
 		"\n" +
@@ -830,6 +856,8 @@ func TestJsxNoConstructedContextValuesLineNumbersSkipTrivia(t *testing.T) {
 // assumed: these fixtures are the measurement. A `var` is used because it is the only binding form
 // that legally redeclares.
 func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		body    string
@@ -886,6 +914,8 @@ func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(t *testing.T) {
 // So the distinguishing input has to split the member access across two lines. Measured against the
 // installed build: it renders line 4, the line the object sits on, not line 5.
 func TestJsxNoConstructedContextValuesMemberUsageIsTheObject(t *testing.T) {
+	t.Parallel()
+
 	source := "function Component() {\n" +
 		"  const o = {a: {b: 1}};\n" +
 		"  return <Ctx.Provider value={\n" +

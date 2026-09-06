@@ -25,6 +25,8 @@ import (
 // The property that actually matters is stated instead: every `ReactiveInstruction` NODE in the
 // tree is reached, counted by an independent walk rather than by the builder.
 func TestReactiveVisitorReachesEveryInstruction(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -79,6 +81,8 @@ func TestReactiveVisitorReachesEveryInstruction(t *testing.T) {
 // then declines to descend. If a non-nil hook recursed anyway, the pass would still compile, still
 // pass a shape test, and quietly do nothing -- so the pruning is asserted directly.
 func TestReactiveVisitorPrunesWhenTraverseIsNotCalled(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`)
 	tree, _ := BuildReactiveFunction(function)
 	if tree == nil {
@@ -148,6 +152,8 @@ func TestReactiveVisitorPrunesWhenTraverseIsNotCalled(t *testing.T) {
 // this package has already paid for that exact omission once: the first spelling of `valueOf`
 // dropped everything but a block's last instruction and cost 27 functions.
 func TestReactiveVisitorSeesSequenceInstructions(t *testing.T) {
+	t.Parallel()
+
 	// A for-of loop's Test and Init are value blocks, which is what produces sequence values here.
 	function, _ := rangesFor(t, `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`)
 	tree, result := BuildReactiveFunction(function)
@@ -185,6 +191,8 @@ func TestReactiveVisitorSeesSequenceInstructions(t *testing.T) {
 // stop holding on code nobody wrote for this test, which is the only thing that would catch a
 // terminal variant no hand-written case happens to produce.
 func TestReactiveVisitorCorpus(t *testing.T) {
+	t.Parallel()
+
 	converted, mismatched, treeInstructions, walkedTotal := 0, 0, 0, 0
 
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {

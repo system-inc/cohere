@@ -24,6 +24,8 @@ func noUnnecessaryTemplateExpressionCaseName(index int) string {
 // Measured one file per program against the installed 8.67.0 build, using upstream's own fixture
 // compilerOptions verbatim. All sixty seven are clean.
 func TestNoUnnecessaryTemplateExpressionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"const string = 'a';\n",
 		"const string = `a`;\n",
@@ -113,6 +115,8 @@ func TestNoUnnecessaryTemplateExpressionStaysSilent(t *testing.T) {
 // column-to-offset conversion counting characters ran the span four bytes long. Fixed in the
 // extractor; the row below holds the corrected span.
 func TestNoUnnecessaryTemplateExpressionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpans  []string
@@ -637,6 +641,8 @@ func TestNoUnnecessaryTemplateExpressionFires(t *testing.T) {
 // Four cases propose edits that overlap within one pass and are excluded, listed in the constant
 // below rather than silently dropped. They are covered for detection by the firing test above.
 func TestNoUnnecessaryTemplateExpressionFixes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantFixed  string

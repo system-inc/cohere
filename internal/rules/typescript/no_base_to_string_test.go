@@ -64,6 +64,8 @@ func runNoBaseToString(t *testing.T, sourceText string, options string) rule_tes
 // is declared somewhere other than on Object itself. Every one of those steps has a passing case
 // here that a wrong answer would turn into a false positive on ordinary code.
 func TestNoBaseToStringStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -311,6 +313,8 @@ func TestNoBaseToStringStaysSilentOnUpstreamPassCases(t *testing.T) {
 // Both ids are represented, seventy-seven for a plain stringification and seventeen for an array
 // join, because joining an array of objects has the same defect through a different door.
 func TestNoBaseToStringFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		options      string
@@ -1015,6 +1019,8 @@ func TestNoBaseToStringFiresOnUpstreamFailCases(t *testing.T) {
 //
 // Measured against the installed 8.x build, one program per case, with controls in the same runs.
 func TestNoBaseToStringOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -1064,6 +1070,8 @@ func TestNoBaseToStringOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
 // checker rather than panicking, so a rule missing those guards goes silent rather than crashing. A
 // vacuous green is the more dangerous of the two failures because nothing announces it.
 func TestNoBaseToStringRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "declare const o: {};\n`${o}`;\n"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoBaseToString, noBaseToStringFile, sourceText))
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoBaseToString, noBaseToStringFile,
@@ -1078,6 +1086,8 @@ func TestNoBaseToStringRequiresTheTypedHarness(t *testing.T) {
 // explicitly empty list means the opposite and must be honored, which is why the wire field is a
 // pointer: absent and empty are different configurations here.
 func TestNoBaseToStringDecoderKeepsTheBuiltinIgnoredNames(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		raw              string
 		wantCheckUnknown bool
@@ -1124,6 +1134,8 @@ func TestNoBaseToStringDecoderKeepsTheBuiltinIgnoredNames(t *testing.T) {
 // satisfy, so the fallback is the only thing between that configuration and an empty ignored list.
 // Every other fixture reaches the rule through the decoder and none can see this line.
 func TestNoBaseToStringFallsBackWhenHandedNilOptions(t *testing.T) {
+	t.Parallel()
+
 	// An Error is ignored by default, so a fallback that lost the builtin names would report here.
 	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoBaseToString,
 		noBaseToStringFile, "declare const e: Error;\n`${e}`;\n", nil))

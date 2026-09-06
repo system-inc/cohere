@@ -43,6 +43,8 @@ const willUpdateSetStateFile = "/repository/source/WillUpdate.tsx"
 // actually produce, and the reasoning is here so the next reader does not delete the case or break
 // the rule to green it.
 func TestNoWillUpdateSetStateFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -154,6 +156,8 @@ func TestNoWillUpdateSetStateFires(t *testing.T) {
 // upstream does not, the two neighbouring lifecycle names, four callee shapes, the absence of any
 // call-graph analysis, both parenthesized forms, and a tagged template.
 func TestNoWillUpdateSetStateStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -258,6 +262,8 @@ func TestNoWillUpdateSetStateStaysSilent(t *testing.T) {
 // weaker than the property it guards is not a guard: a doubled or truncated rendering contains the
 // needle and stays green.
 func TestNoWillUpdateSetStateReportsAtTheCallee(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -305,6 +311,8 @@ func TestNoWillUpdateSetStateReportsAtTheCallee(t *testing.T) {
 // fixture using `RunWithOptions` stays green. This asserts the plain harness works, which is the
 // shape the linter actually runs in for a rule configured with a bare severity.
 func TestNoWillUpdateSetStateDefaultsToAllowingNestedFunctions(t *testing.T) {
+	t.Parallel()
+
 	const callbackSource = "class Hello extends React.Component {\n" +
 		"  componentWillUpdate() { on(function() { this.setState({}); }); }\n}\n"
 
@@ -332,6 +340,8 @@ func TestNoWillUpdateSetStateDefaultsToAllowingNestedFunctions(t *testing.T) {
 // `ExpectFindings` takes one id per finding and the table asserts exactly one. Measured on the
 // release binary, which prints two diagnostics for this source at two different columns.
 func TestNoWillUpdateSetStateReportsEachCallSite(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoWillUpdateSetState, willUpdateSetStateFile,
 		"class Hello extends React.Component {\n"+
 			"  componentWillUpdate() { this.setState({}); this.setState({}); }\n}\n")

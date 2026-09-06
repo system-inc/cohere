@@ -9,6 +9,8 @@ import "testing"
 // it -- and dropping it breaks the caching of `b`, which does escape, because `a` is one of its
 // inputs. The four-level lattice exists for exactly this.
 func TestComputeMemoizedWalksFromEscapingRoots(t *testing.T) {
+	t.Parallel()
+
 	graph := NewMemoizationGraph()
 
 	// c = [b] escapes; b = [] feeds it; a = [props.a] feeds nothing that escapes.
@@ -38,6 +40,8 @@ func TestComputeMemoizedWalksFromEscapingRoots(t *testing.T) {
 // dependency of the scope must be too -- otherwise the scope invalidates more often than necessary
 // and breaks the memoization downstream of it. Upstream's second worked example.
 func TestComputeMemoizedForcesScopeDependencies(t *testing.T) {
+	t.Parallel()
+
 	graph := NewMemoizationGraph()
 
 	// Scope 1 depends on declaration 10. Declaration 2 belongs to it and escapes.
@@ -73,6 +77,8 @@ func TestComputeMemoizedForcesScopeDependencies(t *testing.T) {
 // One escaping root depending on one value, varying only that value's level. A two-state model
 // cannot produce these four answers.
 func TestComputeMemoizedRespectsTheLevels(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name  string
 		level MemoizationLevel
@@ -117,6 +123,8 @@ func TestComputeMemoizedRespectsTheLevels(t *testing.T) {
 // for a node already on the stack, which is a temporary lie corrected on the way back up -- so the
 // test asserts both that it terminates and that the answer is still right.
 func TestComputeMemoizedTerminatesOnCycles(t *testing.T) {
+	t.Parallel()
+
 	graph := NewMemoizationGraph()
 	// 1 -> 2 -> 3 -> 1, with 1 escaping and 3 memoized.
 	graph.Record(1, MemoizationConditional, []DeclarationId{2})
@@ -140,6 +148,8 @@ func TestComputeMemoizedTerminatesOnCycles(t *testing.T) {
 // the first walk's leftovers if they were not cleared. That would make the pass order-dependent in a
 // way no single-run test can see.
 func TestComputeMemoizedIsRepeatable(t *testing.T) {
+	t.Parallel()
+
 	graph := NewMemoizationGraph()
 	graph.Record(1, MemoizationMemoized, []DeclarationId{2})
 	graph.Record(2, MemoizationConditional, nil)
@@ -168,6 +178,8 @@ func TestComputeMemoizedIsRepeatable(t *testing.T) {
 // would hold a value nothing recorded anything about. False costs granularity; true would be a
 // claim the graph does not support.
 func TestComputeMemoizedHandlesUnknownDeclarations(t *testing.T) {
+	t.Parallel()
+
 	graph := NewMemoizationGraph()
 	graph.Record(1, MemoizationConditional, []DeclarationId{99})
 	graph.MarkEscaping(1)
@@ -199,6 +211,8 @@ func TestComputeMemoizedHandlesUnknownDeclarations(t *testing.T) {
 // second, because assigning a stronger level over a weaker one happens to agree with joining. So
 // both orders are checked and the answer must be the same.
 func TestRecordJoinsRatherThanAssigns(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		levels []MemoizationLevel

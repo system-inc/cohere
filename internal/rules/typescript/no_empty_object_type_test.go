@@ -13,6 +13,8 @@ const emptyObjectFile = "/repository/source/Thing.ts"
 // have been invented here.
 
 func TestNoEmptyObjectTypeFiresOnInterfaces(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -33,6 +35,8 @@ func TestNoEmptyObjectTypeFiresOnInterfaces(t *testing.T) {
 }
 
 func TestNoEmptyObjectTypeFiresOnObjectTypes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -56,6 +60,8 @@ func TestNoEmptyObjectTypeFiresOnObjectTypes(t *testing.T) {
 // that applied one unattended would be changing the type rather than repairing a spelling. Asserting
 // the count is what keeps a later change from quietly collapsing them into one automatic fix.
 func TestNoEmptyObjectTypeOffersTwoSuggestions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, "export let value: {};\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -93,6 +99,8 @@ func TestNoEmptyObjectTypeOffersTwoSuggestions(t *testing.T) {
 }
 
 func TestNoEmptyObjectTypeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

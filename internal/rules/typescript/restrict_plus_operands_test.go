@@ -39,6 +39,8 @@ func restrictPlusOperandsBool(value bool) *bool { return &value }
 
 // TestRestrictPlusOperandsStaysSilent is upstream's valid list, each under its own options.
 func TestRestrictPlusOperandsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -117,6 +119,8 @@ func TestRestrictPlusOperandsStaysSilent(t *testing.T) {
 // the two passes: an expression whose operands are each individually impossible reports both operands
 // and never the pair, because the pair pass is gated on the first pass having found nothing.
 func TestRestrictPlusOperandsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -202,6 +206,8 @@ func TestRestrictPlusOperandsFires(t *testing.T) {
 // The expectations are the strings the INSTALLED rule produced for these inputs, which were
 // themselves checked against upstream's recorded `data` for all 56 findings that carry it.
 func TestRestrictPlusOperandsMessages(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -288,6 +294,8 @@ func TestRestrictPlusOperandsMessages(t *testing.T) {
 // The expected text is sliced from upstream's recorded columns, then compared against the text our
 // finding actually covers.
 func TestRestrictPlusOperandsSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -335,6 +343,8 @@ func TestRestrictPlusOperandsSpans(t *testing.T) {
 //   - an explicit `false` is distinguishable from an absent key, which is why the fields are *bool
 //   - a rule configured as a bare "error", which arrives as NIL options, gets the defaults
 func TestRestrictPlusOperandsDecoder(t *testing.T) {
+	t.Parallel()
+
 	decode := func(t *testing.T, raw string) restrictPlusOperandsSettings {
 		t.Helper()
 		decoded, err := rule.DecodeOptionsInto[RestrictPlusOperandsOptions]()(json.RawMessage(raw))
@@ -395,6 +405,8 @@ func TestRestrictPlusOperandsDecoder(t *testing.T) {
 // The plural rendering also pins the ORDER, which is upstream's and is not alphabetical: `null` and
 // `undefined` are both gated on allowNullish and sit on either side of `RegExp`.
 func TestRestrictPlusOperandsStringLikeRenderings(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		settings restrictPlusOperandsSettings
@@ -433,6 +445,8 @@ func TestRestrictPlusOperandsStringLikeRenderings(t *testing.T) {
 // TestRestrictPlusOperandsRequiresTheTypedHarness asserts the rule declares the checker and that the
 // plain harness cannot prove it, so a later revert to rule_testing.Run fails loudly.
 func TestRestrictPlusOperandsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !RestrictPlusOperands.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
@@ -451,6 +465,8 @@ func TestRestrictPlusOperandsRequiresTheTypedHarness(t *testing.T) {
 // most. The shapes are deliberately malformed, because error recovery synthesizes nodes that
 // well-formed source never produces.
 func TestRestrictPlusOperandsSurvivesMalformedExpressions(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		"const x = 1 + ;\n",
 		"const x =  + 1;\n",
@@ -500,6 +516,8 @@ func TestRestrictPlusOperandsSurvivesMalformedExpressions(t *testing.T) {
 //
 // The non-distinguishing row is kept below as the control that makes that visible.
 func TestRestrictPlusOperandsIndividualComplaintSuppressesThePair(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an impossible operand suppresses the bigint pair complaint", func(t *testing.T) {
 		result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile,
 			"declare const a: number | {};\nconst x = a + 1n;", nil)

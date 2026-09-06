@@ -80,6 +80,8 @@ var noUnusedVarsUpstreamJsxReports = []string{
 // was the opposite direction: the factory import exemption, which has its own fixture and which
 // these cases would not have caught.
 func TestNoUnusedVarsStaysSilentOnUpstreamJsxCleanCases(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range noUnusedVarsUpstreamJsxClean {
 		result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", source)
 		if len(result.Diagnostics) != 0 {
@@ -93,6 +95,8 @@ func TestNoUnusedVarsStaysSilentOnUpstreamJsxCleanCases(t *testing.T) {
 // An exact zero-silence assertion rather than a count with a gap list, because there are no gaps
 // here: 17 of 17 report. If that ever stops being true this fails and names the case.
 func TestNoUnusedVarsFiresOnUpstreamJsxReportingCases(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range noUnusedVarsUpstreamJsxReports {
 		result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", source)
 		if len(result.Diagnostics) == 0 {
@@ -108,6 +112,8 @@ func TestNoUnusedVarsFiresOnUpstreamJsxReportingCases(t *testing.T) {
 // a file containing markup. Nothing in the 51 JSX corpus cases covers that shape, so a change that
 // re-opened it would pass every case above.
 func TestNoUnusedVarsJsxDoesNotReopenTheFactoryExemption(t *testing.T) {
+	t.Parallel()
+
 	const source = "import React from 'react';\nexport const A = () => <div />;\n"
 	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", source); len(result.Diagnostics) != 0 {
 		t.Errorf("the JSX factory import must stay exempt; got %d findings", len(result.Diagnostics))

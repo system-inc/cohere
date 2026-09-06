@@ -29,6 +29,8 @@ const objectConstructorFile = "/repository/source/ObjectConstructor.ts"
 // clean upstream for a reason that is not about the rule. It is recorded here rather than silently
 // dropped.
 func TestNoObjectConstructorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		suggestionId string
@@ -132,6 +134,8 @@ func TestNoObjectConstructorFires(t *testing.T) {
 // Object" and is upstream's own reading. The last two are a shadowed `Object`, in a parameter and in
 // a `var`.
 func TestNoObjectConstructorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -157,12 +161,16 @@ func TestNoObjectConstructorStaysSilent(t *testing.T) {
 // reports nothing. Every other rule in this batch skips parentheses, so this is written down rather
 // than left for the next reader to "fix".
 func TestNoObjectConstructorDeclinesAParenthesizedCallee(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
 		"(Object)();"))
 }
 
 // The typed harness is required, and a revert to the plain one must fail loudly.
 func TestNoObjectConstructorNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = "Object();"
 
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
@@ -177,6 +185,8 @@ func TestNoObjectConstructorNeedsTheTypedHarness(t *testing.T) {
 
 // The message, asserted against literals typed here rather than the rule's own constants.
 func TestNoObjectConstructorReportsWhyItMatters(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile, "Object();")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
@@ -197,6 +207,8 @@ func TestNoObjectConstructorReportsWhyItMatters(t *testing.T) {
 // Asserted as silence so that a later change making it report fails loudly and gets re-argued,
 // rather than sliding in as an improvement nobody measured.
 func TestNoObjectConstructorDeclinesInsideAWithBlock(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
 		"with (obj) Object();"))
 }
@@ -212,6 +224,8 @@ func TestNoObjectConstructorDeclinesInsideAWithBlock(t *testing.T) {
 // the two readings most clearly: `const obj = Object?.();` reports columns 13 through 23, which
 // covers `Object?.()` and not the six characters of the callee.
 func TestNoObjectConstructorReportsTheWholeCall(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantPos    int

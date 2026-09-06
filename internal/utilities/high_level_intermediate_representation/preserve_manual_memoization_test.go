@@ -15,6 +15,8 @@ import (
 // pass that produced zero of them until recently, so a silent run is the expected shape of a broken
 // setup rather than of a clean program.
 func TestValidatePreservedManualMemoizationFiresAndStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{1: 7}}
 
 	// The value's scope did not survive: it is memoized in source and not in output.
@@ -48,6 +50,8 @@ func TestValidatePreservedManualMemoizationFiresAndStaysSilent(t *testing.T) {
 // singleton scope, so its intermediate `.x` store is not a dependency and the written `.x.y` path
 // remains valid.
 func TestConditionalOptionalArgumentPreservesManualMemoization(t *testing.T) {
+	t.Parallel()
+
 	t.Run("matching dependency", func(t *testing.T) {
 		findings, lowered := findingsForSource(t, `
 			// @validatePreserveExistingMemoizationGuarantees
@@ -102,6 +106,8 @@ func TestConditionalOptionalArgumentPreservesManualMemoization(t *testing.T) {
 // own id would report every value that was in an absorbed scope -- a false positive on exactly the
 // programs the merge improved.
 func TestValidatePreservedManualMemoizationAcceptsAMergedScope(t *testing.T) {
+	t.Parallel()
+
 	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{1: 8}}
 
 	// Scope 9 survived and absorbed scope 8, which is where the value lives.
@@ -135,6 +141,8 @@ func TestValidatePreservedManualMemoizationAcceptsAMergedScope(t *testing.T) {
 // block, and the outer block's own finish is then dropped as unopened -- so its value is never
 // checked and a real lost memoization goes unreported.
 func TestValidatePreservedManualMemoizationPairsMarkersById(t *testing.T) {
+	t.Parallel()
+
 	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{
 		1: 7, // outer value, scope did not survive
 		2: 8, // inner value, scope did not survive
@@ -161,6 +169,8 @@ func TestValidatePreservedManualMemoizationPairsMarkersById(t *testing.T) {
 // matching start belongs to a block whose dependencies were invalid, which upstream records no state
 // for -- validating it would report against a block that was never opened.
 func TestValidatePreservedManualMemoizationSkipsPrunedAndUnopened(t *testing.T) {
+	t.Parallel()
+
 	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{1: 7}}
 
 	pruned := &ReactiveFunction{Body: ReactiveBlock{
@@ -185,6 +195,8 @@ func TestValidatePreservedManualMemoizationSkipsPrunedAndUnopened(t *testing.T) 
 // non-allocating value. Those need no memoization, so a rule reporting them would fire on every
 // `useMemo` returning a number.
 func TestValidatePreservedManualMemoizationIgnoresUnscopedValues(t *testing.T) {
+	t.Parallel()
+
 	// No entry for identifier 1, so ScopeOf answers zero.
 	scopes := &ReactiveScopes{byIdentifier: map[IdentifierId]ScopeId{}}
 
@@ -220,6 +232,8 @@ func memoStatement(order EvaluationOrder, value InstructionValue) ReactiveStatem
 // no caller and no test is the shape this package keeps finding declared and never constructed. What
 // is asserted is the state of the INPUT, since that is what the decision rests on.
 func TestInferredDependencyComparisonIsBuiltAndGatedOnTruncation(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 		import {useMemo} from 'react';
 		import {sum} from 'shared-runtime';

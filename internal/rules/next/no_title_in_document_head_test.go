@@ -19,6 +19,8 @@ const (
 )
 
 func TestNoTitleInDocumentHeadReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -95,6 +97,8 @@ func TestNoTitleInDocumentHeadReports(t *testing.T) {
 }
 
 func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -221,6 +225,8 @@ func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
 // assertion cannot see where a finding lands, and pointing at the title instead would satisfy every
 // case above.
 func TestNoTitleInDocumentHeadPointsAtTheTagName(t *testing.T) {
+	t.Parallel()
+
 	source := "import { Head as PageHead } from \"next/document\";\nexport const C = () => <PageHead><title>x</title></PageHead>;"
 
 	result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", source)
@@ -236,6 +242,8 @@ func TestNoTitleInDocumentHeadPointsAtTheTagName(t *testing.T) {
 // The message is asserted whole rather than by substring, because a substring predicate is weaker
 // than the property it guards and has gone green over a wrong message in this tree before.
 func TestNoTitleInDocumentHeadMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", upstreamFail)
 	rule_testing.ExpectFindings(t, result, messageNoTitleInDocumentHead.Id)
 

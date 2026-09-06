@@ -50,6 +50,8 @@ func htmlLinkSource(element string) string {
 }
 
 func TestNoHtmlLinkForPagesReportsTheUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
 	for _, element := range upstreamFailCases {
 		t.Run(element, func(t *testing.T) {
 			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(element))
@@ -59,6 +61,8 @@ func TestNoHtmlLinkForPagesReportsTheUpstreamCorpus(t *testing.T) {
 }
 
 func TestNoHtmlLinkForPagesIsSilentOnTheUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
 	for _, element := range upstreamPassCases {
 		t.Run(element, func(t *testing.T) {
 			result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(element))
@@ -69,6 +73,8 @@ func TestNoHtmlLinkForPagesIsSilentOnTheUpstreamCorpus(t *testing.T) {
 
 // Cases upstream does not write, each from reading our code rather than from a neighbouring rule.
 func TestNoHtmlLinkForPagesReportsCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		element string
@@ -132,6 +138,8 @@ func TestNoHtmlLinkForPagesReportsCasesUpstreamDoesNotWrite(t *testing.T) {
 }
 
 func TestNoHtmlLinkForPagesIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		element string
@@ -205,6 +213,8 @@ func TestNoHtmlLinkForPagesIsSilentOnCasesUpstreamDoesNotWrite(t *testing.T) {
 // snapshot underlines: `<a href='/about'>` is seventeen characters and the snapshot's label is
 // seventeen wide. A rule reporting the JsxElement instead would pass every assertion above.
 func TestNoHtmlLinkForPagesPointsAtTheOpeningElement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		element  string
@@ -246,6 +256,8 @@ func TestNoHtmlLinkForPagesPointsAtTheOpeningElement(t *testing.T) {
 // different raw elements through the same shape, and a report site handed the wrong message value
 // satisfies an identifier assertion whenever the two identifiers happen to match.
 func TestNoHtmlLinkForPagesCarriesItsOwnMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoHtmlLinkForPages, "pages/Index.tsx", htmlLinkSource(`<a href='/about'>About</a>`))
 	rule_testing.ExpectFindings(t, result, messageNoHtmlLinkForPages.Id)
 

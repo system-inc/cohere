@@ -16,6 +16,8 @@ import (
 // carrying them are omitted rather than recorded as clean, because recording them as clean would
 // assert the opposite of upstream.
 func TestRulesOfHooksStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -697,6 +699,8 @@ func TestRulesOfHooksStaysSilent(t *testing.T) {
 }
 
 func TestRulesOfHooksFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -1303,6 +1307,8 @@ func TestRulesOfHooksFires(t *testing.T) {
 // then confirmed against `call.callee.span()` in `function_error` versus `call.span` elsewhere. A
 // port that pointed at the call in every arm passes the whole 150-case fixture set above.
 func TestRulesOfHooksSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -1385,6 +1391,8 @@ func TestRulesOfHooksSpans(t *testing.T) {
 // the guard is an equality check on the id and a prefix check on the sentence a reader sees. Both
 // literals are typed here rather than read off the rule.
 func TestRulesOfHooksMessages(t *testing.T) {
+	t.Parallel()
+
 	pairs := []struct {
 		id         string
 		startsWith string
@@ -1417,6 +1425,8 @@ func TestRulesOfHooksMessages(t *testing.T) {
 // Each case says which reading produced it, because a case invented from the same belief as the code
 // tests nothing.
 func TestRulesOfHooksBeyondTheCorpus(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

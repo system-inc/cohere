@@ -10,6 +10,8 @@ import (
 const ambiguousFile = "/repository/source/Thing.tsx"
 
 func TestConsistencyNoAmbiguousIdentifierFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -32,6 +34,8 @@ func TestConsistencyNoAmbiguousIdentifierFires(t *testing.T) {
 }
 
 func TestConsistencyNoAmbiguousIdentifierStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	// The exemptions are the rule. Without them it fires on conventional spellings and on names
 	// somebody else chose, which is how a naming rule gets switched off.
 	cases := []struct {
@@ -72,6 +76,8 @@ func TestConsistencyNoAmbiguousIdentifierStaysSilent(t *testing.T) {
 // The whole point of the `e` message is saying which of the two things it thinks this is, so a
 // reader can disagree with the reasoning rather than only the verdict.
 func TestConsistencyNoAmbiguousIdentifierInfersContext(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -103,6 +109,8 @@ func TestConsistencyNoAmbiguousIdentifierInfersContext(t *testing.T) {
 // No fix, deliberately. Renaming a binding without following its references through scope would
 // leave every other use pointing at a name that no longer exists.
 func TestConsistencyNoAmbiguousIdentifierProposesNoFix(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, ambiguousFile,
 		"try {\n    run();\n} catch (e) {\n    report(e);\n}\n")
 	for _, diagnostic := range result.Diagnostics {
@@ -124,6 +132,8 @@ func TestConsistencyNoAmbiguousIdentifierProposesNoFix(t *testing.T) {
 // The binding position is written without a use site on purpose. A reference to an imported name is
 // a different question, and including one would make these cases measure that instead.
 func TestConsistencyNoAmbiguousIdentifierForeignNames(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -162,6 +172,8 @@ func TestConsistencyNoAmbiguousIdentifierForeignNames(t *testing.T) {
 // it and records a named production defect as its evidence: a class declared `maximumBackoff` while
 // reading `this.maximumBackoff`. This rule exempted it, and now does not.
 func TestConsistencyNoAmbiguousIdentifierJudgesThisProperty(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "class C { e = 1; m() { return this.e; } }"
 	result := rule_testing.Run(t, ConsistencyNoAmbiguousIdentifier, "p.ts", sourceText)
 	reads := 0

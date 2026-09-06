@@ -100,6 +100,8 @@ const multipleReturnIifeSource = `
 //   - A rewritten return jumps somewhere other than the continuation, so the code after the call
 //     never runs on that path.
 func TestInlineRemovesTheCallAndEveryReturnOfTheInlinedBody(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -213,6 +215,8 @@ func TestInlineRemovesTheCallAndEveryReturnOfTheInlinedBody(t *testing.T) {
 // misses every named binding in the function. The visitor already reports the role, so the fix is
 // to read it rather than to loosen the assertion.
 func TestInlineDefinesTheCallResultOnEveryPathToTheContinuation(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -331,6 +335,8 @@ func TestInlineDefinesTheCallResultOnEveryPathToTheContinuation(t *testing.T) {
 // names a block by id. A wrong id here is not a crash: `Block` returns false and most passes skip,
 // so the function analyses as if the edge were not there.
 func TestInlineLeavesEveryBlockReferenceResolvable(t *testing.T) {
+	t.Parallel()
+
 	function, inlined := inlinedFixture(t, multipleReturnIifeSource, false)
 	if function == nil || inlined != 1 {
 		t.Fatalf("the fixture spliced %d calls, want 1", inlined)
@@ -363,6 +369,8 @@ func TestInlineLeavesEveryBlockReferenceResolvable(t *testing.T) {
 // escaping function value would be called somewhere the body no longer exists, and a named binding
 // can be read again after the call.
 func TestInlineDeclinesTheCasesItCannotExpress(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -429,6 +437,8 @@ func TestInlineDeclinesTheCasesItCannotExpress(t *testing.T) {
 // The fixture holds BOTH a real IIFE and a `useMemo`, which is what makes the assertion sharp: a
 // guard that declined everything would also pass a fixture with only the memo in it.
 func TestInlineDeclinesADroppedMemoCallback(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 		function Component(properties: {items: Array<number>}) {
 			const built = (() => {
@@ -483,6 +493,8 @@ func TestInlineDeclinesADroppedMemoCallback(t *testing.T) {
 // rewritten zero-argument memo call after its join. Upstream's candidate table is function-wide,
 // so the intervening block boundary does not stop the callback from being recognised as an IIFE.
 func TestInlineFindsAMemoCallbackAcrossBlocks(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 		function Component(arg: {items?: Array<number>}) {
 			const value = useMemo(() => {
@@ -543,6 +555,8 @@ func TestInlineFindsAMemoCallbackAcrossBlocks(t *testing.T) {
 // A pass that re-splices its own output would copy the body again on every call, and the pipeline
 // calls this once per function per rule invocation.
 func TestInlineIsIdempotent(t *testing.T) {
+	t.Parallel()
+
 	function, inlined := inlinedFixture(t, multipleReturnIifeSource, false)
 	if function == nil || inlined != 1 {
 		t.Fatalf("the fixture spliced %d calls, want 1", inlined)
@@ -576,6 +590,8 @@ func TestInlineIsIdempotent(t *testing.T) {
 var memoInclusiveCall = regexp.MustCompile(`inlineInvokedFunctions\([^,)]*,\s*true\s*\)`)
 
 func TestMemoInclusiveInliningCallSitesAreReviewed(t *testing.T) {
+	t.Parallel()
+
 	// The call sites that are known and reviewed. `cache.go` computes no reactive scope. Production
 	// and the three structural probes all use the complete prefix documented above.
 	knownCallSites := map[string]bool{
@@ -649,6 +665,8 @@ func TestMemoInclusiveInliningCallSitesAreReviewed(t *testing.T) {
 // sat directly above it and was pruned along with the two `PropertyLoad`s feeding it. Upstream keeps
 // all three at its own `DeadCodeElimination` stage.
 func TestInlineStoresTheValueEachReturnProduces(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 	declare function mutate(v: unknown): void;
 	function Component(properties: {flag: boolean; a: {b: number}}) {

@@ -144,6 +144,8 @@ func countScopeStages(function *Function, checker *shimchecker.Checker) scopeSta
 //     Scoring these inflates the gap from +17 to +44 while saying nothing about correspondence,
 //     since any scope we produce is over-production by construction.
 func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
+	t.Parallel()
+
 	fixtures, err := react_conformance.Load("../../react_conformance/testdata/fixtures")
 	if err != nil {
 		t.Fatalf("loading the vendored corpus: %v", err)

@@ -38,6 +38,8 @@ func decodedPromiseExecutorOptions(t *testing.T, raw string) any {
 // global-return surface this harness does not have; they are recorded in
 // `TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress` rather than deleted or greened.
 func TestNoPromiseExecutorReturnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -118,6 +120,8 @@ func TestNoPromiseExecutorReturnStaysSilent(t *testing.T) {
 // which happens for an unnamed function or class body that braces would make invalid syntax.
 // Both arrive here as a zero-length want, and the distinction is recorded in the rule.
 func TestNoPromiseExecutorReturnFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		options     string
@@ -215,6 +219,8 @@ func TestNoPromiseExecutorReturnFires(t *testing.T) {
 // the braces sit outside the parentheses the span excludes. One node, two answers, and only a
 // span assertion beside a suggestion-output assertion records which is which.
 func TestNoPromiseExecutorReturnSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		options      string
@@ -265,6 +271,8 @@ func TestNoPromiseExecutorReturnSpans(t *testing.T) {
 // rule would turn them into facts about the rule. What IS asserted here is the part that does not
 // depend on the missing surface: each input reaches the rule and the rule does not crash on it.
 func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		reason     string
@@ -293,6 +301,8 @@ func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(t *testing.T) {
 // zero value happens to be right, and the fallback is written out anyway so a later default change
 // cannot invert the rule silently.
 func TestDecodeNoPromiseExecutorReturnOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -325,6 +335,8 @@ func TestDecodeNoPromiseExecutorReturnOptions(t *testing.T) {
 // A rule configured as bare "error" reaches Run with nil rather than with an options struct. No
 // fixture routed through the decoder can see that path.
 func TestNoPromiseExecutorReturnWithNilOptionsDefaultsToDisallowingVoid(t *testing.T) {
+	t.Parallel()
+
 	// Under the default, `return void 0` still reports: allowVoid is what exempts it.
 	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn,
 		promiseExecutorFile, "new Promise(() => { return void 1; })", nil), "returnsValue")
@@ -336,6 +348,8 @@ func TestNoPromiseExecutorReturnWithNilOptionsDefaultsToDisallowingVoid(t *testi
 // makes it go completely silent. That is the more dangerous of the two failure modes, because
 // every clean case would then pass vacuously.
 func TestNoPromiseExecutorReturnRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	// Both listeners, because they guard separately and a test covering only one leaves the other's
 	// guard unmeasured. A mutation removing the arrow listener's guard survived a version of this
 	// test that only used a `return` statement.
@@ -357,6 +371,8 @@ func TestNoPromiseExecutorReturnRequiresTheTypedHarness(t *testing.T) {
 // constant, because comparing a diagnostic to the constant it was built from moves both sides
 // together under mutation and asserts nothing.
 func TestNoPromiseExecutorReturnMessages(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedWithOptions(t, NoPromiseExecutorReturn, promiseExecutorFile,
 		"new Promise(r => 1)", decodedPromiseExecutorOptions(t, `{"allowVoid": true}`))
 	if len(result.Diagnostics) != 1 {
@@ -385,6 +401,8 @@ func TestNoPromiseExecutorReturnMessages(t *testing.T) {
 //
 // Every `output` here is upstream's own, extracted from its corpus rather than retyped.
 func TestNoPromiseExecutorReturnSuggestionOutputs(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -502,6 +520,8 @@ func applySuggestion(t *testing.T, source string, suggestion rule.Suggestion) st
 //
 // All five measured clean against the installed eslint at 10.8.1.
 func TestNoPromiseExecutorReturnStaysSilentOnOtherGlobalConstructors(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"new Array(function (resolve, reject) { return 1; });",
 		"new Map(function (resolve, reject) { return 1; });",

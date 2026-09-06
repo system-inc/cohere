@@ -38,6 +38,8 @@ func decodeBanTsCommentOptions(t *testing.T, configuration string) any {
 // shell or a keyboard on the way here. Every one was additionally run through the release binary,
 // which reported nothing on all fifty.
 func TestBanTsCommentStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -109,6 +111,8 @@ func TestBanTsCommentStaysSilentOnUpstreamPassCases(t *testing.T) {
 // case was run through the release binary and the arm it took was read off the output, which is
 // what separates the four arms this rule can reach.
 func TestBanTsCommentFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -183,6 +187,8 @@ func TestBanTsCommentFiresOnUpstreamFailCases(t *testing.T) {
 // Each expected span below is the text the RELEASE BINARY's own label covers, read out of its
 // JSON reporter, so this pins the port against upstream rather than against itself.
 func TestBanTsCommentPointsAtTheCommentInterior(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -278,6 +284,8 @@ func banTsCommentCaseName(index int) string {
 // which produced `// @ts-expect-error see other @ts-expect-error` rather than rewriting only the
 // directive at the front.
 func TestBanTsCommentRewritesEveryIgnoreInTheComment(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSource string
@@ -305,6 +313,8 @@ func TestBanTsCommentRewritesEveryIgnoreInTheComment(t *testing.T) {
 // rewrite on the other arms would delete a directive the author still needs, and the fix engine
 // applies unattended, so this is asserted rather than left to the reader.
 func TestBanTsCommentOnlyIgnoreCarriesAFix(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -339,6 +349,8 @@ func TestBanTsCommentOnlyIgnoreCarriesAFix(t *testing.T) {
 // surrounding text: it is on the text, and the alphabet differs between a line comment and a block
 // one, which is a distinction no imported fixture exercises.
 func TestBanTsCommentReadsTheDirectivePrefixAlphabet(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -376,6 +388,8 @@ func TestBanTsCommentReadsTheDirectivePrefixAlphabet(t *testing.T) {
 // reporting. Upstream's corpus writes only the two exempt spellings, so the two reporting rows here
 // are the ones that pin the guard to the directives it actually names.
 func TestBanTsCommentExemptsPragmasForCheckAndNoCheckOnly(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -404,6 +418,8 @@ func TestBanTsCommentExemptsPragmasForCheckAndNoCheckOnly(t *testing.T) {
 // no imported fixture could see the difference: upstream's three emoji cases are all far past the
 // minimum either way. Both rows measured on the release binary.
 func TestBanTsCommentMeasuresTheDescriptionInBytes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -427,6 +443,8 @@ func TestBanTsCommentMeasuresTheDescriptionInBytes(t *testing.T) {
 // only reason the extractor's fifty-two diagnostics equal its fifty-two inputs, so this fixture is
 // written here rather than imported. Measured on the release binary, which emitted both.
 func TestBanTsCommentReportsLengthAndFormatIndependently(t *testing.T) {
+	t.Parallel()
+
 	const configuration = "{\"ts-ignore\":{\"descriptionFormat\":\"^: TS\\\\d+ because .+$\"}," +
 		"\"minimumDescriptionLength\":25}"
 
@@ -443,6 +461,8 @@ func TestBanTsCommentReportsLengthAndFormatIndependently(t *testing.T) {
 // `@ts-ignore    : TS1234` shaped cases report, and a port trimming for both would silence all
 // four while passing every clean case.
 func TestBanTsCommentMatchesTheFormatAgainstTheUntrimmedDescription(t *testing.T) {
+	t.Parallel()
+
 	const configuration = "{\"ts-ignore\":{\"descriptionFormat\":\"^: TS\\\\d+ because .+$\"}}"
 
 	padded := rule_testing.RunWithOptions(t, BanTsComment, banTsCommentFile,
@@ -465,6 +485,8 @@ func TestBanTsCommentMatchesTheFormatAgainstTheUntrimmedDescription(t *testing.T
 // records `"options": "no"` for this rule and is wrong. The `@ts-check` row is the one a reader is
 // most likely to guess backwards: `@ts-check` turns checking ON, so it defaults to allowed.
 func TestBanTsCommentDefaultsBindWithNoConfiguration(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -497,6 +519,8 @@ func TestBanTsCommentDefaultsBindWithNoConfiguration(t *testing.T) {
 // upstream refuses such a configuration at load time and there is no error channel here that would
 // reach a user.
 func TestDecodeBanTsCommentOptionsReadsEveryShape(t *testing.T) {
+	t.Parallel()
+
 	defaults := DefaultBanTsCommentOptions()
 
 	cases := []struct {
@@ -574,6 +598,8 @@ func TestDecodeBanTsCommentOptionsReadsEveryShape(t *testing.T) {
 // report every `@ts-ignore` in every `.js` file on the tree, a false-positive class no imported
 // fixture can see because the corpus is all TypeScript.
 func TestBanTsCommentDeclinesJavaScriptFiles(t *testing.T) {
+	t.Parallel()
+
 	const source = "// @ts-ignore\n"
 
 	for _, fileName := range []string{
@@ -611,6 +637,8 @@ func TestBanTsCommentDeclinesJavaScriptFiles(t *testing.T) {
 // comparing a finding against the constant it was reported with is equality between two values that
 // move together under mutation and therefore proves nothing.
 func TestBanTsCommentMessageTextNamesTheDirective(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -687,6 +715,8 @@ func TestBanTsCommentMessageTextNamesTheDirective(t *testing.T) {
 // A file ending in an unterminated comment is not exotic. It is what a half-written file on disk
 // looks like while somebody is typing, and the linter runs on those.
 func TestBanTsCommentSurvivesAnUnterminatedBlockComment(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{"/*", "/*/", "/**", "/*@ts-ignore", "//", "/*@ts-ignore\n"} {
 		t.Run(sourceText, func(t *testing.T) {
 			// The assertion is that this returns at all. A finding would also be acceptable for

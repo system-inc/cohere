@@ -9,6 +9,8 @@ import (
 const requireNamedExportFile = "/repository/source/components/Button.tsx"
 
 func TestReactComponentRequireNamedExportFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -100,6 +102,8 @@ func TestReactComponentRequireNamedExportFires(t *testing.T) {
 }
 
 func TestReactComponentRequireNamedExportStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string

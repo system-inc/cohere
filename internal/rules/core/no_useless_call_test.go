@@ -22,6 +22,8 @@ const uselessCallFile = "/repository/source/UselessCall.ts"
 // through a variable key. Four are calls with no arguments at all. And the last is a private
 // identifier, which merely spells the same word.
 func TestNoUselessCallStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -62,6 +64,8 @@ func TestNoUselessCallStaysSilent(t *testing.T) {
 // whitespace, and `[].concat.apply([ ], [1, 2])` matches an empty array literal written two ways,
 // which is the edge case `hasSameTokens` carries from `prefer-spread`.
 func TestNoUselessCallFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -117,6 +121,8 @@ func TestNoUselessCallFires(t *testing.T) {
 // The control is the unparenthesized form, which is upstream's neighbouring case and does report,
 // so the silence here is a measurement about the parentheses rather than about the shape.
 func TestNoUselessCallKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -146,6 +152,8 @@ func TestNoUselessCallKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
 //
 // The control is the dotted form, which reports.
 func TestNoUselessCallDeclinesAComputedAccess(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -181,6 +189,8 @@ func TestNoUselessCallDeclinesAComputedAccess(t *testing.T) {
 // The control is the same shape spelled `call`, so the silence is about the name rather than about
 // the receiver.
 func TestNoUselessCallDeclinesOtherMethods(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -207,6 +217,8 @@ func TestNoUselessCallDeclinesOtherMethods(t *testing.T) {
 // sentence says `.apply()` has the right id, the right span, and tells the reader to look for
 // something that is not there.
 func TestNoUselessCallNamesTheMethod(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantPrefix string
@@ -234,6 +246,8 @@ func TestNoUselessCallNamesTheMethod(t *testing.T) {
 // Upstream passes `node`, the CallExpression. A port anchoring on the callee or on the method name
 // satisfies every assertion above while pointing past the arguments that make the finding true.
 func TestNoUselessCallReportsTheWholeCall(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "obj.foo.call(obj, 1, 2);"
 	result := rule_testing.Run(t, NoUselessCall, uselessCallFile, sourceText)
 	if len(result.Diagnostics) != 1 {
@@ -253,6 +267,8 @@ func TestNoUselessCallReportsTheWholeCall(t *testing.T) {
 // the reader to make two different edits. Upstream's clean case `foo.apply(null, args)` is the first
 // half; the second is asserted with the array literal in place.
 func TestNoUselessCallLeavesVariadicApplyToPreferSpread(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,
 		"declare const args: number[];\nfoo.apply(null, args);\n"))
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,

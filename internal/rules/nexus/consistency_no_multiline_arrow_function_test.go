@@ -9,6 +9,8 @@ import (
 const arrowFile = "/repository/source/Thing.tsx"
 
 func TestConsistencyNoMultilineArrowFunctionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -51,6 +53,8 @@ func TestConsistencyNoMultilineArrowFunctionFires(t *testing.T) {
 }
 
 func TestConsistencyNoMultilineArrowFunctionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -88,6 +92,8 @@ func TestConsistencyNoMultilineArrowFunctionStaysSilent(t *testing.T) {
 // One arrow must never produce two findings. The general case has to skip what the call-expression
 // case already claimed, and a fixture is the only thing that keeps that true.
 func TestConsistencyNoMultilineArrowFunctionReportsEachArrowOnce(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -109,6 +115,8 @@ func TestConsistencyNoMultilineArrowFunctionReportsEachArrowOnce(t *testing.T) {
 // truncating the signature, a nested generic default confusing the type-parameter boundary, and the
 // prototype difference above. The conversion is worth doing and is not worth doing unattended.
 func TestConsistencyNoMultilineArrowFunctionProposesNoFix(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ConsistencyNoMultilineArrowFunction, arrowFile,
 		"const compute = (input) => {\n    return input * 2;\n};\n")
 	rule_testing.ExpectFindings(t, result, "multilineArrow")

@@ -44,6 +44,8 @@ const noMisusedPromisesTsxFile = "noMisusedPromises.tsx"
 // rather than neither, but a port that read the wrong flag for a given position would pass one and
 // fail the other, which is the failure this split is shaped to catch.
 func TestNoMisusedPromisesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -1576,6 +1578,8 @@ useCallback<ReturnsVoid | ReturnsPromiseVoid>(async () => {});
 // does not run it either. TestNoMisusedPromisesExclusionsAreStated names it rather than leaving the
 // count unexplained.
 func TestNoMisusedPromisesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -2893,6 +2897,8 @@ const obj: O = {
 // rather than merely to exist. And the typed harness must still report that input, so the first
 // assertion is not passing because the rule is broken in some other way.
 func TestNoMisusedPromisesRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 const p = Promise.resolve();
 if (p) {
@@ -2922,6 +2928,8 @@ if (p) {
 // The test runs the rule with a Context whose Program is nil and asserts it still reports. A rule
 // that reached for the program would panic here, which is the loud direction.
 func TestNoMisusedPromisesDoesNotReadTheProgram(t *testing.T) {
+	t.Parallel()
+
 	if NoMisusedPromises.ReadsProgram {
 		t.Fatal("the rule body never names ctx.Program, so it must not declare ReadsProgram")
 	}
@@ -2939,6 +2947,8 @@ func TestNoMisusedPromisesDoesNotReadTheProgram(t *testing.T) {
 // string is typed here as a literal rather than compared against the rule's own message constant,
 // because a comparison against the constant moves with the constant and asserts nothing.
 func TestNoMisusedPromisesRendersTheSpreadTypoUpstreamShips(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesFile, `
 const promise = Promise.resolve({ a: 1 });
 const obj = { ...promise };
@@ -2966,6 +2976,8 @@ const obj = { ...promise };
 //
 // One case per message id the rule can emit, so every arm's anchor is pinned.
 func TestNoMisusedPromisesReportsTheRightSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -3095,6 +3107,8 @@ class Derived implements Base {
 // of sub-flags, while the Go struct splits those into two separate fields. This asserts what our
 // decoder actually does with each spelling rather than what the shape suggests.
 func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(t *testing.T) {
+	t.Parallel()
+
 	decode := rule.DecodeOptionsInto[NoMisusedPromisesOptions]()
 
 	cases := []struct {
@@ -3169,6 +3183,8 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(t *testing.T
 // the most common way anyone configures it, while every fixture above — each of which reaches the
 // rule through an explicit options value — stayed green. This bypasses the decoder deliberately.
 func TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -3199,6 +3215,8 @@ func TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled(t *testing.T) {
 // later sync unskips it upstream, the case comes back through the extractor and this test's own
 // arithmetic is what says so.
 func TestNoMisusedPromisesExclusionsAreStated(t *testing.T) {
+	t.Parallel()
+
 	const upstreamValidCases = 123
 	const upstreamInvalidCases = 90
 
@@ -3277,6 +3295,8 @@ func noMisusedPromisesTableSizes(t *testing.T) (silent int, fires int) {
 // an `Array<() => void>` parameter reports NOTHING, because the void-return argument check inspects
 // the argument itself, and the argument is one array rather than three functions.
 func TestNoMisusedPromisesReportsPerElementRatherThanPerSite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -3385,6 +3405,8 @@ f([async () => {}, async () => {}, async () => {}]);
 // a locally declared void parameter report identically with and without the extra file, so the moved
 // verdicts are about resolution rather than about the second file's presence.
 func TestNoMisusedPromisesDependsOnGlobalsTheFixtureLibraryOmits(t *testing.T) {
+	t.Parallel()
+
 	const globals = `
 declare global {
   function setTimeout(handler: () => void, ms?: number): number;
@@ -3450,6 +3472,8 @@ export {};
 // parameter second still reports once, which proves the single finding above is about which position
 // was selected and not about the rule reporting at most once per call.
 func TestNoMisusedPromisesChecksOnlyTheVoidPositions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -3497,6 +3521,8 @@ f(async () => {}, async () => {});
 // Four shapes, because the choice turns on two independent things (is the initializer function-like,
 // does it carry an annotation) and the corpus writes only some of the combinations.
 func TestNoMisusedPromisesReportsThePropertyReturnAnnotationWhenThereIsOne(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -3584,6 +3610,8 @@ const obj: O = {
 // The control matters here more than usual: without a case that DOES report on the same file shape,
 // a suite of three clean assertions would pass just as well against a rule that had stopped running.
 func TestNoMisusedPromisesSurvivesAttributeValuesThatAreNotExpressionContainers(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a string-valued attribute beside a reporting one does not crash the rule", func(t *testing.T) {
 		result := rule_testing.RunTyped(t, NoMisusedPromises, noMisusedPromisesTsxFile, `
 type Props = { onEvent: () => void; label: string };
@@ -3628,6 +3656,8 @@ const element = <Component onEvent />;
 // an `extends` clause name different types, so a mutant that hardcoded either one is caught by the
 // other.
 func TestNoMisusedPromisesNamesTheHeritageTypeInTheMessage(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		sourceText  string

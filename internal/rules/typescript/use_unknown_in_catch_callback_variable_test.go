@@ -33,6 +33,8 @@ const useUnknownInCatchCallbackVariableFile = "file.ts"
 // tuple. They are the reason the rule declines a call it cannot read positionally rather than
 // looking inside, and a port that resolved the spread would report on inputs upstream passes.
 func TestUseUnknownInCatchCallbackVariableStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -83,6 +85,8 @@ func TestUseUnknownInCatchCallbackVariableStaysSilent(t *testing.T) {
 // conditional reports both branches, and the three-finding case reaches its callbacks through a
 // nullish coalescing, a logical and, a logical or, and a parenthesis around each.
 func TestUseUnknownInCatchCallbackVariableFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -133,6 +137,8 @@ func TestUseUnknownInCatchCallbackVariableFires(t *testing.T) {
 // Three of these outputs turn on exactly that: the annotation replacement has to reach back over the
 // colon without eating a `?`, stop before a trailing comment, and leave a default expression alone.
 func TestUseUnknownInCatchCallbackVariableSuggestions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -218,6 +224,8 @@ func TestUseUnknownInCatchCallbackVariableSuggestions(t *testing.T) {
 // above comes from the widening rather than from the computed access being unhandled. It is also
 // something a literal-only test would lose, so it pins the reach as well as the limit.
 func TestUseUnknownInCatchCallbackVariableComputedKeyDivergence(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a let-bound key is silent here and reports upstream", func(t *testing.T) {
 		result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, "\nlet method = 'catch';\nPromise.resolve()[method]((error: Error) => {});\n      ")
 		rule_testing.ExpectClean(t, result)
@@ -254,6 +262,8 @@ func TestUseUnknownInCatchCallbackVariableComputedKeyDivergence(t *testing.T) {
 // The span assertion is the load-bearing half. Every message id below would be satisfied by a rule
 // that correctly pointed at `err`, which is what makes this a real test of the divergence.
 func TestUseUnknownInCatchCallbackVariableThisParameter(t *testing.T) {
+	t.Parallel()
+
 	const source = "interface W {\n  z: number;\n}\ndeclare const p: Promise<void>;\np.catch(function (this: W, err: Error) {});"
 
 	result := rule_testing.RunTyped(t, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
@@ -290,6 +300,8 @@ func TestUseUnknownInCatchCallbackVariableThisParameter(t *testing.T) {
 // above would pass VACUOUSLY while every Fires case failed. The count below is what makes the
 // difference visible: a rule that fires on nothing is not the same as a rule that discriminates.
 func TestUseUnknownInCatchCallbackVariableRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !UseUnknownInCatchCallbackVariable.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
@@ -311,6 +323,8 @@ func TestUseUnknownInCatchCallbackVariableRequiresTheTypedHarness(t *testing.T) 
 // difference. The literals below are typed out rather than compared against the rule's own message
 // constants, which would move with the rule under mutation and assert nothing.
 func TestUseUnknownInCatchCallbackVariableMessages(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -376,6 +390,8 @@ func TestUseUnknownInCatchCallbackVariableMessages(t *testing.T) {
 //	((p.catch))(err => {})   pristine reports, mutant SILENT   distinguishes
 //	(p).catch(err => {})     both report                       does NOT distinguish
 func TestUseUnknownInCatchCallbackVariableParentheses(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -422,6 +438,8 @@ func TestUseUnknownInCatchCallbackVariableParentheses(t *testing.T) {
 // This runs through the TYPED harness. Under rule_testing.Run the rule returns before installing a
 // listener, so the untyped harness would pass without executing a line of it.
 func TestUseUnknownInCatchCallbackVariableSurvivesMalformedCalls(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		// An element access with an empty or missing argument expression.
 		"declare const p: any;\np[](err => {});\n",

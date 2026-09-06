@@ -35,6 +35,8 @@ const graphQlNullableParityPreamble = "declare function GraphQlArgument(n?: unkn
 // carrying every shape below and in the fires list. Where a verdict here disagreed with that run,
 // the run won.
 func TestGraphQlNullableParityStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		// Both directions in agreement, which is the whole point of the rule.
 		"class C {\n  @GraphQlField(() => String, { nullable: true })\n  a!: string | null;\n}\n",
@@ -135,6 +137,8 @@ func TestGraphQlNullableParityStaysSilent(t *testing.T) {
 // Both messages interpolate the rendered type name, which is the part a reader uses to see which
 // side is wrong, so the text is asserted by equality rather than by a substring.
 func TestGraphQlNullableParityFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		wantId      string
@@ -250,6 +254,8 @@ func TestGraphQlNullableParityFires(t *testing.T) {
 // TestGraphQlNullableParityRequiresTheTypedHarness pins that the rule declines rather than crashing
 // without a checker, which no other test here can reach.
 func TestGraphQlNullableParityRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !GraphQlNullableParity.NeedsTypeChecker {
 		t.Fatal("the rule must declare NeedsTypeChecker: one side of every comparison is a type")
 	}

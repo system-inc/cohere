@@ -14,6 +14,8 @@ import (
 // loss of the rule's comparison surface and would still satisfy any assertion phrased about pruning
 // alone. So both directions are asserted, on real source, before any specific claim.
 func TestPruneNonReactiveDependenciesKeepsAndPrunes(t *testing.T) {
+	t.Parallel()
+
 	functions, before, after, removed := 0, 0, 0, 0
 
 	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
@@ -59,6 +61,8 @@ func TestPruneNonReactiveDependenciesKeepsAndPrunes(t *testing.T) {
 // Without the propagation an enclosing scope depending on an inner scope's output prunes it as
 // non-reactive, and the rule then compares a set missing a dependency that genuinely changes.
 func TestPruneNonReactiveDependenciesPropagatesToScopeOutputs(t *testing.T) {
+	t.Parallel()
+
 	// Inner scope: depends on reactive value 1, declares value 2.
 	// Outer scope: depends on value 2, which is only reactive because the inner scope's is.
 	inner := &ReactiveScopeBlock{Scope: 1}
@@ -104,6 +108,8 @@ func TestPruneNonReactiveDependenciesPropagatesToScopeOutputs(t *testing.T) {
 // unconditional, which keeps every dependency and turns the pass into a no-op that still passes a
 // test asserting only that something survives.
 func TestPruneNonReactiveDependenciesDoesNotPropagateFromAnInertScope(t *testing.T) {
+	t.Parallel()
+
 	inner := &ReactiveScopeBlock{Scope: 1}
 	outer := &ReactiveScopeBlock{Scope: 2}
 	tree := &ReactiveFunction{Body: ReactiveBlock{inner, outer}}
@@ -150,6 +156,8 @@ func TestPruneNonReactiveDependenciesDoesNotPropagateFromAnInertScope(t *testing
 // because siblings in one block are visited left to right either way. Nesting is where the order
 // shows, and it is not exotic: 115 of 1,202 corpus scopes sit inside another.
 func TestPruneNonReactiveDependenciesVisitsInnermostFirst(t *testing.T) {
+	t.Parallel()
+
 	// The inner scope sits INSIDE the outer one. Inner depends on reactive value 1 and declares
 	// value 2; outer depends on value 2, which is reactive only by propagation from inner.
 	inner := &ReactiveScopeBlock{Scope: 1}

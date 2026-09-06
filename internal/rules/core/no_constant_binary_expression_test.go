@@ -11,6 +11,8 @@ const constantBinaryFile = "/repository/source/Compare.ts"
 const constantBinaryDeclarations = "declare let a: any, b: any;\n"
 
 func TestNoConstantBinaryExpressionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -84,6 +86,8 @@ func TestNoConstantBinaryExpressionFires(t *testing.T) {
 }
 
 func TestNoConstantBinaryExpressionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -130,6 +134,8 @@ func TestNoConstantBinaryExpressionStaysSilent(t *testing.T) {
 // whose option is off, and the difference surfaces only when someone turns it on. That is the exact
 // shape use-isnan shipped with.
 func TestNoConstantBinaryExpressionRelationalArm(t *testing.T) {
+	t.Parallel()
+
 	source := constantBinaryDeclarations + "export const v = 1 < 2;\n"
 
 	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoConstantBinaryExpression, constantBinaryFile, source,

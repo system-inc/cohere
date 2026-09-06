@@ -9,6 +9,8 @@ import (
 const debuggerFile = "/repository/source/Thing.ts"
 
 func TestNoDebuggerFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -29,6 +31,8 @@ func TestNoDebuggerFires(t *testing.T) {
 }
 
 func TestNoDebuggerStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -52,6 +56,8 @@ func TestNoDebuggerStaysSilent(t *testing.T) {
 // The fix removes the statement rather than commenting it out, because there is no form of it that
 // belongs in committed code.
 func TestNoDebuggerRemovesTheStatement(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoDebugger, debuggerFile, "export function run() {\n    debugger;\n}\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))

@@ -24,6 +24,8 @@ const regexSpacesFile = "/repository/source/RegexSpaces.ts"
 // identical duplicates (`var foo = / /;` appears at both index 3 and index 17); both are kept, so
 // this file holds the corpus rather than a tidied reading of it.
 func TestNoRegexSpacesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -78,6 +80,8 @@ func TestNoRegexSpacesFires(t *testing.T) {
 // guard, and they are pass cases rather than fail cases: with flags unknown the parse is unknown,
 // and reporting on a guess would be worse than staying quiet.
 func TestNoRegexSpacesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -153,6 +157,8 @@ func TestNoRegexSpacesStaysSilent(t *testing.T) {
 //
 // The last case is the one place we do not match oxc. See the rule's doc comment.
 func TestNoRegexSpacesReportsTheRunItself(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantStart  int
@@ -216,6 +222,8 @@ func TestNoRegexSpacesReportsTheRunItself(t *testing.T) {
 // of n spaces and ` {n}` accept exactly the same input. Nothing here picks between valid answers,
 // so nothing needs a human to choose it.
 func TestNoRegexSpacesFixes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSource string
@@ -274,6 +282,8 @@ func TestNoRegexSpacesFixes(t *testing.T) {
 // the last two are the ones upstream has no equivalent of: a lone space between two real runs, and
 // three runs where the middle is widest.
 func TestNoRegexSpacesReportsOnlyTheFirstRun(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantStart  int
@@ -314,6 +324,8 @@ func TestNoRegexSpacesReportsOnlyTheFirstRun(t *testing.T) {
 // bracket, and the depth zero run genuinely is the earlier one. A port that simply ignored flags
 // everywhere would pass that case and fail the other two.
 func TestNoRegexSpacesAgreesAcrossSpellings(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -352,6 +364,8 @@ func TestNoRegexSpacesAgreesAcrossSpellings(t *testing.T) {
 // parenthesized callee, a member call that merely ends in the right name, a shadowing local, and a
 // call with no arguments.
 func TestNoRegexSpacesShapesOurCorpusDoesNotCover(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a literal preceded by a comment reports inside the pattern", func(t *testing.T) {
 		sourceText := "// a comment about the pattern\nvar foo = /bar  baz/;"
 		result := rule_testing.Run(t, NoRegexSpaces, regexSpacesFile, sourceText)
@@ -406,6 +420,8 @@ func TestNoRegexSpacesShapesOurCorpusDoesNotCover(t *testing.T) {
 // `d`. That case is in the imported corpus and its fix pair is what pins it, but it pins it only
 // once; these make the general rule explicit.
 func TestNoRegexSpacesParsesTheCookedPatternAndReportsRawOffsets(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an escaped bracket cooks to a real class opener", func(t *testing.T) {
 		rule_testing.ExpectClean(t, rule_testing.Run(t, NoRegexSpaces, regexSpacesFile,
 			`var foo = new RegExp(' \[   ');`))
@@ -466,6 +482,8 @@ func TestNoRegexSpacesParsesTheCookedPatternAndReportsRawOffsets(t *testing.T) {
 // perfect rule would report it, but a finding at a position derived from a correspondence already
 // known to be wrong is worse than no finding: the fix would rewrite bytes nobody pointed at.
 func TestNoRegexSpacesDropsAPatternItCannotMap(t *testing.T) {
+	t.Parallel()
+
 	// A real line continuation inside the argument, written as an actual newline in the source.
 	// Here it sits BEFORE the run, so the walk desynchronizes while cooked characters remain and
 	// the loop's own bail is what fires.
@@ -498,6 +516,8 @@ func TestNoRegexSpacesDropsAPatternItCannotMap(t *testing.T) {
 //
 // The brace form is here for the same reason and is the one whose width is not a constant at all.
 func TestNoRegexSpacesMapsThroughEveryEscapeForm(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

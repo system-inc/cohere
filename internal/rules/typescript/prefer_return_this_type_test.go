@@ -23,6 +23,8 @@ func preferReturnThisTypeCaseName(index int) string {
 // file per call, so the fixtures are safe by construction; the oracle used to measure them had to
 // be built that way deliberately.
 func TestPreferReturnThisTypeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		// Upstream's valid list, byte for byte.
 		"\nclass Foo {\n  f1() {}\n  f2(): Foo {\n    return new Foo();\n  }\n  f3() {\n    return this;\n  }\n  f4(): this {\n    return this;\n  }\n  f5(): any {\n    return this;\n  }\n  f6(): unknown {\n    return this;\n  }\n  f7(foo: Foo): Foo {\n    return Math.random() > 0.5 ? foo : this;\n  }\n  f10(this: Foo, that: Foo): Foo;\n  f11(): Foo {\n    return;\n  }\n  f13(this: Foo): Foo {\n    return this;\n  }\n  f14(): { f14: Function } {\n    return this;\n  }\n  f15(): Foo | this {\n    return Math.random() > 0.5 ? new Foo() : this;\n  }\n}\n    ",
@@ -123,6 +125,8 @@ func TestPreferReturnThisTypeStaysSilent(t *testing.T) {
 // Every case reports exactly once, which is asserted by passing a single id: a port that reported
 // an overload signature as well as its implementation would fail on the count alone.
 func TestPreferReturnThisTypeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpan   string
@@ -360,6 +364,8 @@ func TestPreferReturnThisTypeFires(t *testing.T) {
 // The case used here REPORTS under RunTyped and is asserted clean here, so a revert that dropped
 // NeedsTypeChecker would fail rather than pass vacuously.
 func TestPreferReturnThisTypeRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !PreferReturnThisType.NeedsTypeChecker {
 		t.Fatal("the rule must declare NeedsTypeChecker: every judgment it makes is a type identity question")
 	}

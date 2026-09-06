@@ -15,6 +15,8 @@ import (
 // before assertion keeps that result from passing vacuously, and the call count distinguishes a
 // lowering failure from a fixture that simply no longer reaches the in-between state.
 func TestAlignMethodCallScopesRemovesTheInBetweenState(t *testing.T) {
+	t.Parallel()
+
 	// A known primitive-returning method is the live shape after call-result allocation became
 	// faithful. Its result does not allocate, while its PropertyLoad result is scoped, so alignment
 	// must remove the property's scope.
@@ -49,6 +51,8 @@ func TestAlignMethodCallScopesRemovesTheInBetweenState(t *testing.T) {
 // control for that, and the count is asserted rather than logged because a drop to zero would mean
 // the pass stopped being reachable rather than stopped being needed.
 func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
+	t.Parallel()
+
 	functions, changed := 0, 0
 	forEachCorpusFunctionWithChecker(t, 400, func(function *Function, checker *shimchecker.Checker) {
 		InferReactive(function, checker)

@@ -24,6 +24,8 @@ func noUnsafeTypeAssertionCaseName(index int) string {
 // clean. RunTyped is one file per call, so the fixtures are safe by construction and the oracle
 // used to measure them had to be built that way on purpose.
 func TestNoUnsafeTypeAssertionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		// Upstream's valid list, byte for byte.
 		"\ntype Obj = { foo: string };\nfunction func<T extends Obj>(a: T) {\n  const b = a as T;\n}\n      ",
@@ -72,6 +74,8 @@ func TestNoUnsafeTypeAssertionStaysSilent(t *testing.T) {
 // A substring predicate cannot see a wrong name in either slot, and the type name is the only part
 // of this rule's output that a reader uses to find the site.
 func TestNoUnsafeTypeAssertionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []struct {
@@ -448,6 +452,8 @@ func TestNoUnsafeTypeAssertionFires(t *testing.T) {
 // instrument that sees it, and the risk it covers is not theoretical for this rule: the body
 // dereferences the checker four times on its first path.
 func TestNoUnsafeTypeAssertionRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoUnsafeTypeAssertion.NeedsTypeChecker {
 		t.Fatal("the rule must declare NeedsTypeChecker: every step of its judgment is a type question")
 	}

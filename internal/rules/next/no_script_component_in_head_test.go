@@ -8,6 +8,8 @@ import (
 )
 
 func TestNoScriptComponentInHeadReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -96,6 +98,8 @@ func TestNoScriptComponentInHeadReports(t *testing.T) {
 }
 
 func TestNoScriptComponentInHeadIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -201,6 +205,8 @@ func TestNoScriptComponentInHeadIsSilent(t *testing.T) {
 // the opening element's name node rather than the element and rather than the `<Script>` that caused
 // the finding, and a port pointing at any of the three satisfies every id assertion above.
 func TestNoScriptComponentInHeadPointsAtTheHeadName(t *testing.T) {
+	t.Parallel()
+
 	source := "import Head from \"next/head\";\nimport Script from \"next/script\";\nexport default function Index() { return (<Head><Script></Script></Head>); }\n"
 	result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
@@ -238,6 +244,8 @@ func TestNoScriptComponentInHeadPointsAtTheHeadName(t *testing.T) {
 // pointing a reader at the wrong element. The release binary reports at column fifty, which is the
 // inner `Head`; the outer sits at forty four.
 func TestNoScriptComponentInHeadBlamesTheInnerHead(t *testing.T) {
+	t.Parallel()
+
 	source := "import Head from \"next/head\";\nimport Script from \"next/script\";\nexport default function Index() { return (<Head><Head><Script></Script></Head></Head>); }\n"
 	result := rule_testing.RunTyped(t, NoScriptComponentInHead, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
@@ -262,6 +270,8 @@ func TestNoScriptComponentInHeadBlamesTheInnerHead(t *testing.T) {
 // silent fixture above would pass vacuously and every reporting one would fail in a way that reads
 // as a rule bug rather than as a harness mismatch. Asserting the silence directly names the cause.
 func TestNoScriptComponentInHeadRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoScriptComponentInHead.NeedsTypeChecker {
 		t.Fatal("the rule resolves tags through the checker and must declare NeedsTypeChecker")
 	}

@@ -208,6 +208,8 @@ func runNoConfusingVoidExpressionCase(t *testing.T, testCase noConfusingVoidExpr
 
 // TestNoConfusingVoidExpressionFires runs upstream's 57 invalid cases.
 func TestNoConfusingVoidExpressionFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noConfusingVoidExpressionFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			result := runNoConfusingVoidExpressionCase(t, testCase)
@@ -242,6 +244,8 @@ func TestNoConfusingVoidExpressionFires(t *testing.T) {
 
 // TestNoConfusingVoidExpressionStaysSilent runs upstream's 53 valid cases.
 func TestNoConfusingVoidExpressionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range noConfusingVoidExpressionCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			rule_testing.ExpectClean(t, runNoConfusingVoidExpressionCase(t, testCase))
@@ -260,6 +264,8 @@ func TestNoConfusingVoidExpressionStaysSilent(t *testing.T) {
 // statement position is clean and the same call assigned or in an arrow shorthand reports, exactly
 // as a void-returning one does.
 func TestNoConfusingVoidExpressionCoversUndefinedReturns(t *testing.T) {
+	t.Parallel()
+
 	const declaration = "declare function returnsUndefined(): undefined;\n"
 
 	for _, testCase := range []struct {
@@ -307,6 +313,8 @@ func TestNoConfusingVoidExpressionCoversUndefinedReturns(t *testing.T) {
 // A deliberate narrowing rather than a different repair: upstream offers a fix here and this does
 // not. Stated so the missing fix reads as a decision rather than an unfinished port.
 func TestNoConfusingVoidExpressionDeclinesToRepairOverAComment(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name      string
 		source    string
@@ -349,6 +357,8 @@ func TestNoConfusingVoidExpressionDeclinesToRepairOverAComment(t *testing.T) {
 // writes no `undefined` annotation under this option. Measured against the installed rule: a
 // function annotated `undefined` is NOT exempt, while `void` and `void | undefined` are.
 func TestNoConfusingVoidExpressionVoidReturningIsVoidNotVoidLike(t *testing.T) {
+	t.Parallel()
+
 	options := `{"ignoreVoidReturningFunctions":true}`
 
 	for _, testCase := range []struct {

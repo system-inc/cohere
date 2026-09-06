@@ -18,6 +18,8 @@ import (
 // and the comment is preserved at the case so the next reader does not read the silence as a
 // judgment we made.
 func TestNoUnstableNestedComponentsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		source  string
@@ -663,6 +665,8 @@ func TestNoUnstableNestedComponentsStaysSilent(t *testing.T) {
 // TestNoUnstableNestedComponentsFires holds every failing case upstream ships, imported
 // verbatim, with the finding count upstream asserts for each.
 func TestNoUnstableNestedComponentsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		source  string
@@ -1422,6 +1426,8 @@ func upstreamMessage(parentName string, asProps bool) string {
 // the reported text is sliced out of the source here, which is the same claim in the form this
 // harness can check.
 func TestNoUnstableNestedComponentsSpansAndMessages(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		// source is the whole file.
@@ -1515,6 +1521,8 @@ func TestNoUnstableNestedComponentsSpansAndMessages(t *testing.T) {
 // silent against the installed build on 2026-08-27. `no-multi-comp` counts `_Foo` AS a component
 // through the other predicate, so the two look interchangeable and are not.
 func TestNoUnstableNestedComponentsLowercaseParentIsSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		`function _ParentComponent() {
   function Nested() { return <div />; }
@@ -1538,6 +1546,8 @@ func TestNoUnstableNestedComponentsLowercaseParentIsSilent(t *testing.T) {
 // Written as a structural assertion over the kinds this rule validates rather than as a findings
 // check, because a findings check would pass whether the claim held or not.
 func TestNoUnstableNestedComponentsRenderMethodGuard(t *testing.T) {
+	t.Parallel()
+
 	source := `class ParentComponent extends React.Component {
   render() {
     class Nested extends React.Component {
@@ -1594,6 +1604,8 @@ func TestNoUnstableNestedComponentsRenderMethodGuard(t *testing.T) {
 // which is where a default inversion would live. The pattern defaults to a NON-EMPTY string, so a
 // zero-value struct is a different rule rather than the documented one.
 func TestDecodeNoUnstableNestedComponentsOptions(t *testing.T) {
+	t.Parallel()
+
 	// A bare "error" arrives as empty input and must land on the documented defaults.
 	decoded, err := DecodeNoUnstableNestedComponentsOptions(nil)
 	if err != nil {
@@ -1642,6 +1654,8 @@ func TestDecodeNoUnstableNestedComponentsOptions(t *testing.T) {
 // assertion on nil yields the zero value. Without the fallback in Run the empty pattern would match
 // no prop name and every render prop would start reporting.
 func TestNoUnstableNestedComponentsNilOptions(t *testing.T) {
+	t.Parallel()
+
 	source := `function ParentComponent() {
   return <SomeComponent renderFooter={() => <div />} />;
 }`
@@ -1653,6 +1667,8 @@ func TestNoUnstableNestedComponentsNilOptions(t *testing.T) {
 // TestNoUnstableNestedComponentsAllowAsProps pins the option against the same source with it off,
 // so the case cannot pass by the rule being silent for an unrelated reason.
 func TestNoUnstableNestedComponentsAllowAsProps(t *testing.T) {
+	t.Parallel()
+
 	source := `function ParentComponent() {
   return <SomeComponent footer={() => <div />} />;
 }`
@@ -1675,6 +1691,8 @@ func TestNoUnstableNestedComponentsAllowAsProps(t *testing.T) {
 // inherited from an oxc port. A React component in a `.ts` file is ordinary and legal, so a gate
 // here would cost every finding in every `.ts` file. The two runs differ only in the extension.
 func TestNoUnstableNestedComponentsHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	source := `function ParentComponent() {
   const Nested = () => React.createElement("div", null);
   return React.createElement("div", null, React.createElement(Nested, null));
@@ -1700,6 +1718,8 @@ func TestNoUnstableNestedComponentsHasNoFileSuffixGate(t *testing.T) {
 // attribute whose value is a string rather than an expression container, a spread attribute with no
 // name at all, a computed object key, and a namespaced JSX attribute.
 func TestNoUnstableNestedComponentsDoesNotPanicOnAwkwardShapes(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		`function ParentComponent() {
   const rows = [{ notPrefixedWithRender: (props) => <Row {...props} /> }];
@@ -1745,6 +1765,8 @@ func TestNoUnstableNestedComponentsDoesNotPanicOnAwkwardShapes(t *testing.T) {
 // Every row measured against the installed 7.37.5 build on 2026-08-27. Note `use` alone reports:
 // the pattern requires a capital or a digit AFTER `use`, so the bare name does not match.
 func TestNoUnstableNestedComponentsHookNamePattern(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		calleeName string
 		findings   int
@@ -1781,6 +1803,8 @@ func TestNoUnstableNestedComponentsHookNamePattern(t *testing.T) {
 // The corpus configures propNamePattern exactly once, on a passing case, so nothing imported can
 // see the pattern being consulted rather than ignored.
 func TestNoUnstableNestedComponentsPropNamePattern(t *testing.T) {
+	t.Parallel()
+
 	source := `function ParentComponent() {
   return <SomeComponent someRenderer={() => <div />} />;
 }`
@@ -1821,6 +1845,8 @@ func TestNoUnstableNestedComponentsPropNamePattern(t *testing.T) {
 // no fixture built from them can separate the two versions either. The mutation stays a live
 // survivor and is recorded as such in the rule's own comment rather than papered over here.
 func TestNoUnstableNestedComponentsAttributeValueKinds(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -1862,6 +1888,8 @@ func TestNoUnstableNestedComponentsAttributeValueKinds(t *testing.T) {
 // the first and the rest is whether an element with a string attribute sits between the component
 // and the attribute that would exempt it.
 func TestNoUnstableNestedComponentsAttributeClimbIsBounded(t *testing.T) {
+	t.Parallel()
+
 	reporting := `function ParentComponent() {
   return <Outer footer={() => <div />} />;
 }`
@@ -1890,6 +1918,8 @@ func TestNoUnstableNestedComponentsAttributeClimbIsBounded(t *testing.T) {
 // worth having: upstream does NOT confine the recovery to `render`, so a component built in an
 // ordinary method reports too.
 func TestNoUnstableNestedComponentsInsideClassComponents(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -1939,6 +1969,8 @@ func TestNoUnstableNestedComponentsInsideClassComponents(t *testing.T) {
 // a direct property value, and I could not construct one upstream also detects. Recorded as
 // unresolved rather than as an equivalence verdict.
 func TestNoUnstableNestedComponentsCreateElementPropsPosition(t *testing.T) {
+	t.Parallel()
+
 	source := `function ParentComponent() {
   return React.createElement(Some, { footer: () => React.createElement("div", null) });
 }`

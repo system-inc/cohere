@@ -28,6 +28,8 @@ const requireRenderReturnFile = "/repository/source/RequireRenderReturn.tsx"
 // upstream's harness and has no counterpart here, since our parser reads class fields
 // unconditionally.
 func TestRequireRenderReturnFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -137,6 +139,8 @@ func TestRequireRenderReturnFires(t *testing.T) {
 
 // The clean cases. Upstream's thirteen, plus the ones that pin a decision the corpus never writes.
 func TestRequireRenderReturnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -251,6 +255,8 @@ func TestRequireRenderReturnStaysSilent(t *testing.T) {
 // reported columns rather than from reading the rule. `rule_testing.Run` does not trim the fixture, so
 // the slice out of the literal and the bytes on disk are the same string.
 func TestRequireRenderReturnSpan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -325,6 +331,8 @@ func TestRequireRenderReturnSpan(t *testing.T) {
 // the second component. A rule collecting into a map rather than a slice passes that assertion and
 // emits these in whatever order the map iterated.
 func TestRequireRenderReturnSpansAreInSourceOrder(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "class A extends React.Component { render() { } }\nvar B = createReactClass({ render: function() { } });\n"
 	result := rule_testing.Run(t, RequireRenderReturn, requireRenderReturnFile, sourceText)
 	if len(result.Diagnostics) != 2 {
@@ -347,6 +355,8 @@ func TestRequireRenderReturnSpansAreInSourceOrder(t *testing.T) {
 // other: a rule reporting the right id with a description copied from a neighbour passes every
 // assertion above.
 func TestRequireRenderReturnMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageNoRenderReturn.Id != "noRenderReturn" {
 		t.Errorf("message id is %q, want %q", messageNoRenderReturn.Id, "noRenderReturn")
 	}
@@ -367,6 +377,8 @@ func TestRequireRenderReturnMessage(t *testing.T) {
 //
 // The source below is deliberately free of JSX so a `.ts` parse is legal.
 func TestRequireRenderReturnHasNoFileGate(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "class Hello extends React.Component {\n  render() {}\n}\n"
 	for _, fileName := range []string{
 		"/repository/source/Probe.tsx",
@@ -388,6 +400,8 @@ func TestRequireRenderReturnHasNoFileGate(t *testing.T) {
 // therefore no decoder to go wrong, so this pins that the absence is deliberate: passing nil
 // explicitly reaches the rule the same way the live config does, and it still reports.
 func TestRequireRenderReturnIgnoresOptions(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "class Hello extends React.Component {\n  render() {}\n}\n"
 	result := rule_testing.RunWithOptions(t, RequireRenderReturn, requireRenderReturnFile, sourceText, nil)
 	rule_testing.ExpectFindings(t, result, "noRenderReturn")

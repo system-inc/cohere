@@ -21,6 +21,8 @@ const noAwaitInLoopFile = "/repository/source/NoAwaitInLoop.ts"
 // nested is deliberate asynchronous iteration, a plain `using` does not wait, and an `await using`
 // in a for-loop INITIALIZER runs once.
 func TestNoAwaitInLoopFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -53,6 +55,8 @@ func TestNoAwaitInLoopFires(t *testing.T) {
 }
 
 func TestNoAwaitInLoopStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -99,6 +103,8 @@ func TestNoAwaitInLoopStaysSilent(t *testing.T) {
 // installed build, and the semicolon question specifically was settled by running the same source
 // with the semicolon removed and watching upstream's end column move.
 func TestNoAwaitInLoopSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -139,6 +145,8 @@ func TestNoAwaitInLoopSpans(t *testing.T) {
 // string. It is here because the rule has one message and three entry points, and a reworded
 // description would otherwise be invisible.
 func TestNoAwaitInLoopMessage(t *testing.T) {
+	t.Parallel()
+
 	if messageUnexpectedAwaitInLoop.Id != "unexpectedAwait" {
 		t.Fatalf("expected id %q, got %q", "unexpectedAwait", messageUnexpectedAwaitInLoop.Id)
 	}
@@ -169,6 +177,8 @@ func TestNoAwaitInLoopMessage(t *testing.T) {
 // them clean, and a firing control was run alongside them to prove the measurement could see a
 // report at all.
 func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -205,6 +215,8 @@ func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(t *testing.T) {
 // A loop header has parts that run once and parts the loop re-enters, and being anywhere inside a
 // loop node is not the question. Every row was measured against the installed build at 10.8.1.
 func TestNoAwaitInLoopLoopPositions(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string

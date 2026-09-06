@@ -9,6 +9,8 @@ import (
 const reactImportFile = "/repository/source/components/Field.tsx"
 
 func TestReactImportNoDestructuringFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -87,6 +89,8 @@ func TestReactImportNoDestructuringFires(t *testing.T) {
 }
 
 func TestReactImportNoDestructuringStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -143,6 +147,8 @@ func TestReactImportNoDestructuringStaysSilent(t *testing.T) {
 // depend on traversal order rather than on any single node, and a change to how listeners are
 // dispatched would move it silently.
 func TestReactImportNoDestructuringDependsOnImportOrder(t *testing.T) {
+	t.Parallel()
+
 	// The ordinary case: the import is above the use, and both are reported.
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactImportNoDestructuring, reactImportFile,
 		"import React, { useState } from 'react';\nexport function Field() { return useState(0); }\n"),

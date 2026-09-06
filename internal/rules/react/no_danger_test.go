@@ -57,6 +57,8 @@ func runNoDanger(t *testing.T, sourceText string, rawOptions string) rule_testin
 // The last invalid case names THREE entries in its errors array, so its finding count is upstream's
 // statement rather than my inference.
 func TestNoDangerFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -79,6 +81,8 @@ func TestNoDangerFires(t *testing.T) {
 }
 
 func TestNoDangerStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -109,6 +113,8 @@ func TestNoDangerStaysSilent(t *testing.T) {
 // lines are the ones that look wrong and are not: a port testing "is the tag a lowercase Identifier"
 // would be silent on both and pass every imported fixture, because the corpus writes neither.
 func TestNoDangerElementNameBoundary(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -137,6 +143,8 @@ func TestNoDangerElementNameBoundary(t *testing.T) {
 // would be the natural way to write this rule and would panic on the string-valued form, which the
 // port brief names as a crash class that costs a whole file.
 func TestNoDangerAttributeNameBoundary(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -170,6 +178,8 @@ func TestNoDangerAttributeNameBoundary(t *testing.T) {
 // at the line. Upstream compares against a name it builds with a shallow expression that is not the
 // one it renders elsewhere, and the two shapes below are where that expression breaks.
 func TestNoDangerCustomComponentNames(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -223,6 +233,8 @@ func TestNoDangerCustomComponentNames(t *testing.T) {
 // suite reached that path. Every fixture above goes through the decoder, so this is what covers the
 // nil input and the JSON tag, neither of which has an upstream counterpart.
 func TestNoDangerDecodesOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("absent options give the documented default", func(t *testing.T) {
 		decoded, err := DecodeNoDangerOptions(nil)
 		if err != nil {
@@ -284,6 +296,8 @@ func TestNoDangerDecodesOptions(t *testing.T) {
 // ExpectFindings cannot see any of this, so a rule anchoring on the element would pass every fixture
 // above while pointing somewhere the reader was never shown.
 func TestNoDangerSpanAndMessage(t *testing.T) {
+	t.Parallel()
+
 	t.Run("the finding points at the attribute, not the element", func(t *testing.T) {
 		const sourceText = "const a = <div dangerouslySetInnerHTML={{__html:''}} />;"
 		const want = "dangerouslySetInnerHTML={{__html:''}}"
@@ -330,6 +344,8 @@ func TestNoDangerSpanAndMessage(t *testing.T) {
 // ExpectFindings fixture can see a panic, so the sweep reports SURVIVED identically whether the
 // part-by-part rendering matters or not. This names what it prevents.
 func TestNoDangerDoesNotPanicOnUnusualTagNames(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"<a.b.c.d dangerouslySetInnerHTML={{__html:''}} />;",
 		"<this.Foo dangerouslySetInnerHTML={{__html:''}} />;",
@@ -355,6 +371,8 @@ func TestNoDangerDoesNotPanicOnUnusualTagNames(t *testing.T) {
 // That is a fact about the language rather than about the rule, and it is stated here rather than
 // left as an unexplained narrowing.
 func TestNoDangerHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "<div dangerouslySetInnerHTML={{__html:''}} />;"
 	for _, fileName := range []string{
 		"/repository/source/Danger.tsx",

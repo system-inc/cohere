@@ -45,6 +45,8 @@ func decodeRequireImportsOptions(t *testing.T, optionsText string) any {
 // `configValidator` case holds two statements with a `require` in each. Every other input reports
 // once, recovered by aligning each snapshot entry on the source line it prints.
 func TestNoRequireImportsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []requireImportsCase{
 		{sourceText: "var lib = require('lib');", options: "", findings: 1},
 		{sourceText: "let lib2 = require('lib2');", options: "", findings: 1},
@@ -94,6 +96,8 @@ func TestNoRequireImportsFires(t *testing.T) {
 // `createRequire` and `let require = bazz` cases each declare a real local binding, which is the
 // only thing that makes a genuine `require` call silent. The remainder exercise the two options.
 func TestNoRequireImportsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []requireImportsCase{
 		{sourceText: "import { l } from 'lib';", options: ""},
 		{sourceText: "var lib3 = load('not_an_import');", options: ""},
@@ -140,6 +144,8 @@ func TestNoRequireImportsStaysSilent(t *testing.T) {
 // green over the wrong choice. The expected strings here are typed literals rather than anything
 // derived from the rule, so a mutation cannot move both sides together.
 func TestNoRequireImportsSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -199,6 +205,8 @@ func TestNoRequireImportsSpans(t *testing.T) {
 // than against the rule's own constant. Comparing to the constant is equality that looks correct and
 // moves with the rule under mutation, so it proves nothing.
 func TestNoRequireImportsMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
 		"var lib = require('lib');", nil)
 	if len(result.Diagnostics) != 1 {
@@ -221,6 +229,8 @@ func TestNoRequireImportsMessage(t *testing.T) {
 // corpus writes no parenthesized callee and no escaped path, so every one of these would have been a
 // silent divergence in either direction.
 func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -357,6 +367,8 @@ func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(t *testing.T) {
 // no checker, so a later revert of the nil guard fails loudly rather than reporting on every
 // `require` in the file regardless of shadowing.
 func TestNoRequireImportsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoRequireImports.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker; the shadow test cannot work without it")
 	}
@@ -371,6 +383,8 @@ func TestNoRequireImportsRequiresTheTypedHarness(t *testing.T) {
 // TestDecodeNoRequireImportsOptions pins the decoder itself, which is where the default inversion
 // and the pattern compilation live and where upstream has no counterpart to compare against.
 func TestDecodeNoRequireImportsOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an absent allowAsImport is false", func(t *testing.T) {
 		decoded, err := DecodeNoRequireImportsOptions(json.RawMessage(`{}`))
 		if err != nil {
@@ -429,6 +443,8 @@ func TestDecodeNoRequireImportsOptions(t *testing.T) {
 // conversion that takes the whole linter down. Measured by removing the kind test and watching this
 // input panic with `ast.nodeData is *ast.NoSubstitutionTemplateLiteral, not *ast.StringLiteral`.
 func TestNoRequireImportsSurvivesMalformedImportEquals(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -479,6 +495,8 @@ func TestNoRequireImportsSurvivesMalformedImportEquals(t *testing.T) {
 // though both put a declaration in a source file. An ambient declaration declares a name that
 // already exists rather than introducing a binding, and the ambient flag is what separates them.
 func TestNoRequireImportsAcrossDeclarationOrderings(t *testing.T) {
+	t.Parallel()
+
 	const ambientTypes = "declare function require(id: string): any;\n"
 
 	cases := []struct {

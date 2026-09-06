@@ -12,6 +12,8 @@ import "testing"
 // This package already discovers the closed set by scanning source for the marker method, so the
 // guard costs nothing beyond naming the one kind that is legitimately in the default.
 func TestMemoizationLevelOfCoversEveryInstructionValue(t *testing.T) {
+	t.Parallel()
+
 	// The only value upstream classifies as Never. Anything else reaching the default is a gap.
 	legitimateDefaults := map[string]string{
 		"UnsupportedNode": "upstream's only Never arm: a node the compiler does not model",
@@ -60,6 +62,8 @@ func TestMemoizationLevelOfCoversEveryInstructionValue(t *testing.T) {
 // branch and `Never` is its default one. A port reading the first level in the arm gets the right
 // answer for the wrong reason and would flip the day the flag default changes.
 func TestMemoizationLevelOfMatchesUpstreamGroups(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name  string
 		want  MemoizationLevel
@@ -111,6 +115,8 @@ func TestMemoizationLevelOfMatchesUpstreamGroups(t *testing.T) {
 // classify. Upstream gives all four the same answer in separate arms, which matches what they are:
 // none produces an identity of its own.
 func TestMemoizationLevelOfReactiveValueHandlesComposites(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name  string
 		want  MemoizationLevel
@@ -145,6 +151,8 @@ func TestMemoizationLevelOfReactiveValueHandlesComposites(t *testing.T) {
 
 // TestMemoizationInputsGapsAreDeclared pins the gap list so closing one is a visible event.
 func TestMemoizationInputsGapsAreDeclared(t *testing.T) {
+	t.Parallel()
+
 	gaps := MemoizationInputsGaps()
 	if len(gaps) != 2 {
 		t.Fatalf("expected 2 declared gaps, found %d; a gap was added or closed without this test "+

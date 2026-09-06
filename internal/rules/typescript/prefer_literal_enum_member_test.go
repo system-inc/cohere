@@ -43,6 +43,8 @@ func decodePreferLiteralEnumMemberOptionsForTest(t *testing.T, raw string) any {
 // Literal, and a bare backtick string is a NoSubstitutionTemplateLiteral rather than a
 // TemplateLiteral with an empty expression list.
 func TestPreferLiteralEnumMemberStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\nenum ValidRegex {\n  A = /test/,\n}\n    ",
 		"\nenum ValidString {\n  A = 'test',\n}\n    ",
@@ -76,6 +78,8 @@ func TestPreferLiteralEnumMemberStaysSilentOnUpstreamPassCases(t *testing.T) {
 // expression; ours produces a real KindParenthesizedExpression, and without the unwrap in the rule
 // this case reports and upstream does not.
 func TestPreferLiteralEnumMemberStaysSilentWhenBitwiseExpressionsAreAllowed(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\nenum Foo {\n  A = 1 << 0,\n  B = 1 >> 0,\n  C = 1 >>> 0,\n  D = 1 | 0,\n  E = 1 & 0,\n  F = 1 ^ 0,\n  G = ~1,\n}\n      ",
 		"\nenum Foo {\n  A = 1 << 0,\n  B = 1 >> 0,\n  C = A | B,\n}\n      ",
@@ -103,6 +107,8 @@ func TestPreferLiteralEnumMemberStaysSilentWhenBitwiseExpressionsAreAllowed(t *t
 // points. Each expected span below is sliced out of upstream's own line and column numbers rather
 // than typed, so the assertion cannot drift from what the corpus recorded.
 func TestPreferLiteralEnumMemberFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -197,6 +203,8 @@ func TestPreferLiteralEnumMemberFiresOnUpstreamFailCases(t *testing.T) {
 // name a sibling member only inside a bitwise expression, so `x >> Foo.A` reports for `x` while
 // `Foo.A | Foo.B` two rows above does not.
 func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreAllowed(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -240,6 +248,8 @@ func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreAllowed(t *testing
 // row is what proves the decoder does not treat a written false as a missing key and fall back to a
 // default that happened to agree.
 func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreExplicitlyDisallowed(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -278,6 +288,8 @@ func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreExplicitlyDisallow
 // that never ran. None of these appear in upstream's test file: its parser cannot produce a
 // parenthesis node at all, so no case it writes could have found the unwrap missing.
 func TestPreferLiteralEnumMemberOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -500,6 +512,8 @@ func TestPreferLiteralEnumMemberOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T
 // agreement is a coincidence: the next key added here may default to true, and nothing else in this
 // file would notice a decoder that dropped it.
 func TestPreferLiteralEnumMemberDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		raw  string
 		want bool
@@ -531,6 +545,8 @@ func TestPreferLiteralEnumMemberDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFal
 // Every other fixture in this file reaches the rule through the decoder and none of them can see
 // this line.
 func TestPreferLiteralEnumMemberFallsBackWhenHandedNilOptions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, PreferLiteralEnumMember,
 		preferLiteralEnumMemberFile, "enum Foo {\n  A = 1 << 0,\n}\n", nil)
 	rule_testing.ExpectFindings(t, result, "notLiteral")
@@ -547,6 +563,8 @@ func TestPreferLiteralEnumMemberFallsBackWhenHandedNilOptions(t *testing.T) {
 // comparison against the constant is equality, it looks correct, and both sides move together under
 // mutation, which is the specific way this assertion fails to be an assertion.
 func TestPreferLiteralEnumMemberRendersUpstreamsMessageText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		options     string

@@ -26,6 +26,8 @@ func noDynamicDeleteCaseName(index int) string {
 // driven by the ESLint Linter API, which reported nothing on all eleven and produced no parse
 // error on any of them.
 func TestNoDynamicDeleteStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\nconst container: { [i: string]: 0 } = {};\ndelete container.aaa;\n    ",
 		"\nconst container: { [i: string]: 0 } = {};\ndelete container.delete;\n    ",
@@ -57,6 +59,8 @@ func TestNoDynamicDeleteStaysSilentOnUpstreamPassCases(t *testing.T) {
 // That matters more here than on most rules, because upstream reports on the KEY rather than on the
 // delete expression, and a message-id assertion cannot see the difference.
 func TestNoDynamicDeleteFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpan   string
@@ -143,6 +147,8 @@ func TestNoDynamicDeleteFiresOnUpstreamFailCases(t *testing.T) {
 // derived from reading the rule, because reading the rule file suggests the opposite for the
 // parenthesized rows: it tests `property.type === Literal`, and a paren is a real node here.
 func TestNoDynamicDeleteStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -198,6 +204,8 @@ func TestNoDynamicDeleteStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
 // The remaining rows pin where the finding LANDS on nested and parenthesized shapes, which is the
 // half of this rule a message-id assertion cannot see.
 func TestNoDynamicDeleteFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpan   string
@@ -283,6 +291,8 @@ func TestNoDynamicDeleteFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) {
 // in this tree carry a `.tsx`-only gate upstream does not have, which cost every finding in every
 // other extension until somebody measured it.
 func TestNoDynamicDeleteReportsInJavaScriptToo(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoDynamicDelete, "/repository/source/Container.js",
 		"const container = {};\ndelete container[name];")
 	rule_testing.ExpectFindings(t, result, "dynamicDelete")

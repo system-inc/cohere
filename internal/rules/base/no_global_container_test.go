@@ -30,6 +30,8 @@ func asTheNoGlobalContainerHarnessWroteIt(text string) string {
 // port something it would not have invented: a property key reports, and a locally declared
 // function of that name reports too.
 func TestNoGlobalContainer(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -165,6 +167,8 @@ func TestNoGlobalContainer(t *testing.T) {
 // against a literal typed here rather than against the rule's own constant, which would move with
 // any mutation of it.
 func TestNoGlobalContainerRendersTheSourceRulesMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoGlobalContainer, noGlobalContainerFile,
 		"const c = getGlobalContainer();\n")
 	if len(result.Diagnostics) != 1 {

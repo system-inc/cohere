@@ -41,6 +41,8 @@ func decodedParamOptions(t *testing.T, raw string) any {
 // whitespace, so the offsets are unshifted. That is checked rather than assumed: the assertion
 // slices the same string it passed in and compares the reported text.
 func TestNoParamReassignFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		options     any
@@ -123,6 +125,8 @@ func TestNoParamReassignFires(t *testing.T) {
 // The clean cases are the whole discrimination, and four of them are textually indistinguishable
 // from failing ones: what separates them is which binding the name resolves to.
 func TestNoParamReassignStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -217,6 +221,8 @@ func TestNoParamReassignStaysSilent(t *testing.T) {
 // that without the arm the climb runs off the top of the tree, and the arm is what makes the walk
 // terminate at the right boundary rather than by exhausting parents.
 func TestNoParamReassignStopsAtAConciseArrowBody(t *testing.T) {
+	t.Parallel()
+
 	reporting := []struct {
 		sourceText string
 		messageId  string
@@ -272,6 +278,8 @@ func TestNoParamReassignStopsAtAConciseArrowBody(t *testing.T) {
 // looking at the operator; ours gives them two kinds, so the postfix one is a separate arm that no
 // imported case reaches. Found by a mutant that neutralised it and survived all 78 corpus cases.
 func TestNoParamReassignSeesPostfixUpdates(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"function foo(a) { a.b++; }",
 		"function foo(a) { a.b--; }",
@@ -297,6 +305,8 @@ func TestNoParamReassignSeesPostfixUpdates(t *testing.T) {
 // Found by a mutant that widened the search from the body to the whole function and survived every
 // fixture; measured against the installed rule on the five shapes below.
 func TestNoParamReassignSeesIntoParameterDefaults(t *testing.T) {
+	t.Parallel()
+
 	reporting := []struct {
 		sourceText string
 		messageId  string
@@ -342,6 +352,8 @@ func TestNoParamReassignSeesIntoParameterDefaults(t *testing.T) {
 // with no function expression underneath, so registering only upstream's three goes silent on every
 // parameter in every class. Found by a differential run, where all six of its mismatches were this.
 func TestNoParamReassignReachesIntoClassBodies(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		messageId  string
@@ -385,6 +397,8 @@ func TestNoParamReassignReachesIntoClassBodies(t *testing.T) {
 // reasoning that a shadow is exempt, which is true of the binding it shadows and not of the shadow
 // itself. Measured against the installed rule, which reports one finding on each.
 func TestNoParamReassignAttributesAShadowedWriteToOneFunction(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantName   string
@@ -417,6 +431,8 @@ func TestNoParamReassignAttributesAShadowedWriteToOneFunction(t *testing.T) {
 // a nil receiver and answers nil. That is the more dangerous of the two failure modes: every
 // StaysSilent case passes vacuously and only the Fires cases notice.
 func TestNoParamReassignNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoParamReassign.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring the checker, which makes every silent fixture vacuous")
 	}
@@ -426,6 +442,8 @@ func TestNoParamReassignNeedsTheTypedHarness(t *testing.T) {
 
 // The decoder and the two allowance lists, which are the lines with no upstream counterpart.
 func TestNoParamReassignOptions(t *testing.T) {
+	t.Parallel()
+
 	propertyWrite := "function foo(a) { a.b = 0; }"
 
 	t.Run("nil options, the shape the live config produces", func(t *testing.T) {
@@ -500,6 +518,8 @@ func TestNoParamReassignOptions(t *testing.T) {
 // Both messages, asserted against literals typed here rather than against the rule's own builders,
 // which would move with them under mutation.
 func TestNoParamReassignMessages(t *testing.T) {
+	t.Parallel()
+
 	binding := messageAssignmentToParameter("bar")
 	if binding.Id != "assignmentToFunctionParam" {
 		t.Errorf("binding message id is %q", binding.Id)

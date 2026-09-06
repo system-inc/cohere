@@ -14,6 +14,8 @@ const propertyAliasFile = "/repository/source/Thing.ts"
 // precisely because those two sites are suppressed.
 
 func TestConsistencyNoPropertyAliasFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -48,6 +50,8 @@ func TestConsistencyNoPropertyAliasFires(t *testing.T) {
 // and each is the kind that reads as a bug until its reason is stated.
 
 func TestConsistencyNoPropertyAliasStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

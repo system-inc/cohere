@@ -41,6 +41,8 @@ const graphQlOperationContextPreamble = "declare class GraphQlOperationContext<K
 // real ESLint rule over api-phi-health and over seeded files. Where a case's verdict here disagreed
 // with that run, the run won.
 func TestGraphQlOperationContextMatchesReturnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		// The matching shape, which is what the one real call site in api-phi-health looks like.
 		"class R {\n  @GraphQlQuery(() => ThingOne)\n  async find(@InjectGraphQlOperationContext() c: GraphQlOperationContext<ThingOne>): Promise<ThingOne> {\n    void c;\n    return new ThingOne();\n  }\n}\n",
@@ -111,6 +113,8 @@ func TestGraphQlOperationContextMatchesReturnStaysSilent(t *testing.T) {
 // Both messages interpolate a type name through the checker and the mismatch message interpolates
 // two, so a substring predicate could not tell a correct finding from one naming the wrong types.
 func TestGraphQlOperationContextMatchesReturnFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		wantId      string
@@ -216,6 +220,8 @@ func TestGraphQlOperationContextMatchesReturnFires(t *testing.T) {
 // TestGraphQlOperationContextMatchesReturnRequiresTheTypedHarness pins that the rule declines rather
 // than crashing without a checker, which no other test here can reach.
 func TestGraphQlOperationContextMatchesReturnRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !GraphQlOperationContextMatchesReturn.NeedsTypeChecker {
 		t.Fatal("the rule must declare NeedsTypeChecker: both sides of its comparison are types")
 	}

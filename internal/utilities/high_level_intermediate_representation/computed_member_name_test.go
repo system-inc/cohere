@@ -21,6 +21,8 @@ import (
 // The empty name is the right answer rather than a fallback. The name feeds `classifyFunction`,
 // which asks whether it reads as a component or a hook, and a computed key is neither.
 func TestLoweringAClassMemberWithAComputedName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -78,6 +80,8 @@ func TestLoweringAClassMemberWithAComputedName(t *testing.T) {
 // Asserted separately from the crash above, because a fix that returned the source text would stop
 // the panic and start classifying `[Symbol.for('Foo')]` as a component.
 func TestAComputedMemberNameLowersToNoName(t *testing.T) {
+	t.Parallel()
+
 	source := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.tsx",
 		Path:     "/test.tsx",

@@ -15,6 +15,8 @@ const dupeClassMembersFile = "/repository/source/Members.ts"
 // two inputs declare the same member three times and report twice, so a fixture asserting one
 // finding per input is wrong on those and right everywhere else.
 func TestNoDupeClassMembersFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -56,6 +58,8 @@ func TestNoDupeClassMembersFires(t *testing.T) {
 // A rule comparing source text gets two of these right by accident and two wrong; one comparing
 // cooked text gets the other pair wrong. The type has to travel with the value.
 func TestNoDupeClassMembersStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -94,6 +98,8 @@ func TestNoDupeClassMembersStaysSilent(t *testing.T) {
 // which is exactly the shape a port drops silently: the flag looks like defensive copying until a
 // file declares both.
 func TestNoDupeClassMembersSeparatesPrivateNames(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile,
 		"class A { #foo() {} foo() {} }"))
 
@@ -114,6 +120,8 @@ func TestNoDupeClassMembersSeparatesPrivateNames(t *testing.T) {
 // Found on `BaseSchema.ts` in a real repository, which overloads `is` and `in` twice each: four
 // reports on code `tsc --noEmit` accepts without a diagnostic.
 func TestNoDupeClassMembersAllowsOverloadSignatures(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -140,6 +148,8 @@ func TestNoDupeClassMembersAllowsOverloadSignatures(t *testing.T) {
 // genuine duplicate through, and the third case is the one that catches it, since a class can carry
 // signatures and a duplicate implementation at once.
 func TestNoDupeClassMembersStillReportsDuplicatesBesideOverloads(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

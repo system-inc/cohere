@@ -22,6 +22,8 @@ const noUnsafeUnaryMinusFile = "/repository/source/Negate.ts"
 // that proves the union walk: the union's own flags carry `Union` and nothing else, so a version
 // asking the whole type rather than its parts would report this valid input.
 func TestNoUnsafeUnaryMinusStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -54,6 +56,8 @@ func TestNoUnsafeUnaryMinusStaysSilent(t *testing.T) {
 // Upstream records exactly one diagnostic per input and the rule `break`s at the first offending
 // union part, so no input here can report twice. `@typescript-eslint` agreed on all nine.
 func TestNoUnsafeUnaryMinusFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -90,6 +94,8 @@ func TestNoUnsafeUnaryMinusFires(t *testing.T) {
 //	`T extends any` REPORTS, because the constraint resolves to `unknown` rather than staying `any`
 //	a whole numeric enum is SILENT, because it splits into members that are each NumberLike
 func TestNoUnsafeUnaryMinusTypeBoundary(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -152,6 +158,8 @@ func TestNoUnsafeUnaryMinusTypeBoundary(t *testing.T) {
 // no such type, so no imported case needed a second file, but the next person adding one to this
 // table needs to know why their new clean case might be hollow.
 func TestNoUnsafeUnaryMinusTheErrorTypeIsAny(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"declare const x: Disposable;\n-x;",
 		"declare const x: NotDefinedAnywhere;\n-x;",
@@ -181,6 +189,8 @@ func TestNoUnsafeUnaryMinusTheErrorTypeIsAny(t *testing.T) {
 // green. It matters more than usual for this rule: the type name is interpolated per finding, and
 // it is exactly the half where the two upstream references disagree.
 func TestNoUnsafeUnaryMinusSpansAndText(t *testing.T) {
+	t.Parallel()
+
 	t.Run("the finding spans the whole unary expression, not the operand", func(t *testing.T) {
 		source := "declare const a: string;\nconst negated = -a;"
 		result := rule_testing.RunTyped(t, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, source)
@@ -287,6 +297,8 @@ func TestNoUnsafeUnaryMinusSpansAndText(t *testing.T) {
 // unreachable through registration, since `NeedsTypeChecker` is declared; it covers the harness
 // path, where a Context is built by hand. This test pins the declaration AND the guard.
 func TestNoUnsafeUnaryMinusRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoUnsafeUnaryMinus.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}

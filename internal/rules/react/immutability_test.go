@@ -15,6 +15,8 @@ import (
 // hypotheses formed from reading were wrong, and each would have shipped as a confident fixture.
 // They are recorded at their cases.
 func TestImmutabilityFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -295,6 +297,8 @@ function Component(props) {
 // only in whether the mutation comes before or after the freeze. A rule keyed on where a value came
 // from rather than on what has happened to it passes the fires table and fails both of these.
 func TestImmutabilityStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -507,6 +511,8 @@ function Component(props) {
 // `props.a = 1` underlines `props` and `props.a.q = 1` underlines `props.a`. Every one of those six
 // was green under `ExpectFindings`, which is exactly the failure this step exists to catch.
 func TestImmutabilitySpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		source   string
@@ -580,6 +586,8 @@ func TestImmutabilitySpans(t *testing.T) {
 // brief records a porter whose message-id mutant and message-text mutant BOTH survived a test
 // written the other way, because equality against the constant moves with the constant.
 func TestImmutabilityMessagesAreDistinct(t *testing.T) {
+	t.Parallel()
+
 	source := "function Component(props) {\n  props.a = 1;\n  return <div />;\n}\n"
 	result := rule_testing.RunTyped(t, Immutability, "component.tsx", source)
 	if len(result.Diagnostics) != 1 {
@@ -601,6 +609,8 @@ func TestImmutabilityMessagesAreDistinct(t *testing.T) {
 // right about every verdict and wrong about every sentence. Each expectation is React's own wording
 // for the same input, matched on the distinguishing clause rather than on the whole sentence.
 func TestImmutabilityReasonSelectsTheMessage(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -637,6 +647,8 @@ func TestImmutabilityReasonSelectsTheMessage(t *testing.T) {
 // vote on termination, and this asserts that directly rather than through a fixture, because a
 // fixture can only observe the symptom as slowness.
 func TestImmutabilityConvergenceEqualityIgnoresReasons(t *testing.T) {
+	t.Parallel()
+
 	first := immutabilityAbstractValue{Kind: immutabilityFrozen, Reasons: immutabilityReasonState}
 	second := immutabilityAbstractValue{Kind: immutabilityFrozen, Reasons: immutabilityReasonJsxCaptured}
 	merged := immutabilityMergeValues(first, second)
@@ -658,6 +670,8 @@ func TestImmutabilityConvergenceEqualityIgnoresReasons(t *testing.T) {
 // `Frozen` joined with `Mutable` is `MaybeFrozen`, an element that is NEITHER operand. Every row
 // here was measured against React's executable with the compilation gate held constant.
 func TestImmutabilityJoinIsNotAnOrdering(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		a, b     immutabilityValueKind
@@ -701,6 +715,8 @@ func TestImmutabilityJoinIsNotAnOrdering(t *testing.T) {
 // rather than panicking, which is the more dangerous of the two failure modes: every silent fixture
 // would pass vacuously.
 func TestImmutabilityRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "function Component(props) {\n  props.a = 1;\n  return <div />;\n}\n"
 	if result := rule_testing.RunTyped(t, Immutability, "component.tsx", source); len(result.Diagnostics) == 0 {
 		t.Fatal("the typed harness reported nothing, so this test cannot see a regression")

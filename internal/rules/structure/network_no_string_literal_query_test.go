@@ -19,6 +19,8 @@ const queryDeclarations = "declare const networkService: {\n" +
 	"declare const identifier: string;\n"
 
 func TestNetworkNoStringLiteralQueryFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -91,6 +93,8 @@ func TestNetworkNoStringLiteralQueryFires(t *testing.T) {
 }
 
 func TestNetworkNoStringLiteralQueryStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

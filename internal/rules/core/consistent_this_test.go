@@ -41,6 +41,8 @@ func consistentThisOptions(t *testing.T, aliases ...string) any {
 // rendering these literals from that JSON, so nothing was retyped and no escape sequence was
 // hand-written. The generator refuses any case holding a byte outside printable ASCII.
 func TestConsistentThisFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		aliases    []string
@@ -76,6 +78,8 @@ func TestConsistentThisFires(t *testing.T) {
 // is an alias for the context. A port matching on the initializer alone reports all four of the
 // destructuring cases, since every one of them assigns a this expression.
 func TestConsistentThisStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		aliases    []string
@@ -123,6 +127,8 @@ func TestConsistentThisStaysSilent(t *testing.T) {
 // declaration, so this port reported twice where upstream reports once at column 5. Nothing in the
 // imported corpus could see it: it writes no nested function declaring its own alias.
 func TestConsistentThisScopeModel(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -159,6 +165,8 @@ func TestConsistentThisScopeModel(t *testing.T) {
 // the compound-operator discrimination reaching a logical assignment, which reports twice: once
 // because the alias never received a plain assignment and once because the operator is not `=`.
 func TestConsistentThisOtherDeclarationForms(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -191,6 +199,8 @@ func TestConsistentThisOtherDeclarationForms(t *testing.T) {
 // aliasNotAssignedToThis unreachable and makes unexpectedAlias report every capture of `this` under
 // any name at all. So the nil case is asserted by behaviour rather than only by field.
 func TestDecodeConsistentThisOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an absent option is the alias that", func(t *testing.T) {
 		decoded, err := DecodeConsistentThisOptions(nil)
 		if err != nil {
@@ -264,6 +274,8 @@ func TestDecodeConsistentThisOptions(t *testing.T) {
 // span is the only thing separating that from upstream's node. Upstream reports the VariableDeclarator
 // and the AssignmentExpression, neither of which includes the `var` keyword or the semicolon.
 func TestConsistentThisPointsAtTheAssignment(t *testing.T) {
+	t.Parallel()
+
 	declaration := rule_testing.RunWithOptions(t, ConsistentThis, consistentThisFile,
 		"var context = this", consistentThisOptions(t, "self"))
 	rule_testing.ExpectFindings(t, declaration, "unexpectedAlias")
@@ -300,6 +312,8 @@ func TestConsistentThisPointsAtTheAssignment(t *testing.T) {
 // The last row is the one that pins the descent resuming: a real function nested inside an arrow is
 // a scope again, so its unassigned alias reports.
 func TestConsistentThisTreatsAnArrowAsNeitherScopeNorTransparent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -331,6 +345,8 @@ func TestConsistentThisTreatsAnArrowAsNeitherScopeNorTransparent(t *testing.T) {
 // expression judging its own declarations. Dropping function expressions from the scope list
 // survives the whole imported corpus and costs the first two rows here.
 func TestConsistentThisJudgesAFunctionExpressionAsItsOwnScope(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -17,6 +17,8 @@ const prototypeBuiltinsFile = "/repository/source/PrototypeBuiltins.ts"
 // fixture a porter invents encodes the same belief as the port, and the case that catches a bug is
 // the one nobody would think to write.
 func TestNoPrototypeBuiltinsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -71,6 +73,8 @@ func TestNoPrototypeBuiltinsFires(t *testing.T) {
 // resembles one of the three names is a different property. And a private field spelling the same
 // word cannot reach the builtin at all.
 func TestNoPrototypeBuiltinsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -129,6 +133,8 @@ func TestNoPrototypeBuiltinsStaysSilent(t *testing.T) {
 // and report on the wrong thing for the rest. `this` and a call-returned receiver are the shapes
 // our own code most plausibly writes.
 func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(t *testing.T) {
+	t.Parallel()
+
 	fires := []struct {
 		name       string
 		sourceText string
@@ -172,6 +178,8 @@ func TestNoPrototypeBuiltinsHandlesTypeScriptReceivers(t *testing.T) {
 // somewhere useless. Sliced out of the source with the finding's own range so the assertion cannot
 // agree with the code by sharing its arithmetic.
 func TestNoPrototypeBuiltinsPointsAtTheMemberExpression(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -216,6 +224,8 @@ func TestNoPrototypeBuiltinsPointsAtTheMemberExpression(t *testing.T) {
 // If a later change reaches for `ctx.TypeChecker`, the rule goes silent under `rule_testing.Run` and
 // every clean case above starts passing vacuously. This asserts the plain harness still fires.
 func TestNoPrototypeBuiltinsNeedsNoTypeChecker(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.Run(t, NoPrototypeBuiltins, prototypeBuiltinsFile, "foo.hasOwnProperty('bar')"),
 		"noPrototypeBuiltins")

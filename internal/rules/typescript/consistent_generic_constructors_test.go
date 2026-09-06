@@ -36,6 +36,8 @@ func consistentGenericConstructorsSettingsFor(t *testing.T, wire string) any {
 // TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations below rather than quietly
 // dropped or forced green.
 func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wire       string
@@ -128,6 +130,8 @@ func TestConsistentGenericConstructorsStaysSilent(t *testing.T) {
 // `new \n Foo<string> \n ()` both report, and a fixer computing ranges by arithmetic rather than by
 // scanning for the brackets writes the wrong text on both while satisfying every id.
 func TestConsistentGenericConstructorsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wire       string
@@ -451,6 +455,8 @@ func TestConsistentGenericConstructorsFires(t *testing.T) {
 // make it green. The branch it guards is the one part of this port no fixture covers, and saying so
 // here is more useful than a mutation score that quietly counts it as unreachable.
 func TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "const foo: Foo<string> = new Foo();\n"
 
 	// Control one: without the option, this source reports. So the case upstream lists as clean is
@@ -474,6 +480,8 @@ func TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations(t *testi
 // matches neither arm and makes the rule silently inert while every fixture built from an explicit
 // struct still passes.
 func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		wire string
 		want ConsistentGenericConstructorsMode

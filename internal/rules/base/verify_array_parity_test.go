@@ -30,6 +30,8 @@ const verifyArrayDecoratorPreamble = "declare function VerifyIsArray(): Property
 // Written rather than imported, since this is our own rule. Each case names which of the three
 // decorator sets it exercises, and the whole set was checked against the existing ESLint rule.
 func TestVerifyArrayParityFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name     string
 		source   string
@@ -141,6 +143,8 @@ func TestVerifyArrayParityFires(t *testing.T) {
 
 // TestVerifyArrayParityStaysSilent covers the inputs the rule must decline.
 func TestVerifyArrayParityStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -226,6 +230,8 @@ func TestVerifyArrayParityStaysSilent(t *testing.T) {
 // TestVerifyArrayParityRequiresTheTypedHarness asserts the rule declines a nil checker, with a
 // control proving the same input reports through the typed harness.
 func TestVerifyArrayParityRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = "class Entity { @VerifyIsString() names: string[]; }"
 
 	rule_testing.ExpectClean(t, rule_testing.Run(t, VerifyArrayParity,

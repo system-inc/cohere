@@ -10,6 +10,8 @@ import (
 const moduleAliasFile = "/repository/source/Thing.tsx"
 
 func TestImportRequireModuleAliasFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -73,6 +75,8 @@ func TestImportRequireModuleAliasFires(t *testing.T) {
 // written while still reading as a real finding in every count. This rule reports the binding, which
 // is both on the import line and the text a reader has to change.
 func TestImportRequireModuleAliasReportsAtTheBinding(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "// Dependencies - React\n" +
 		"// The binding below is deliberately misnamed\n" +
 		"// eslint-disable-next-line nexus/import-require-module-alias\n" +
@@ -92,6 +96,8 @@ func TestImportRequireModuleAliasReportsAtTheBinding(t *testing.T) {
 // renames a binding without following its references, and the corrupted output still parses, so the
 // edit engine's parse guard cannot catch it.
 func TestImportRequireModuleAliasProposesNoFix(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ImportRequireModuleAlias, moduleAliasFile, "import Reakt from 'react';\n")
 	rule_testing.ExpectFindings(t, result, "requireAliasName")
 
@@ -104,6 +110,8 @@ func TestImportRequireModuleAliasProposesNoFix(t *testing.T) {
 }
 
 func TestImportRequireModuleAliasStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -142,6 +150,8 @@ func TestImportRequireModuleAliasStaysSilent(t *testing.T) {
 // original got from its AST for free. This rule keys on ImportDeclaration and so never sees them,
 // and this fixture is what keeps that true if the listener set ever widens.
 func TestImportRequireModuleAliasIgnoresJsxAndOtherIdentifiers(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "import React from 'react';\n" +
 		"const Reakt = 1;\n" +
 		"export function Component() {\n" +
@@ -153,6 +163,8 @@ func TestImportRequireModuleAliasIgnoresJsxAndOtherIdentifiers(t *testing.T) {
 }
 
 func TestImportRequireModuleAliasReadsOptions(t *testing.T) {
+	t.Parallel()
+
 	options := ImportRequireModuleAliasOptions{
 		Modules: map[string]ModuleAlias{
 			// A package the defaults say nothing about.

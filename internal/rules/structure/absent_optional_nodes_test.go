@@ -37,6 +37,8 @@ import (
 // something optional in a shape not listed here, the fix is to add the shape, not to trust the
 // green.
 func TestNoRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		"declare const memo: unknown;\nexport const value = 1;\n",
 		"import { networkService } from './NetworkService.ts';\nlet useThingRequest;\nexport const value = useThingRequest;\n",

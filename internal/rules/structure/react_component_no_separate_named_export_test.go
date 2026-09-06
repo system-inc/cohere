@@ -9,6 +9,8 @@ import (
 const separateExportFile = "/repository/source/components/Button.tsx"
 
 func TestReactComponentNoSeparateNamedExportFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -48,6 +50,8 @@ func TestReactComponentNoSeparateNamedExportFires(t *testing.T) {
 }
 
 func TestReactComponentNoSeparateNamedExportStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -180,6 +184,8 @@ func TestReactComponentNoSeparateNamedExportStaysSilent(t *testing.T) {
 // otherwise, on the first fixable rule I have written since it existed. An id-only fixture would
 // have agreed with me.
 func TestReactComponentNoSeparateNamedExportFixDeletesTheStatement(t *testing.T) {
+	t.Parallel()
+
 	source := "function Button() {\n    return <button />;\n}\nexport { Button };\n"
 	rule_testing.ExpectFixedSource(t,
 		rule_testing.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, source),

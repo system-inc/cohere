@@ -91,6 +91,8 @@ func goldenDependencies(t *testing.T, expectPath string) []string {
 // And this package declares `DependencyGapOptionalChains`, so an optional chain is expected to score
 // short. Asserting equality would fail on upstream's own choices rather than on our defects.
 func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
+	t.Parallel()
+
 	fixtures, err := react_conformance.Load("../../react_conformance/testdata/fixtures")
 	if err != nil {
 		t.Fatalf("loading the vendored corpus: %v", err)

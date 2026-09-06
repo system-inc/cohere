@@ -48,6 +48,8 @@ func decodeClassLiteralPropertyStyleOptions(t *testing.T, configuration string) 
 // The same source appears under both options in several places, which is the point: this rule's
 // verdict lives above the code as often as in it.
 func TestClassLiteralPropertyStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -199,6 +201,8 @@ func TestClassLiteralPropertyStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
 // suggestion count says whether a repair was offered at all. And the applied source says what a
 // human accepting that suggestion would get, which no message-id assertion can see.
 func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -422,6 +426,8 @@ func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(t *testing.T) {
 // comment, and those are the two that would survive an enumerating fixer while telling you nothing.
 // Every expectation is what the installed 8.67.0 build produced for that exact input.
 func TestClassLiteralPropertyStylePreservesTheReturnAnnotation(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText    string
 		wantSuggested string
@@ -486,6 +492,8 @@ func TestClassLiteralPropertyStylePreservesTheReturnAnnotation(t *testing.T) {
 // Each row was run through the installed 8.67.0 build and carries the verdict that build produced,
 // so a row asserting silence asserts upstream's silence rather than this port's.
 func TestClassLiteralPropertyStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -669,6 +677,8 @@ func TestClassLiteralPropertyStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *te
 // is why every other test in this file routes through the decoder and why this one asserts the
 // decoder's own output.
 func TestClassLiteralPropertyStyleDecoderResolvesTheStyle(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		wantStyle     ClassLiteralPropertyStyleSetting
@@ -704,6 +714,8 @@ func TestClassLiteralPropertyStyleDecoderResolvesTheStyle(t *testing.T) {
 // every file and reports nothing while every decoder-routed fixture stays green, which is the exact
 // failure this project has shipped before.
 func TestClassLiteralPropertyStyleNilOptionsFallsBackToUpstreamDefault(t *testing.T) {
+	t.Parallel()
+
 	// `fields` is the default, so a literal getter reports and a readonly field does not.
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle,
 		classLiteralPropertyStyleFile, "class C { get x() { return 1; } }", nil), "preferFieldStyle")
@@ -722,6 +734,8 @@ func TestClassLiteralPropertyStyleNilOptionsFallsBackToUpstreamDefault(t *testin
 // of these, since its parser rejects what ours recovers from, so asserting a verdict would be
 // inventing one.
 func TestClassLiteralPropertyStyleSurvivesMalformedClassMembers(t *testing.T) {
+	t.Parallel()
+
 	for name, sourceText := range map[string]string{
 		"noParens":     "class C { get x { return 1; } }",
 		"noBody":       "class C { get x() }",

@@ -9,6 +9,8 @@ import (
 const sparseArrayFile = "/repository/source/Thing.ts"
 
 func TestNoSparseArraysFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -30,6 +32,8 @@ func TestNoSparseArraysFires(t *testing.T) {
 }
 
 func TestNoSparseArraysStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -56,6 +60,8 @@ func TestNoSparseArraysStaysSilent(t *testing.T) {
 // One finding per array rather than one per hole, so a two-hole array reports once. Reported on the
 // literal rather than the hole because the hole has no text of its own to point at.
 func TestNoSparseArraysReportsOncePerArray(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoSparseArrays, sparseArrayFile, "export const Values = [1, , , 4];\n")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want exactly one finding for a two-hole array, got %d", len(result.Diagnostics))

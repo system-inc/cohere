@@ -12,6 +12,8 @@ import "testing"
 // every over-specified one -- exactly inverted, and passing any test that only checks "unequal paths
 // disagree".
 func TestCompareManualMemoDependenciesAsymmetry(t *testing.T) {
+	t.Parallel()
+
 	local := func(identifier IdentifierId, properties ...string) ManualMemoDependency {
 		path := make([]DependencyPathEntry, 0, len(properties))
 		for _, property := range properties {
@@ -83,6 +85,8 @@ func TestCompareManualMemoDependenciesAsymmetry(t *testing.T) {
 // The control matters here more than usual: the same shape with a different property name must be
 // `Ok`, or the case below passes because deeper paths are rejected generally.
 func TestCompareManualMemoDependenciesWithdrawsTheRuleForRefs(t *testing.T) {
+	t.Parallel()
+
 	path := func(properties ...string) []DependencyPathEntry {
 		entries := make([]DependencyPathEntry, 0, len(properties))
 		for _, property := range properties {
@@ -130,6 +134,8 @@ func TestCompareManualMemoDependenciesWithdrawsTheRuleForRefs(t *testing.T) {
 // letting the depth rule decide, because it is a difference regardless of what the rest of the path
 // does.
 func TestCompareManualMemoDependenciesComparesOptionality(t *testing.T) {
+	t.Parallel()
+
 	root := ManualMemoRoot{Place: Place{Identifier: 1}}
 	optional := ManualMemoDependency{Root: root, Path: []DependencyPathEntry{{Property: "a", Optional: true}}}
 	plain := ManualMemoDependency{Root: root, Path: []DependencyPathEntry{{Property: "a"}}}
@@ -151,6 +157,8 @@ func TestCompareManualMemoDependenciesComparesOptionality(t *testing.T) {
 // A global is compared by name and a local by identifier, and the two kinds never match each other
 // -- a global has no identifier in this function to compare against.
 func TestCompareManualMemoDependenciesGlobalRoots(t *testing.T) {
+	t.Parallel()
+
 	globalRoot := func(name string) ManualMemoDependency {
 		return ManualMemoDependency{Root: ManualMemoRoot{IsGlobal: true, Name: name}}
 	}
@@ -179,6 +187,8 @@ func TestCompareManualMemoDependenciesGlobalRoots(t *testing.T) {
 // reported reason is the strongest disagreement seen, so a root difference against one entry does
 // not mask a ref-access difference against another.
 func TestMergeCompareDependencyResultsTakesTheMostSpecific(t *testing.T) {
+	t.Parallel()
+
 	results := []CompareDependencyResult{
 		CompareDependencyOk,
 		CompareDependencyRootDifference,

@@ -151,37 +151,52 @@ func runTypedFiles(
 		t.Fatalf("the subject file %q is not among the fixture files %v", subjectFileName, keysOf(files))
 	}
 
-	directory := t.TempDir()
-	for name, contents := range files {
-		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatalf("creating the fixture directory for %s: %v", name, err)
-		}
-		if err := os.WriteFile(path, []byte(strings.TrimSpace(contents)+"\n"), 0o644); err != nil {
-			t.Fatalf("writing the fixture %s: %v", name, err)
-		}
-	}
-
-	// After the files exist and before the program is built, so a hook can add something to the
-	// directory that the program or a rule will then find.
+	// A fixture with a setup hook is built the old way, uncached.
+	//
+	// The hook is handed the directory and may do anything to it, including linking a real package in
+	// from outside. Two callers passing identical file maps can therefore still want different
+	// programs, so the file bytes are no longer a complete cache key and sharing the build would be
+	// wrong rather than merely conservative.
+	var graph *program.Graph
+	var directory string
 	if setup != nil {
+		directory = t.TempDir()
+		for name, contents := range files {
+			path := filepath.Join(directory, name)
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatalf("creating the fixture directory for %s: %v", name, err)
+			}
+			if err := os.WriteFile(path, []byte(strings.TrimSpace(contents)+"\n"), 0o644); err != nil {
+				t.Fatalf("writing the fixture %s: %v", name, err)
+			}
+		}
+
+		// After the files exist and before the program is built, so a hook can add something to the
+		// directory that the program or a rule will then find.
 		setup(directory)
-	}
 
-	configPath := filepath.Join(directory, "tsconfig.json")
-	if err := os.WriteFile(configPath, []byte(defaultTsConfig), 0o644); err != nil {
-		t.Fatalf("writing the tsconfig: %v", err)
-	}
+		configPath := filepath.Join(directory, "tsconfig.json")
+		if err := os.WriteFile(configPath, []byte(defaultTsConfig), 0o644); err != nil {
+			t.Fatalf("writing the tsconfig: %v", err)
+		}
 
-	graph, err := program.Build(program.Options{
-		ConfigFileName:   configPath,
-		CurrentDirectory: directory,
-		// One checker rather than several: a fixture is one file, and the parallel path adds
-		// scheduling nondeterminism to a test whose whole value is being deterministic.
-		SingleThreaded: true,
-	})
-	if err != nil {
-		t.Fatalf("building the type graph: %v", err)
+		built, err := program.Build(program.Options{
+			ConfigFileName:   configPath,
+			CurrentDirectory: directory,
+			// One checker rather than several: a fixture is one file, and the parallel path adds
+			// scheduling nondeterminism to a test whose whole value is being deterministic.
+			SingleThreaded: true,
+		})
+		if err != nil {
+			t.Fatalf("building the type graph: %v", err)
+		}
+		graph = built
+	} else {
+		built, cachedDirectory, err := buildCachedProgram(files, subjectFileName)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		graph, directory = built, cachedDirectory
 	}
 
 	projectFiles := graph.ProjectFiles()

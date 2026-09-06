@@ -42,6 +42,8 @@ func asTheTypedPreferForOfHarnessWroteIt(text string) string {
 // where the indexed element is being ASSIGNED rather than read, each of which makes a for-of
 // rewrite wrong rather than merely different.
 func TestPreferForOfStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\nfor (let i = 0; i < arr1.length; i++) {\n  const x = arr1[i] === arr2[i];\n}\n    ",
 		"\nfor (let i = 0; i < arr.length; i++) {\n  arr[i] = 0;\n}\n    ",
@@ -114,6 +116,8 @@ func TestPreferForOfStaysSilentOnUpstreamPassCases(t *testing.T) {
 // One row reports twice, on a loop nested inside a loop where the inner index SHADOWS the outer. It
 // is the case that separates resolving an identifier to its declaration from matching it by name.
 func TestPreferForOfFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantIds    []string
@@ -243,6 +247,8 @@ func TestPreferForOfFiresOnUpstreamFailCases(t *testing.T) {
 // corpus. Every verdict below was then measured against the installed 8.x build, with a reporting
 // control in the same run.
 func TestPreferForOfOnShapesUpstreamsCorpusCannotSeparate(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -372,6 +378,8 @@ func TestPreferForOfOnShapesUpstreamsCorpusCannotSeparate(t *testing.T) {
 //
 // Measured against the installed 8.x build, all ten including the control reporting.
 func TestPreferForOfDoesNotMistakeAReadForAWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -501,6 +509,8 @@ func TestPreferForOfDoesNotMistakeAReadForAWrite(t *testing.T) {
 // as a literal rather than read from the rule's own constant, because a comparison against the
 // constant moves with any mutation of it.
 func TestPreferForOfRendersUpstreamsMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, PreferForOf, preferForOfFile,
 		"for (let i = 0; i < arr.length; i++) {\n  console.log(arr[i]);\n}\n")
 	if len(result.Diagnostics) != 1 {
@@ -526,6 +536,8 @@ func TestPreferForOfRendersUpstreamsMessageText(t *testing.T) {
 // This asserts the untyped harness produces nothing on an input the typed one reports, so a later
 // revert to rule_testing.Run fails loudly rather than quietly.
 func TestPreferForOfRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "for (let i = 0; i < arr.length; i++) {\n  console.log(arr[i]);\n}\n"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, PreferForOf, preferForOfFile, sourceText))
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferForOf,
@@ -547,6 +559,8 @@ func TestPreferForOfRequiresTheTypedHarness(t *testing.T) {
 // nothing imported can see this; it was found by measuring the other spelling and it changed the
 // port.
 func TestPreferForOfReproducesUpstreamsObjectPatternAsymmetry(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string

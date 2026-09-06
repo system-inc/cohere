@@ -630,6 +630,8 @@ var preferRegexLiteralsDecidedByGlobalsConfig = []preferRegexLiteralsRow{
 // known consequence of not having one, and it fails the moment the behaviour changes in either
 // direction.
 func TestPreferRegexLiteralsReportsWhatTheGlobalsConfigWouldHaveSilenced(t *testing.T) {
+	t.Parallel()
+
 	for _, row := range preferRegexLiteralsDecidedByGlobalsConfig {
 		t.Run(row.source, func(t *testing.T) {
 			rule_testing.ExpectFindings(t, runPreferRegexLiterals(t, row), row.ids...)
@@ -698,6 +700,8 @@ var preferRegexLiteralsDecidedByLanguageEdition = []preferRegexLiteralsRow{
 // described at each row rather than pinned, so this test does not have to be rewritten every time
 // the pattern scanner learns a new syntax.
 func TestPreferRegexLiteralsRecordsTheLanguageEditionDivergence(t *testing.T) {
+	t.Parallel()
+
 	for _, row := range preferRegexLiteralsDecidedByLanguageEdition {
 		t.Run(row.source, func(t *testing.T) {
 			rule_testing.ExpectFindings(t, runPreferRegexLiterals(t, row), row.ids...)
@@ -712,11 +716,15 @@ func TestPreferRegexLiteralsRecordsTheLanguageEditionDivergence(t *testing.T) {
 // program with no DOM library, so the call is declined. Upstream reports it only because its config
 // declares `window` a global, which is the same missing surface as the `globals: off` cases.
 func TestPreferRegexLiteralsIsSilentWithoutADeclaredGlobal(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile,
 		"new window['RegExp']('\\x56\\x78\\x45', '');"))
 }
 
 func TestPreferRegexLiteralsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, row := range preferRegexLiteralsClean {
 		t.Run(row.source, func(t *testing.T) {
 			rule_testing.ExpectClean(t, runPreferRegexLiterals(t, row))
@@ -725,6 +733,8 @@ func TestPreferRegexLiteralsStaysSilent(t *testing.T) {
 }
 
 func TestPreferRegexLiteralsFires(t *testing.T) {
+	t.Parallel()
+
 	for _, row := range preferRegexLiteralsReporting {
 		t.Run(row.source, func(t *testing.T) {
 			result := runPreferRegexLiterals(t, row)
@@ -844,6 +854,8 @@ func runPreferRegexLiterals(t *testing.T, row preferRegexLiteralsRow) rule_testi
 // that had stopped working. This asserts the typed harness is what makes it report, so a later
 // revert of `NeedsTypeChecker` fails loudly.
 func TestPreferRegexLiteralsNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = "new RegExp('abc');"
 	rule_testing.ExpectFindings(t,
 		rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile, source),
@@ -858,6 +870,8 @@ func TestPreferRegexLiteralsNeedsTheTypedHarness(t *testing.T) {
 // than the call would pass every row above while pointing at the wrong span, and the suggestion it
 // carries would then replace the wrong bytes. Upstream reports the whole call expression.
 func TestPreferRegexLiteralsReportsTheWholeCall(t *testing.T) {
+	t.Parallel()
+
 	const source = "const pattern = new RegExp('abc', 'g');"
 	result := rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile, source)
 	if len(result.Diagnostics) != 1 {
@@ -876,6 +890,8 @@ func TestPreferRegexLiteralsReportsTheWholeCall(t *testing.T) {
 // against the rule's own constant, since comparing a diagnostic to the constant it was built from is
 // an equality that moves on both sides under mutation and therefore proves nothing.
 func TestPreferRegexLiteralsExplainsWhyItMatters(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile, "new RegExp('abc');")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))

@@ -9,6 +9,8 @@ import (
 // The fail cases are oxc's own, plus the paired `<img></img>` form, which our tree reaches at a
 // different depth than the self-closing one and which oxc's corpus does not contain.
 func TestNoImgElementReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -66,6 +68,8 @@ export const MyComponent = () => <img src={somePicture.src} alt='foo' />;`,
 // The pass cases are oxc's own. The <picture> ones are the exemption, and the `<Image />` one is
 // the replacement the rule exists to push toward, which must never itself report.
 func TestNoImgElementIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string

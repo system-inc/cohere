@@ -158,6 +158,8 @@ const noUselessAssignmentFile = "/repository/source/Component.tsx"
 // the contract; this one is the map. It fails only on a false positive, which is the direction that
 // costs a reader trust.
 func TestNoUselessAssignmentSurvey(t *testing.T) {
+	t.Parallel()
+
 	falsePositives := 0
 	for index, source := range noUselessAssignmentUpstreamPass {
 		result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, source)
@@ -195,6 +197,8 @@ func TestNoUselessAssignmentSurvey(t *testing.T) {
 // and the expected count is the same snapshot-derived number the survey uses. This is stronger than
 // the survey's "does not exceed": it is a claim of exact agreement on every input.
 func TestNoUselessAssignmentFires(t *testing.T) {
+	t.Parallel()
+
 	for index := range noUselessAssignmentUpstreamFail {
 		entry := noUselessAssignmentUpstreamFail[index]
 		t.Run(fmt.Sprintf("upstream fail %d", index), func(t *testing.T) {
@@ -215,6 +219,8 @@ func TestNoUselessAssignmentFires(t *testing.T) {
 // right-hand side, and several the exported-binding guard, and every one of them reported a finding
 // at some point while this was being written.
 func TestNoUselessAssignmentStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for index, source := range noUselessAssignmentUpstreamPass {
 		t.Run(fmt.Sprintf("upstream pass %d", index), func(t *testing.T) {
 			rule_testing.ExpectClean(t,
@@ -231,6 +237,8 @@ func TestNoUselessAssignmentStaysSilent(t *testing.T) {
 // reader looks at. Asserted for a declarator, a plain assignment, and a compound assignment,
 // because the three take different paths through `writeTargetOf`.
 func TestNoUselessAssignmentPointsAtTheIdentifier(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -290,6 +298,8 @@ func TestNoUselessAssignmentPointsAtTheIdentifier(t *testing.T) {
 // fail in a way that reads like a rule bug rather than a harness one. Asserting the difference
 // directly means the two failure modes cannot be confused.
 func TestNoUselessAssignmentNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "function f() {\n\tlet value = 1;\n\tuse(value);\n\tvalue = 2;\n}"
 
 	if !NoUselessAssignment.NeedsTypeChecker {
@@ -311,6 +321,8 @@ func TestNoUselessAssignmentNeedsTheTypedHarness(t *testing.T) {
 // later porter extending the rule sees immediately which of these they have picked up. Each is a
 // silent miss, never a wrong report, which is the direction a partial port should miss in.
 func TestNoUselessAssignmentBoundary(t *testing.T) {
+	t.Parallel()
+
 	recovered := []struct {
 		name  string
 		why   string
@@ -354,6 +366,8 @@ func TestNoUselessAssignmentBoundary(t *testing.T) {
 // No imported case could see it: upstream's corpus writes the shape only with an else arm present,
 // where the kill is real and both implementations agree.
 func TestNoUselessAssignmentConditionalWritesDoNotKill(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -435,6 +449,8 @@ func TestNoUselessAssignmentConditionalWritesDoNotKill(t *testing.T) {
 // walk one step back instead of copying the blocker set passed the entire imported corpus, passed
 // six of these seven, and reported two false positives on this one.
 func TestNoUselessAssignmentSelfReferentialWritesStayLive(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -520,6 +536,8 @@ func TestNoUselessAssignmentSelfReferentialWritesStayLive(t *testing.T) {
 // real tree, 50 of them in a single file. The findings count went from 257 to 34 when this was
 // fixed, which is the ratio that makes this the most valuable test in the file.
 func TestNoUselessAssignmentShorthandPropertyIsARead(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -566,6 +584,8 @@ func TestNoUselessAssignmentShorthandPropertyIsARead(t *testing.T) {
 // TestNoUselessAssignmentSwitchFlow pins the control flow shapes a switch produces, which the
 // imported corpus does not cover at all and which the real tree is full of.
 func TestNoUselessAssignmentSwitchFlow(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

@@ -66,6 +66,8 @@ func applyConsistentIndexedObjectStyleSuggestion(t *testing.T, source string, su
 // Twenty-four of the fifty-two are circularity cases, which makes that test most of what this rule
 // decides rather than an edge.
 func TestConsistentIndexedObjectStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string
@@ -143,6 +145,8 @@ func TestConsistentIndexedObjectStyleStaysSilentOnUpstreamPassCases(t *testing.T
 // spelling because there is no builtin Mutable. A rule that repaired any of them would satisfy every
 // message assertion while writing source that does not compile.
 func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		optionsJson  string
@@ -698,6 +702,8 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(t *testing.T) {
 // the plain harness that answers nothing and every self-referencing case would report, so the
 // failure direction here is over-reporting rather than silence.
 func TestConsistentIndexedObjectStyleNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !ConsistentIndexedObjectStyle.NeedsTypeChecker {
 		t.Fatal("the circularity test resolves identifiers, so the rule must declare NeedsTypeChecker")
 	}
@@ -712,6 +718,8 @@ func TestConsistentIndexedObjectStyleNeedsTheTypedHarness(t *testing.T) {
 // An unrecognised value keeps the default rather than turning the rule off, which is the safe
 // direction: a typo in a config should not silently disable a rule.
 func TestDecodeConsistentIndexedObjectStyleOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -746,6 +754,8 @@ func TestDecodeConsistentIndexedObjectStyleOptions(t *testing.T) {
 // rule through the decoder, so nothing there can see the fallback. The separating input is a Record
 // type: silent under the default record mode, reporting under index-signature mode.
 func TestConsistentIndexedObjectStyleFallsBackToTheDefaultOnNilOptions(t *testing.T) {
+	t.Parallel()
+
 	const record = "type T = Record<string, number>;"
 
 	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, ConsistentIndexedObjectStyle,

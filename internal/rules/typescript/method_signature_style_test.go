@@ -44,6 +44,8 @@ func decodeMethodSignatureStyleOptions(t *testing.T, configuration string) any {
 // escape sequence passed through a shell or a keyboard on the way here. Every one was additionally
 // run through the installed 8.67.0 build, which reported nothing on all twenty-four.
 func TestMethodSignatureStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -165,6 +167,8 @@ func TestMethodSignatureStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
 // unattended. And the suggestion, where there is one, says what a human accepting it would get,
 // which is the only way to see a repair the engine never applies.
 func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -543,6 +547,8 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(t *testing.T) {
 // checked through the TypeScript compiler to confirm the member's type is identical before and
 // after.
 func TestMethodSignatureStylePreservesEverythingInsideTheSignature(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -632,6 +638,8 @@ func TestMethodSignatureStylePreservesEverythingInsideTheSignature(t *testing.T)
 // Each row was run through the installed 8.67.0 build and carries the verdict that build produced,
 // so a row asserting silence asserts upstream's silence rather than this port's.
 func TestMethodSignatureStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -718,6 +726,8 @@ func TestMethodSignatureStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing
 // TestMethodSignatureStyleDecoderResolvesTheStyle puts the one line with no upstream counterpart
 // under test.
 func TestMethodSignatureStyleDecoderResolvesTheStyle(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		wantStyle     MethodSignatureStyleSetting
@@ -747,6 +757,8 @@ func TestMethodSignatureStyleDecoderResolvesTheStyle(t *testing.T) {
 
 // TestMethodSignatureStyleNilOptionsFallsBackToUpstreamDefault bypasses the decoder entirely.
 func TestMethodSignatureStyleNilOptionsFallsBackToUpstreamDefault(t *testing.T) {
+	t.Parallel()
+
 	// `property` is the default, so a shorthand method reports and a function property does not.
 	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, MethodSignatureStyle,
 		methodSignatureStyleFile, "interface I { m(a: string): void; }", nil), "errorMethod")
@@ -762,6 +774,8 @@ func TestMethodSignatureStyleNilOptionsFallsBackToUpstreamDefault(t *testing.T) 
 //
 // There is no finding to assert; the assertion is that the run completes.
 func TestMethodSignatureStyleSurvivesMalformedSignatures(t *testing.T) {
+	t.Parallel()
+
 	for name, sourceText := range map[string]string{
 		"noParens":    "interface I { m: void; }",
 		"unclosed":    "interface I { m(a: string): void;",

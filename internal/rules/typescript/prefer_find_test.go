@@ -47,6 +47,8 @@ func applyPreferFindSuggestion(t *testing.T, source string, suggestion rule.Sugg
 // TypeScript compiler. Every one was run through the installed 8.x build against a real program,
 // which reported nothing and produced no parse error on any of them.
 func TestPreferFindStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\ninterface JerkCode<T> {\n  filter(predicate: (item: T) => boolean): JerkCode<T>;\n}\n\ndeclare const jerkCode: JerkCode<string>;\n\njerkCode.filter(item => item === 'aha')[0];\n    ",
 		"\ndeclare const arr: readonly string[];\narr.filter(item => item === 'aha')[1];\n    ",
@@ -86,6 +88,8 @@ func TestPreferFindStaysSilentOnUpstreamPassCases(t *testing.T) {
 // The harness writes each fixture as `strings.TrimSpace(source)+"\n"`, so both the span slices and
 // the expected rewrites are against that trimmed text rather than the Go literal.
 func TestPreferFindFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []preferFindFinding
@@ -309,6 +313,8 @@ func TestPreferFindFiresOnUpstreamFailCases(t *testing.T) {
 // Under the plain harness the checker is nil and every listener returns immediately, so the clean
 // fixtures would pass having proven nothing.
 func TestPreferFindNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !PreferFind.NeedsTypeChecker {
 		t.Fatal("the rule resolves the filtered receiver's type, so it must declare NeedsTypeChecker")
 	}
@@ -329,6 +335,8 @@ func TestPreferFindNeedsTheTypedHarness(t *testing.T) {
 //
 // All five were measured clean on the installed 8.x build before being written here.
 func TestPreferFindStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"declare const arr: string[];\narr.filter(x => true).indexOf('a');",
 		"declare const arr: string[];\narr.filter(x => true).includes('a');",

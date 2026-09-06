@@ -90,6 +90,8 @@ func requireAwaitSilentCases() []requireAwaitCase {
 }
 
 func TestRequireAwaitFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range requireAwaitFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			wantIds := make([]string, len(testCase.wantNames))
@@ -102,6 +104,8 @@ func TestRequireAwaitFires(t *testing.T) {
 }
 
 func TestRequireAwaitStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range requireAwaitSilentCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t, runRequireAwait(t, testCase))
@@ -116,6 +120,8 @@ func TestRequireAwaitStaysSilent(t *testing.T) {
 // than by the function bound to it, an empty string literal name renders as a name rather than as
 // an absent one, and a computed name renders as no name at all.
 func TestRequireAwaitNamesTheFunction(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range requireAwaitFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
 			result := runRequireAwait(t, testCase)
@@ -146,6 +152,8 @@ func TestRequireAwaitNamesTheFunction(t *testing.T) {
 // join the construct to the line above, and upstream substitutes a semicolon rather than emitting
 // nothing. Three of its own cases exercise it, all measured.
 func TestRequireAwaitSuggestsRemovingAsync(t *testing.T) {
+	t.Parallel()
+
 	semicolons := 0
 	for _, testCase := range requireAwaitFiresCases() {
 		t.Run(testCase.sourceText, func(t *testing.T) {
@@ -200,6 +208,8 @@ func TestRequireAwaitSuggestsRemovingAsync(t *testing.T) {
 // expression, so no semicolon is needed even though the property has an unterminated initializer.
 // Every verdict below was measured against the installed rule before the row was written.
 func TestRequireAwaitSemicolonNeedsBothHalves(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantText   string
@@ -246,6 +256,8 @@ func TestRequireAwaitSemicolonNeedsBothHalves(t *testing.T) {
 // function async, which is both wrong and silent, since the finding still appears and still carries
 // a repair. Upstream was driven over each shape below and removes exactly "async " every time.
 func TestRequireAwaitFindsAsyncPastOtherModifiers(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"class A { static async foo() { return 1; } }",
 		"class A { public async foo() { return 1; } }",
@@ -288,6 +300,8 @@ func TestRequireAwaitFindsAsyncPastOtherModifiers(t *testing.T) {
 // plausible span and only one matches. Every expectation below was measured against the installed
 // rule.
 func TestRequireAwaitReportsOnTheFunctionHead(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantHead   string

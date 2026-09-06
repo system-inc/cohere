@@ -47,6 +47,8 @@ func requireArraySortCompareOptionsFor(t *testing.T, optionsJson string) any {
 // Seven of the twenty carry explicit options, and both settings of the single option appear, so the
 // exemption is exercised in both directions rather than only at its default.
 func TestRequireArraySortCompareStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string
@@ -156,6 +158,8 @@ func TestRequireArraySortCompareStaysSilentOnUpstreamPassCases(t *testing.T) {
 // newline, so comparing against the literal would be off by one byte on all seventeen and would read
 // exactly like an off-by-one in the rule.
 func TestRequireArraySortCompareFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string
@@ -287,6 +291,8 @@ func TestRequireArraySortCompareFiresOnUpstreamFailCases(t *testing.T) {
 // non-string arrays whose verdict the option cannot change. Only a string array with no options at
 // all separates the two decoders, which is the third case below.
 func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		raw  string
@@ -324,6 +330,8 @@ func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t
 // A string array with no options is the separating input. Under the default it is exempt; under a
 // zeroed struct it reports.
 func TestRequireArraySortCompareFallsBackToTheDefaultOnNilOptions(t *testing.T) {
+	t.Parallel()
+
 	const stringArray = "['foo', 'bar', 'baz'].sort();"
 
 	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
@@ -344,6 +352,8 @@ func TestRequireArraySortCompareFallsBackToTheDefaultOnNilOptions(t *testing.T) 
 // defect. Asserting the declaration directly means a later revert fails loudly rather than going
 // quietly green.
 func TestRequireArraySortCompareNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !RequireArraySortCompare.NeedsTypeChecker {
 		t.Fatal("the rule resolves the receiver's type, so it must declare NeedsTypeChecker")
 	}
@@ -361,6 +371,8 @@ func TestRequireArraySortCompareNeedsTheTypedHarness(t *testing.T) {
 // fails the report test. Two clean verdicts, two mechanisms, and a port could get one right by
 // accident while breaking the other.
 func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 	}{
@@ -442,6 +454,8 @@ func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(t *test
 // argument. The doc comment asserted `(a.sort)()` was silent upstream on the reasoning that a paren
 // breaks the child relation. Measured, it reports, and the port was silently missing it.
 func TestRequireArraySortCompareFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpan   string
@@ -523,6 +537,8 @@ func TestRequireArraySortCompareFiresOnShapesTheCorpusDoesNotWrite(t *testing.T)
 // here, so the silence below is specifically about folding through a binding rather than about
 // computed access being unsupported.
 func TestRequireArraySortCompareDoesNotConstantFoldAComputedKey(t *testing.T) {
+	t.Parallel()
+
 	const folded = "function f(a: number[]) {\n  const key = 'sort';\n  a[key]();\n}"
 	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
 		requireArraySortCompareFile, folded, DefaultRequireArraySortCompareSettings()))

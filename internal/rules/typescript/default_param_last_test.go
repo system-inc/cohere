@@ -15,6 +15,8 @@ const defaultParamLastFile = "/repository/source/Parameters.ts"
 // findings. Every case was replayed through the installed @typescript-eslint build before it was
 // written here, and all 45 agreed with the corpus on count and on span.
 func TestDefaultParamLastFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -239,6 +241,8 @@ func TestDefaultParamLastFires(t *testing.T) {
 // are the false positives it already thought about; the added ones cover the two places our tree
 // differs from the one upstream reads.
 func TestDefaultParamLastStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -398,6 +402,8 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 // rule_testing.Run does not trim, so the literal here and the file on disk are the same bytes and the
 // slice is not offset. The typed harness would trim; this rule needs no checker.
 func TestDefaultParamLastSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -583,6 +589,8 @@ func TestDefaultParamLastSpans(t *testing.T) {
 // The rule interpolates nothing, so there is no rendered text and no format string to guard; a
 // rule.Message is {Id, Description} and both halves are asserted directly.
 func TestDefaultParamLastMessageReadsAsWritten(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile,
 		"function foo(a = 1, b: number) {}")
 	if len(result.Diagnostics) != 1 {

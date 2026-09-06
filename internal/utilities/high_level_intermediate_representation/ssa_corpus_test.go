@@ -29,6 +29,8 @@ import (
 
 // Run SSA over a real tree with a real checker and cohere every function.
 func TestSSAOverRealCodebase(t *testing.T) {
+	t.Parallel()
+
 	root := os.Getenv("SSA_CORPUS")
 	if root == "" {
 		root = corpusRoot

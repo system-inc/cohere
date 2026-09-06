@@ -39,6 +39,8 @@ func noUselessDefaultAssignmentOptionsFor(t *testing.T, optionsJson string) any 
 // `noUncheckedIndexedAccess` project our harness cannot express; measured, all three stay clean
 // under our options too, so the option is not what decides them and importing them costs nothing.
 func TestNoUselessDefaultAssignmentStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"function Bar({ foo = '' }: { foo?: string }) {\n  return foo;\n}\n",
 		"const { foo } = { foo: 'bar' };\n",
@@ -125,6 +127,8 @@ func TestNoUselessDefaultAssignmentStaysSilent(t *testing.T) {
 // under our options, the real finding is identical and the file-level one is absent, which is
 // what these rows assert. See the rule's doc comment for why the gate is a decline here.
 func TestNoUselessDefaultAssignmentFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText  string
 		optionsJson string

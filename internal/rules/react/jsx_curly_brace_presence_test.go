@@ -26,6 +26,8 @@ func jsxCurlyBracePresenceRun(t *testing.T, source string, optionsJson string) r
 
 // Clean cases, imported verbatim from upstream's corpus.
 func TestJsxCurlyBracePresenceStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for index, testCase := range []struct {
 		source  string
 		options string
@@ -130,6 +132,8 @@ func TestJsxCurlyBracePresenceStaysSilent(t *testing.T) {
 
 // Reporting cases, imported verbatim from upstream's corpus, with the repair each asserts.
 func TestJsxCurlyBracePresenceFires(t *testing.T) {
+	t.Parallel()
+
 	for index, testCase := range []struct {
 		source  string
 		options string
@@ -443,6 +447,8 @@ func TestJsxCurlyBracePresenceFires(t *testing.T) {
 // A case whose upstream `output` equals its input is excluded, because upstream writes that
 // when the fixer DECLINES; those are asserted separately by name below.
 func TestJsxCurlyBracePresenceRepairsSource(t *testing.T) {
+	t.Parallel()
+
 	for index, testCase := range []struct {
 		source  string
 		options string
@@ -697,6 +703,8 @@ func TestJsxCurlyBracePresenceRepairsSource(t *testing.T) {
 // repair writes over. It is asserted by slicing the source with the finding's own range, which is
 // the only form that catches a fix anchored one node away from the thing it describes.
 func TestJsxCurlyBracePresenceSpansTheBraces(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		source  string
 		options string
@@ -725,6 +733,8 @@ func TestJsxCurlyBracePresenceSpansTheBraces(t *testing.T) {
 // Comparing a diagnostic to the very constant the rule reports with is equality that moves on both
 // sides under mutation, so it proves nothing about what a reader sees.
 func TestJsxCurlyBracePresenceMessages(t *testing.T) {
+	t.Parallel()
+
 	unnecessary := jsxCurlyBracePresenceRun(t, `<App>{'foo'}</App>`, "")
 	rule_testing.ExpectFindings(t, unnecessary, "UnnecessaryCurly")
 	if got := unnecessary.Diagnostics[0].Message.Id; got != "UnnecessaryCurly" {
@@ -754,6 +764,8 @@ func TestJsxCurlyBracePresenceMessages(t *testing.T) {
 // fixture can catch that, because the node does not exist in the tree the corpus was written
 // against. Each expectation below was measured against the installed build, 7.37.5.
 func TestJsxCurlyBracePresenceSeesThroughParentheses(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		source  string
 		options string
@@ -779,6 +791,8 @@ func TestJsxCurlyBracePresenceSeesThroughParentheses(t *testing.T) {
 // `{'bar' as string}` and repairs it to `"bar"`. Measured against the installed build, which is
 // silent on all four for the same reason.
 func TestJsxCurlyBracePresenceLeavesTypeScriptExpressionsAlone(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		`<App p={'bar' as string} />`,
 		`<App p={'bar'!} />`,
@@ -805,6 +819,8 @@ func TestJsxCurlyBracePresenceLeavesTypeScriptExpressionsAlone(t *testing.T) {
 // the only decline this rule can produce, and the entity arm as reachable-but-subsumed. Both were
 // driven through the installed build.
 func TestJsxCurlyBracePresenceDeclinesSomeRepairs(t *testing.T) {
+	t.Parallel()
+
 	result := jsxCurlyBracePresenceRun(t, "<App p=\"a\nb\" />", `{"props":"always"}`)
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("expected one finding, got %v", result.MessageIds())
@@ -835,6 +851,8 @@ func TestJsxCurlyBracePresenceDeclinesSomeRepairs(t *testing.T) {
 // reach, so the branch survived being neutered. Every row below was run through 7.37.5 before it
 // was written here, and the expectation is what that run produced rather than what the code does.
 func TestJsxCurlyBracePresenceShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	// Character references. Upstream's corpus only ever writes the NAMED form, so the digits and
 	// the hash in the reference grammar are unreached by it and a scanner accepting only letters
 	// would pass every imported case while repairing source it must decline.
@@ -875,6 +893,8 @@ func TestJsxCurlyBracePresenceShapesTheCorpusDoesNotWrite(t *testing.T) {
 // one reads as an empty string. That misreading cost a round trip here, because `trim()` on it
 // LOOKS empty and the comparison against the empty string is false.
 func TestJsxCurlyBracePresenceUsesJavaScriptWhitespaceWhenTrimming(t *testing.T) {
+	t.Parallel()
+
 	nextLine := string(rune(0x0085))
 	source := "<App>\n  a\n" + nextLine + "\n  b\n</App>"
 

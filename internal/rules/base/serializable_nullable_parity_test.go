@@ -30,6 +30,8 @@ type serializableNullableParityFinding struct {
 // are the same claim. Reading the source suggests otherwise, because the guard it writes tests for
 // a null that absent never produces.
 func TestSerializableNullableParityStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		// A DIFFERENT decorator carrying the same option key, and the same decorator on a METHOD
 		// rather than a property. Each closes a mutant the rest of the corpus could not see: one
@@ -61,6 +63,8 @@ func TestSerializableNullableParityStaysSilent(t *testing.T) {
 }
 
 func TestSerializableNullableParityFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText   string
 		wantFindings []serializableNullableParityFinding
@@ -130,6 +134,8 @@ func TestSerializableNullableParityFires(t *testing.T) {
 // It is a property of every base rule that keys on an identifier's spelling rather than resolving
 // it, and it is written down in both files because each reads as a defect on its own.
 func TestSerializableNullableParityKeysOnTheDecoratorName(t *testing.T) {
+	t.Parallel()
+
 	const preamble = "declare function OrmColumn(o?: any): any;\ndeclare function SerializableField(o?: any): any;\n"
 
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, SerializableNullableParity,

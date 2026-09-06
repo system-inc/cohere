@@ -44,6 +44,8 @@ func decodedMaxClassesPerFileOptions(t *testing.T, raw string) any {
 // Every case string was built from a list rather than typed, so no escape could be cooked on the
 // way in, and every verdict was reproduced by driving the installed eslint at 10.8.1 first.
 func TestMaxClassesPerFileFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -82,6 +84,8 @@ func TestMaxClassesPerFileFires(t *testing.T) {
 }
 
 func TestMaxClassesPerFileStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -117,6 +121,8 @@ func TestMaxClassesPerFileStaysSilent(t *testing.T) {
 // The three shapes here are the three upstream asserts, and each offset pair was converted to a
 // line and column and checked against upstream's numbers before being written down.
 func TestMaxClassesPerFileSpansTheProgramBody(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -157,6 +163,8 @@ func TestMaxClassesPerFileSpansTheProgramBody(t *testing.T) {
 // before being written, and a port counting only top-level statements passes all 18 imported cases
 // while going silent on every one of these.
 func TestMaxClassesPerFileCountsEveryClassInTheFile(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -180,6 +188,8 @@ func TestMaxClassesPerFileCountsEveryClassInTheFile(t *testing.T) {
 // The option is a oneOf over an integer and an object, and its default is 1 rather than the zero
 // value, so three separate decode paths can each silently invert the rule.
 func TestDecodeMaxClassesPerFileOptions(t *testing.T) {
+	t.Parallel()
+
 	settingsFrom := func(t *testing.T, raw string) MaxClassesPerFileOptions {
 		t.Helper()
 		decoded, err := DecodeMaxClassesPerFileOptions(json.RawMessage(raw))

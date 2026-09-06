@@ -12,6 +12,8 @@ const constAssignmentFile = "/repository/source/components/Thing.tsx"
 // run proves only that the rule does not fire on code containing none of the shape. These fixtures
 // are the entire specification, which raises rather than lowers the bar on where the clean cases sit.
 func TestReactComponentNoConstAssignmentFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -59,6 +61,8 @@ func TestReactComponentNoConstAssignmentFires(t *testing.T) {
 }
 
 func TestReactComponentNoConstAssignmentStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string

@@ -15,6 +15,8 @@ const requestSuffixFile = "/repository/source/api/UserRequest.ts"
 const plainNamedFile = "/repository/source/api/User.ts"
 
 func TestNetworkRequireHookRequestSuffixFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -122,6 +124,8 @@ func TestNetworkRequireHookRequestSuffixFires(t *testing.T) {
 }
 
 func TestNetworkRequireHookRequestSuffixStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string
@@ -192,6 +196,8 @@ func TestNetworkRequireHookRequestSuffixStaysSilent(t *testing.T) {
 // Recorded rather than deleted: a mutant that survives is either a missing fixture or a line that
 // does not change behavior, and those look identical until someone works out which.
 func TestNetworkRequireHookRequestSuffixJudgesTheBaseName(t *testing.T) {
+	t.Parallel()
+
 	source := "export function useUserRequest() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
 
 	// A correct file name inside an unrelated directory stays silent.
@@ -212,6 +218,8 @@ func TestNetworkRequireHookRequestSuffixJudgesTheBaseName(t *testing.T) {
 // Worth stating plainly because the first version of this file did put it in the table, and it
 // failed for that reason rather than for a defect in the rule.
 func TestNetworkRequireHookRequestSuffixNeedsTheImport(t *testing.T) {
+	t.Parallel()
+
 	// Identical to a firing case in every respect except where networkService comes from.
 	withoutImport := "declare const networkService: { useGraphQlQuery(document: unknown): unknown };\n" +
 		"declare const gqlDocument: unknown;\n" +

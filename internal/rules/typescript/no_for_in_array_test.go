@@ -50,6 +50,8 @@ export {};
 // Every one was additionally driven through `@typescript-eslint` 8.67.0 on a real program before it
 // became a fixture, and both references produced the same verdict and the same span on all of them.
 func TestNoForInArrayFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -88,6 +90,8 @@ func TestNoForInArrayFires(t *testing.T) {
 // failing case in the table above. That pair is the only thing in either corpus proving the length
 // half of the predicate is load-bearing rather than decorative.
 func TestNoForInArrayStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -124,6 +128,8 @@ func TestNoForInArrayStaysSilent(t *testing.T) {
 // harness. tsgolint could not be run directly for the same reason oxlint cannot, but the two
 // implementations are line-for-line the same predicate.
 func TestNoForInArrayNeedsBothHalvesOfThePredicate(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -153,6 +159,8 @@ func TestNoForInArrayNeedsBothHalvesOfThePredicate(t *testing.T) {
 // reporting nothing where a finding IS expected, so they would have sat in the clean list asserting
 // the exact opposite of upstream while the suite stayed green.
 func TestNoForInArrayDomCollections(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -186,6 +194,8 @@ func TestNoForInArrayDomCollections(t *testing.T) {
 // Upstream's line numbers are 1-based against text that begins with a newline, and the harness
 // trims the source before parsing, so each expected line shifts up by one here.
 func TestNoForInArrayReportsTheLoopHead(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name                             string
 		sourceText                       string
@@ -264,6 +274,8 @@ func lineAndColumnOf(sourceText string, offset int) (int, int) {
 // repair would be a real behavior change against oxlint, and without this it would go unnoticed:
 // every assertion above is satisfied by a finding that also carries a fix.
 func TestNoForInArrayCarriesNoRepair(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoForInArray, noForInArrayFile,
 		"for (const x in [3, 4, 5]) {\n  console.log(x);\n}")
 	if len(result.Diagnostics) != 1 {
@@ -283,6 +295,8 @@ func TestNoForInArrayCarriesNoRepair(t *testing.T) {
 // constant, because comparing a finding to the constant it was built from is an equality that moves
 // on both sides under mutation and therefore guards nothing.
 func TestNoForInArrayMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoForInArray, noForInArrayFile,
 		"for (const x in [3, 4, 5]) {\n  console.log(x);\n}")
 	if len(result.Diagnostics) != 1 {
@@ -320,6 +334,8 @@ func TestNoForInArrayMessageText(t *testing.T) {
 // would not crash under a nil checker, it would go silent, and every fixture above would pass having
 // proven nothing.
 func TestNoForInArrayRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoForInArray.NeedsTypeChecker {
 		t.Fatal("this rule asks the checker what a type is; without NeedsTypeChecker it would be " +
 			"handed a nil checker and go silent on every input while every fixture still passed")

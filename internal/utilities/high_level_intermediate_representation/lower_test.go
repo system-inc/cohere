@@ -178,6 +178,8 @@ func requireInstruction(t *testing.T, function *Function, want string) {
 // cohere's `controlflow` lays it out twice and both copies carry the same source positions; see the
 // Try terminal's comment for why an IR cannot do that.
 func TestLowerTryFinally(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(a: number) {
 			let x = 0;
@@ -232,6 +234,8 @@ func TestLowerTryFinally(t *testing.T) {
 // "cannot throw" is a judgement a later pass may revise and a graph whose shape depends on it must
 // be rebuilt when it changes.
 func TestLowerTryFinallyWithoutCatch(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f() {
 			try {
@@ -252,6 +256,8 @@ func TestLowerTryFinallyWithoutCatch(t *testing.T) {
 
 // TestLowerLoop covers the second named shape.
 func TestLowerLoop(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(items: number[]) {
 			let total = 0;
@@ -293,6 +299,8 @@ func TestLowerLoop(t *testing.T) {
 // TestLowerForOfProducesIteratorProtocol pins that iteration is instructions rather than terminal
 // payload, which is what lets an effect pass see that iterating mutates the iterator.
 func TestLowerForOfProducesIteratorProtocol(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(items: string[]) {
 			for (const item of items) {
@@ -307,6 +315,8 @@ func TestLowerForOfProducesIteratorProtocol(t *testing.T) {
 }
 
 func TestLowerWhileAndDoWhile(t *testing.T) {
+	t.Parallel()
+
 	whileFunction := lowerSource(t, `
 		function f(n: number) {
 			while (n > 0) {
@@ -336,6 +346,8 @@ func TestLowerWhileAndDoWhile(t *testing.T) {
 // next case block, not the statement's fallthrough. Getting that backwards is the classic switch
 // lowering bug and it produces a graph that looks right.
 func TestLowerSwitch(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(kind: string) {
 			let result = 0;
@@ -402,6 +414,8 @@ func TestLowerSwitch(t *testing.T) {
 // A switch with no default can fall past every case, so `EachSuccessor` must yield the fallthrough
 // for it and must not for a switch that has one. Treating it uniformly either way is wrong.
 func TestLowerSwitchWithoutDefaultCanSkipEveryCase(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(kind: string) {
 			switch (kind) {
@@ -437,6 +451,8 @@ func TestLowerSwitchWithoutDefaultCanSkipEveryCase(t *testing.T) {
 // property loads. See pattern.go: the flattening is recoverable from the structure and the
 // structure is not recoverable from the flattening.
 func TestLowerDestructuring(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(input: {a: number; b: {c: number}; rest: number}) {
 			const {a, b: {c}, ...others} = input;
@@ -510,6 +526,8 @@ func TestLowerDestructuring(t *testing.T) {
 // every downstream analysis that it does, which is wrong in the direction that produces false
 // positives about what a function reads.
 func TestLowerLogicalIsControlFlow(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(a: unknown, b: unknown) {
 			return a && expensive(b);
@@ -550,6 +568,8 @@ func TestLowerLogicalIsControlFlow(t *testing.T) {
 }
 
 func TestLowerTernary(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(flag: boolean) {
 			return flag ? left() : right();
@@ -561,6 +581,8 @@ func TestLowerTernary(t *testing.T) {
 
 // TestLowerMethodCallKeepsReceiver pins the distinction an effect pass depends on.
 func TestLowerMethodCallKeepsReceiver(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(list: number[]) {
 			list.push(1);
@@ -592,6 +614,8 @@ func TestLowerMethodCallKeepsReceiver(t *testing.T) {
 // TestLowerGlobalStoreIsOneInstruction records that the `globals` rule's whole detection is this
 // instruction existing.
 func TestLowerGlobalStoreIsOneInstruction(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f() {
 			someGlobal = 1;
@@ -603,6 +627,8 @@ func TestLowerGlobalStoreIsOneInstruction(t *testing.T) {
 
 // TestLowerJsx proves the JSX variants carry what a React rule needs.
 func TestLowerJsx(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function Component(props: {title: string}) {
 			return <div className="a" {...props}>hello {props.title}</div>;
@@ -649,6 +675,8 @@ func TestLowerJsx(t *testing.T) {
 // A rule asking what a component depends on reads uses. If the tag stayed a string, every component
 // reference would be invisible to that question.
 func TestLowerJsxComponentTagIsAValueReference(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function Outer() {
 			return <Inner value={1} />;
@@ -671,6 +699,8 @@ func TestLowerJsxComponentTagIsAValueReference(t *testing.T) {
 // TestLowerLabeledBreakAndContinue covers labeled jumps, which are where a jump-target stack is
 // usually wrong.
 func TestLowerLabeledBreakAndContinue(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(rows: number[][]) {
 			outer: for (const row of rows) {
@@ -699,6 +729,8 @@ func TestLowerLabeledBreakAndContinue(t *testing.T) {
 
 // TestLowerLabeledBlockBreak pins the non-loop label case, which takes a different path.
 func TestLowerLabeledBlockBreak(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(flag: boolean) {
 			block: {
@@ -716,6 +748,8 @@ func TestLowerLabeledBlockBreak(t *testing.T) {
 
 // TestLowerNestedFunction pins that nested functions live in the arena, not inline.
 func TestLowerNestedFunction(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function outer(items: number[]) {
 			const doubled = items.map(item => item * 2);
@@ -749,6 +783,8 @@ func TestLowerNestedFunction(t *testing.T) {
 // TypeScript's generic symbol accessor returns the PROPERTY symbol at the shorthand name; lowering
 // needs the shorthand's VALUE symbol so the read stays connected to the local declaration.
 func TestLowerShorthandPropertyReadsLocalBinding(t *testing.T) {
+	t.Parallel()
+
 	function := lowerTypedFunctions(t, "shorthand.tsx", `
 		export function makeObject() {
 			const temp = compute();
@@ -803,6 +839,8 @@ func TestLowerShorthandPropertyReadsLocalBinding(t *testing.T) {
 // See ReversePostorder: a value defined only where control never arrives is a value no analysis
 // should see.
 func TestLowerUnreachableCodeIsDropped(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f() {
 			return 1;
@@ -820,6 +858,8 @@ func TestLowerUnreachableCodeIsDropped(t *testing.T) {
 
 // TestLowerAsyncAndGeneratorModifiers pins the flags validators read.
 func TestLowerAsyncAndGeneratorModifiers(t *testing.T) {
+	t.Parallel()
+
 	asyncFunction := lowerSource(t, `
 		async function f() {
 			return await load();
@@ -843,6 +883,8 @@ func TestLowerAsyncAndGeneratorModifiers(t *testing.T) {
 // TestLowerOptionalChaining pins that optionality is represented as control flow and recovered as
 // one access path. The guarded PropertyLoad itself is ordinary; the Optional terminal is the guard.
 func TestLowerOptionalChaining(t *testing.T) {
+	t.Parallel()
+
 	function := lowerTypedFunctions(t, "optional.ts", `
 		function f(input: {a?: {b: number}}) {
 			return input.a?.b;
@@ -884,6 +926,8 @@ func TestLowerOptionalChaining(t *testing.T) {
 // unmodelled construct becomes an opaque value with unknown effects, which is the conservative
 // answer.
 func TestLowerUnsupportedSyntaxDoesNotFail(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f() {
 			class Inner {}
@@ -905,6 +949,8 @@ func TestLowerUnsupportedSyntaxDoesNotFail(t *testing.T) {
 
 // TestLowerReturnsIsOneIdentifier pins that every return stores into one value.
 func TestLowerReturnsIsOneIdentifier(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(flag: boolean) {
 			if (flag) {
@@ -936,6 +982,8 @@ func TestLowerReturnsIsOneIdentifier(t *testing.T) {
 // If a fallthrough were an edge, an `if` would propagate values from the test directly into the
 // join, bypassing both arms. The error is silent because the join is genuinely reachable.
 func TestFallthroughIsNotAnEdge(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(flag: boolean) {
 			let value = 0;
@@ -975,6 +1023,8 @@ func TestFallthroughIsNotAnEdge(t *testing.T) {
 
 // TestEachSuccessorAndFallthroughReachesTheJoin is the complement: a structural walk must reach it.
 func TestEachSuccessorAndFallthroughReachesTheJoin(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `
 		function f(flag: boolean) {
 			if (flag) {

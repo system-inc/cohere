@@ -20,6 +20,8 @@ const mixedEnumsFile = "/repository/source/Enums.ts"
 // being weakened into single-file approximations.
 
 func TestNoMixedEnumsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\nenum Fruit {}\n    ",
 		"\nenum Fruit {\n  Apple,\n}\n    ",
@@ -59,6 +61,8 @@ func TestNoMixedEnumsStaysSilent(t *testing.T) {
 }
 
 func TestNoMixedEnumsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		findings   int
@@ -102,6 +106,8 @@ func TestNoMixedEnumsFires(t *testing.T) {
 const mixedEnumsDeclarationSource = "export enum Enum {\n  A = 'A',\n  B = 'B',\n}\n"
 
 func TestNoMixedEnumsAcrossFiles(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -133,6 +139,8 @@ func TestNoMixedEnumsAcrossFiles(t *testing.T) {
 // that trim the leading newline every corpus case carries would shift every column by one and
 // the failure would read exactly like an off-by-one in the rule.
 func TestNoMixedEnumsSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantText   string
@@ -167,6 +175,8 @@ func TestNoMixedEnumsSpans(t *testing.T) {
 // TestNoMixedEnumsMessage asserts the reported id and description against literals typed here
 // rather than against the rule's own constant, which would move with any mutation to it.
 func TestNoMixedEnumsMessage(t *testing.T) {
+	t.Parallel()
+
 	message := buildNoMixedEnumsMessage()
 	if message.Id != "mixed" {
 		t.Fatalf("message id is %q, want %q", message.Id, "mixed")
@@ -181,6 +191,8 @@ func TestNoMixedEnumsMessage(t *testing.T) {
 // shim returns nil rather than panicking, so the failure would be SILENCE, and every
 // StaysSilent case above would keep passing vacuously if the declaration were ever reverted.
 func TestNoMixedEnumsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoMixedEnums.NeedsTypeChecker {
 		t.Fatal("rule must declare NeedsTypeChecker")
 	}
@@ -206,6 +218,8 @@ func TestNoMixedEnumsRequiresTheTypedHarness(t *testing.T) {
 // Each row was measured against the installed @typescript-eslint rule, and the bare forms are
 // carried alongside as controls so a row going silent for an unrelated reason is visible.
 func TestNoMixedEnumsParentheses(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -242,6 +256,8 @@ func TestNoMixedEnumsParentheses(t *testing.T) {
 // a finding anchored on the KindParenthesizedExpression would satisfy the count assertion above
 // while pointing at text upstream never highlights.
 func TestNoMixedEnumsParenthesizedSpanExcludesTheWrapper(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "enum E {\n  A = 'a',\n  B = (1),\n}\n"
 	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
 	if len(result.Diagnostics) != 1 {
@@ -260,6 +276,8 @@ func TestNoMixedEnumsParenthesizedSpanExcludesTheWrapper(t *testing.T) {
 // this is a separate test: reading the upstream source shows a `return` inside a loop and not what
 // that return is worth.
 func TestNoMixedEnumsUnknownAborts(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -286,6 +304,8 @@ func TestNoMixedEnumsUnknownAborts(t *testing.T) {
 // desired type. Without the adoption the scan reaches the string with nothing to compare against and
 // goes silent. Measured reporting upstream.
 func TestNoMixedEnumsAdoptsNumberIntoAnUnsetDesiredType(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "declare const f: () => any;\nenum E {\n  A = f(),\n  B = 1,\n  C = 'c',\n}\n"
 	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
 	rule_testing.ExpectFindings(t, result, "mixed")
@@ -296,6 +316,8 @@ func TestNoMixedEnumsAdoptsNumberIntoAnUnsetDesiredType(t *testing.T) {
 // only the name, and no imported fixture covers it because every invalid case in the corpus has an
 // initializer on the reported member.
 func TestNoMixedEnumsMemberWithoutInitializerIsTheAnchor(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "enum E {\n  A = 'a',\n  B,\n}\n"
 	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
 	if len(result.Diagnostics) != 1 {
@@ -314,6 +336,8 @@ func TestNoMixedEnumsMemberWithoutInitializerIsTheAnchor(t *testing.T) {
 // breaking out of its scope scan on the earliest match, and it is not something a reader would
 // predict from the rule's description.
 func TestNoMixedEnumsMergeOrdering(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "enum E {\n  A = 1,\n}\nenum E {\n  B = 'b',\n}\nenum E {\n  C = 2,\n}\n"
 	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
 	// Only the middle declaration reports. The third agrees with the FIRST, so if it were judged
@@ -326,6 +350,8 @@ func TestNoMixedEnumsMergeOrdering(t *testing.T) {
 // merge and is judged alone. The second row is the control: without it the first row's finding
 // could equally be explained by the two enums simply being in the same file.
 func TestNoMixedEnumsNamespaceMerging(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -358,6 +384,8 @@ func TestNoMixedEnumsNamespaceMerging(t *testing.T) {
 // declaration a later one is judged against. Without the skip the later pair would be compared to a
 // declaration with no members, which has no kind at all.
 func TestNoMixedEnumsEmptyDeclarationIsNotAReference(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "enum E {}\nenum E {\n  A = 1,\n  B = 'b',\n}\n"
 	result := rule_testing.RunTyped(t, NoMixedEnums, mixedEnumsFile, sourceText)
 	rule_testing.ExpectFindings(t, result, "mixed")
@@ -366,6 +394,8 @@ func TestNoMixedEnumsEmptyDeclarationIsNotAReference(t *testing.T) {
 // TestNoMixedEnumsConstAndAmbientEnums pins that the rule reaches const and declared enums, which the
 // corpus never writes. Both were measured reporting upstream.
 func TestNoMixedEnumsConstAndAmbientEnums(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -390,6 +420,8 @@ func TestNoMixedEnumsConstAndAmbientEnums(t *testing.T) {
 // interpolating a NUMBER is still a string member. Asking the checker would be more careful and
 // would disagree with the rule being ported.
 func TestNoMixedEnumsTemplateLiteralsAreStrings(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -417,6 +449,8 @@ func TestNoMixedEnumsTemplateLiteralsAreStrings(t *testing.T) {
 // name. The two clean rows are controls: without them a rule that classified every call as String
 // would still pass the reporting row.
 func TestNoMixedEnumsCheckerArm(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -443,6 +477,8 @@ func TestNoMixedEnumsCheckerArm(t *testing.T) {
 // `typeof null === 'object'` falling into its Literal switch's default arm. The second row is the
 // control proving the pair does disagree once the null is removed.
 func TestNoMixedEnumsNullAborts(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -472,6 +508,8 @@ func TestNoMixedEnumsNullAborts(t *testing.T) {
 // U2 is the control. Without it the four clean rows read as "this shape is just never reported",
 // which is the wrong conclusion: the same pair without the leading boolean does report.
 func TestNoMixedEnumsUnknownFirstMemberSilencesEverything(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

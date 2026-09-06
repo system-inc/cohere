@@ -32,6 +32,8 @@ const noArrowFunctionLifecycleFile = "/repository/source/NoArrowFunctionLifecycl
 // compares the whole rewritten file, so a repair with the right text over the wrong span fails
 // here even though its message id is correct.
 func TestNoArrowFunctionLifecycleFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -502,6 +504,8 @@ func TestNoArrowFunctionLifecycleFires(t *testing.T) {
 
 // TestNoArrowFunctionLifecycleStaysSilent runs every case this port declines.
 func TestNoArrowFunctionLifecycleStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -784,6 +788,8 @@ func TestNoArrowFunctionLifecycleStaysSilent(t *testing.T) {
 // writes only the reporting halves, so a port using one combined list would pass every imported
 // case while reporting two shapes upstream ignores. All four measured on the installed build.
 func TestNoArrowFunctionLifecycleStaticSplit(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -819,6 +825,8 @@ func TestNoArrowFunctionLifecycleStaticSplit(t *testing.T) {
 // structurally cannot: rendering an annotated parameter by name alone would drop the annotation the
 // way a shipped fixer once widened eight declarations to `any`.
 func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -857,6 +865,8 @@ func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(t *testing.T) {
 // string does. Asserted against a literal typed here rather than against the rule's own constant,
 // which would move with any mutation of it.
 func TestNoArrowFunctionLifecycleMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile,
 		"class H extends React.Component { componentDidMount = () => {}; render() { return <div />; } }")
 	rule_testing.ExpectFindings(t, result, "lifecycle")
@@ -879,6 +889,8 @@ func TestNoArrowFunctionLifecycleMessageText(t *testing.T) {
 // the block-body anchor from the property to the arrow survived every fixture, because no other
 // assertion in the suite looks at where a block-body finding points. Each site is a row here now.
 func TestNoArrowFunctionLifecycleAnchor(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -925,6 +937,8 @@ func TestNoArrowFunctionLifecycleAnchor(t *testing.T) {
 // Three siblings in this package gate on `.tsx` and `.jsx`, which is oxc residue. Upstream has no
 // such gate anywhere, and a lifecycle arrow with no JSX in it needs no JSX file.
 func TestNoArrowFunctionLifecycleHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	const source = "class H extends React.Component { componentDidMount = () => {}; }"
 
 	for _, suffix := range []string{".tsx", ".ts"} {

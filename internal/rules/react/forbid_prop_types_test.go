@@ -67,6 +67,8 @@ func runForbidPropTypes(t *testing.T, sourceText string, options *ForbidPropType
 
 // TestForbidPropTypesFires runs the forty-nine reporting cases from upstream.
 func TestForbidPropTypesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -604,6 +606,8 @@ func TestForbidPropTypesFires(t *testing.T) {
 // being configurable rather than on the shape of the code, which is why the option travels with
 // each case rather than being applied to the table as a whole.
 func TestForbidPropTypesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -1087,6 +1091,8 @@ func TestForbidPropTypesStaysSilent(t *testing.T) {
 // that visible: the direct form still reports under the plain harness while the indirect form goes
 // silent. A single-assertion test would have read as "the rule needs types" and hidden which part.
 func TestForbidPropTypesRequiresTheTypedHarnessForIndirection(t *testing.T) {
+	t.Parallel()
+
 	indirect := "const shared = { a: PropTypes.any };\n" +
 		"class C extends React.Component { render() { return null; } }\n" +
 		"C.propTypes = shared;\n"
@@ -1115,6 +1121,8 @@ func TestForbidPropTypesRequiresTheTypedHarnessForIndirection(t *testing.T) {
 // in the program and the run fails before any rule is offered a file. That is a fact about the
 // typed harness rather than about this rule.
 func TestForbidPropTypesHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	source := "class C extends React.Component { render() { return null; } }\n" +
 		"C.propTypes = { a: PropTypes.any };\n"
 	result := rule_testing.RunTyped(t, ForbidPropTypes, "/repository/source/Suffix.tsx", source)
@@ -1129,6 +1137,8 @@ func TestForbidPropTypesHasNoFileSuffixGate(t *testing.T) {
 // silent on inputs upstream reports while every imported fixture stayed green, because the corpus
 // writes real components throughout.
 func TestForbidPropTypesDeclarationShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -1186,6 +1196,8 @@ func TestForbidPropTypesDeclarationShapes(t *testing.T) {
 // report on it. And `PropTypes.string` is clean only because it is off the default list, which the
 // forbid-list table below separates from the shape question.
 func TestForbidPropTypesValueShapes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		value     string
@@ -1229,6 +1241,8 @@ func TestForbidPropTypesValueShapes(t *testing.T) {
 // would silently turn the second into the first. Measured on the installed build: `{forbid: []}`
 // over `PropTypes.any` is clean.
 func TestForbidPropTypesForbidList(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		value     string
@@ -1261,6 +1275,8 @@ func TestForbidPropTypesForbidList(t *testing.T) {
 
 // TestForbidPropTypesContextOptions pins the two declaration names that are off by default.
 func TestForbidPropTypesContextOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		declaration string
@@ -1299,6 +1315,8 @@ func TestForbidPropTypesContextOptions(t *testing.T) {
 // a member expression and nothing else, so a call receiver such as `Yup.object()` falls through to
 // false whatever is imported. Measured with and without the yup import: both clean.
 func TestForbidPropTypesShapeReceiver(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -1346,6 +1364,8 @@ func TestForbidPropTypesShapeReceiver(t *testing.T) {
 // collected in a pass before anything is judged. The last case is what makes that pre-pass
 // observable: the same code with the import moved below still reports.
 func TestForbidPropTypesForeignPackageGuard(t *testing.T) {
+	t.Parallel()
+
 	body := "class C extends React.Component { static propTypes = { a: PropTypes.any }; render() { return null; } }\n"
 	cases := []struct {
 		name       string
@@ -1400,6 +1420,8 @@ func TestForbidPropTypesForeignPackageGuard(t *testing.T) {
 // first. Without that pass this case reports and the one above it does not, which is a difference no
 // imported fixture can see because the corpus writes every import at the top.
 func TestForbidPropTypesCollectsImportsBeforeJudging(t *testing.T) {
+	t.Parallel()
+
 	source := "class C extends React.Component { static propTypes = { a: PropTypes.any }; render() { return null; } }\n" +
 		"import { PropTypes } from 'other-lib';\n"
 	result := runForbidPropTypes(t, source, nil)
@@ -1419,6 +1441,8 @@ func TestForbidPropTypesCollectsImportsBeforeJudging(t *testing.T) {
 // inventing them, and this case pins the resulting silence so a later settings surface turns it
 // into a failing test rather than leaving it unnoticed.
 func TestForbidPropTypesDoesNotUnwrapPropWrappers(t *testing.T) {
+	t.Parallel()
+
 	source := "class C extends React.Component { render() { return null; } }\n" +
 		"C.propTypes = forbidExtraProps({ a: PropTypes.any });\n"
 	result := runForbidPropTypes(t, source, nil)
@@ -1441,6 +1465,8 @@ func TestForbidPropTypesDoesNotUnwrapPropWrappers(t *testing.T) {
 // `RunTyped` writes `strings.TrimSpace(source) + "\n"`, so the expectation is sliced from the same
 // transform rather than from the Go literal.
 func TestForbidPropTypesSpans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -1490,6 +1516,8 @@ func TestForbidPropTypesSpans(t *testing.T) {
 // format string does. Asserted by equality against a literal typed here rather than against the
 // rule's own constant, which would move on both sides under mutation and could not fail.
 func TestForbidPropTypesMessageText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		value  string
@@ -1518,6 +1546,8 @@ func TestForbidPropTypesMessageText(t *testing.T) {
 // TestDecodeForbidPropTypesOptions pins the decoder, whose absent-versus-empty handling on `forbid`
 // has no upstream counterpart.
 func TestDecodeForbidPropTypesOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no options means the default list", func(t *testing.T) {
 		decoded, err := DecodeForbidPropTypesOptions(nil)
 		if err != nil {
@@ -1589,6 +1619,8 @@ func TestDecodeForbidPropTypesOptions(t *testing.T) {
 //
 // All four rows measured against the installed build.
 func TestForbidPropTypesAssignmentOperators(t *testing.T) {
+	t.Parallel()
+
 	for _, operator := range []string{"=", "||=", "??=", "+="} {
 		t.Run(operator, func(t *testing.T) {
 			source := "class C extends React.Component { render() { return null; } }\n" +
@@ -1617,6 +1649,8 @@ func TestForbidPropTypesAssignmentOperators(t *testing.T) {
 // The two rows have opposite verdicts from statement order alone, which is the cheapest possible
 // distinguishing pair. Both measured on the installed build.
 func TestForbidPropTypesGetterTakesTheLastReturn(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		body      string
@@ -1682,6 +1716,8 @@ func TestForbidPropTypesGetterTakesTheLastReturn(t *testing.T) {
 // Contrived, and that is the point: everything less contrived cannot distinguish the versions, so a
 // fixture over it would assert nothing. Every row measured against the installed build.
 func TestForbidPropTypesRecordedPackageNameReachesTheIdentifierArm(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		imports   string
@@ -1750,6 +1786,8 @@ func TestForbidPropTypesRecordedPackageNameReachesTheIdentifierArm(t *testing.T)
 // same shape reached two ways with opposite verdicts, which is what makes this measurable at all.
 // Every row measured against the installed build.
 func TestForbidPropTypesObjectLiteralArmDoesNotFollowIdentifiers(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

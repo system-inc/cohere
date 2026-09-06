@@ -12,6 +12,8 @@ import "testing"
 // So the chain is written out here and every one of the sixteen pairs is compared against it. A
 // reordering of the constants fails this immediately rather than silently changing classifications.
 func TestJoinMemoizationLevelsMatchesUpstreamChain(t *testing.T) {
+	t.Parallel()
+
 	// upstream's `joinAliases`, transcribed arm for arm rather than expressed as a max.
 	chain := func(first, second MemoizationLevel) MemoizationLevel {
 		switch {
@@ -56,6 +58,8 @@ func TestJoinMemoizationLevelsMatchesUpstreamChain(t *testing.T) {
 // sequence so a reordering fails here with a clear message rather than in a downstream pass with an
 // obscure one.
 func TestMemoizationLevelOrderIsStrength(t *testing.T) {
+	t.Parallel()
+
 	if !(MemoizationNever < MemoizationUnmemoized &&
 		MemoizationUnmemoized < MemoizationConditional &&
 		MemoizationConditional < MemoizationMemoized) {

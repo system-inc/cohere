@@ -46,6 +46,8 @@ func noUnknownPropertyOptions(t *testing.T, raw string) any {
 
 // TestNoUnknownPropertyFires runs every case this port reports on.
 func TestNoUnknownPropertyFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -148,6 +150,8 @@ func TestNoUnknownPropertyFires(t *testing.T) {
 
 // TestNoUnknownPropertyStaysSilent runs every case this port declines.
 func TestNoUnknownPropertyStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -330,6 +334,8 @@ func TestNoUnknownPropertyStaysSilent(t *testing.T) {
 // survives. `ExpectFixedSource` replays the fix and compares the whole rewritten file, so a repair
 // with the right text over the wrong span fails here even though its message id is correct.
 func TestNoUnknownPropertyRepairs(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -361,6 +367,8 @@ func TestNoUnknownPropertyRepairs(t *testing.T) {
 // guessing, and a fix is applied unattended. Asserting the ABSENCE of a repair is something no
 // message-id fixture can see.
 func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -390,6 +398,8 @@ func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(t *testing.T) {
 // computed, and the tag-restricted one joins a whole list into its text. Asserted against literals
 // typed here rather than against the rule's own constants, which would move under mutation.
 func TestNoUnknownPropertyMessageText(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -439,6 +449,8 @@ func TestNoUnknownPropertyMessageText(t *testing.T) {
 // and that asymmetry is exactly the shape the brief warns about: a fix that lands correctly while
 // the finding points elsewhere shows the reader a line they were never told about.
 func TestNoUnknownPropertyAnchor(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -470,6 +482,8 @@ func TestNoUnknownPropertyAnchor(t *testing.T) {
 // attribute is written. Naming the canonical spelling does NOT exempt the DOM one, which is the
 // half a single-row fixture would miss.
 func TestNoUnknownPropertyIgnoreOption(t *testing.T) {
+	t.Parallel()
+
 	t.Run("the written spelling exempts", func(t *testing.T) {
 		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(t, `{"ignore":["class"]}`))
 		rule_testing.ExpectClean(t, result)
@@ -489,6 +503,8 @@ func TestNoUnknownPropertyIgnoreOption(t *testing.T) {
 // The default is false, and the default matters: with it off an uppercase data attribute is
 // accepted silently, which is the opposite verdict from every other unknown name.
 func TestNoUnknownPropertyRequireDataLowercase(t *testing.T) {
+	t.Parallel()
+
 	t.Run("off by default", func(t *testing.T) {
 		result := rule_testing.RunWithOptions(t, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(t, ``))
 		rule_testing.ExpectClean(t, result)
@@ -515,6 +531,8 @@ func TestNoUnknownPropertyRequireDataLowercase(t *testing.T) {
 // `.ts` is absent for a PARSER reason rather than a rule one: TypeScript reads an opening angle
 // bracket there as a type assertion, so no JSX attribute node exists for any rule to see.
 func TestNoUnknownPropertyHasNoFileSuffixGate(t *testing.T) {
+	t.Parallel()
+
 	const source = `<div class="x" />`
 
 	for _, fileName := range []string{
@@ -531,6 +549,8 @@ func TestNoUnknownPropertyHasNoFileSuffixGate(t *testing.T) {
 
 // TestDecodeNoUnknownPropertyOptions covers both options and the nil-options path.
 func TestDecodeNoUnknownPropertyOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("an empty body carries upstream's defaults", func(t *testing.T) {
 		decoded, err := DecodeNoUnknownPropertyOptions(nil)
 		if err != nil {
@@ -569,6 +589,8 @@ func TestDecodeNoUnknownPropertyOptions(t *testing.T) {
 // passing while the rule quietly stopped knowing names. These counts were taken from the installed
 // module's own constants at extraction time.
 func TestNoUnknownPropertyTables(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		got  int

@@ -60,6 +60,8 @@ func decodeNoUnnecessaryBooleanLiteralCompareOptions(t *testing.T, configuration
 // Recording it as clean here would assert a property of a layer this test cannot reach. See
 // `TestNoUnnecessaryBooleanLiteralCompareSuppressionCaseIsDecidedAboveTheRule`.
 func TestNoUnnecessaryBooleanLiteralCompareStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -170,6 +172,8 @@ func TestNoUnnecessaryBooleanLiteralCompareStaysSilentOnUpstreamPassCases(t *tes
 // the whole comparison rather than the compared expression. And the applied source says what the
 // edit engine will write unattended, which no message-id assertion can see.
 func TestNoUnnecessaryBooleanLiteralCompareFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -565,6 +569,8 @@ func TestNoUnnecessaryBooleanLiteralCompareFiresOnUpstreamFailCases(t *testing.T
 // exactly the shapes a re-rendering fixer would drop while every other fixture stayed green. Every
 // expectation is what the installed 8.67.0 build produced.
 func TestNoUnnecessaryBooleanLiteralCompareKeepsEverythingInTheExpression(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantFixed  string
@@ -627,6 +633,8 @@ func TestNoUnnecessaryBooleanLiteralCompareKeepsEverythingInTheExpression(t *tes
 // Each row was run through the installed 8.67.0 build and carries the verdict that build produced,
 // so a row asserting silence asserts upstream's silence rather than this port's.
 func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		sourceText    string
@@ -793,6 +801,8 @@ func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWr
 // options struct directly, which is why every other test in this file routes through the decoder and
 // why this one asserts the decoder's own output.
 func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		configuration string
 		wantFalse     bool
@@ -841,6 +851,8 @@ func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(t *testin
 // That is worse than the usual inert shape: the rule would report where upstream is silent, and
 // every decoder-routed fixture would stay green.
 func TestNoUnnecessaryBooleanLiteralCompareNilOptionsAllowsTheNullishFamilies(t *testing.T) {
+	t.Parallel()
+
 	// A plain boolean still reports on nil options.
 	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t,
 		NoUnnecessaryBooleanLiteralCompare, noUnnecessaryBooleanLiteralCompareFile,
@@ -862,6 +874,8 @@ func TestNoUnnecessaryBooleanLiteralCompareNilOptionsAllowsTheNullishFamilies(t 
 // turns that into silence rather than a panic. Silence is the more dangerous failure: every clean
 // case passes vacuously and every reporting case fails in a way that reads as a rule bug.
 func TestNoUnnecessaryBooleanLiteralCompareRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	source := "declare const b: boolean;\nconst z = b === true;"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnnecessaryBooleanLiteralCompare,
 		noUnnecessaryBooleanLiteralCompareFile, source))
@@ -885,6 +899,8 @@ func TestNoUnnecessaryBooleanLiteralCompareRequiresTheTypedHarness(t *testing.T)
 // decision: an explicit value wins, an unset one falls back to `strict`, and `strict: false` with no
 // explicit value resolves to off.
 func TestNoUnnecessaryBooleanLiteralCompareStrictNullChecksArmIsHarnessBlocked(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		strict           core.Tristate
 		strictNullChecks core.Tristate
@@ -931,6 +947,8 @@ func TestNoUnnecessaryBooleanLiteralCompareStrictNullChecksArmIsHarnessBlocked(t
 // is what makes it clean in a real run. Confirmed by removing the comment and watching the same
 // source report identically.
 func TestNoUnnecessaryBooleanLiteralCompareSuppressionCaseIsDecidedAboveTheRule(t *testing.T) {
+	t.Parallel()
+
 	withComment := "function test(a?: boolean): boolean {\n  // eslint-disable-next-line\n  return a !== false;\n}"
 	withoutComment := "function test(a?: boolean): boolean {\n  return a !== false;\n}"
 

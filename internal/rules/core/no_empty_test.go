@@ -8,6 +8,8 @@ import (
 
 // TestNoEmptyReportsEmptyBlocks is the fixture that must fire.
 func TestNoEmptyReportsEmptyBlocks(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		source string
 		wantId string
@@ -33,6 +35,8 @@ func TestNoEmptyReportsEmptyBlocks(t *testing.T) {
 // A try statement has up to three blocks and each is its own claim about what happens there, so an
 // empty try, catch, and finally are three findings rather than one.
 func TestNoEmptyReportsEachEmptyBlockOfATryStatement(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoEmpty, "try.ts", "try { work(); } catch (error) {} finally {}")
 	rule_testing.ExpectFindings(t, result, "unexpectedBlock", "unexpectedBlock")
 
@@ -45,6 +49,8 @@ func TestNoEmptyReportsEachEmptyBlockOfATryStatement(t *testing.T) {
 // A comment is what turns an empty block from ambiguous into deliberate, so both comment forms count
 // and both stay silent wherever a block would otherwise report.
 func TestNoEmptyAcceptsAnyCommentAsIntent(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"if (foo) { // nothing to do\n}",
 		"while (foo) { /* empty */ }",
@@ -70,6 +76,8 @@ func TestNoEmptyAcceptsAnyCommentAsIntent(t *testing.T) {
 // test pins the behavior at the surface where a reader checks it, and stays correct whichever way
 // the check is implemented underneath.
 func TestNoEmptyIsNotFooledByCommentMarkersInStrings(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		`switch (path.replace('/*', '')) {}`,
 		`switch (text.split('//')[0]) {}`,
@@ -89,6 +97,8 @@ func TestNoEmptyIsNotFooledByCommentMarkersInStrings(t *testing.T) {
 // function-like form is here because each reaches the block through a different parent kind, and a
 // check that named only some of them would report on the rest.
 func TestNoEmptyExemptsFunctionBodies(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"function noop() {}",
 		"const noop = function () {};",
@@ -113,6 +123,8 @@ func TestNoEmptyExemptsFunctionBodies(t *testing.T) {
 
 // TestNoEmptyStaysSilentOnBlocksWithContent is the half that catches a rule firing on correct code.
 func TestNoEmptyStaysSilentOnBlocksWithContent(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"if (foo) { bar(); }",
 		"while (foo) { bar(); }",
@@ -136,6 +148,8 @@ func TestNoEmptyStaysSilentOnBlocksWithContent(t *testing.T) {
 // The option defaults off, so a registry that forgets to wire it must produce the strict rule rather
 // than a silent one.
 func TestNoEmptyWithoutOptionsReportsEmptyCatch(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunWithOptions(t, NoEmpty, "strict.ts", "try { work(); } catch (error) {}", nil)
 	rule_testing.ExpectFindings(t, result, "unexpectedBlock")
 }
@@ -146,6 +160,8 @@ func TestNoEmptyWithoutOptionsReportsEmptyCatch(t *testing.T) {
 // reports. That boundary is the whole option: a codebase that has decided a bare catch is idiomatic
 // has said nothing about an empty finally.
 func TestNoEmptyAllowEmptyCatchExemptsOnlyTheCatch(t *testing.T) {
+	t.Parallel()
+
 	options := NoEmptyOptions{AllowEmptyCatch: true}
 
 	for _, source := range []string{

@@ -11,6 +11,8 @@ const effectCommentFile = "/repository/source/components/Panel.tsx"
 const effectCommentDeclarations = "import React from 'react';\ndeclare const route: string;\n"
 
 func TestReactHookRequireEffectCommentFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -83,6 +85,8 @@ func TestReactHookRequireEffectCommentFires(t *testing.T) {
 }
 
 func TestReactHookRequireEffectCommentStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		fileName   string

@@ -10,6 +10,8 @@ import (
 const stutterFile = "/repository/source/Thing.ts"
 
 func TestConsistencyNoStutteringNameFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -33,6 +35,8 @@ func TestConsistencyNoStutteringNameFires(t *testing.T) {
 }
 
 func TestConsistencyNoStutteringNameStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	// The whole design of this rule is that it stays silent on generic names that are doing their
 	// job. The declaration-site version of this idea measured 1,355 hits and roughly forty were
 	// real, so these cases are the rule's reason for existing rather than incidental coverage.
@@ -59,6 +63,8 @@ func TestConsistencyNoStutteringNameStaysSilent(t *testing.T) {
 }
 
 func TestConsistencyNoStutteringNameRespectsTheGenericNamesOption(t *testing.T) {
+	t.Parallel()
+
 	// The option replaces the default set rather than adding to it, so a name on the default list
 	// stops being checked once a caller names its own vocabulary.
 	options := ConsistencyNoStutteringNameOptions{GenericNames: []string{"payload"}}
@@ -73,6 +79,8 @@ func TestConsistencyNoStutteringNameRespectsTheGenericNamesOption(t *testing.T) 
 }
 
 func TestConsistencyNoStutteringNameNamesTheWord(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ConsistencyNoStutteringName, stutterFile, "export const a = outcome.outcome;\n")
 	rule_testing.ExpectFindings(t, result, "stutteringName")
 

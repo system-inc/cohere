@@ -10,6 +10,8 @@ import (
 // slice identity rather than by contents, because a copy with the same elements passes any contents
 // check and still costs an allocation per block on every pass that touches the tree.
 func TestReactiveTransformKeepDoesNotReallocate(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `function f(a) { if (a) { return 1; } return 2; }`)
 	tree, _ := BuildReactiveFunction(function)
 	if tree == nil {
@@ -43,6 +45,8 @@ func TestReactiveTransformKeepDoesNotReallocate(t *testing.T) {
 // `replace-many` is the one that matters most: it is how `pruneNonEscapingScopes` flattens a scope,
 // splicing the body into the enclosing block and dropping the wrapper.
 func TestReactiveTransformRemovesAndReplaces(t *testing.T) {
+	t.Parallel()
+
 	source := `function f(a) { const x = a + 1; const y = x + 2; return y; }`
 
 	t.Run("remove drops the statement", func(t *testing.T) {
@@ -122,6 +126,8 @@ func TestReactiveTransformRemovesAndReplaces(t *testing.T) {
 // the terminal holding the pre-rewrite slice, which is invisible to any test that only counts what
 // the walk reached -- the walk did reach it, and the result was thrown away.
 func TestReactiveTransformRewritesNestedBlocks(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -177,6 +183,8 @@ func TestReactiveTransformRewritesNestedBlocks(t *testing.T) {
 // terminal arm no case happens to produce, which is exactly the failure `transformTerminalBlocks`
 // invites by being written out by hand.
 func TestReactiveTransformCorpus(t *testing.T) {
+	t.Parallel()
+
 	converted, survived, totalRemoved := 0, 0, 0
 
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {

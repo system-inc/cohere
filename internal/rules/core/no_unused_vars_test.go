@@ -12,6 +12,8 @@ import (
 // pair while being wrong, and this rule has several candidate spans to get wrong: the declaration
 // statement, the declarator, and the name.
 func TestNoUnusedVarsReportsAtTheBindingName(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -44,6 +46,8 @@ func TestNoUnusedVarsReportsAtTheBindingName(t *testing.T) {
 // equality that cannot fail: both sides move together under mutation, so a message-text mutant
 // survives a test written that way.
 func TestNoUnusedVarsMessageIdAndDescription(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const forgotten = 1;")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
@@ -64,6 +68,8 @@ func TestNoUnusedVarsMessageIdAndDescription(t *testing.T) {
 // it goes SILENT, and every StaysSilent fixture then passes vacuously. That failure is invisible
 // from a green suite, so it gets its own assertion with a control on the other side.
 func TestNoUnusedVarsRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = "const forgotten = 1;"
 	if result := rule_testing.Run(t, NoUnusedVars, "a.ts", source); len(result.Diagnostics) != 0 {
 		t.Errorf("untyped harness: want silence, got %d findings", len(result.Diagnostics))
@@ -78,6 +84,8 @@ func TestNoUnusedVarsRequiresTheTypedHarness(t *testing.T) {
 // one of them. Three of this rule's defaults are not the zero value, and the inventory records the
 // rule as having no options at all, so each default is pinned here individually.
 func TestDecodeNoUnusedVarsOptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("bare error supplies every default", func(t *testing.T) {
 		decoded, err := DecodeNoUnusedVarsOptions(nil)
 		if err != nil {
@@ -116,6 +124,8 @@ func TestDecodeNoUnusedVarsOptions(t *testing.T) {
 // than through the decoder, since that default is the single largest behavioral difference between
 // oxc and ESLint and the one a later reader is most likely to "correct".
 func TestNoUnusedVarsIgnorePatternDefaults(t *testing.T) {
+	t.Parallel()
+
 	// Routed through the shared harness assertions rather than through a length comparison, so the
 	// fixture-pair guard can see that this rule is shown both to fire and to stay quiet.
 	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const _ignored = 1;"))
@@ -142,6 +152,8 @@ func TestNoUnusedVarsIgnorePatternDefaults(t *testing.T) {
 // TestNoUnusedVarsJsxFactoryImport pins the exemption that removed 510 false positives from our own
 // tree. `import React` in a `.tsx` looks untouched and is used by the JSX transform.
 func TestNoUnusedVarsJsxFactoryImport(t *testing.T) {
+	t.Parallel()
+
 	const source = "import React from 'react';\nexport const A = 1;\n"
 	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", source); len(result.Diagnostics) != 0 {
 		t.Errorf("a React import in a .tsx file is exempt; got %d findings", len(result.Diagnostics))
@@ -160,6 +172,8 @@ func TestNoUnusedVarsJsxFactoryImport(t *testing.T) {
 // like the binding and declines, missing the finding. Both orderings are pinned because a symbol
 // can carry more than one declaration and the ordering is not something to assume.
 func TestNoUnusedVarsSeparatesShadowedBindingsBySymbol(t *testing.T) {
+	t.Parallel()
+
 	// The inner binding is read; the outer one is not. A name-matching rule reports neither.
 	result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts",
 		"const outer = 1; { const outer = 2; console.log(outer); }")
@@ -181,6 +195,8 @@ func TestNoUnusedVarsSeparatesShadowedBindingsBySymbol(t *testing.T) {
 // Both orderings, because an index-zero test passes one and fails the other, and which one it fails
 // depends on which declaration the checker happens to list first.
 func TestNoUnusedVarsDeclarationMergingExportsFromEitherSide(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"interface Merged {\n  bar: string;\n}\nexport const Merged = 'bar';\n",
 		"export const Merged = 'bar';\ninterface Merged {\n  bar: string;\n}\n",
@@ -204,6 +220,8 @@ func TestNoUnusedVarsDeclarationMergingExportsFromEitherSide(t *testing.T) {
 // it establishes, because a fixture whose name promises to guard a branch it cannot see is worse
 // than no fixture: it stops the next reader from checking.
 func TestNoUnusedVarsSkipsDeclarationFiles(t *testing.T) {
+	t.Parallel()
+
 	const source = "interface Unreferenced {}\ntype AlsoUnreferenced = {};\n"
 	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.d.ts", source); len(result.Diagnostics) != 0 {
 		t.Errorf("a .d.ts declares rather than defines and is skipped whole; got %d findings",
@@ -222,6 +240,8 @@ func TestNoUnusedVarsSkipsDeclarationFiles(t *testing.T) {
 // guard matters had to be written from the real-tree finding it removed. Upstream oxc never reports
 // it (`mod.rs:388`); ESLint does, measured with its own Linter API.
 func TestNoUnusedVarsExemptsMappedTypeKeys(t *testing.T) {
+	t.Parallel()
+
 	// NOT exported, and that is the whole point of the case. The first fixture written for this
 	// survivor used an exported type and the mutant survived it again: an exported declaration is
 	// already exempt for a different reason, so both the guarded and the unguarded rule reach
@@ -254,6 +274,8 @@ func TestNoUnusedVarsExemptsMappedTypeKeys(t *testing.T) {
 // The controls matter as much as the cases: the exported binding ITSELF must still be exempt, or
 // this test would pass on a rule that had simply stopped believing in exports.
 func TestNoUnusedVarsExportedContainerDoesNotExemptItsContents(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -286,6 +308,8 @@ func TestNoUnusedVarsExportedContainerDoesNotExemptItsContents(t *testing.T) {
 // is a left-versus-right or a same-name-versus-different-name distinction where a rule that ignored
 // the side would pass a one-sided fixture.
 func TestNoUnusedVarsDiscardedReads(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -320,6 +344,8 @@ func TestNoUnusedVarsDiscardedReads(t *testing.T) {
 // TestNoUnusedVarsTypePositionsThatNameWithoutReading pins the type-level shapes where a binding is
 // mentioned without being used.
 func TestNoUnusedVarsTypePositionsThatNameWithoutReading(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -353,6 +379,8 @@ func TestNoUnusedVarsTypePositionsThatNameWithoutReading(t *testing.T) {
 // Both are upstream distinctions visible only in its snapshot rather than in its source, and each
 // one has a near-identical neighbour falling the other way.
 func TestNoUnusedVarsAmbientModuleExplicitExports(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name   string
 		source string
@@ -379,6 +407,8 @@ func TestNoUnusedVarsAmbientModuleExplicitExports(t *testing.T) {
 // TestNoUnusedVarsReExportFromModuleIsNotALocalRead pins the one-word difference between a specifier
 // that reads a local binding and one that names something in another module.
 func TestNoUnusedVarsReExportFromModuleIsNotALocalRead(t *testing.T) {
+	t.Parallel()
+
 	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts",
 		"import { resolve } from \"path\";\nexport { resolve } from \"path\";"); len(result.Diagnostics) != 1 {
 		t.Errorf("`export { x } from './m'` names the other module, so the import is unused; got %d",
@@ -397,6 +427,8 @@ func TestNoUnusedVarsReExportFromModuleIsNotALocalRead(t *testing.T) {
 // patterns: a variable or parameter named with a leading underscore is ignored by default, a caught
 // error is not.
 func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(t *testing.T) {
+	t.Parallel()
+
 	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "try {} catch(_) { }"); len(result.Diagnostics) != 1 {
 		t.Errorf("caughtErrorsIgnorePattern has no default, so `catch(_)` reports; got %d",
 			len(result.Diagnostics))

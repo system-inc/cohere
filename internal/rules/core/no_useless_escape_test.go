@@ -29,6 +29,8 @@ const uselessEscapeFile = "/repository/source/UselessEscape.tsx"
 
 // TestNoUselessEscapeFires runs every failing input and asserts the exact diagnostic count.
 func TestNoUselessEscapeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		findings   int
@@ -167,6 +169,8 @@ func TestNoUselessEscapeFires(t *testing.T) {
 // only way to mean a literal, and the fifty v-flag cases pin the reserved double punctuator rule
 // that no amount of reading the prose would produce correctly.
 func TestNoUselessEscapeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -404,6 +408,8 @@ func TestNoUselessEscapeStaysSilent(t *testing.T) {
 //
 // The expectations are upstream's own `fix` vector, verbatim.
 func TestNoUselessEscapeRepairsSource(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSource string

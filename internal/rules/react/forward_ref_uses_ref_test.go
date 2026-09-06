@@ -42,6 +42,8 @@ var upstreamFails = []string{
 // TestForwardRefUsesRefFiresOnUpstreamCorpus runs oxc's five fail inputs. The snapshot gives one
 // diagnostic per input, so each asserts exactly one id.
 func TestForwardRefUsesRefFiresOnUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range upstreamFails {
 		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", source)
 		rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
@@ -56,6 +58,8 @@ func TestForwardRefUsesRefFiresOnUpstreamCorpus(t *testing.T) {
 // bracket the arity check on both sides, so a port written as "fewer than two parameters" fails the
 // first and a port written as "not exactly two" fails the second.
 func TestForwardRefUsesRefStaysSilentOnUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range upstreamPasses {
 		result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", source)
 		rule_testing.ExpectClean(t, result)
@@ -66,6 +70,8 @@ func TestForwardRefUsesRefStaysSilentOnUpstreamCorpus(t *testing.T) {
 // cannot see. Upstream labels the function expression rather than the call, so a port reporting the
 // call node passes every id assertion above while pointing at the wrong span on every finding.
 func TestForwardRefUsesRefPointsAtTheFunction(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		source string
 		want   string
@@ -87,6 +93,8 @@ func TestForwardRefUsesRefPointsAtTheFunction(t *testing.T) {
 // TestForwardRefUsesRefRendersItsMessage asserts the rendered description exactly rather than by
 // substring, because a weaker predicate than the property it guards is not a guard.
 func TestForwardRefUsesRefRendersItsMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef((props) => null);")
 	rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
 	if result.Diagnostics[0].Message.Description != messageForwardRefUsesRef.Description {
@@ -116,6 +124,8 @@ func applySuggestion(source string, suggestion rule.Suggestion) string {
 // `wantRemove` empty means upstream offers only the add-ref repair, which happens for an anonymous
 // function expression in statement context, where unwrapping would not parse.
 func TestForwardRefUsesRefOffersUpstreamRepairs(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		source     string
 		wantRemove string
@@ -184,6 +194,8 @@ func TestForwardRefUsesRefOffersUpstreamRepairs(t *testing.T) {
 // five. The point of the silent half is that there is no import tracking either, so an alias is
 // invisible in the other direction.
 func TestForwardRefUsesRefMatchesTheCalleeNameOnly(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"NotReact.forwardRef(function (e) {});",
 		"obj.deep.forwardRef(function (i) {});",
@@ -224,6 +236,8 @@ func TestForwardRefUsesRefMatchesTheCalleeNameOnly(t *testing.T) {
 // Upstream destructures the callee and the first argument directly, with no paren skipping, so
 // wrapping either one makes the rule blind. All four were run against the release binary.
 func TestForwardRefUsesRefDeclinesParenthesesAtTheCalleeAndArgument(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"(forwardRef)(function (b) {});",
 		"(React.forwardRef)(function (a) {});",
@@ -243,6 +257,8 @@ func TestForwardRefUsesRefDeclinesParenthesesAtTheCalleeAndArgument(t *testing.T
 // removal suggestion. Measured by running oxlint with suggestions applied: the source came back as
 // `(forwardRef(function (a, ref) {}));`, the add-ref repair, rather than unwrapped.
 func TestForwardRefUsesRefSkipsParenthesesWalkingToTheStatement(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", "(forwardRef(function (a) {}));")
 	rule_testing.ExpectFindings(t, result, "forwardRefUsesRef")
 	if len(result.Diagnostics[0].Suggestions) != 1 {
@@ -261,6 +277,8 @@ func TestForwardRefUsesRefSkipsParenthesesWalkingToTheStatement(t *testing.T) {
 // through a separate `rest.is_some()` guard. A `this` parameter is inside ours and outside oxc's,
 // and upstream reports. Counting `Parameters()` directly gets both wrong. Both measured on oxlint.
 func TestForwardRefUsesRefCountsParametersTheWayOxcDoes(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"forwardRef(function (...a) {});",
 		"forwardRef((a, ...b) => {});",
@@ -292,6 +310,8 @@ func TestForwardRefUsesRefCountsParametersTheWayOxcDoes(t *testing.T) {
 // TestForwardRefUsesRefDeclinesNonFunctionArguments covers the shapes that are not a function at
 // all, including the spread that upstream declines through `as_expression` returning nothing.
 func TestForwardRefUsesRefDeclinesNonFunctionArguments(t *testing.T) {
+	t.Parallel()
+
 	for _, source := range []string{
 		"forwardRef(...x);",
 		"forwardRef(class { m(a) {} });",
@@ -313,6 +333,8 @@ func TestForwardRefUsesRefDeclinesNonFunctionArguments(t *testing.T) {
 // suggestion is read by a human before it is applied. Measured by running oxlint with suggestions
 // applied, which rewrote the named case to `function Named(a) {};`.
 func TestForwardRefUsesRefWithholdsRemovalOnlyForAnonymousStatements(t *testing.T) {
+	t.Parallel()
+
 	anonymousStatement := rule_testing.Run(t, ForwardRefUsesRef, "input.tsx", "forwardRef(function (a) {});")
 	rule_testing.ExpectFindings(t, anonymousStatement, "forwardRefUsesRef")
 	if len(anonymousStatement.Diagnostics[0].Suggestions) != 1 {
@@ -343,6 +365,8 @@ func TestForwardRefUsesRefWithholdsRemovalOnlyForAnonymousStatements(t *testing.
 // vectors do not reach, where the range has to be recovered from source text because our tree has
 // no node for the list itself.
 func TestForwardRefUsesRefRewritesAwkwardParameterLists(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		source     string
 		wantAddRef string

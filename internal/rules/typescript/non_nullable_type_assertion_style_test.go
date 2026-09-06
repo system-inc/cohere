@@ -47,6 +47,8 @@ func asTheTypedHarnessWroteIt(text string) string {
 // removes nullish from a type ALIAS rather than from the expression, so the assertion is doing real
 // work a `!` would not do.
 func TestNonNullableTypeAssertionStyleStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"\ndeclare const original: number | string;\nconst cast = original as string;\n    ",
 		"\ndeclare const original: number | undefined;\nconst cast = original as string | number | undefined;\n    ",
@@ -80,6 +82,8 @@ func TestNonNullableTypeAssertionStyleStaysSilentOnUpstreamPassCases(t *testing.
 // upstream records only a start column on this rule and a start column cannot see a finding anchored
 // on the wrong node that happens to begin in the right place.
 func TestNonNullableTypeAssertionStyleFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpan   string
@@ -160,6 +164,8 @@ func TestNonNullableTypeAssertionStyleFiresOnUpstreamFailCases(t *testing.T) {
 // call, a bare await, or a redundant parenthesis, so the wrapping decision is almost entirely
 // untested by the imported cases.
 func TestNonNullableTypeAssertionStyleOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -278,6 +284,8 @@ func TestNonNullableTypeAssertionStyleOnShapesUpstreamsCorpusDoesNotWrite(t *tes
 // is typed as a literal rather than read from the rule's own constant, because a comparison against
 // the constant moves with any mutation of it.
 func TestNonNullableTypeAssertionStyleRendersUpstreamsMessageText(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NonNullableTypeAssertionStyle,
 		nonNullableTypeAssertionStyleFile,
 		"declare const maybe: string | undefined;\nconst bar = maybe as string;\n")
@@ -302,6 +310,8 @@ func TestNonNullableTypeAssertionStyleRendersUpstreamsMessageText(t *testing.T) 
 // asserts the untyped harness produces no finding on an input the typed one reports, which makes a
 // later revert to rule_testing.Run fail loudly rather than quietly.
 func TestNonNullableTypeAssertionStyleRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "declare const maybe: string | undefined;\nconst bar = maybe as string;\n"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NonNullableTypeAssertionStyle,
 		nonNullableTypeAssertionStyleFile, sourceText))
@@ -320,6 +330,8 @@ func TestNonNullableTypeAssertionStyleRequiresTheTypedHarness(t *testing.T) {
 // Every verdict and every repair was measured against the installed 8.x build on that exact source in
 // its own program, with a reporting control in the same run.
 func TestNonNullableTypeAssertionStyleOnTypeParametersAndPartialUnions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -429,6 +441,8 @@ func TestNonNullableTypeAssertionStyleOnTypeParametersAndPartialUnions(t *testin
 // because meta.fixable is code. Measured against the installed 8.x build with controls in the same
 // runs.
 func TestNonNullableTypeAssertionStyleOnNullishFlagsAndUnionAssertions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string

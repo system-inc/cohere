@@ -40,6 +40,8 @@ const directMutationStateFile = "/repository/source/DirectMutationState.tsx"
 // expression reports the whole expression including the operator. `this.state.foo` against
 // `this.state.foo++` is that difference, and no message-id assertion can see it.
 func TestNoDirectMutationStateFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -213,6 +215,8 @@ func TestNoDirectMutationStateFires(t *testing.T) {
 // and a component constructor inside a `describe` callback, which is the exemption surviving two
 // intervening call expressions that are outside the class rather than inside the constructor.
 func TestNoDirectMutationStateStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -301,6 +305,8 @@ func TestNoDirectMutationStateStaysSilent(t *testing.T) {
 // these fall the opposite way from what the rule's name predicts, and two of them are parenthesis
 // forms no fixture in either corpus writes.
 func TestNoDirectMutationStateMeasuredAgainstTheReleaseBinary(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		source    string
@@ -512,6 +518,8 @@ class Outer extends React.Component {
 // The `.tsx` control below is kept: it is what makes this a measurement of the suffix rather than
 // of the rule going silent for some other reason.
 func TestNoDirectMutationStateReportsInNonJsxFiles(t *testing.T) {
+	t.Parallel()
+
 	const source = `
 class A extends React.Component {
   m() { this.state.x = 1; }
@@ -531,6 +539,8 @@ class A extends React.Component {
 // is not a guard: a description carrying a doubled word or a stray interpolation would satisfy a
 // substring check while being wrong on screen.
 func TestNoDirectMutationStateMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoDirectMutationState, directMutationStateFile, `
 class A extends React.Component {
   m() { this.state.x = 1; }

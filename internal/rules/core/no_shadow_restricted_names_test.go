@@ -28,6 +28,8 @@ const shadowRestrictedNamesFile = "/repository/source/ShadowRestrictedNames.ts"
 // why a port that finds only variable declarations still passes a suite asserting one finding per
 // input and fails this one loudly.
 func TestNoShadowRestrictedNamesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -102,6 +104,8 @@ func TestNoShadowRestrictedNamesFires(t *testing.T) {
 // and it stops being harmless the moment anything writes to it. Distinguishing the two needs to
 // know which declaration a later `undefined = 5` binds to, which is why this rule reads the checker.
 func TestNoShadowRestrictedNamesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -144,6 +148,8 @@ func TestNoShadowRestrictedNamesStaysSilent(t *testing.T) {
 // upstream's default of reporting it. A struct field named `ReportGlobalThis` would default to
 // false and silently turn off a third of the rule for every caller who passed no options.
 func TestNoShadowRestrictedNamesRespectsAllowGlobalThis(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -175,6 +181,8 @@ func TestNoShadowRestrictedNamesRespectsAllowGlobalThis(t *testing.T) {
 // reporting the class declaration and reporting its name both produce one finding with the id
 // `shadowingRestrictedName`, and only the slice tells them apart.
 func TestNoShadowRestrictedNamesPointsAtTheName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -221,6 +229,8 @@ func TestNoShadowRestrictedNamesPointsAtTheName(t *testing.T) {
 // that answer, so every shape is a place the carve-out could be silently too generous, and a
 // too-generous carve-out is the quiet direction: the rule simply stops reporting.
 func TestNoShadowRestrictedNamesCarveOutBoundary(t *testing.T) {
+	t.Parallel()
+
 	fires := []struct {
 		name       string
 		sourceText string
@@ -320,6 +330,8 @@ func TestNoShadowRestrictedNamesCarveOutBoundary(t *testing.T) {
 // it would go *loud*, turning upstream's clean `var undefined;` into a finding. Either direction is
 // a defect, and asserting the difference here names which one it is.
 func TestNoShadowRestrictedNamesNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "var undefined; doSomething(undefined);"
 
 	rule_testing.ExpectClean(t,
@@ -346,6 +358,8 @@ func TestNoShadowRestrictedNamesNeedsTheTypedHarness(t *testing.T) {
 // reports twice. Confirmed against our checker before the rule was written: the two declarations
 // have distinct pointers and the write resolves to the inner one.
 func TestNoShadowRestrictedNamesReportsTheWrittenBindingNotItsNamesake(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "var undefined; function f() { var undefined; undefined = 1; }"
 
 	// Byte 34 is the inner declaration's name; byte 4 is the outer one's, 30 bytes earlier.

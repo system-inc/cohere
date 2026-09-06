@@ -50,6 +50,8 @@ const checkedRequiresFile = "/repository/source/CheckedRequires.tsx"
 // set comparison and diverge from the corpus, so `ExpectFindings` taking an ordered list is doing
 // real work here.
 func TestCheckedRequiresFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -85,6 +87,8 @@ func TestCheckedRequiresFires(t *testing.T) {
 // access, which is exactly the shape that panics a rule reaching for a callee name without checking
 // the kind first.
 func TestCheckedRequiresStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -154,6 +158,8 @@ func runCheckedRequires(t *testing.T, sourceText string, rawOptions string) rule
 // locally-defined function of that name is silent, which is the control separating "resolved to the
 // pragma" from "resolved to anything at all".
 func TestCheckedRequiresResolvesEveryPragmaShape(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -279,6 +285,8 @@ func TestCheckedRequiresResolvesEveryPragmaShape(t *testing.T) {
 // property is unmistakably `checked` to a reader and invisible to the rule, and that is reproduced
 // rather than improved.
 func TestCheckedRequiresMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -398,6 +406,8 @@ func TestCheckedRequiresMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
 // WROTE rather than from the literal above, because `RunTyped` trims the fixture and a span sliced
 // from an untrimmed literal is off by one.
 func TestCheckedRequiresReportsOnTheWholeElement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -458,6 +468,8 @@ func TestCheckedRequiresReportsOnTheWholeElement(t *testing.T) {
 // rule's own constants, because comparing a diagnostic to the constant it was reported with is an
 // equality both sides of which move together under mutation.
 func TestCheckedRequiresMessagesReadAsWritten(t *testing.T) {
+	t.Parallel()
+
 	result := runCheckedRequires(t, "<input checked defaultChecked />", "")
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("got %d findings, want 2", len(result.Diagnostics))
@@ -489,6 +501,8 @@ func TestCheckedRequiresMessagesReadAsWritten(t *testing.T) {
 // value, the rule would still behave correctly while its decoder was broken. So this asserts the
 // decoder rather than inferring it from a passing fixture.
 func TestCheckedRequiresDecodesItsOptions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name                string
 		raw                 string
@@ -526,6 +540,8 @@ func TestCheckedRequiresDecodesItsOptions(t *testing.T) {
 
 // TestCheckedRequiresRejectsMalformedOptions asserts the decoder surfaces bad input.
 func TestCheckedRequiresRejectsMalformedOptions(t *testing.T) {
+	t.Parallel()
+
 	if _, err := DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(`{"ignoreMissingProperties":`)); err == nil {
 		t.Fatal("truncated JSON decoded without error")
 	}
@@ -546,6 +562,8 @@ func TestCheckedRequiresRejectsMalformedOptions(t *testing.T) {
 // report under BOTH harnesses; if it did not, this test would be measuring a broken harness rather
 // than a real dependency.
 func TestCheckedRequiresNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const bareCall = "import { createElement } from 'react';\ncreateElement('input', { checked: true });\n"
 
 	typed := rule_testing.RunTypedWithOptions(t, CheckedRequiresOnChangeOrReadOnly,
@@ -570,6 +588,8 @@ func TestCheckedRequiresNeedsTheTypedHarness(t *testing.T) {
 // assuming it. A rule whose defaults were not zero would be silently inverted on this path, which is
 // a failure 21 of 21 imported cases could not see on a rule that hit it.
 func TestCheckedRequiresHandlesNilOptions(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTypedWithOptions(t, CheckedRequiresOnChangeOrReadOnly,
 		checkedRequiresFile, "<input checked defaultChecked />", nil)
 	rule_testing.ExpectFindings(t, result, "exclusiveCheckedAttribute", "missingProperty")
@@ -591,6 +611,8 @@ func TestCheckedRequiresHandlesNilOptions(t *testing.T) {
 // JSX one because JSX in a `.ts` file is a syntax error, so it is the arm that can actually
 // distinguish the two extensions.
 func TestCheckedRequiresHasNoFileGate(t *testing.T) {
+	t.Parallel()
+
 	const source = "declare const React: any;\nReact.createElement('input', { checked: true });\n"
 	for _, fileName := range []string{
 		"/repository/source/CheckedRequires.tsx",
@@ -613,6 +635,8 @@ func TestCheckedRequiresHasNoFileGate(t *testing.T) {
 // tagged template. Each reaches the CallExpression listener with a callee that is neither an
 // identifier nor a property access.
 func TestCheckedRequiresSurvivesShapesThatWouldPanic(t *testing.T) {
+	t.Parallel()
+
 	sources := []string{
 		"(()=>{})();\n",
 		"class Base { constructor() {} }\nclass Derived extends Base { constructor() { super(); } }\n",

@@ -24,6 +24,8 @@ const arrayConstructorFile = "/repository/source/ArrayConstructor.tsx"
 // Copied because a fixture a porter invents encodes the same belief as the port, and the case that
 // catches a bug is the one nobody would think to write.
 func TestNoArrayConstructorFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -109,6 +111,8 @@ func TestNoArrayConstructorFires(t *testing.T) {
 // different function entirely. The type-argument forms are TypeScript rather than the untyped
 // pitfall. The optional forms are upstream declining to judge a case, not judging it safe.
 func TestNoArrayConstructorStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -189,6 +193,8 @@ func TestNoArrayConstructorStaysSilent(t *testing.T) {
 // That is the most damaging failure this rule has available, and upstream's corpus is blind to it,
 // which is a good demonstration that copying the corpus is a floor rather than a ceiling.
 func TestNoArrayConstructorDeclinesOtherConstructors(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"foo();",
 		"new Foo(1, 2);",
@@ -213,6 +219,8 @@ func TestNoArrayConstructorDeclinesOtherConstructors(t *testing.T) {
 // refused a step earlier. So deleting the optional check entirely leaves upstream's whole corpus
 // green. `Array?.()` and `Array?.(1, 2)` are the inputs that can see it, and neither is upstream's.
 func TestNoArrayConstructorDeclinesBareOptionalCalls(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{"Array?.();", "Array?.(1, 2);", "Array?.(...args);"} {
 		t.Run(sourceText, func(t *testing.T) {
 			rule_testing.ExpectClean(t,
@@ -227,6 +235,8 @@ func TestNoArrayConstructorDeclinesBareOptionalCalls(t *testing.T) {
 // parameter named `Array`, so it exercises the same resolution on a different reported shape, and it
 // is the case a reader is most likely to hit in real code: a function that takes a constructor.
 func TestNoArrayConstructorDeclinesAShadowedArray(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"function build(Array) { return new Array(1, 2); }",
 		"function build(Array) { return Array(); }",
@@ -252,6 +262,8 @@ func TestNoArrayConstructorDeclinesAShadowedArray(t *testing.T) {
 // rule, and anyone who switches a fixture back to `Run` gets a failure here rather than a green
 // suite that proves nothing.
 func TestNoArrayConstructorNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoArrayConstructor.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker; the shadow fixtures no longer mean anything")
 	}
@@ -268,6 +280,8 @@ func TestNoArrayConstructorNeedsTheTypedHarness(t *testing.T) {
 // is upstream's own `fix` table, which is the part of the corpus the extractor's counts do not
 // cover.
 func TestNoArrayConstructorSuggestsAnArrayLiteral(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -335,6 +349,8 @@ func TestNoArrayConstructorSuggestsAnArrayLiteral(t *testing.T) {
 // None of this is a correctness problem while the rewrite is a suggestion, because a human sees the
 // result before it lands. It would be one if this were ever promoted to a fix.
 func TestNoArrayConstructorKeepsCommentsAmongArguments(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ sourceText, wantSource string }{
 		// Comments as the only "arguments" are lost, because they are not arguments.
 		{"Array(/*a*/ /*b*/)", "[]"},
@@ -379,6 +395,8 @@ func TestNoArrayConstructorKeepsCommentsAmongArguments(t *testing.T) {
 // this case from the ordinary one without looking at what precedes the statement, so nothing here
 // may be applied unattended.
 func TestNoArrayConstructorNeverProposesAnAutomaticFix(t *testing.T) {
+	t.Parallel()
+
 	sourceText := "const value = 1;\nFn\nArray()\n"
 	result := rule_testing.RunTyped(t, NoArrayConstructor, arrayConstructorFile, sourceText)
 	if len(result.Diagnostics) != 1 {

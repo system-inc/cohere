@@ -9,6 +9,8 @@ import (
 const forDirectionFile = "/repository/source/Loop.ts"
 
 func TestForDirectionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -53,6 +55,8 @@ func TestForDirectionFires(t *testing.T) {
 }
 
 func TestForDirectionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -129,6 +133,8 @@ func TestForDirectionStaysSilent(t *testing.T) {
 // The return is kept: it makes the single-report behavior local rather than a property a reader
 // has to reconstruct, and one line is cheaper than this comment.
 func TestForDirectionReportsOncePerLoop(t *testing.T) {
+	t.Parallel()
+
 	// The same counter on both sides. Qualifies on the left only, since the wrong direction
 	// differs by side and one update cannot be both.
 	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,

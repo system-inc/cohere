@@ -47,6 +47,8 @@ func decodedNoImplicitCoercionOptions(t *testing.T, raw string) any {
 // Asserting only the ids would leave both surfaces unchecked, so this asserts the repair on the
 // fixable cases, the suggested rewrite on the rest, and the rendered message text on all of them.
 func TestNoImplicitCoercionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name             string
 		options          string
@@ -177,6 +179,8 @@ func noImplicitCoercionApplyFixes(source string, fixes []rule.Fix) string {
 }
 
 func TestNoImplicitCoercionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		options string
@@ -297,6 +301,8 @@ func TestNoImplicitCoercionStaysSilent(t *testing.T) {
 // The last row is the one that separates a scope-aware answer from a textual one: a shadow in a
 // SIBLING function does not reach the expression, so the fix stands.
 func TestNoImplicitCoercionWithholdsTheFixWhenBooleanIsShadowed(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name       string
 		sourceText string
@@ -344,6 +350,8 @@ func TestNoImplicitCoercionWithholdsTheFixWhenBooleanIsShadowed(t *testing.T) {
 // CALLEE ends an optional chain, so the recommendation moves from `>= 0` back to `!== -1`. Measured
 // against the installed build, which recommends exactly that for each.
 func TestNoImplicitCoercionParenthesesShapes(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name           string
 		sourceText     string
@@ -379,6 +387,8 @@ func TestNoImplicitCoercionParenthesesShapes(t *testing.T) {
 // the property statically and reports, while `foo[indexOf](x)` computes the name at runtime and
 // cannot be recognised.
 func TestNoImplicitCoercionIndexOfShapes(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name           string
 		sourceText     string
@@ -434,6 +444,8 @@ func TestNoImplicitCoercionIndexOfShapes(t *testing.T) {
 //
 // Every row was measured against the installed build at 10.8.1.
 func TestNoImplicitCoercionMultiplyByOneOperandShapes(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name           string
 		sourceText     string
@@ -480,6 +492,8 @@ func TestNoImplicitCoercionMultiplyByOneOperandShapes(t *testing.T) {
 // The fixtures below are the rule's half of that. Nothing here can catch an extraction bug, which
 // is the point worth remembering: the defect was never in the rule.
 func TestNoImplicitCoercionMultilineOperand(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name           string
 		sourceText     string
@@ -515,6 +529,8 @@ func TestNoImplicitCoercionMultilineOperand(t *testing.T) {
 // worth pinning: the natural way to write the recommendation is to rebuild it from parts, and that
 // is how this project lost type information twice.
 func TestNoImplicitCoercionTypeScriptShapes(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name           string
 		sourceText     string
@@ -543,6 +559,8 @@ func TestNoImplicitCoercionTypeScriptShapes(t *testing.T) {
 // three of the four judgments switched off, and every fixture built from a struct rather than routed
 // through the decoder would pass anyway.
 func TestDecodeNoImplicitCoercionOptions(t *testing.T) {
+	t.Parallel()
+
 	settingsFrom := func(t *testing.T, raw string) NoImplicitCoercionOptions {
 		t.Helper()
 		decoded, err := DecodeNoImplicitCoercionOptions(json.RawMessage(raw))

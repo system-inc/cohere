@@ -27,6 +27,8 @@ const setterReturnFile = "/repository/source/SetterReturn.js"
 // forty cases about `Object.defineProperty` descriptors that exist only to pin a gap upstream
 // deliberately leaves open (see the rule's doc comment).
 func TestNoSetterReturnFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		findings   int
@@ -95,6 +97,8 @@ func TestNoSetterReturnFires(t *testing.T) {
 // because that is what upstream asserts, and reproducing a stated gap is the instruction rather
 // than improving on it silently.
 func TestNoSetterReturnStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []string{
 		"function foo() { return 1; }",
 		"function set(val) { return 1; }",
@@ -228,6 +232,8 @@ func TestNoSetterReturnStaysSilent(t *testing.T) {
 // its three has no semicolon in the source, so the statement ends at the expression and the span
 // shortens with it. A rule spanning the expression would drop the leading `return ` from all six.
 func TestNoSetterReturnSpansTheWholeStatement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantSpans  []string

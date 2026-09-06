@@ -20,6 +20,8 @@ import (
 const preferNumericLiteralsDeclinesToFix = "\x00declines"
 
 func TestPreferNumericLiteralsStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		source string
@@ -63,6 +65,8 @@ func TestPreferNumericLiteralsStaysSilent(t *testing.T) {
 }
 
 func TestPreferNumericLiteralsFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		source    string
@@ -151,6 +155,8 @@ func TestPreferNumericLiteralsFires(t *testing.T) {
 // The span and the interpolated function name, neither of which ExpectFindings can see. The name is
 // read out of the source rather than being a constant, so each callee spelling names itself.
 func TestPreferNumericLiteralsSpanAndMessage(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		source       string
@@ -192,6 +198,8 @@ func TestPreferNumericLiteralsSpanAndMessage(t *testing.T) {
 // Five of upstream's passing cases are shadows and nothing about the syntax separates them from the
 // real thing.
 func TestPreferNumericLiteralsGlobalGuard(t *testing.T) {
+	t.Parallel()
+
 	shadowed := []string{
 		"function foo(parseInt: any) { parseInt('111110111', 2); }",
 		"function foo() { var parseInt: any; parseInt('111110111', 2); }",
@@ -212,6 +220,8 @@ func TestPreferNumericLiteralsGlobalGuard(t *testing.T) {
 // that reports with a fix beside one that reports without, differing only in the thing being
 // measured, so a comparison that answered the same for both would fail rather than half-pass.
 func TestPreferNumericLiteralsValueComparison(t *testing.T) {
+	t.Parallel()
+
 	fixed := []struct {
 		name      string
 		source    string
@@ -266,6 +276,8 @@ func TestPreferNumericLiteralsValueComparison(t *testing.T) {
 // `isSpecificId(calleeNode, "parseInt")`, so neither needed a test there. Expressed as code here,
 // each becomes a line that can be wrong on its own.
 func TestPreferNumericLiteralsArgumentCountAndCalleeName(t *testing.T) {
+	t.Parallel()
+
 	silent := []struct {
 		name   string
 		source string

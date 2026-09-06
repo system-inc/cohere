@@ -12,6 +12,8 @@ import (
 // post-dominator frontier rather than the post-dominator chain `UnconditionalBlocks` walks, and the
 // two are easy to confuse because they read the same tree.
 func TestControlDominatorsFindsTheDecidingBranch(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `function Component(x, flag) {
   if (flag) {
     sink(1);
@@ -50,6 +52,8 @@ func TestControlDominatorsFindsTheDecidingBranch(t *testing.T) {
 // The half that makes the test above mean something. `ControlDominators` takes a predicate over the
 // branch's test, and a version that ignored it would report every guarded block as controlled.
 func TestControlDominatorsConsultsTheTest(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `function Component(x, flag) {
   if (flag) {
     sink(1);
@@ -73,6 +77,8 @@ func TestControlDominatorsConsultsTheTest(t *testing.T) {
 // Straight-line code is the case a frontier implementation gets wrong by returning the entry block
 // for everything, which would exempt every setter in the codebase.
 func TestControlDominatorsIsEmptyWithoutBranches(t *testing.T) {
+	t.Parallel()
+
 	function := lowerSource(t, `function Component(x) {
   sink(1);
   return x;
@@ -91,6 +97,8 @@ func TestControlDominatorsIsEmptyWithoutBranches(t *testing.T) {
 
 // A nil function yields a predicate rather than a panic.
 func TestControlDominatorsIsNilSafe(t *testing.T) {
+	t.Parallel()
+
 	if ControlDominators(nil, func(Place) bool { return true })(BlockId(1)) {
 		t.Error("a nil function reported a controlled block")
 	}

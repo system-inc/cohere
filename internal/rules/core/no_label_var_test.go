@@ -17,6 +17,8 @@ const labelVarFile = "/repository/source/LabelVar.ts"
 // asserted below rather than left to a message id. Every case string was verified byte against byte
 // against the upstream file, and every verdict reproduced by driving the installed eslint at 10.8.1.
 func TestNoLabelVarFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -42,6 +44,8 @@ func TestNoLabelVarFires(t *testing.T) {
 // whose name is not the label's, which is the ordinary case a rule that ignored the name would
 // report.
 func TestNoLabelVarStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -68,6 +72,8 @@ func TestNoLabelVarStaysSilent(t *testing.T) {
 // The function and class rows are the same point from the other side: a binding that is not a `var`
 // at all still clashes, because the clash is about the NAME being taken.
 func TestNoLabelVarFiresOnCasesBeyondTheCorpus(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -100,6 +106,8 @@ func TestNoLabelVarFiresOnCasesBeyondTheCorpus(t *testing.T) {
 // the block it labels. Both measured clean upstream, and a rule searching the file for the name
 // reports both.
 func TestNoLabelVarStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -125,6 +133,8 @@ func TestNoLabelVarStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
 // `x: for(;;) { break x; }`. Reporting the LABEL instead would be a defensible reading of the same
 // rule with an identical message id, and no id fixture could tell the two apart.
 func TestNoLabelVarSpansTheWholeLabeledStatement(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name         string
 		sourceText   string
@@ -154,6 +164,8 @@ func TestNoLabelVarSpansTheWholeLabeledStatement(t *testing.T) {
 // the top of the listener makes it go completely silent. That is the more dangerous of the two
 // failure modes, because every clean case would then pass vacuously.
 func TestNoLabelVarRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t,
 		rule_testing.RunTyped(t, NoLabelVar, labelVarFile, "function bar(x) { x: for(;;) { break x; } }"),
 		"identifierClashWithLabel")
@@ -165,6 +177,8 @@ func TestNoLabelVarRequiresTheTypedHarness(t *testing.T) {
 // constant, because comparing a diagnostic to the constant it was built from moves both sides
 // together under mutation and asserts nothing.
 func TestNoLabelVarMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.RunTyped(t, NoLabelVar, labelVarFile, "function bar(x) { x: for(;;) { break x; } }")
 	if len(result.Diagnostics) != 1 {
 		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
@@ -191,6 +205,8 @@ func TestNoLabelVarMessage(t *testing.T) {
 // block and is in scope at the label, so a rule that simply never looked inside would get the other
 // four right for the wrong reason.
 func TestNoLabelVarAsksAtTheLabelRatherThanInsideItsBody(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		sourceText  string

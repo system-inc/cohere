@@ -10,6 +10,8 @@ import (
 // one of them carries the same import; the corpus varies only the path, because the path is the
 // whole judgment. Each was additionally confirmed against the release oxlint binary.
 func TestNoDocumentImportInPageIsSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -65,6 +67,8 @@ func TestNoDocumentImportInPageIsSilentOnUpstreamPassCases(t *testing.T) {
 // upstream reports, because it is not the immediate child of a `pages` directory. Confirmed
 // reporting against the release oxlint binary rather than taken from the snapshot alone.
 func TestNoDocumentImportInPageReportsOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -105,6 +109,8 @@ func TestNoDocumentImportInPageReportsOnUpstreamFailCases(t *testing.T) {
 // import shape other than a default binding is unpinned by it, and a port that guessed either would
 // pass all eleven imported fixtures.
 func TestNoDocumentImportInPageReportsOnShapesTheCorpusNeverPins(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -177,6 +183,8 @@ func TestNoDocumentImportInPageReportsOnShapesTheCorpusNeverPins(t *testing.T) {
 // Nothing deduplicates per file, so a file importing the module twice reports twice. Split out
 // because ExpectFindings takes one id per finding and the table above passes exactly one.
 func TestNoDocumentImportInPageReportsOncePerDeclaration(t *testing.T) {
+	t.Parallel()
+
 	source := "import Document from \"next/document\";\n" +
 		"import { Html } from \"next/document\";\n"
 	result := rule_testing.Run(t, NoDocumentImportInPage, "components/Thing.tsx", source)
@@ -188,6 +196,8 @@ func TestNoDocumentImportInPageReportsOncePerDeclaration(t *testing.T) {
 // are shapes the rule's own name suggests it should catch, and reproducing the narrowness is the
 // port rather than a gap in it.
 func TestNoDocumentImportInPageIsSilentOnShapesTheCorpusNeverPins(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -288,6 +298,8 @@ func TestNoDocumentImportInPageIsSilentOnShapesTheCorpusNeverPins(t *testing.T) 
 // release binary at offset 20 length 37 for a file whose import sits under a comment, which is the
 // whole declaration starting at the `import` keyword and excluding the leading trivia.
 func TestNoDocumentImportInPagePointsAtTheWholeDeclaration(t *testing.T) {
+	t.Parallel()
+
 	source := "// a comment above\n" +
 		"\n" +
 		"import Document from \"next/document\";\n" +
@@ -309,6 +321,8 @@ func TestNoDocumentImportInPagePointsAtTheWholeDeclaration(t *testing.T) {
 // there is to assert: it pins that the finding carries THIS message rather than a sibling rule's,
 // which the id alone would also satisfy if two rules shared one.
 func TestNoDocumentImportInPageCarriesItsOwnMessage(t *testing.T) {
+	t.Parallel()
+
 	result := rule_testing.Run(t, NoDocumentImportInPage, "components/Thing.tsx",
 		"import Document from \"next/document\";\n")
 	rule_testing.ExpectFindings(t, result, messageNoDocumentImportInPage.Id)

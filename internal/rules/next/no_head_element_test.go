@@ -7,6 +7,8 @@ import (
 )
 
 func TestNoHeadElementReports(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string
@@ -41,6 +43,8 @@ func TestNoHeadElementReports(t *testing.T) {
 }
 
 func TestNoHeadElementIsSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		fileName string

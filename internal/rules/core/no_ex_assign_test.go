@@ -9,6 +9,8 @@ import (
 const exAssignFile = "/repository/source/Thing.ts"
 
 func TestNoExAssignFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -30,6 +32,8 @@ func TestNoExAssignFires(t *testing.T) {
 }
 
 func TestNoExAssignStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -64,6 +68,8 @@ func TestNoExAssignStaysSilent(t *testing.T) {
 // Found while measuring whether the four reference-blocked rules could be answered syntactically,
 // not by reviewing this rule. The walker it shares with them was missing a whole category of write.
 func TestNoExAssignSeesUpdateExpressions(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -86,6 +92,8 @@ func TestNoExAssignSeesUpdateExpressions(t *testing.T) {
 // A unary that reads its operand is not a write, which is what keeps the arm above from being a
 // blanket rule about unary expressions.
 func TestNoExAssignIgnoresReadingUnaryOperators(t *testing.T) {
+	t.Parallel()
+
 	for _, sourceText := range []string{
 		"try {} catch (error) { const a = -error; }",
 		"try {} catch (error) { const a = !error; }",

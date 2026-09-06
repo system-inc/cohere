@@ -23,6 +23,8 @@ const unsafeOptionalChainingFile = "/repository/source/Chain.ts"
 // TestNoUnsafeOptionalChainingReportsPerChain below rather than here, because this test asserts
 // one finding per input.
 func TestNoUnsafeOptionalChainingFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -64,6 +66,8 @@ func TestNoUnsafeOptionalChainingFires(t *testing.T) {
 // A port anchoring on the enclosing member expression would report each of these once and pass a
 // fixture that asserted one finding.
 func TestNoUnsafeOptionalChainingReportsPerChain(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -88,6 +92,8 @@ func TestNoUnsafeOptionalChainingReportsPerChain(t *testing.T) {
 // behind `??` or `||` is safe on the right, because the operator supplies the fallback. Arithmetic
 // is safe under the default options, which is what the option exists to change.
 func TestNoUnsafeOptionalChainingStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -181,6 +187,8 @@ func TestNoUnsafeOptionalChainingStaysSilent(t *testing.T) {
 // how it pins that an options object that omits the key still gets the default rather than the
 // zero value of whatever the decoder produced.
 func TestNoUnsafeOptionalChainingArithmeticOption(t *testing.T) {
+	t.Parallel()
+
 	// Omitting the option entirely leaves arithmetic clean.
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo - bar;"))
@@ -212,6 +220,8 @@ func TestNoUnsafeOptionalChainingArithmeticOption(t *testing.T) {
 // the enclosing member access or call that made it unsafe. That is a real design decision: the
 // chain is the thing the author must change, and the enclosing operator is only the evidence.
 func TestNoUnsafeOptionalChainingReportsTheChainSpan(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -262,6 +272,8 @@ func TestNoUnsafeOptionalChainingReportsTheChainSpan(t *testing.T) {
 // The arithmetic finding's span, asserted separately because it is produced by a different arm
 // and could point at the operator or the whole binary expression without any fixture noticing.
 func TestNoUnsafeOptionalChainingReportsTheArithmeticSpan(t *testing.T) {
+	t.Parallel()
+
 	source := "bar + obj?.foo;"
 	result := rule_testing.RunWithOptions(t, NoUnsafeOptionalChaining, unsafeOptionalChainingFile,
 		source, NoUnsafeOptionalChainingOptions{DisallowArithmeticOperators: true})
@@ -283,6 +295,8 @@ func TestNoUnsafeOptionalChainingReportsTheArithmeticSpan(t *testing.T) {
 // Upstream has a fail case for `in` but none for `instanceof`, none for a computed access, none
 // for a call argument's spread, and none for a class expression's heritage. Each is below.
 func TestNoUnsafeOptionalChainingCoversEveryUnsafeContext(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -348,6 +362,8 @@ func TestNoUnsafeOptionalChainingCoversEveryUnsafeContext(t *testing.T) {
 // `[...undefined]` throws. A port that treats every spread alike reports this, and upstream's
 // two object-spread clean cases are the only thing pinning the distinction.
 func TestNoUnsafeOptionalChainingDeclinesSafeContextsUnderTheOption(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -393,6 +409,8 @@ func TestNoUnsafeOptionalChainingDeclinesSafeContextsUnderTheOption(t *testing.T
 // genuinely non-optional access and does report. The pair is what makes the discrimination
 // visible; either case alone passes under the wrong predicate.
 func TestNoUnsafeOptionalChainingDistinguishesChainRootFromChainMembership(t *testing.T) {
+	t.Parallel()
+
 	// Inside one chain: `.bar` short-circuits with the rest and is safe.
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnsafeOptionalChaining,
 		unsafeOptionalChainingFile, "obj?.foo.bar;"))

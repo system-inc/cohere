@@ -67,6 +67,8 @@ func runUnboundMethod(t *testing.T, sourceText string, options string) rule_test
 // arrow-function property, a natively bound global, and a long tail of assertion and chaining
 // wrappers that have to be seen through.
 func TestUnboundMethodStaysSilentOnUpstreamPassCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -236,6 +238,8 @@ func TestUnboundMethodStaysSilentOnUpstreamPassCases(t *testing.T) {
 // start column on only three of its sixty-nine findings and a line number alone cannot see a finding
 // anchored on the wrong node on the right line.
 func TestUnboundMethodFiresOnUpstreamFailCases(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    string
@@ -662,6 +666,8 @@ func TestUnboundMethodFiresOnUpstreamFailCases(t *testing.T) {
 // type-level test answers false for it and only the name lookup would exempt it. Here the import
 // makes it a local module symbol instead, which is not natively bound at all, so both report.
 func TestUnboundMethodResolvesAcrossAModuleBoundary(t *testing.T) {
+	t.Parallel()
+
 	const moduleFileName = "/repository/source/class.ts"
 	const moduleSource = "export const console = { log() {} };\n"
 
@@ -731,6 +737,8 @@ func TestUnboundMethodResolvesAcrossAModuleBoundary(t *testing.T) {
 // different arms. When they agree, or when only one is dangerous, both orderings pick the same one.
 // One of upstream's two hundred and eleven cases is in that position.
 func TestUnboundMethodOnAUnionWhoseConstituentsDisagree(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "\nclass Foo {\n  floor = function () {};\n}\n\n" +
 		"const { floor } = Math.random() > 0.5 ? new Foo() : Math;\n      "
 
@@ -773,6 +781,8 @@ func TestUnboundMethodOnAUnionWhoseConstituentsDisagree(t *testing.T) {
 //
 // Measured against the installed 8.x build, one program per case, with controls in the same run.
 func TestUnboundMethodSeesThroughWrappersUpstreamsParserRemoves(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -873,6 +883,8 @@ func TestUnboundMethodSeesThroughWrappersUpstreamsParserRemoves(t *testing.T) {
 //
 // Measured against the installed 8.x build, one program per case, with a control in the same run.
 func TestUnboundMethodOnThisAnnotationsAndRepeatedConstituents(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -958,6 +970,8 @@ func TestUnboundMethodOnThisAnnotationsAndRepeatedConstituents(t *testing.T) {
 //
 // Measured against the installed 8.x build, one program per case.
 func TestUnboundMethodStopsAtTheFirstReportingPropertyName(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		why        string
@@ -1016,6 +1030,8 @@ func TestUnboundMethodStopsAtTheFirstReportingPropertyName(t *testing.T) {
 // asserts the untyped harness produces nothing on an input the typed one reports, so a later revert
 // to rule_testing.Run fails loudly rather than quietly.
 func TestUnboundMethodRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const sourceText = "declare const o: { m(): void };\nconst f = o.m;\n"
 	rule_testing.ExpectClean(t, rule_testing.Run(t, UnboundMethod, unboundMethodFile, sourceText))
 	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UnboundMethod, unboundMethodFile,
@@ -1029,6 +1045,8 @@ func TestUnboundMethodRequiresTheTypedHarness(t *testing.T) {
 // wanted strings are typed as literals rather than read from the rule's own constants, because a
 // comparison against the constant moves with any mutation of it.
 func TestUnboundMethodRendersUpstreamsMessageText(t *testing.T) {
+	t.Parallel()
+
 	const base = "A method that is not declared with `this: void` may cause unintentional scoping " +
 		"of `this` when separated from its object.\n" +
 		"Consider using an arrow function or explicitly `.bind()`ing the method to avoid calling " +

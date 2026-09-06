@@ -151,6 +151,8 @@ func hasEffect(list []string, want string) bool {
 // source with Assign. The ordinary-binding edge is load-bearing for destructured component props:
 // without it a frozen props object becomes an unknown mutable `prop` before an optional-chain phi.
 func TestDestructureEffectsNameEveryBinding(t *testing.T) {
+	t.Parallel()
+
 	function, table := effectsFor(t, `
 		function Component(source: {a: object, nested: {b: object}, c: object}) {
 			const {a, nested: {b}, ...rest} = source;
@@ -227,6 +229,8 @@ func TestDestructureEffectsNameEveryBinding(t *testing.T) {
 // later unknown call is allowed to conditionally mutate an ordinary value but not a value whose
 // identity a live manual memo has frozen.
 func TestManualMemoMarkersFreezeTheirOperands(t *testing.T) {
+	t.Parallel()
+
 	test := func(source string, wantFreeze bool) {
 		function, _ := effectsFor(t, source)
 		value := function.Params[0]
@@ -273,6 +277,8 @@ function f(value: object) { return value; }`, false)
 // must discard the conditional mutation there while retaining it for the otherwise identical
 // unfrozen object. This prevents the fix from becoming a broad zero-argument-method exemption.
 func TestMemoFreezeRefinesAnUnknownMethodMutation(t *testing.T) {
+	t.Parallel()
+
 	build := func(frozen bool) (*Function, Place, *Instruction, *Instruction) {
 		function := NewFunction(nil, "f", FunctionKindOther)
 		block := function.NewBlock(BlockKindBlock)
@@ -356,6 +362,8 @@ func TestMemoFreezeRefinesAnUnknownMethodMutation(t *testing.T) {
 // marker. CreateFrom copies the current kind into a fresh value, while Capture and MaybeAlias are
 // information-flow edges; none of those three share identity under the same ordering.
 func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		relation   AliasingEffectKind
@@ -427,6 +435,8 @@ func TestFreezeFollowsOnlySharedAssignIdentity(t *testing.T) {
 // than one directly-created value. A phi denotes the union of its operands, and a frozen function
 // recursively freezes its captured context. Neither relationship is an ordinary range Capture.
 func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
+	t.Parallel()
+
 	t.Run("phi operands", func(t *testing.T) {
 		function := NewFunction(nil, "f", FunctionKindOther)
 		entry := function.NewBlock(BlockKindBlock)
@@ -515,6 +525,8 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(t *testing.T) {
 // initialize can still appear as a marker operand; treating the marker as its allocation site
 // would suppress an otherwise conservative unknown-call mutation.
 func TestStartMemoizeFreezeRequiresAnInitializedAbstractValue(t *testing.T) {
+	t.Parallel()
+
 	build := func(initialized bool) (*Function, *Instruction, *Instruction) {
 		function := NewFunction(nil, "f", FunctionKindOther)
 		block := function.NewBlock(BlockKindBlock)
@@ -579,6 +591,8 @@ func TestStartMemoizeFreezeRequiresAnInitializedAbstractValue(t *testing.T) {
 // on a count, because the brief records a phi mutant that survived a name-keyed assertion while the
 // merge rule was dead.
 func TestPropertyStoreMutatesItsObject(t *testing.T) {
+	t.Parallel()
+
 	function, table := effectsFor(t, `function f() { const o = { a: 0 }; o.a = 1; return o; }`)
 
 	effects := effectsOn(function, table, "o")
@@ -592,6 +606,8 @@ func TestPropertyStoreMutatesItsObject(t *testing.T) {
 // `o.a = v` does not only mutate `o`, it records that `o` now holds `v`. Without that edge an
 // escape analysis cannot follow a value into a structure, which is the whole point of the pass.
 func TestPropertyStoreCapturesTheStoredValue(t *testing.T) {
+	t.Parallel()
+
 	function, table := effectsFor(t, `function f(v: object) { const o = { a: {} }; o.a = v; return o; }`)
 
 	effects := effectsOn(function, table, "v")
@@ -606,6 +622,8 @@ func TestPropertyStoreCapturesTheStoredValue(t *testing.T) {
 // than the specific variant: an unknown call that recorded NO mutation would make every consumer
 // under-report, and an under-reporting escape analysis is unsound in the dangerous direction.
 func TestUnknownCallConservativelyMutatesItsArguments(t *testing.T) {
+	t.Parallel()
+
 	function, table := effectsFor(t, `function f() { const o = { a: 0 }; unknownFunction(o); return o; }`)
 
 	effects := effectsOn(function, table, "o")
@@ -621,6 +639,8 @@ func TestUnknownCallConservativelyMutatesItsArguments(t *testing.T) {
 // tests would still describe real behaviour and only this one would fail, which is why it exists
 // rather than a bare assertion that some call produced some effect.
 func TestKnownReadOnlySignatureDoesNotMutate(t *testing.T) {
+	t.Parallel()
+
 	function, table := effectsFor(t, `function f(list: number[]) { const found = list.includes(1); return found; }`)
 
 	effects := effectsOn(function, table, "list")
@@ -635,6 +655,8 @@ func TestKnownReadOnlySignatureDoesNotMutate(t *testing.T) {
 // tree at 2,202 call sites. Measured against React's executable: a frozen array's `push` reports
 // while `sort` on the same array is clean, because `sort` is absent from upstream's table.
 func TestKnownMutatingSignatureMutatesItsReceiver(t *testing.T) {
+	t.Parallel()
+
 	function, table := effectsFor(t, `function f() { const list: number[] = []; list.push(1); return list; }`)
 
 	effects := effectsOn(function, table, "list")
@@ -653,6 +675,8 @@ func TestKnownMutatingSignatureMutatesItsReceiver(t *testing.T) {
 // later reader who adds `sort` to the table sees this go red and reads why rather than discovering
 // the divergence from a differential run.
 func TestSortIsSilentBecauseUpstreamHasNoSignatureForIt(t *testing.T) {
+	t.Parallel()
+
 	if _, found := effectSignatures["sort"]; found {
 		t.Fatal("sort was added to the signature table; upstream has no entry for it and React " +
 			"is measurably silent on a frozen array's sort, so adding it is a divergence that " +
@@ -670,6 +694,8 @@ func TestSortIsSilentBecauseUpstreamHasNoSignatureForIt(t *testing.T) {
 // its own doc comment records the ordering pair that proves freezing is a dataflow fact rather than
 // a property of a value's origin.
 func TestJsxFreezesWhatItInterpolates(t *testing.T) {
+	t.Parallel()
+
 	function, table := effectsFor(t, `function C() { const o = { a: 0 }; return <div>{o}</div>; }`)
 
 	effects := effectsOn(function, table, "o")
@@ -683,6 +709,8 @@ func TestJsxFreezesWhatItInterpolates(t *testing.T) {
 // This is the effect a rule asking "was this object mutated after crossing an async boundary" would
 // read, and it is named in the dispatch as one of the things this substrate makes possible.
 func TestAwaitConditionallyMutatesTheAwaitedValue(t *testing.T) {
+	t.Parallel()
+
 	function, table := effectsFor(t, `async function f(p: Promise<object>) { const v = await p; return v; }`)
 
 	effects := effectsOn(function, table, "p")
@@ -701,6 +729,8 @@ func TestAwaitConditionallyMutatesTheAwaitedValue(t *testing.T) {
 // corpus while the invariant does not: any instruction value other than UnsupportedNode that
 // produces no effect is a hole in the switch.
 func TestEveryInstructionShapeProducesEffects(t *testing.T) {
+	t.Parallel()
+
 	source := `
 function f(a: number[], o: { x: number }, p: Promise<number>, fn: (n: number) => number) {
 	const sum = a.length + 1;
@@ -758,6 +788,8 @@ function f(a: number[], o: { x: number }, p: Promise<number>, fn: (n: number) =>
 // producing a message that names a different value between runs, which is a defect this tree has
 // already shipped once in `static_components.go`.
 func TestEffectsAreDeterministic(t *testing.T) {
+	t.Parallel()
+
 	source := `
 function f(c: boolean, a: object, b: object) {
 	let value = a;
@@ -804,6 +836,8 @@ declare function use(v: object): void;`
 // This is the test that would go red if someone decided the projection could be done without
 // ranges, which is the specific wrong turn the package comment argues against.
 func TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead(t *testing.T) {
+	t.Parallel()
+
 	from := Place{Identifier: IdentifierId(1)}
 	into := Place{Identifier: IdentifierId(2)}
 	effects := []AliasingEffect{{Kind: AliasingEffectCapture, From: from, Into: into, HasFrom: true}}
@@ -839,6 +873,8 @@ func TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead(t *testing.T) {
 // This test goes RED if a gap is ever closed, which is deliberate: closing one should be a
 // deliberate edit here rather than a silent change in what a consumer can trust.
 func TestEffectGapsAreNamedInTheApi(t *testing.T) {
+	t.Parallel()
+
 	gaps := EffectGaps()
 	if len(gaps) != 3 {
 		t.Fatalf("EffectGaps changed; if a gap was closed, update the consumers that ask. got %v", gaps)
@@ -868,6 +904,8 @@ func TestEffectGapsAreNamedInTheApi(t *testing.T) {
 // a named local callee start reaching its call site, which is exactly when every consumer's
 // assumptions change.
 func TestInterproceduralParametersAreNotInferred(t *testing.T) {
+	t.Parallel()
+
 	function, table := effectsFor(t, `
 function outer() {
 	function inner(target: { a: number }) { target.a = 1; }
@@ -925,6 +963,8 @@ func typeName(value InstructionValue) string {
 // `includes` has a Read receiver, never enters the captures list, and must also yield exactly one,
 // from the branch instead. The inverted mutant gives `map` two and `includes` zero.
 func TestCaptureReceiverIsAliasedExactlyOnce(t *testing.T) {
+	t.Parallel()
+
 	if effectSignatures["map"].Receiver != EffectCapture {
 		t.Fatal("the control failed: map must carry a Capture receiver or this test measures nothing")
 	}
@@ -974,6 +1014,8 @@ func TestCaptureReceiverIsAliasedExactlyOnce(t *testing.T) {
 // the brief's "name the input on which the two versions produce different output" catching a wrong
 // guess one step before it became a test.
 func TestAnUnknownMethodCallDoesNotMutateTheMethodItself(t *testing.T) {
+	t.Parallel()
+
 	function, table := effectsFor(t, `
 function f(lib: { doThing(v: object): void }, v: object) { lib.doThing(v); return 1; }`)
 

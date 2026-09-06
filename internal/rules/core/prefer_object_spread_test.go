@@ -159,6 +159,8 @@ const preferObjectSpreadGlobalDeclaration = ""
 // also what `TestEveryRuleShipsAFixturePair` looks for by name, so a hand-rolled comparison would
 // read to the guard as no proof at all.
 func TestPreferObjectSpreadFires(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range preferObjectSpreadFiringCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			if testCase.ecmaVersionGated {
@@ -196,6 +198,8 @@ func TestPreferObjectSpreadFires(t *testing.T) {
 
 // TestPreferObjectSpreadStaysSilent runs upstream's 32 valid cases.
 func TestPreferObjectSpreadStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range preferObjectSpreadCleanCases {
 		t.Run(testCase.source, func(t *testing.T) {
 			if testCase.ecmaVersionGated {
@@ -216,6 +220,8 @@ func TestPreferObjectSpreadStaysSilent(t *testing.T) {
 // Each exists because a mutation survived all 95 imported cases, and each verdict was measured
 // against the installed rule rather than derived from reading the fixer.
 func TestPreferObjectSpreadAddedCases(t *testing.T) {
+	t.Parallel()
+
 	for _, testCase := range []struct {
 		name        string
 		source      string
@@ -264,6 +270,8 @@ func TestPreferObjectSpreadAddedCases(t *testing.T) {
 // same case whose applied text cannot be compared, so the finding assertion alone could not see it.
 // This asserts what the finding OFFERS instead.
 func TestPreferObjectSpreadDeclinesOnARecoveredParse(t *testing.T) {
+	t.Parallel()
+
 	const source = "const test = Object.assign({ ...bar }, {\n<!-- html comment\nfoo: 'bar'\n--> weird\n})"
 
 	result := rule_testing.RunTyped(t, PreferObjectSpread, preferObjectSpreadFile, source)

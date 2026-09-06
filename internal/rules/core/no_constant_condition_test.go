@@ -11,6 +11,8 @@ const constantConditionFile = "/repository/source/Condition.ts"
 const constantConditionDeclarations = "declare let a: any, b: any;\n"
 
 func TestNoConstantConditionFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -78,6 +80,8 @@ func TestNoConstantConditionFires(t *testing.T) {
 }
 
 func TestNoConstantConditionStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string

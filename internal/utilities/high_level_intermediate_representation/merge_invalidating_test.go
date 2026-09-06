@@ -15,6 +15,8 @@ import (
 // "last write wins" produces 5 here, which is lower than the true last usage -- and a value that
 // looks settled earlier than it is gets its scope merged forward past a read that is still live.
 func TestFindLastUsageRecordsTheHighestOrder(t *testing.T) {
+	t.Parallel()
+
 	// `total` is read in the loop body and again in the return, so its last usage must be the
 	// return rather than the loop.
 	function, _ := rangesFor(t, `
@@ -72,6 +74,8 @@ func TestFindLastUsageRecordsTheHighestOrder(t *testing.T) {
 // real order of zero. Collapsing the two would make an unread declaration look like one last used
 // at the very start of the function, which is exactly the answer that permits a merge.
 func TestLastUsedAtReportsMissesRatherThanZero(t *testing.T) {
+	t.Parallel()
+
 	usage := &LastUsage{byDeclaration: map[DeclarationId]EvaluationOrder{7: 0}}
 
 	if order, found := usage.LastUsedAt(7); !found || order != 0 {
@@ -93,6 +97,8 @@ func TestLastUsedAtReportsMissesRatherThanZero(t *testing.T) {
 // Order must not matter -- it is an artifact of collection -- and the optional flag must, because
 // `a?.b` and `a.b` invalidate under different conditions.
 func TestAreEqualDependenciesIsSetEquality(t *testing.T) {
+	t.Parallel()
+
 	plain := func(identifier IdentifierId, property string, optional bool) ReactiveScopeDependency {
 		return ReactiveScopeDependency{
 			Identifier: identifier,
@@ -161,6 +167,8 @@ func TestAreEqualDependenciesIsSetEquality(t *testing.T) {
 // pass knows nothing about. Upstream would throw; answering true instead would permit a merge on
 // absent information, which is the wrong direction for a pass whose true answer relaxes a guard.
 func TestAreLValuesLastUsedByScopeDeclinesOnMissingInformation(t *testing.T) {
+	t.Parallel()
+
 	usage := &LastUsage{byDeclaration: map[DeclarationId]EvaluationOrder{
 		1: 5,
 		2: 12,
@@ -196,6 +204,8 @@ func TestAreLValuesLastUsedByScopeDeclinesOnMissingInformation(t *testing.T) {
 // table, because a missing entry makes `AreLValuesLastUsedByScope` decline a merge that should have
 // been allowed, and that failure is silent -- the output is merely more granular.
 func TestFindLastUsageCorpus(t *testing.T) {
+	t.Parallel()
+
 	functions, declarationsSeen, missing, outOfOrder := 0, 0, 0, 0
 	// Accumulated across the whole corpus rather than per function, because a DeclarationId is only
 	// unique within its function -- so these are compared per function, inside the walk below, and
@@ -303,6 +313,8 @@ func TestFindLastUsageCorpus(t *testing.T) {
 // answer false: that isolates the no-dependencies arm from the type arm, so a test passing here
 // cannot be passing because the type lookup happened to say yes.
 func TestScopeIsEligibleForMergingTreatsNoDependenciesAsEligible(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
 	if function == nil {
 		t.Fatal("the source did not lower")
@@ -333,6 +345,8 @@ func TestScopeIsEligibleForMergingTreatsNoDependenciesAsEligible(t *testing.T) {
 // Only 2 of 1,576 corpus scopes carry a reassignment, so corpus coverage says almost nothing about
 // this branch. It gets its own fixture for that reason rather than being trusted to the sweep.
 func TestCanMergeScopesDeclinesReassignments(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
 	if function == nil {
 		t.Fatal("the source did not lower")
@@ -376,6 +390,8 @@ func TestCanMergeScopesDeclinesReassignments(t *testing.T) {
 // happen to be connected", which merges scopes that do not invalidate together -- and the resulting
 // program recomputes more than it should while every fixture still passes.
 func TestCanMergeScopesRequiresRootedInvalidatingFlow(t *testing.T) {
+	t.Parallel()
+
 	function, _ := rangesFor(t, `function f(a) { const x = [a]; return x; }`)
 	if function == nil {
 		t.Fatal("the source did not lower")
@@ -438,6 +454,8 @@ func TestCanMergeScopesRequiresRootedInvalidatingFlow(t *testing.T) {
 // Each case here is therefore built to pass every guard except the one it targets, with a real
 // checker so the type arm genuinely answers true rather than falling through on a nil.
 func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(t *testing.T) {
+	t.Parallel()
+
 	withInvalidatingScopes(t, func(function *Function, checker *shimchecker.Checker,
 		invalidating IdentifierId) {
 		// The baseline: rooted, always-invalidating, flowing from the earlier scope's declarations,
@@ -543,6 +561,8 @@ func withInvalidatingScopes(t *testing.T, visit func(*Function, *shimchecker.Che
 // invented code, and a conservation test that never sees a merge asserts nothing. The merge count is
 // therefore asserted nonzero first.
 func TestMergeReactiveScopesPreservesEveryStatement(t *testing.T) {
+	t.Parallel()
+
 	functions, totalMerges, lost := 0, 0, 0
 	pruneCalls, declarationsPruned := 0, 0
 
@@ -624,6 +644,8 @@ func TestMergeReactiveScopesPreservesEveryStatement(t *testing.T) {
 // `to > from + 1` guard produces: every scope "merges" with itself, `Merged` fills with its own id,
 // and the pass reports work it did not do.
 func TestMergeReactiveScopesRecordsAbsorbedIds(t *testing.T) {
+	t.Parallel()
+
 	functions, merges, recorded, selfReferences := 0, 0, 0, 0
 
 	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
@@ -682,6 +704,8 @@ func TestMergeReactiveScopesRecordsAbsorbedIds(t *testing.T) {
 // the arm at all. A synthetic tree is a weaker test than real source and it is used here for a
 // stated reason rather than convenience: the alternative is an arm with no coverage whatsoever.
 func TestMergeReactiveScopesFoldsInterleavedStatements(t *testing.T) {
+	t.Parallel()
+
 	first := &ReactiveScopeBlock{Scope: 1}
 	between := &ReactiveInstructionStatement{Instruction: &ReactiveInstruction{Order: 5}}
 	second := &ReactiveScopeBlock{Scope: 2, Instructions: ReactiveBlock{

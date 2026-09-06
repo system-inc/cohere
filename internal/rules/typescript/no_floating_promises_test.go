@@ -90,6 +90,8 @@ func applyNoFloatingPromisesSuggestion(t *testing.T, source string, suggestion r
 }
 
 func TestNoFloatingPromisesStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -177,6 +179,8 @@ func TestNoFloatingPromisesStaysSilent(t *testing.T) {
 }
 
 func TestNoFloatingPromisesFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -290,6 +294,8 @@ func TestNoFloatingPromisesFires(t *testing.T) {
 }
 
 func TestNoFloatingPromisesSuggestionsRewriteTheSource(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		sourceText  string
@@ -427,6 +433,8 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(t *testing.T) {
 // eslint` is SILENT on `(p.catch)(() => {})` because ESTree has no parenthesized-expression node,
 // and tsgolint reports because typescript-go keeps one. tsgolint wins, so the report is deliberate.
 func TestNoFloatingPromisesMeasuredParentheses(t *testing.T) {
+	t.Parallel()
+
 	prelude := "declare const p: Promise<number>;\n"
 	cases := []struct {
 		name    string
@@ -462,6 +470,8 @@ func TestNoFloatingPromisesMeasuredParentheses(t *testing.T) {
 // because there is one statement". A TRIPLE does, and every position is read rather than the count
 // alone.
 func TestNoFloatingPromisesReportsOncePerStatement(t *testing.T) {
+	t.Parallel()
+
 	triple := "declare const a: Promise<number>;\ndeclare const b: Promise<number>;\ndeclare const c: Promise<number>;\n"
 
 	grouped := runNoFloatingPromises(t, triple+"[a, b, c];\n", nil)
@@ -507,6 +517,8 @@ func sourceOf(t *testing.T, sourceText string, result rule_testing.Result, index
 // both sides change together and the assertion stays green. These strings are typed from
 // upstream's source instead, so a reworded message fails.
 func TestNoFloatingPromisesMessagesReadAsUpstreamWrote(t *testing.T) {
+	t.Parallel()
+
 	wantById := map[string]string{
 		"floating":                            "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
 		"floatingVoid":                        "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator.",
@@ -556,6 +568,8 @@ func TestNoFloatingPromisesMessagesReadAsUpstreamWrote(t *testing.T) {
 // adapter set NeedsTypeChecker on everything it wrapped and the listener was upstream's. Absorbing
 // the rule made the nil case reachable AND made the listener ours, so the guard is written here.
 func TestNoFloatingPromisesRequiresTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	if !NoFloatingPromises.NeedsTypeChecker {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
@@ -585,6 +599,8 @@ func TestNoFloatingPromisesRequiresTheTypedHarness(t *testing.T) {
 // measured against `@typescript-eslint` before being written here, and both references agree on
 // all five.
 func TestNoFloatingPromisesThenableNeedsTwoFunctionParameters(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -629,6 +645,8 @@ func TestNoFloatingPromisesThenableNeedsTwoFunctionParameters(t *testing.T) {
 // core path of every promise test, and enum resolution reaches the declaring module. A findings
 // cache keyed on the linted file alone would be wrong for both.
 func TestNoFloatingPromisesResolvesAStaticMemberName(t *testing.T) {
+	t.Parallel()
+
 	sameFile := "enum Methods {\n  Catch = 'catch',\n}\ndeclare const p: Promise<number>;\np[Methods.Catch](() => {});\n"
 	rule_testing.ExpectClean(t, runNoFloatingPromises(t, sameFile, nil))
 
@@ -656,6 +674,8 @@ func TestNoFloatingPromisesResolvesAStaticMemberName(t *testing.T) {
 // to a plain bool would turn every unconfigured run into an explicit `ignoreVoid: false`, inverting
 // almost the whole corpus. It stays a pointer end to end so that absent and false stay different.
 func TestDecodeNoFloatingPromisesOptions(t *testing.T) {
+	t.Parallel()
+
 	decode := func(t *testing.T, raw string) NoFloatingPromisesOptions {
 		t.Helper()
 		decoded, err := DecodeNoFloatingPromisesOptions([]byte(raw))

@@ -23,6 +23,8 @@ const extendNativeFile = "/repository/source/ExtendNative.ts"
 // finding rather than only the message id: `ExpectFindings` cannot see anything the format string
 // does, and one input reports twice with a different name each time.
 func TestNoExtendNativeFires(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -82,6 +84,8 @@ func TestNoExtendNativeFires(t *testing.T) {
 // set: `parseFloat` is a global and its prototype is being extended, and it is clean purely because
 // its name does not start with a capital.
 func TestNoExtendNativeStaysSilent(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		options    any
@@ -121,6 +125,8 @@ func TestNoExtendNativeStaysSilent(t *testing.T) {
 // reports the whole assignment, and a define call reports the whole call. A port reporting the
 // `.prototype` member access instead passes every id fixture in this file.
 func TestNoExtendNativeReportsTheWholeExtension(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		sourceText string
 		wantPos    int
@@ -158,6 +164,8 @@ func TestNoExtendNativeReportsTheWholeExtension(t *testing.T) {
 // 10.8.1, because upstream matches an assignment expression and nothing else. Reproduced rather than
 // improved on, and recorded here so the next reader does not helpfully "fix" it.
 func TestNoExtendNativeDeclinesShapesTheCorpusOmits(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -184,6 +192,8 @@ func TestNoExtendNativeDeclinesShapesTheCorpusOmits(t *testing.T) {
 // Handing the harness a struct directly would leave the serde tag untested, and the tag is the line
 // most likely to have no upstream counterpart. This decodes the same JSON the config would carry.
 func TestNoExtendNativeDecodesItsOptions(t *testing.T) {
+	t.Parallel()
+
 	decode := rule.DecodeOptionsInto[NoExtendNativeOptions]()
 
 	decoded, err := decode(json.RawMessage(`{"exceptions": ["Object"]}`))
@@ -213,6 +223,8 @@ func TestNoExtendNativeDecodesItsOptions(t *testing.T) {
 // turns a decode error on empty input into nil, and a type assertion on nil yields the zero value.
 // The zero value being correct here is a coincidence worth pinning rather than relying on.
 func TestNoExtendNativeDefaultsWithoutTheDecoder(t *testing.T) {
+	t.Parallel()
+
 	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
 		"Object.prototype.p = 0", nil), "unexpected")
 }
@@ -222,6 +234,8 @@ func TestNoExtendNativeDefaultsWithoutTheDecoder(t *testing.T) {
 // The rule guards on a nil checker, so under `rule_testing.Run` it goes silent rather than panicking,
 // and every StaysSilent case above would pass vacuously.
 func TestNoExtendNativeNeedsTheTypedHarness(t *testing.T) {
+	t.Parallel()
+
 	const source = "Object.prototype.p = 0"
 
 	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoExtendNative, extendNativeFile,
@@ -245,6 +259,8 @@ func TestNoExtendNativeNeedsTheTypedHarness(t *testing.T) {
 // not change the shared object. All five rows are clean on eslint 10.8.1, measured before they were
 // written here.
 func TestNoExtendNativeDeclinesReadingAPrototypeProperty(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -277,6 +293,8 @@ func TestNoExtendNativeDeclinesReadingAPrototypeProperty(t *testing.T) {
 //
 // All four measured clean on eslint 10.8.1 before being written here.
 func TestNoExtendNativeDeclinesADefineCallOnAnotherReceiver(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
@@ -306,6 +324,8 @@ func TestNoExtendNativeDeclinesADefineCallOnAnotherReceiver(t *testing.T) {
 // property name in: the prototype of an assignment target, the prototype inside a define call, and
 // the define method's own name.
 func TestNoExtendNativeReadsATemplateSubscript(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		sourceText string
