@@ -17,6 +17,35 @@ scratch on every run, once per shard.
 
 `cohere` removes the boundaries by standing in the type checker's own language.
 
+## The name
+
+`cohere` is a transitive verb. You cohere something: it takes an object and changes it, which is
+what this does. It lints, autofixes and formats, and `ReportNodeWithFixes` is the heart of the rule
+system, so the most consequential surface here is the one that rewrites your source.
+
+From _cohaerēre_, to stick together. The physics sense is the useful one: coherent light is not
+light that is similar, it is light that is phase-locked, and nothing is added to make it so. The
+photons stop cancelling each other. That is the problem this solves for a codebase written by many
+hands at once.
+
+## Coherent is not the same as correct, and `verify` is the program that will say so
+
+Logic has the pair:
+
+- **coherent** means the parts hang together, with no internal contradiction
+- **correspondent** means the whole thing matches the world outside it
+
+A perfectly coherent story can be entirely false. Coherence is a relation among the parts and says
+nothing about whether they touch reality, which is why a green run over a probe that never fired
+feels exactly like a green run over a clean tree.
+
+Those are two jobs rather than two features of one program. `cohere` answers *is this well-formed
+and in phase*, from the graph alone, which is what lets it be fast enough to leave on. A separate
+`verify` will answer *did it actually do the thing*, which cannot be answered from inside the code
+and needs running it and reading what came out. The oracles belong there: the fixture pairs, the
+mutation sweeps, the known-dirty controls, the differential against the gate this replaces. Today
+they live here, in `internal/lint/rules/tools/` and beside the rules they hold.
+
 ## Built on
 
 - [microsoft/typescript-go](https://github.com/microsoft/typescript-go) — Apache 2.0. The TypeScript
