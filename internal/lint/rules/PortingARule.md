@@ -462,6 +462,24 @@ every one was the harness rather than the tree:
 - absolute paths outside the config base directory, which make the Linter answer
   "No matching configuration found" and report nothing rather than erroring
 
+**That last one also has a false-POSITIVE costume, and it is the more convincing of the
+two.** The Linter does not merely stay silent: it returns its complaint as a MESSAGE in
+the ordinary messages array, so an extractor counting `messages.length` reads a
+configuration failure as a finding. A corpus extraction reported "183 of 183 cases
+reported through the installed rule" and every one of the 183 was the same complaint
+about the fixture path. That number looks like a working oracle rather than a broken one,
+which is worse than a zero: a zero at least invites suspicion.
+
+**The mechanical fix generalises past this instrument.** A real finding carries a
+`messageId`; the Linter's own complaints do not. So refuse any message without one rather
+than counting it:
+
+    const complaints = messages.filter(m => !m.messageId);
+    if (complaints.length > 0) { /* refuse, naming the first */ }
+
+Then seed fixtures INSIDE the config base with a relative filename, which is what makes
+the complaint stop happening at all.
+
 The coordinator hit the same class twice in one night: `$?` after a pipe reporting
 `head`'s success while the build failed, and a `cd` that drifted into another repo
 so `git status` came back clean.
@@ -1533,6 +1551,26 @@ the reasoning at the line, and say in your report that the suppression layer is 
 makes it clean upstream. The porter who hit this confirmed the mechanism by deleting
 the disable comment and watching the same file report.
 
+**Driving the installed rule does not dissolve this, and there the case arrives as a
+DISAGREEMENT rather than as an annotation you can read.** A porter who replayed
+upstream's whole corpus through the Linter API — the method this document recommends,
+because it answers what the rule does HERE rather than what the corpus file claims — got
+262 of 263 rows agreeing and one row where the port reported and the oracle did not. The
+natural reading of a single disagreement against a measured oracle is that the port is
+wrong. It was not: the row's source carried `// eslint-disable-line`, so what the oracle
+had recorded was the suppression layer removing a finding the rule had already produced.
+
+So the Linter API is an oracle for the rule PLUS everything ESLint layers above it, and a
+rule fixture wants only the first. **Grep your corpus for `eslint-disable` before
+trusting any row of it**, whether the verdicts came from annotations or from a driven
+run — one line, and it tells you exactly which rows are about the wrong layer:
+
+    grep -c "eslint-disable" tests/lib/rules/<rule>.js
+
+Confirm each hit the same way: re-run that source through the oracle with the comment
+deleted. If it reports, the rule's own verdict is *reporting*, and that is what the
+fixture asserts.
+
 ## 6. Write the rule until the fixtures pass
 
 Doc comment carrying valid and invalid examples, and a message whose Description says
@@ -1591,6 +1629,66 @@ and with two entries it often preserves the original order by chance. A single r
 reported "survived" and the honest answer was "survives most of the time". If your rule
 iterates a map and the mutant reorders it, score it several times before writing the
 equivalence argument.
+
+## 7b. If the rule's judgment is a matcher, the corpus is not enough
+
+**A corpus tests a matcher only on inputs upstream thought of.** That sentence is the
+whole section, and it is a different claim from the mutation sweep's. The sweep proves
+your fixtures can SEE. This is about what they are pointed AT: a fixture set can be
+demonstrably able to fail and still be blind, because every input in it is well-formed.
+
+Measured on `no-restricted-imports`, whose `patterns` option matches a module specifier
+with the `ignore` npm package — gitignore semantics, which nothing in this tree had, so
+the port had to reimplement them. The differential was built the way this document asks:
+every `group` configuration in upstream's corpus crossed with every module specifier
+appearing in it, driven through the real `ignore` package. 864 pairs, 90 of them
+matching, so neither degenerate answer could pass.
+
+**It passed 864 of 864, the rule passed all 263 corpus rows, and three genuine defects
+were still live:**
+
+    a `./` trim on the candidate    made ["foo/bar"] match "./foo/bar"      upstream: false
+    a `./` trim on the pattern      made ["./types"] match "types"          upstream: false
+    `*` allowed to match nothing    made ["foo/*"] match "foo/" and         upstream: false
+                                    "foo//bar"
+
+None of the three is reachable from the corpus, and the reason is structural rather than
+bad luck: **every specifier upstream wrote is a well-formed module name.** No corpus case
+imports from `"./foo/bar"`, or `"foo/"`, or `"foo//bar"`, so no corpus case can separate a
+matcher that is right about them from one that is not.
+
+**The second instrument is the same cross product against inputs the corpus never
+contains.** Take the configurations you already have and cross them with adversarial
+inputs: a leading `./`, a trailing separator, a doubled separator, `../` and `../../`, a
+bare `.` and `..`, a leading `#`, a trailing dot, a case-flipped name, the empty string.
+540 more pairs, 76 matching, and all three defects fell out at once. Both tables now live
+in the rule's test.
+
+The general shape, for any rule whose verdict comes from a matcher rather than from the
+tree:
+
+- The corpus proves you agree with upstream **where upstream looked.**
+- The adversarial cross product proves you agree **where it did not.**
+- Neither is optional, and the second is the one that finds things.
+
+This applies wherever a port reimplements a library rather than reading the AST: a glob
+matcher, a regular-expression translation, a path normaliser, a name-mangling scheme. The
+corpus tests the RULE. It does not test the library, because upstream never had to.
+
+**The third defect is the one worth reading twice, because re-deriving it from first
+principles gets it wrong the same way.** The bug was `foo/*` matching `foo/` and
+`foo//bar`, which reads exactly like `*` needing to be one-or-more instead of
+zero-or-more. It is not. Measured against the installed `ignore`:
+
+    ["f*"]     against "f"          TRUE     `*` really is zero-or-more
+    ["foo/*"]  against "foo/"       false
+    ["foo/*"]  against "foo//bar"   false
+
+So `*` is zero-or-more and correct as written, and the real rule is that **an empty path
+SEGMENT never matches.** The constraint belongs on the segment, not on the wildcard, and
+"fixing" the wildcard breaks `f*` while appearing to fix the symptom. Write the comment
+that says so at the line, because the next reader's instinct will be the wrong one and
+the fix that follows from it passes the failing case.
 
 ## 8. Assert spans, not just message ids
 

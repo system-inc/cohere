@@ -40,6 +40,35 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// which is the asymmetry the control depends on, so the config cannot name it.
 		"import-require-path-alias": "the directional control for the differential",
 
+		// Both ported and registered without being enabled, because neither rule can be enabled by
+		// a porting step: each does nothing at all until somebody writes the list of what this
+		// project bans. Upstream's own default for both is an empty configuration, and the audits
+		// recorded zero violations here for exactly that reason rather than because the tree is
+		// clean -- an unconfigured options-driven rule and a clean tree are indistinguishable in a
+		// violation count, which is the shape this repository keeps finding.
+		//
+		// Measured through the installed ESLint 10.8.1: `export var a;` with no options and
+		// `import fs from 'fs';` with no options both report nothing. Neither name appears anywhere
+		// in CohereSettings.json under any spelling, so there is no standing decision to honour or
+		// reverse; there is simply nothing to enable yet.
+		"no-restricted-exports": "ported and registered; enforces nothing until a project names which export names it bans, which is a decision about this codebase rather than a wiring step",
+		"no-restricted-imports": "ported and registered; enforces nothing until a project names which modules it bans, which is a decision about this codebase rather than a wiring step",
+
+		// The same class as the two above, and for the same measured reason. Neither rule can
+		// report anything until somebody writes the configuration that says what to enforce:
+		// id-denylist has no denylist until one is named, and id-match's default pattern is
+		// upstream's `^.+$`, which every non-empty name matches. Both audits recorded zero
+		// violations here, and for both that zero is an artifact of being unconfigured rather than
+		// evidence about the tree -- the shape this repository keeps finding.
+		//
+		// Measured through the installed ESLint 10.8.1 under sourceType module with the
+		// typescript-eslint parser: `var foo = 1;` reports nothing under either rule with no
+		// options. Neither name appears anywhere in CohereSettings.json under any spelling, so
+		// there is no standing decision to honour or reverse; there is simply nothing to enable
+		// until Kirk chooses a denylist or a pattern.
+		"id-denylist": "ported and registered; denies nothing until a project names which identifiers it bans, which is a decision about this codebase rather than a wiring step",
+		"id-match":    "ported and registered; matches everything until a project names a naming pattern, which is a decision about this codebase rather than a wiring step",
+
 		// Ported and registered without being enabled, because enabling it is a decision with work
 		// attached rather than a wiring step. The audit measured 54 violations and the rule has no
 		// fixer, so every one is a hand edit; the config has never named it under either spelling.
@@ -284,6 +313,27 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		"base/provider-return-matches-token":            "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
 		"base/verify-optional-parity":                   "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
 		"base/verify-array-parity":                      "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		// The two react entries below are a THIRD shape, distinct from both groups above.
+		//
+		// They are not rules the config turned off, and they are not rules from a namespace ahra
+		// does not name: ahra enables 58 other `react/` rules. These two were ported deliberately
+		// unenabled because the task that ported them said to register without enabling, and because
+		// each is a guardrail against drift rather than a cleanup. Both were measured on the real
+		// tree before this entry was written, rather than inheriting the audit's number.
+		//
+		// Measured 2026-09-06 with both enabled in a throwaway copy of the config, `--no-fix --lint`
+		// over 3,540 files: ZERO findings each, zero crashed files. That zero is a real one rather
+		// than an inert rule, established three ways. Neither appears in the run's "was offered no
+		// files" list, both appear among the 300 rules that "watched files and reported nothing",
+		// and six other `react/` rules reported 220 findings in the same run, so the instrument that
+		// found nothing here demonstrably works. A seeded two-file tree reports one finding from
+		// each and stays silent on its clean sibling.
+		//
+		// So enabling either is a decision about whether to hold the tree to a convention it already
+		// satisfies, which is Kirk's call and costs nothing today. The config line is where he would
+		// say so.
+		"react/sort-comp":                 "registered but not enabled: ported as a guardrail rather than a cleanup, and measured at zero findings over 3,540 files with the rule demonstrably live (not in the offered-no-files list, and a seeded probe reports). Enabling it is a decision about adopting a member-ordering convention the tree already satisfies",
+		"react/no-invalid-html-attribute": "registered but not enabled: ported as a guardrail rather than a cleanup, and measured at zero findings over 3,540 files with the rule demonstrably live (not in the offered-no-files list, and a seeded probe reports). Enabling it costs nothing today and would catch a future invalid rel value",
 	}
 
 	rules := All()
