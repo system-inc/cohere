@@ -1764,6 +1764,29 @@ separates the two readings, confirm the shipped rule and the mutant disagree on 
 add it with a control.** Confirming both halves is what distinguishes a fixture that kills
 the mutant from one that merely happens to pass.
 
+**The fork above is the easy case. The common one is a sequence, and it needs both.** Read
+as a fork, this section tells you to pick a tool; the defect that most wants finding is the
+one where the first tool changes the code and the second discovers the change is untested.
+
+Measured on `@typescript-eslint/prefer-regexp-exec`. Three steps, three instruments:
+
+    1. dry run        the `const` guard over-reported nothing but was SILENT on
+                      `let r = /x/; a.match(r)`, which upstream reports. A belief
+                      about the world, and only real files showed it.
+
+    2. sweep          the replacement guard was written, and a mutation deleting it
+                      SURVIVED all 37 corpus rows. Upstream never binds a regex to a
+                      `let`, so no imported case can judge the thing just written.
+
+    3. oracle         upstream's own behaviour settled what the guard should say, and
+                      the test written from it is the only thing that kills the mutant.
+
+Neither instrument alone arrives. The dry run finds the belief wrong and hands you a
+correction it cannot check; the sweep finds the correction untested and cannot tell you
+what it should have been. **A fix made in response to a dry run is code no fixture has ever
+judged**, because the fixtures are exactly what failed to raise it, so the sweep is not
+optional afterwards. Run it again after every dry-run repair, on the guard you just touched.
+
 **The script takes an expression, not statements.** `import re; source = re.sub(...)`
 fails with a bare `SyntaxError` that names nothing and reads like a broken script. Keep
 the rewrite to a single expression. Separately, gofmt's alignment silently no-ops a
