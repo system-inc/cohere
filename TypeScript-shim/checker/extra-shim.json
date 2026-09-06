@@ -49,6 +49,7 @@
 		],
 		"Checker": [
 			"numberType",
+			"stringType",
 			"booleanType",
 			"globalRegExpType"
 		],
