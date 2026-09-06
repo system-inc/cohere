@@ -3312,7 +3312,20 @@ The section above says a comment is not evidence. This is the sharper form, and 
 fixtures agree with it and cannot falsify it.** You end up with a wrong belief, a test that
 confirms it, and a green suite. The loop is closed and nothing inside it can open it.
 
-Three instances in one batch, by two authors, all with locally sound reasoning at every step:
+**This section caught its own subject while it was being written, on 2026-09-06**, and that
+is the argument for not skipping it. Its author, drafting the warning below, was at the same
+time testing `complexity`'s name builder and found a rendering they had derived rather than
+measured -- with a fixture written from the derivation, agreeing with it, passing. Upstream
+renders `{ d: function named() {} }` as `Method 'd'`, because the property name is tried
+first and the function's own `id` is only a fallback. Not a subtle case; invisible only
+because no corpus case puts a named function expression in a property position.
+
+So the count is four instances, and the fourth is the one that matters: knowing about this
+failure, and writing it down at that moment, did not prevent it. What caught it was an
+instrument.
+
+The other three, in the same batch and by two authors, all with locally sound reasoning at
+every step:
 
     max-depth        "without this arm, sibling methods accumulate depth"
                      They do not; the depth decrements on exit. Fixtures were written from
@@ -3331,11 +3344,18 @@ Three instances in one batch, by two authors, all with locally sound reasoning a
                      An ASCII-only scan documented as a deliberate narrowing, with upstream's
                      counterexample sitting in the corpus.
 
-**What breaks the loop is a mutation you did not choose the shape of.** In all three the
-survivor was the only signal, and in two of them the author's first instinct on reading it
-was to add another fixture -- which would have been written from the same premise and would
-have passed for the same reason. The third round of the same mistake is one step away, and it
-looks like diligence.
+**What breaks the loop is an instrument whose shape you did not choose.** In the three above
+that was a surviving mutant, and it was the only signal; in two of them the author's first
+instinct on reading it was to add another fixture, which would have been written from the
+same premise and would have passed for the same reason. The next round of the same mistake
+is one step away and it looks like diligence.
+
+The fourth had a different instrument, and the difference is worth keeping: no mutant found
+it, because the rule agreed with itself everywhere the mutation could reach. What found it
+was testing the name builder directly, against a table of shapes chosen from the question
+rather than from the corpus, and then driving upstream once per row. A mutation sweep asks
+whether your fixtures can see; a table built from the question asks whether you pointed them
+anywhere near the thing.
 
 So when a mutant survives an arm you have DOCUMENTED, suspect the documentation before the
 fixtures. A surviving mutant has exactly two readings, and they need different responses:
@@ -3352,6 +3372,15 @@ class nested inside an already-deep block rather than sibling methods, both sets
 test, labelled. The non-discriminating rows are the evidence that the original argument was
 wrong rather than merely unproven, and without them the next reader deletes the arm, sees the
 sibling rows stay green, and concludes it was dead code.
+
+**A documented unreachable branch is a justification, so delete it rather than explaining
+it.** The same `complexity` name builder carried two accessor arms in a branch only an
+arrow or a function expression can reach, which therefore can never be an accessor. A
+mutation gutting them survived, correctly. The tempting response is a comment saying why
+they are there; that comment would be exactly the kind of claim this section is about, and
+it would outlive whoever could still check it. The reachable version is smaller, and an arm
+that survives gutting is a candidate for deletion before it is a candidate for
+documentation.
 
 **And correcting the fixtures does not correct the justification.** This is the part with no
 instrument at all. `max-depth` shipped in one commit with a comment saying siblings accumulate
