@@ -100,6 +100,28 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		"id-length": "ported and registered; audited No at 862 violations with no fixer, so enabling is a decision for whoever takes that cleanup",
 		"max-depth": "ported and registered; audited No at 176 violations with no fixer, so enabling is a decision for whoever takes that cleanup",
 
+		// Audited **Strong No**, and the measurement is why rather than a matter of taste. Re-run
+		// on the current tree with the rule enabled through the real config layer, one-var's
+		// default of "always" reports 25,882 findings across 2,029 of 3,540 project files -- 57%
+		// of the codebase, every one of them `combine`. (The audit in core/one_var.md recorded
+		// 24,698 when it ran; the tree has grown since and the two agree in magnitude.)
+		//
+		// A count that size and that uniform is a convention clash, not a defect signal: this
+		// codebase declares one binding per statement deliberately, and one-var's default asks for
+		// the opposite. Enabling it would rewrite more than half the tree to a style nobody chose.
+		//
+		// Not inert when unconfigured, which is what separates this from the four rules above:
+		// upstream's `defaultOptions: ["always"]` means a bare "error" starts reporting
+		// immediately. The name appears nowhere in CohereSettings.json under any spelling, so
+		// there is no standing decision being honoured or reversed here -- there is a new one to
+		// be made, and it is Kirk's rather than a porting step's.
+		//
+		// The port exists so that decision can be revisited without redoing the work, and so the
+		// opposite setting stays available: `{"const": "never"}` would enforce the convention the
+		// tree already follows, and on the same measurement it reports far less. That is a
+		// different config line rather than a different rule.
+		"one-var": "ported and registered; audited Strong No and re-measured at 25,882 findings over 2,029 files under its default, which is a convention clash rather than a defect signal, so enabling is Kirk's decision",
+
 		// Audited **No** at 326 violations, and there is a second argument against enabling beyond
 		// the cleanup cost: the Tricorder paper the standard cites names cyclomatic complexity as
 		// failing the bar for a useful diagnostic, because the number correlates poorly with what
