@@ -24,8 +24,26 @@ import (
 const tsgoInternalPrefix = "github.com/microsoft/TypeScript/tsc/internal/"
 
 type ExtraShim struct {
-	ExtraFunctions  []string
-	ExtraMethods    map[string]([]string)
+	ExtraFunctions []string
+	ExtraMethods   map[string]([]string)
+
+	// ExtraFields names unexported struct fields to generate a reader for.
+	//
+	// # Adding a name here obliges a row in TestShimFieldAccessorsReadTheFieldsTheyName
+	//
+	// A generated reader dereferences a mirror by field offset through `unsafe.Pointer`, so an
+	// accessor that reads the WRONG field compiles, runs, and returns a plausible value. The only
+	// thing that catches it is `internal/types/program/shim_layout_test.go`, which compares each
+	// accessor's result against the checker's own name for what it should have returned.
+	//
+	// That test is a table, and a table does not fail because it is short. `Checker_stringType` was
+	// added and shipped with the table still listing three accessors beside four fields: the suite
+	// stayed green, the guard read as covering the group, and the gap opened in silence. Closed at
+	// `0fd5095`, by whoever noticed rather than by anything in the workflow.
+	//
+	// So the obligation is stated here, at the file somebody edits to add a field, because nothing
+	// downstream prompts it. Add the name, regenerate, then add the row, and prove the row can fail
+	// by pointing it at a different accessor before trusting it.
 	ExtraFields     map[string]([]string)
 	IgnoreFunctions []string
 
