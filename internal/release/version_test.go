@@ -12,6 +12,8 @@ import (
 // well-formed, and has no way to learn it resolves nowhere.
 
 func TestVersionNamesTheRepositoryAlongsideTheCommit(t *testing.T) {
+	t.Parallel()
+
 	provenance := Provenance{
 		Version:          "1.2.3",
 		CompilerCommit:   "d6c4afddb2c55f4a9dea7b59293a99a8fdea1799",
@@ -35,6 +37,8 @@ func TestVersionNamesTheRepositoryAlongsideTheCommit(t *testing.T) {
 }
 
 func TestVersionDegradesToTheBareCommitWhenTheUpstreamIsUnknown(t *testing.T) {
+	t.Parallel()
+
 	// A submodule with no configured origin still yields the commit, which is the fact a bug report
 	// needs most. What it must not do is print a dangling "@" or invent a repository.
 	for _, upstream := range []string{"", "unknown"} {
@@ -57,6 +61,8 @@ func TestVersionDegradesToTheBareCommitWhenTheUpstreamIsUnknown(t *testing.T) {
 }
 
 func TestVersionSaysWhenItIsALocalBuild(t *testing.T) {
+	t.Parallel()
+
 	// An unstamped build's version number identifies nothing, and a reader who treats "dev" as a
 	// release would go looking for rules that were never published.
 	local := Provenance{Version: "dev", CompilerCommit: "unknown", GoToolchain: "go1.27.0", Platform: "darwin/arm64"}
@@ -77,6 +83,8 @@ func TestVersionSaysWhenItIsALocalBuild(t *testing.T) {
 }
 
 func TestVersionSaysWhenTheBuildTreeWasDirty(t *testing.T) {
+	t.Parallel()
+
 	// A version number identifies what was released. It cannot say whether the release is
 	// reproducible, and in a worktree several members edit at once those come apart constantly: a
 	// release staged mid-flight embeds someone's uncommitted work, ships, and reports a version that
@@ -103,6 +111,8 @@ func TestVersionSaysWhenTheBuildTreeWasDirty(t *testing.T) {
 }
 
 func TestCompilerUpstreamNormalizesBothUrlShapes(t *testing.T) {
+	t.Parallel()
+
 	// git accepts ssh and https remotes, and a build machine's choice of clone should not change
 	// what a release reports. Otherwise two reports of the same pin look different, and a reader
 	// comparing them sees a discrepancy that is not one.

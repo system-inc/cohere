@@ -13,6 +13,8 @@ import (
 // two cannot drift.
 
 func TestPlatformManifestDeclaresTheOperatingSystemAndArchitectureNpmResolvesBy(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		target                  Target
 		expectedName            string
@@ -42,6 +44,8 @@ func TestPlatformManifestDeclaresTheOperatingSystemAndArchitectureNpmResolvesBy(
 }
 
 func TestPlatformManifestMatchesWhatTheLauncherLooksFor(t *testing.T) {
+	t.Parallel()
+
 	// The launcher builds the package name from Node's process.platform and process.arch, which are
 	// npm's spelling. This asserts the published name is the one it will ask for, for every target
 	// we ship. A mismatch here is a package that publishes, installs, and is never found.
@@ -59,6 +63,8 @@ func TestPlatformManifestMatchesWhatTheLauncherLooksFor(t *testing.T) {
 }
 
 func TestPlatformManifestClaimsNoCommand(t *testing.T) {
+	t.Parallel()
+
 	// Only the dispatcher owns the `cohere` name. A platform package with a `bin` field would race
 	// it for the same link in node_modules/.bin, and which one wins depends on install order.
 	for _, target := range Targets {
@@ -70,6 +76,8 @@ func TestPlatformManifestClaimsNoCommand(t *testing.T) {
 }
 
 func TestDispatcherDependsOnEveryPlatformExactly(t *testing.T) {
+	t.Parallel()
+
 	manifest := decodeManifest(t, mustDispatcherManifest(t, "1.2.3"))
 
 	optional, ok := manifest["optionalDependencies"].(map[string]any)
@@ -104,6 +112,8 @@ func TestDispatcherDependsOnEveryPlatformExactly(t *testing.T) {
 // which would have passed unchanged if `v` had silently stopped being declared: the guarantee it
 // stated was true and the guarantee anyone reading it believed was not.
 func TestDispatcherOwnsBothCommandNames(t *testing.T) {
+	t.Parallel()
+
 	manifest := decodeManifest(t, mustDispatcherManifest(t, "1.2.3"))
 
 	binaries, ok := manifest["bin"].(map[string]any)
@@ -125,6 +135,8 @@ func TestDispatcherOwnsBothCommandNames(t *testing.T) {
 }
 
 func TestLauncherHoldsTheNoFallbackRule(t *testing.T) {
+	t.Parallel()
+
 	// The launcher is generated as a string, so a compiler cannot check it. These assert the
 	// substance rather than the wording: that it exits non-zero on a missing binary, and that no
 	// bare command name appears as something it could run instead.
@@ -153,6 +165,8 @@ func TestLauncherHoldsTheNoFallbackRule(t *testing.T) {
 }
 
 func TestLauncherDoesNotReportSuccessForASignalledRun(t *testing.T) {
+	t.Parallel()
+
 	// spawnSync reports a null status when the child is killed by a signal, and null is falsy — so
 	// the obvious implementation exits zero for a run that was terminated. That is a green gate over
 	// a killed process.

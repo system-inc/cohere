@@ -16,6 +16,8 @@ import (
 // support. A field nobody derives drifts toward whatever was easiest to write.
 
 func TestEveryTargetIsAPlatformGoCanActuallyBuild(t *testing.T) {
+	t.Parallel()
+
 	supported := supportedPlatforms(t)
 
 	for _, target := range Targets {
@@ -29,6 +31,8 @@ func TestEveryTargetIsAPlatformGoCanActuallyBuild(t *testing.T) {
 }
 
 func TestTargetsCoverTheThreeOperatingSystemsWeClaimToShip(t *testing.T) {
+	t.Parallel()
+
 	// The manifests tell npm we support darwin, linux, and win32, and the launcher resolves a
 	// package per platform. A target list that quietly lost one would publish a dispatcher whose
 	// optional dependency for that platform does not exist, and the failure lands on whoever
@@ -51,6 +55,8 @@ func TestTargetsCoverTheThreeOperatingSystemsWeClaimToShip(t *testing.T) {
 }
 
 func TestTargetsHasNoDuplicates(t *testing.T) {
+	t.Parallel()
+
 	// Two entries for one platform stage the same package twice, and the second write wins silently.
 	// Whichever manifest lands last is the one published, so a duplicate with a typo'd architecture
 	// would publish a package whose contents and `cpu` field disagree.

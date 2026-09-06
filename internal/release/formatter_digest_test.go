@@ -42,6 +42,8 @@ func stagedBundles(t *testing.T) string {
 // digest the same. Without it, a digest that hashed the path rather than the content would pass the
 // mutation test below and still be wrong.
 func TestDigestMatchesAFaithfulCopy(t *testing.T) {
+	t.Parallel()
+
 	staged := stagedBundles(t)
 
 	source, err := ResolveFormatterSource()
@@ -62,6 +64,8 @@ func TestDigestMatchesAFaithfulCopy(t *testing.T) {
 // TestDigestDetectsOneChangedByte is the known-dirty control. A digest that has never returned a
 // different value for different bytes has not been shown to detect anything.
 func TestDigestDetectsOneChangedByte(t *testing.T) {
+	t.Parallel()
+
 	staged := stagedBundles(t)
 
 	before, err := digestBundles(staged)
@@ -94,6 +98,8 @@ func TestDigestDetectsOneChangedByte(t *testing.T) {
 // TestDigestRefusesAMissingBundle holds the loud-failure rule: absence is an error naming the file,
 // never a digest over the seven that were there.
 func TestDigestRefusesAMissingBundle(t *testing.T) {
+	t.Parallel()
+
 	staged := stagedBundles(t)
 
 	if err := os.Remove(filepath.Join(staged, FormatterBundleNames[0])); err != nil {
@@ -120,6 +126,8 @@ func TestDigestRefusesAMissingBundle(t *testing.T) {
 // function was never broken. The defect was in whether the resolve is reached at all, so a test
 // that never exercises the gate cannot see it, however true its assertions are.
 func TestStampFollowsTheBytesNotTheFlag(t *testing.T) {
+	t.Parallel()
+
 	stamped := FormatterSource{Commit: "abc123", Digest: "def456"}
 	resolve := func() (FormatterSource, error) { return stamped, nil }
 
@@ -141,6 +149,8 @@ func TestStampFollowsTheBytesNotTheFlag(t *testing.T) {
 // unavailable fork means. Required, it fails the release. Not required, it leaves an empty stamp,
 // which says plainly that the binary cannot name its formatter.
 func TestStampRequiresAForkOnlyWhenAsked(t *testing.T) {
+	t.Parallel()
+
 	resolve := func() (FormatterSource, error) {
 		return FormatterSource{}, errors.New("no fork here")
 	}

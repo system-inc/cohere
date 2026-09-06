@@ -14,6 +14,8 @@ import (
 // the two paths into the hash agree, which is the property the comparison in CohereEmbeddedBundles
 // depends on.
 func TestEmbeddedBundlesMatchTheirOwnDigest(t *testing.T) {
+	t.Parallel()
+
 	source, err := prettier.Bundles()
 	if err != nil {
 		t.Fatalf("reading the embedded bundles: %v", err)
@@ -44,6 +46,8 @@ func TestEmbeddedBundlesMatchTheirOwnDigest(t *testing.T) {
 // the comparison mean anything. If they ever diverge the check fails on correct bundles, somebody
 // relaxes it, and the stamp stops being worth carrying.
 func TestBothDigestPathsAgree(t *testing.T) {
+	t.Parallel()
+
 	source, err := ResolveFormatterSource()
 	if err != nil {
 		t.Skipf("NOT MEASURED: the Prettier fork is unavailable, so the two paths are unverified here: %v", err)
@@ -73,6 +77,8 @@ func TestBothDigestPathsAgree(t *testing.T) {
 // TestDigestFilesRefusesAnAbsentBundle holds the loud-failure rule on the in-memory path, matching
 // what the directory path already does: absence names the file rather than digesting what is there.
 func TestDigestFilesRefusesAnAbsentBundle(t *testing.T) {
+	t.Parallel()
+
 	source, err := prettier.Bundles()
 	if err != nil {
 		t.Fatalf("reading the embedded bundles: %v", err)
@@ -109,6 +115,8 @@ func TestDigestFilesRefusesAnAbsentBundle(t *testing.T) {
 // version of this test hashed inline and passed while a mutation dropping the name from the real
 // function went undetected -- a test of its own arithmetic rather than of the code.
 func TestDigestKeysByName(t *testing.T) {
+	t.Parallel()
+
 	content := []byte("the same bytes under either name")
 
 	before, err := digestNamedBundles([]string{"plugins/yaml.js"}, map[string][]byte{"plugins/yaml.js": content})

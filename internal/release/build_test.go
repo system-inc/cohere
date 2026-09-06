@@ -14,6 +14,8 @@ import (
 // rather than trusted to review.
 
 func TestReleaseBuildStripsSymbols(t *testing.T) {
+	t.Parallel()
+
 	if len(StripFlags) == 0 {
 		t.Fatalf("no strip flags, so released binaries would ship with symbols and DWARF")
 	}
@@ -27,6 +29,8 @@ func TestReleaseBuildStripsSymbols(t *testing.T) {
 }
 
 func TestDescribeBuildNamesTheFlagsActuallyUsed(t *testing.T) {
+	t.Parallel()
+
 	// A size label that names the wrong build is worse than an unlabeled size: it is confidently
 	// wrong rather than ambiguous. So the description is built from the same values the compiler
 	// receives, and this asserts it cannot drift into a hand-written string.
@@ -49,6 +53,8 @@ func TestDescribeBuildNamesTheFlagsActuallyUsed(t *testing.T) {
 // than its name implies, and a mis-staged binary passes every check that stops at existence.
 
 func TestVerifyBinaryRefusesTheWrongPlatformsExecutable(t *testing.T) {
+	t.Parallel()
+
 	// The reachable failure: a staging bug writes one target's binary into another's package. It
 	// publishes cleanly, installs cleanly, and fails at exec on a user's machine with a format
 	// error that reads as a broken install rather than as our mistake.
@@ -66,6 +72,8 @@ func TestVerifyBinaryRefusesTheWrongPlatformsExecutable(t *testing.T) {
 }
 
 func TestVerifyBinaryRefusesSomethingThatIsNotAnExecutable(t *testing.T) {
+	t.Parallel()
+
 	// Large enough to clear the size floor and still not a program.
 	notABinary := writeFakeExecutable(t, []byte("#!/bin/sh\necho nope\n"))
 	if _, err := cohereBinary(notABinary, Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"}); err == nil {
@@ -74,6 +82,8 @@ func TestVerifyBinaryRefusesSomethingThatIsNotAnExecutable(t *testing.T) {
 }
 
 func TestVerifyBinaryAcceptsTheRightFormat(t *testing.T) {
+	t.Parallel()
+
 	// A guard that refuses everything is as useless as one that refuses nothing, and it is the
 	// version that gets deleted rather than fixed.
 	cases := map[string][]byte{
@@ -91,6 +101,8 @@ func TestVerifyBinaryAcceptsTheRightFormat(t *testing.T) {
 }
 
 func TestEveryTargetHasAKnownExecutableFormat(t *testing.T) {
+	t.Parallel()
+
 	// The guard skips an operating system it has no magic for, so that adding a target never blocks
 	// a release on a missing table entry. That is the right runtime behavior and the wrong thing to
 	// discover silently, so the omission fails here instead.
@@ -117,6 +129,8 @@ func writeFakeExecutable(t *testing.T, magic []byte) string {
 }
 
 func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(t *testing.T) {
+	t.Parallel()
+
 	// Every other test of this table builds its fixtures out of the table, so they pass for any
 	// value in it, including a wrong one. That is the shape where a corpus encodes a misreading:
 	// the suite agrees with the belief that produced it and never touches the thing the belief is
