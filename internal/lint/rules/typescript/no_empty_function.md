@@ -12,55 +12,34 @@
 
 Disallow empty functions
 
-## Why this recommendation
+## Status: declined as a port, because it would register a second NAME rather than a second check
 
-Stylistic. Small enough to adopt if we want the convention, not urgent if we do not.
+There is no `.go` beside this file, and that is the finding rather than an omission.
 
-## Violations
+This rule is `getESLintCoreRule('no-empty-function')` with four extra `allow` values layered over it.
+`core/no_empty_function.go` already carries all four, and its doc comment says so with a measurement
+taken when it was ported.
 
-45 in the tree. Showing the first few.
+**That claim was re-measured independently for this batch rather than inherited.** Upstream's
+extension and upstream's core were driven over identical inputs on the installed 8.67.0 / 10.8.1
+builds, across the extension's own 16-case corpus:
 
-**`libraries/structure/libraries/nexus/source/coordination/BackoffTask.test.ts:115`**
+    total 16   identical 14   divergent 0   config problems 2
 
-```
-const task = jest.fn().mockImplementation(() => new Promise(() => {})); // Never resolves
-```
+The two rows that are not identical are not behavioural. They are the cases spelling an allow value
+in kebab case, `private-constructors` and `protected-constructors`, which eslint core REFUSES at
+config load rather than answering differently:
 
-> Unexpected empty arrow function
+    Value "private-constructors" should be equal to one of the allowed values.
 
-**`libraries/structure/libraries/nexus/source/coordination/BackoffTask.test.ts:186`**
+So the only real difference between the two rules is the spelling of two option values, which is what
+the core rule's own doc comment already records. Every case where both configurations load agrees.
 
-```
-.mockImplementation(() => new Promise(() => {})); // Never resolves
-```
+The remaining work a port would represent is the NAME, and nothing asks for it: the config enables
+`no-empty-function` at `CohereSettings.json:516` and never mentions the namespaced spelling.
 
-> Unexpected empty arrow function
+## If this is revisited
 
-**`libraries/structure/libraries/nexus/source/coordination/CountdownLatch.ts:12`**
-
-```
-this.resolveFunction = () => {};
-```
-
-> Unexpected empty arrow function
-
-**`libraries/structure/libraries/nexus/source/coordination/PromiseBarrier.test.ts:65`**
-
-```
-const promise = Promise.reject(new Error('test error')).catch(() => {});
-```
-
-> Unexpected empty arrow function
-
-**`libraries/structure/libraries/nexus/source/coordination/PromiseBarrier.test.ts:171`**
-
-```
-const promise1 = pendingPromise1.catch(() => {});
-```
-
-> Unexpected empty arrow function
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-
+The kebab spellings are the one thing a consumer might want. If a project needs to write
+`"private-constructors"` in `CohereSettings.json`, that is a change to `DecodeNoEmptyFunctionOptions`
+accepting both spellings, not a new rule.
