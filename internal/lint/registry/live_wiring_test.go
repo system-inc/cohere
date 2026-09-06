@@ -110,6 +110,43 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// reporting immediately.
 		"complexity": "ported and registered; audited No at 326 violations with no fixer, and the metric itself is contested, so enabling is a decision rather than a wiring step",
 
+		// Audited **No** at 2 violations, which is a judgment about ENABLING and stands. The audit's
+		// stated reason does not: it says the rule "overlaps a rule we already enforce in-house, so
+		// it would report the same defect under a second name", and no such rule exists. Checked --
+		// the only sort-named rules the binary registers are
+		// `@typescript-eslint/require-array-sort-compare`, `react/sort-comp` and
+		// `react/sort-default-props`, none of which looks at a variable declaration block.
+		//
+		// So the honest reason to leave it off is the one the count gives rather than the one the
+		// audit wrote: two sites, both in libraries/structure, against a convention nobody has
+		// agreed to adopt. Unlike the rules above it this one DOES ship a fixer, so enabling it is
+		// cheaper than most -- which is a reason to revisit it deliberately rather than to flip it
+		// as part of a port.
+		"sort-vars": "ported and registered; audited No at 2 violations, and its stated overlap reason does not hold, so enabling is a decision somebody should make on the real reason",
+
+		// Audited **Strong No** at 5619 violations, measured at 6000 on the current tree. That is a
+		// judgment about ENABLING and it plainly stands: the rule ships a fixer, but six thousand
+		// automated rewrites of function expressions into arrows is a change to how the codebase
+		// reads rather than a cleanup, and several of them would be semantic -- the fixer
+		// deliberately declines fourteen shapes in upstream's own corpus precisely because the
+		// repair would alter `this`.
+		//
+		// One correction to the audit's metadata while it is being cited: it records "needs type
+		// information: no", which is true of ESLint and false of a cohere port. Telling a genuine
+		// self-reference from a shadowed one is name resolution, and a text comparison gets it
+		// wrong -- `foo(function bar() { function bar() {} bar(); })` reports upstream and a text
+		// match calls it clean. Upstream reads eslint-scope for this, which is not a type checker;
+		// here the equivalent is the checker, so the rule declares NeedsTypeChecker.
+		"prefer-arrow-callback": "ported and registered; audited Strong No at 5619 violations, measured 6000, so enabling is a codebase-wide decision rather than a wiring step",
+
+		// Audited **No** at 1736 violations, which is a judgment about ENABLING and stands. What
+		// makes it a decision rather than a wiring step is the same thing that made it worth
+		// porting carefully: the rule has SIX mutually exclusive modes, and which one this codebase
+		// wants is a style choice nobody has made. The default, "always", is not a safe pick by
+		// omission either -- it is the strictest of the six, requiring shorthand for methods and
+		// properties at once.
+		"object-shorthand": "ported and registered; audited No at 1736 violations, and its six mutually exclusive modes mean enabling is picking a style rather than flipping a switch",
+
 		// Ported and registered without being enabled, because enabling it is a decision with work
 		// attached rather than a wiring step. The audit measured 54 violations and the rule has no
 		// fixer, so every one is a hand edit; the config has never named it under either spelling.
