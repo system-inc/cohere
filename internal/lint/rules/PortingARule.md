@@ -1729,10 +1729,28 @@ opposite directions:**
 
 **The loud one is the lucky one.** `id-denylist` refused to start, which is a failure
 nobody can ship past. `id-match` is the shape this repository exists to refuse: a rule
-that registers, passes a complete fixture pair in both directions, survives a full
-mutation sweep, appears in `--rules`, and enforces something other than what the config
-says. Its corpus has 100 cases and 52 of them carry `properties: true`; every one still
-passed, because every one reached the decoder through the test's own bytes.
+that registers, passes a complete fixture pair in both directions, appears in `--rules`,
+and enforces something other than what the config says. Its corpus has 100 cases and 52
+of them carry `properties: true`; every one still passed, because every one reached the
+decoder through the test's own bytes.
+
+**Scored, rather than asserted**, because the first draft of this section claimed the
+blindness without measuring it and was wrong about which mutant demonstrates it. Restoring
+the original defect -- a decoder that understands only upstream's flat tuple and not the
+nested shape a config delivers -- gives:
+
+    against the 100 imported corpus rows          SURVIVED
+    against the same rows plus the contract test  CAUGHT, 4 failing lines
+
+`id-denylist` scores the same way on its own defect, and the symmetry is the point: the
+loud failure and the silent one are one blindness, and the noise was luck rather than a
+difference in kind.
+
+    against the 143 imported corpus rows          SURVIVED
+    against the same rows plus the contract test  CAUGHT, 4 failing lines
+
+That is the section in two measurements. The corpus cannot see it and a table written
+specifically for the boundary can, so the boundary needs its own table.
 
 **The instrument is a dry run against the real tree, through the real config layer**, and
 it is the only one that sees this. Not `go test`. Not the sweep. Seed a small tree with a
@@ -1766,6 +1784,91 @@ in. Refuse instead.
 options is not necessarily the spelling this tree can hand you. Check `meta.schema` for
 how many elements it declares, and if the answer is more than one, your decoder has a
 second shape to accept and your fixtures cannot tell you whether it does.
+
+## 7d. A screen for an ABSENT thing is most confident when it is broken
+
+**An audit's zero cannot tell a clean tree from a rule that cannot fire here.** Several
+rules carry the verdict "Yes, violations: none" while being structurally incapable of
+reporting in this tree, and the count reads identically either way. The two causes look
+the same from outside and are completely different:
+
+    the rule is configuration-driven      it reads its OWN `context.options`, which the
+                                          config layer hands to rule.Context. Port it;
+                                          the zero means "nothing is configured yet".
+    the rule reads a SHARED setting       it reads `context.settings.*`, which
+                                          rule.Context has no path to and which ahra
+                                          configures nowhere. That arm cannot work here.
+
+`react/prefer-exact-props` is the second kind, measured independently by two agents weeks
+apart with identical results: all 12 of its reporting cases go silent with no settings,
+because `getExactPropWrapperFunctions(context)` is the only input its reporting branch
+has. The ruling is at `internal/lint/rules/react/forbid_prop_types.go:158-183`.
+`id-denylist` and `id-match` are the first kind. Both zeros looked the same in the audit.
+
+**The obvious screen is to grep the rule file for `context.settings`, and it is broken.**
+This is the part to read twice, because a reader who re-derives the screen will write the
+broken one:
+
+    grep -cE "context\.settings" .../rules/id-denylist.js             0    correct
+    grep -cE "context\.settings" .../rules/forbid-prop-types.js       0    WRONG
+
+`forbid-prop-types` reads that setting **indirectly**, through
+`eslint-plugin-react/lib/util/propWrapper.js:21`:
+
+    return new Set(context.settings.propWrapperFunctions || []);
+
+So it passes a direct scan clean and then registers a port that cannot fire. Run that
+screen across a queue and you get a confident clean sweep over exactly the rules it
+cannot see.
+
+**And this is the general hazard, not a detail about one plugin.** A grep can only find
+the names you thought of. That is the same failure as a corpus containing only the inputs
+upstream thought of (7b), one level out: in both cases the instrument's blind spot is
+shaped like the author's imagination, and in both cases the output of a blind instrument
+is a clean result. **A screen looking for an absent thing gives its most confident answer
+when it is broken**, because "found nothing" is simultaneously the success signal and the
+failure signal.
+
+**The executable check needs no guess about which helper name to look for.** Drive the
+INSTALLED rule twice over every corpus case, once with a settings block and once without,
+and compare. A rule whose reporting path reaches `context.settings` moves; one that reads
+only its own options does not. Measured across three instruments on the two rules above:
+
+    the rule file names a shared setting          0        0        control: 0  (missed it)
+    its transitive imports do                     0        0        control: 1  (found it)
+    corpus cases that move with a settings block  0/145    0/100    control: 0 -> 1
+
+Only the third needs no guess, and only the third is worth running across a queue.
+
+**The refusal is the load-bearing piece, not a nicety.** Require a control that MOVES
+before believing a subject that does not, and make the probe exit non-zero when the
+control stays flat. Without it a flat subject result is a number rather than a
+measurement, and the two are indistinguishable in the output:
+
+    if (controlMoved === 0) {
+      console.log('REFUSING: the control did not move, so this probe is not measuring ' +
+                  'a settings dependency');
+      process.exit(1);
+    }
+
+That refusal fired twice while this was being built, and both causes were the instrument
+rather than the rules:
+
+    a settings block of the wrong SHAPE    propWrapperFunctions wants
+                                           [{property: 'exact', exact: true}], and a bare
+                                           string array leaves the control silent
+    a hand-written control case            it never triggered the rule at all
+
+Both were fixed by taking the settings block and a reporting case **verbatim from the
+control rule's own corpus** rather than inventing them, which is step 3's rule applied to
+the instrument instead of to the fixtures. Only then did the control move 0 -> 1 and the
+subjects' flat 0-of-245 become a result.
+
+**So the screen, in order:** read `meta.schema` for the rule's own option surface, then
+drive the installed rule with and without settings over its whole corpus, with a control
+that is known to depend on settings and is required to move. If any part of a rule's
+reporting path reaches outside `meta.schema`, that arm cannot work here, and saying so
+with the measurement is a better outcome than a port that registers and never fires.
 
 ## 8. Assert spans, not just message ids
 
