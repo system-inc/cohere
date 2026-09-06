@@ -282,6 +282,13 @@ func run() error {
 			return fmt.Errorf("loading the lint config: %w", err)
 		}
 		lintConfig = loaded
+		projectFileNames := make([]string, 0, len(projectFiles))
+		for _, projectFile := range projectFiles {
+			projectFileNames = append(projectFileNames, projectFile.FileName())
+		}
+		if err := lintConfig.ValidateSelectors(projectFileNames); err != nil {
+			return fmt.Errorf("validating the lint config: %w", err)
+		}
 		graph.LintConfig = lintConfig
 		graph.RuleOptions = registry.Options()
 	}
