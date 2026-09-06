@@ -1,4 +1,4 @@
-// Command vendor_react_fixtures re-pulls React's error-named compiler fixtures at a chosen commit.
+// Command vendor_fixtures re-pulls React's error-named compiler fixtures at a chosen commit.
 //
 // The corpus under `internal/react_conformance/testdata/fixtures` is vendored rather than fetched at
 // test time, so this tool is what makes the pin reproducible: it is how the vendored tree was
@@ -24,7 +24,7 @@
 // `recursive=1` reports `truncated`, and this tool refuses to proceed when it is true. That check
 // is the difference between a measurement and a guess.
 //
-//	go run ./tools/vendor_react_fixtures -sha <commit> -out internal/react_conformance/testdata/fixtures
+//	go run ./tools/react/vendor_fixtures -sha <commit> -out internal/react_conformance/testdata/fixtures
 //
 // Pass -dry-run to report the counts without writing.
 package main
@@ -377,6 +377,6 @@ func sortedKeys(counts map[string]int) []string {
 }
 
 func fail(format string, arguments ...any) {
-	fmt.Fprintf(os.Stderr, "vendor_react_fixtures: "+format+"\n", arguments...)
+	fmt.Fprintf(os.Stderr, "react/vendor_fixtures: "+format+"\n", arguments...)
 	os.Exit(1)
 }

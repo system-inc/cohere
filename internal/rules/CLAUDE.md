@@ -179,7 +179,7 @@ rule that went quiet.
 
 ## Prove the fixtures can see: the mutation sweep
 
-    tools/sweep.sh <file> <package> "<python expression rewriting the string `source`>" [TestName]
+    tools/rules/score_one_mutation.sh <file> <package> "<python expression rewriting the string `source`>" [TestName]
 
 Mutate every discrimination the rule makes, one at a time. **A green suite proves nothing until
 something has been shown able to turn it red.**

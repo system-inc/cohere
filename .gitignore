@@ -3,7 +3,7 @@
 # One entry per main package, because `go build ./<path>/<name>` drops the binary at the repository
 # root by default. A binary not listed here shows up as a large untracked file, and the next
 # `git add -A` commits a platform-specific executable into history. That is not hypothetical: a 9 MB
-# `vendor_react_fixtures` and a 4.9 MB `gen_tailwind_collapse` both sat here, and the second one was
+# `vendor_fixtures` and a 4.9 MB `gen_tailwind_collapse` both sat here, and the second one was
 # committed before anyone noticed.
 #
 # The list covers command/ AND tools/, which an earlier version did not — it walked only command/,
@@ -32,15 +32,15 @@
 /generate_descriptor_base
 /generate_descriptor_table
 /generate_framework_variants
-/generate_typescript_shims
+/generate_shims
 /generate_statics
 /generate_syntax_tree
 /generate_theme
 /generate_utility
 /generate_value_parser
 /generate_variant
-/build_dispatcher_npm_package
-/vendor_react_fixtures
+/build_dispatcher_package
+/vendor_fixtures
 /dist/
 
 # Local caches — the graph snapshot and the rebuild cache both live here

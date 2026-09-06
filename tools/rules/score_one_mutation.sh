@@ -15,14 +15,14 @@
 # the half that a known-dirty control sails straight past, because a control proves the harness can
 # fail while saying nothing about whether this particular edit landed.
 #
-#   tools/sweep.sh <file> <package> <python-expression-rewriting-stdin>
+#   tools/rules/score_one_mutation.sh <file> <package> <python-expression-rewriting-stdin>
 #
 # The mutant must also compile. A build failure is neither a catch nor a survival, and scoring it as
 # a catch is how a sweep congratulates itself for a syntax error.
 set -uo pipefail
 
 if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
-    echo "usage: tools/sweep.sh <file> <package> <python-rewrite> [test-name-pattern]" >&2
+    echo "usage: tools/rules/score_one_mutation.sh <file> <package> <python-rewrite> [test-name-pattern]" >&2
     exit 2
 fi
 

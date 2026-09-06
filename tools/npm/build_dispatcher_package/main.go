@@ -1,4 +1,4 @@
-// Command build_dispatcher_npm_package writes one npm package to a directory, and compiles nothing.
+// Command build_dispatcher_package writes one npm package to a directory, and compiles nothing.
 //
 // A release is seven npm packages: six holding a cross-compiled binary each, and the one a consumer
 // actually installs, which holds no binary at all. That last one is the dispatcher package — a Node
@@ -29,7 +29,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: build_dispatcher_npm_package <output-directory>")
+		fmt.Fprintln(os.Stderr, "usage: npm/build_dispatcher_package <output-directory>")
 		os.Exit(1)
 	}
 

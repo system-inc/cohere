@@ -15,7 +15,7 @@ import (
 // 650 files and 504 KiB is a cheap price for a score that means the same thing on every machine on
 // every day, and the currency that fetching buys is the thing a pinned sha deliberately gives up:
 // an expectation that changes under the implementation is a diff a human should read, not a number
-// that moves. `tools/vendor_react_fixtures` re-pulls at a chosen sha when the pin is bumped.
+// that moves. `tools/react/vendor_fixtures` re-pulls at a chosen sha when the pin is bumped.
 const fixtureRoot = "testdata/fixtures"
 
 func load(t *testing.T) []Fixture {
@@ -540,7 +540,7 @@ func TestFlowExclusionIsCountedNotDropped(t *testing.T) {
 //
 // It checks structure rather than content: every input has its expectation, every expectation has
 // its input, and nothing else is in the directory. Content is guaranteed by `Load` parsing each
-// golden, and against upstream by re-running `tools/vendor_react_fixtures` and diffing, which is how
+// golden, and against upstream by re-running `tools/react/vendor_fixtures` and diffing, which is how
 // the current tree was verified byte-for-byte when it was written.
 func TestVendoredCorpusPairsAreComplete(t *testing.T) {
 	var inputs, expectations []string

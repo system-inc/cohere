@@ -45,7 +45,7 @@
 // Gating it would cost more than it saves — a suite behind a tag is a suite that stops being run,
 // and the first thing it would stop catching is a vendored corpus that quietly changed size.
 //
-// `tools/vendor_react_fixtures` is the network-touching half, and it is a command run deliberately
+// `tools/react/vendor_fixtures` is the network-touching half, and it is a command run deliberately
 // when the pin moves, never from a test.
 package react_conformance
 
@@ -192,7 +192,7 @@ func Load(root string) ([]Fixture, error) {
 	if errorNamed != ExpectedErrorFixtureCount || clean != ExpectedCleanFixtureCount {
 		return nil, fmt.Errorf(
 			"corpus holds %d error-named and %d clean fixtures, want %d and %d; re-run "+
-				"`tools/vendor_react_fixtures` at the pinned sha, and if upstream really changed, "+
+				"`tools/react/vendor_fixtures` at the pinned sha, and if upstream really changed, "+
 				"read the diff before moving these numbers",
 			errorNamed, clean, ExpectedErrorFixtureCount, ExpectedCleanFixtureCount)
 	}
