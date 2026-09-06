@@ -1782,6 +1782,34 @@ compile, and refuses to score at all unless the package is green before the muta
 All three refusals are correct and **none is a pass.** Before the byte check existed, a
 mutation changing one space inside a comment came back "caught by thirty-two lines".
 
+**`CAUGHT: N` counts OUTPUT LINES CONTAINING "FAIL", not assertions, and reporting it as
+assertions overstates it about threefold.** The tool's own line is honest -- it says
+"failing line(s)" -- and it is the reader who converts that into a claim about coverage.
+
+Decomposed on a real run, where the tool reported 6:
+
+    --- FAIL: TestSomethingFires                 a test header
+        --- FAIL: TestSomethingFires/invalid-20  a subtest header
+    --- FAIL: TestSomethingElse                  another test header
+    FAIL                                         a bare summary line
+    FAIL  github.com/...                         the package line
+    FAIL                                         another bare one
+
+Two actual assertion failures under six matching lines. So a sweep on a rule with no
+subtests and one failing assertion reports 4, and one with fifty failing subtests reports
+53; the number moves with test STRUCTURE as much as with coverage.
+
+Two consequences. **Quote it as the tool does, "CAUGHT" or "CAUGHT: N failing lines", not
+as a count of assertions** -- a figure in a report that does not survive re-measurement is
+the decay class this document keeps correcting, and this one was introduced by an author
+who had just written a section about exactly that. And **when you want the assertion count,
+grep for the file-and-line prefix** (`_test\.go:[0-9]+:`), which is one line per
+`t.Errorf` and cannot be inflated by structure.
+
+**None of which weakens a catch.** One assertion firing on the exact discriminating input
+is a complete pin, and a larger number is not a better one; it usually just means the
+mutation broke something structural. The count is a diagnostic, not a score.
+
 **"Does not compile" is now a narrower message than it used to be, and this is worth
 knowing.** Earlier revisions told you to read that refusal as a question rather than a
 verdict, because the check was tree-wide and could not tell your broken mutation from a
@@ -1854,7 +1882,7 @@ builds it as `hashIfNeeded + name` because ESTree's `key.name` omits the hash, s
 guarded with `if !strings.HasPrefix(text, "#")`. Two mutations were then run:
 
     remove the guard entirely          SURVIVED
-    add the hash unconditionally       CAUGHT by 7 assertions
+    add the hash unconditionally       CAUGHT
 
 The author read that pair as "the condition is dead and the body is load-bearing,
 therefore `Text()` omits the hash", simplified the code to `"#" + name.Text()`, and broke
