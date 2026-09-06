@@ -106,6 +106,32 @@ var messageNoUnusedVars = rule.Message{
 // One sub-case is not symmetric and is easy to miss: a parameter named exactly `_` is NOT ignored
 // under the default args pattern (`ignored.rs:424`), while a variable named `_` is. That asymmetry
 // is upstream's and is reproduced.
+//
+// # This underscore default is the ENTIRE measured gap against `@typescript-eslint/no-unused-vars`
+//
+// Measured on the ahra tree on 2026-09-05, driving the installed 8.67.0 rule through the ESLint
+// Linter API over 4,961 files and comparing against this rule's own dry run over the same tree.
+// The namespaced rule reports three findings; this rule reports two of them, at identical
+// file, line and column:
+//
+//	modules/google/analytics/AnalyticsTypes.ts:30:6   AnalyticsColumnWidthsInterface   both report
+//	modules/planetscale/PlanetScaleTypes.ts:6:6       ParsedRowInterface               both report
+//	modules/pensieve/PensieveBootstrap.test.ts:509:58 _nextContent                     only upstream
+//
+// The single missing finding is a destructured binding named `_nextContent`, and it is missing
+// because of the underscore default above rather than because of anything structural. Setting
+// `varsIgnorePattern` to `^$` in the config reproduces all three at exactly upstream's positions,
+// with no code change and no other movement anywhere in the tree. That measurement is why the gap
+// is recorded here rather than closed: which default this tree wants is a configuration decision,
+// and reversing it in the rule would reverse it for the oxc differential too.
+//
+// Worth stating plainly because it has been assumed twice in the other direction: the missing
+// finding is NOT evidence that this rule is blind to type declarations. It is not. A seeded probe
+// carrying an unused `type` alias, an unused `interface` and an unused `const` reports all three,
+// and the two type findings above are ones this rule already makes on the real tree. The
+// `bindingType` arm in `collectCandidateBindings` is what does it. A port of the namespaced rule
+// undertaken to recover type-declaration coverage would be recovering coverage that is already
+// here.
 var NoUnusedVars = rule.Rule{
 	Name: "no-unused-vars",
 
