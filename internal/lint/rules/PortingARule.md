@@ -2019,10 +2019,8 @@ right-directory zero, and the reading that follows is confident and wrong.
 
     [ "$(git rev-parse --show-toplevel)" = "$expected" ] || { echo "wrong repo"; exit 1; }
 
-One line, and it converts a plausible zero into a loud failure. This is the same repair as
-making a differential harness refuse on a wrong denominator rather than warn, applied to
-the shell instead of to a test: **an instrument that cannot tell you it was asked the wrong
-question must be made to refuse rather than to answer.** Three separate people hit this in
+One line, and it converts a plausible zero into a loud failure. It is the general repair
+applied to the shell rather than to a test. Three separate people hit this in
 one night from three directions -- an extractor counting "No matching configuration found"
 as a finding, a harness silently dropping six files, and a coordinator measuring from the
 wrong checkout five times -- so the pattern is not a personal lapse and a reminder will not
@@ -2091,10 +2089,9 @@ reading said so. The check that works is narrower: **is this artifact the one my
 produced?** A size, a timestamp, a grep for the symbol you just added.
 
 **And what makes this class dangerous is not that the wrong source is nearby, it is that it
-answers.** A missing thing errors and you notice. An adjacent thing responds, plausibly, in
-the right format, at the right magnitude. That is true of the stale binary, of the symlink in
-`node_modules`, of a `git grep` run in the wrong repository, and of every instrument in the
-section above. Which is why the repair is always the same: make it refuse rather than answer.
+answers**, which is the property the section above is built on. That is true of the stale
+binary, of the symlink in `node_modules`, and of a `git grep` run in the wrong repository, so
+they take the same repair as everything there.
 
 ## 11. The gate
 
