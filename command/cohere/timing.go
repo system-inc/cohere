@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/system-inc/cohere/internal/program"
+	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // printTimings renders per-rule cost, most expensive first.

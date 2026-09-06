@@ -25,8 +25,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/configuration"
 	"github.com/system-inc/cohere/internal/differential"
+	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
 func main() {

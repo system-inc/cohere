@@ -6,16 +6,16 @@
 # `vendor_fixtures` and a 4.9 MB `gen_tailwind_collapse` both sat here, and the second one was
 # committed before anyone noticed.
 #
-# The list covers command/ AND tools/, which an earlier version did not — it walked only command/,
+# The list covers command/ AND the tools/ directories under internal/, which an earlier version did not — it walked only command/,
 # so it reported clean while a tools/ binary was staged and waiting. This says which are missing:
 #
-#	find command tools -name '*.go' -exec grep -l '^package main' {} \; | xargs -n1 dirname |
+#	find command internal -name '*.go' -exec grep -l '^package main' {} \; | xargs -n1 dirname |
 #	  sort -u | xargs -n1 basename | while read n; do
 #	    grep -q "^/$n$" .gitignore || echo "missing: $n"
 #	  done
 #
 # A binary whose name differs from its directory needs its own line: `gen_tailwind_collapse` is built
-# from `tools/tailwind/generate_collapse`, so no directory-derived entry ever covered it.
+# from `internal/lint/rules/tailwind/tools/generate_collapse`, so no directory-derived entry ever covered it.
 /formatdiff
 /gen_tailwind_collapse
 /cohere

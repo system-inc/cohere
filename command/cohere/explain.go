@@ -8,7 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 
-	"github.com/system-inc/cohere/internal/program"
+	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // printExplanation renders what every rule did on one file.

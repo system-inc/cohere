@@ -16,8 +16,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/system-inc/cohere/internal/dispatch"
-	"github.com/system-inc/cohere/internal/release"
+	"github.com/system-inc/cohere/internal/release/dispatch"
+	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
 func main() {

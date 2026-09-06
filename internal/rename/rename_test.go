@@ -11,7 +11,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
-	"github.com/system-inc/cohere/internal/program"
+	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // fixturePath resolves a fixture under testdata to an absolute path.

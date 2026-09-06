@@ -10,9 +10,9 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/system-inc/cohere/internal/fix"
-	"github.com/system-inc/cohere/internal/program"
-	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // applyProposedFixes rewrites every file whose rules proposed a repair, and reports what it did.
@@ -30,10 +30,10 @@ func applyProposedFixes(
 	graph *program.Graph,
 	projectFiles []*ast.SourceFile,
 	rules []rule.Rule,
-	transform fix.Transform,
+	transform edit.Transform,
 	formatCandidates []string,
 	maxPasses int,
-) (fix.Summary, program.Result, error) {
+) (edit.Summary, program.Result, error) {
 	// This walk is the run's FIRST walk over the program, and it is returned so the lint phase can
 	// reuse it rather than repeat it.
 	//
@@ -50,19 +50,19 @@ func applyProposedFixes(
 	// longer exist.
 	result, err := graph.Walk(ctx, projectFiles, rules)
 	if err != nil {
-		return fix.Summary{}, program.Result{}, fmt.Errorf("collecting proposals: %w", err)
+		return edit.Summary{}, program.Result{}, fmt.Errorf("collecting proposals: %w", err)
 	}
 
 	// Group proposals by the file they belong to. A diagnostic carries its source file, so the
 	// grouping is exact rather than inferred from a range.
-	byFileName := map[string][]fix.Proposal{}
+	byFileName := map[string][]edit.Proposal{}
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.SourceFile == nil || len(diagnostic.Fixes) == 0 {
 			continue
 		}
 		fileName := diagnostic.SourceFile.FileName()
 		for _, proposed := range diagnostic.Fixes {
-			byFileName[fileName] = append(byFileName[fileName], fix.Proposal{
+			byFileName[fileName] = append(byFileName[fileName], edit.Proposal{
 				RuleName: diagnostic.RuleName,
 				Fix:      proposed,
 			})
@@ -96,7 +96,7 @@ func applyProposedFixes(
 	if len(candidates) == 0 {
 		// An empty run still reports its population, so "nothing proposed a fix" cannot be confused
 		// with "the fixer never ran".
-		return fix.Summarize(nil), result, nil
+		return edit.Summarize(nil), result, nil
 	}
 
 	// Sorted so a run is reproducible and a diff of two runs is readable.
@@ -106,7 +106,7 @@ func applyProposedFixes(
 	}
 	sort.Strings(fileNames)
 
-	results := make([]fix.FileResult, 0, len(fileNames))
+	results := make([]edit.FileResult, 0, len(fileNames))
 	for _, fileName := range fileNames {
 		// The first pass reuses the proposals already collected; later passes re-lint the rewritten
 		// text. Reusing them for the first pass and only the first pass is what keeps offsets honest:
@@ -114,7 +114,7 @@ func applyProposedFixes(
 		firstPass := byFileName[fileName]
 		used := false
 
-		propose := func(_ string, text string) ([]fix.Proposal, error) {
+		propose := func(_ string, text string) ([]edit.Proposal, error) {
 			if !used {
 				used = true
 				return firstPass, nil
@@ -122,7 +122,7 @@ func applyProposedFixes(
 			return proposalsForText(fileName, text, graph, rules)
 		}
 
-		fileResult, err := fix.FixAndTransformFile(fileName, propose, transform, maxPasses)
+		fileResult, err := edit.FixAndTransformFile(fileName, propose, transform, maxPasses)
 		if err != nil {
 			// One file failing must not abandon the rest. The failure is reported rather than
 			// swallowed, and the tree is left in a state where every other fix still landed.
@@ -140,7 +140,7 @@ func applyProposedFixes(
 		results = append(results, fileResult)
 	}
 
-	return fix.Summarize(results), result, nil
+	return edit.Summarize(results), result, nil
 }
 
 // proposalsForText re-runs the rules against rewritten text.
@@ -157,7 +157,7 @@ func proposalsForText(
 	text string,
 	graph *program.Graph,
 	rules []rule.Rule,
-) ([]fix.Proposal, error) {
+) ([]edit.Proposal, error) {
 	rooted := fileName
 	if !tspath.IsRootedDiskPath(rooted) {
 		rooted = "/" + rooted
@@ -257,7 +257,7 @@ func proposalsForText(
 		walkNode(sourceFile.AsNode(), listeners)
 	}
 
-	return fix.ProposalsFrom(diagnostics), nil
+	return edit.ProposalsFrom(diagnostics), nil
 }
 
 // walkNode visits every node, calling any listener registered for its kind.

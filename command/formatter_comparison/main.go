@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/formatter_comparison"
+	"github.com/system-inc/cohere/internal/format/comparison"
 )
 
 func main() {

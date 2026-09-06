@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/fix"
-	"github.com/system-inc/cohere/internal/prettier"
+	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // A scoped transform must format what is in scope and skip what is not, and the skip must carry the
@@ -39,7 +39,7 @@ func TestAScopedTransformFormatsOnlyWhatIsInScope(t *testing.T) {
 	}
 
 	_, err = transform("/repo/out.ts", "hello\n")
-	if !errors.Is(err, fix.ErrSkipped) {
+	if !errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("a file outside scope should skip, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "outside the format scope") {
@@ -92,7 +92,7 @@ func TestAnEmptyScopeSkipsEverythingAndSaysWhy(t *testing.T) {
 	}, formatScope{Description: "nothing (could not determine what changed: git exploded)"})
 
 	_, err := transform("/repo/a.ts", "x")
-	if !errors.Is(err, fix.ErrSkipped) {
+	if !errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("expected a skip, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "could not determine what changed") {

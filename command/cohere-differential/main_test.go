@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/configuration"
 	"github.com/system-inc/cohere/internal/differential"
+	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
 // The control precondition has to be able to reject, or it is the thing it guards against.

@@ -1,0 +1,129 @@
+package nexus
+
+import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
+	"github.com/system-inc/cohere/internal/lint/rule"
+)
+
+// forbiddenSource is one package we do not import, and what to import instead.
+//
+// A table rather than a branch per package: the original repeated the same report-and-rewrite four
+// times for static imports and four more for call expressions, which is where the next entry gets
+// added to one list and forgotten in the other.
+type forbiddenSource struct {
+	Specifier   string
+	Replacement string
+	Message     rule.Message
+}
+
+var forbiddenSources = []forbiddenSource{
+	{
+		Specifier:   "next/navigation",
+		Replacement: "@structure/source/router/Navigation",
+		Message: rule.Message{
+			Id: "forbiddenNavigationImport",
+			Description: "Importing from 'next/navigation' is not allowed. Use " +
+				"'@structure/source/router/Navigation', which is the same navigation without binding " +
+				"the file to one framework's router.",
+		},
+	},
+	{
+		Specifier:   "next/link",
+		Replacement: "@structure/source/components/navigation/Link",
+		Message: rule.Message{
+			Id: "forbiddenLinkImport",
+			Description: "Importing from 'next/link' is not allowed. Use " +
+				"'@structure/source/components/navigation/Link' instead, so a link renders the same way " +
+				"whichever framework is underneath it.",
+		},
+	},
+	{
+		Specifier:   "next/image",
+		Replacement: "@structure/source/components/images/Image",
+		Message: rule.Message{
+			Id: "forbiddenImageImport",
+			Description: "Importing from 'next/image' is not allowed. Use " +
+				"'@structure/source/components/images/Image' instead, so an image renders the same way " +
+				"whichever framework is underneath it.",
+		},
+	},
+	{
+		Specifier:   "framer-motion",
+		Replacement: "motion/react",
+		Message: rule.Message{
+			Id: "forbiddenMotionImport",
+			Description: "Importing from 'framer-motion' is not allowed. Use 'motion/react', which is the " +
+				"same library under the name it ships as now.",
+		},
+	},
+}
+
+// ImportNoForbiddenSource replaces framework-coupled packages with the framework-independent
+// equivalents shipped from @structure/source.
+//
+//	valid:   import Link from '@structure/source/components/navigation/Link'
+//	invalid: import Link from 'next/link'
+//	invalid: const { motion } = require('framer-motion')
+//	invalid: const module = await import('next/image')
+//
+// The fix rewrites only the specifier string, never the import clause, and that restraint is the
+// interesting decision. The TypeScript original rebuilds the whole declaration for the next/image
+// case so a default import becomes a named one, which means the fix is guessing at the replacement
+// module's export shape from inside a rule that cannot see it. Rewriting the string is the part
+// that is always correct; if the bindings also need to change, the compiler says so immediately and
+// a human makes that call with the module in front of them.
+var ImportNoForbiddenSource = rule.Rule{
+	Name: "nexus/import-no-forbidden-source",
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		// The finding is anchored on the specifier, which is both the thing that gets rewritten and
+		// the thing a reader has to change.
+		//
+		// Anchoring on the enclosing declaration instead is what this rule did first, and it is a
+		// defect that hides in plain sight: a node's Pos() includes its leading trivia, so an import
+		// preceded by comments reports at the first comment rather than at the import. In the Next
+		// wrapper files that put the finding on line 1 while the author's
+		// `eslint-disable-next-line` sat on line 3 covering line 4. A `-next-line` directive can
+		// only match the line after itself, so the finding was unreachable by any suppression that
+		// could be written, and it reads as a real finding in every count. Report the node the
+		// original reports.
+		report := func(specifierNode *ast.Node, source string) {
+			for _, forbidden := range forbiddenSources {
+				if source != forbidden.Specifier {
+					continue
+				}
+				ctx.ReportNodeWithFixes(
+					specifierNode,
+					forbidden.Message,
+					ctx.ReplaceNode(specifierNode, "'"+forbidden.Replacement+"'"),
+				)
+				return
+			}
+		}
+
+		return rule.Listeners{
+			ast.KindImportDeclaration: func(node *ast.Node) {
+				declaration := node.AsImportDeclaration()
+				if declaration == nil || declaration.ModuleSpecifier == nil {
+					return
+				}
+				if !ast.IsStringLiteralLike(declaration.ModuleSpecifier) {
+					return
+				}
+				report(declaration.ModuleSpecifier, declaration.ModuleSpecifier.Text())
+			},
+
+			ast.KindCallExpression: func(node *ast.Node) {
+				source, isImport := imports.CallExpressionSource(node)
+				if !isImport {
+					return
+				}
+				call := node.AsCallExpression()
+				if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
+					return
+				}
+				report(call.Arguments.Nodes[0], source)
+			},
+		}
+	},
+}

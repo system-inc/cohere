@@ -18,7 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/release"
+	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
 func main() {

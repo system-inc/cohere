@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/program"
-	"github.com/system-inc/cohere/internal/rule"
+	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // The coverage note distinguishes a rule nobody wired from a rule that is configured and satisfied.

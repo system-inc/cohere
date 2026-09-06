@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/fix"
-	"github.com/system-inc/cohere/internal/prettier"
+	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // formatEngine formats one file's text, or says it could not.
@@ -66,14 +66,14 @@ type formatEngine interface {
 // says it looked and broke. Collapsing either into "returned the text unchanged" makes a formatter
 // that never ran indistinguishable from a tree that was already correct, which is the ambiguity the
 // coverage line exists to destroy.
-func formatTransform(engine formatEngine) fix.Transform {
+func formatTransform(engine formatEngine) edit.Transform {
 	return func(fileName string, text string) (string, error) {
 		if engine == nil {
-			return "", fmt.Errorf("%w: no formatter is configured", fix.ErrSkipped)
+			return "", fmt.Errorf("%w: no formatter is configured", edit.ErrSkipped)
 		}
 
 		if !engine.Handles(fileName) {
-			return "", fmt.Errorf("%w: %s is not a file type the formatter handles", fix.ErrSkipped, extensionOf(fileName))
+			return "", fmt.Errorf("%w: %s is not a file type the formatter handles", edit.ErrSkipped, extensionOf(fileName))
 		}
 
 		formatted, err := engine.Format(fileName, text)
@@ -87,7 +87,7 @@ func formatTransform(engine formatEngine) fix.Transform {
 			// and the types phase reports it in a form a reader can act on. A second complaint from the
 			// formatter adds noise rather than information.
 			if isUnparseable(err) {
-				return "", fmt.Errorf("%w: the file does not parse, so there is nothing to format", fix.ErrSkipped)
+				return "", fmt.Errorf("%w: the file does not parse, so there is nothing to format", edit.ErrSkipped)
 			}
 			return "", err
 		}
@@ -131,7 +131,7 @@ func extensionOf(fileName string) string {
 // Returning nil rather than quietly wiring the native formatter is the whole point. `formatdiff`
 // exists in-tree and would compile, and it is the wrong engine: FormatCodeSettings has no
 // printWidth, so it has no line-breaking engine at all, and 21.8% of tracked files diverge from our
-// Prettier after every settings-reachable fix. A bare `cohere` running it would reformat about a
+// Prettier after every settings-reachable edit. A bare `cohere` running it would reformat about a
 // fifth of the tree away from what the existing gate produces, which is worse than not formatting.
 //
 // A nil engine skips with "no formatter is configured" and that reaches the coverage line, so a run

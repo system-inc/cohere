@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/fix"
-	"github.com/system-inc/cohere/internal/prettier"
+	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // fakeEngine stands in for the real formatter so the seam can be tested before the engine exists.
@@ -74,14 +74,14 @@ func prettierLike() *fakeEngine {
 //
 // Returning the input unchanged would work and would be wrong: it is indistinguishable from
 // "already correctly formatted", so a formatter that handles nothing would report a whole tree as
-// clean. That is the ambiguity `fix.ErrSkipped` exists to remove.
+// clean. That is the ambiguity `edit.ErrSkipped` exists to remove.
 func TestAnUnhandledFileTypeIsSkippedWithItsReason(t *testing.T) {
 	transform := formatTransform(prettierLike())
 
 	for _, fileName := range []string{"Makefile", "notes.txt", "query.graphql", "script.sh"} {
 		t.Run(fileName, func(t *testing.T) {
 			_, err := transform(fileName, "anything at all\n")
-			if !errors.Is(err, fix.ErrSkipped) {
+			if !errors.Is(err, edit.ErrSkipped) {
 				t.Fatalf("expected a skip for %s, got %v", fileName, err)
 			}
 			if !strings.Contains(err.Error(), "not a file type the formatter handles") {
@@ -119,7 +119,7 @@ func TestHandledFileTypesAreNotSkipped(t *testing.T) {
 	for _, fileName := range []string{"a.ts", "b.tsx", "c.js", "d.jsx", "e.mjs", "f.md", "g.css", "h.json"} {
 		t.Run(fileName, func(t *testing.T) {
 			_, err := transform(fileName, "const a = 1;\n")
-			if errors.Is(err, fix.ErrSkipped) {
+			if errors.Is(err, edit.ErrSkipped) {
 				t.Fatalf("%s was skipped but should be formatted: %v", fileName, err)
 			}
 		})
@@ -132,7 +132,7 @@ func TestHandledFileTypesAreNotSkipped(t *testing.T) {
 func TestAnUnparseableFileIsSkippedNotFailed(t *testing.T) {
 	_, err := formatTransform(parseFailingEngine())("broken.ts", "function alpha( {\n")
 
-	if !errors.Is(err, fix.ErrSkipped) {
+	if !errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("an unparseable file should skip, not fail: %v", err)
 	}
 	if !strings.Contains(err.Error(), "does not parse") {
@@ -174,7 +174,7 @@ func TestFormattedOutputStillParses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if parses, reason := fix.Parses("sample.ts", formatted); !parses {
+	if parses, reason := edit.Parses("sample.ts", formatted); !parses {
 		t.Fatalf("the formatter produced text that does not parse: %s (%q)", reason, formatted)
 	}
 }
@@ -227,7 +227,7 @@ func TestAFormatFailureIsNotDowngradedToASkip(t *testing.T) {
 	if err == nil {
 		t.Fatalf("a failing formatter reported success")
 	}
-	if errors.Is(err, fix.ErrSkipped) {
+	if errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("a real failure was downgraded to a skip: %v", err)
 	}
 	if !strings.Contains(err.Error(), "ran out of memory") {
@@ -242,7 +242,7 @@ func TestAnUnhandledFileIsNeverHandedToTheEngine(t *testing.T) {
 	engine := prettierLike()
 	transform := formatTransform(engine)
 
-	if _, err := transform("Makefile", "all:\n"); !errors.Is(err, fix.ErrSkipped) {
+	if _, err := transform("Makefile", "all:\n"); !errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("expected a skip, got %v", err)
 	}
 	if len(engine.askedFor) != 0 {
@@ -264,7 +264,7 @@ func TestAnUnhandledFileIsNeverHandedToTheEngine(t *testing.T) {
 func TestNoConfiguredFormatterSkipsWithAReason(t *testing.T) {
 	_, err := formatTransform(nil)("a.ts", "const a = 1;\n")
 
-	if !errors.Is(err, fix.ErrSkipped) {
+	if !errors.Is(err, edit.ErrSkipped) {
 		t.Fatalf("a missing formatter should skip, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "no formatter is configured") {

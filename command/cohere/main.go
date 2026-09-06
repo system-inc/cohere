@@ -18,13 +18,13 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/cohere/internal/configuration"
-	"github.com/system-inc/cohere/internal/fix"
-	"github.com/system-inc/cohere/internal/program"
-	"github.com/system-inc/cohere/internal/registry"
-	"github.com/system-inc/cohere/internal/release"
-	"github.com/system-inc/cohere/internal/rule"
-	"github.com/system-inc/cohere/internal/unused_code_report"
+	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/lint/registry"
+	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/types/program"
+	"github.com/system-inc/cohere/internal/unused_exports"
 )
 
 // processStart is stamped before anything else runs, so the phase line can say how much of the run
@@ -80,7 +80,7 @@ func run() error {
 	// corpus. Reformatting the tree away from what the gate produces is worse than not formatting,
 	// so enabling is a separate decision from wiring.
 	format := flag.Bool("format", false, "run the formatter over the candidate files")
-	maxFixPasses := flag.Int("fix-passes", fix.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
+	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
 	unusedReport := flag.Bool("unused", false, "report code that was written and never used: unreferenced exports, and statements nothing can reach")
@@ -556,7 +556,7 @@ func run() error {
 		}
 	}
 
-	// Phase 5: unused_code_report. A report, run only when asked for, and never a reason to fail a build.
+	// Phase 5: unused_exports. A report, run only when asked for, and never a reason to fail a build.
 	if !runUnused {
 		report.record(phaseUnused, outcomeSkipped, 0, "not requested — this is a report, ask for it with --unused")
 	} else {
@@ -578,13 +578,13 @@ func run() error {
 			)
 		}
 
-		unusedResult, err := unused_code_report.Run(ctx, graph, projectFiles, *unusedDeep)
+		unusedResult, err := unused_exports.Run(ctx, graph, projectFiles, *unusedDeep)
 		if err != nil {
 			return fmt.Errorf("running the unused report: %w", err)
 		}
 		unusedDuration := time.Since(unusedStart)
 
-		unused_code_report.Write(os.Stdout, unusedResult, *unusedAll)
+		unused_exports.Write(os.Stdout, unusedResult, *unusedAll)
 
 		// Deliberately NOT added to `findings`. The exit code is the gate's verdict, and this phase
 		// is not part of the gate: an export held for an external consumer is unused and correct, so

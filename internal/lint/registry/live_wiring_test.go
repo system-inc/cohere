@@ -1,0 +1,339 @@
+package registry
+
+import (
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/system-inc/cohere/internal/lint/configuration"
+)
+
+// The live config, which is the only thing that decides whether a registered rule ever runs.
+const liveConfigPath = "/Users/kirkouimet/Projects/ahra/CohereSettings.json"
+
+// A rule's fixture proves it works. The config decides whether it runs, and nothing else connects
+// the two: `rule_testing` never reads `CohereSettings.json`, so a rule can pass both directions of its own
+// pair and be inert on every real file.
+//
+// That happened. The first `@next/next` rule registered as `next-no-assign-module-variable` while
+// the config said `nextjs/no-assign-module-variable`, which resolves on a `/` boundary to
+// `no-assign-module-variable`. The names did not match, the rule ran on nothing, and its tests were
+// green. Only the coverage line caught it, and only because a second sentence happened to print.
+//
+// This is the mechanical version: every registered rule must be a name the live config can resolve,
+// or be listed below as deliberately not enabled.
+func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
+	if _, err := os.Stat(liveConfigPath); err != nil {
+		t.Skipf("the live config is not present at %s", liveConfigPath)
+	}
+
+	loaded, err := configuration.Load(liveConfigPath)
+	if err != nil {
+		t.Fatalf("loading the live config: %v", err)
+	}
+	resolved := loaded.Resolve("app/Probe.tsx")
+
+	// Rules cohere implements that the live config deliberately does not enable. Each needs a reason,
+	// because an entry here silences the guard for that rule permanently.
+	deliberatelyNotEnabled := map[string]string{
+		// The differential harness's cohere-only control. The gate's oxlint plugin has no such rule,
+		// which is the asymmetry the control depends on, so the config cannot name it.
+		"import-require-path-alias": "the directional control for the differential",
+
+		// Ported and registered without being enabled, because enabling it is a decision with work
+		// attached rather than a wiring step. The audit measured 54 violations and the rule has no
+		// fixer, so every one is a hand edit; the config has never named it under either spelling.
+		"@typescript-eslint/no-deprecated": "ported and registered; the audit measured 54 violations and the rule has no fixer, so enabling is a decision for whoever takes that cleanup",
+
+		// The live config sets `react/jsx-key` to "off" explicitly, in a block of ten-plus rules
+		// this project has deliberately turned off alongside `react/react-in-jsx-scope`. That is a
+		// decision about this codebase rather than a wiring gap, and flipping it here would
+		// override it silently, so the rule is ported, registered and inventoried while staying
+		// off. Turning it on is a config change for whoever owns that block to make.
+		"react/jsx-key": "the live config turns react/jsx-key off deliberately, beside react-in-jsx-scope",
+
+		// The live config already turns this rule off, at the config key `no-useless-rename`, in the same
+		// block as react/jsx-key and react/react-in-jsx-scope. That decision was recorded BEFORE
+		// the rule was ported, which is how this migration is meant to work, and running
+		// EnableRule.ts would have reversed it through the porting process rather than because
+		// anybody changed their mind.
+		//
+		// Unlike the typescript/ case below, no spelling difference is involved: the key is the
+		// bare name and it resolves against the registered rule exactly. So the off applies, the
+		// rule is offered no files, and this exemption is what stops that reading as a wiring gap.
+		//
+		// The port is complete and proven either way. The audit measured 3 violations, all
+		// auto-fixable, so turning it on later is one config line plus a fix pass.
+		"no-useless-rename": "the live config turns no-useless-rename off deliberately, beside react/jsx-key",
+
+		// The live config already turns this rule off, at the config key `typescript/require-array-sort-compare`, under the
+		// old short spelling. Somebody decided against it, and the
+		// port does not get to reverse that.
+		//
+		// What makes this worth spelling out is that enabling it would have LOOKED like a normal
+		// port rather than like an override. The registered name here is the full
+		// `@typescript-eslint/` spelling, and `settingFor` resolves an exact match first and then a
+		// suffix trim on a `/` boundary, so the existing `typescript/` key does not resolve against
+		// it. Measured directly against `settingFor`: the bare and `typescript/` spellings both
+		// resolve to that "off" and the `@typescript-eslint/` one does not. Adding an "error" line
+		// would therefore have silently won over a standing decision through a spelling difference,
+		// with nothing in any diff to show that is what happened.
+		//
+		// So the rule is ported, registered and tested while staying off, the same shape as
+		// `react/jsx-key` above. Turning it on is a config change for whoever owns that "off" to
+		// make, and the audit puts the cost at four sites, three of them `results.sort()` over small
+		// number arrays inside test assertions where the default sort is harmless.
+		"@typescript-eslint/require-array-sort-compare": "the live config turns it off deliberately at the config key `typescript/require-array-sort-compare`, under the typescript/ spelling",
+
+		// The same situation as the entry above, one line earlier in the same block: the live
+		// config turns this off at the config key `typescript/require-array-sort-compare` under the `typescript/` spelling, which
+		// does not resolve against the `@typescript-eslint/` name registered here. Enabling it was
+		// attempted and reverted rather than kept, because the two rules sit in the same
+		// hand-maintained list of deliberate disables and treating them differently would be
+		// arbitrary.
+		//
+		// The audit measures eleven sites, and unlike its neighbour this rule IS auto-fixable, so
+		// the cleanup is a command plus a review of the diff rather than eleven judgments. That
+		// makes it the cheaper of the two to turn on, and it is still not a porter's call.
+		"@typescript-eslint/no-meaningless-void-operator": "the live config turns it off deliberately at the config key `typescript/no-meaningless-void-operator`, under the typescript/ spelling",
+
+		// Left off for a reason that is not a config decision at all: the rule cannot see its own
+		// subject in this architecture, so enabling it would wire up a rule that is guaranteed to
+		// report nothing on every file forever.
+		//
+		// The rule judges whether a file begins with a byte order mark. Measured against
+		// `osvfs.FS().ReadFile`, which is the read every source file in a real run goes through:
+		// a file whose first three bytes on disk are `ef bb bf` arrives as text beginning with
+		// `65 78 70`, the mark already removed, while an unmarked control of the same length is
+		// unchanged and a mark written in the MIDDLE of a file survives intact. So the stripping is
+		// specific to position zero, which is the one position this rule asks about, and it happens
+		// below every rule rather than in any of them. `cachedvfs` over the same reads gives the
+		// same answer, so it is not the cache.
+		//
+		// A dry run against the ahra tree agrees: the rule is offered all 3,513 files, registers a
+		// listener on all 3,513, and reports zero. A seeded two-file tree holding one genuinely
+		// marked file reports zero as well, and that zero is what separates this from the audit's
+		// predicted zero. The audit rated it Yes on the strength of a clean tree; the tree is clean
+		// AND the rule could not tell if it were not.
+		//
+		// The rule is ported, tested and registered anyway rather than abandoned, because the port
+		// itself is correct against upstream and the missing piece is one line elsewhere: a lint
+		// phase that read the file's real bytes, or a source-file flag carrying whether a mark was
+		// stripped, makes it work as written. Worth knowing while that is decided: the FIX phase
+		// reads through `os.ReadFile` and keeps the mark, while the lint phase reads through
+		// `osvfs` and does not, so the two phases disagree by three bytes about where everything in
+		// a marked file lives.
+		"unicode-bom": "the leading byte order mark is stripped by osvfs before any rule runs, so the rule cannot see its own subject; measured against osvfs.FS().ReadFile with an unmarked control and a mid-file control",
+
+		// Registered but deliberately not enabled, and the reason is volume rather than
+		// correctness. Measured against the ahra tree with the installed @typescript-eslint 8.67.0
+		// build: 2,846 findings across 672 files, with 324 of them in one file. The rule ships no
+		// fixer, and every site is a judgment about what the code actually guarantees rather than a
+		// mechanical rewrite, so adopting it is a project with an owner rather than a config line a
+		// porter adds.
+		//
+		// The port itself is complete and agrees with upstream on all twenty two of its corpus
+		// cases plus eight more measured shapes. Nothing here needs fixing before it can be turned
+		// on; somebody has to decide to spend the 2,846 decisions.
+		"@typescript-eslint/no-unsafe-type-assertion": "registered but left off pending a decision about volume: measured at 2,846 findings across 672 files on the ahra tree with the installed 8.67.0 build, no fixer, every site a human judgment",
+
+		// Registered but deliberately not enabled, and the reason is that turning it on is a
+		// stylistic decision with edits attached rather than a correctness one. Upstream marks it
+		// `recommended: false` and neither gate enforced it, so nothing is being reversed here and
+		// no prior `off` exists under either spelling; the decision has simply not been made.
+		//
+		// Measured with the rule temporarily enabled and the config restored afterward: 11 findings
+		// across 10 files, from 173,533 registrations over 3,516 files, 12.3ms, zero crashed files.
+		// Every finding was read at its source and every one is a real unnecessary brace, mostly
+		// `className={'...'}` where a plain string attribute says the same thing. Unlike the volume
+		// case above, this one DOES ship a fixer and all eleven repairs were verified byte for byte
+		// against the installed 7.37.5 build, so adopting it is one fix run rather than eleven
+		// judgments. It is left off because eleven files changing spelling is still somebody's call
+		// about house style, not because anything about the port is unfinished.
+		"react/jsx-curly-brace-presence": "registered but left off pending a decision about house style: 11 findings across 10 files on the ahra tree, every one verified against the installed 7.37.5 build at the same position and with the same repair text, and all of them mechanically fixable",
+
+		// Registered but deliberately not enabled, because the config already carries a standing
+		// decision against this rule and that decision cannot be seen by the resolver.
+		// the config key `typescript/restrict-template-expressions` reads `"typescript/restrict-template-expressions": "off"`, written
+		// under the old short spelling. `settingFor` matches a key exactly, then trims the RULE NAME
+		// off the CONFIG KEY and requires what remains to end in a slash; the old key is SHORTER
+		// than the full name, so the trim is a no-op and the branch never fires. Measured rather
+		// than read: `"typescript/restrict-template-expressions".endswith("@typescript-eslint/restrict-template-expressions")`
+		// is false.
+		//
+		// So enabling this would reverse somebody's decision through a spelling difference, with
+		// nothing in the diff to show a decision was reversed. The port is complete and its
+		// eighty six imported cases pass; turning it on is a decision for whoever wrote that line.
+		"@typescript-eslint/restrict-template-expressions": "registered but left off because the config key `typescript/restrict-template-expressions` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+
+		// Same shape as the entry above, for the same reason and at a different line.
+		// the config key `typescript/no-useless-default-assignment` reads `"typescript/no-useless-default-assignment": "off"`, written
+		// under the old short spelling. The config key is 40 characters and the registered name is 48,
+		// so the key is SHORTER than the name, the trim is a no-op, and the branch never fires.
+		// Measured with two controls that do resolve, rather than read off the brief.
+		"@typescript-eslint/no-useless-default-assignment": "registered but left off because the config key `typescript/no-useless-default-assignment` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+
+		// The same shape as the entry above, and the same reason. the config key `typescript/no-useless-default-assignment` reads
+		// `"typescript/no-duplicate-type-constituents": "off"`, written under the old short
+		// spelling, and the resolver cannot match a key that is shorter than the registered name.
+		// Confirmed by the linter itself rather than by argument: a `--lint` run prints
+		// `config: key "typescript/no-duplicate-type-constituents" matches no registered rule, so
+		// its off never applies`, which is the instrument that now names all thirteen orphans.
+		//
+		// The port is complete and agrees with upstream on all eighty two of its corpus cases plus
+		// fifteen more TypeScript shapes measured against the installed build. The audit puts the
+		// cleanup at three sites and the rule is auto-fixable, so turning it on is cheap; it is
+		// still a decision for whoever wrote that off rather than for a porter.
+		"@typescript-eslint/no-duplicate-type-constituents": "registered but left off because the config key `typescript/no-duplicate-type-constituents` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+
+		// The third of this shape, and the reason is the same one. the config key `typescript/no-duplicate-type-constituents` reads
+		// `"typescript/unbound-method": "off"`, written under the old short spelling. The key is 25
+		// characters and the registered name is 34, so the key is SHORTER than the name, the trim is
+		// a no-op, and the resolver's slash-boundary branch never fires.
+		//
+		// Confirmed by the linter rather than by argument. A `--lint` run prints all three of:
+		//
+		//	rule @typescript-eslint/unbound-method was offered no files
+		//	rule @typescript-eslint/unbound-method is not in the config, so it ran on no files
+		//	key "typescript/unbound-method" matches no registered rule, so its off never applies
+		//
+		// The port is complete and agrees with upstream on two hundred and ten of its two hundred
+		// and eleven corpus cases, plus seventeen further shapes measured against the installed
+		// build. The one disagreement is a union whose constituents reach different arms of the
+		// danger test, where the two type checkers normalize the constituent order differently; it
+		// reports the same node with the same span and the other message, and it is recorded in its
+		// own test rather than smoothed over.
+		//
+		// The audit puts the cleanup at eighteen sites and the rule is not auto-fixable, so turning
+		// it on is a real decision and it belongs to whoever wrote that off rather than to a porter.
+		"@typescript-eslint/unbound-method": "registered but left off because the config key `typescript/unbound-method` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+
+		// The fourth of this shape. the config key `typescript/unbound-method` reads
+		// `"typescript/no-base-to-string": "off"`, again under the old short spelling, and again the
+		// key is shorter than the registered name so the resolver's slash-boundary branch cannot
+		// fire. Confirmed by the linter, which prints that the key matches no registered rule.
+		//
+		// This one was dispatched as an ordinary enable, on the understanding that only its sibling
+		// carried a prior decision. It carries one too, and it is the first entry on the brief's own
+		// list of eight stranded `typescript/` keys, so it gets the same treatment rather than a
+		// different one for having been described differently.
+		//
+		// The port agrees with upstream on all three hundred and seventeen of its corpus cases,
+		// including the rendered message text with its interpolated name and three-valued certainty.
+		// The audit measured fifty-three violations and notes that several are deliberate String()
+		// fallbacks in generic serializers that already branch on typeof, so enabling is a judgment
+		// about those sites rather than a cleanup, and it belongs to whoever wrote the off.
+		"@typescript-eslint/no-base-to-string": "registered but left off because the config key `typescript/no-base-to-string` carries a prior off under the old short spelling, which the resolver cannot match against the full name; enabling would reverse a standing decision invisibly",
+
+		// A THIRD shape: not turned off, and not unmentioned for want of a config layer, but held
+		// back because enabling it is a codebase-wide convention decision rather than a cleanup.
+		//
+		// This rule requires an options object and is INERT without one. Upstream reads its pattern
+		// from `context.options[0]`, and ESLint fills a schema default only into an options object
+		// that is present, so a bare `"error"` makes every listener early-return. Measured on the
+		// installed build with one violating input three ways: no options reports zero, `{}` reports
+		// one, an explicit pattern reports one. `EnableRule.ts` writes a bare `"error"`, which is
+		// exactly the inert state, so enabling it through the usual path would have registered a
+		// rule that lints nothing while looking enforced.
+		//
+		// Registered with RequiresOptions and a decoder that refuses empty input, so that state now
+		// fails loudly with the pattern to write rather than passing silently.
+		//
+		// Left unenabled because the pattern it would enforce is a naming convention for the whole
+		// tree. Measured with the documented default `^(is|has)[A-Z]([A-Za-z0-9]?)+`: 313 findings
+		// across 168 files, spot-checked against the installed build on three files which agreed
+		// exactly. They are correct rather than false: `open`, `modal`, `openOnPress` and
+		// `sessionIdHttpOnlyCookieExists` are all real boolean props that do not start with is or
+		// has. Adopting that convention, choosing a different pattern, or declining is Kirk's call,
+		// and the config line is where he would say so.
+		"react/boolean-prop-naming": "registered but not enabled because it requires an options object and is inert without one, and because its documented default pattern reports 313 findings across 168 files, which is a naming convention for the whole tree rather than a cleanup a porter should choose",
+
+		// A DIFFERENT shape from every entry above it, and the first of its kind in this map.
+		//
+		// The entries above are rules the live config deliberately turned off, where the exemption
+		// records a standing decision. This one is not off; it is unmentioned, because ahra's config
+		// has no `base/` keys at all. `base` is api-phi-health's own lint layer rather than ahra's,
+		// so there is no line anybody wrote for it and nothing to reverse.
+		//
+		// The rule is ported and registered so it exists to be turned on; where it gets enabled is a
+		// question about which trees run base's rules, which is Kirk's to answer rather than a
+		// porter's. Recorded here so that "unmentioned" reads as a pending decision rather than as a
+		// port somebody forgot to wire.
+		"base/inject-type-matches-parameter": "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/no-hand-built-declared-error":  "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/no-global-container":           "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+
+		// Same shape and same reason as the entry above: ahra's config names no base/ rules, so there
+		// is nothing to reverse and nothing anybody has decided yet. The source repository runs this
+		// one at `warn` rather than `error`, which is a severity question for whoever enables it here
+		// and is recorded so the answer is not silently `error` by default.
+		"base/relation-must-be-optional": "registered but not enabled because ahra's config names no base/ rules at all; the source repository runs it at warn rather than error, which is part of the same pending decision",
+
+		// Same shape and same reason as its two siblings above. The source repository runs this one
+		// at error, unlike relation-must-be-optional's warn, which is worth knowing when the pending
+		// decision is finally made rather than discovering it after enabling.
+		"base/orm-column-requires-declare":              "registered but not enabled because ahra's config names no base/ rules at all; the source repository runs it at error, which is part of the same pending decision",
+		"base/no-bare-throw":                            "registered but not enabled because ahra's config names no base/ rules at all; the source repository enforces it, with disable comments carrying reasons at the few places it is waived, so its silence here is the pending decision rather than a judgment about the tree",
+		"base/context-requires-access":                  "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make. This rule additionally ships with NO default requirements, so enabling it without supplying the protected context keys would look enabled while enforcing nothing",
+		"base/no-console":                               "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/orm-column-nullable-parity":               "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/serializable-nullable-parity":             "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/graphql-operation-context-matches-return": "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/graphql-nullable-parity":                  "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/pagination-decorator":                     "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/provider-return-matches-token":            "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/verify-optional-parity":                   "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+		"base/verify-array-parity":                      "registered but not enabled because ahra's config names no base/ rules at all; base is api-phi-health's own lint layer, so which trees enforce it is a decision nobody has made yet rather than one this port should make",
+	}
+
+	rules := All()
+	if len(rules) == 0 {
+		t.Fatal("the registry is empty, so this test proves nothing")
+	}
+
+	var unreachable []string
+	for _, subject := range rules {
+		if _, excused := deliberatelyNotEnabled[subject.Name]; excused {
+			continue
+		}
+		// `StatusOf` rather than `Enabled`, because Enabled collapses two different worlds into
+		// one false. A rule the config turns off is a decision somebody made and recorded; a rule
+		// the config never mentions is a wiring gap. Twelve rules landed deliberately unenabled
+		// tonight, each honouring a standing `off`, and this guard was reporting three of them as
+		// running on nothing alongside genuine gaps. That is a false positive on correct work, and
+		// a guard that cries wolf on the right answer gets ignored on the wrong one.
+		status, _ := resolved.StatusOf(subject.Name)
+		if status == configuration.StatusUnconfigured {
+			unreachable = append(unreachable, subject.Name)
+		}
+	}
+
+	// An exemption is a claim about the world, and the world moves. `import-require-path-alias` is
+	// exempt because the gate's oxlint plugin has no such rule, which is what makes it the
+	// differential's cohere-only control. If somebody adds it to that plugin, the exemption becomes
+	// wrong silently: the guard keeps passing and the rule stays unwired for a reason that no longer
+	// exists.
+	//
+	// So the reason gets checked rather than trusted. This is the same discipline as proving a
+	// detector can fail: an allowlist nobody validates is an allowlist that outlives its premise.
+	const gatePluginPath = "/Users/kirkouimet/Projects/ahra/libraries/structure/libraries/nexus/code-quality/oxlint/OxlintNexusPlugin.mjs"
+	if pluginSource, err := os.ReadFile(gatePluginPath); err == nil {
+		if strings.Contains(string(pluginSource), "import-require-path-alias") {
+			t.Errorf(
+				"the gate's oxlint plugin now defines import-require-path-alias, so exempting it here " +
+					"is no longer correct: it was exempt because the gate could not name it",
+			)
+		}
+	}
+
+	if len(unreachable) > 0 {
+		t.Errorf(
+			"%d registered rules are not mentioned by the live config, so they run on nothing and "+
+				"nobody has said whether they should: %v\n"+
+				"a rule whose name the config cannot resolve passes its own fixtures and lints no "+
+				"files. A rule the config explicitly turns off is not this: that is a decision, and "+
+				"it is reported separately by the run itself as scoped off",
+			len(unreachable), unreachable,
+		)
+	}
+}

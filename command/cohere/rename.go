@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/program"
 	"github.com/system-inc/cohere/internal/rename"
+	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // renameVerbName is the subcommand that triggers a program-wide rename.

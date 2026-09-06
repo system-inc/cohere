@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/fix"
+	"github.com/system-inc/cohere/internal/edit"
 )
 
 // Apply writes a plan to disk, refusing anything it cannot show to be safe.
@@ -103,7 +103,7 @@ func Apply(plan *Plan) (int, error) {
 		builder.WriteString(text[previous:])
 		updated := builder.String()
 
-		if parses, reason := fix.Parses(fileName, updated); !parses {
+		if parses, reason := edit.Parses(fileName, updated); !parses {
 			return 0, fmt.Errorf(
 				"renaming would leave %s unparseable (%s), so nothing was written",
 				fileName, reason,

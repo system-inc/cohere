@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/registry"
+	"github.com/system-inc/cohere/internal/lint/registry"
 )
 
 // The flag exists so a caller can tell a binary that lacks a rule from one whose rule found

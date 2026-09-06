@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/fix"
-	"github.com/system-inc/cohere/internal/prettier"
+	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // formatScope is which files the format phase considers, and how that set was decided.
@@ -307,7 +307,7 @@ func unquoteGitPath(path string) string {
 // counted and named rather than quietly passed over. That is the difference between "formatted 12
 // files" with no denominator and a line that says what was in scope and why, which is the same
 // discipline the skip channel already carries for unhandled file types.
-func scopedTransform(inner fix.Transform, scope formatScope) fix.Transform {
+func scopedTransform(inner edit.Transform, scope formatScope) edit.Transform {
 	if inner == nil {
 		return nil
 	}
@@ -317,7 +317,7 @@ func scopedTransform(inner fix.Transform, scope formatScope) fix.Transform {
 
 	return func(fileName string, text string) (string, error) {
 		if !scope.includes(fileName) {
-			return "", fmt.Errorf("%w: outside the format scope, %s", fix.ErrSkipped, scope.Description)
+			return "", fmt.Errorf("%w: outside the format scope, %s", edit.ErrSkipped, scope.Description)
 		}
 		return inner(fileName, text)
 	}
