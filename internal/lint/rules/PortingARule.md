@@ -2015,6 +2015,39 @@ tree, same flags, differing only in that file — 167 crashed before, 0 after. W
 unit test cannot reach the defect, say so in the test comment and name what did prove
 it, rather than letting a green suite imply coverage it does not have.
 
+### The binary that answered may not be the one you built
+
+**Restored after a consolidation cut it. This has been the highest-cost trap in this setup.**
+
+`go build -o <path>` leaves the previous binary in place when the compile fails, so a broken
+tree does not clear the artifact. The stale binary then answers, and it answers plausibly.
+Measured tonight, with another agent's rule mid-write:
+
+    go build -o $S/probe-bin ./command/cohere   # compile error printed
+    stat -f%z $S/probe-bin                      # unchanged, byte for byte
+    $S/probe-bin --rules | wc -l                # 449, confident and stale
+
+**And it composes with a second trap.** `$?` after a pipe is the exit of the last stage, not
+the build, so `go build ... 2>&1 | head -2` reports success while the build failed. Redirect
+to a file and read the code:
+
+    go build -o "$S/cohere-$NAME" ./command/cohere > "$S/build.log" 2>&1; echo "exit=$?"
+
+Three things must go wrong for a false reading: the pipe hides the failure, the artifact
+survives, and the count looks right. All three happened in one command tonight, and the agent
+nearly reported a clean finish from it.
+
+**The other face of this is the binary the tree resolves.** The ahra tree reaches a linter
+through `node_modules/.bin/`, a symlink to something somebody built earlier, and rebuilding
+into your scratchpad does not update it. The gap between the two reads as a false negative in
+your rule rather than as two binaries answering, because it moves by exactly the one or two
+rules you just added. Two authors once found that symlink pointing at a binary inside their
+own session's scratchpad which they had never built: the path looked like theirs, which is
+exactly what disarms the check.
+
+Same shape as everything in this document: **take the measurement from the thing, not from
+something adjacent to it.**
+
 ## 11. The gate
 
     go build ./... && go test -count=1 ./...
