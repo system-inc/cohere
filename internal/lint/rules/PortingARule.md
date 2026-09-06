@@ -3,6 +3,15 @@
 You are porting one ESLint rule to this tree. Read this document once before you
 start, then work the numbered steps in order.
 
+**Notice how it is weighted, because the weighting is the argument.** Step 6, write the
+rule, is eight lines. The sections on proving your fixtures can see, on crossing the
+config boundary, on running dry against real source, and on the gate are together about
+a thousand. That is not neglect of the interesting part. Rules here are mostly
+straightforward and the instruments that tell you whether one works are mostly not, so
+almost every defect this document records was a correct-looking measurement rather than a
+hard piece of logic. Read it and you should come away primed to distrust your own
+instrument before you distrust the rule.
+
 Two things to know before step 1.
 
 **If the substrate is genuinely absent, the deliverable changes from a port to a
