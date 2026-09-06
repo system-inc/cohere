@@ -18,7 +18,7 @@ const duplicatePropsFile = "/repository/source/Duplicate.tsx"
 //
 // Every case in the two blocks below is verbatim from
 // `oxc/crates/oxc_linter/src/rules/react/jsx_no_duplicate_props.rs`, pulled with
-// `tools/extract_oxc_fixtures -dump` and written into this file by a script rather than by hand, so
+// oxc's inline Tester block and written into this file by a script rather than by hand, so
 // no transcription step existed that could cook an escape. One Tester block, 12 pass and 9 fail,
 // and the snapshot records 9 diagnostics from those 9 inputs, so one finding per input is measured
 // here rather than assumed.

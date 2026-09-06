@@ -7,7 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
-// Corpus imported verbatim from oxc's inline Tester block by tools/extract_oxc_fixtures
+// Corpus imported verbatim from oxc's inline Tester block from its inline Tester block
 // -dump, then written by a script rather than by hand. The brief requires the bytes on disk
 // to equal the bytes upstream, and three porters have now found their own reading pass over
 // escape sequences insufficient, so a checker compares them mechanically below.

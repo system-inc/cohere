@@ -6,7 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/rule_testing"
 )
 
-// The corpus below is oxc's own, extracted verbatim by `tools/extract_oxc_fixtures -dump` and
+// The corpus below is oxc's own, extracted verbatim from its inline Tester block -dump` and
 // written through a generator rather than typed, so no escape sequence passes through a shell or a
 // heredoc on the way in. Every string here is byte-identical to the Rust source it came from; the
 // verification script that established that is recorded in the commit message.

@@ -18,7 +18,7 @@ const childrenPropFile = "/repository/source/Children.tsx"
 // The corpus is oxc's, copied rather than rewritten.
 //
 // Every case below is verbatim from `oxc/crates/oxc_linter/src/rules/react/no_children_prop.rs`,
-// pulled with `tools/extract_oxc_fixtures -dump` and written into this file by a script rather than
+// pulled from oxc's inline Tester block and written into this file by a script rather than
 // by hand, so no transcription step existed that could cook an escape. One Tester block, 38 pass
 // and 15 fail, and the snapshot records 15 diagnostics from those 15 inputs, so one finding per
 // input is measured here rather than assumed.

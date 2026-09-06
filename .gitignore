@@ -32,14 +32,14 @@
 /generate_descriptor_base
 /generate_descriptor_table
 /generate_framework_variants
-/generate_shims
+/generate_typescript_shims
 /generate_statics
 /generate_syntax_tree
 /generate_theme
 /generate_utility
 /generate_value_parser
 /generate_variant
-/stage_dispatcher
+/build_dispatcher_npm_package
 /vendor_prettier_bundles
 /vendor_react_fixtures
 /dist/

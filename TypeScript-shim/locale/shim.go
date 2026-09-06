@@ -1,6 +1,6 @@
 // Package locale re-exports typescript-go's diagnostic locale type.
 //
-// Hand-written rather than generated, for the same reason the parser and format shims are: generate_shims
+// Hand-written rather than generated, for the same reason the parser and format shims are: generate_typescript_shims
 // covers the packages a headless linter needs, and until a diagnostic had to be rendered this was not
 // among them.
 //
