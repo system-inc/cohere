@@ -414,6 +414,25 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		"default-case":           "ported and registered, not enabled: 62 findings over 3,540 files, so enabling it is a scheduled cleanup rather than a guardrail. Audited No, and that refusal was about enabling rather than about the port",
 		"func-name-matching":     "ported and registered, not enabled: 178 findings over 3,540 files, so enabling it is a scheduled cleanup rather than a guardrail. Audited No, and that refusal was about enabling rather than about the port",
 		"class-methods-use-this": "ported and registered, not enabled: 217 findings over 3,540 files (the audit said 194; the tree grew, and the new count agrees with ESLint on all 1,163 files it touches). Audited No, and that refusal was about enabling rather than about the port",
+		// Three stylistic core rules, registered and left unenabled. Same shape as the four above:
+		// each has a real cost on this tree, so enabling one is a scheduled cleanup rather than a
+		// guardrail somebody can flip on.
+		//
+		// Counts measured 2026-09-06 over 3,540 files, and each was differentially compared against
+		// ESLint driving the same rule over the same files. All three agree exactly:
+		//
+		//	no-plusplus           616 findings, 221 files, eslint agrees to the finding
+		//	no-continue         1,191 findings, 330 files, eslint agrees to the finding
+		//	no-inline-comments  3,979 findings, 1,304 files, eslint agrees on every dense file
+		//
+		// `no-inline-comments` is the largest and the count is load-bearing on two shelf fixes
+		// landed alongside it: the comment scanner could not see a comment alone inside a JSX
+		// expression, nor one after the last element of a comma-terminated list. Before those, the
+		// rule was silent on 31 of its own 49 corpus cases and under-reported here by 73. Both fixes
+		// are committed separately and the full-tree control shows no other rule's count moved.
+		"no-plusplus":        "ported and registered, not enabled: 616 findings over 3,540 files. Enabling it is a scheduled cleanup rather than a guardrail, and `++` in a for-loop update is idiomatic enough that the allowForLoopAfterthoughts option is probably the real question",
+		"no-continue":        "ported and registered, not enabled: 1,191 findings over 3,540 files, which is a control-flow convention for the whole tree rather than a defect class",
+		"no-inline-comments": "ported and registered, not enabled: 3,979 findings over 3,540 files, the largest count in this batch. A trailing-comment convention is a formatting decision, and at this volume it is Kirk's call rather than a porter's",
 	}
 
 	rules := All()
