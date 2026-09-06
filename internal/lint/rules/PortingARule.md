@@ -1734,6 +1734,58 @@ reported "survived" and the honest answer was "survives most of the time". If yo
 iterates a map and the mutant reorders it, score it several times before writing the
 equivalence argument.
 
+### Mutation results are evidence about FIXTURES, not about the parser
+
+Everything above establishes that a sweep proves a fixture set can see. Here is the next
+thing, and it is a different claim: **a sweep proves nothing whatsoever about the
+substrate.** Reading it as though it does produces a confident wrong belief about how the
+AST behaves, and one that survives its own author's review, because mutation evidence
+feels like measurement.
+
+The shape first, because it generalises past the instance:
+
+    a SURVIVING mutant   your fixtures cannot discriminate this change
+    a CAUGHT mutant      your fixtures can discriminate this change
+
+Both are statements about the discriminating power of a corpus. Neither is a statement
+about what the parser returns, what a node kind contains, or what a helper answers. The
+only instrument for those is a probe that asks the parser and prints what comes back.
+
+**Measured, and the author had it backwards for two commits.** A rule needed a private
+class member's name spelled the way `exceptMethods` entries are written, `#foo`. Upstream
+builds it as `hashIfNeeded + name` because ESTree's `key.name` omits the hash, so the port
+guarded with `if !strings.HasPrefix(text, "#")`. Two mutations were then run:
+
+    remove the guard entirely          SURVIVED
+    add the hash unconditionally       CAUGHT by 7 assertions
+
+The author read that pair as "the condition is dead and the body is load-bearing,
+therefore `Text()` omits the hash", simplified the code to `"#" + name.Text()`, and broke
+two fixtures. A five-line probe rule printing `name.Text()` for a private identifier
+answered `"#foo"`: the hash was already there, the guard was correct, and its condition is
+simply always true in this tree.
+
+**Both mutation results are consistent with either belief**, which is why the pair could
+not settle it and why the wrong reading felt supported. The survivor says the fixtures
+cannot see the guard removed; that is equally true whether the guard is redundant or
+whether removing it happens to leave behavior unchanged for another reason. The caught
+mutant says the fixtures can see a doubled hash; that is equally true whether `Text()`
+supplies the hash or the code does.
+
+So when a sweep tempts you into a claim of the form "therefore the AST does X", stop and
+write the probe. It is two minutes, it cannot be misread, and the alternative is a
+simplification that compiles, reads better, and is wrong.
+
+**The corollary for equivalence arguments.** A survivor you intend to write off as
+equivalent needs a reason stated in terms of the CODE -- this branch is unreachable, these
+two expressions compute the same value -- and that reason has to be established
+independently. "It survived, so it must be redundant" is the inference this section exists
+to stop. Elsewhere in this document a porter emptied two arms of `default-param-last`,
+watched both survive, and found the arms genuinely reachable because the parser recovers
+from illegal source. Same lesson from the other direction: the mutant was right that the
+fixtures were blind, and wrong about why.
+
+
 ## 7b. If the rule's judgment is a matcher, the corpus is not enough
 
 **A corpus tests a matcher only on inputs upstream thought of.** That sentence is the
