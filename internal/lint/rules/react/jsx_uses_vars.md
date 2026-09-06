@@ -42,8 +42,9 @@ marking surface. The stronger reason is below.
 Upstream needs this rule because `eslint-scope` does not connect a JSX element name to its
 declaration. Ours does.
 
-Measured with a probe at `internal/jsx_uses_vars_probe/`, since removed, driving this repository's
-own `no-unused-vars` over **upstream's own corpus for this rule**:
+Measured with a probe at `internal/jsx_uses_vars_probe/`, which is **still in the tree and still
+runnable**, driving this repository's own `no-unused-vars` over **upstream's own corpus for this
+rule**:
 
 | | |
 |---|---|
@@ -61,5 +62,8 @@ flagged, and porting it would add a rule that reports nothing and changes nothin
 ### What would reopen this
 
 A change to how `no-unused-vars` resolves references, such that a binding used only as a JSX tag
-name starts being reported. The probe above is the test for it, and re-creating it is a ten-minute
-job from upstream's corpus.
+name starts being reported.
+
+The probe is kept rather than deleted precisely so that this does not depend on anyone re-reading
+this document. It is an ordinary test: `go test ./internal/jsx_uses_vars_probe/` goes red the day
+the decline stops being correct. A paragraph cannot do that.

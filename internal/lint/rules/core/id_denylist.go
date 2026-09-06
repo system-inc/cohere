@@ -189,9 +189,10 @@ var messageIdDenylistRestrictedPrivate = rule.Message{
 //	node .../globalcount.cjs id-denylist id-denylist.json
 //	  -> id-denylist: the global exemption changes 13/145 corpus verdicts
 //
-// The checker answers the same question, and better, through `identifierIsShadowed`: a name whose
-// symbol has a declaration in a real source file is ours, and everything else is the environment's.
-// Measured against the checker over all thirteen shapes, the four resolution outcomes are:
+// The checker answers the same question through `idDenylistIsReferenceToGlobalVariable` below.
+// Reaching for `identifierIsShadowed`, the helper already in this package, is the obvious move and
+// it is WRONG here by exactly one row -- see that function's own comment for the measurement.
+// Over all thirteen shapes, the four resolution outcomes are:
 //
 //	nil symbol                  not shadowed  -> the environment's  -> exempt
 //	zero declarations           not shadowed  -> the environment's  -> exempt (undefined)
@@ -200,7 +201,9 @@ var messageIdDenylistRestrictedPrivate = rule.Message{
 //
 // **Where it diverges, and why the divergence is not repairable here.** ESLint lets a config
 // DECLARE globals that the code never mentions -- `languageOptions.globals: {myGlobal: "readonly"}`
-// and the `/* global myGlobal */` comment directive. Nine corpus cases turn on that surface, and
+// and the `/* global myGlobal */` comment directive. Eight corpus cases turn on that surface, five
+// of which actually diverge -- they are pinned one by one, at MEASURED verdicts, in
+// TestIdDenylistDivergesOnTheEslintGlobalsSurface. And
 // cohere has no counterpart to it: `CohereSettings.json` carries no globals key, and the checker's
 // answer comes from the lib and `@types` a file is actually compiled against. So for a name that is
 // neither declared in source nor declared by any lib, upstream can be told it is a global and this

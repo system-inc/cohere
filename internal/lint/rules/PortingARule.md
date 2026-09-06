@@ -1690,6 +1690,83 @@ SEGMENT never matches.** The constraint belongs on the segment, not on the wildc
 that says so at the line, because the next reader's instinct will be the wrong one and
 the fix that follows from it passes the failing case.
 
+## 7c. Your fixtures never cross the config boundary, so they cannot test your decoder
+
+**Every fixture reaches your decoder with bytes the TEST built. The config layer builds
+different bytes.** That sentence is the whole section, and it names a blindness neither
+of the two instruments above can reach.
+
+The mutation sweep proves your fixtures can SEE. The adversarial cross product proves
+they are pointed at enough INPUTS. **Neither can see this one at all**, because the
+defect does not live in the rule or in its corpus. It lives on the boundary between the
+config layer and the rule, and a fixture never crosses that boundary: it hands the
+decoder a literal it wrote itself, so the decoder is exercised on the shape the fixture
+author already believed in.
+
+The mechanism is one line. `internal/lint/configuration/configuration.go` parses a rule
+setting as `["severity", <options>]` and keeps exactly one element:
+
+    setting.Options = tuple[1]
+
+ESLint does not. `context.options` is **every** element after the severity, so an
+upstream rule with more than one option reads a variadic list where cohere reads a single
+JSON value. Any rule whose upstream option surface is variadic is therefore configured
+differently here, and its decoder has to accept the cohere shape or it is wrong on every
+real config while being right on every fixture.
+
+Measured, on two rules ported together, and the pair is the point because **they fail in
+opposite directions:**
+
+    id-denylist   ["error", "data", "err", "cb"]              upstream's variadic spelling
+                  decoder receives  "data"                     a bare string, not a list
+                  -> rule configuration: rule id-denylist: decoding []string:
+                     json: cannot unmarshal string into Go value of type []string
+
+    id-match      ["error", "^[a-z]+$", { "properties": true }]
+                  decoder receives  "^[a-z]+$"                 the flag object is GONE
+                  -> no error. The pattern arrives, the rule runs, reports, and looks
+                     configured, with every option silently off.
+
+**The loud one is the lucky one.** `id-denylist` refused to start, which is a failure
+nobody can ship past. `id-match` is the shape this repository exists to refuse: a rule
+that registers, passes a complete fixture pair in both directions, survives a full
+mutation sweep, appears in `--rules`, and enforces something other than what the config
+says. Its corpus has 100 cases and 52 of them carry `properties: true`; every one still
+passed, because every one reached the decoder through the test's own bytes.
+
+**The instrument is a dry run against the real tree, through the real config layer**, and
+it is the only one that sees this. Not `go test`. Not the sweep. Seed a small tree with a
+config that actually exercises your options, and read what comes back:
+
+    <scratchpad>/probetree/CohereSettings.json     {"rules": {"<your rule>": ["error", <options>]}}
+    <scratchpad>/probetree/tsconfig.json           the harness tsconfig, copied
+    <scratchpad>/probetree/source/Probe1.ts        source that must report
+    <scratchpad>/probetree/source/Probe2.ts        source that must not
+
+    cd <scratchpad>/probetree && <your binary> --no-fix --lint
+
+The second file is not optional. A configured rule that reports on everything and one
+that reports on the right things look identical from the first file alone, and a decoder
+that silently dropped your options usually still reports SOMETHING.
+
+Then write the contract into the test suite, because a dry run is a thing you did once
+and a fixture is a thing that keeps being true. The rows to pin are the shapes the config
+layer can actually deliver:
+
+    ["error", ["data", "err"]]      the cohere spelling: one options value after the severity
+    ["error", "data"]               upstream's variadic form, collapsed to its first element
+    ["error", []]                   explicitly empty
+    a shape that is neither         must ERROR, never decode to an empty configuration
+
+That last row matters more than it looks. A decoder that answers "no options" to a
+malformed config produces exactly the inert rule this section is about, one layer further
+in. Refuse instead.
+
+**The general form, for any rule with an option surface:** upstream's spelling of its
+options is not necessarily the spelling this tree can hand you. Check `meta.schema` for
+how many elements it declares, and if the answer is more than one, your decoder has a
+second shape to accept and your fixtures cannot tell you whether it does.
+
 ## 8. Assert spans, not just message ids
 
 **`ExpectFindings` asserts message ids and count and nothing else.** A rule whose
