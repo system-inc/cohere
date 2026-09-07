@@ -114,7 +114,7 @@ var messageArrayCallbackPrependVoid = rule.Message{
 // return true; })` reports and `foo.every(function() { if (a) return true; else return false; })`
 // does not, and the difference is whether any path reaches the closing brace. Upstream asks
 // `isAnySegmentReachable(funcInfo.currentSegments)` at the function's exit, which is code path
-// analysis. `internal/utilities/controlflow` answers exactly that question with `Graph.EndReachable`,
+// analysis. `internal/lint/ecmascript/control_flow_graph` answers exactly that question with `Graph.EndReachable`,
 // whose doc comment names this as the question it exists for, so this rule is a caller rather than
 // a reimplementation.
 //

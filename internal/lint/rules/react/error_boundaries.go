@@ -63,7 +63,7 @@ var messageJsxInTryStatement = rule.Message{
 // parent chain already answers, is the cargo cult that clause names.
 //
 // **Stated plainly because this rule was the first consumer of the dominator tree and the dataflow
-// solver added in `internal/utilities/controlflow`, and used neither.** Both were read first. Dominance
+// solver added in `internal/lint/ecmascript/control_flow_graph`, and used neither.** Both were read first. Dominance
 // answers "must control pass through A to reach B", which is a question about paths; this rule asks
 // "is B written inside A", which is a question about text, and a try block does not dominate its own
 // body in any useful sense once a throw edge exists. A dataflow would carry an "inside a try" bit

@@ -66,7 +66,7 @@ var messageUnreachableLoop = rule.Message{
 // `isAnySegmentReachable` says the position it stands at is reachable; `Program:exit` reports
 // whatever was recorded and never had a loop event.
 //
-// `internal/utilities/controlflow` answers all three. Its `Loop` hook is documented as running "where
+// `internal/lint/ecmascript/control_flow_graph` answers all three. Its `Loop` hook is documented as running "where
 // control flows back into a loop for another iteration of it" and it is handed the loop node
 // directly, so upstream's `loopsByTargetSegments` map from segment to loop has no counterpart here:
 // the event already names its loop. `Builder.Current().Reachable` is the reachability question, at

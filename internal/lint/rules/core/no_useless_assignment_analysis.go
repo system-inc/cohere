@@ -63,7 +63,7 @@ type deadStoreEvent struct {
 // question, and a function body starts a fresh flow graph with no antecedent path to the enclosing
 // writes at all.
 //
-// `internal/utilities/controlflow` supplies forward `Successors`, so the question is asked in the
+// `internal/lint/ecmascript/control_flow_graph` supplies forward `Successors`, so the question is asked in the
 // direction it is posed. Measured against the same imported corpus, that recovers the update
 // expressions, the destructuring targets, and the try-block kills the inversion had to decline.
 func analyzeDeadStoresByLiveness(ctx rule.Context, sourceFile *ast.Node) {

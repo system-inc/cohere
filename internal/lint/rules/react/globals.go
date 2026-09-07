@@ -526,7 +526,7 @@ func isInsideCatchOrFinally(node *ast.Node, root *ast.Node) bool {
 // `return <div />; g = 1;` is silent upstream, measured with a control. This reproduces the shape
 // the corpus and the probes exercise rather than real reachability: only a sibling statement in the
 // same list is considered, and only the four completions that end a block. A full answer belongs in
-// `internal/utilities/controlflow` rather than here, and this rule does not need one, since unreachable
+// `internal/lint/ecmascript/control_flow_graph` rather than here, and this rule does not need one, since unreachable
 // code after a return is the only form either upstream's corpus or these probes produce.
 func followsAnAbruptCompletion(node *ast.Node, root *ast.Node) bool {
 	for current := node; current != nil && current != root; current = current.Parent {

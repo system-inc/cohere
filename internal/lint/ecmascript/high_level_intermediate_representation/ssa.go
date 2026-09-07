@@ -13,7 +13,7 @@
 // a lookup actually crosses a join with disagreeing predecessors, which means it never places one
 // that redundancy elimination would immediately remove, and it needs no dominance frontier at all.
 //
-// That last point is why this does not consume `internal/utilities/controlflow`'s dominator tree.
+// That last point is why this does not consume `internal/lint/ecmascript/control_flow_graph`'s dominator tree.
 // `AnalyzeDominators` is generic over `control_flow_graph.Graph[E]` and `control_flow_graph.Block[E]`, which are
 // that package's own types; this graph is `Function` and `BasicBlock`. There is no conversion, and
 // writing one would mean materialising a second graph purely to compute a frontier this algorithm
@@ -21,7 +21,7 @@
 // computed there, over this graph, for checking rather than for construction.
 //
 // Stated plainly for the next pass built on this IR, because it is easy to plan around the wrong
-// answer: NOTHING in `internal/utilities/controlflow` applies to this graph without a conversion that
+// answer: NOTHING in `internal/lint/ecmascript/control_flow_graph` applies to this graph without a conversion that
 // does not exist. Its dominators, its dataflow solver, and its path analysis are all generic over
 // `Graph[E]`. A pass here that wants any of them either writes the conversion or, as this does,
 // computes what it needs over `Function.Blocks`, which is already in reverse postorder.

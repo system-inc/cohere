@@ -10,7 +10,7 @@
 //
 // # The decision this package makes, and why
 //
-// cohere already has a basic-block control-flow graph in `internal/utilities/controlflow`, with
+// cohere already has a basic-block control-flow graph in `internal/lint/ecmascript/control_flow_graph`, with
 // predecessor edges, a dominator tree, and a monotone dataflow solver. It also has a resident
 // whole-program type checker. The obvious move was therefore a thin IR: keep pointing at AST nodes,
 // lean on the existing graph for control flow, and add only the value naming on top. That would be

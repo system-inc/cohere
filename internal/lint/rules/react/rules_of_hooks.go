@@ -177,7 +177,7 @@ var (
 //
 // # The control-flow graph, and the one place it does not answer the question
 //
-// This is the first rule in the catalog to consume `internal/utilities/controlflow`, which is a
+// This is the first rule in the catalog to consume `internal/lint/ecmascript/control_flow_graph`, which is a
 // basic-block graph vendored from rslint whose block layout deliberately mirrors ESLint's own code
 // path analysis. Whether that mirroring actually holds for the shapes this rule turns on had never
 // been tested, so it was probed against both oracles before anything was built on it. Sixteen

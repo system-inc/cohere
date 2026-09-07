@@ -51,7 +51,7 @@ var messageNoUselessAssignment = rule.Message{
 // candidate write. That is the same predicate computed from the edges that existed, and it worked
 // well enough to reproduce 33 of upstream's 54 diagnostics.
 //
-// `internal/utilities/controlflow` now supplies a real basic-block graph with forward `Successors`, so
+// `internal/lint/ecmascript/control_flow_graph` now supplies a real basic-block graph with forward `Successors`, so
 // the question is asked in the direction it is posed and this is upstream's shape rather than a
 // reconstruction of it. The analysis lives in `no_useless_assignment_analysis.go`.
 //

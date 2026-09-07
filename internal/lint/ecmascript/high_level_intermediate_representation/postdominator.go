@@ -4,7 +4,7 @@
 // at `oxc_react_compiler/src/react_compiler_hir/dominator.rs`. Cooper, Harvey and Kennedy, "A
 // Simple, Fast Dominance Algorithm", run over the REVERSED graph with one synthetic exit.
 //
-// # Why this is here rather than borrowed from internal/utilities/controlflow
+// # Why this is here rather than borrowed from internal/lint/ecmascript/control_flow_graph
 //
 // `controlflow` has both pieces and neither is reachable. `AnalyzeDominators` is generic over
 // `control_flow_graph.Graph[E]` and `control_flow_graph.Block[E]`, whose `index`, `final` and `thrown` fields are
