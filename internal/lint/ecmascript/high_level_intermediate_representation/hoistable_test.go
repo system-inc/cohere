@@ -794,8 +794,9 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// 28/28 positive and 69/69 clean, so the movement is pinned as a corrected input order rather
 	// than accepted from this distribution alone. After the loop-header correction, state freezing
 	// moves 625/2841 to 631/3043; STATE_EFFECTS.md accounts for all added and removed scope inputs.
-	if deep != 631 || flat != 3043 {
-		t.Errorf("got %d deep and %d flat dependencies, want 631 and 3043; a SMALL move here is "+
+	// Effect-hook freezing moves those to 649/3118, attributed in EFFECT_HOOK_EFFECTS.md.
+	if deep != 649 || flat != 3118 {
+		t.Errorf("got %d deep and %d flat dependencies, want 649 and 3118; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

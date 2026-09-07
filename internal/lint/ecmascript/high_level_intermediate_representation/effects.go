@@ -1279,6 +1279,14 @@ func lookupSignature(function *Function, instruction *Instruction, name string) 
 	if origin.Module == "react" && origin.Export == "useState" {
 		return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: EffectValueFrozen}, true
 	}
+	if origin.Module == "react" {
+		switch origin.Export {
+		case "useEffect":
+			return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: EffectValuePrimitive}, true
+		case "useLayoutEffect", "useInsertionEffect":
+			return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: EffectValueFrozen}, true
+		}
+	}
 	if name == "" {
 		return effectSignature{}, false
 	}

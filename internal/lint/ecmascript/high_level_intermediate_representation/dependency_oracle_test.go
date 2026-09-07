@@ -271,7 +271,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// are the base and fork copies of `optional-member-expression-inverted-optionals-parallel-paths`:
 	// both now resolve `props.a.b.c.d.e` instead of stopping at `props.a.b`. Their dependency counts
 	// are unchanged, so this is path precision rather than new over-production.
-	const knownMatched = 81
+	const knownMatched = 82
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
@@ -287,7 +287,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	//
 	// So a rise is asserted as loudly as a fall. Raise this deliberately, alongside the floor, when
 	// collection genuinely improves.
-	const knownMatchedCeiling = 81
+	const knownMatchedCeiling = 82
 	if matched > knownMatchedCeiling {
 		t.Errorf("matched %d of %d golden dependencies, UP from %d, which this test treats as "+
 			"suspect rather than good: the usual cause is the pattern above reading upstream's "+
@@ -415,7 +415,9 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// `array-pattern-spread-creates-array`; matched does not fall. This is three fewer dependencies
 	// upstream does not name, so that equality was tightened. State freezing subsequently exposes
 	// one raw setState dependency, pruned before validation; STATE_EFFECTS.md attributes the +1.
-	const knownOursTotal = 124
+	// Effect freezing adds exactly the golden ref dependency in ref-like-name-in-effect: 125 total,
+	// 82 matched. EFFECT_HOOK_EFFECTS.md records the unchanged remaining fixture lists.
+	const knownOursTotal = 125
 	if upstreamTotal != knownUpstreamTotal {
 		t.Errorf("upstream total is %d, want %d; the corpus or the cache-slot spelling changed and "+
 			"every count below is against a different population", upstreamTotal, knownUpstreamTotal)
