@@ -47,3 +47,67 @@ func TestSettingForStillReconcilesABarePluginRule(t *testing.T) {
 		t.Error("a bare registry name no longer finds its prefixed config entry")
 	}
 }
+
+/*
+ * Option elements after the first survive parsing rather than being dropped.
+ *
+ * eslint's wire format is `[severity, ...options]`, and several core rules use more than one
+ * element: `eqeqeq` is `['error', 'always', { null: 'ignore' }]`. `parseRuleSetting` kept
+ * `tuple[1]` and discarded the rest, so such an entry was accepted and silently did nothing beyond
+ * its first option, which is the worst available outcome for a configuration file: the author sees
+ * their setting in the file, the tool reports no error, and half the setting has no effect.
+ *
+ * Measured before the repair: a config carrying `["error", "always", {"null": "ignore"}]` resolved
+ * its options to the string `"always"` alone.
+ *
+ * The exposure on the ahra tree was zero, since no rule there carries more than one option element,
+ * so this was latent rather than live. It was repaired anyway because the failure mode is silence,
+ * and a silent config defect is discovered by someone spending an afternoon on why their second
+ * option does nothing.
+ *
+ * The single-option case below is the load-bearing half. `Options` is read by 120 decoders as the
+ * first element alone, so a repair that widened that field to carry the whole array would break
+ * every one of them, and a table testing only the multi-option case would not notice.
+ */
+func TestParseRuleSettingKeepsOptionsAfterTheFirst(t *testing.T) {
+	t.Parallel()
+
+	for name, testCase := range map[string]struct {
+		body           string
+		wantOptions    string
+		wantAdditional []string
+	}{
+		"twoOptionElements": {
+			body:           `["error", "always", {"null": "ignore"}]`,
+			wantOptions:    `"always"`,
+			wantAdditional: []string{`{"null": "ignore"}`},
+		},
+		"oneOptionElement": {
+			body:        `["error", {"allow": ["warn"]}]`,
+			wantOptions: `{"allow": ["warn"]}`,
+		},
+		"bareSeverity": {
+			body: `"error"`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			setting, err := parseRuleSetting([]byte(testCase.body))
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if got := string(setting.Options); got != testCase.wantOptions {
+				t.Errorf("Options = %s, want %s", got, testCase.wantOptions)
+			}
+			if len(setting.AdditionalOptions) != len(testCase.wantAdditional) {
+				t.Fatalf("AdditionalOptions has %d entries, want %d",
+					len(setting.AdditionalOptions), len(testCase.wantAdditional))
+			}
+			for index, want := range testCase.wantAdditional {
+				if got := string(setting.AdditionalOptions[index]); got != want {
+					t.Errorf("AdditionalOptions[%d] = %s, want %s", index, got, want)
+				}
+			}
+		})
+	}
+}

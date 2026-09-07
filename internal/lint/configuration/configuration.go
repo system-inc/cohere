@@ -57,6 +57,22 @@ type RuleSetting struct {
 	// are silent. Four rules in the gate cohere replaces were dead for months underneath exactly
 	// that, so the distinction between "no options" and "options I did not read" is kept.
 	Options json.RawMessage
+
+	// AdditionalOptions are the option elements after the first, kept rather than dropped.
+	//
+	// eslint's wire format is `[severity, ...options]` and a handful of core rules use more than one
+	// element: `eqeqeq` is `['error', 'always', { null: 'ignore' }]`, and `no-unused-expressions`
+	// and `camelcase` have the same shape. Every one of cohere's 120 decoders reads `Options` as the
+	// single first element, so widening that field would have to change all of them at once.
+	//
+	// Keeping the remainder here instead means nothing currently reading `Options` changes, and a
+	// decoder that needs the second element has somewhere to find it. Nil for the common case.
+	//
+	// Recorded rather than repaired further because the exposure was measured: no rule in the ahra
+	// configuration carries more than one option element today, so this is a latent defect. The
+	// alternative was to leave the elements dropped, which is the shape where a config entry is
+	// accepted and silently does nothing.
+	AdditionalOptions []json.RawMessage
 }
 
 // Override is a glob-scoped block that changes rule settings for matching files.
@@ -390,6 +406,11 @@ func parseRuleSetting(value json.RawMessage) (RuleSetting, error) {
 	setting := RuleSetting{Severity: severity}
 	if len(tuple) > 1 {
 		setting.Options = tuple[1]
+	}
+	if len(tuple) > 2 {
+		// Everything after the first option element. Previously discarded here, which meant a config
+		// entry could be accepted and silently do nothing beyond its first option.
+		setting.AdditionalOptions = tuple[2:]
 	}
 	return setting, nil
 }
