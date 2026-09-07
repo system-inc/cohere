@@ -95,7 +95,8 @@ func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
 	// precede their continuations, which settles two call/property pairs before this pass sees them.
 	// State freezing exposes Menu's findIndex property/result pair: 61. See STATE_EFFECTS.md.
 	// Effect-hook signatures expose 79 useEffect pairs in 48 more functions: EFFECT_HOOK_EFFECTS.md.
-	const knownChanged = 109
+	// Immutable alias-edge refinement exposes four more functions, listed in IMMUTABLE_ALIAS_EDGES.md.
+	const knownChanged = 113
 	if changed != knownChanged {
 		t.Errorf("the pass changed %d of %d functions, want %d", changed, functions, knownChanged)
 	}

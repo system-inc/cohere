@@ -107,7 +107,20 @@ that were previously internal to a larger scope.
 | useEventSourceSnapshot | 0 | 4 |
 | useTimeSeriesDataWithCache | 0 | 7 |
 
-The private experiment is not a population measurement. The preceding committed
-population is 177; compare a committed repair binary on the same frozen snapshot
-only after the fixtures, structural suite and build pass. Retain added, removed
-and unchanged findings, and adjudicate additions rather than crediting a net drop.
+## Committed population measurement
+
+An archive binary built from `a9b43dd` measures 162 findings on the same frozen
+snapshot, versus 177 at `b9f24f3`: 19 removed, four added, 158 unchanged. The four
+additions occur in `SensationsDashboard.tsx`: one DependencyMutable at 182:11 and
+three ValueUnmemoized occurrences sharing 90:11. React compiler 1.0.0 bails out on
+that function's unsupported `finally`; these additions are unadjudicated, not
+evidence of correctness or of regression.
+
+Of the 162 occurrences, 119 have covering CompileSuccess and are confirmed false
+positives. The other 43 have covering bailouts: 33 Todo, seven Hooks and three
+Suppression. This is a frozen-snapshot comparison, not a fresh live-tree reading.
+The compiler controls remain live, and finding multiplicity is retained.
+
+The archive binary's SHA256 is
+`34b197d8a67d81af71715f7532aefae21e2f3650d59df5d56c5acd9d9d2570c6`.
+Its TypeScript submodule is clean at `1f70213d4922b434345f639b441681e470c7cfc1`.

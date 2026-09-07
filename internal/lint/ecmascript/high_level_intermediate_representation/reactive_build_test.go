@@ -405,9 +405,11 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 	// Correctly classifying for-of headers as loop blocks closes the seven scoped-loop loss cases
 	// and one composite-value case. Alignment now encloses the loop instead of leaving a Scope
 	// terminal inside an initializer or test that `ReactiveValue` cannot represent. The remaining
-	// composite-value cases are unchanged; the genuinely unexplained-loss count stays zero.
+	// composite-value cases initially stayed unchanged. Immutable alias-edge refinement closes
+	// findBottomBarDataKey's one-instruction loss; IMMUTABLE_ALIAS_EDGES.md attributes that movement.
+	// The genuinely unexplained-loss count stays zero.
 	const (
-		knownLostWithValueTerminal = 5
+		knownLostWithValueTerminal = 4
 		knownLostWithScopedLoop    = 0
 		knownDoubleEmitted         = 4
 	)

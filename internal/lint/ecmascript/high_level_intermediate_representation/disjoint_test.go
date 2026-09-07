@@ -763,17 +763,18 @@ export function loopy(limit: number) {
 	// An operand that is settled by this point must NOT be dragged into a class through this
 	// instruction. Dropping `Contains` admits exactly those, which both inflates the member count
 	// and fragments the partition into more, smaller classes. React's reverse-postorder traversal
-	// puts loop bodies before their continuations; under that order the real pass produces 14 members
-	// in 3 classes while the mutant still produces 24 in 6.
+	// puts loop bodies before their continuations. Immutable Assign refinement then leaves the two
+	// primitive initializer copies settled, producing 12 members in 3 classes. The Contains-free
+	// mutant produces 22 in 7; IMMUTABLE_ALIAS_EDGES.md records the removed members.
 	classes := set.Sets()
 	if got := len(classes); got != 3 {
 		t.Errorf("this function forms %d classes, want 3. Dropping the `Contains` half of the "+
-			"operand gate produces 6, because every settled operand joins a class it has no "+
+			"operand gate produces 7, because every settled operand joins a class it has no "+
 			"business in: %v", got, classes)
 	}
-	if got := set.Size(); got != 14 {
-		t.Errorf("this function unifies %d values, want 14. Dropping the `Contains` half of the "+
-			"operand gate produces 24.", got)
+	if got := set.Size(); got != 12 {
+		t.Errorf("this function unifies %d values, want 12. Dropping the `Contains` half of the "+
+			"operand gate produces 22.", got)
 	}
 
 	// Two-sided: a pass that unified nothing would also fail the counts above, so require at least

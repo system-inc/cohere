@@ -1458,7 +1458,11 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					}
 
 				case effect.Kind == AliasingEffectCreateFrom:
-					state.createFrom(index, effect.From, effect.Into)
+					if state.notMutable(effect.From.Identifier) {
+						state.create(effect.Into, aliasingNodeObject)
+					} else {
+						state.createFrom(index, effect.From, effect.Into)
+					}
 					state.deriveImmutable(effect.From.Identifier, effect.Into.Identifier)
 					index++
 
@@ -1480,8 +1484,8 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					state.deriveImmutable(effect.From.Identifier, effect.Into.Identifier)
 					if sourceIsMutable {
 						state.shareIdentity(effect.From.Identifier, effect.Into.Identifier)
+						state.assign(index, effect.From, effect.Into)
 					}
-					state.assign(index, effect.From, effect.Into)
 					index++
 
 				case effect.Kind == AliasingEffectAlias:

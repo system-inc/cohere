@@ -579,6 +579,12 @@ func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
 		{name: "alias mutable values", edge: AliasingEffectAlias, fromKind: EffectValueMutable, intoKind: EffectValueMutable, wantWidened: true},
 		{name: "maybe-alias frozen source", edge: AliasingEffectMaybeAlias, fromKind: EffectValueFrozen, intoKind: EffectValueMutable},
 		{name: "maybe-alias primitive source", edge: AliasingEffectMaybeAlias, fromKind: EffectValuePrimitive, intoKind: EffectValueMutable, wantWidened: true},
+		{name: "create-from frozen source", edge: AliasingEffectCreateFrom, fromKind: EffectValueFrozen, intoKind: EffectValueMutable},
+		{name: "create-from primitive source", edge: AliasingEffectCreateFrom, fromKind: EffectValuePrimitive, intoKind: EffectValueMutable},
+		{name: "create-from mutable source", edge: AliasingEffectCreateFrom, fromKind: EffectValueMutable, intoKind: EffectValueMutable, wantWidened: true},
+		{name: "assign frozen source", edge: AliasingEffectAssign, fromKind: EffectValueFrozen, intoKind: EffectValueMutable},
+		{name: "assign primitive source", edge: AliasingEffectAssign, fromKind: EffectValuePrimitive, intoKind: EffectValueMutable},
+		{name: "assign mutable source", edge: AliasingEffectAssign, fromKind: EffectValueMutable, intoKind: EffectValueMutable, wantWidened: true},
 	}
 
 	for _, testCase := range tests {
