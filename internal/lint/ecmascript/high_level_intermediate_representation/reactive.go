@@ -959,6 +959,12 @@ func (r *reactivity) applyToPlaces(function *Function, isOutermost bool) {
 			EachInstructionPlacePointer(instruction, func(place *Place, role PlaceRole) {
 				r.setPlace(place)
 			})
+			switch value := instruction.Value.(type) {
+			case *FunctionExpression:
+				r.propagateToNested(function.Functions[value.Function], value.Captures)
+			case *ObjectMethod:
+				r.propagateToNested(function.Functions[value.Function], nil)
+			}
 		}
 		EachTerminalPlacePointer(block.Terminal, func(place *Place, role PlaceRole) {
 			r.setPlace(place)
@@ -972,10 +978,6 @@ func (r *reactivity) applyToPlaces(function *Function, isOutermost bool) {
 	for index := range function.Context {
 		r.setPlace(&function.Context[index])
 	}
-
-	for _, nested := range function.Functions {
-		r.propagateToNested(nested)
-	}
 }
 
 // propagateToNested carries the enclosing function's reactive set into a nested function's places.
@@ -985,11 +987,20 @@ func (r *reactivity) applyToPlaces(function *Function, isOutermost bool) {
 // The pairing that actually carries meaning across the boundary is positional, through
 // `Captures[i]` and `Context[i]`, and it is applied here before the walk so a context value inherits
 // its capture's reactivity.
-func (r *reactivity) propagateToNested(nested *Function) {
+func (r *reactivity) propagateToNested(nested *Function, captures []Place) {
 	if nested == nil {
 		return
 	}
-	r.applyToPlaces(nested, false)
+	child := &reactivity{
+		function: nested,
+		reactive: map[IdentifierId]bool{},
+	}
+	for index, capture := range captures {
+		if index < len(nested.Context) && r.reactive[capture.Identifier] {
+			child.reactive[nested.Context[index].Identifier] = true
+		}
+	}
+	child.applyToPlaces(nested, false)
 }
 
 // setPlace writes the settled flag onto one place.
@@ -997,7 +1008,5 @@ func (r *reactivity) setPlace(place *Place) {
 	if place == nil {
 		return
 	}
-	if r.reactive[place.Identifier] {
-		place.Reactive = true
-	}
+	place.Reactive = r.reactive[place.Identifier]
 }
