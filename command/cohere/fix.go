@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/suppression"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -235,6 +236,21 @@ func proposalsForText(
 	}
 	applicable = withoutTypeChecker
 
+	/*
+	 * The same suppression index the lint path builds, for the same reason.
+	 *
+	 * `internal/types/program/walk.go:500` filters a diagnostic through `directives.Suppresses`
+	 * before reporting it. This path did not, so a rule's finding was correctly withheld and its
+	 * FIX was applied anyway: both linters reported nothing on a disabled line and both fixers
+	 * rewrote it. That is worse than either half alone, because the file changes with no diagnostic
+	 * explaining why and the only evidence is in `git diff`.
+	 *
+	 * Demonstrated rather than theorised. `libraries/structure/source/router/hooks/useRouter.ts`
+	 * carries a deliberate `eslint-disable-next-line nexus/import-no-forbidden-source`, and a fixer
+	 * run reverted it, reintroducing a circular import worth 108 findings across five rules.
+	 */
+	directives := suppression.Build(sourceFile.Text())
+
 	var diagnostics []rule.Diagnostic
 	for _, subject := range applicable {
 		currentRule := subject
@@ -245,6 +261,9 @@ func proposalsForText(
 				diagnostic.RuleName = currentRule.Name
 				if diagnostic.SourceFile == nil {
 					diagnostic.SourceFile = sourceFile
+				}
+				if directives.Suppresses(diagnostic.RuleName, diagnostic.Range.Pos()) {
+					return
 				}
 				diagnostics = append(diagnostics, diagnostic)
 			},
