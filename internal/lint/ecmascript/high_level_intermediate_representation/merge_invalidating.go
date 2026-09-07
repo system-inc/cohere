@@ -10,9 +10,8 @@
 // so that every scope can become a block. Without it `assertValidBlockNesting` fails outright.
 //
 // This is pipeline position 482, runs on the TREE, and is an optimisation rather than a
-// precondition. It fuses ADJACENT scopes whose invalidation conditions are identical, so that two
-// scopes recomputing under exactly the same circumstances become one. Nothing breaks if it does not
-// run; the output is merely more granular than upstream's.
+// precondition. It fuses ADJACENT scopes whose invalidation conditions are identical and removes
+// nested scopes that repeat their enclosing scope's dependency set. Both affect memo validation.
 //
 // Confusing the two is easy and the names encourage it. The first asks "do these ranges overlap",
 // the second asks "would these two always recompute together".
@@ -323,9 +322,8 @@ func mergeAllowedInstruction(value InstructionValue) bool {
 //
 // # Nested blocks first
 //
-// Upstream traverses nested blocks before scanning the current one, so an inner merge is already
-// done when the outer scan reaches the statement containing it. Reversing that order would scan a
-// block whose contents are about to change.
+// Upstream traverses nested blocks with the enclosing dependency set before scanning the current
+// one. A nested scope with that same set is replaced by its body, separately from adjacent merges.
 func MergeReactiveScopesThatInvalidateTogether(tree *ReactiveFunction, function *Function,
 	dependencies *ScopeDependencies, typeChecker *shimchecker.Checker) MergeScopesResult {
 	if tree == nil || function == nil || dependencies == nil {
@@ -340,6 +338,7 @@ func MergeReactiveScopesThatInvalidateTogether(tree *ReactiveFunction, function 
 	}
 	tree.Body = merger.mergeBlock(tree.Body)
 	return MergeScopesResult{
+		NestedScopesRemoved:   merger.nestedScopesRemoved,
 		Merges:                merger.merges,
 		DeclarationPruneCalls: merger.declarationPruneCalls,
 		DeclarationsPruned:    merger.declarationsPruned,
@@ -354,6 +353,7 @@ func MergeReactiveScopesThatInvalidateTogether(tree *ReactiveFunction, function 
 // `updateScopeDeclarations` exactly once per merge, so any refactor that drops the call or moves it
 // behind a guard breaks that equality rather than passing silently.
 type MergeScopesResult struct {
+	NestedScopesRemoved int
 	// Merges is how many scopes were absorbed into a survivor.
 	Merges int
 	// DeclarationPruneCalls is how many times the declaration pruning ran, which must equal Merges.
@@ -364,10 +364,12 @@ type MergeScopesResult struct {
 }
 
 type scopeMerger struct {
-	function     *Function
-	dependencies *ScopeDependencies
-	typeChecker  *shimchecker.Checker
-	usage        *LastUsage
+	parentScope         *ScopeId
+	nestedScopesRemoved int
+	function            *Function
+	dependencies        *ScopeDependencies
+	typeChecker         *shimchecker.Checker
+	usage               *LastUsage
 	// temporaries resolves a StoreLocal chain, so a value copied into a temporary is still
 	// recognised as the earlier scope's output. See `declaredByOrAliasedFrom`.
 	temporaries map[DeclarationId]DeclarationId
@@ -393,14 +395,28 @@ type mergeCandidate struct {
 func (m *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 	// Nested blocks first, so an inner merge is settled before the outer scan reads the statement
 	// holding it.
+	rebuilt := make(ReactiveBlock, 0, len(block))
 	for _, statement := range block {
 		switch shape := statement.(type) {
 		case *ReactiveScopeBlock:
+			parent := m.parentScope
+			if !shape.Pruned {
+				scope := shape.Scope
+				m.parentScope = &scope
+			}
 			shape.Instructions = m.mergeBlock(shape.Instructions)
+			m.parentScope = parent
+			if !shape.Pruned && parent != nil && AreEqualDependencies(m.dependencies.DependenciesOf(*parent), m.dependencies.DependenciesOf(shape.Scope)) {
+				m.nestedScopesRemoved++
+				rebuilt = append(rebuilt, shape.Instructions...)
+				continue
+			}
 		case *ReactiveTerminalStatement:
 			m.mergeTerminalBlocks(shape)
 		}
+		rebuilt = append(rebuilt, statement)
 	}
+	block = rebuilt
 
 	var candidate *mergeCandidate
 	var committed []mergeCandidate

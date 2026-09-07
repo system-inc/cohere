@@ -468,11 +468,11 @@ func AnalyzePreservedManualMemoization(function *Function,
 		return nil
 	}
 
-	MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, typeChecker)
 	nonEscaping := PruneNonEscapingScopesWithScopes(tree, function, dependencies, scopes, typeChecker)
-	PruneUnusedScopes(tree, dependencies)
-	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 	PruneNonReactiveDependencies(tree, function, dependencies)
+	PruneUnusedScopes(tree, dependencies)
+	MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, typeChecker)
+	PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 
 	// The third firing condition, on. This gate was closed and the reason it was closed is gone.
 	//
