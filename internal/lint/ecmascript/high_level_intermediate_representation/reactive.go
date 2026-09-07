@@ -585,11 +585,16 @@ func useRefResultValues(function *Function) map[IdentifierId]bool {
 			if instruction == nil {
 				continue
 			}
-			call, ok := instruction.Value.(*CallExpression)
-			if !ok {
+			var callee Place
+			switch call := instruction.Value.(type) {
+			case *CallExpression:
+				callee = call.Callee
+			case *MethodCall:
+				callee = call.Property
+			default:
 				continue
 			}
-			if calleeName(function, instruction, call.Callee) == "useRef" {
+			if calleeName(function, instruction, callee) == "useRef" {
 				refs[instruction.LValue.Identifier] = true
 			}
 		}
