@@ -732,6 +732,15 @@ func diagnosticMessage(diagnostic *ast.Diagnostic) string {
 
 // printRuleDiagnostic prints one rule finding in the same shape, with the rule name where the error
 // code goes — a reader should not have to learn two formats.
+// singleLineDescription collapses a message's internal newlines so one finding prints as one line.
+//
+// Named rather than inlined so a test can hold it. A test asserting `strings.ReplaceAll` on its own
+// input passes whatever the printer does, which is a test of the standard library rather than of
+// this program.
+func singleLineDescription(description string) string {
+	return strings.ReplaceAll(description, "\n", " ")
+}
+
 func printRuleDiagnostic(diagnostic rule.Diagnostic) {
 	sourceFile := diagnostic.SourceFile
 	if sourceFile == nil {
@@ -740,10 +749,23 @@ func printRuleDiagnostic(diagnostic rule.Diagnostic) {
 	}
 
 	line, character := scanner.GetECMALineAndByteOffsetOfPosition(sourceFile, diagnostic.Range.Pos())
+
+	// One finding is one line, whatever the message does internally.
+	//
+	// Two rules write a second paragraph into their description with an embedded newline, which put
+	// the rule tag on a line carrying no position. Any reader keyed on `position ... [rule]` then
+	// drops those findings silently, and it drops the LONGEST messages, which are the ones carrying
+	// advice. Four of 5,312 findings on the ahra tree wrapped that way, and an extractor that missed
+	// them sent me four hours into a rule that was working correctly.
+	//
+	// Joining rather than forbidding the newline, because the rules are not wrong to want a second
+	// paragraph: the message is the rule's to write and the line discipline is the printer's to keep.
+	description := singleLineDescription(diagnostic.Message.Description)
+
 	fmt.Printf(
 		"%s:%d:%d - %s [%s/%s]\n",
 		sourceFile.FileName(), line+1, character+1,
-		diagnostic.Message.Description, diagnostic.RuleName, diagnostic.Message.Id,
+		description, diagnostic.RuleName, diagnostic.Message.Id,
 	)
 }
 
