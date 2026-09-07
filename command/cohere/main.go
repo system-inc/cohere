@@ -384,8 +384,15 @@ func run() error {
 		case formatter == nil:
 			// No formatter means nothing to enumerate for. The scope keeps its type-graph narrowing so
 			// the fix phase's own reporting is unchanged.
-			inProgram := make(map[string]struct{}, len(projectFiles))
-			for _, sourceFile := range projectFiles {
+			//
+			// Narrowed against the whole program rather than against a named scope, for the reason
+			// the block above states: the format phase has its own universe. A run scoped to one file
+			// still reports honestly how many changed files the program contains, and reporting the
+			// intersection with the scope instead made `7 changed files, 0 of them in the program` on
+			// a tree where three of them were.
+			wholeProgram := graph.ProjectFiles()
+			inProgram := make(map[string]struct{}, len(wholeProgram))
+			for _, sourceFile := range wholeProgram {
 				inProgram[sourceFile.FileName()] = struct{}{}
 			}
 			scope = scope.narrowTo(inProgram)

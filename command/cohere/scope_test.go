@@ -897,3 +897,43 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 		}
 	})
 }
+
+// TestNarrowToUsesTheWholeProgramNotTheLintScope holds that the format phase keeps its own universe
+// when the lint phase has been scoped to a named path.
+//
+// The two narrowings are different questions and the file already says so: a proposed fix comes from
+// a rule that ran over the program, so its candidate must be in the program; a format candidate
+// comes from the disk. Scoping the lint walk to one named file and then narrowing the format scope
+// against that same slice reported `7 changed files, 0 of them in the program` on a tree where three
+// of them were.
+//
+// This asserts the composition rather than `narrowTo` alone, because `narrowTo` was correct at both
+// readings. What changed was the population handed to it, which is precisely the shape of mistake
+// the comment above that function was written about.
+func TestNarrowToUsesTheWholeProgramNotTheLintScope(t *testing.T) {
+	changed := formatScope{
+		FileNames: []string{"/repository/a.ts", "/repository/b.ts", "/repository/notes.md"},
+		index: map[string]struct{}{
+			"/repository/a.ts":     {},
+			"/repository/b.ts":     {},
+			"/repository/notes.md": {},
+		},
+		Description: "3 changed files (working tree, staged, and untracked)",
+	}
+
+	wholeProgram := map[string]struct{}{
+		"/repository/a.ts": {},
+		"/repository/b.ts": {},
+		"/repository/c.ts": {},
+	}
+	if narrowed := changed.narrowTo(wholeProgram); !strings.Contains(narrowed.Description, "2 of them in the program") {
+		t.Fatalf("the whole program should have found two of the changed files: %s", narrowed.Description)
+	}
+
+	// The regression. A lint scope of one named file is not the population this question is about,
+	// and narrowing against it reports zero on a tree that has two.
+	lintScopedToOneFile := map[string]struct{}{"/repository/c.ts": {}}
+	if narrowed := changed.narrowTo(lintScopedToOneFile); !strings.Contains(narrowed.Description, "0 of them in the program") {
+		t.Fatalf("this fixture no longer reproduces the defect it was written for: %s", narrowed.Description)
+	}
+}
