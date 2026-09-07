@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,6 +41,11 @@ type formatScope struct {
 
 	// Everything is whether the scope is the whole tree rather than a subset.
 	Everything bool
+
+	// RequestDescription says what the caller asked for, as opposed to what was found. A named
+	// directory enumerates every file under it, most of which the program never contained, so the
+	// enumerated count is not a number anybody wants beside the count actually checked.
+	RequestDescription string
 }
 
 // narrowTo reports how many of the scope's files are in a given population, and re-describes the
@@ -482,4 +488,107 @@ func resolveStructureIgnorePath(directory string) string {
 // that had proposals and costs what it did before the format phase existed.
 func (s formatScope) formatCandidates() []string {
 	return s.FileNames
+}
+
+// namedPathsScope resolves the paths a caller named on the command line.
+//
+// A positional path was parsed and discarded before this existed, so `cohere --lint OneFile.ts`
+// checked all 3,542 files and reported every finding in the tree. Measured: 3.042s and 5,201
+// findings for one named file, against 3.003s and 5,201 for the whole tree. Same cost, same output,
+// and no way to tell from either that the argument had been ignored.
+//
+// A named directory expands to the files under it rather than matching by prefix, so membership
+// stays one map lookup for every phase downstream. `.` is the whole tree and says so, which keeps
+// `cohere --lint .` meaning what it has always meant instead of quietly becoming a subset of one
+// directory entry.
+//
+// Resolution is against the working directory the caller gave, not the process's own, because
+// `--directory` already redefines what a relative path means everywhere else in this binary and a
+// second answer here would be a bug nobody could see from the output.
+func namedPathsScope(workingDirectory string, names []string) (formatScope, error) {
+	// `--directory` defaults to empty, meaning the process's own. Resolving against empty leaves a
+	// relative path, which never matches a source file name because those are absolute, so every
+	// named path fell out of scope and the run checked nothing while reporting success. That is the
+	// green-over-zero-files failure this binary exists to have stopped making, and it was one
+	// `filepath.Join` away from shipping.
+	if workingDirectory == "" {
+		current, err := os.Getwd()
+		if err != nil {
+			return formatScope{}, fmt.Errorf("resolving the working directory: %w", err)
+		}
+		workingDirectory = current
+	}
+
+	absolute := make([]string, 0, len(names))
+
+	for _, name := range names {
+		path := name
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(workingDirectory, name)
+		}
+		path = filepath.Clean(path)
+
+		information, err := os.Stat(path)
+		if err != nil {
+			// A path that does not exist is a loud failure rather than an empty scope. Silently
+			// checking nothing because of a typo is the green-over-zero-files defect, and it is the
+			// one this binary exists to have stopped making.
+			return formatScope{}, fmt.Errorf("resolving %s: %w", name, err)
+		}
+
+		if !information.IsDir() {
+			absolute = append(absolute, path)
+			continue
+		}
+
+		if path == filepath.Clean(workingDirectory) {
+			return wholeTreeScope(), nil
+		}
+
+		err = filepath.WalkDir(path, func(entry string, directoryEntry fs.DirEntry, walkError error) error {
+			if walkError != nil {
+				return walkError
+			}
+			if directoryEntry.IsDir() {
+				return nil
+			}
+			absolute = append(absolute, filepath.Clean(entry))
+			return nil
+		})
+		if err != nil {
+			return formatScope{}, fmt.Errorf("walking %s: %w", name, err)
+		}
+	}
+
+	sort.Strings(absolute)
+
+	index := make(map[string]struct{}, len(absolute))
+	for _, path := range absolute {
+		index[path] = struct{}{}
+	}
+
+	description := fmt.Sprintf("%d named path%s", len(absolute), plural(len(absolute)))
+	if len(absolute) == 0 {
+		description = fmt.Sprintf("0 files under the named paths in %s", workingDirectory)
+	}
+
+	request := strings.Join(names, ", ")
+	if len(names) > 3 {
+		request = fmt.Sprintf("%s and %d more", strings.Join(names[:3], ", "), len(names)-3)
+	}
+
+	return formatScope{
+		FileNames:          absolute,
+		index:              index,
+		Description:        description,
+		RequestDescription: request,
+	}, nil
+}
+
+// plural is the one-character suffix that keeps a count reading as English.
+func plural(count int) string {
+	if count == 1 {
+		return ""
+	}
+	return "s"
 }

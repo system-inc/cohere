@@ -802,3 +802,98 @@ func TestParseSubmoduleStageIgnoresOrdinaryFiles(t *testing.T) {
 		t.Errorf("a tree with no gitlinks reported %d submodules: %v", len(submodules), submodules)
 	}
 }
+
+// TestNamedPathsScopeResolvesFilesAndDirectories holds the four answers a named path can produce.
+//
+// A positional path was parsed and discarded before this scope existed, so `cohere --lint OneFile.ts`
+// checked all 3,542 files and printed every finding in the tree: 3.042s and 5,201 findings for one
+// named file, against 3.003s and 5,201 for the whole tree. Nothing in either run said the argument
+// had been ignored, which is why the assertions below are about membership rather than about a
+// count: a scope that silently held everything would satisfy a count.
+func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
+	directory := t.TempDir()
+
+	write := func(relative string) string {
+		t.Helper()
+		path := filepath.Join(directory, relative)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("const a = 1;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+
+	named := write("source/Named.ts")
+	sibling := write("source/Sibling.ts")
+	nested := write("source/deep/Nested.ts")
+	elsewhere := write("other/Elsewhere.ts")
+
+	t.Run("one file is one file", func(t *testing.T) {
+		scope, err := namedPathsScope(directory, []string{"source/Named.ts"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if scope.Everything {
+			t.Fatal("a named file produced a whole-tree scope, which is the defect this replaces")
+		}
+		if !scope.includes(named) {
+			t.Errorf("the named file was not in scope: %v", scope.FileNames)
+		}
+		// The control. Without it a scope that included everything would pass the assertion above.
+		if scope.includes(sibling) || scope.includes(elsewhere) {
+			t.Errorf("an unnamed file was in scope: %v", scope.FileNames)
+		}
+	})
+
+	t.Run("a directory is everything under it", func(t *testing.T) {
+		scope, err := namedPathsScope(directory, []string{"source"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{named, sibling, nested} {
+			if !scope.includes(want) {
+				t.Errorf("a file under the named directory was not in scope: %s", want)
+			}
+		}
+		if scope.includes(elsewhere) {
+			t.Errorf("a file outside the named directory was in scope: %s", elsewhere)
+		}
+	})
+
+	// `cohere --lint .` has always meant the whole tree and has to keep meaning it. A prefix match
+	// would make it a subset of one directory entry, silently.
+	t.Run("the working directory itself is the whole tree", func(t *testing.T) {
+		scope, err := namedPathsScope(directory, []string{"."})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !scope.Everything {
+			t.Fatalf("`.` narrowed instead of meaning everything: %v", scope.FileNames)
+		}
+	})
+
+	// A typo must fail loudly. An empty scope reporting success is the green-over-zero-files failure,
+	// and this scope reached it once during development by resolving against an empty directory.
+	t.Run("a path that does not exist is an error", func(t *testing.T) {
+		if _, err := namedPathsScope(directory, []string{"source/Missing.ts"}); err == nil {
+			t.Fatal("a nonexistent path resolved without error")
+		}
+	})
+
+	// The working directory defaults to empty at the flag, meaning the process's own. Resolving
+	// against empty leaves a relative path, which never matches an absolute source file name, so
+	// every named path fell out of scope and the run checked nothing while reporting success.
+	t.Run("an empty working directory resolves against the process", func(t *testing.T) {
+		scope, err := namedPathsScope("", []string{"scope.go"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range scope.FileNames {
+			if !filepath.IsAbs(name) {
+				t.Fatalf("a relative path reached the scope index and would match nothing: %s", name)
+			}
+		}
+	})
+}

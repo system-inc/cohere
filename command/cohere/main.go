@@ -250,11 +250,46 @@ func run() error {
 	buildDuration := time.Since(buildStart)
 
 	projectFiles := graph.ProjectFiles()
+	wholeProgramCount := len(projectFiles)
 
-	fmt.Printf(
-		"graph built in %s — %d files in the program, %d of them ours\n",
-		round(buildDuration), len(graph.SourceFiles()), len(projectFiles),
-	)
+	// A named path narrows every phase below, because this slice is what they are handed. The type
+	// graph is untouched: it still holds the whole program, so a rule that reads a declaration out
+	// of a file nobody named still finds it. Only the walk list shrinks.
+	//
+	// Before this, a positional path was parsed and discarded. `cohere --lint OneFile.ts` took
+	// 3.042s and printed 5,201 findings; the whole tree took 3.003s and printed 5,201. Same cost,
+	// same output, and nothing in either run said the argument had been ignored.
+	lintScope := formatScope{Everything: true}
+	if named := flag.Args(); len(named) > 0 && !*listRules && !*listRulesEnabled {
+		scope, err := namedPathsScope(*directory, named)
+		if err != nil {
+			return err
+		}
+		lintScope = scope
+		if !scope.Everything {
+			projectFiles = filterToScope(projectFiles, scope)
+		}
+	}
+
+	if lintScope.Everything {
+		fmt.Printf(
+			"graph built in %s — %d files in the program, %d of them ours\n",
+			round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
+		)
+	} else {
+		// Both numbers, because a reader who sees only the narrowed count cannot tell a scoped run
+		// from a tree that shrank, and those want opposite reactions.
+		// The scope's own count is the paths it enumerated, which is not the number checked: a named
+		// directory holds markdown and data files the program never contained. Reporting the walked
+		// count beside the enumerated one made `58 in scope (2685 named paths)`, two true numbers
+		// that read as a contradiction. The enumerated count is dropped and the description says
+		// what was asked for instead.
+		fmt.Printf(
+			"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s)\n",
+			round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
+			len(projectFiles), lintScope.RequestDescription,
+		)
+	}
 
 	findings := 0
 	report := &pipelineReport{graph: buildDuration, processStart: processStart}
@@ -282,8 +317,16 @@ func run() error {
 			return fmt.Errorf("loading the lint config: %w", err)
 		}
 		lintConfig = loaded
-		projectFileNames := make([]string, 0, len(projectFiles))
-		for _, projectFile := range projectFiles {
+		// Validated against the whole program rather than against a narrowed scope. The question
+		// this check asks is whether a config override reaches any file at all, which is a property
+		// of the tree and not of one run: scoping to a single file legitimately leaves `modules/**`
+		// matching nothing, and failing there would make every scoped run report a broken config.
+		//
+		// Measured while building the scope: `--lint OneFile.ts` refused to run, naming three
+		// overrides as vacuous, because the validator was handed the one file in scope.
+		wholeProgramFiles := graph.ProjectFiles()
+		projectFileNames := make([]string, 0, len(wholeProgramFiles))
+		for _, projectFile := range wholeProgramFiles {
 			projectFileNames = append(projectFileNames, projectFile.FileName())
 		}
 		if err := lintConfig.ValidateSelectors(projectFileNames); err != nil {
@@ -1091,4 +1134,20 @@ func implementsConfiguredRule(configured string, implemented map[string]bool) bo
 		return implemented[configured[slash+1:]]
 	}
 	return false
+}
+
+// filterToScope keeps the project files a scope names, in their original order.
+//
+// Order is preserved rather than rebuilt from the scope, because the walk reports findings in the
+// order it receives files and a scoped run should print what an unscoped run printed for those same
+// files, in the same sequence. Sorting here would make the two disagree for no reason a reader
+// could see.
+func filterToScope(projectFiles []*ast.SourceFile, scope formatScope) []*ast.SourceFile {
+	kept := make([]*ast.SourceFile, 0, len(scope.FileNames))
+	for _, sourceFile := range projectFiles {
+		if scope.includes(filepath.Clean(sourceFile.FileName())) {
+			kept = append(kept, sourceFile)
+		}
+	}
+	return kept
 }
