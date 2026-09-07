@@ -408,6 +408,31 @@ func runPreserveManualMemoization(t *testing.T, name string, source string) rule
 	}, "/"+name)
 }
 
+func TestPreserveManualMemoizationReportsMissingSeedDependency(t *testing.T) {
+	t.Parallel()
+	const source = `import React from 'react'; import {useField} from './field';
+function Component() {
+const field=useField();
+const seeded=React.useMemo(()=>field.value ? {value:field.value.value} : {value:undefined},[]);
+const [value]=React.useState(seeded.value);
+return <div>{value}</div>;
+}`
+	for _, testCase := range []struct {
+		name, source string
+		findings     int
+	}{
+		{"missing", source, 1},
+		{"correct", strings.Replace(source, "},[]);", "},[field.value]);", 1), 0},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := runPreserveManualMemoization(t, testCase.name+".tsx", testCase.source)
+			if len(result.Diagnostics) != testCase.findings {
+				t.Fatalf("findings=%v, want %d", result.Diagnostics, testCase.findings)
+			}
+		})
+	}
+}
+
 // TestFixturesMatchTheVendoredCorpus diffs every fixture above against the file it was copied from.
 //
 // The port brief's standing instruction is to cohere copied strings mechanically rather than by
