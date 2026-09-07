@@ -972,3 +972,86 @@ func TestNarrowToKeepsANamedScopesOwnWording(t *testing.T) {
 		t.Errorf("a changed-files scope lost its wording: %s", described)
 	}
 }
+
+// TestChangedFilesScopeDescendsIntoSubmodules holds that a file changed inside a submodule reaches
+// the scope, and that the submodule's own pointer does not.
+//
+// The two halves fail in opposite directions and both are silent. Keeping the pointer makes the
+// formatter read a directory as a file and report one it could not process. Dropping the pointer
+// without descending loses every file inside: on the ahra tree an edit under
+// `libraries/structure/source` reached the parent as ` M libraries/structure` and left as nothing,
+// so a scope computed from the parent alone looked deliberate and never visited the edit.
+//
+// Nested on purpose. `libraries/structure` holds `nexus`, and a single level of descent returned
+// that inner pointer as an ordinary path, which is how the first version of this reproduced the
+// first failure while fixing the second.
+func TestChangedFilesScopeDescendsIntoSubmodules(t *testing.T) {
+	root := t.TempDir()
+
+	git := func(directory string, arguments ...string) {
+		t.Helper()
+		command := exec.Command("git", arguments...)
+		command.Dir = directory
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Skipf("git is unavailable or refused (%v): %s", err, output)
+		}
+	}
+
+	makeRepository := func(directory string) {
+		t.Helper()
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		git(directory, "init", "--quiet")
+		git(directory, "config", "user.email", "fixture@example.com")
+		git(directory, "config", "user.name", "fixture")
+		git(directory, "config", "protocol.file.allow", "always")
+	}
+
+	inner := filepath.Join(t.TempDir(), "inner")
+	makeRepository(inner)
+	if err := os.WriteFile(filepath.Join(inner, "Inner.ts"), []byte("export const inner = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(inner, "add", "Inner.ts")
+	git(inner, "commit", "--quiet", "-m", "inner")
+
+	makeRepository(root)
+	if err := os.WriteFile(filepath.Join(root, "Root.ts"), []byte("export const root = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(root, "add", "Root.ts")
+	git(root, "commit", "--quiet", "-m", "root")
+	git(root, "-c", "protocol.file.allow=always", "submodule", "--quiet", "add", inner, "library")
+	git(root, "commit", "--quiet", "-m", "add the submodule")
+
+	// A clean tree is the control: without it, a resolver returning everything would satisfy the
+	// assertions below.
+	clean, err := changedFilesScope(root)
+	if err != nil {
+		t.Fatalf("unexpected error on a clean tree: %v", err)
+	}
+	if len(clean.FileNames) != 0 {
+		t.Fatalf("a clean tree reported changes: %v", clean.FileNames)
+	}
+
+	// Now the case that motivated this: a file changed only inside the submodule.
+	if err := os.WriteFile(filepath.Join(root, "library", "Inner.ts"), []byte("export const inner = 2;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	scope, err := changedFilesScope(root)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	joined := strings.Join(scope.FileNames, " ")
+	if !strings.Contains(joined, filepath.Join(root, "library", "Inner.ts")) {
+		t.Errorf("a file changed inside the submodule was not in scope: %v", scope.FileNames)
+	}
+	// The submodule's own pointer is a gitlink, not a file. Keeping it makes the formatter try to
+	// read a directory.
+	if scope.includes(filepath.Join(root, "library")) {
+		t.Errorf("the submodule pointer itself was in scope: %v", scope.FileNames)
+	}
+}

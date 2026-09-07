@@ -234,6 +234,37 @@ func gitChangedFiles(workingDirectory string) ([]string, error) {
 			kept = append(kept, name)
 		}
 	}
+
+	// Dropping the pointer is only half the answer, and the missing half was silent.
+	//
+	// A submodule reports as one entry no matter how many files inside it changed, so on this tree
+	// an edit to `libraries/structure/source/...` reached here as ` M libraries/structure` and left
+	// as nothing at all. Measured: the parent repository sees the edited file zero times and the
+	// submodule sees it once.
+	//
+	// That is the exact shape this layer exists to prevent. A scope computed from the parent alone
+	// looks deliberate, runs fast, and never visits the edit, which is worse than being slow.
+	//
+	// Each submodule is asked with the same flags for the same reasons, and its answers are prefixed
+	// back to the parent's path space so every caller downstream keeps receiving paths it can
+	// resolve. A submodule that cannot be read is skipped rather than failing the run: it is one
+	// directory's worth of scope, and the parent's answer is still useful without it.
+	//
+	// Recursive on purpose, and the first version was not. `libraries/structure` holds `nexus`, so a
+	// single level returned that nested pointer as an ordinary path and the formatter reported one
+	// file it could not process, which is a true statement about a path that was never a file. The
+	// same drop has to happen at every level, which is what calling back into this function does.
+	// Each level prefixes only its own segment, so the paths compose rather than doubling.
+	for submodule := range submodules {
+		inside, err := gitChangedFiles(filepath.Join(workingDirectory, submodule))
+		if err != nil {
+			continue
+		}
+		for _, name := range inside {
+			kept = append(kept, filepath.Join(submodule, name))
+		}
+	}
+
 	return kept, nil
 }
 
