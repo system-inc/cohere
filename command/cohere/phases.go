@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // phaseName is one step of the pipeline, in the order it runs.
@@ -263,6 +265,19 @@ func (r *pipelineReport) Write(out io.Writer) {
 	// no finding, and `--lint` alone is a deliberate narrowing whose own phase line already says so;
 	// warning on those would put the sentence on ordinary runs until people stopped reading it,
 	// which would cost exactly the case it exists for.
+	// A binary built from a modified tree reproduces no commit, so a number it produced cannot be
+	// checked against anything later.
+	//
+	// Said here rather than only under `--version`, because the run that needs to disclose it is the
+	// one producing findings, and nobody types `--version` before reading a count. It caught a real
+	// case: after reverting an experiment I never rebuilt, so four rounds of parity came from a
+	// binary carrying code that no longer existed. The numbers happened to be unaffected, and the
+	// only reason I knew that is that I checked the version line by hand.
+	//
+	// Silent on a clean build. A line on every ordinary run is one people learn to skip, which would
+	// cost exactly the case it exists for.
+	r.writeProvenanceWarning(out, release.Current().SourceTreeModified)
+
 	// File scope is its own dimension and the phase lines cannot express it. A run narrowed to one
 	// file ran every phase it was asked for, so `the phases above say what was not checked` points a
 	// reader at lines that answer a different question.
@@ -317,4 +332,16 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 
 	fmt.Fprintf(out, "  total %s — graph %s, phases %s, %s outside any phase\n",
 		round(total), round(r.graph), round(accounted-r.graph), round(unaccounted))
+}
+
+// writeProvenanceWarning says when the binary cannot be traced to a commit.
+//
+// Takes the flag rather than reading it, so a fixture can hold both directions. `Current()` reads
+// stamps the linker wrote, which a test cannot vary, and a test that could only observe the build
+// it happens to run under would assert nothing.
+func (r *pipelineReport) writeProvenanceWarning(out io.Writer, sourceTreeModified bool) {
+	if !sourceTreeModified {
+		return
+	}
+	fmt.Fprintf(out, "  this binary was built from a modified tree, so no commit reproduces these findings\n")
 }

@@ -307,3 +307,29 @@ func TestCoverageNamesTheFilesItDidNotLookAt(t *testing.T) {
 		t.Errorf("a report with no scope numbers should not invent them:\n%s", rendered)
 	}
 }
+
+// TestProvenanceWarningFiresOnlyOnAModifiedTree holds the disclosure that a binary cannot be traced
+// to a commit.
+//
+// It caught a real case before it existed. After reverting an experiment I never rebuilt, so four
+// rounds of parity measurement came from a binary carrying code that no longer existed in the tree.
+// The numbers happened to be unaffected, and the only reason that was knowable is that the version
+// line was read by hand.
+//
+// Both directions, because a warning on every run is one people learn to skip, which would cost
+// exactly the case it exists for.
+func TestProvenanceWarningFiresOnlyOnAModifiedTree(t *testing.T) {
+	report := &pipelineReport{}
+
+	modified := &strings.Builder{}
+	report.writeProvenanceWarning(modified, true)
+	if !strings.Contains(modified.String(), "no commit reproduces these findings") {
+		t.Errorf("a modified tree should disclose itself: %q", modified.String())
+	}
+
+	clean := &strings.Builder{}
+	report.writeProvenanceWarning(clean, false)
+	if clean.String() != "" {
+		t.Errorf("a clean build should say nothing: %q", clean.String())
+	}
+}
