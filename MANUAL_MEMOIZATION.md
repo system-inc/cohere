@@ -128,8 +128,13 @@ signature returns Frozen, reads the callee, and freezes arguments. A private con
 changing only the useState result's Create effect from Mutable to Frozen keeps `newName` at
 `[21,22)` and makes both halves silent. This is evidence for the missing hook-result effect, not a
 shipped repair or a population measurement. No shared effects code was changed. A production fix
-still needs hook-origin resolution, paired regression fixtures, and a full differential; adding a
+needed hook-origin resolution, paired regression fixtures, and a full differential; adding a
 `trim` exemption or exempting setters in the validator would address the wrong layer.
+
+The origin-safe state effect and paired fixtures are now implemented. `STATE_EFFECTS.md` records
+the prerequisite and the attribution of all four changed corpus-count checks, including the raw
+setter dependency that disappears during final pruning. Its population differential is separate
+from these structural measurements; the 217 figure above still describes the preceding repair.
 
 ## Next trace
 

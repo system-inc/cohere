@@ -169,9 +169,10 @@ type ComputedDelete struct {
 
 // CallExpression calls a value.
 type CallExpression struct {
-	Callee   Place
-	Args     []Argument
-	Optional bool
+	Callee       Place
+	Args         []Argument
+	Optional     bool
+	CalleeOrigin ModuleExportOrigin
 }
 
 // MethodCall calls a property of an object, keeping the receiver.
@@ -180,10 +181,16 @@ type CallExpression struct {
 // must attribute mutation to it. Lowering a method call as a property load plus a call would lose
 // that the loaded function and the object are related.
 type MethodCall struct {
-	Receiver Place
-	Property Place
-	Args     []Argument
-	Optional bool
+	Receiver     Place
+	Property     Place
+	Args         []Argument
+	Optional     bool
+	CalleeOrigin ModuleExportOrigin
+}
+
+type ModuleExportOrigin struct {
+	Module string
+	Export string
 }
 
 // NewExpression constructs a value.

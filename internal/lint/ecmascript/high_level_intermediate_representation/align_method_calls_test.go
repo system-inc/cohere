@@ -93,7 +93,8 @@ func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
 	//
 	// 60 after reverse postorder began matching React's fallthrough-first traversal. Loop bodies now
 	// precede their continuations, which settles two call/property pairs before this pass sees them.
-	const knownChanged = 60
+	// State freezing exposes Menu's findIndex property/result pair: 61. See STATE_EFFECTS.md.
+	const knownChanged = 61
 	if changed != knownChanged {
 		t.Errorf("the pass changed %d of %d functions, want %d", changed, functions, knownChanged)
 	}

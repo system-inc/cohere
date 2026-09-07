@@ -593,11 +593,12 @@ func TestMemoInclusiveInliningCallSitesAreReviewed(t *testing.T) {
 	t.Parallel()
 
 	// The call sites that are known and reviewed. `cache.go` computes no reactive scope. Production
-	// and the three structural probes all use the complete prefix documented above.
+	// and the structural probes, including state-setter pruning, use the complete prefix above.
 	knownCallSites := map[string]bool{
 		"../../ecmascript/high_level_intermediate_representation/cache.go": true,
 		"cache.go":                       true,
 		"dependency_oracle_test.go":      true,
+		"effects_react_state_test.go":    true,
 		"hoistable_test.go":              true,
 		"preserve_manual_memoization.go": true,
 		"scope_oracle_test.go":           true,

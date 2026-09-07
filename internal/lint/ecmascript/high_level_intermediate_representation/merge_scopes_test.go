@@ -746,8 +746,9 @@ func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
 	//
 	// The direction is unchanged and is the one already stated on `MergeGapPrimitiveOperandSkip`:
 	// not skipping visits operands upstream skips, and visiting an operand can only ever ADD a
-	// union, so this errs toward merging more than upstream rather than less.
-	const knownGateDivergence = 3
+	// union, so this errs toward merging more than upstream rather than less. State freezing raises
+	// the bound to seven, attributed to three input components in STATE_EFFECTS.md.
+	const knownGateDivergence = 7
 	if withoutGate-withGate != knownGateDivergence {
 		t.Errorf("skipping every function-expression operand changed the union count from %d to "+
 			"%d, a divergence of %d where %d was measured; MergeGapPrimitiveOperandSkip changed "+

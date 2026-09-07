@@ -1269,6 +1269,16 @@ func effectsForUnknownCall(
 // apart for the reason effectGlobalFunctions gives. Returns false for anything unknown, which sends
 // the call to the conservative default.
 func lookupSignature(function *Function, instruction *Instruction, name string) (effectSignature, bool) {
+	var origin ModuleExportOrigin
+	switch call := instruction.Value.(type) {
+	case *CallExpression:
+		origin = call.CalleeOrigin
+	case *MethodCall:
+		origin = call.CalleeOrigin
+	}
+	if origin.Module == "react" && origin.Export == "useState" {
+		return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: EffectValueFrozen}, true
+	}
 	if name == "" {
 		return effectSignature{}, false
 	}

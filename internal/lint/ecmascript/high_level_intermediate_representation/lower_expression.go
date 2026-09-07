@@ -211,6 +211,7 @@ func (b *builder) lowerCallExpression(node *ast.Node) Place {
 	optional := expression.QuestionDotToken != nil
 
 	callee := expression.Expression
+	origin := b.calleeModuleOrigin(callee)
 	if callee != nil && callee.Kind == ast.KindPropertyAccessExpression {
 		access := callee.AsPropertyAccessExpression()
 		receiver := b.lowerExpressionToPlace(access.Expression)
@@ -221,10 +222,11 @@ func (b *builder) lowerCallExpression(node *ast.Node) Place {
 		property := b.emit(&Primitive{Value: name}, access.Name())
 		args := b.lowerArguments(expression.Arguments)
 		return b.emit(&MethodCall{
-			Receiver: receiver,
-			Property: property,
-			Args:     args,
-			Optional: optional,
+			CalleeOrigin: origin,
+			Receiver:     receiver,
+			Property:     property,
+			Args:         args,
+			Optional:     optional,
 		}, node)
 	}
 	if callee != nil && callee.Kind == ast.KindElementAccessExpression {
@@ -233,16 +235,17 @@ func (b *builder) lowerCallExpression(node *ast.Node) Place {
 		property := b.lowerExpressionToPlace(access.ArgumentExpression)
 		args := b.lowerArguments(expression.Arguments)
 		return b.emit(&MethodCall{
-			Receiver: receiver,
-			Property: property,
-			Args:     args,
-			Optional: optional,
+			CalleeOrigin: origin,
+			Receiver:     receiver,
+			Property:     property,
+			Args:         args,
+			Optional:     optional,
 		}, node)
 	}
 
 	calleePlace := b.lowerExpressionToPlace(callee)
 	args := b.lowerArguments(expression.Arguments)
-	return b.emit(&CallExpression{Callee: calleePlace, Args: args, Optional: optional}, node)
+	return b.emit(&CallExpression{Callee: calleePlace, Args: args, Optional: optional, CalleeOrigin: origin}, node)
 }
 
 func (b *builder) lowerNewExpression(node *ast.Node) Place {
