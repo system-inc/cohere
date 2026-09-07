@@ -49,4 +49,10 @@ The optional fixtures already have another matching full-depth dependency, and
 the precise-chain fixture already has another x.y.z. Only the less-precise-chain
 fixture gains a new golden match: 82/88 to 83/88. No matcher change accounts for
 the gain. Corpus hoisting counts, scope counts, alignment, merge bounds and
-conservation do not change. A committed population measurement follows separately.
+conservation do not change.
+
+The `dc82ac8` archive binary measures 44 findings on the frozen snapshot: one
+removed (useAssetPreview), none added and 44 unchanged relative to `f693b4f`.
+The remaining population has 28 covering CompileSuccess occurrences and 16
+bailout-covered occurrences (15 Todo, one Suppression). Zero false positives is
+not yet achieved.

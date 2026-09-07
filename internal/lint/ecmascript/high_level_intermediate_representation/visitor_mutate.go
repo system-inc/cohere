@@ -268,6 +268,7 @@ func EachBlockReferencePointer(terminal Terminal, visit func(block *BlockId)) {
 	case *Branch:
 		visitReal(&t.Consequent)
 		visitReal(&t.Alternate)
+		visitReal(&t.Fallthrough)
 	case *Switch:
 		for index := range t.Cases {
 			visitReal(&t.Cases[index].Block)

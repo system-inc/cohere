@@ -395,7 +395,7 @@ func everyTerminalSample(t *testing.T) []Terminal {
 		&Return{}, &Throw{}, &Unreachable{}, &Unsupported{},
 		&Goto{Block: block()},
 		&If{Consequent: block(), Alternate: block(), Fallthrough: block()},
-		&Branch{Consequent: block(), Alternate: block()},
+		&Branch{Consequent: block(), Alternate: block(), Fallthrough: block()},
 		&Switch{Cases: []SwitchCase{{Block: block()}, {Block: block()}}, Fallthrough: block()},
 		&While{Test: block(), Loop: block(), Fallthrough: block()},
 		&DoWhile{Loop: block(), Test: block(), Fallthrough: block()},
