@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/system-inc/cohere/internal/types/program"
@@ -81,15 +82,49 @@ func printSharedFills(out io.Writer, timings *program.Timings) {
 		return
 	}
 
-	keys := make([]string, 0, len(fills))
-	for key := range fills {
-		keys = append(keys, key)
+	// Keys are collapsed to their family before reporting, because a key identifies a cache entry
+	// and a cache entry is not a line worth reading. The HIR cache keys per function node, by kind
+	// and source offset, which is correct for a cache and produced 11,150 rows here against three
+	// real ones: `--timing` was 17,000 lines, two thirds of them a single derivation reported one
+	// function at a time, each costing 0.00ms and none of them actionable.
+	//
+	// The family is everything before the first colon, which is how these keys are already built
+	// (`hir.Function:175:10055`, `comments.All`). A key with no colon is its own family, so the
+	// three genuinely distinct entries are unchanged.
+	type sharedFamily struct {
+		duration time.Duration
+		entries  int
 	}
-	sort.Strings(keys)
+	families := make(map[string]*sharedFamily, len(fills))
+	for key, duration := range fills {
+		name := key
+		if colon := strings.IndexByte(key, ':'); colon >= 0 {
+			name = key[:colon]
+		}
+		family, seen := families[name]
+		if !seen {
+			family = &sharedFamily{}
+			families[name] = family
+		}
+		family.duration += duration
+		family.entries++
+	}
 
-	for _, key := range keys {
-		fmt.Fprintf(out, "  shared: %s cost %s, paid once per file and used by several rules\n",
-			key, formatMilliseconds(fills[key]))
+	names := make([]string, 0, len(families))
+	for name := range families {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		family := families[name]
+		if family.entries == 1 {
+			fmt.Fprintf(out, "  shared: %s cost %s, paid once per file and used by several rules\n",
+				name, formatMilliseconds(family.duration))
+			continue
+		}
+		fmt.Fprintf(out, "  shared: %s cost %s across %d entries, paid once per file and used by several rules\n",
+			name, formatMilliseconds(family.duration), family.entries)
 	}
 }
 

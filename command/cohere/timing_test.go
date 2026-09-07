@@ -218,3 +218,46 @@ func TestTheTableItselfCarriesTheCoverageLine(t *testing.T) {
 		t.Fatalf("the table's coverage line did not name the unmeasured remainder:\n%s", rendered)
 	}
 }
+
+// TestPerNodeSharedFillsCollapseToOneRow holds that a derivation keyed per node reports as one
+// line rather than one line per node.
+//
+// A cache key identifies a cache entry, which is not a unit anybody wants to read. The HIR cache
+// keys per function by kind and source offset, correctly, and `--timing` rendered 11,150 rows for
+// it against three real ones: 17,000 lines of output, two thirds of it a single derivation reported
+// one function at a time, every row reading 0.00ms and none of them actionable. Collapsed, that
+// derivation is 1,256ms and the largest shared cost in the run.
+//
+// The single-entry assertions matter as much as the collapsed one. A fix that summed everything
+// under one heading would pass a test that only counted rows, and would destroy the three
+// distinct entries this table exists to separate.
+func TestPerNodeSharedFillsCollapseToOneRow(t *testing.T) {
+	timings := program.NewTimings([]string{"a-rule"})
+	setCost(timings, "a-rule", 10*time.Millisecond, 100)
+
+	timings.RecordSharedFill("a-rule", "hir.Function:175:1001", 3*time.Millisecond)
+	timings.RecordSharedFill("a-rule", "hir.Function:175:2002", 4*time.Millisecond)
+	timings.RecordSharedFill("a-rule", "hir.Function:175:3003", 5*time.Millisecond)
+	timings.RecordSharedFill("a-rule", "comments.All", 120*time.Millisecond)
+
+	rendered := renderTimings(timings, 200*time.Millisecond)
+
+	if strings.Count(rendered, "shared: hir.Function") != 1 {
+		t.Fatalf("the per-node derivation should report as exactly one row:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "across 3 entries") {
+		t.Fatalf("the collapsed row should say how many entries it stands for:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "12.0ms") && !strings.Contains(rendered, "12ms") {
+		t.Fatalf("the collapsed row should carry the summed cost of 12ms:\n%s", rendered)
+	}
+
+	// A derivation with one entry keeps the plain wording: the count would be noise on a row that
+	// stands for exactly itself.
+	if !strings.Contains(rendered, "shared: comments.All cost") {
+		t.Fatalf("a single-entry derivation should still be named plainly:\n%s", rendered)
+	}
+	if strings.Contains(rendered, "comments.All cost 120ms across") {
+		t.Fatalf("a single-entry derivation should not carry an entry count:\n%s", rendered)
+	}
+}
