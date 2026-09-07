@@ -864,6 +864,7 @@ type dependencyCollector struct {
 	// nestedHoistable is the prototype seam: paths that exist only inside a nested function, which
 	// `CollectHoistablePropertyLoads` never sees because it does not descend either.
 	nestedHoistable map[ScopeId][]ReactiveScopeDependency
+	assumedInvoked  AssumedInvokedFunctions
 }
 
 func (c *dependencyCollector) currentScope() (ScopeId, bool) {
@@ -1448,6 +1449,9 @@ func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Plac
 	// 25 to 20. Latent rather than inert, and recorded because it read as a failed change for a
 	// whole cycle before the other half landed.
 	alwaysReached := blocksAlwaysReached(nested)
+	if c.assumedInvoked == nil {
+		c.assumedInvoked = CollectAssumedInvokedFunctions(c.function)
+	}
 	// A root is suppressed only when some OTHER access names it with a deeper path: that bare
 	// root is the redundant evidence that prunes the path away in `collectMinimalInSubtree`.
 	deepRoots := map[IdentifierId]bool{}
@@ -1471,7 +1475,7 @@ func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Plac
 			Reactive:   outer.Reactive,
 			Path:       dep.Path,
 		}
-		if len(dep.Path) > 0 && alwaysReached[accessBlocks[index]] &&
+		if c.assumedInvoked[id] && len(dep.Path) > 0 && alwaysReached[accessBlocks[index]] &&
 			c.checkValidDependency(translated) {
 			if scope, ok := c.currentScope(); ok {
 				if c.nestedHoistable == nil {

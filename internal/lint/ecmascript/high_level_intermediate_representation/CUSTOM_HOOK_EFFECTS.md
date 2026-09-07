@@ -124,3 +124,12 @@ this repair the frozen snapshot has 30 findings: 17 with covering reference
 CompileSuccess and 13 covered only by bailouts. A private exact-source experiment
 cleared 13 of the 17 confirmed false positives; this is not a whole-tree verdict
 and does not establish that no findings were added.
+
+The subsequent whole-snapshot measurement, from an archive-built binary at
+`48ad641`, is **30 to 11: 19 removed, zero added, 11 unchanged**. Four remaining
+occurrences have covering reference CompileSuccess; six have only Todo errors
+and one only Suppression. No bailout-covered occurrence is declared correct or
+incorrect. The metadata-only prerequisite `4c7dade` independently reproduces all
+30 occurrences from `22b3128`, with no added or removed findings.
+
+Binary SHA256: `62d976c3888bf2b5d6c70caa3dee82f34ca51cc004397bb7c1df73c77621e30e`.
