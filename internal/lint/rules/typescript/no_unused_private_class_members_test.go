@@ -41,6 +41,7 @@ func TestNoUnusedPrivateClassMembersStaysSilent(t *testing.T) {
 		"class Test1 {\n  constructor(private readonly parameterProperty: number) {}\n  method() {\n    return this.parameterProperty;\n  }\n}\n",
 		"class Test1 {\n  constructor(private readonly parameterProperty: number = 1) {}\n  method() {\n    return this.parameterProperty;\n  }\n}\n",
 		"class Foo {\n  private prop: number;\n\n  method(thing: Foo) {\n    return thing.prop;\n  }\n}\n",
+		"class Decimal {\n  private padded(places: number): string {\n    return String(places);\n  }\n  render(places: number): string {\n    const rounded = this.round(places);\n    return rounded.padded(places);\n  }\n  round(places: number): Decimal {\n    return this;\n  }\n}\n",
 		"class Foo {\n  private static staticProp: number;\n\n  method(thing: typeof Foo) {\n    return thing.staticProp;\n  }\n}\n",
 		"class Foo {\n  private prop: number;\n\n  method() {\n    const self = this;\n    return self.prop;\n  }\n}\n",
 		"class Foo {\n  #privateMember = 42;\n  method() {\n    return this.#privateMember;\n  }\n}\n",
