@@ -698,3 +698,135 @@ function Foo(props) {
 			"shared dependency named by both memo blocks", doubled)
 	}
 }
+
+/*
+ * A memo that builds a collection in a loop is the shape this rule reports and should not.
+ *
+ * Measured on the ahra tree: 287 findings against eslint-plugin-react-hooks 7.1.1's zero, on a
+ * shape that is among the most common `useMemo` bodies anyone writes. The object is created inside
+ * the memo, mutated only inside it, and never escapes before the memo returns, so there is nothing
+ * for the compiler to refuse to preserve.
+ *
+ * # The two firing cases are checked against React's own compiler, not against a reading
+ *
+ * `babel-plugin-react-compiler` 1.0.0 was run directly over both, with
+ * `validatePreserveExistingMemoizationGuarantees` on, and reports zero `CompileError` events for
+ * each. That harness was proven able to fail first: a memo with an empty dependency array over a
+ * reactive value produces exactly one, "Existing memoization could not be preserved". So the zero
+ * is a measured verdict from the reference implementation rather than an absent instrument, and
+ * these two cases are false positives rather than a defensible divergence.
+ *
+ * # This test is red on purpose
+ *
+ * The defect is diagnosed and not yet repaired, and a red test is the honest way to carry that: it
+ * names the expected behaviour, fails until the behaviour is real, and cannot be mistaken for a
+ * passing suite. Tracing the pipeline places the loss at `PruneUnusedScopes`, which prunes the memo
+ * block because `hasOwnDeclaration` finds nothing declared in it -- the scope's only value is a
+ * temporary that never gets a recorded declaration, because `visitDependency` records one only when
+ * a value is read from OUTSIDE the scope that produced it, and nothing outside this memo reads the
+ * collection before the memo returns it. Pass ordering was tested as a hypothesis and ruled out:
+ * moving to upstream's order (non-escaping, non-reactive, unused, merge-invalidating, always-
+ * invalidating) leaves both cases firing.
+ *
+ * # Why the corpus could not catch this
+ *
+ * Not one of the 507 vendored upstream fixtures puts a loop inside a `useMemo`. The blind spot is
+ * the corpus's, not the port's, which is why this table is written here rather than vendored: there
+ * is nothing upstream to copy.
+ *
+ * # The four silent cases are the load-bearing half
+ *
+ * A fix that reaches zero by weakening the rule passes a table built only from the two failing
+ * cases. The four that must stay silent are what separates a repair from a removal, and they are
+ * each one variable away from a firing case: same loop without the mutation, same mutation without
+ * the loop, same collection built without either.
+ */
+func TestPreserveManualMemoizationLoopBuiltCollections(t *testing.T) {
+	t.Parallel()
+
+	const preamble = "import {useMemo} from 'react';\n"
+
+	for name, testCase := range map[string]struct {
+		source string
+		fires  bool
+	}{
+		"mapBuiltInLoop": {fires: false, source: preamble + `
+function Component(props) {
+  const map = useMemo(() => {
+    const result = new Map();
+    for (const member of props.members) {
+      result.set(member, member);
+    }
+    return result;
+  }, [props.members]);
+  return <div>{map.size}</div>;
+}
+`},
+		"arrayBuiltInLoop": {fires: false, source: preamble + `
+function Component(props) {
+  const list = useMemo(() => {
+    const result = [];
+    for (const member of props.members) {
+      result.push(member);
+    }
+    return result;
+  }, [props.members]);
+  return <div>{list.length}</div>;
+}
+`},
+		"loopWithoutMutation": {fires: false, source: preamble + `
+function Component(props) {
+  const total = useMemo(() => {
+    let sum = 0;
+    for (const member of props.members) {
+      sum = sum + member.length;
+    }
+    return sum;
+  }, [props.members]);
+  return <div>{total}</div>;
+}
+`},
+		"mutationWithoutLoop": {fires: false, source: preamble + `
+function Component(props) {
+  const map = useMemo(() => {
+    const result = new Map();
+    result.set(props.key, props.key);
+    return result;
+  }, [props.key]);
+  return <div>{map.size}</div>;
+}
+`},
+		"collectionWithoutMutation": {fires: false, source: preamble + `
+function Component(props) {
+  const map = useMemo(() => {
+    return new Map([['count', props.count]]);
+  }, [props.count]);
+  return <div>{map.size}</div>;
+}
+`},
+		"primitiveResult": {fires: false, source: preamble + `
+function Component(props) {
+  const doubled = useMemo(() => {
+    return props.count * 2;
+  }, [props.count]);
+  return <div>{doubled}</div>;
+}
+`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			result := runPreserveManualMemoization(t, name+".tsx", testCase.source)
+			if testCase.fires {
+				if len(result.Diagnostics) == 0 {
+					t.Errorf("%s: no findings, want at least one; if this now passes the rule "+
+						"stopped reporting a case it used to, which is the removal this table "+
+						"exists to catch", name)
+				}
+				return
+			}
+			if len(result.Diagnostics) != 0 {
+				t.Errorf("%s: %d findings, want none; a memo that mutates only what it created "+
+					"has nothing for the compiler to fail to preserve", name, len(result.Diagnostics))
+			}
+		})
+	}
+}
