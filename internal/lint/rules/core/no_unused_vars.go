@@ -107,23 +107,33 @@ var messageNoUnusedVars = rule.Message{
 // under the default args pattern (`ignored.rs:424`), while a variable named `_` is. That asymmetry
 // is upstream's and is reproduced.
 //
-// # This underscore default is the ENTIRE measured gap against `@typescript-eslint/no-unused-vars`
+// # This underscore default was the entire measured gap, and config has since closed it
 //
 // Measured on the ahra tree on 2026-09-05, driving the installed 8.67.0 rule through the ESLint
 // Linter API over 4,961 files and comparing against this rule's own dry run over the same tree.
-// The namespaced rule reports three findings; this rule reports two of them, at identical
+// The namespaced rule reported three findings; this rule reported two of them, at identical
 // file, line and column:
 //
 //	modules/google/analytics/AnalyticsTypes.ts:30:6   AnalyticsColumnWidthsInterface   both report
 //	modules/planetscale/PlanetScaleTypes.ts:6:6       ParsedRowInterface               both report
 //	modules/pensieve/PensieveBootstrap.test.ts:509:58 _nextContent                     only upstream
 //
-// The single missing finding is a destructured binding named `_nextContent`, and it is missing
-// because of the underscore default above rather than because of anything structural. Setting
-// `varsIgnorePattern` to `^$` in the config reproduces all three at exactly upstream's positions,
-// with no code change and no other movement anywhere in the tree. That measurement is why the gap
-// is recorded here rather than closed: which default this tree wants is a configuration decision,
-// and reversing it in the rule would reverse it for the oxc differential too.
+// The single missing finding was a destructured binding named `_nextContent`, missing because of
+// the underscore default above rather than because of anything structural. That reading said the
+// remedy was `varsIgnorePattern` set to `^$` in the config, which is a configuration decision
+// rather than a rule change, because reversing the default in the rule would reverse it for the
+// oxc differential too.
+//
+// Re-measured on 2026-09-07 against the ahra tree's uncached differential: all three sites now
+// report from both engines, `_nextContent` at 509:58 included. `CohereSettings.json` carries
+// `varsIgnorePattern` and `argsIgnorePattern` at `^$`, so the remedy the paragraph above predicted
+// is what someone applied. The default described in this comment is unchanged and still oxc's; it
+// is simply no longer reached on this tree.
+//
+// Both readings are kept because they are both true, of different configurations, and a reader who
+// finds only the first will go looking for a defect that a config file already answered. The gap is
+// a property of the config rather than of this rule, which is also why it can come back: that
+// setting closes it, and removing it opens it again.
 //
 // Worth stating plainly because it has been assumed twice in the other direction: the missing
 // finding is NOT evidence that this rule is blind to type declarations. It is not. A seeded probe
