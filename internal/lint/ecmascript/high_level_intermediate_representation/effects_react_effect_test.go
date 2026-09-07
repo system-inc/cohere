@@ -14,15 +14,17 @@ const effectHookDeclarations = `declare module 'react' {
 export function useEffect(callback: () => unknown, dependencies?: unknown[]): void;
 export function useLayoutEffect(callback: () => unknown, dependencies?: unknown[]): void;
 export function useInsertionEffect(callback: () => unknown, dependencies?: unknown[]): void;
+export function useImperativeHandle(reference: unknown, create: unknown): void;
 export function useCallback<T>(callback: T, dependencies: unknown[]): T;
 const React: {useState: typeof useState; useMemo: typeof useMemo; useCallback: typeof useCallback;
-useEffect: typeof useEffect; useLayoutEffect: typeof useLayoutEffect; useInsertionEffect: typeof useInsertionEffect};
+useEffect: typeof useEffect; useLayoutEffect: typeof useLayoutEffect; useInsertionEffect: typeof useInsertionEffect;
+useImperativeHandle: typeof useImperativeHandle};
 export default React;
 }`
 
 func TestEffectHookSignaturesFollowImportOrigin(t *testing.T) {
 	t.Parallel()
-	for _, hook := range []string{"useEffect", "useLayoutEffect", "useInsertionEffect"} {
+	for _, hook := range []string{"useEffect", "useLayoutEffect", "useInsertionEffect", "useImperativeHandle"} {
 		for _, testCase := range []struct {
 			name       string
 			prefix     string
@@ -108,6 +110,32 @@ func TestEffectHookSignaturesFollowImportOrigin(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestImperativeHandleDoesNotPromoteStableSetter(t *testing.T) {
+	t.Parallel()
+	const source = `import React from 'react'; function Component({ref,value}) {
+const reference=React.useRef(null);
+const [state,setState]=React.useState(false);
+React.useImperativeHandle(ref,()=>({focus:()=>reference.current?.focus()}));
+const callback=React.useCallback(()=>{setState(false)},[]);
+return <button ref={reference} onClick={callback}>{state}</button>;
+}`
+	for _, testCase := range []struct {
+		name, source string
+		findings     int
+	}{
+		{"handle", source, 0},
+		{"without handle", strings.Replace(source, "React.useImperativeHandle(ref,()=>({focus:()=>reference.current?.focus()}));", "", 1), 0},
+		{"missing dependency", strings.Replace(source, "setState(false)", "setState(value)", 1), 1},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			findings, lowered := findingsForSource(t, testCase.source)
+			if !lowered || len(findings) != testCase.findings {
+				t.Fatalf("lowered=%t findings=%v, want %d findings", lowered, findings, testCase.findings)
+			}
+		})
 	}
 }
 

@@ -1294,7 +1294,7 @@ func lookupSignature(function *Function, instruction *Instruction, name string) 
 		switch origin.Export {
 		case "useEffect":
 			return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: EffectValuePrimitive}, true
-		case "useLayoutEffect", "useInsertionEffect":
+		case "useLayoutEffect", "useInsertionEffect", "useImperativeHandle":
 			return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: EffectValueFrozen}, true
 		}
 	}
