@@ -771,3 +771,54 @@ func TestDecodeNoFloatingPromisesOptions(t *testing.T) {
 		rule_testing.ExpectClean(t, runNoFloatingPromises(t, source, decoded))
 	})
 }
+
+// TestNoFloatingPromisesResolvesThroughANamespaceImport pins that an allowlisted call is recognised
+// when it arrives through a namespace import rather than a named one.
+//
+// `import * as Runner from './runner'` then `Runner.describe(...)` is the same function as
+// `import { describe }` then `describe(...)`, and upstream exempts both. Written after an
+// `allowForKnownSafeCalls` experiment on the ahra tree cleared 144 of this rule's 150 findings
+// against ESLint's 150, which made namespace imports look like the boundary. They are not: this
+// test passes, and the six survivors are all `describe` reached through either import form. The
+// test is kept because the property is worth holding and nothing else held it.
+//
+// Written against the multi-file harness deliberately. A single-file `declare module` does not
+// resolve its own imports here, so both forms report nothing at all and every assertion passes
+// without testing anything. That is measured, not assumed: a local object with a promise-returning
+// method reports `floatingVoid`, and the same call through a declared module reports nothing in
+// either import form.
+func TestNoFloatingPromisesResolvesThroughANamespaceImport(t *testing.T) {
+	t.Parallel()
+
+	const runnerModule = "export function describe(name: string, action: () => void): Promise<void> {\n" +
+		"  return Promise.resolve();\n" +
+		"}\n" +
+		"export function teardown(): Promise<void> {\n" +
+		"  return Promise.resolve();\n" +
+		"}\n"
+
+	options := NoFloatingPromisesOptions{
+		AllowForKnownSafeCalls: []type_checking.TypeOrValueSpecifier{
+			{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"describe"}, Path: "runner.ts"},
+		},
+	}
+
+	runWith := func(t *testing.T, entry string) rule_testing.Result {
+		t.Helper()
+		return rule_testing.RunTypedFilesWithOptions(t, NoFloatingPromises, map[string]string{
+			"runner.ts":            runnerModule,
+			noFloatingPromisesFile: entry,
+		}, noFloatingPromisesFile, options)
+	}
+
+	// The control comes first, because it is what proves the other two mean anything: same module,
+	// same namespace, a name the allowlist does not carry.
+	rule_testing.ExpectFindings(t,
+		runWith(t, "import * as Runner from './runner';\nRunner.teardown();\n"), "floatingVoid")
+
+	rule_testing.ExpectClean(t,
+		runWith(t, "import { describe } from './runner';\ndescribe('...', () => {});\n"))
+
+	rule_testing.ExpectClean(t,
+		runWith(t, "import * as Runner from './runner';\nRunner.describe('...', () => {});\n"))
+}
