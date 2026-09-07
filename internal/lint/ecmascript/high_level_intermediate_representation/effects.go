@@ -655,11 +655,16 @@ func InferAliasingEffects(function *Function) *AliasingEffects {
 	if function == nil {
 		return effects
 	}
+	primitiveProperties := inferPrimitivePropertyReads(function)
 	for _, instruction := range function.Instructions {
 		if instruction == nil {
 			continue
 		}
-		if list := effectsForInstruction(function, instruction); len(list) > 0 {
+		list := effectsForInstruction(function, instruction)
+		if _, property := instruction.Value.(*PropertyLoad); property && primitiveProperties[instruction.LValue.Identifier] {
+			list = []AliasingEffect{create(instruction.LValue, EffectValuePrimitive)}
+		}
+		if len(list) > 0 {
 			effects.byInstruction[instruction.Id] = list
 		}
 	}
