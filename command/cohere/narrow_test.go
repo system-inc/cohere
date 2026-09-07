@@ -166,3 +166,47 @@ func itoaForTest(value int) string {
 	}
 	return string(digits)
 }
+
+// TestAChangedLintConfigWidensTheScope holds the one changed file that must not narrow anything.
+//
+// A rule config decides what every file means, and no import edge carries that relationship: the
+// dependent closure reaches consumers of an edited module and has nothing to say about a rule
+// turning off. Measured before this guard existed, on the real tree: setting `eqeqeq` to off and
+// asking `--changed` checked 3 files and said nothing about the 68 findings that had just stopped
+// existing.
+//
+// The assertion is on the path comparison rather than on a whole run, because that is where it
+// broke. `--directory` defaults to empty, so resolving the config against the flag left a relative
+// name that never matched an absolute scope entry, and the guard silently never fired. Same defect
+// `namedPathsScope` hit, arriving through a different door.
+func TestAChangedLintConfigWidensTheScope(t *testing.T) {
+	directory := t.TempDir()
+	configPath := filepath.Join(directory, "CohereSettings.json")
+
+	changed := formatScope{
+		FileNames: []string{configPath, filepath.Join(directory, "Edited.ts")},
+		index: map[string]struct{}{
+			configPath:                            {},
+			filepath.Join(directory, "Edited.ts"): {},
+		},
+	}
+
+	if !scopeCoversLintConfig(changed, "CohereSettings.json", directory) {
+		t.Error("a changed config was not recognised in the scope, so the guard would never fire")
+	}
+
+	// The control, and it is the half that broke: resolving against an empty directory leaves the
+	// path relative, and a relative path matches nothing in a scope built from absolute names.
+	if scopeCoversLintConfig(changed, "CohereSettings.json", "") {
+		t.Error("a bare relative config path matched an absolute scope, which cannot happen")
+	}
+
+	// And a scope without the config must not be widened, or the flag would never narrow at all.
+	sourceOnly := formatScope{
+		FileNames: []string{filepath.Join(directory, "Edited.ts")},
+		index:     map[string]struct{}{filepath.Join(directory, "Edited.ts"): {}},
+	}
+	if scopeCoversLintConfig(sourceOnly, "CohereSettings.json", directory) {
+		t.Error("a scope holding no config reported one")
+	}
+}

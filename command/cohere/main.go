@@ -282,7 +282,26 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("asking what changed: %w", err)
 		}
-		lintScope, projectFiles = narrowToClosure(graph, scope, projectFiles)
+
+		// A changed rule config changes what every file means, and no import edge carries that.
+		//
+		// Measured: turning `eqeqeq` off and asking `--changed` checked 3 files and said nothing
+		// about the 68 findings that had just stopped existing. The closure cannot help, because the
+		// relationship is not an import; the config reaches every file at once.
+		//
+		// So the config is the one changed file that widens the scope instead of narrowing it. The
+		// whole tree is the only answer that is not a guess about which rules moved.
+		// Resolved against the graph's directory rather than the flag's, which defaults to empty and
+		// would leave a relative path that never matches an absolute scope entry. That is the same
+		// defect `namedPathsScope` hit and the same one its fixture asserts against, arriving here
+		// through a different door.
+		if scopeCoversLintConfig(scope, *lintConfigFileName, graph.Config.GetCurrentDirectory()) {
+			fmt.Fprintf(os.Stderr,
+				"note: %s changed, which changes what every file means, so the whole tree is checked\n",
+				*lintConfigFileName)
+		} else {
+			lintScope, projectFiles = narrowToClosure(graph, scope, projectFiles)
+		}
 	}
 
 	if lintScope.Everything {
@@ -1005,6 +1024,20 @@ func printSuppressionCoverage(coverage program.Coverage) {
 			)
 		}
 	}
+}
+
+// scopeCoversLintConfig reports whether a changed-file scope contains the lint config itself.
+//
+// Its own function so a fixture can hold the comparison rather than reconstruct it. The
+// reconstruction is what makes this untestable in place: asserting that `resolveLintConfigPath`
+// plus `Clean` matches an absolute scope entry is a true statement about two helpers and says
+// nothing about whether the call site passes them the right directory.
+//
+// It passed the wrong one first. `--directory` defaults to empty, so resolving against the flag
+// left a bare relative name that never matched an absolute scope entry, and the guard silently
+// never fired. Resolving against the graph's directory is what makes it fire.
+func scopeCoversLintConfig(scope formatScope, configFileName string, currentDirectory string) bool {
+	return scope.includes(filepath.Clean(resolveLintConfigPath(configFileName, currentDirectory)))
 }
 
 // resolveLintConfigPath finds the lint config relative to the directory paths resolve against.
