@@ -272,3 +272,38 @@ func TestAReusedPhaseIsNotDoubleCounted(t *testing.T) {
 			"contributing nothing:\n  %q", got)
 	}
 }
+
+// TestCoverageNamesTheFilesItDidNotLookAt holds the dimension the phase lines cannot express.
+//
+// A run narrowed to one file runs every phase it was asked for, so the phase lines report a
+// complete run and the existing sentence points at them. On the ahra tree that reads as
+// `this run did not check everything — the phases above say what was not checked` for a run that
+// visited 1 file of 3,542, and the phases say nothing about the other 3,541.
+//
+// The gap is the larger of the two: skipping a phase withholds one kind of finding, and skipping
+// files withholds every kind on every file skipped.
+func TestCoverageNamesTheFilesItDidNotLookAt(t *testing.T) {
+	scoped := &pipelineReport{filesInScope: 5, filesInProgram: 3542}
+	scoped.record(phaseLint, outcomeRan, 8*time.Millisecond, "")
+
+	if rendered := render(scoped); !strings.Contains(rendered, "checked 5 of 3542 files") {
+		t.Errorf("a scoped run should name both numbers:\n%s", rendered)
+	}
+
+	// The control, and it is what stops this from becoming a line on every run. A run over the whole
+	// program has nothing to disclose, and a warning that fires always is one people stop reading.
+	whole := &pipelineReport{filesInScope: 3542, filesInProgram: 3542}
+	whole.record(phaseLint, outcomeRan, 8*time.Millisecond, "")
+
+	if rendered := render(whole); strings.Contains(rendered, "of 3542 files") {
+		t.Errorf("an unscoped run should say nothing about file scope:\n%s", rendered)
+	}
+
+	// A report that was never told the numbers says nothing either, rather than reporting 0 of 0.
+	silent := &pipelineReport{}
+	silent.record(phaseLint, outcomeRan, 8*time.Millisecond, "")
+
+	if rendered := render(silent); strings.Contains(rendered, "files — the rest") {
+		t.Errorf("a report with no scope numbers should not invent them:\n%s", rendered)
+	}
+}

@@ -321,7 +321,12 @@ func run() error {
 	}
 
 	findings := 0
-	report := &pipelineReport{graph: buildDuration, processStart: processStart}
+	report := &pipelineReport{
+		graph:          buildDuration,
+		processStart:   processStart,
+		filesInScope:   len(projectFiles),
+		filesInProgram: wholeProgramCount,
+	}
 
 	// Phase 2: fix and format. Mutation runs before anything reports, so every phase downstream sees
 	// the repaired tree rather than findings a fixer would have silently repaired.

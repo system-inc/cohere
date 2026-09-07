@@ -106,6 +106,14 @@ type pipelineReport struct {
 	// to a reader deciding where the time went, and is not one of the records because nothing can
 	// skip it.
 	graph time.Duration
+	// filesInScope and filesInProgram say how much of the tree this run visited.
+	//
+	// Zero means the run was not scoped and the coverage line has nothing to add. Anything else is a
+	// deliberate narrowing whose size the phase lines cannot express: they report which phases ran,
+	// and a run that checked one file out of 3,542 in every phase looks complete to them.
+	filesInScope   int
+	filesInProgram int
+
 	// processStart is when the process began, as close to it as a Go program can observe.
 	//
 	// Recorded so the phase line can state its own completeness. Summing the phases and calling it
@@ -255,6 +263,17 @@ func (r *pipelineReport) Write(out io.Writer) {
 	// no finding, and `--lint` alone is a deliberate narrowing whose own phase line already says so;
 	// warning on those would put the sentence on ordinary runs until people stopped reading it,
 	// which would cost exactly the case it exists for.
+	// File scope is its own dimension and the phase lines cannot express it. A run narrowed to one
+	// file ran every phase it was asked for, so `the phases above say what was not checked` points a
+	// reader at lines that answer a different question.
+	//
+	// Said first, and with both numbers, because it is the larger gap: skipping a phase withholds one
+	// kind of finding, and checking 1 file of 3,542 withholds every kind on 3,541 files.
+	if r.filesInScope > 0 && r.filesInScope < r.filesInProgram {
+		fmt.Fprintf(out, "  this run checked %d of %d files — the rest were not looked at\n",
+			r.filesInScope, r.filesInProgram)
+	}
+
 	if !r.checkedEverything() {
 		fmt.Fprintf(out, "  this run did not check everything — the phases above say what was not checked\n")
 	}
