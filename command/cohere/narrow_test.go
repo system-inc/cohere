@@ -191,14 +191,38 @@ func TestAChangedLintConfigWidensTheScope(t *testing.T) {
 		},
 	}
 
-	if !scopeCoversLintConfig(changed, "CohereSettings.json", directory) {
+	if changedConfiguration(changed, &program.Graph{ConfigFileName: filepath.Join(directory, "tsconfig.json")},
+		"CohereSettings.json") == "" {
 		t.Error("a changed config was not recognised in the scope, so the guard would never fire")
 	}
 
 	// The control, and it is the half that broke: resolving against an empty directory leaves the
 	// path relative, and a relative path matches nothing in a scope built from absolute names.
-	if scopeCoversLintConfig(changed, "CohereSettings.json", "") {
+	if changedConfiguration(changed, &program.Graph{}, "CohereSettings.json") != "" {
 		t.Error("a bare relative config path matched an absolute scope, which cannot happen")
+	}
+
+	// The tsconfig that built the program is the second kind, and it reaches every file the same way.
+	// Changing `target` alters how every file is checked and no import edge carries that.
+	tsconfigPath := filepath.Join(directory, "tsconfig.json")
+	withTsconfig := formatScope{
+		FileNames: []string{tsconfigPath},
+		index:     map[string]struct{}{tsconfigPath: {}},
+	}
+	if changedConfiguration(withTsconfig, &program.Graph{ConfigFileName: tsconfigPath}, "CohereSettings.json") == "" {
+		t.Error("a changed tsconfig was not recognised")
+	}
+
+	// And a tsconfig reached through `extends` is the third. On the real tree the root holds one
+	// line, `extends`, and every option and include pattern lives in the base it points at, so a
+	// guard checking only the root would miss every real change to how the program is built.
+	basePath := filepath.Join(directory, "Base.jsonc")
+	withBase := formatScope{
+		FileNames: []string{basePath},
+		index:     map[string]struct{}{basePath: {}},
+	}
+	if changedConfiguration(withBase, &program.Graph{ConfigFileName: tsconfigPath}, "CohereSettings.json") != "" {
+		t.Error("a graph with no extends chain reported one of its files as changed")
 	}
 
 	// And a scope without the config must not be widened, or the flag would never narrow at all.
@@ -206,7 +230,8 @@ func TestAChangedLintConfigWidensTheScope(t *testing.T) {
 		FileNames: []string{filepath.Join(directory, "Edited.ts")},
 		index:     map[string]struct{}{filepath.Join(directory, "Edited.ts"): {}},
 	}
-	if scopeCoversLintConfig(sourceOnly, "CohereSettings.json", directory) {
+	if changedConfiguration(sourceOnly, &program.Graph{ConfigFileName: filepath.Join(directory, "tsconfig.json")},
+		"CohereSettings.json") != "" {
 		t.Error("a scope holding no config reported one")
 	}
 }

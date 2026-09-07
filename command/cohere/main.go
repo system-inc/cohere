@@ -291,14 +291,19 @@ func run() error {
 		//
 		// So the config is the one changed file that widens the scope instead of narrowing it. The
 		// whole tree is the only answer that is not a guess about which rules moved.
+		// Measured twice, once per kind. Turning `eqeqeq` off and asking `--changed` checked 3 files
+		// and said nothing about the 68 findings that had just stopped existing. Changing `target` in
+		// the tsconfig did the same: 3 files, no note, while every file in the program was now being
+		// checked against different compiler options.
+		//
 		// Resolved against the graph's directory rather than the flag's, which defaults to empty and
 		// would leave a relative path that never matches an absolute scope entry. That is the same
 		// defect `namedPathsScope` hit and the same one its fixture asserts against, arriving here
 		// through a different door.
-		if scopeCoversLintConfig(scope, *lintConfigFileName, graph.Config.GetCurrentDirectory()) {
+		if changedConfig := changedConfiguration(scope, graph, *lintConfigFileName); changedConfig != "" {
 			fmt.Fprintf(os.Stderr,
 				"note: %s changed, which changes what every file means, so the whole tree is checked\n",
-				*lintConfigFileName)
+				filepath.Base(changedConfig))
 		} else {
 			lintScope, projectFiles = narrowToClosure(graph, scope, projectFiles)
 		}
@@ -1026,7 +1031,13 @@ func printSuppressionCoverage(coverage program.Coverage) {
 	}
 }
 
-// scopeCoversLintConfig reports whether a changed-file scope contains the lint config itself.
+// changedConfiguration names the configuration file in a changed-file scope, or empty when none is.
+//
+// Three kinds, and all three reach every file at once: the rule config, the tsconfig that built the
+// program, and every tsconfig that one extends. The extends chain matters here rather than being a
+// completeness gesture. On this tree the root tsconfig holds one line, `extends`, and every option
+// and every include pattern lives in the base it points at, so a guard checking only the root would
+// miss every real change to how the program is built.
 //
 // Its own function so a fixture can hold the comparison rather than reconstruct it. The
 // reconstruction is what makes this untestable in place: asserting that `resolveLintConfigPath`
@@ -1036,8 +1047,34 @@ func printSuppressionCoverage(coverage program.Coverage) {
 // It passed the wrong one first. `--directory` defaults to empty, so resolving against the flag
 // left a bare relative name that never matched an absolute scope entry, and the guard silently
 // never fired. Resolving against the graph's directory is what makes it fire.
-func scopeCoversLintConfig(scope formatScope, configFileName string, currentDirectory string) bool {
-	return scope.includes(filepath.Clean(resolveLintConfigPath(configFileName, currentDirectory)))
+func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFileName string) string {
+	currentDirectory := ""
+	if graph.Config != nil {
+		currentDirectory = graph.Config.GetCurrentDirectory()
+	}
+
+	// The lint config resolves against the graph's directory when there is one, and against the
+	// tsconfig's own directory otherwise. Both are the tree root in practice, and falling back to the
+	// empty string would leave a relative path that matches nothing, which is how the first version
+	// of this guard was silently inert.
+	if currentDirectory == "" && graph.ConfigFileName != "" {
+		currentDirectory = filepath.Dir(graph.ConfigFileName)
+	}
+
+	candidates := []string{resolveLintConfigPath(lintConfigFileName, currentDirectory), graph.ConfigFileName}
+	if graph.Config != nil {
+		candidates = append(candidates, graph.Config.ExtendedSourceFiles()...)
+	}
+
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if scope.includes(filepath.Clean(candidate)) {
+			return candidate
+		}
+	}
+	return ""
 }
 
 // resolveLintConfigPath finds the lint config relative to the directory paths resolve against.
