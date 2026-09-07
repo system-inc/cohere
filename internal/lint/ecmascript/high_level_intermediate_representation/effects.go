@@ -818,7 +818,7 @@ func effectsForInstruction(function *Function, instruction *Instruction) []Alias
 
 	case *ComputedLoad:
 		return []AliasingEffect{
-			create(lvalue, EffectValueMutable),
+			flow(AliasingEffectCreateFrom, value.Object, lvalue),
 			flow(AliasingEffectCapture, value.Object, lvalue),
 			flow(AliasingEffectImmutableCapture, value.Property, lvalue),
 		}
