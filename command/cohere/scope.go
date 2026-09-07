@@ -42,6 +42,10 @@ type formatScope struct {
 	// Everything is whether the scope is the whole tree rather than a subset.
 	Everything bool
 
+	// DependentCount is how many files were added because they import something named, so the
+	// coverage line can say why more was checked than was asked for.
+	DependentCount int
+
 	// RequestDescription says what the caller asked for, as opposed to what was found. A named
 	// directory enumerates every file under it, most of which the program never contained, so the
 	// enumerated count is not a number anybody wants beside the count actually checked.

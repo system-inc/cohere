@@ -267,7 +267,25 @@ func run() error {
 		}
 		lintScope = scope
 		if !scope.Everything {
-			projectFiles = filterToScope(projectFiles, scope)
+			named := filterToScope(projectFiles, scope)
+
+			// The named files alone are not the answer. A change to an exported type breaks its
+			// consumers, and those findings would vanish rather than appear: demonstrated by giving
+			// one function an `any` return, which produced seven new findings across the tree, four of
+			// them in a consumer two directories from the edit.
+			//
+			// Above the closure limit the honest answer is the whole tree, because a truncated
+			// closure would be fast and silently miss findings, which is worse than being slow.
+			closure, within := graph.DependentClosure(named)
+			if !within {
+				lintScope = formatScope{Everything: true}
+				fmt.Fprintf(os.Stderr,
+					"note: %s reaches more than %d files through imports, so the whole tree is checked\n",
+					scope.RequestDescription, program.DependentClosureLimit)
+			} else {
+				projectFiles = closure
+				lintScope.DependentCount = len(closure) - len(named)
+			}
 		}
 	}
 
@@ -284,11 +302,22 @@ func run() error {
 		// count beside the enumerated one made `58 in scope (2685 named paths)`, two true numbers
 		// that read as a contradiction. The enumerated count is dropped and the description says
 		// what was asked for instead.
-		fmt.Printf(
-			"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s)\n",
-			round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
-			len(projectFiles), lintScope.RequestDescription,
-		)
+		// The dependent count is named rather than folded into the total, because a reader who asked
+		// for one file and sees eleven checked should be told why without having to know that this
+		// binary walks imports at all.
+		if lintScope.DependentCount > 0 {
+			fmt.Printf(
+				"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s plus %d that import it)\n",
+				round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
+				len(projectFiles), lintScope.RequestDescription, lintScope.DependentCount,
+			)
+		} else {
+			fmt.Printf(
+				"graph built in %s — %d files in the program, %d of them ours, %d in scope (%s)\n",
+				round(buildDuration), len(graph.SourceFiles()), wholeProgramCount,
+				len(projectFiles), lintScope.RequestDescription,
+			)
+		}
 	}
 
 	findings := 0
