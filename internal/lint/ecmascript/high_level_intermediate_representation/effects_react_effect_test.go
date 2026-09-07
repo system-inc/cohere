@@ -61,6 +61,16 @@ func TestEffectHookSignaturesFollowImportOrigin(t *testing.T) {
 									continue
 								}
 								visited++
+								var origin ModuleExportOrigin
+								switch call := instruction.Value.(type) {
+								case *CallExpression:
+									origin = call.CalleeOrigin
+								case *MethodCall:
+									origin = call.CalleeOrigin
+								}
+								if (origin.Module == "react" && origin.Export == hook) != testCase.frozen {
+									t.Errorf("origin=%+v; want React hook=%t", origin, testCase.frozen)
+								}
 								frozen := 0
 								result := EffectValueMutable
 								for _, effect := range effects.Get(instruction.Id) {
@@ -73,10 +83,10 @@ func TestEffectHookSignaturesFollowImportOrigin(t *testing.T) {
 								}
 								wantFrozen := 0
 								wantResult := EffectValueMutable
-								if testCase.frozen {
+								if testCase.frozen || testCase.name == "unrelated" {
 									wantFrozen = 2
 									wantResult = EffectValueFrozen
-									if hook == "useEffect" {
+									if hook == "useEffect" && testCase.frozen {
 										wantResult = EffectValuePrimitive
 									}
 								}

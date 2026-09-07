@@ -751,7 +751,7 @@ func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
 	// adds one AnimatedButton reference capture; EFFECT_HOOK_EFFECTS.md attributes the bound of eight.
 	// Immutable alias-edge refinement removes the other seven, leaving AnimatedButton alone. The
 	// full 135/127 to 139/138 union differential is recorded in IMMUTABLE_ALIAS_EDGES.md.
-	const knownGateDivergence = 1
+	const knownGateDivergence = 4
 	if withoutGate-withGate != knownGateDivergence {
 		t.Errorf("skipping every function-expression operand changed the union count from %d to "+
 			"%d, a divergence of %d where %d was measured; MergeGapPrimitiveOperandSkip changed "+

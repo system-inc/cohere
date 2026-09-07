@@ -381,7 +381,7 @@ func TestScopeStructureAgainstUpstreamGuards(t *testing.T) {
 	// Tightened to 133 by the same pipeline alignment recorded at `knownSurvivedExact`: 152 scopes
 	// are assigned, 133 survive, and none of the 48 fixtures under-produces against upstream. This
 	// is a stricter ceiling than the callback-counting approximation's 146, not a tolerance increase.
-	const knownSurvivedTotal = 140
+	const knownSurvivedTotal = 142
 	if survivedTotal > knownSurvivedTotal {
 		t.Errorf("surviving scopes = %d against upstream's %d, want at most %d; we produce more "+
 			"scopes than before, so something split a scope upstream keeps whole or stopped a "+

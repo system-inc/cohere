@@ -1287,6 +1287,9 @@ func lookupSignature(function *Function, instruction *Instruction, name string) 
 			return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: EffectValueFrozen}, true
 		}
 	}
+	if origin.Module != "react" && isModuleHookCall(function, instruction) {
+		return customHookSignature(function), true
+	}
 	if name == "" {
 		return effectSignature{}, false
 	}

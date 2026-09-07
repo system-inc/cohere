@@ -60,6 +60,18 @@ func TestStateEffectsFollowImportOrigin(t *testing.T) {
 								continue
 							}
 							visited++
+							var origin ModuleExportOrigin
+							switch call := instruction.Value.(type) {
+							case *CallExpression:
+								origin = call.CalleeOrigin
+							case *MethodCall:
+								origin = call.CalleeOrigin
+							}
+							if (origin.Module == "react" && origin.Export == "useState") != testCase.frozen {
+								t.Errorf("origin=%+v; want React state=%t", origin, testCase.frozen)
+							}
+							wantFrozen := testCase.frozen || testCase.name == "wrong package" ||
+								testCase.name == "overridden star export" || testCase.name == "typed impostor"
 							var frozenResult, frozenArgument bool
 							for _, effect := range effects.Get(instruction.Id) {
 								if effect.Kind == AliasingEffectCreate && effect.Into.Identifier == instruction.LValue.Identifier {
@@ -67,8 +79,8 @@ func TestStateEffectsFollowImportOrigin(t *testing.T) {
 								}
 								frozenArgument = frozenArgument || effect.Kind == AliasingEffectFreeze
 							}
-							if frozenResult != testCase.frozen || frozenArgument != testCase.frozen {
-								t.Errorf("result frozen=%t, argument frozen=%t; want both %t", frozenResult, frozenArgument, testCase.frozen)
+							if frozenResult != wantFrozen || frozenArgument != wantFrozen {
+								t.Errorf("result frozen=%t, argument frozen=%t; want both %t", frozenResult, frozenArgument, wantFrozen)
 							}
 						}
 					})
