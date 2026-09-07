@@ -1039,6 +1039,18 @@ func printSuppressionCoverage(coverage program.Coverage) {
 // and every include pattern lives in the base it points at, so a guard checking only the root would
 // miss every real change to how the program is built.
 //
+// Dependencies are deliberately not a fourth kind, and the reason is worth stating because
+// `package.json` looks like the obvious next entry. It is a declaration; the checker reads
+// `node_modules`, and the two move independently: a version edited with no install changes nothing
+// the program can see, and an install changes every consumer of a package without touching a
+// tracked file. `node_modules` is gitignored, so git cannot report the change that actually
+// matters. A guard on `package.json` would fire on the edits that mean nothing and stay silent on
+// the ones that mean everything, which is worse than the gap it appears to close.
+//
+// So a dependency change is a real limit of `--changed` rather than a defect in it. The honest
+// answer after an install is a whole-tree run, and the coverage line saying how many files were
+// checked is what leaves that visible.
+//
 // Its own function so a fixture can hold the comparison rather than reconstruct it. The
 // reconstruction is what makes this untestable in place: asserting that `resolveLintConfigPath`
 // plus `Clean` matches an absolute scope entry is a true statement about two helpers and says
