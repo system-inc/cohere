@@ -144,7 +144,15 @@ name identifies its anonymous function.
 | useGraphQlInfiniteScroll.ts useGraphQlInfiniteScroll | 0/3 | 0/14 |
 | useTimeSeriesState.tsx useTimeSeriesState | 0/0 | 0/2 |
 
-A committed population comparison is still required. The preceding effect-hook
-commit measures 162 on the frozen snapshot; do not quote a working-tree binary as
-a reproducible population result.
+## Committed population
 
+The `f693b4f` archive binary measures 45 findings on the same frozen snapshot,
+against 162 at `a9b43dd`: 121 removed, four added and 41 unchanged. Its SHA256 is
+`4d49218e9563ebdeeda6d5d9c759087c9895abad8a1326dadec6cc692bb7d57e`.
+
+There are 29 covering CompileSuccess occurrences, hence confirmed false positives,
+and 16 bailout-covered occurrences (15 Todo, one Suppression). Three of the four
+additions are confirmed false positives: FinancePeopleView at 79:27 and two
+TableRoot occurrences sharing 342:11. The InputMultipleSelect addition at 124:18
+is Todo-covered and remains unadjudicated. A net reduction does not excuse the
+three regressions, and the parent task remains open.
