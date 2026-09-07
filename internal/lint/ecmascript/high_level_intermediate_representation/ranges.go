@@ -1371,6 +1371,11 @@ type pendingMutation struct {
 // and the result is a range table that is subtly narrow or subtly wide with no invariant violated.
 // They are transcribed one for one against both implementations for that reason.
 func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasingState, []pendingMutation) {
+	return buildAliasingGraphWithContextKinds(function, effects, nil)
+}
+
+func buildAliasingGraphWithContextKinds(function *Function, effects *AliasingEffects,
+	contextKinds map[IdentifierId]EffectValueKind) (*aliasingState, []pendingMutation) {
 	state := newAliasingState()
 	refs := refDerivedValues(function)
 	var mutations []pendingMutation
@@ -1399,6 +1404,9 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 	}
 	for _, contextValue := range function.Context {
 		state.create(contextValue, aliasingNodeObject)
+		if kind, known := contextKinds[contextValue.Identifier]; known && kind != EffectValueMutable {
+			state.markImmutable(contextValue.Identifier, kind)
+		}
 	}
 	// The return value is an entry value too. Upstream creates its node beside the params and
 	// context, and adds an alias edge into it at every `return` terminal, so a mutation of a
@@ -1468,7 +1476,7 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 						for _, capture := range expression.Captures {
 							allImmutable = allImmutable && state.notMutable(capture.Identifier) && !refs[capture.Identifier]
 						}
-						if allImmutable && int(expression.Function) < len(function.Functions) && hasReadOnlyClosureEffects(function.Functions[expression.Function], map[*Function]bool{}) {
+						if allImmutable && int(expression.Function) < len(function.Functions) && hasReadOnlyClosureEffectsForCaptures(function.Functions[expression.Function], expression.Captures, state.immutable) {
 							effect.Value = EffectValueFrozen
 						}
 					}

@@ -1,5 +1,64 @@
 package high_level_intermediate_representation
 
+func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, kinds map[IdentifierId]EffectValueKind) bool {
+	if hasReadOnlyClosureEffects(function, map[*Function]bool{}) {
+		return true
+	}
+	if function == nil || len(function.Context) != len(captures) {
+		return false
+	}
+	contextKinds := map[IdentifierId]EffectValueKind{}
+	hasMixedCapture := false
+	for index, capture := range captures {
+		kind, known := kinds[capture.Identifier]
+		if !known || kind == EffectValueMutable || kind == EffectValueGlobal {
+			return false
+		}
+		hasMixedCapture = hasMixedCapture || kind == EffectValueMaybeFrozen
+		contextKinds[function.Context[index].Identifier] = kind
+	}
+	if !hasMixedCapture {
+		return false
+	}
+	effects := InferAliasingEffects(function)
+	producers := map[IdentifierId]InstructionValue{}
+	for _, instruction := range function.Instructions {
+		if instruction != nil {
+			producers[instruction.LValue.Identifier] = instruction.Value
+		}
+	}
+	for _, instruction := range function.Instructions {
+		if instruction == nil {
+			continue
+		}
+		switch value := instruction.Value.(type) {
+		case *Await, *StoreGlobal, *StoreContext, *ObjectMethod, *NewExpression, *FunctionExpression:
+			return false
+		case *LoadGlobal:
+			if value.Name == "Date" {
+				return false
+			}
+		case *MethodCall:
+			if _, known := lookupSignature(function, instruction, calleeName(function, instruction, value.Property)); !known {
+				return false
+			}
+		case *CallExpression:
+			if _, known := lookupSignature(function, instruction, calleeName(function, instruction, value.Callee)); !known {
+				if _, global := producers[value.Callee.Identifier].(*LoadGlobal); !global {
+					return false
+				}
+			}
+		}
+		for _, effect := range effects.Get(instruction.Id) {
+			if effect.Kind == AliasingEffectFreeze {
+				return false
+			}
+		}
+	}
+	_, mutations := buildAliasingGraphWithContextKinds(function, effects, contextKinds)
+	return len(mutations) == 0
+}
+
 func hasReadOnlyClosureEffects(function *Function, seen map[*Function]bool) bool {
 	if function == nil || seen[function] {
 		return false
