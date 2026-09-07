@@ -94,6 +94,9 @@ Before this repair, the exact `12a6f28` archive binary reports ten occurrences o
 the frozen ahra snapshot: three covered by reference CompileSuccess and seven
 covered by bailouts. Its SHA-256 is
 `7a2183f7faf087413ec56cd210462941bf648e039ad1d67308cfd8fe5bce3b03`.
-The private exact-source probe clears TasksCenter but retains both TimeSeriesChart
-findings. A fresh committed-binary population differential is still required;
-the seven bailouts are not evidence of either correctness or incorrectness.
+The exact `42239d3` archive binary reports nine occurrences: one removed, none
+added, nine unchanged. TasksCenter is cleared; both TimeSeriesChart findings
+remain covered by reference CompileSuccess. The other seven retain their bailout
+coverage (six Todo, one Suppression), which is not evidence of either correctness
+or incorrectness. The binary's SHA-256 is
+`fa37c35a64c80237e15f0bba0981d00e9de8cde262f6faf3b7ac4e882d7035f3`.
