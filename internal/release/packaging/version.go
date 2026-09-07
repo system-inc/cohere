@@ -76,6 +76,16 @@ type Provenance struct {
 	// Version is the published version, or "dev" for a local build.
 	Version string
 
+	// SelfCommit is the commit of THIS repository the binary was built from, or "" when the build
+	// carried no version-control stamp.
+	//
+	// Separate from CompilerCommit, which names the vendored compiler and moves independently. A
+	// local build reports its version as "dev", which says nothing about which rules it holds, and
+	// every measurement taken with it is only reproducible if the binary can name its own vintage.
+	// Two numbers taken from binaries at different commits look exactly like a contradiction, and
+	// the cheapest way to tell those apart is for each number to arrive with its commit attached.
+	SelfCommit string
+
 	// CompilerCommit is the pinned commit of the vendored compiler.
 	CompilerCommit string
 
@@ -124,6 +134,7 @@ type Provenance struct {
 func Current() Provenance {
 	return Provenance{
 		Version:            version,
+		SelfCommit:         resolveSelfCommit(),
 		CompilerCommit:     resolveCompilerCommit(),
 		CompilerUpstream:   compilerUpstream,
 		GoToolchain:        resolveGoToolchain(),
@@ -153,6 +164,11 @@ func (provenance Provenance) String() string {
 		"  platform:       " + provenance.Platform,
 		"  go:             " + provenance.GoToolchain,
 		"  compiler:       " + provenance.describeCompiler(),
+	}
+	// Printed whenever the build carried a stamp, including a release, because a published version
+	// still does not say which commit produced it and a bug report quoting both is easier to chase.
+	if provenance.SelfCommit != "" {
+		lines = append(lines, "  commit:         "+shortCommit(provenance.SelfCommit))
 	}
 	// Printed only when the binary carries a formatter, so a build that predates it does not grow a
 	// line reading "unknown" that looks like a lost stamp rather than a feature that did not exist.
@@ -263,6 +279,24 @@ func resolveCompilerCommit() string {
 		}
 	}
 	return "unknown"
+}
+
+// resolveSelfCommit reads this repository's commit from the stamp Go's linker writes.
+//
+// Go records `vcs.revision` on any build inside a version-controlled tree, so this needs no
+// `-ldflags` and works for a local `go build` as well as a release. Empty when the stamp is absent,
+// which is the honest answer for a build made outside a repository or with `-buildvcs=false`.
+func resolveSelfCommit() string {
+	information, available := debug.ReadBuildInfo()
+	if !available {
+		return ""
+	}
+	for _, setting := range information.Settings {
+		if setting.Key == "vcs.revision" {
+			return setting.Value
+		}
+	}
+	return ""
 }
 
 // resolveSourceTreeModified reports whether the build tree carried uncommitted changes.

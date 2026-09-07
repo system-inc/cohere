@@ -151,3 +151,46 @@ func TestCompilerUpstreamNormalizesBothUrlShapes(t *testing.T) {
 		}
 	}
 }
+
+/*
+ * The binary names the commit it was built from, on its own line.
+ *
+ * `Version` reads "dev" for every local build, which says nothing about which rules the binary
+ * holds. Every measurement taken with it is reproducible only if it can name its own vintage, and
+ * two numbers taken from binaries at different commits look exactly like a contradiction: that
+ * happened today between me and `@system`, where 287 and 217 were both true and three graph repairs
+ * had landed in between.
+ *
+ * The revision was already in the binary. Go's linker stamps `vcs.revision` on any build inside a
+ * version-controlled tree, and `resolveCompilerCommit` was already reading it. It surfaced only
+ * inside the compiler line's fallback text, under a label a reader asking "which cohere is this"
+ * would not look at.
+ *
+ * The empty case is the load-bearing half. A build outside a repository, or with `-buildvcs=false`,
+ * carries no stamp, and printing "unknown" there would read as a lost stamp rather than a build
+ * that never had one. Absent evidence is not evidence.
+ */
+func TestVersionNamesItsOwnCommit(t *testing.T) {
+	t.Parallel()
+
+	withCommit := Provenance{
+		Version:        "dev",
+		Platform:       "darwin/arm64",
+		GoToolchain:    "go1.27.0",
+		CompilerCommit: "abc123",
+		SelfCommit:     "9627c14720cdabcdef0123456789abcdef012345",
+	}.String()
+	if !strings.Contains(withCommit, "commit:         9627c14720cd") {
+		t.Errorf("a stamped build does not name its commit on its own line:\n%s", withCommit)
+	}
+
+	withoutCommit := Provenance{
+		Version:        "dev",
+		Platform:       "darwin/arm64",
+		GoToolchain:    "go1.27.0",
+		CompilerCommit: "abc123",
+	}.String()
+	if strings.Contains(withoutCommit, "commit:") {
+		t.Errorf("an unstamped build grew a commit line it cannot support:\n%s", withoutCommit)
+	}
+}
