@@ -135,6 +135,9 @@ The origin-safe state effect and paired fixtures are now implemented. `STATE_EFF
 the prerequisite and the attribution of all four changed corpus-count checks, including the raw
 setter dependency that disappears during final pruning. Its population differential is separate
 from these structural measurements; the 217 figure above still describes the preceding repair.
+The committed state repair measures 177 on the same snapshot: 58 removed, 18 added and 159 unchanged.
+Five additions are covered by successful reference compilation and remain false positives. See
+`STATE_EFFECTS.md` for the reference verdict categories; the parent parity task stays open.
 
 ## Next trace
 

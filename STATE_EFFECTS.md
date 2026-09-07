@@ -112,9 +112,27 @@ iterations. The count pins are recalibrated to these attributed inputs, not rela
 
 ## Population gate
 
-The last committed snapshot measurement before this repair is 217 findings. It is
-not a measurement of state freezing. Measure the repair only after fixtures, the
-full lint suite and the build pass, using a binary built from its exact commit.
-Keep added, removed and unchanged finding multisets, not just a net count. Any live
-ESLint comparison must disable its cache. Remaining findings still require reference
-compiler adjudication; a lower number alone does not establish parity.
+Source archives of `3a0e70f` and repair `b9f24f3`, built with the same pinned TypeScript
+checkout, expose identical 450-rule inventories. On the frozen snapshot the baseline
+reproduces the preceding 217 finding multiset exactly. The repaired binary reports
+177: **58 removed, 18 added, 159 unchanged**. This is not a fresh live-tree ESLint run.
+
+Direct React compiler 1.0.0 runs on all 58 remaining flagged files, with preservation
+validation enabled and the bad-dependency controls run first, give covering
+CompileSuccess events for 130 occurrences. The other 47 are covered by different
+bailouts: 33 Todo, 7 Hooks and 7 Suppression. None has a preservation CompileError;
+none throws out of the harness. Bailouts are not evidence that those 47 findings
+are correct or incorrect.
+
+Five of the 18 additions fall in successfully compiled functions: one in
+`SidebarNewProjectDialog`, two in `NotificationsContainer` and two in
+`useVariableVirtualScroll`. They are unresolved false positives, not an improvement
+to claim as stricter checking. The other 13 additions have bailout-covered verdicts.
+The state repair fixes its demonstrated mechanism but does not close parity, and
+the net reduction does not excuse these additions.
+
+All 28 scoreable preservation-error goldens still report and all 69 clean goldens
+remain silent with zero unsupported. The full lint suite, build and scope oracle
+pass; scope under-production remains zero. Those controls bound the repair without
+substituting for the population differential. Subsequent comparisons must retain
+finding multiplicity and disable ESLint's cache for live source changes.
