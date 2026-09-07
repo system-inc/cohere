@@ -402,14 +402,13 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 	// remaining double emissions all carry composite value terminals and stay under the declared
 	// `ReactiveFunctionGapValueExpressions`.
 	//
-	// It also makes a second gap visible instead of folding it into those control-flow counters.
-	// Seven functions put a Scope terminal inside a loop's init or test value block. `valueOf` can
-	// preserve the block's instructions but cannot represent that statement-shaped scope inside a
-	// `ReactiveValue`; upstream rejects the same terminal shape. Classifying it separately keeps the
-	// genuinely unexplained-loss count at zero.
+	// Correctly classifying for-of headers as loop blocks closes the seven scoped-loop loss cases
+	// and one composite-value case. Alignment now encloses the loop instead of leaving a Scope
+	// terminal inside an initializer or test that `ReactiveValue` cannot represent. The remaining
+	// composite-value cases are unchanged; the genuinely unexplained-loss count stays zero.
 	const (
-		knownLostWithValueTerminal = 6
-		knownLostWithScopedLoop    = 7
+		knownLostWithValueTerminal = 5
+		knownLostWithScopedLoop    = 0
 		knownDoubleEmitted         = 4
 	)
 	if lostWithValueTerminal != knownLostWithValueTerminal ||

@@ -838,8 +838,8 @@ func (b *builder) lowerForStatement(node *ast.Node, label string) {
 func (b *builder) lowerForOfStatement(node *ast.Node, label string) {
 	statement := node.AsForInOrOfStatement()
 
-	init := b.reserve(BlockKindBlock)
-	test := b.reserve(BlockKindBlock)
+	init := b.reserve(BlockKindLoop)
+	test := b.reserve(BlockKindLoop)
 	loop := b.reserve(BlockKindLoop)
 	fallthroughBlock := b.reserve(BlockKindBlock)
 

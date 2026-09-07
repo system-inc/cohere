@@ -373,7 +373,7 @@ const (
 	BlockKindBlock BlockKind = iota
 	// BlockKindValue is a block whose purpose is to produce a value, such as one arm of a ternary.
 	BlockKindValue
-	// BlockKindLoop is a loop body.
+	// BlockKindLoop marks loop-related blocks, including loop initializers and tests.
 	BlockKindLoop
 	// BlockKindSequence is one element of a sequence expression.
 	BlockKindSequence

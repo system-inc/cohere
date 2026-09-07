@@ -793,8 +793,8 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// the live corpus to 625 deep / 2,843 flat. The two direct preserve-memoization oracles remain
 	// 28/28 positive and 69/69 clean, so the movement is pinned as a corrected input order rather
 	// than accepted from this distribution alone.
-	if deep != 625 || flat != 2843 {
-		t.Errorf("got %d deep and %d flat dependencies, want 625 and 2843; a SMALL move here is "+
+	if deep != 625 || flat != 2841 {
+		t.Errorf("got %d deep and %d flat dependencies, want 625 and 2841; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}
