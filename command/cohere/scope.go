@@ -178,6 +178,10 @@ func changedFilesScope(workingDirectory string) (formatScope, error) {
 		FileNames:   absolute,
 		index:       index,
 		Description: description,
+		// Named for the coverage line, which asks what the caller requested rather than what was
+		// found. Without it a `--changed` run printed `3 in scope ()`, which is a true count beside
+		// an empty reason.
+		RequestDescription: "what git reports as changed",
 	}, nil
 }
 

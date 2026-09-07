@@ -90,6 +90,8 @@ func run() error {
 	// across everything that was alive only through it. Keeping both means the two numbers can be
 	// read against each other before the bigger one is trusted.
 	unusedDeep := flag.Bool("unused-deep", false, "with --unused, also compute the transitive closure and group the dead code into islands")
+	changedOnly := flag.Bool("changed", false,
+		"check only the files git reports as changed, plus everything that imports them")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -260,33 +262,27 @@ func run() error {
 	// 3.042s and printed 5,201 findings; the whole tree took 3.003s and printed 5,201. Same cost,
 	// same output, and nothing in either run said the argument had been ignored.
 	lintScope := formatScope{Everything: true}
-	if named := flag.Args(); len(named) > 0 && !*listRules && !*listRulesEnabled {
-		scope, err := namedPathsScope(*directory, named)
+	switch {
+	case len(flag.Args()) > 0 && !*listRules && !*listRulesEnabled:
+		scope, err := namedPathsScope(*directory, flag.Args())
 		if err != nil {
 			return err
 		}
-		lintScope = scope
-		if !scope.Everything {
-			named := filterToScope(projectFiles, scope)
+		lintScope, projectFiles = narrowToClosure(graph, scope, projectFiles)
 
-			// The named files alone are not the answer. A change to an exported type breaks its
-			// consumers, and those findings would vanish rather than appear: demonstrated by giving
-			// one function an `any` return, which produced seven new findings across the tree, four of
-			// them in a consumer two directories from the edit.
-			//
-			// Above the closure limit the honest answer is the whole tree, because a truncated
-			// closure would be fast and silently miss findings, which is worse than being slow.
-			closure, within := graph.DependentClosure(named)
-			if !within {
-				lintScope = formatScope{Everything: true}
-				fmt.Fprintf(os.Stderr,
-					"note: %s reaches more than %d files through imports, so the whole tree is checked\n",
-					scope.RequestDescription, program.DependentClosureLimit)
-			} else {
-				projectFiles = closure
-				lintScope.DependentCount = len(closure) - len(named)
-			}
+	case *changedOnly:
+		// Opt-in, and it has to stay that way. Measured on this tree with nothing edited: the changed
+		// set is three files, and linting them reports 6 findings against a real 5,201 in 93ms and
+		// exits green. As a default that is the silent-green failure this binary exists to have
+		// stopped making, wearing the costume of a speed improvement.
+		//
+		// As a flag it is a statement: the caller has said they want the answer about what they
+		// touched, and the coverage line says how many files that was.
+		scope, err := changedFilesScope(graph.Config.GetCurrentDirectory())
+		if err != nil {
+			return fmt.Errorf("asking what changed: %w", err)
 		}
+		lintScope, projectFiles = narrowToClosure(graph, scope, projectFiles)
 	}
 
 	if lintScope.Everything {
@@ -1207,4 +1203,38 @@ func filterToScope(projectFiles []*ast.SourceFile, scope formatScope) []*ast.Sou
 		}
 	}
 	return kept
+}
+
+// narrowToClosure turns a scope into the files a run should visit, and says when it declined.
+//
+// Shared by the named-path and changed-file paths rather than written at each, because the judgment
+// is the same and it is the judgment that is easy to get wrong. The files a caller pointed at are
+// not the answer on their own: a change to an exported type breaks its consumers, and those
+// findings vanish rather than appear. Demonstrated by giving one function an `any` return, which
+// produced seven new findings across the tree, four of them in a consumer two directories from the
+// edit, and a run scoped to the edited file alone saw three.
+//
+// Above the closure limit the whole tree is checked and a note says why. A truncated closure would
+// be fast and silently miss findings, which is worse than being slow, and it is the one failure a
+// fast path must not introduce.
+func narrowToClosure(
+	graph *program.Graph,
+	scope formatScope,
+	projectFiles []*ast.SourceFile,
+) (formatScope, []*ast.SourceFile) {
+	if scope.Everything {
+		return scope, projectFiles
+	}
+
+	seeds := filterToScope(projectFiles, scope)
+	closure, within := graph.DependentClosure(seeds)
+	if !within {
+		fmt.Fprintf(os.Stderr,
+			"note: %s reaches more than %d files through imports, so the whole tree is checked\n",
+			scope.RequestDescription, program.DependentClosureLimit)
+		return formatScope{Everything: true}, projectFiles
+	}
+
+	scope.DependentCount = len(closure) - len(seeds)
+	return scope, closure
 }
