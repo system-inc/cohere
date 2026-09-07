@@ -346,7 +346,7 @@ func TestBuildReactiveFunctionLogicalKeepsRightPrefix(t *testing.T) {
 func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 	t.Parallel()
 
-	converted, lostWithValueTerminal, lostWithout := 0, 0, 0
+	converted, lostWithValueTerminal, lostWithScopedLoopValue, lostWithout := 0, 0, 0, 0
 	doubleEmitted, unmatchedGotos := 0, 0
 	elidedScopeBreaks, nonImplicitScopeBreaks := 0, 0
 
@@ -367,6 +367,7 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 				hasValueTerminal = true
 			}
 		}
+		hasScopedLoopValue := hasScopeTerminalInLoopValueBlock(function)
 
 		tree, result := BuildReactiveFunction(function)
 		if tree == nil {
@@ -380,9 +381,12 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 		nonImplicitScopeBreaks += result.NonImplicitScopeBreaks
 
 		if graphInstructions > 0 && result.Instructions < graphInstructions {
-			if hasValueTerminal {
+			switch {
+			case hasValueTerminal:
 				lostWithValueTerminal++
-			} else {
+			case hasScopedLoopValue:
+				lostWithScopedLoopValue++
+			default:
 				lostWithout++
 			}
 		}
@@ -393,93 +397,34 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 			"every count below would be a fact about the harness", converted)
 	}
 
-	// The initial conversion lost instructions in 353 functions with a value terminal. Rebuilding
-	// logical, ternary and optional terminals through `visitValueBlockTerminal` reduces that to four:
-	// the ordinary lowering shapes now become compound values, including nested expressions, while
-	// a value subtree carrying a phi or an unsupported terminal deliberately takes the conservative
-	// statement fallback. The remaining gap is asserted below rather than hidden in the improvement.
+	// React-compatible reverse postorder closes the old break-target defect: unmatched gotos and
+	// non-implicit scope breaks both fall to zero, and double emission falls from 21 to 4. The four
+	// remaining double emissions all carry composite value terminals and stay under the declared
+	// `ReactiveFunctionGapValueExpressions`.
 	//
-	// A function losing instructions with no value terminal is a real bug, and it is the
-	// exact shape that was already found once here: the first spelling of `valueOf` returned only a
-	// block's last instruction, which cost 27 functions holding a `ForOf` whose `Test` and `Init`
-	// are read through it.
-	// Four functions lose instructions with no value terminal, which the declared gap does NOT
-	// explain. Measured, attributed and pinned rather than tolerated: every one of the four also
-	// carries an unmatched goto (both=4, lost-but-matched=0 over the same walk), so the loss is the
-	// subset of the unmatched-goto population whose orphaned target held instructions. The cause is
-	// the scope terminals built above -- before that pass the same walk reports zero of both.
-	//
-	// A ceiling, for the same reason as the two below: this is a known defect with a named cause,
-	// and the test's job is to stop it growing while it waits to be fixed.
-	//
-	// This briefly rose to five when frozen propagation split another scope. Structured value
-	// reconstruction brings it back to four while moving the aggregate control-flow counters from
-	// 22 double emissions / 60 unmatched gotos to 21 / 61. One block is no longer emitted twice or
-	// lost with its target; the goto reaching that target is now classified as unmatched instead.
-	// The total anomaly count stays 82, so this is a tighter loss bound around the same break-target
-	// defect rather than evidence that the defect closed.
-	const knownLostWithoutValueTerminal = 4
-	if lostWithout > knownLostWithoutValueTerminal {
-		t.Errorf("%d function(s) lost instructions with NO value terminal, up from the measured "+
-			"%d; the declared gap explains only value terminals, so this is unattributed loss",
-			lostWithout, knownLostWithoutValueTerminal)
-	}
-	if lostWithout < knownLostWithoutValueTerminal {
-		t.Errorf("unattributed loss is %d, down from %d; if the break-target handling was fixed, "+
-			"lower this bound so the improvement is held", lostWithout, knownLostWithoutValueTerminal)
-	}
-
-	// Double emission and unmatched gotos are pinned at their measured values rather than at zero,
-	// because on the graph the pipeline really delivers they are NOT zero and saying otherwise
-	// would be a green that hides them. Both are caused by the scope terminals built above: the
-	// same walk reports 0 and 0 on the graph before that pass runs.
-	//
-	// Held as a CEILING so the number can only be driven down. A drop is the fix landing and the
-	// signal to lower the bound; a rise is a regression this test exists to catch. Neither is
-	// allowed to happen quietly, which is the whole point of pinning a known-bad number instead of
-	// deleting the assertion.
-	//
-	// 21 to 22 and 61 to 60 together, by the declaration-id fix in `lower.go`. One block trades for
-	// one goto, which is what a recovered scope does here: a scope that survives adds a terminal to
-	// break to, so a goto that previously found nothing now matches, and the block it lands in is
-	// reached from one more place. The scopes recovered are named at `knownSurvivedExact` in
-	// `scope_oracle_test.go`.
-	//
-	// Structured logical/ternary/optional reconstruction reverses that aggregate trade: 22 to 21
-	// double emissions and 60 to 61 unmatched gotos. Their sum remains 82, and non-implicit scope
-	// breaks remain 85, so the unresolved population did not grow; one failure moved from repeated
-	// traversal to the missing-break-target arm.
+	// It also makes a second gap visible instead of folding it into those control-flow counters.
+	// Seven functions put a Scope terminal inside a loop's init or test value block. `valueOf` can
+	// preserve the block's instructions but cannot represent that statement-shaped scope inside a
+	// `ReactiveValue`; upstream rejects the same terminal shape. Classifying it separately keeps the
+	// genuinely unexplained-loss count at zero.
 	const (
-		knownDoubleEmitted  = 21
-		knownUnmatchedGotos = 61
+		knownLostWithValueTerminal = 6
+		knownLostWithScopedLoop    = 7
+		knownDoubleEmitted         = 4
 	)
-	// A note for whoever tightens this: `valueOf`'s own double-emit guard is NOT what these 21
-	// come from. Removing that guard entirely leaves the count at exactly 21, so it never fires on
-	// this corpus and a mutation of it is unmeasurable here. The 21 are counted on the statement
-	// path instead. Recorded because a surviving mutant on that guard means the corpus lacks the
-	// input, not that the guard is dead code.
-	if doubleEmitted > knownDoubleEmitted {
-		t.Errorf("%d block(s) emitted twice across the corpus, up from the measured %d; a block "+
-			"reached from two places must be scheduled and broken to, not walked again",
-			doubleEmitted, knownDoubleEmitted)
+	if lostWithValueTerminal != knownLostWithValueTerminal ||
+		lostWithScopedLoopValue != knownLostWithScopedLoop || lostWithout != 0 {
+		t.Errorf("instruction loss: composite-value=%d (want %d), scoped-loop-value=%d (want %d), "+
+			"unattributed=%d (want 0)", lostWithValueTerminal, knownLostWithValueTerminal,
+			lostWithScopedLoopValue, knownLostWithScopedLoop, lostWithout)
 	}
-	if unmatchedGotos > knownUnmatchedGotos {
-		t.Errorf("%d goto(s) found no enclosing construct to break to, up from the measured %d",
-			unmatchedGotos, knownUnmatchedGotos)
+	if doubleEmitted != knownDoubleEmitted {
+		t.Errorf("double-emitted blocks=%d, want %d; the remaining population is the declared "+
+			"composite-value gap", doubleEmitted, knownDoubleEmitted)
 	}
-	if doubleEmitted < knownDoubleEmitted || unmatchedGotos < knownUnmatchedGotos {
-		t.Errorf("double emission is %d (was %d) and unmatched gotos %d (was %d); if these were "+
-			"fixed, lower the bounds in this test so the improvement is held rather than "+
-			"re-openable", doubleEmitted, knownDoubleEmitted, unmatchedGotos, knownUnmatchedGotos)
-	}
-
-	// Held as a floor rather than an equality. The remaining structured-value gap is still declared,
-	// so a zero here means either that the gap closed or the measurement stopped reaching it; both
-	// require updating the declaration and this assertion together.
-	if lostWithValueTerminal == 0 {
-		t.Errorf("no function lost instructions at a value terminal, but " +
-			"ReactiveFunctionGapValueExpressions is still declared; either the gap closed and " +
-			"should be removed, or the measurement stopped reading")
+	if unmatchedGotos != 0 {
+		t.Errorf("unmatched gotos=%d, want 0; React-compatible reverse postorder closed this gap",
+			unmatchedGotos)
 	}
 
 	// The scope-fallthrough elision, asserted as a floor because a zero here would mean
@@ -491,52 +436,49 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 			"scope terminals; the set is not being populated, so the tree carries invented breaks",
 			converted)
 	}
-	// Upstream asserts this is impossible and aborts; a linter counts instead. The count is the
-	// ROOT of everything else this test pins, which is measured rather than argued: over the same
-	// walk, 92 functions carry a non-implicit scope break, 61 carry an unmatched goto, and the
-	// overlap is 61 with zero unmatched-only. The unmatched gotos are therefore a strict subset --
-	// the cases severe enough that `breakTarget` found nothing at all -- and the four instruction
-	// losses are a subset of those in turn.
-	//
-	// So this is ONE defect with three symptoms at three severities, not three defects. Driving
-	// this to zero should take the other two with it.
-	// # Moved when a callback's mutation of its parameter began widening the receiver's range
-	//
-	// 92 to 93. One function in the corpus gains a non-implicit break, and the two severer symptoms
-	// this comment calls subsets of it do NOT move: `unmatchedGotos` holds at 61 and the instruction
-	// losses at 4. So the population grew by one at the mildest severity and the defect did not
-	// deepen, which is the distinction this test's own model of "one defect, three severities" is
-	// built to express.
-	//
-	// Worth stating plainly because the message below says upstream raises an invariant: that is
-	// about the shape, not about this corpus. The corpus here is `libraries/structure/source`, real
-	// TypeScript with no upstream counterpart, so this count has no parity reference and 92 was
-	// already a measured defect rather than a target.
-	//
-	// 86 with the two frozen-propagation edges. Falling is the improvement this bound names, and it
-	// falls because a frozen value stops widening a scope across a call, so fewer scopes reach a
-	// break that has to be spelled out. `unmatchedGotos` holds at 60 and `doubleEmitted` at 22.
-	//
-	// 85 with the frozen-capture rule in `ranges.go`. Falling is the improvement this bound names,
-	// and it falls for the same reason as the move to 86: a value that stops widening leaves fewer
-	// scopes reaching a break that has to be spelled out. `unmatchedGotos` holds at 60,
-	// `doubleEmitted` at 22, and unattributed loss at 5.
-	const knownNonImplicitScopeBreaks = 85
-	if nonImplicitScopeBreaks > knownNonImplicitScopeBreaks {
-		t.Errorf("%d break(s) to a scope fallthrough were not implicit, up from the measured %d; "+
-			"upstream raises an invariant here, so this is a control-flow stack the walk built "+
-			"differently", nonImplicitScopeBreaks, knownNonImplicitScopeBreaks)
-	}
-	if nonImplicitScopeBreaks < knownNonImplicitScopeBreaks {
-		t.Errorf("non-implicit scope breaks are %d, down from %d; lower this bound and check "+
-			"whether the unmatched-goto and instruction-loss counts fell with it",
-			nonImplicitScopeBreaks, knownNonImplicitScopeBreaks)
+	if nonImplicitScopeBreaks != 0 {
+		t.Errorf("non-implicit scope breaks=%d, want 0; upstream treats this shape as impossible",
+			nonImplicitScopeBreaks)
 	}
 
-	t.Logf("converted=%d lostWithValueTerminal=%d lostWithout=%d doubleEmitted=%d unmatchedGotos=%d "+
-		"elidedScopeBreaks=%d nonImplicitScopeBreaks=%d",
-		converted, lostWithValueTerminal, lostWithout, doubleEmitted, unmatchedGotos,
+	t.Logf("converted=%d lostWithValueTerminal=%d lostWithScopedLoopValue=%d lostWithout=%d "+
+		"doubleEmitted=%d unmatchedGotos=%d elidedScopeBreaks=%d nonImplicitScopeBreaks=%d",
+		converted, lostWithValueTerminal, lostWithScopedLoopValue, lostWithout, doubleEmitted, unmatchedGotos,
 		elidedScopeBreaks, nonImplicitScopeBreaks)
+}
+
+func hasScopeTerminalInLoopValueBlock(function *Function) bool {
+	if function == nil {
+		return false
+	}
+	var valueBlocks []BlockId
+	for _, block := range function.Blocks {
+		switch terminal := block.Terminal.(type) {
+		case *While:
+			valueBlocks = append(valueBlocks, terminal.Test)
+		case *DoWhile:
+			valueBlocks = append(valueBlocks, terminal.Test)
+		case *For:
+			valueBlocks = append(valueBlocks, terminal.Init, terminal.Test)
+			if HasBlock(terminal.Update) {
+				valueBlocks = append(valueBlocks, terminal.Update)
+			}
+		case *ForOf:
+			valueBlocks = append(valueBlocks, terminal.Init, terminal.Test)
+		case *ForIn:
+			valueBlocks = append(valueBlocks, terminal.Init)
+		}
+	}
+	for _, blockID := range valueBlocks {
+		block, ok := function.Block(blockID)
+		if !ok {
+			continue
+		}
+		if _, scoped := block.Terminal.(*Scope); scoped {
+			return true
+		}
+	}
+	return false
 }
 
 // TestReactiveFunctionGapsAreDeclared pins the gap list so closing one is a visible event.

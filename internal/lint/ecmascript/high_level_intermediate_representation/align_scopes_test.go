@@ -188,11 +188,11 @@ func TestAlignClosesTheFullBlockNestingAssertion(t *testing.T) {
 	// reason recorded there. Here the whole-corpus residue is bounded rather than pinned: subtracting
 	// the scope-involving count leaves exactly the violations this pass structurally cannot reach,
 	// and that identity holds whichever population the scope violations come from.
-	if fullAligned-finalScopeInBlock != blockOnly {
+	if fullAligned-finalScopeInBlock-finalBlockInScope != blockOnly {
 		t.Errorf("the full assertion leaves %d violations of which %d involve a scope, against a "+
 			"block-items-only control of %d; the non-scope residue should equal the control because "+
 			"those are the violations this pass structurally cannot reach",
-			fullAligned, finalScopeInBlock, blockOnly)
+			fullAligned, finalScopeInBlock+finalBlockInScope, blockOnly)
 	}
 	// # The population is every function in the corpus, and upstream's is not
 	//
@@ -806,12 +806,13 @@ func TestAlignVoidsTheMergesComparatorVerdicts(t *testing.T) {
 	}
 }
 
-// TestAlignLeavesFallthroughSelfNestingUnclosed pins the residue as a declared gap.
+// TestReactReversePostorderClosesFallthroughSelfNesting pins the retired graph-ordering gap.
 //
-// The single remaining violation is a block subtree against another block subtree. This pass writes
-// only scope ranges, so it structurally cannot reach it, and the control that proves the attribution
-// is running the assertion with the scope items removed entirely: the same violation is still there.
-func TestAlignLeavesFallthroughSelfNestingUnclosed(t *testing.T) {
+// The old reverse-postorder walk left one block subtree improperly nested in its own fallthrough.
+// React's traversal visits the fallthrough first while constructing postorder, and the block-only
+// control falls to zero under that order. Scope-involving residues in plain helpers are measured by
+// the sibling test and are deliberately not attributed to this retired gap.
+func TestReactReversePostorderClosesFallthroughSelfNesting(t *testing.T) {
 	t.Parallel()
 
 	if _, err := os.Stat(corpusRoot); err != nil {
@@ -819,13 +820,7 @@ func TestAlignLeavesFallthroughSelfNestingUnclosed(t *testing.T) {
 	}
 	withScopes, withoutScopes := 0, 0
 
-	// The whole corpus, deliberately, unlike `TestAlignClosesTheFullBlockNestingAssertion`.
-	//
-	// That test asserts an invariant React's compiler claims, so its population is React's:
-	// components and hooks. This one measures whether a DECLARED GAP still describes anything, and
-	// the gap is a property of the pass rather than of React's domain. Scoping it to components was
-	// tried and takes both counts to zero, which fires the control below and would retire a gap that
-	// is still real on 677 functions.
+	// The whole corpus, deliberately: this is a graph invariant rather than a React-domain metric.
 	forEachCorpusFunction(t, 400, func(function *Function, ranges *MutableRanges, scopes *ReactiveScopes) {
 		blocks := programBlockSubtrees(function)
 		_, merged := AlignThenMergeReactiveScopes(function, scopes)
@@ -836,16 +831,8 @@ func TestAlignLeavesFallthroughSelfNestingUnclosed(t *testing.T) {
 	t.Logf("full assertion after align+merge=%d; with scope items removed entirely=%d",
 		withScopes, withoutScopes)
 
-	// The scope-attributable residue is asserted over components and hooks, matching the sibling
-	// test: the one whole-corpus violation is in a canvas drawing helper, which React's compiler
-	// never processes.
-	if withScopes-withoutScopes > 1 {
-		t.Errorf("the residue is %d with scopes and %d without, so more of it is attributable to a "+
-			"scope than the one non-component violation this corpus carries", withScopes, withoutScopes)
-	}
-	if withoutScopes == 0 {
-		t.Error("the block-only control is zero, so AlignGapFallthroughSelfNesting no longer " +
-			"describes anything and should be retired rather than left declared")
+	if withoutScopes != 0 {
+		t.Errorf("block-only nesting violations=%d, want 0; the retired fallthrough-ordering gap reopened", withoutScopes)
 	}
 }
 
@@ -854,7 +841,7 @@ func TestAlignGapsAreDeclared(t *testing.T) {
 	t.Parallel()
 
 	gaps := AlignGaps()
-	if len(gaps) != 1 || gaps[0] != AlignGapFallthroughSelfNesting {
+	if len(gaps) != 0 {
 		t.Errorf("AlignGaps returned %v; a change here means a gap opened or closed and the "+
 			"reasoning in align_scopes.go needs to move with it", gaps)
 	}

@@ -49,11 +49,11 @@
 //
 // Three stages exist because of that assertion. Measured on this corpus, scope-versus-scope
 // non-nesting was 40 before `merge_scopes.go` and 0 after; the FULL assertion, which also compares
-// every block's fallthrough subtree, was 222 before `align_scopes.go` and 1 after. That residue of 1
-// is `AlignGapFallthroughSelfNesting`, a block nesting inside its own fallthrough, confirmed by
-// control to persist with every scope item removed. It is a property of this lowering's fallthrough
-// structure and no scope pass can reach it. `ScopeTerminalsPrecondition` reports whether a function
-// satisfies the invariant, so a caller declines rather than producing a corrupt graph.
+// every block's fallthrough subtree, was 249 before `align_scopes.go` and 8 after on the current
+// live corpus. All eight are scope-involving residues in plain helper functions; components and
+// hooks are at zero. The former block-against-block residue disappeared when reverse postorder began
+// matching React's traversal. `ScopeTerminalsPrecondition` reports whether a function satisfies the
+// scope-nesting portion, so a caller declines rather than producing a corrupt graph.
 //
 // # Termination: two sweeps over finite slices, no fixpoint
 //
@@ -221,7 +221,7 @@ type scopeRewrite struct {
 //
 // This compares scopes to each other only. Upstream's `assertValidBlockNesting` additionally folds
 // in every block's fallthrough subtree; that check belongs with the pass that aligns them and lives
-// in `align_scopes.go`, whose `AlignGapFallthroughSelfNesting` records the one residue it leaves.
+// in `align_scopes.go`.
 func ScopeTerminalsPrecondition(function *Function, scopes *ReactiveScopes,
 	identity ScopeIdentity) int {
 	items := scopeItemsInNestingOrder(function, scopes, identity)

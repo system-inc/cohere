@@ -762,24 +762,31 @@ export function loopy(limit: number) {
 
 	// An operand that is settled by this point must NOT be dragged into a class through this
 	// instruction. Dropping `Contains` admits exactly those, which both inflates the member count
-	// and fragments the partition into more, smaller classes.
+	// and fragments the partition into more, smaller classes. React's reverse-postorder traversal
+	// puts loop bodies before their continuations; under that order the real pass produces 14 members
+	// in 3 classes while the mutant still produces 24 in 6.
 	classes := set.Sets()
-	if got := len(classes); got != 2 {
-		t.Errorf("this function forms %d classes, want 2. Dropping the `Contains` half of the "+
+	if got := len(classes); got != 3 {
+		t.Errorf("this function forms %d classes, want 3. Dropping the `Contains` half of the "+
 			"operand gate produces 6, because every settled operand joins a class it has no "+
 			"business in: %v", got, classes)
 	}
-	if got := set.Size(); got != 16 {
-		t.Errorf("this function unifies %d values, want 16. Dropping the `Contains` half of the "+
+	if got := set.Size(); got != 14 {
+		t.Errorf("this function unifies %d values, want 14. Dropping the `Contains` half of the "+
 			"operand gate produces 24.", got)
 	}
 
-	// Two-sided: a pass that unified nothing would also fail the counts above, so require that the
-	// classes actually formed are multi-member.
+	// Two-sided: a pass that unified nothing would also fail the counts above, so require at least
+	// one genuine multi-member class. A singleton is legitimate here: the corrected ordering leaves
+	// the settled return aggregate in its own class.
+	multiMember := false
 	for _, class := range classes {
-		if len(class) < 2 {
-			t.Errorf("class %v is a singleton; both classes here are genuine merges", class)
+		if len(class) > 1 {
+			multiMember = true
 		}
+	}
+	if !multiMember {
+		t.Errorf("all classes are singletons; the pass unified nothing: %v", classes)
 	}
 }
 

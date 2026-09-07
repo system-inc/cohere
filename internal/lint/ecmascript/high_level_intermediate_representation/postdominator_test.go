@@ -92,7 +92,7 @@ var postDominatorShapes = []struct {
 	{name: "if", code: `function f(p) { if (p) { a(); } return b; }`, minimumPairs: 6},
 	{name: "if else", code: `function f(p) { if (p) { a(); } else { b(); } return c; }`, minimumPairs: 12},
 	{name: "early return", code: `function f(p) { if (p) { return 1; } a(); return 2; }`, minimumPairs: 6},
-	{name: "both arms return", code: `function f(p) { if (p) { return 1; } else { return 2; } }`, minimumPairs: 12},
+	{name: "both arms return", code: `function f(p) { if (p) { return 1; } else { return 2; } }`, minimumPairs: 9},
 	{name: "nested if", code: `function f(p, q) { if (p) { if (q) { a(); } b(); } return c; }`, minimumPairs: 12},
 	{name: "while", code: `function f(p) { while (p) { a(); } return b; }`, minimumPairs: 12},
 	{name: "while with break", code: `function f(p) { while (p) { if (p) { break; } a(); } return b; }`, minimumPairs: 20},

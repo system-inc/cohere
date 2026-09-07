@@ -716,17 +716,20 @@ function Foo(props) {
  * is a measured verdict from the reference implementation rather than an absent instrument, and
  * these two cases are false positives rather than a defensible divergence.
  *
- * # This test is red on purpose
+ * # The defect was graph order, not pruning
  *
- * The defect is diagnosed and not yet repaired, and a red test is the honest way to carry that: it
- * names the expected behaviour, fails until the behaviour is real, and cannot be mistaken for a
- * passing suite. Tracing the pipeline places the loss at `PruneUnusedScopes`, which prunes the memo
- * block because `hasOwnDeclaration` finds nothing declared in it -- the scope's only value is a
- * temporary that never gets a recorded declaration, because `visitDependency` records one only when
- * a value is read from OUTSIDE the scope that produced it, and nothing outside this memo reads the
- * collection before the memo returns it. Pass ordering was tested as a hypothesis and ruled out:
- * moving to upstream's order (non-escaping, non-reactive, unused, merge-invalidating, always-
- * invalidating) leaves both cases firing.
+ * The first trace blamed `PruneUnusedScopes`; a trace against React's own intermediate form
+ * falsified that diagnosis. Our memo scope was already born as `[8:34]`, through the component's
+ * return, while React's was `[8:23]`, ending at the loop backedge. The difference began one layer
+ * earlier: our reverse-postorder DFS visited real successors and then fallthrough, which put the
+ * loop continuation before its body after reversal. Mutable-range inference therefore observed the
+ * mutation after every post-loop read and widened the collection through the whole function.
+ *
+ * `ReversePostorder` now ports React's actual traversal: visit the structural fallthrough first,
+ * visit real successors in reverse, then reverse postorder. The loop body consequently precedes its
+ * continuation, the collection scope closes before `FinishMemoize`, and all six cases below pass
+ * without an exemption in the validator. Pass ordering was separately tested and ruled out before
+ * this repair.
  *
  * # Why the corpus could not catch this
  *

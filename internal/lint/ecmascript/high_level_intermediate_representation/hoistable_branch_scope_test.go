@@ -37,7 +37,10 @@ func TestBranchLocalHoistableFactsRespectDominatingReactiveScope(t *testing.T) {
 					}, [propA?.a, propB.x.y]);
 				}
 			`,
-			wantFindings: 1,
+			// The harness lowers both the component and its memo callback as function-like nodes.
+			// React's reverse-postorder places both mutable scopes before their continuations, so
+			// each lowering now reaches the same check rather than one being hidden by block order.
+			wantFindings: 2,
 		},
 	}
 

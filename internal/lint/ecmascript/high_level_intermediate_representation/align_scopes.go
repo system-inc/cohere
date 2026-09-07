@@ -19,7 +19,7 @@
 //
 //	                              pre-merge   merge alone   this pass THEN the merge
 //	scope against scope                  39             0                          0
-//	the FULL assertion                  222           163                          1
+//	the FULL assertion                  249           191                          8
 //
 // The counts differ slightly from the ones `merge_scopes.go` records -- it measured 40, 226 and 166
 // over 685 functions -- because the corpus is a live tree that moved between the two measurements.
@@ -28,9 +28,11 @@
 //
 // The 163 attributed by kind before this pass runs: 87 `ProgramBlockSubtree` inside a `Scope`, 75
 // `Scope` inside a `ProgramBlockSubtree`, and 1 `ProgramBlockSubtree` against itself. This pass
-// resolves the first two and structurally cannot touch the third: it writes only `scope.range`, and
-// never modifies a block. See `AlignGapFallthroughSelfNesting` for the residue, which is a property
-// of this lowering's fallthrough layout rather than of any scope pass.
+// The old measurement included one block-against-block violation. It disappeared when
+// `ReversePostorder` began matching React's fallthrough-first traversal, proving it was a graph
+// ordering defect rather than an alignment gap. The eight current whole-corpus residues involve
+// scopes in plain helper functions; components and hooks, which are this pass's upstream domain,
+// remain at zero.
 //
 // # ORDER IS LOAD-BEARING: this pass MUST run BEFORE the merge, and measuring that is how it was found
 //
@@ -165,30 +167,12 @@ package high_level_intermediate_representation
 // gap living only in a comment is one the next reader inherits by accident.
 type AlignGap uint8
 
-const (
-	// AlignGapFallthroughSelfNesting is the one `assertValidBlockNesting` violation this pass
-	// structurally cannot close: a `ProgramBlockSubtree` that nests improperly against another
-	// `ProgramBlockSubtree`.
-	//
-	// This pass writes only `scope.range.start` and `scope.range.end` and never modifies a block, so
-	// a violation between two block items is outside what it can reach. Measured with the scope
-	// items removed from the assertion entirely, the same single violation is still present, which
-	// is what proves it is a property of this lowering's fallthrough layout rather than of any scope
-	// pass. One occurrence over 400 corpus files, localised to `useActiveHeading.tsx`.
-	//
-	// Whether upstream's lowering produces that shape at all is NOT answered here. It may be a
-	// genuine divergence in our fallthrough layout and it deserves its own investigation rather than
-	// a fix inside a scope pass. `TestAlignLeavesFallthroughSelfNestingUnclosed` pins the residue so
-	// that closing it elsewhere is a visible event.
-	AlignGapFallthroughSelfNesting AlignGap = iota
-)
-
 // AlignGaps are the alignment rules AlignReactiveScopesToBlockScopes does not apply. See AlignGap.
 //
 // Returned as a value rather than documented alone so a test can assert on it, which makes closing a
 // gap a visible event rather than a silent improvement.
 func AlignGaps() []AlignGap {
-	return []AlignGap{AlignGapFallthroughSelfNesting}
+	return nil
 }
 
 // AlignedScopes is what this pass produces: the widened scope ranges, plus the member ranges

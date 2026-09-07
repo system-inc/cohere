@@ -90,7 +90,10 @@ func TestAlignMethodCallScopesReachesTheCorpus(t *testing.T) {
 	// known-mutable MethodCalls now allocate a result that the disjoint pass joins with the property,
 	// so they reach this pass already aligned. The remaining 177 property-only calls are known
 	// primitive-returning methods, spread across these 62 functions.
-	const knownChanged = 62
+	//
+	// 60 after reverse postorder began matching React's fallthrough-first traversal. Loop bodies now
+	// precede their continuations, which settles two call/property pairs before this pass sees them.
+	const knownChanged = 60
 	if changed != knownChanged {
 		t.Errorf("the pass changed %d of %d functions, want %d", changed, functions, knownChanged)
 	}

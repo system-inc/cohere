@@ -36,66 +36,117 @@ func Finalize(function *Function) {
 // A pass wanting the unreachable code should read the AST, or the other graph. This one is for
 // reasoning about what runs.
 //
-// The traversal follows real edges only, plus fallthroughs, because a construct's fallthrough is
-// reachable through its arms and a walk that omitted it would drop live blocks whenever an arm's
-// terminal names the fallthrough only structurally.
+// The traversal is upstream's `getReversePostorderedBlocks`: visit a structural fallthrough first,
+// then the real successors in reverse order. Postorder is reversed at the end, so that puts loop
+// bodies and conditional arms before their continuation in the final slice. That ordering is more
+// than presentation. Evaluation order is assigned from this slice, and mutable-range inference
+// must see a mutation in a loop body before a read after the loop.
+//
+// A fallthrough is visited initially as structural rather than executable. If no real edge reaches
+// it, upstream retains its block id as an empty Unreachable block; if a real edge reaches it later,
+// the same block is revisited as executable. Keeping those two states separate prevents a
+// fallthrough link from manufacturing a control-flow edge while still preserving the structured
+// terminal's required target.
 func ReversePostorder(function *Function) {
-	postorder := make([]*BasicBlock, 0, len(function.Blocks))
-	visited := make(map[BlockId]bool, len(function.Blocks))
-
-	// Iterative rather than recursive: a deeply nested function would otherwise be bounded by the
-	// goroutine stack, and lowering is called on whatever the source contains.
-	type frame struct {
-		block      *BasicBlock
-		successors []BlockId
-		next       int
-	}
-	entry, ok := function.Block(function.Entry)
-	if !ok {
+	if function == nil {
 		return
 	}
-	stack := []*frame{{block: entry, successors: successorList(entry)}}
-	visited[entry.Id] = true
+	postorder := make([]*BasicBlock, 0, len(function.Blocks))
+	visited := make(map[BlockId]bool, len(function.Blocks))
+	used := make(map[BlockId]bool, len(function.Blocks))
+	usedFallthroughs := make(map[BlockId]bool, len(function.Blocks))
+
+	// Iterative rather than recursive. A block may be visited first as a structural fallthrough and
+	// later revisited through a real edge, so each frame retains whether this is the visit that owns
+	// the postorder append, exactly as upstream's `wasVisited` local does.
+	type successor struct {
+		id     BlockId
+		isUsed bool
+	}
+	type frame struct {
+		block      *BasicBlock
+		successors []successor
+		next       int
+		ownsAppend bool
+	}
+	enter := func(id BlockId, isUsed bool) *frame {
+		wasUsed := used[id]
+		wasVisited := visited[id]
+		visited[id] = true
+		if isUsed {
+			used[id] = true
+		}
+		if wasVisited && (wasUsed || !isUsed) {
+			return nil
+		}
+
+		block, ok := function.Block(id)
+		if !ok {
+			return nil
+		}
+		var successors []successor
+		if fallthroughBlock, ok := Fallthrough(block.Terminal); ok {
+			if isUsed {
+				usedFallthroughs[fallthroughBlock] = true
+			}
+			successors = append(successors, successor{id: fallthroughBlock, isUsed: false})
+		}
+		var real []BlockId
+		EachSuccessor(block.Terminal, func(next BlockId) {
+			real = append(real, next)
+		})
+		for index := len(real) - 1; index >= 0; index-- {
+			successors = append(successors, successor{id: real[index], isUsed: isUsed})
+		}
+		return &frame{block: block, successors: successors, ownsAppend: !wasVisited}
+	}
+
+	entry := enter(function.Entry, true)
+	if entry == nil {
+		return
+	}
+	stack := []*frame{entry}
 
 	for len(stack) > 0 {
 		top := stack[len(stack)-1]
 		if top.next == len(top.successors) {
-			postorder = append(postorder, top.block)
+			if top.ownsAppend {
+				postorder = append(postorder, top.block)
+			}
 			stack = stack[:len(stack)-1]
 			continue
 		}
-		successorId := top.successors[top.next]
+		next := top.successors[top.next]
 		top.next++
-		if visited[successorId] {
-			continue
+		if child := enter(next.id, next.isUsed); child != nil {
+			stack = append(stack, child)
 		}
-		successor, ok := function.Block(successorId)
-		if !ok {
-			continue
-		}
-		visited[successorId] = true
-		stack = append(stack, &frame{block: successor, successors: successorList(successor)})
 	}
 
 	blocks := make([]*BasicBlock, 0, len(postorder))
 	for index := len(postorder) - 1; index >= 0; index-- {
-		blocks = append(blocks, postorder[index])
+		block := postorder[index]
+		switch {
+		case used[block.Id]:
+			blocks = append(blocks, block)
+		case usedFallthroughs[block.Id]:
+			placeholder := &BasicBlock{
+				Id:           block.Id,
+				Kind:         block.Kind,
+				Terminal:     &Unreachable{},
+				Predecessors: append([]BlockId(nil), block.Predecessors...),
+			}
+			blocks = append(blocks, placeholder)
+			function.blocksById[block.Id] = placeholder
+		}
 	}
 	function.Blocks = blocks
 
 	for id := range function.blocksById {
-		if !visited[id] {
+		if !used[id] && !usedFallthroughs[id] {
 			delete(function.blocksById, id)
 		}
 	}
-}
-
-func successorList(block *BasicBlock) []BlockId {
-	var successors []BlockId
-	EachSuccessorAndFallthrough(block.Terminal, func(id BlockId) {
-		successors = append(successors, id)
-	})
-	return successors
 }
 
 // MarkPredecessors recomputes every block's Predecessors from the real edges.

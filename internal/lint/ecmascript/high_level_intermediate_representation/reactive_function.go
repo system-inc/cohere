@@ -410,7 +410,10 @@ const (
 	// Logical, ternary and optional terminals now become their nested reactive values on the shapes
 	// their lowering produces. The helper deliberately declines an unexpected value-block terminal
 	// and falls back to the statement-preserving path, so labeled or scope-interleaved value blocks
-	// remain outside the reconstructed subset. `Sequence` also remains until lowering constructs it.
+	// remain outside the reconstructed subset. In particular, a Scope terminal inside a loop's init
+	// or test cannot be represented by `ReactiveValue`; the corpus conservation test measures that
+	// population separately from unexplained instruction loss. `Sequence` also remains until lowering
+	// constructs it.
 	ReactiveFunctionGapValueExpressions
 )
 

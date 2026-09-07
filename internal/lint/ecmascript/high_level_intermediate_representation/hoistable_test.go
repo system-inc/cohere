@@ -786,8 +786,15 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// A pin against a live tree is worth keeping anyway: it fails loudly when either the corpus or
 	// the analysis moves, which is a question worth being asked even when the answer is "the corpus
 	// moved." A pin nobody can explain a movement in is the one to distrust.
-	if deep != 626 || flat != 2809 {
-		t.Errorf("got %d deep and %d flat dependencies, want 626 and 2809; a SMALL move here is "+
+	// # React-compatible reverse postorder
+	//
+	// Visiting structural fallthroughs first while constructing postorder puts loop bodies before
+	// their continuations after reversal. That changes the mutable intervals consumed here and moves
+	// the live corpus to 625 deep / 2,843 flat. The two direct preserve-memoization oracles remain
+	// 28/28 positive and 69/69 clean, so the movement is pinned as a corrected input order rather
+	// than accepted from this distribution alone.
+	if deep != 625 || flat != 2843 {
+		t.Errorf("got %d deep and %d flat dependencies, want 625 and 2843; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}
