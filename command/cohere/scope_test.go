@@ -938,38 +938,44 @@ func TestNarrowToUsesTheWholeProgramNotTheLintScope(t *testing.T) {
 	}
 }
 
-// TestNarrowToKeepsANamedScopesOwnWording holds that a scope stated by name is not redescribed as a
-// set git found.
+// TestNarrowToAppendsToTheScopesOwnWording holds that this function does not choose the wording.
 //
-// `narrowTo` writes one sentence, and that sentence describes how `changedFilesScope` decided its
-// files. Once a named scope started reaching this function it inherited that wording and reported
-// `1 changed files` for a file nobody had changed.
+// Four defects of one shape have passed through these three lines. The empty-scope branch above
+// carries the first, the format phase's population the second, inferring `changed files` for a
+// named scope the third, and inferring `named` from a request description the fourth, which made
+// `--changed` report `7 named` for files nobody named one heartbeat after that field was added for
+// an unrelated reason.
 //
-// This is the third defect of the same shape in this function: a description correct where it was
-// written and wrong two calls later. The empty-scope branch above carries the first, and the format
-// phase's population carried the second. The pattern is worth the fixture more than the wording is.
-func TestNarrowToKeepsANamedScopesOwnWording(t *testing.T) {
+// The repair is that each constructor writes a sentence about itself and this function appends to
+// it. The assertions below are that both kinds survive unchanged, which is the property the four
+// defects each broke in a different direction.
+func TestNarrowToAppendsToTheScopesOwnWording(t *testing.T) {
 	population := map[string]struct{}{"/repository/a.ts": {}}
 
 	named := formatScope{
-		FileNames:          []string{"/repository/a.ts"},
-		index:              map[string]struct{}{"/repository/a.ts": {}},
-		RequestDescription: "a.ts",
+		FileNames:   []string{"/repository/a.ts"},
+		index:       map[string]struct{}{"/repository/a.ts": {}},
+		Description: "1 named path",
 	}
-	if described := named.narrowTo(population).Description; strings.Contains(described, "changed") {
-		t.Errorf("a named scope was described as changed files: %s", described)
-	} else if !strings.Contains(described, "1 named") {
-		t.Errorf("a named scope should say it was named: %s", described)
+	if described := named.narrowTo(population).Description; described != "1 named path, 1 of them in the program" {
+		t.Errorf("a named scope's own wording did not survive: %s", described)
 	}
 
-	// The control. A scope git found keeps the wording that describes how git found it, so the branch
-	// above narrows the behaviour rather than replacing it.
 	fromGit := formatScope{
-		FileNames: []string{"/repository/a.ts"},
-		index:     map[string]struct{}{"/repository/a.ts": {}},
+		FileNames:   []string{"/repository/a.ts"},
+		index:       map[string]struct{}{"/repository/a.ts": {}},
+		Description: "1 changed files (working tree, staged, and untracked)",
 	}
-	if described := fromGit.narrowTo(population).Description; !strings.Contains(described, "changed files") {
-		t.Errorf("a changed-files scope lost its wording: %s", described)
+	described := fromGit.narrowTo(population).Description
+	if described != "1 changed files (working tree, staged, and untracked), 1 of them in the program" {
+		t.Errorf("a changed-files scope's own wording did not survive: %s", described)
+	}
+
+	// The control that matters: the two must differ. A function that returned one spelling for both
+	// would satisfy either assertion alone, and that is exactly what the third and fourth defects
+	// did.
+	if described == named.narrowTo(population).Description {
+		t.Error("both kinds of scope described themselves identically")
 	}
 }
 

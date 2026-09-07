@@ -87,21 +87,18 @@ func (s formatScope) narrowTo(population map[string]struct{}) formatScope {
 		return s
 	}
 
-	// A named scope keeps its own wording. This sentence describes how changedFilesScope found its
-	// files, and applying it to a set the caller stated by name reported `1 changed files` for a file
-	// nobody had changed.
+	// The scope says how it was decided; this function only adds how much of it is in the program.
 	//
-	// The same shape as the empty-scope branch above: a description correct where it was written and
-	// wrong two calls later, once a second kind of scope started reaching this function.
-	if s.RequestDescription != "" {
-		s.Description = fmt.Sprintf("%d named, %d of them in the program", len(s.FileNames), inPopulation)
-		return s
-	}
-
-	s.Description = fmt.Sprintf(
-		"%d changed files (working tree, staged, and untracked), %d of them in the program",
-		len(s.FileNames), inPopulation,
-	)
+	// Four defects of one shape have now passed through these three lines, each a description that
+	// was correct where it was written and wrong once another kind of scope started arriving. The
+	// last was inferring `named` from a request description being present, which made `--changed`
+	// report `7 named` for files nobody named, one heartbeat after that field was added to fix an
+	// empty pair of parentheses.
+	//
+	// So the wording is no longer decided here. The description a constructor already wrote says how
+	// its files were chosen, and this function appends to it rather than choosing between spellings
+	// it cannot know the caller meant.
+	s.Description = fmt.Sprintf("%s, %d of them in the program", s.Description, inPopulation)
 	return s
 }
 
