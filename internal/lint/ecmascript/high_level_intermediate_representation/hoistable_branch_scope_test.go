@@ -1,6 +1,9 @@
 package high_level_intermediate_representation
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestBranchLocalHoistableFactsRespectDominatingReactiveScope(t *testing.T) {
 	t.Parallel()
@@ -45,15 +48,22 @@ func TestBranchLocalHoistableFactsRespectDominatingReactiveScope(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			findings, lowered := findingsForSource(t, testCase.source)
-			if !lowered {
-				t.Fatal("fixture did not lower")
-			}
-			if len(findings) != testCase.wantFindings {
-				t.Fatalf("got %d preserved-memoization findings, want %d: %+v",
-					len(findings), testCase.wantFindings, findings)
-			}
-		})
+		for _, enabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/preservation=%t", testCase.name, enabled), func(t *testing.T) {
+				source, wantFindings := testCase.source, 0
+				if !enabled {
+					source = "// @enablePreserveExistingMemoizationGuarantees:false\n" + source
+					wantFindings = testCase.wantFindings
+				}
+				findings, lowered := findingsForSource(t, source)
+				if !lowered {
+					t.Fatal("fixture did not lower")
+				}
+				if len(findings) != wantFindings {
+					t.Fatalf("got %d preserved-memoization findings, want %d: %+v",
+						len(findings), wantFindings, findings)
+				}
+			})
+		}
 	}
 }

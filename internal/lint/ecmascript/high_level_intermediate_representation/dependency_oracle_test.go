@@ -271,7 +271,9 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	// are the base and fork copies of `optional-member-expression-inverted-optionals-parallel-paths`:
 	// both now resolve `props.a.b.c.d.e` instead of stopping at `props.a.b`. Their dependency counts
 	// are unchanged, so this is path precision rather than new over-production.
-	const knownMatched = 82
+	// Manual-memo prefix seeding recovers x.y in preserve-memo-deps-conditional-property-chain-less-
+	// precise-deps without adding dependencies. MANUAL_MEMO_HOISTING.md records all four changed rows.
+	const knownMatched = 83
 	if matched < knownMatched {
 		t.Errorf("matched %d of %d golden dependencies, down from %d; dependency collection got "+
 			"shallower or lost a path", matched, scored, knownMatched)
@@ -287,7 +289,7 @@ func TestInferredDependenciesAgainstGoldenCacheSlots(t *testing.T) {
 	//
 	// So a rise is asserted as loudly as a fall. Raise this deliberately, alongside the floor, when
 	// collection genuinely improves.
-	const knownMatchedCeiling = 82
+	const knownMatchedCeiling = 83
 	if matched > knownMatchedCeiling {
 		t.Errorf("matched %d of %d golden dependencies, UP from %d, which this test treats as "+
 			"suspect rather than good: the usual cause is the pattern above reading upstream's "+

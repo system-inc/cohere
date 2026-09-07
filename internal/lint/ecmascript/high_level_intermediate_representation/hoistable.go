@@ -332,10 +332,11 @@ func (h *HoistableAnalysis) hoistableAt(block BlockId) []ReactiveScopeDependency
 
 // collectNonNullsInBlocks seeds each block with the accesses it proves non-null by itself.
 //
-// Upstream's `collectNonNullsInBlocks`. Two sources of seed:
+// Upstream's `collectNonNullsInBlocks`. Sources of seed:
 //
 //	the first parameter of a component, which React assumes non-null outright
 //	any instruction that dereferences a value, which proves the OBJECT was non-null
+//	non-optional written memo prefixes, when preservation guarantees are enabled
 //
 // The second is the load-bearing one and it is a deduction rather than an assumption: if
 // `props.a.b` executed without throwing, then `props.a` was not nullish at that point, so `props.a`
@@ -424,6 +425,25 @@ func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges
 			}
 			if written[instructionId] {
 				continue
+			}
+			if marker, ok := instruction.Value.(*StartMemoize); ok && preserveExistingMemoizationEnabled(function) {
+				for _, dependency := range marker.Deps {
+					if dependency.Root.IsGlobal || !isImmutableAtInstruction(function,
+						dependency.Root.Place.Identifier, instruction.Order, ranges, identity, scopes) {
+						continue
+					}
+					for index, entry := range dependency.Path {
+						if entry.Optional {
+							break
+						}
+						path := ReactiveScopeDependency{
+							Identifier: dependency.Root.Place.Identifier,
+							Reactive:   dependency.Root.Place.Reactive,
+							Path:       dependency.Path[:index],
+						}
+						assumed[registry.pathIndex(path)] = true
+					}
+				}
 			}
 			path, ok := maybeNonNullInInstruction(instruction.Value, temporaries)
 			if !ok {
@@ -1032,13 +1052,16 @@ func invokedNonNullPaths(parent *Function, expression *FunctionExpression,
 
 // dependencyArrayInstructions returns the loads that exist only to build a memo dependency array.
 //
-// # Why reading them is circular
+// # Why raw dependency-array loads are not evidence
 //
 // `useMemo(() => ..., [propA?.a, propB.x.y])` lowers its dependency array to ordinary loads, so
 // `propB.x.y` appears as a `PropertyLoad` chain in the enclosing function. `collectNonNullsInBlocks`
 // would read that chain as proof that `propB.x` is non-null, and the dependency walk then descends
 // past `x` and infers `propB.x.y` where upstream infers bare `propB`. The developer's own answer
 // becomes the evidence for a deeper answer, and the rule reports a disagreement it manufactured.
+// Preservation-enabled mode separately seeds immutable non-optional prefixes from StartMemoize,
+// matching React's explicit option gate. Raw loads must still be excluded: they ignore both that
+// option and the optional-path stopping rule. MANUAL_MEMO_HOISTING.md records the distinction.
 //
 // # Why upstream never sees these instructions
 //
