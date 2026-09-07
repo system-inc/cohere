@@ -44,6 +44,14 @@ type controlFlowTarget struct {
 // reactiveContext is the walk's state, upstream's `Context`.
 type reactiveContext struct {
 	function *Function
+	// flattenedScopes are scope ids `FlattenReactiveLoops` decided to prune, so the block emitted
+	// for one is marked pruned as it is built.
+	//
+	// Upstream rewrites the `Scope` terminal into a `PrunedScope` terminal and the builder reads the
+	// variant. This IR has 21 terminals and no `PrunedScope` among them, so the decision travels as
+	// a set of ids instead of a rewritten graph. Same outcome, and it keeps every other pass reading
+	// the shape it reads today rather than growing a variant for one producer.
+	flattenedScopes map[ScopeId]bool
 	// scheduled are blocks a parent has committed to emitting, so a child emits a break instead of
 	// emitting them again. This is what makes the walk single-visit in the presence of joins.
 	scheduled map[BlockId]bool
@@ -269,10 +277,24 @@ type ReactiveBuildResult struct {
 // reason `FindDisjointMutableValues` records: an IdentifierId names one value in this function and a
 // different value in a nested one.
 func BuildReactiveFunction(function *Function) (*ReactiveFunction, ReactiveBuildResult) {
+	return BuildReactiveFunctionWithFlattenedScopes(function, nil)
+}
+
+/*
+ * The same build, told which scopes `FlattenReactiveLoops` decided to prune.
+ *
+ * Separate entry point rather than a changed signature: `BuildReactiveFunction` is what every caller
+ * that does not care about loop flattening should keep calling, and passing nil is exactly the
+ * behaviour they have today. The pruning decision belongs to the pass that made it, so it is carried
+ * in rather than rediscovered here.
+ */
+func BuildReactiveFunctionWithFlattenedScopes(function *Function,
+	flattenedScopes map[ScopeId]bool) (*ReactiveFunction, ReactiveBuildResult) {
 	if function == nil {
 		return nil, ReactiveBuildResult{}
 	}
 	context := newReactiveContext(function)
+	context.flattenedScopes = flattenedScopes
 	entry := context.block(function.Entry)
 	if entry == nil {
 		return nil, ReactiveBuildResult{}
@@ -679,6 +701,7 @@ func (c *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) 
 		*into = append(*into, &ReactiveScopeBlock{
 			Scope:        terminal.Scope,
 			Instructions: body,
+			Pruned:       c.flattenedScopes[terminal.Scope],
 		})
 		c.visitFallthrough(fallthroughId, into)
 

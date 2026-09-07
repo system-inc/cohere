@@ -458,6 +458,24 @@ func prunePassOverScopes(tree *ReactiveFunction, function *Function,
 	TransformReactiveFunction(tree, ReactiveTransformer{
 		Scope: func(scope *ReactiveScopeBlock, traverse func()) ReactiveTransformed {
 			traverse()
+			// A scope pruned before this pass ran is already a decision, and the marker pass below
+			// has to see it.
+			//
+			// `FlattenReactiveLoops` marks a scope inside a loop as pruned while the reactive tree
+			// is being built, which is three passes before this one. Upstream reaches the same state
+			// by rewriting the terminal into `PrunedScope`, so its `prune_non_escaping_scopes` never
+			// sees such a scope as a live one to reason about. Here the block is still a
+			// `ReactiveScopeBlock` carrying `Pruned`, so the equivalent is to fold it into the set
+			// this pass is accumulating. Without this the marker pass computes `every declaration is
+			// in a pruned scope` against a set missing the loop-flattened ones, leaves the
+			// `FinishMemoize` unflagged, and the validator reports a memoization the compiler
+			// declined on purpose.
+			if scope.Pruned {
+				if prunedScopes != nil {
+					prunedScopes[scope.Scope] = true
+				}
+				return KeepStatement()
+			}
 			if dependencies == nil {
 				return KeepStatement()
 			}

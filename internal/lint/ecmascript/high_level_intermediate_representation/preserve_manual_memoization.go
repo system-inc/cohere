@@ -455,9 +455,15 @@ func AnalyzePreservedManualMemoization(function *Function,
 	aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 	identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
 	BuildReactiveScopeTerminals(function, scopes, identity)
+
+	// Upstream's position: immediately after the scope terminals exist and before dependencies are
+	// collected. A scope inside a loop is pruned as policy rather than as a failure, and the
+	// validator has to be able to tell those apart -- see `flatten_reactive_loops.go`.
+	flattenedScopes := FlattenReactiveLoops(function)
+
 	dependencies := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
 
-	tree, _ := BuildReactiveFunction(function)
+	tree, _ := BuildReactiveFunctionWithFlattenedScopes(function, flattenedScopes)
 	if tree == nil {
 		return nil
 	}
