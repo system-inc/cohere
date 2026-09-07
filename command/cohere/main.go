@@ -380,7 +380,23 @@ func run() error {
 		// per commit and 35 across five, so changed-files puts the common case in the tens of
 		// milliseconds.
 		scope := wholeTreeScope()
-		if !*formatAll {
+		switch {
+		case *formatAll:
+			// Asked for by name, so it keeps the whole tree.
+
+		case !lintScope.Everything:
+			// A caller who named paths has already said which files this run is about, and asking git
+			// what changed answers a different question at the cost of a subprocess.
+			//
+			// Measured: `git status --porcelain --untracked-files=all` is about 70ms on this tree, and
+			// it was most of the 116ms a scoped run spent outside any phase. On a run whose phases
+			// total 343ms that is not a rounding error.
+			//
+			// The named scope is the right answer rather than merely the cheap one. Formatting files
+			// the caller did not name would be a surprise in the one mode where they were explicit.
+			scope = lintScope
+
+		default:
 			resolved, scopeError := changedFilesScope(graph.Config.GetCurrentDirectory())
 			if scopeError != nil {
 				// Falling back to the whole tree would turn a failed subprocess into a five-minute

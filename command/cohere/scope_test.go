@@ -937,3 +937,38 @@ func TestNarrowToUsesTheWholeProgramNotTheLintScope(t *testing.T) {
 		t.Fatalf("this fixture no longer reproduces the defect it was written for: %s", narrowed.Description)
 	}
 }
+
+// TestNarrowToKeepsANamedScopesOwnWording holds that a scope stated by name is not redescribed as a
+// set git found.
+//
+// `narrowTo` writes one sentence, and that sentence describes how `changedFilesScope` decided its
+// files. Once a named scope started reaching this function it inherited that wording and reported
+// `1 changed files` for a file nobody had changed.
+//
+// This is the third defect of the same shape in this function: a description correct where it was
+// written and wrong two calls later. The empty-scope branch above carries the first, and the format
+// phase's population carried the second. The pattern is worth the fixture more than the wording is.
+func TestNarrowToKeepsANamedScopesOwnWording(t *testing.T) {
+	population := map[string]struct{}{"/repository/a.ts": {}}
+
+	named := formatScope{
+		FileNames:          []string{"/repository/a.ts"},
+		index:              map[string]struct{}{"/repository/a.ts": {}},
+		RequestDescription: "a.ts",
+	}
+	if described := named.narrowTo(population).Description; strings.Contains(described, "changed") {
+		t.Errorf("a named scope was described as changed files: %s", described)
+	} else if !strings.Contains(described, "1 named") {
+		t.Errorf("a named scope should say it was named: %s", described)
+	}
+
+	// The control. A scope git found keeps the wording that describes how git found it, so the branch
+	// above narrows the behaviour rather than replacing it.
+	fromGit := formatScope{
+		FileNames: []string{"/repository/a.ts"},
+		index:     map[string]struct{}{"/repository/a.ts": {}},
+	}
+	if described := fromGit.narrowTo(population).Description; !strings.Contains(described, "changed files") {
+		t.Errorf("a changed-files scope lost its wording: %s", described)
+	}
+}

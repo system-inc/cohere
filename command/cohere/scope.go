@@ -87,6 +87,17 @@ func (s formatScope) narrowTo(population map[string]struct{}) formatScope {
 		return s
 	}
 
+	// A named scope keeps its own wording. This sentence describes how changedFilesScope found its
+	// files, and applying it to a set the caller stated by name reported `1 changed files` for a file
+	// nobody had changed.
+	//
+	// The same shape as the empty-scope branch above: a description correct where it was written and
+	// wrong two calls later, once a second kind of scope started reaching this function.
+	if s.RequestDescription != "" {
+		s.Description = fmt.Sprintf("%d named, %d of them in the program", len(s.FileNames), inPopulation)
+		return s
+	}
+
 	s.Description = fmt.Sprintf(
 		"%d changed files (working tree, staged, and untracked), %d of them in the program",
 		len(s.FileNames), inPopulation,
