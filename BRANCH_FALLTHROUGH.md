@@ -32,4 +32,11 @@ preservation validation enabled and a proven-failing bad-dependency control.
 
 The private intervention passes the existing HIR suite without changing any
 corpus-count expectations. The production fixture suite and broader lint suite
-remain required before a committed population measurement.
+both pass, as does go build ./....
+
+The `22b3128` archive binary measures 30 findings on the frozen snapshot, against
+44 at `dc82ac8`: 14 removed, none added and 30 unchanged. Seventeen occurrences
+have covering CompileSuccess and remain confirmed false positives. Thirteen are
+bailout-covered (12 Todo, one Suppression) and remain unadjudicated.
+The binary's SHA256 is
+`328e45cce1d52ba81b206154e93533e66c7f9f1758a029733aac1e8f13d378ed`.

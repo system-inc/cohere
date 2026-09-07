@@ -55,8 +55,8 @@
 //     - `var` is lowered as `let`. Function-scoped hoisting is not modelled, so a `var` used before
 //     its declaration in a different block resolves as though it were block-scoped.
 //     - A free identifier becomes `LoadGlobal` whether it is a true global, an import, or a
-//     module-scope binding. `GlobalBindingKind` is always `Global`. Distinguishing an import from
-//     a true global belongs to a later pass. A CAPTURE is no longer in this list: see `captureOf`.
+//     module-scope binding. `GlobalBindingKind`, Source and Imported now retain that distinction
+//     when declarations are available. A CAPTURE is no longer in this list: see `captureOf`.
 //     Note what this entry originally claimed and what was measured. It said resolution "needs the
 //     checker", which was right, but `Lower` took no checker and `symbolOf` read `node.Symbol()` -
 //     a field the binder writes only onto DECLARATION nodes, and only when a binder has run at

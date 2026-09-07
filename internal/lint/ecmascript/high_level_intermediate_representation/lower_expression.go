@@ -173,10 +173,9 @@ func (b *builder) lowerIdentifier(node *ast.Node) Place {
 		}
 	}
 
-	// Unresolved by the checker and unknown to every enclosing function: a true global, an import,
-	// or a module-scope binding. `GlobalBindingKind` is still always `Global`; distinguishing an
-	// import from a global remains a later pass.
-	return b.emit(&LoadGlobal{Name: name, BindingKind: GlobalBindingKindGlobal}, node)
+	// Unknown to every enclosing function: a true global, an import, or a module-scope binding.
+	// Retain the checker's declaration provenance rather than conflating those three cases.
+	return b.emit(moduleGlobalLoad(node, symbol), node)
 }
 
 func (b *builder) lowerPropertyAccess(node *ast.Node) Place {
