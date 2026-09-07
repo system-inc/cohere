@@ -891,7 +891,7 @@ type aliasingState struct {
 
 	// immutable is upstream's abstract value kind, reduced to the one bit the mutation gate needs.
 	//
-	// `InferMutationAliasingEffects` carries a five-point lattice -- Mutable, Context, Primitive,
+	// `InferMutationAliasingEffects` carries a six-point lattice -- Mutable, Context, Primitive,
 	// Frozen, MaybeFrozen, Global -- because it uses the distinctions to phrase diagnostics. The
 	// only consumer here is `state.mutate` at `InferMutationAliasingEffects.ts:1489`, whose
 	// conditional arm mutates for `Mutable` and `Context` and returns `none` for everything else.
@@ -938,6 +938,9 @@ func (s *aliasingState) freezeWithSeen(id IdentifierId, seen map[IdentifierId]bo
 	if _, initialized := s.nodes[id]; !initialized {
 		return false
 	}
+	if kind, immutable := s.immutable[id]; immutable && kind != EffectValueMaybeFrozen {
+		return false
+	}
 	identity, shared := s.identities[id]
 	if !shared {
 		s.markImmutable(id, EffectValueFrozen)
@@ -978,14 +981,12 @@ func (s *aliasingState) deriveImmutable(from IdentifierId, into IdentifierId) {
 	delete(s.immutable, into)
 }
 
-// derivePhiImmutable marks a phi non-mutable only when every incoming value is already known
-// non-mutable and every predecessor has been evaluated.
+// derivePhiImmutable joins the known kinds after every predecessor has been evaluated.
 //
 // Upstream's `InferenceState.inferPhi` does not invent a new abstract value for a phi. It maps the
 // phi to the union of the instruction values named by its operands, so a conditional mutation is
-// later applied to each underlying value. If every value in that union is Primitive or Frozen, the
-// mutation is discarded. This map is a reduced representation of that state, so the equivalent is
-// one non-mutable bit on the phi itself.
+// later checked against their joined kind. Frozen mixed with Mutable yields MaybeFrozen, which
+// suppresses conditional mutation but retains Assign/CreateFrom identity and alias edges.
 //
 // A backedge or unknown operand leaves the phi mutable. Upstream resolves those through its dataflow
 // fixpoint; this pass is deliberately single-shot, and treating an incomplete union as frozen would
@@ -995,17 +996,29 @@ func (s *aliasingState) derivePhiImmutable(phi *Phi, seenBlocks map[BlockId]bool
 		return
 	}
 	kind := EffectValuePrimitive
+	hasFrozen, hasMutable := false, false
 	for _, predecessor := range PhiOperandsInOrder(phi) {
 		if !seenBlocks[predecessor] {
 			return
 		}
 		operandKind, present := s.immutable[phi.Operands[predecessor].Identifier]
 		if !present {
+			hasMutable = true
+			continue
+		}
+		hasFrozen = hasFrozen || operandKind == EffectValueFrozen || operandKind == EffectValueMaybeFrozen
+		hasMutable = hasMutable || operandKind == EffectValueMaybeFrozen
+		if operandKind == EffectValueFrozen || operandKind == EffectValueMaybeFrozen {
+			kind = operandKind
+		} else if operandKind == EffectValueGlobal && kind == EffectValuePrimitive {
+			kind = EffectValueGlobal
+		}
+	}
+	if hasMutable {
+		if !hasFrozen {
 			return
 		}
-		if operandKind != EffectValuePrimitive {
-			kind = EffectValueFrozen
-		}
+		kind = EffectValueMaybeFrozen
 	}
 	s.markImmutable(phi.Place.Identifier, kind)
 }
@@ -1359,6 +1372,7 @@ type pendingMutation struct {
 // They are transcribed one for one against both implementations for that reason.
 func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasingState, []pendingMutation) {
 	state := newAliasingState()
+	refs := refDerivedValues(function)
 	var mutations []pendingMutation
 	index := 0
 
@@ -1450,6 +1464,13 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					if expression, ok := instruction.Value.(*FunctionExpression); ok &&
 						effect.Into.Identifier == instruction.LValue.Identifier {
 						state.recordFreezeSources(effect.Into.Identifier, expression.Captures)
+						allImmutable := len(expression.Captures) > 0
+						for _, capture := range expression.Captures {
+							allImmutable = allImmutable && state.notMutable(capture.Identifier) && !refs[capture.Identifier]
+						}
+						if allImmutable && int(expression.Function) < len(function.Functions) && hasReadOnlyClosureEffects(function.Functions[expression.Function], map[*Function]bool{}) {
+							effect.Value = EffectValueFrozen
+						}
 					}
 					if effect.Value != EffectValueMutable {
 						state.markImmutable(effect.Into.Identifier, effect.Value)
@@ -1458,7 +1479,7 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					}
 
 				case effect.Kind == AliasingEffectCreateFrom:
-					if state.notMutable(effect.From.Identifier) {
+					if kind, immutable := state.immutable[effect.From.Identifier]; immutable && kind != EffectValueMaybeFrozen {
 						state.create(effect.Into, aliasingNodeObject)
 					} else {
 						state.createFrom(index, effect.From, effect.Into)
@@ -1471,7 +1492,7 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					if _, exists := state.nodes[effect.Into.Identifier]; !exists {
 						state.create(effect.Into, aliasingNodeObject)
 					}
-					sourceIsMutable := !state.notMutable(effect.From.Identifier)
+					sourceIsMutable := !state.notMutable(effect.From.Identifier) || state.immutable[effect.From.Identifier] == EffectValueMaybeFrozen
 					// An assignment carries mutability with it, the same way `CreateFrom` does.
 					// Upstream's `Assign` arm reads `state.kind(effect.from)` and switches on the
 					// result, with `ValueKind.Frozen` its first case
@@ -1494,12 +1515,12 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					// into a frozen/primitive destination. Keeping either edge would let a later
 					// mutation of the destination widen a value upstream proved non-mutable.
 					if kind, present := state.immutable[effect.From.Identifier]; present &&
-						(kind == EffectValueFrozen || kind == EffectValuePrimitive) {
+						(kind == EffectValueFrozen || kind == EffectValuePrimitive || kind == EffectValueGlobal) {
 						index++
 						break
 					}
 					if kind, present := state.immutable[effect.Into.Identifier]; present &&
-						(kind == EffectValueFrozen || kind == EffectValuePrimitive) {
+						(kind == EffectValueFrozen || kind == EffectValuePrimitive || kind == EffectValueGlobal) {
 						index++
 						break
 					}
@@ -1509,8 +1530,7 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 				case effect.Kind == AliasingEffectMaybeAlias:
 					// MaybeAlias has one intentional asymmetry in upstream's shared refinement:
 					// it survives primitive/global sources and immutable destinations, but a Frozen
-					// (or MaybeFrozen) source is still rewritten to ImmutableCapture. This reduced
-					// lattice has no MaybeFrozen kind, so Frozen is the exact expressible gate.
+					// source is rewritten to ImmutableCapture. MaybeFrozen retains the edge.
 					if kind, present := state.immutable[effect.From.Identifier]; present &&
 						kind == EffectValueFrozen {
 						index++
@@ -1523,15 +1543,15 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					// Upstream switches on the SOURCE's kind here and only two of its four arms
 					// reach `state.capture` (`InferMutationAliasingEffects.ts:894-942`):
 					//
-					//	Frozen, MaybeFrozen   re-applied as `ImmutableCapture`
+					//	Frozen               re-applied as `ImmutableCapture`
 					//	Global, Primitive     pruned, the arm breaks with no effect pushed
 					//	Context               re-applied as `MaybeAlias`
-					//	default (Mutable)     pushed, and widens
+					//	Mutable, MaybeFrozen pushed for a mutable destination
 					//
 					// `ImmutableCapture` is already a no-op for range widening in this pass, and a
 					// pruned effect never reaches it either, so both of the arms this tree can
-					// express come out the same way: do not widen. `Global` and `Context` have no
-					// `EffectValueKind` here, so the switch is over the two that do.
+					// express as immutable sources come out the same way: do not widen. Context
+					// remains represented by the conservative Mutable seed.
 					//
 					// The kind is what this needs and one bit is not enough for it. `notMutable`
 					// answers "not Mutable or Context", which is exactly right for the two
@@ -1545,12 +1565,12 @@ func buildAliasingGraph(function *Function, effects *AliasingEffects) (*aliasing
 					// null for `Frozen`, `Global` and `Primitive`, and a mutable source into a null
 					// destination matches none of the three branches, so it is pruned.
 					if kind, present := state.immutable[effect.From.Identifier]; present &&
-						(kind == EffectValueFrozen || kind == EffectValuePrimitive) {
+						(kind == EffectValueFrozen || kind == EffectValuePrimitive || kind == EffectValueGlobal) {
 						index++
 						break
 					}
 					if kind, present := state.immutable[effect.Into.Identifier]; present &&
-						(kind == EffectValueFrozen || kind == EffectValuePrimitive) {
+						(kind == EffectValueFrozen || kind == EffectValuePrimitive || kind == EffectValueGlobal) {
 						index++
 						break
 					}

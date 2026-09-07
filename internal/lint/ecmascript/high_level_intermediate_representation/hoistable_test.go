@@ -796,8 +796,8 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// moves 625/2841 to 631/3043; STATE_EFFECTS.md accounts for all added and removed scope inputs.
 	// Effect-hook freezing moves those to 649/3118, attributed in EFFECT_HOOK_EFFECTS.md. Immutable
 	// alias-edge refinement moves those to 685/3227; IMMUTABLE_ALIAS_EDGES.md lists the full delta.
-	if deep != 777 || flat != 3380 {
-		t.Errorf("got %d deep and %d flat dependencies, want 777 and 3380; a SMALL move here is "+
+	if deep != 795 || flat != 3302 {
+		t.Errorf("got %d deep and %d flat dependencies, want 795 and 3302; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

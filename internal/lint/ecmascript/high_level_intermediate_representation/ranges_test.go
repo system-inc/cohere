@@ -579,6 +579,13 @@ func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
 		{name: "alias mutable values", edge: AliasingEffectAlias, fromKind: EffectValueMutable, intoKind: EffectValueMutable, wantWidened: true},
 		{name: "maybe-alias frozen source", edge: AliasingEffectMaybeAlias, fromKind: EffectValueFrozen, intoKind: EffectValueMutable},
 		{name: "maybe-alias primitive source", edge: AliasingEffectMaybeAlias, fromKind: EffectValuePrimitive, intoKind: EffectValueMutable, wantWidened: true},
+		{name: "maybe-alias global source", edge: AliasingEffectMaybeAlias, fromKind: EffectValueGlobal, intoKind: EffectValueMutable, wantWidened: true},
+		{name: "maybe-alias mixed source", edge: AliasingEffectMaybeAlias, fromKind: EffectValueMaybeFrozen, intoKind: EffectValueMutable, wantWidened: true},
+		{name: "alias mixed source", edge: AliasingEffectAlias, fromKind: EffectValueMaybeFrozen, intoKind: EffectValueMutable, wantWidened: true},
+		{name: "capture mixed source", edge: AliasingEffectCapture, fromKind: EffectValueMaybeFrozen, intoKind: EffectValueMutable, wantWidened: true},
+		{name: "capture global source", edge: AliasingEffectCapture, fromKind: EffectValueGlobal, intoKind: EffectValueMutable},
+		{name: "create-from mixed source", edge: AliasingEffectCreateFrom, fromKind: EffectValueMaybeFrozen, intoKind: EffectValueMutable, wantWidened: true},
+		{name: "assign mixed source", edge: AliasingEffectAssign, fromKind: EffectValueMaybeFrozen, intoKind: EffectValueMutable, wantWidened: true},
 		{name: "create-from frozen source", edge: AliasingEffectCreateFrom, fromKind: EffectValueFrozen, intoKind: EffectValueMutable},
 		{name: "create-from primitive source", edge: AliasingEffectCreateFrom, fromKind: EffectValuePrimitive, intoKind: EffectValueMutable},
 		{name: "create-from mutable source", edge: AliasingEffectCreateFrom, fromKind: EffectValueMutable, intoKind: EffectValueMutable, wantWidened: true},
@@ -609,6 +616,10 @@ func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
 			block.Terminal = &Return{Value: result}
 			Finalize(function)
 
+			mutationKind := AliasingEffectMutate
+			if testCase.edge == AliasingEffectCapture {
+				mutationKind = AliasingEffectMutateTransitive
+			}
 			effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
 				fromInstruction.Id: {create(from, testCase.fromKind)},
 				edgeInstruction.Id: {
@@ -617,7 +628,7 @@ func TestAliasingRefinementMatchesAbstractKinds(t *testing.T) {
 				},
 				mutationInstruction.Id: {
 					create(result, EffectValuePrimitive),
-					mutate(AliasingEffectMutate, into),
+					mutate(mutationKind, into),
 				},
 			}}
 			ranges := InferMutableRangesWithEffects(function, effects)
@@ -1351,8 +1362,7 @@ export function f() {
 	// before and after. What stopped is the `Capture` from the frozen global into `holder`, which
 	// upstream also prunes -- its `Capture` arm maps a `Global` source to a null `sourceType` that
 	// matches none of its three branches (`InferMutationAliasingEffects.ts:901`), and a `Frozen`
-	// source to `ImmutableCapture`. This tree types a `LoadGlobal` as `EffectValueFrozen`, so it
-	// takes the second route to the same answer.
+	// source to `ImmutableCapture`. LoadGlobal now carries Global directly and takes the first route.
 	//
 	// Widening a global was never meaningful, and the sequence-index guard this test exists for is
 	// untouched: without it the count rises by two from whatever the baseline is, which is still

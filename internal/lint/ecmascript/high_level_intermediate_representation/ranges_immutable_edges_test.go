@@ -30,7 +30,7 @@ func TestImmutableSourcesDoNotWidenThroughMutableFallbacks(t *testing.T) {
 				if calls != 1 {
 					t.Fatalf("found %d calls, want one conditional mutation", calls)
 				}
-				foundSource, sourceWidened, fallbackWidened := false, false, false
+				foundSource, foundFallback, sourceWidened, fallbackWidened := false, false, false, false
 				for _, identifier := range function.Identifiers {
 					if identifier == nil {
 						continue
@@ -40,11 +40,15 @@ func TestImmutableSourcesDoNotWidenThroughMutableFallbacks(t *testing.T) {
 						foundSource = true
 						sourceWidened = sourceWidened || ranges.Get(identifier.Id).Contains(mutationOrder)
 					case "items":
+						foundFallback = true
 						fallbackWidened = fallbackWidened || ranges.Get(identifier.Id).Contains(mutationOrder)
 					}
 				}
-				if !foundSource || !fallbackWidened {
-					t.Fatal("source or mutable fallback was not exercised")
+				if !foundSource || !foundFallback {
+					t.Fatal("source or fallback was not exercised")
+				}
+				if wantWidened := functionName == "ordinary"; fallbackWidened != wantWidened {
+					t.Errorf("fallback widened=%t, want %t", fallbackWidened, wantWidened)
 				}
 				if wantWidened := functionName == "ordinary"; sourceWidened != wantWidened {
 					t.Errorf("source widened=%t, want %t", sourceWidened, wantWidened)

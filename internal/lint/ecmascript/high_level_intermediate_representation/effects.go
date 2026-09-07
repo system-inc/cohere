@@ -300,8 +300,8 @@ type AliasingEffect struct {
 //
 // This is upstream's `ValueKind` and it is deliberately NOT the same type as the six-element
 // lattice `immutability.go` builds for itself. That rule's lattice is a private type with a join
-// (`immutabilityMergeKinds`) tuned to what it reports; this is only the seed kind a Create names,
-// with no join, because this pass never merges two kinds. Sharing one type across the two would
+// (`immutabilityMergeKinds`) tuned to what it reports; this kind also feeds the range graph's phi
+// refinement. Sharing one type across the two would
 // couple a rule's message selection to a substrate enum for no gain, and `immutability.go`'s
 // version carries a reason bitset this one has no use for.
 type EffectValueKind uint8
@@ -313,6 +313,8 @@ const (
 	EffectValuePrimitive
 	// EffectValueFrozen is a value that must not be mutated from here on.
 	EffectValueFrozen
+	EffectValueMaybeFrozen
+	EffectValueGlobal
 )
 
 func (k EffectValueKind) String() string {
@@ -321,6 +323,10 @@ func (k EffectValueKind) String() string {
 		return "primitive"
 	case EffectValueFrozen:
 		return "frozen"
+	case EffectValueMaybeFrozen:
+		return "maybe-frozen"
+	case EffectValueGlobal:
+		return "global"
 	default:
 		return "mutable"
 	}
@@ -771,10 +777,10 @@ func effectsForInstruction(function *Function, instruction *Instruction) []Alias
 		return []AliasingEffect{create(lvalue, EffectValueMutable)}
 
 	case *LoadGlobal:
-		// A global is Frozen rather than Mutable: writing to one is a finding upstream, which
+		// A global is non-mutable but distinct from Frozen: writing to one is a finding upstream, which
 		// `immutability.go` reports with its own reason. Measured there and reused rather than
 		// re-derived.
-		return []AliasingEffect{create(lvalue, EffectValueFrozen)}
+		return []AliasingEffect{create(lvalue, EffectValueGlobal)}
 
 	case *StoreGlobal:
 		return []AliasingEffect{
@@ -872,8 +878,8 @@ func effectsForInstruction(function *Function, instruction *Instruction) []Alias
 	case *FunctionExpression:
 		// Creating a closure captures everything it closes over. Upstream additionally decides
 		// Mutable against Frozen for the closure itself by asking whether the inner function has
-		// tracked side effects; that read is what `EffectGapInterproceduralParameters` covers, and
-		// Mutable is the conservative choice.
+		// tracked side effects. Mutable is the conservative seed; the range graph refines proven
+		// read-only closures once capture kinds are available.
 		out := []AliasingEffect{create(lvalue, EffectValueMutable)}
 		for _, capture := range value.Captures {
 			out = append(out, flow(AliasingEffectCapture, capture, lvalue))
