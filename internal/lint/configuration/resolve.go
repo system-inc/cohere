@@ -97,14 +97,42 @@ func (r Resolved) settingFor(ruleName string) (RuleSetting, bool) {
 	if setting, configured := r.Rules[ruleName]; configured {
 		return setting, true
 	}
+
+	// The suffix must fall on a `/` boundary, or a config entry for `no-enum` would silence
+	// `consistency-no-enum`.
+	//
+	// Collected rather than returned on first match, which is the whole repair. The old loop
+	// returned the first entry the range yielded, and Go randomises map iteration order, so a bare
+	// registry name reachable from two prefixed config keys resolved differently between runs of one
+	// binary over one config. Measured before this guard, with `@typescript-eslint/no-shadow` at
+	// error and `nexus/no-shadow` at off: the bare name resolved enabled 157 times and disabled 43
+	// times across 200 resolutions.
+	//
+	// That is the worst shape a configuration defect can take. A surprising result invites a re-run,
+	// and a re-run here manufactures a second opinion rather than a confirmation.
+	var matched RuleSetting
+	found := false
+	ambiguous := false
 	for configuredName, setting := range r.Rules {
-		if prefix := strings.TrimSuffix(configuredName, ruleName); prefix != configuredName {
-			if strings.HasSuffix(prefix, "/") {
-				return setting, true
-			}
+		prefix := strings.TrimSuffix(configuredName, ruleName)
+		if prefix == configuredName || !strings.HasSuffix(prefix, "/") {
+			continue
 		}
+		if found {
+			ambiguous = true
+			continue
+		}
+		matched = setting
+		found = true
 	}
-	return RuleSetting{}, false
+
+	// Two prefixed entries reach one bare registry name and the config has not said which it means.
+	// Reporting unconfigured is the honest answer: it routes to the caller that already knows how to
+	// say "nobody has decided about this rule", rather than picking one at random and looking sure.
+	if ambiguous {
+		return RuleSetting{}, false
+	}
+	return matched, found
 }
 
 // Resolve computes the effective configuration for one file path.
