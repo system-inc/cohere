@@ -276,3 +276,82 @@ func buildPathTestGraph(t *testing.T, code string) (*Graph[string], map[string][
 	}
 	return graph, locations
 }
+
+/*
+ * An implicit exception inside a `catch` body leaves through the thrown path, not the normal one.
+ *
+ * `firstThrowableFork` had a branch that, for a throwable node inside a `catch` of a `try` with a
+ * `finally`, recorded the current block as an *implicit* source of the statement's ordinary
+ * continuation. That made the `finally`'s normal entry reachable from a path that only exists
+ * because something threw, and so made the enclosing function's end reachable when every path
+ * through it returns or throws.
+ *
+ * ESLint does not have that branch. `makeFirstThrowablePathInTryOrCatchBlock`
+ * (`code-path-analysis/code-path-state.js:1780`) adds the head to `thrownForkContext` for both the
+ * `try` and `catch` positions, with `position !== "catch" || !hasFinalizer` only deciding whether
+ * to fork at all rather than where the fork goes.
+ *
+ * The shape below is the minimal one. A declaration in the `try` supplies the throwable node that
+ * triggers the fork; without it there is nothing that can throw before the `return`, which is why
+ * `noDeclaration` was correct even while this was broken. The `finally` supplies the frame the
+ * branch keyed on. The `catch` rethrowing is what makes the end genuinely unreachable, so it is the
+ * case where a spurious normal edge is observable.
+ *
+ * On the ahra tree this took `consistent-return` from 141 findings to 131, matching eslint exactly,
+ * and moved no other rule that reads this graph.
+ */
+func TestEndIsUnreachableWhenACatchRethrowsBesideAFinally(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name string
+		code string
+		want bool
+	}{
+		{
+			name: "declarationInTryWithRethrowingCatchAndFinally",
+			code: "function f() { try { const r = g(); return r; } catch (e) { throw e; } finally { k(); } }",
+			want: false,
+		},
+		{
+			// No throwable node before the `return`, so no fork is created at all. Correct before
+			// the repair and after it, and kept so a regression that removed the fork entirely
+			// could not pass this table.
+			name: "noDeclarationInTry",
+			code: "function f() { try { return 1; } catch (e) { throw e; } finally { k(); } }",
+			want: false,
+		},
+		{
+			// No `finally`, so the branch that was removed never applied here.
+			name: "noFinally",
+			code: "function f() { try { const r = g(); return r; } catch (e) { throw e; } }",
+			want: false,
+		},
+		{
+			// The `catch` returns rather than rethrows, so every path still leaves with a value.
+			name: "catchReturns",
+			code: "function f() { try { const r = g(); return r; } catch (e) { return 2; } finally { k(); } }",
+			want: false,
+		},
+		{
+			// The end genuinely is reachable here: the `catch` neither returns nor throws, so
+			// control falls out of the statement and off the end of the function. This is the
+			// control that fails if a repair reaches the other four by declaring the end
+			// unreachable whenever a `finally` is present.
+			name: "catchFallsThroughSoEndIsReachable",
+			code: "function f() { try { const r = g(); return r; } catch (e) { h(e); } finally { k(); } }",
+			want: true,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			graph, _ := buildPathTestGraph(t, testCase.code)
+			if graph == nil {
+				t.Fatal("no graph")
+			}
+			if graph.EndReachable != testCase.want {
+				t.Errorf("EndReachable = %v, want %v", graph.EndReachable, testCase.want)
+			}
+		})
+	}
+}

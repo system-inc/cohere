@@ -458,16 +458,6 @@ func (b *Builder[E]) firstThrowableFork() {
 		return
 	}
 	f.thrownForked = true
-	if f.position == posCatch && f.hasFinally {
-		// ESLint merges an implicit exception from a catch body into the
-		// catch's ordinary finally continuation. An explicit throw still uses
-		// the abrupt layout through makeThrow.
-		f.implicit = append(f.implicit, b.cur)
-		next := b.newBlock()
-		b.link(b.cur, next)
-		b.enter(next)
-		return
-	}
 	f.thrownAny = true
 	b.link(b.cur, throwTarget(f))
 	next := b.newBlock()

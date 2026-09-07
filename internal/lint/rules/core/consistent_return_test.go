@@ -487,15 +487,25 @@ func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(t *testing.T) {
 //
 // Measured cost on the ahra tree: 141 findings against the installed rule's 130, with all 130
 // agreeing exactly and nothing missing in the other direction.
-func TestConsistentReturnOverReportsOnATryWithADeclarationAndAFinally(t *testing.T) {
+func TestConsistentReturnHandlesATryWithADeclarationAndAFinally(t *testing.T) {
 	t.Parallel()
 
+	// Was an over-report and is now correct. The function returns on every path: the `try` returns
+	// a value and the `catch` rethrows, so nothing falls off the end.
+	//
+	// The cause was in `control_flow_graph` rather than here. An implicit exception raised inside a
+	// `catch` body was routed into the `try` statement's ordinary continuation, which made the
+	// `finally`'s normal entry reachable and therefore the function's end reachable. ESLint's
+	// `makeFirstThrowablePathInTryOrCatchBlock` adds that path to `thrownForkContext` in both the
+	// try and catch positions; ours had a separate branch for the catch case. Removing it brought
+	// the tree from 141 findings to eslint's 131, exactly, with no other rule moving.
 	reporting := "async function f() { try { const r = g(); return r; } catch (e) { throw e; } finally { k(); } }"
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, ConsistentReturn, consistentReturnFile, reporting), "missingReturn")
+	rule_testing.ExpectClean(t,
+		rule_testing.Run(t, ConsistentReturn, consistentReturnFile, reporting))
 
-	// The two controls that localise the cause. Both are correctly silent, and each differs from
-	// the case above by exactly one element.
+	// The two controls that localised the cause, kept because they are what proves the repair did
+	// not simply silence the rule on every try/finally shape. Each differs from the case above by
+	// exactly one element and each was already correct.
 	withoutDeclaration := "async function f() { try { return 1; } catch (e) { throw e; } finally { k(); } }"
 	rule_testing.ExpectClean(t,
 		rule_testing.Run(t, ConsistentReturn, consistentReturnFile, withoutDeclaration))
