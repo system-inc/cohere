@@ -418,3 +418,43 @@ void handler;
 `)
 	rule_testing.ExpectFindings(t, result, "missingAwait")
 }
+
+// TestRequireAwaitExemptsAnInterfaceMethod covers the class-method half of the contract check.
+//
+// `implements` puts the contract on the class rather than on the method, so the method has no
+// contextual type of its own and the object-literal path above does not reach it. The control
+// below asserts the exemption is not simply swallowing every method.
+func TestRequireAwaitExemptsAnInterfaceMethod(t *testing.T) {
+	t.Parallel()
+
+	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+interface AdapterInterface {
+    fetchBalances: () => Promise<number[]>;
+}
+class ScaffoldedAdapter implements AdapterInterface {
+    async fetchBalances(): Promise<number[]> {
+        return [];
+    }
+}
+void ScaffoldedAdapter;
+`)
+	rule_testing.ExpectClean(t, result)
+}
+
+// TestRequireAwaitReportsAMethodWithNoInterface is the control for the exemption above.
+//
+// The same method on a class that implements nothing has no contract to satisfy, so the keyword is
+// the author's own choice and the finding stands.
+func TestRequireAwaitReportsAMethodWithNoInterface(t *testing.T) {
+	t.Parallel()
+
+	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+class PlainAdapter {
+    async fetchBalances(): Promise<number[]> {
+        return [];
+    }
+}
+void PlainAdapter;
+`)
+	rule_testing.ExpectFindings(t, result, "missingAwait")
+}

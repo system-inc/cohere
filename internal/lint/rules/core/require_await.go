@@ -708,6 +708,13 @@ func requireAwaitSatisfiesPromiseContract(ctx rule.Context, node *ast.Node) bool
 
 	contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone)
 	if contextualType == nil {
+		// A class method has no contextual type of its own; its contract comes from whatever the
+		// class implements or extends. Without this, an adapter satisfying an interface whose
+		// declared member returns a promise reads as a stray keyword, and the repair the rule
+		// suggests would stop the class from satisfying its own interface.
+		contextualType = requireAwaitHeritageMemberType(ctx, node)
+	}
+	if contextualType == nil {
 		return false
 	}
 
@@ -732,4 +739,44 @@ func requireAwaitSatisfiesPromiseContract(ctx rule.Context, node *ast.Node) bool
 	}
 
 	return sawSignature
+}
+
+// requireAwaitHeritageMemberType finds the type a class's own interface declares for this method.
+//
+// `class CoinbaseAdapter implements FinanceAdapterInterface` puts the contract on the class rather
+// than on the method, so `getContextualType` on the method returns nothing. Walking to the heritage
+// clause and asking for the member of the same name recovers it. Measured on ahra: five finance
+// adapters implement one interface whose fetch members return promises, and two of the five
+// genuinely await, so the promise is earned and the other three have no choice about the keyword.
+func requireAwaitHeritageMemberType(ctx rule.Context, node *ast.Node) *checker.Type {
+	if !ast.IsMethodDeclaration(node) || ast.IsStatic(node) {
+		return nil
+	}
+	name := node.Name()
+	if name == nil || !ast.IsIdentifier(name) {
+		return nil
+	}
+	class := node.Parent
+	if class == nil || !ast.IsClassLike(class) {
+		return nil
+	}
+	heritageClauses := type_checking.GetHeritageClauses(class)
+	if heritageClauses == nil {
+		return nil
+	}
+
+	for _, clause := range heritageClauses.Nodes {
+		for _, typeNode := range clause.AsHeritageClause().Types.Nodes {
+			heritageType := ctx.TypeChecker.GetTypeAtLocation(typeNode)
+			if heritageType == nil {
+				continue
+			}
+			member := checker.Checker_getPropertyOfType(ctx.TypeChecker, heritageType, name.Text())
+			if member == nil {
+				continue
+			}
+			return ctx.TypeChecker.GetTypeOfSymbolAtLocation(member, node)
+		}
+	}
+	return nil
 }

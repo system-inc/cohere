@@ -67,5 +67,28 @@ const basic = Buffer.from(`${creds.clientId}:${creds.clientSecret}`).toString('b
 
 ### What fixing looks like
 
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable, and site-by-site is the wrong place to start. Measured on ahra, 2026-09-08:
+**188 of 507 sites are `Buffer`**, and they are not unsafe code at all. `@cloudflare/workers-types`
+ships `declare const Buffer: any` (index.d.ts:486), and the base TypeScript configuration lists it
+after `node` in `types`, so the `any` wins over the real declaration from `@types/node`. A two-line
+file calling `Buffer.from(...).toString('hex')` produces nine findings.
+
+Removing `@cloudflare/workers-types` from the `types` array was measured on the same tree:
+
+    no-unsafe-member-access    507 -> 264
+    no-unsafe-assignment       435 -> 331
+    no-unsafe-call             257 ->  42
+    no-unsafe-argument         141 ->  86
+    total                    1,340 -> 723
+    type diagnostics            15 ->  20
+
+617 findings for one config line. The five new type errors are real bugs the `any` was hiding
+(`Uint8Array` passed where `Buffer` is required, in ThingsApi and the see/look route), which is the
+rule doing its job one level up.
+
+The general lesson, and the reason this section exists: **on any of the four unsafe-* rules, count
+by the type that is `any` before touching a single call site.** A broken ambient declaration
+concentrates hundreds of findings behind one cause, and sweeping them individually is not just slow
+but wrong, because it treats a configuration defect as a code defect. Sample the sites, group them
+by the value whose type is `any`, and fix the declaration if one dominates.
 
