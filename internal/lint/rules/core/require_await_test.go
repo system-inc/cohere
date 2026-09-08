@@ -356,3 +356,65 @@ func TestRequireAwaitReportsOnTheFunctionHead(t *testing.T) {
 		})
 	}
 }
+
+// TestRequireAwaitExemptsAPromiseContract covers the case upstream cannot see.
+//
+// A function written into a position whose declared type demands a promise has to be async, and
+// reporting it would be telling the author to make their code not compile. The exemption is only
+// sound if it is narrow, so both directions are asserted here: the contract case stays silent, and
+// the same body in a position that does NOT demand a promise still reports.
+func TestRequireAwaitExemptsAPromiseContract(t *testing.T) {
+	t.Parallel()
+
+	// The stub matches a map whose declared signature returns a promise, exactly the shape a
+	// not-yet-wired collector takes beside siblings that really do I/O.
+	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+type CollectorType = (key: string) => Promise<number>;
+const collectors: Record<string, CollectorType> = {
+    wired: async function (key: string): Promise<number> {
+        return Promise.resolve(key.length);
+    },
+    notWiredYet: async function (key: string): Promise<number> {
+        return 0;
+    },
+};
+void collectors;
+`)
+	rule_testing.ExpectClean(t, result)
+}
+
+// TestRequireAwaitStillReportsWithoutAContract is the control for the exemption above.
+//
+// A detector that cannot fire is indistinguishable from a clean corpus, so the same body written
+// where nothing demands a promise has to still report. Without this the exemption could be
+// swallowing every finding and the suite would look identical.
+func TestRequireAwaitStillReportsWithoutAContract(t *testing.T) {
+	t.Parallel()
+
+	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+async function notWiredYet(key: string): Promise<number> {
+    return 0;
+}
+void notWiredYet;
+`)
+	rule_testing.ExpectFindings(t, result, "missingAwait")
+}
+
+// TestRequireAwaitReportsWhenTheContractAcceptsEither guards the narrowness of the exemption.
+//
+// A position typed `T | Promise<T>` gives the author a choice, so the keyword is optional there and
+// the finding is real. This matters because that union is what a deliberately widened interface
+// looks like, and widening is the correct repair when no implementation awaits. Exempting it would
+// make the rule unable to see the very thing the widening was meant to expose.
+func TestRequireAwaitReportsWhenTheContractAcceptsEither(t *testing.T) {
+	t.Parallel()
+
+	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+type EitherType = (key: string) => number | Promise<number>;
+const handler: EitherType = async function (key: string): Promise<number> {
+    return key.length;
+};
+void handler;
+`)
+	rule_testing.ExpectFindings(t, result, "missingAwait")
+}

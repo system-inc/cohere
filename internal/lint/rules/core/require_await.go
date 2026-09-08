@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	type_checking "github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -58,6 +60,9 @@ import (
 // reports the OUTER function, and the inner arrow is separately clean because it does await.
 var RequireAwait = rule.Rule{
 	Name: "require-await",
+	// The contract check reads the checker. Without this the checker is nil, the guard silently
+	// never fires, and the rule quietly reverts to upstream's blindness.
+	NeedsTypeChecker: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		check := func(node *ast.Node) {
 			checkRequireAwait(ctx, node)
@@ -96,6 +101,9 @@ func checkRequireAwait(ctx rule.Context, node *ast.Node) {
 		return
 	}
 	if requireAwaitContainsAwait(body) {
+		return
+	}
+	if requireAwaitSatisfiesPromiseContract(ctx, node) {
 		return
 	}
 
@@ -664,4 +672,64 @@ func requireAwaitNameText(name *ast.Node) (string, bool) {
 		return name.Text(), true
 	}
 	return "", false
+}
+
+// requireAwaitSatisfiesPromiseContract answers whether this function's `async` is required by the
+// contract it is being written into, rather than being a stray keyword.
+//
+// # Why the core rule needs this and upstream's does not have it
+//
+// ESLint judges one function at a time, so it can see that a body holds no `await` but not why the
+// keyword is there. Both the core rule and the typed variant therefore report the same shape: a
+// stub written into a position whose declared type is `=> Promise<T>`, sitting beside siblings that
+// genuinely do I/O. Measured in ahra, that shape is most of what survives an honest sweep: a
+// not-yet-wired ads collector in a map typed `=> Promise<...>`, a test double standing in for a
+// dependency whose real implementation awaits, a condition function matching its interface.
+//
+// Upstream already concedes the case in a narrower form. An EMPTY body is exempt precisely because
+// reporting it "would fire on every unimplemented method in a codebase" — the same reasoning,
+// drawn by body shape rather than by contract. A stub with one `return emptyReport(...)` in it is
+// the same animal and falls outside that line.
+//
+// We hold a resident type graph and a real checker, so we can ask the question upstream cannot:
+// what type is this function expected to have where it is written? If that position demands a
+// promise, the `async` is load-bearing and removing it would break the assignment. Reporting it
+// would be telling the author to make their code wrong.
+//
+// The check is deliberately narrow. It fires only when a contextual type exists AND every call
+// signature it offers returns a thenable. A position that accepts `T | Promise<T>` is NOT exempt,
+// because there the keyword really is optional and the finding is real — that union is exactly
+// what a widened interface looks like, and widening is the right repair when no implementation
+// awaits. Absent contextual type means absent exemption.
+func requireAwaitSatisfiesPromiseContract(ctx rule.Context, node *ast.Node) bool {
+	if ctx.TypeChecker == nil {
+		return false
+	}
+
+	contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone)
+	if contextualType == nil {
+		return false
+	}
+
+	// Every signature the position offers has to demand a promise. If any one of them accepts a
+	// plain value, the author had a choice and the keyword is not required of them.
+	sawSignature := false
+	for _, part := range type_checking.UnionTypeParts(contextualType) {
+		for _, signature := range type_checking.GetCallSignatures(ctx.TypeChecker, part) {
+			sawSignature = true
+			returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
+
+			// Split the RETURN type, not the function type. A position declared
+			// `T | Promise<T>` offers one signature whose return is a union, and the author may
+			// legitimately answer with either, so the keyword is optional and the finding stands.
+			// Only a return type that is thenable in every branch actually demands a promise.
+			for _, returnPart := range type_checking.UnionTypeParts(returnType) {
+				if !type_checking.IsThenableType(ctx.TypeChecker, node, returnPart) {
+					return false
+				}
+			}
+		}
+	}
+
+	return sawSignature
 }
