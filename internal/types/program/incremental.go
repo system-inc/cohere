@@ -89,6 +89,28 @@ func (s *IncrementalSession) Diagnostics(ctx context.Context) []*ast.Diagnostic 
 
 // Write persists what the next run needs to tell changed files from unchanged ones.
 //
+// It costs about 146ms on ahra warm, and the cost is CPU rather than disk. Measured by
+// instrumenting inside upstream's emitBuildInfo:
+//
+//	snapshotToBuildInfo   104ms   walking the snapshot
+//	json.Marshal            9ms   3.5 MB of JSON
+//	the write itself       0.4ms
+//
+// Writing 3.5 MB on this machine is 0.5ms, ten trials. So "the cache rewrites an unchanged file
+// every run" is true and is not worth fixing: skipping the write when the bytes match was built,
+// measured, and reverted, because reading the old file to compare costs more than the write it
+// avoids (blocked A/B, six runs each: 362ms median unchanged against 371ms with the skip).
+//
+// Upstream's own already-up-to-date check cannot fire for us and that is not a bug to fix here:
+// buildInfoEmitPending is initialized true for any incremental config with no in-memory
+// predecessor (programtosnapshot.go:69) and set true again unconditionally after semantic
+// diagnostics (program.go:319). Both are correct for the watch process it was written for. cohere
+// is one-shot, so a fresh snapshot every run means the flag is structurally always true.
+//
+// The remaining cost lives in rebuilding state a resident process would still hold -- the 204ms
+// parse in NewIncrementalSession and the 104ms snapshot walk here are the same expense paid at
+// both ends. Neither is reachable without deciding whether cohere stays one-shot. See #hfv0ae3.
+//
 // Call it after Diagnostics, on the same session. Calling it before, or on a different
 // session, produces a build info that records nothing as checked and a warm run that skips
 // nothing, which costs more than not caching at all.
