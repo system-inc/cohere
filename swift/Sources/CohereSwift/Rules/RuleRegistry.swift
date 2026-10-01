@@ -3,7 +3,12 @@
  a rule costs nothing to run because nothing crosses a boundary to reach it.
  */
 public enum RuleRegistry {
-    public static let fileRules: [any FileRule] = []
+    public static let fileRules: [any FileRule] = [
+        NoForceUnwrap(),
+        NoForceTry(),
+        NoForceCast(),
+        NoImplicitlyUnwrappedOptional(),
+    ]
 
     public static let packageRules: [any PackageRule] = [
         RequireSwiftSixLanguageMode(),
