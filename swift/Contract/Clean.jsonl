@@ -4,7 +4,7 @@
 {"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":31,"detail":""}
 {"kind":"types","diagnostics":0,"files":2,"elapsedMilliseconds":820,"filesWithoutRecord":[],"build":"swift build, scratch /cache/cohere/swift/0000"}
 {"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":820,"detail":""}
-{"kind":"lint","findings":0,"rulesRun":4,"filesWalked":2,"nodesVisited":512,"elapsedMilliseconds":0,"reusedFrom":"fix","rulesSilent":[],"rulesWatchedAndQuiet":4,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":[]}
+{"kind":"lint","findings":0,"rulesRun":4,"filesWalked":2,"nodesVisited":512,"elapsedMilliseconds":0,"reusedFrom":"fix","rulesSilent":[],"rulesWatchedAndQuiet":4,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":[],"configNote":"config: no CohereSettings.json beside Package.swift, so every house rule ran at error — put one at /project/CohereSettings.json to change that"}
 {"kind":"phase","name":"lint","outcome":"reused","elapsedMilliseconds":0,"detail":"the fix phase's walk (nothing was rewritten)"}
 {"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested — this is a report, ask for it with --unused"}
 {"kind":"summary","findings":0,"complete":true,"nothingToCheck":"","exitCode":0}

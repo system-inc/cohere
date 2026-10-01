@@ -178,7 +178,7 @@ differ.
 {"kind":"lint","findings":3,"rulesRun":15,"filesWalked":149,"nodesVisited":412233,"elapsedMilliseconds":96,
  "reusedFrom":"","rulesSilent":["cohere-swift/no-print"],"rulesWatchedAndQuiet":9,
  "crashes":[{"file":"/…/X.swift","error":"…"}],
- "rulesScopedOff":{"cohere-swift/no-print":12},"rulesNotConfigured":[]}
+ "rulesScopedOff":{"cohere-swift/no-print":12},"rulesNotConfigured":[],"configNote":""}
 ```
 
 Rendered by the existing lint line and coverage printers:
@@ -260,9 +260,13 @@ and values are severities and strictness options, never allow lists or ignore na
 is configured by `.swift-format`, found at or above each file, so `Format.sh` and cohere read the
 same file and cannot disagree.
 
-**Open: where the config lives for a Swift package.** The proving-ground packages have none.
-Recommended: the engine reads `CohereSettings.json` beside `Package.swift`. When there is none, it
-runs the house rules at `error` and says so on every run (`config: none beside Package.swift, the
-house rules ran at error`). That is not the permissive default the TypeScript loader refuses. The
-TypeScript loader refuses to lint with nothing configured because the output looks like a clean
-run. Here, every rule runs, and the coverage line names the default.
+**Where the config lives.** The engine reads `CohereSettings.json` from beside `Package.swift`, or
+the file `--lint-config` names. When there is none, every house rule runs at `error`, and every run
+says so in one line naming the defaults in force and where a config would go:
+`  config: no CohereSettings.json beside Package.swift, so every house rule ran at error — put one at <root>/CohereSettings.json to change that`.
+That is not the permissive default the TypeScript loader refuses. The TypeScript loader refuses to
+lint with nothing configured because the output would look like a clean run. Here, every rule runs,
+and the line says why. Approved by @system_cohere, 2026-10-01.
+
+The line travels in the `lint` record as `"configNote"`. It is empty when a config was read, and the
+front door prints it under the lint line whenever it is not empty.
