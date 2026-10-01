@@ -1,6 +1,6 @@
 package suppression
 
-import "strings"
+import "github.com/system-inc/cohere/internal/lint/ecmascript/directives"
 
 // commentSpan is one comment's byte range in a file.
 type commentSpan struct {
@@ -94,24 +94,14 @@ func scanEnables(text string, lineOf func(offset int) int) []enableSpan {
 	found := []enableSpan{}
 
 	for _, comment := range scanComments(text) {
-		body := strings.TrimSpace(stripCommentMarkers(text[comment.pos:comment.end]))
-
-		for _, directive := range enableDirectives {
-			if !strings.HasPrefix(body, directive) {
-				continue
-			}
-			rest := body[len(directive):]
-			// Same anchoring rule as a disable: the directive has to be the whole word.
-			if rest != "" && !strings.HasPrefix(rest, " ") && !strings.HasPrefix(rest, "\t") {
-				continue
-			}
-			names, _ := splitReason(rest)
-			found = append(found, enableSpan{
-				line:  lineOf(comment.pos),
-				rules: parseRuleNames(names),
-			})
-			break
+		names, isEnable := directives.ParseEnable(text[comment.pos:comment.end])
+		if !isEnable {
+			continue
 		}
+		found = append(found, enableSpan{
+			line:  lineOf(comment.pos),
+			rules: names,
+		})
 	}
 
 	return found

@@ -56,6 +56,10 @@ func TestRegisteredNamesMatchTheirUpstreamSpelling(t *testing.T) {
 		"better-tailwindcss": true,
 		"structure":          true,
 		"nexus":              true,
+		// @eslint-community/eslint-plugin-eslint-comments, whose rules are about directive comments.
+		// Its plugin key is the two-segment `@eslint-community/eslint-comments`, which is the prefix
+		// its documentation configures and the one ESLint would resolve if the plugin were installed.
+		"@eslint-community/eslint-comments": true,
 	}
 
 	for _, name := range registered {

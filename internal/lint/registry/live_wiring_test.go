@@ -40,6 +40,15 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 		// which is the asymmetry the control depends on, so the config cannot name it.
 		"import-require-path-alias": "the directional control for the differential",
 
+		// Kirk decided every suppression must carry a stated reason, and asked for the port to land
+		// registered rather than enabled. Dry-run on the ahra tree with the rule switched on through
+		// a scratch copy of CohereSettings.json (`--no-fix --lint`): 337 findings over 166 files,
+		// 321 of them `// eslint-disable-next-line` with no ` -- reason`. The same files run through
+		// the cloned upstream rule on the installed ESLint 10.8.1 report 335; the 2 extra are prose
+		// line comments starting `// eslint-disable`, which cohere honors as directives and ESLint
+		// does not. ESLint itself cannot run the rule today: the plugin is not installed in ahra.
+		"@eslint-community/eslint-comments/require-description": "ported and registered; 337 undescribed directives over 166 files to give reasons first, and the ESLint plugin is not installed, so enabling is Kirk's call",
+
 		// Both ported and registered without being enabled, because neither rule can be enabled by
 		// a porting step: each does nothing at all until somebody writes the list of what this
 		// project bans. Upstream's own default for both is an empty configuration, and the audits

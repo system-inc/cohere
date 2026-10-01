@@ -391,7 +391,7 @@ func offsetOfLine(source string, line int) int {
 // Every honored spelling suppresses, and they share one grammar.
 //
 // Four spellings reach this parser and the corpus above exercises only `eslint-disable`, so a
-// spelling could be dropped from `disableDirectives` and every other test here would still pass.
+// spelling could be dropped from `directives.disableDirectives` and every other test here would still pass.
 //
 // `cohere-disable` is what new code writes. `verify-disable` is what this tool's own directives were
 // called before the rename, and it is honored so a comment written under the old name does not start
