@@ -68,8 +68,15 @@ public struct NoLongLineComment: FileRule {
         }
         let start = file.locations.location(for: AbsolutePosition(utf8Offset: first.start))
         let end = file.locations.location(for: AbsolutePosition(utf8Offset: last.end))
-        /* A star-slash in the text would close the block early, so the run is reported without a fix and a person decides how to phrase it. */
-        let foldable = !run.contains { $0.text.contains("*/") }
+        /*
+         Either delimiter in the text makes the fold unsafe, so the run is reported without a fix and a person
+         decides how to phrase it. A star-slash would close the block early, as in TypeScript. A slash-star is
+         Swift's own hazard: Swift block comments nest, so a path ending in a slash and a star, written in a
+         comment, opens a second block that never closes and the file stops parsing. Measured on ahraos-macos,
+         where a comment naming the provider-proxy routes did exactly that. (This comment cannot quote the path:
+         it is itself a block comment, and quoting it broke this file's build.)
+         */
+        let foldable = !run.contains { $0.text.contains("*/") || $0.text.dropFirst(2).contains("/*") }
         return FindingRecord(
             source: .rule,
             file: file.url.path,

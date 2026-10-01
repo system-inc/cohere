@@ -75,6 +75,14 @@ struct NoLongLineCommentTests {
         #expect(Self.fixed(source) == source)
     }
 
+    /* Swift block comments nest, so a slash-star in the text would open a block that never closes. */
+    @Test func aSlashStarWithholdsTheFix() {
+        let source = "// one\n// serves /provider-proxy/* routes\n// three\n// four\n// five\nlet value = 1\n"
+        let findings = NoLongLineComment().findings(in: Self.file(source))
+        #expect(findings.count == 1)
+        #expect(findings.first?.fixes.isEmpty == true)
+    }
+
     @Test func aCommentInsideAStringIsNotAComment() {
         let source = "let text = \"\"\"\n// one\n// two\n// three\n// four\n// five\n\"\"\"\n"
         #expect(NoLongLineComment().findings(in: Self.file(source)).isEmpty)
