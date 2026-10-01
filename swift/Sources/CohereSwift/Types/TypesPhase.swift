@@ -34,19 +34,41 @@ struct TypesPhase {
     let resolutionAllowed: Bool
     let runner: ProcessRunner
 
+    /*
+     The packages to build: the root, plus each local package that holds test files of ours. Building the root
+     compiles a local package's libraries but never its tests, because a dependency's test targets are not part
+     of the root's graph. Measured on Presence: without these builds, RigSolve's, CaptureWire's and VRMKit's 26
+     test files had no compiler record at all.
+     */
+    private var builds: [(root: URL, scratchPath: URL)] {
+        let testTargetNames = Set(files.filter { $0.targetKind == "test" }.map(\.targetName))
+        let locals = package.localPackages.filter { local in
+            local.targets.contains { $0.kind == "test" && testTargetNames.contains($0.name) }
+        }
+        return [(package.root, scratchPath)] + locals.map { ($0.root, scratchPath.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true)) }
+    }
+
     func run() throws -> Result {
         let start = Date()
-        var arguments = ["build", "--build-tests", "--scratch-path", scratchPath.path]
-        if !resolutionAllowed {
-            arguments.append("--disable-automatic-resolution")
+        var failedBuilds: [ProcessRunner.Result] = []
+        var targetDirectories: [(String, URL)] = []
+        for build in builds {
+            var arguments = ["build", "--build-tests", "--scratch-path", build.scratchPath.path]
+            if !resolutionAllowed {
+                arguments.append("--disable-automatic-resolution")
+            }
+            let result = try runner.run("swift", arguments, in: build.root)
+            if !result.succeeded {
+                failedBuilds.append(result)
+            }
+            let directories = try buildDirectories(under: build.scratchPath)
+            guard !directories.isEmpty else {
+                throw TypesFailure(description: "the build of \(build.root.path) left no target directories under \(intermediates(of: build.scratchPath).path), so this engine does not recognise the build system's layout and cannot read what the compiler said\n\(Self.tail(of: result))")
+            }
+            targetDirectories.append(contentsOf: directories)
         }
-        let build = try runner.run("swift", arguments, in: package.root)
 
         let reader = try SerializedDiagnosticsReader(libraryPath: SerializedDiagnosticsReader.toolchainLibraryPath(runner: runner))
-        let targetDirectories = try buildDirectories()
-        guard !targetDirectories.isEmpty || files.isEmpty else {
-            throw TypesFailure(description: "the build left no target directories under \(intermediatesDirectory.path), so this engine does not recognise the build system's layout and cannot read what the compiler said\n\(Self.tail(of: build))")
-        }
 
         let ours = Dictionary(files.map { ($0.url.resolvingSymlinksInPath().path, $0) }, uniquingKeysWith: { first, _ in first })
         var seen = Set<String>()
@@ -91,7 +113,7 @@ struct TypesPhase {
         }
 
         /* A failed build with no error in any file of ours failed somewhere no file carries: linking, a dependency, the manifest. Said, never swallowed. */
-        if !build.succeeded && !findings.contains(where: { $0.severity == .error }) {
+        if let failed = failedBuilds.first, !findings.contains(where: { $0.severity == .error }) {
             findings.append(FindingRecord(
                 source: .compiler,
                 file: package.root.appendingPathComponent("Package.swift").path,
@@ -100,7 +122,7 @@ struct TypesPhase {
                 severity: .error,
                 rule: "",
                 messageId: "buildFailed",
-                message: "swift build failed outside any file this run checks, so the package does not build: \(Self.tail(of: build))"
+                message: "swift build failed outside any file this run checks, so the package does not build: \(Self.tail(of: failed))"
             ))
         }
 
@@ -110,7 +132,7 @@ struct TypesPhase {
             files: files.count,
             elapsedMilliseconds: Pipeline.milliseconds(since: start),
             filesWithoutRecord: withoutRecord.sorted(),
-            build: "swift build --build-tests, scratch \(scratchPath.path)"
+            build: "swift build --build-tests of \(builds.count) packages, scratch \(scratchPath.path)"
         )
         return Result(findings: findings, record: record, hasErrors: findings.contains { $0.severity == .error })
     }
@@ -120,14 +142,15 @@ struct TypesPhase {
         var description: String
     }
 
-    private var intermediatesDirectory: URL {
+    private func intermediates(of scratchPath: URL) -> URL {
         scratchPath.appendingPathComponent("out/Intermediates.noindex", isDirectory: true)
     }
 
     /* Every build directory belonging to a target we own files in, with that target's name: `<Target>-p.build`, `<Target>-t.build`, and the testable variants. */
-    private func buildDirectories() throws -> [(String, URL)] {
+    private func buildDirectories(under scratchPath: URL) throws -> [(String, URL)] {
         let targetNames = Set(files.map(\.targetName))
         let manager = FileManager.default
+        let intermediatesDirectory = intermediates(of: scratchPath)
         guard manager.fileExists(atPath: intermediatesDirectory.path) else { return [] }
         var directories: [(String, URL)] = []
         for packageDirectory in try manager.contentsOfDirectory(at: intermediatesDirectory, includingPropertiesForKeys: nil) {
