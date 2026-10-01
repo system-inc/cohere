@@ -113,6 +113,17 @@ public struct NoLongLineComment: FileRule {
     static func lineComments(in file: ParsedFile) -> [LineComment] {
         var comments: [LineComment] = []
         for token in file.tree.tokens(viewMode: .sourceAccurate) {
+            /*
+             A run sitting between two members of a chain (`.padding()`, comments, `.frame()`) is left as it is.
+             swift-format 604 moves the member after a block comment back to the chain's starting indentation,
+             which makes the code read as though the member belonged to a different expression, while `//` lines
+             in the same place keep it. Found by @system_cohere_swift_ahraos_macos on 9 SwiftUI chains, and
+             reproduced with swift-format alone. A fold the formatter then undoes would be a finding nobody can
+             clear, so the rule does not raise it.
+             */
+            if token.tokenKind == .period, token.parent?.as(MemberAccessExprSyntax.self)?.base != nil {
+                continue
+            }
             var offset = token.position.utf8Offset
             /* Only leading trivia: a comment in trailing trivia shares its line with the code before it. */
             var aloneOnLine = token.position.utf8Offset == 0 || token.previousToken(viewMode: .sourceAccurate) == nil

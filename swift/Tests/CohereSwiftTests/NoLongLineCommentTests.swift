@@ -83,6 +83,12 @@ struct NoLongLineCommentTests {
         #expect(findings.first?.fixes.isEmpty == true)
     }
 
+    /* swift-format 604 de-indents the next member after a block comment inside a chain, so the run is left alone. */
+    @Test func aRunInsideAMemberChainIsLeftAlone() {
+        let source = "let view = content\n    .padding()\n    // one\n    // two\n    // three\n    // four\n    // five\n    .frame()\n"
+        #expect(NoLongLineComment().findings(in: Self.file(source)).isEmpty)
+    }
+
     @Test func aCommentInsideAStringIsNotAComment() {
         let source = "let text = \"\"\"\n// one\n// two\n// three\n// four\n// five\n\"\"\"\n"
         #expect(NoLongLineComment().findings(in: Self.file(source)).isEmpty)
