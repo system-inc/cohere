@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/edit"
@@ -146,7 +147,14 @@ func configuredFormatter(enabled bool) (formatEngine, error) {
 		return nil, nil
 	}
 
-	engine, err := prettier.New(prettier.DefaultOptions())
+	// Resolving, not one engine built from DefaultOptions: each file formats with the config Prettier
+	// would resolve for it. DefaultOptions is ahra's block, and running it over api-phi-health rewrote
+	// every multi-line JSX opening tag, because that repository sets bracketSameLine.
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("finding where to resolve the Prettier config from: %w", err)
+	}
+	engine, err := prettier.NewResolving(workingDirectory)
 	if err != nil {
 		// Not a nil engine. Nil already means "nobody asked for a formatter", and the coverage line
 		// reports that as a deliberate absence. An engine that was asked for and could not load its
