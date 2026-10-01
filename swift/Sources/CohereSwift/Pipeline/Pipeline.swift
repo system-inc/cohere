@@ -1,0 +1,219 @@
+import CryptoKit
+import Foundation
+
+/*
+ One run: describe the package, then fix and format, types, lint, unused, in that order, each phase's
+ outcome stated whether or not it ran.
+
+ The order is cohere's and the reasons are the same. Mutation runs first so everything downstream sees
+ the repaired tree. A file that does not parse stops the run there, because rewriting or type-checking a
+ tree the parser could not read produces nonsense. Compiler errors stop lint, because rule findings
+ against code whose semantics are wrong are noise; compiler warnings do not, because warning-level code
+ still means what it says.
+
+ What counts as complete is narrower than "every phase ran". A phase the caller turned off (`--lint`
+ alone, `--no-fix`, an opt-in report nobody asked for) withholds nothing they did not choose to withhold.
+ A phase that was cut off, a phase that is not built yet, a file that could not be read, or a file the
+ compiler left no record for all withhold findings nobody chose to give up, and any of them makes the
+ run incomplete and its exit code 1.
+ */
+public struct Pipeline {
+    private let options: CommandOptions
+    private let writer: ContractWriter
+    private let workingDirectory: URL
+    private let runner: ProcessRunner
+
+    public init(options: CommandOptions, writer: ContractWriter, workingDirectory: URL, runner: ProcessRunner = ProcessRunner()) {
+        self.options = options
+        self.writer = writer
+        self.workingDirectory = workingDirectory
+        self.runner = runner
+    }
+
+    /* A run that could not happen at all. Exit 2, no summary: the front door says nothing was checked. */
+    public struct RunFailure: Error, CustomStringConvertible {
+        public var description: String
+    }
+
+    public func run() async throws -> Int32 {
+        try writer.write(EngineVersion.provenance(toolchain: EngineVersion.toolchain(runner: runner)))
+        if options.showVersion {
+            return 0
+        }
+
+        let configuration = try RuleConfiguration.load(packageRoot: options.root ?? workingDirectory, explicitPath: options.lintConfig)
+        if options.listRules || options.listRulesEnabled {
+            for name in RuleRegistry.allNames {
+                let severity = configuration.severity(of: name)
+                if options.listRulesEnabled && severity == .off {
+                    continue
+                }
+                try writer.write(RuleRecord(name: name, severity: severity.rawValue))
+            }
+            return 0
+        }
+
+        guard let root = options.root else {
+            throw RunFailure(description: "no --root was given, so there is no package to check")
+        }
+        guard FileManager.default.fileExists(atPath: root.appendingPathComponent("Package.swift").path) else {
+            throw RunFailure(description: "\(root.path) holds no Package.swift, so there is no package to check")
+        }
+
+        /*
+         Unlike TypeScript, `--changed` cannot answer before the package is described: a changed `.swift` file
+         counts only if a target compiles it, and only the description says which do. Describing costs about a
+         second, cold.
+         */
+        let describeStart = Date()
+        let package = try PackageModel.load(root: root, scratchPath: Self.scratchPath(for: root), runner: runner)
+        let fileSet = try FileSet.build(package: package, runner: runner)
+        let scope = try FileScope.resolve(options: options, fileSet: fileSet, root: root, workingDirectory: workingDirectory, runner: runner)
+        if !scope.nothingToCheck.isEmpty {
+            return try finishWithNothingToCheck(scope.nothingToCheck)
+        }
+        if !fileSet.note.isEmpty {
+            FileHandle.standardError.write(Data("note: \(fileSet.note)\n".utf8))
+        }
+        try writer.write(projectRecord(package: package, fileSet: fileSet, scope: scope, elapsed: Self.milliseconds(since: describeStart)))
+
+        var complete = true
+
+        /* Parsing is the fix phase's first step: it is what the fixers and the formatter would rewrite. */
+        let fixStart = Date()
+        let parsed = await SourceParser().parse(scope.files)
+        for error in parsed.parseErrors {
+            try writer.write(error)
+        }
+        if !parsed.unreadable.isEmpty {
+            complete = false
+            for crash in parsed.unreadable {
+                FileHandle.standardError.write(Data("note: \(crash.file) could not be read, so nothing in it was checked: \(crash.error)\n".utf8))
+            }
+        }
+        let filesThatDoNotParse = Set(parsed.parseErrors.map(\.file)).count
+
+        if !options.runFix {
+            try writer.write(PhaseRecord(name: .fix, outcome: .skipped, detail: "not requested"))
+        } else if !options.mutate {
+            try writer.write(PhaseRecord(name: .fix, outcome: .skipped, detail: "--no-fix"))
+        } else {
+            try writer.write(fixRecord(scope: scope, considered: parsed.files.count))
+            try writer.write(PhaseRecord(name: .fix, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: fixStart)))
+        }
+
+        if filesThatDoNotParse > 0 {
+            let reason = "parsing bailed: \(filesThatDoNotParse) files do not parse, and checking a tree the parser could not read reports nonsense"
+            try writer.write(PhaseRecord(name: .types, outcome: options.runTypes ? .notReached : .skipped, detail: options.runTypes ? reason : "not requested"))
+            try writer.write(PhaseRecord(name: .lint, outcome: options.runLint ? .notReached : .skipped, detail: options.runLint ? reason : "not requested"))
+            try writer.write(unusedPhase())
+            return try writer.finish(complete: false)
+        }
+
+        if !options.runTypes {
+            try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not requested"))
+        } else {
+            /* Not built yet. Skipped with the reason rather than omitted, and the run is incomplete until it lands. */
+            try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not built yet for Swift, so no compiler diagnostic was checked"))
+            complete = false
+        }
+
+        if !options.runLint {
+            try writer.write(PhaseRecord(name: .lint, outcome: .skipped, detail: "not requested"))
+        } else {
+            let lintStart = Date()
+            let lint = Linter(configuration: configuration).run(package: package, manifests: await manifests(of: package), files: parsed.files)
+            for finding in lint.findings {
+                try writer.write(finding)
+            }
+            var record = lint.record
+            record.elapsedMilliseconds = Self.milliseconds(since: lintStart)
+            try writer.write(record)
+            try writer.write(PhaseRecord(name: .lint, outcome: .ran, elapsedMilliseconds: record.elapsedMilliseconds))
+            if !record.crashes.isEmpty {
+                complete = false
+            }
+        }
+
+        try writer.write(unusedPhase())
+        return try writer.finish(complete: complete)
+    }
+
+    private func finishWithNothingToCheck(_ reason: String) throws -> Int32 {
+        for name in [PhaseRecord.Name.fix, .types, .lint] {
+            try writer.write(PhaseRecord(name: name, outcome: .skipped, detail: reason))
+        }
+        try writer.write(unusedPhase())
+        return try writer.finish(complete: true, nothingToCheck: reason)
+    }
+
+    private func unusedPhase() -> PhaseRecord {
+        options.unused
+            ? PhaseRecord(name: .unused, outcome: .skipped, detail: "not implemented for Swift yet")
+            : PhaseRecord(name: .unused, outcome: .skipped, detail: "not requested — this is a report, ask for it with --unused")
+    }
+
+    private func projectRecord(package: PackageModel, fileSet: FileSet, scope: FileScope, elapsed: Int) -> ProjectRecord {
+        let counts = Dictionary(grouping: fileSet.owned, by: \.targetName).mapValues(\.count)
+        return ProjectRecord(
+            root: package.root.path,
+            package: package.name,
+            elapsedMilliseconds: elapsed,
+            filesInPackage: fileSet.filesInPackage.count,
+            filesOurs: fileSet.owned.count,
+            filesInScope: scope.files.count,
+            scopeDescription: scope.description,
+            /* A local package's targets are named `<package>/<target>`, so a reader can tell Presence's own targets from VRMKit's. */
+            targets: package.allPackages.flatMap { member in
+                member.targets.map { target in
+                    let name = member.root == package.root ? target.name : "\(member.name)/\(target.name)"
+                    return ProjectRecord.Target(name: name, kind: target.kind, files: counts[target.name] ?? 0, languageMode: target.languageMode)
+                }
+            },
+            excluded: fileSet.excluded
+        )
+    }
+
+    /*
+     The fix phase before fixers and the formatter exist: every file considered, nothing rewritten, and every
+     file counted as not formatted with the reason, so this cannot read as a formatter that found everything
+     already correct.
+     */
+    private func fixRecord(scope: FileScope, considered: Int) -> FixRecord {
+        FixRecord(
+            filesConsidered: considered,
+            filesRewritten: 0,
+            fixesApplied: 0,
+            fixesRefused: 0,
+            refusalsByReason: [:],
+            filesReformatted: 0,
+            filesNotFormatted: considered,
+            notFormattedReasons: considered > 0 ? ["the format phase is not built yet": considered] : [:],
+            formatScope: scope.everything ? "every file in the package" : scope.description
+        )
+    }
+
+    /* Each owned package's manifest, parsed, so package rules can point at the line that would fix them. A manifest that cannot be read is absent, and its findings point at line 1. */
+    private func manifests(of package: PackageModel) async -> [String: ParsedFile] {
+        let owned = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
+        let files = owned.map { FileSet.OwnedFile(url: $0.root.appendingPathComponent("Package.swift"), targetName: $0.root.path, targetKind: "manifest") }
+        let result = await SourceParser().parse(files)
+        return Dictionary(result.files.map { ($0.targetName, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /*
+     Where SwiftPM writes when the engine runs it: outside the project, keyed by the package's path, so a run
+     never takes the developer's `.build` lock and `--no-fix` writes nothing into the project.
+     */
+    static func scratchPath(for root: URL) -> URL {
+        let digest = SHA256.hash(data: Data(root.resolvingSymlinksInPath().path.utf8))
+        let key = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Caches/cohere/swift", isDirectory: true)
+            .appendingPathComponent(key, isDirectory: true)
+    }
+
+    static func milliseconds(since start: Date) -> Int {
+        Int((Date().timeIntervalSince(start) * 1000).rounded())
+    }
+}
