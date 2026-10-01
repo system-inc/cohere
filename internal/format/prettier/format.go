@@ -9,10 +9,9 @@ import (
 
 // formatScript calls into the loaded bundles.
 //
-// The options mirror the ahra Prettier configuration. They are passed explicitly rather than resolved from
-// a .prettierrc because resolution is Node's job and this runtime has no filesystem: the config is
-// the caller's to supply, and hardcoding it here would silently ignore a project that configured
-// something else.
+// The options are passed explicitly rather than resolved inside the runtime, because this runtime has
+// no filesystem: the config is the caller's to supply, through ResolveOptions in config.go, and
+// hardcoding it here would silently ignore a project that configured something else.
 const formatScript = `
 	(function () {
 		return prettier.format(__source, {
@@ -22,23 +21,49 @@ const formatScript = `
 			useTabs: __useTabs,
 			semi: __semi,
 			singleQuote: __singleQuote,
-			printWidth: __printWidth
+			printWidth: __printWidth,
+			trailingComma: __trailingComma,
+			bracketSpacing: __bracketSpacing,
+			bracketSameLine: __bracketSameLine,
+			arrowParens: __arrowParens,
+			endOfLine: __endOfLine
 		});
 	})()
 `
 
 // Options are the Prettier settings the engine formats with.
+//
+// The last five are the options a config in our repositories names beyond ahra's five. Four of them are
+// Prettier 3's defaults, so setting them changes nothing, and they are carried anyway so a resolved
+// config is passed whole rather than filtered by someone's belief about which keys matter.
+// BracketSameLine is the one that is not a default, and leaving it out is what made api-phi-health's JSX
+// measure against the wrong formatter.
 type Options struct {
 	TabWidth    int
 	UseTabs     bool
 	Semi        bool
 	SingleQuote bool
 	PrintWidth  int
+
+	TrailingComma   string
+	BracketSpacing  bool
+	BracketSameLine bool
+	ArrowParens     string
+	EndOfLine       string
 }
 
-// DefaultOptions mirrors the prettier block in the ahra package.json.
+// DefaultOptions mirrors the prettier block in the ahra package.json, over Prettier's own defaults.
+//
+// A caller formatting a repository it can locate should use ResolveOptions instead. This exists for
+// tests and for callers with no directory to resolve from.
 func DefaultOptions() Options {
-	return Options{TabWidth: 4, UseTabs: false, Semi: true, SingleQuote: true, PrintWidth: 120}
+	options := PrettierDefaults()
+	options.TabWidth = 4
+	options.UseTabs = false
+	options.Semi = true
+	options.SingleQuote = true
+	options.PrintWidth = 120
+	return options
 }
 
 // Engine formats source by running our Prettier fork inside goja.
@@ -104,6 +129,11 @@ func (engine *Engine) Format(fileName string, text string) (string, error) {
 	engine.runtime.Set("__semi", engine.options.Semi)
 	engine.runtime.Set("__singleQuote", engine.options.SingleQuote)
 	engine.runtime.Set("__printWidth", engine.options.PrintWidth)
+	engine.runtime.Set("__trailingComma", engine.options.TrailingComma)
+	engine.runtime.Set("__bracketSpacing", engine.options.BracketSpacing)
+	engine.runtime.Set("__bracketSameLine", engine.options.BracketSameLine)
+	engine.runtime.Set("__arrowParens", engine.options.ArrowParens)
+	engine.runtime.Set("__endOfLine", engine.options.EndOfLine)
 
 	value, err := engine.runtime.RunString(formatScript)
 	if err != nil {
