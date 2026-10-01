@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -266,6 +268,13 @@ var ButtonHasType = rule.Rule{
 				checkExpression(node, conditional.WhenFalse)
 
 			default:
+				// Deliberately quieter than upstream, which is type-blind and stops here. When the
+				// checker proves every value this expression can take is a written-out type the
+				// config permits, nothing is computed in the sense the message means, so there is
+				// nothing to report. See buttonHasTypeProvenPermitted.
+				if buttonHasTypeProvenPermitted(ctx, expression, settings) {
+					return
+				}
 				// The complex report anchors on the EXPRESSION rather than on the element, which is
 				// upstream's `reportComplex(expression)` and is the one place these two nodes differ.
 				ctx.ReportNode(expression, messageButtonComplexType)
@@ -425,6 +434,46 @@ func buttonHasTypePropertyValue(property *ast.Node) *ast.Node {
 		return property
 	}
 	return property
+}
+
+// buttonHasTypeProvenPermitted reports whether the checker proves an expression can only be one of
+// the types the configuration permits.
+//
+// This is where cohere is deliberately quieter than upstream. `complexType` exists because a
+// computed value "could evaluate to a value that silently submits a form", and when the expression's
+// type is a union whose every constituent is a string literal naming a permitted type, it cannot.
+// The real site is `Button.tsx:222` in ahra, `<button type={type}>` with `type = 'button'`
+// destructured from a prop typed `'button' | 'submit' | 'reset'`; ESLint reports it, and the finding
+// is false.
+//
+// Every constituent must be a string literal, so `undefined` (an optional prop with no default, where
+// HTML's `submit` default applies), `string`, `any`, an error type and a type parameter all keep
+// reporting. Every literal must be PERMITTED rather than merely known, so a config that switches
+// `reset` off still reports a union that contains it.
+func buttonHasTypeProvenPermitted(ctx rule.Context, expression *ast.Node, settings ButtonHasTypeOptions) bool {
+	if ctx.TypeChecker == nil {
+		return false
+	}
+	// A shorthand `{type}` arrives as the property node itself (see buttonHasTypePropertyValue), and
+	// the checker types it as the binding it names, so it needs no unwrapping. Measured: unwrapping to
+	// its name changed no fixture.
+	expressionType := ctx.TypeChecker.GetTypeAtLocation(expression)
+	if expressionType == nil {
+		return false
+	}
+	for _, constituent := range type_checking.UnionTypeParts(expressionType) {
+		if !type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsStringLiteral) {
+			return false
+		}
+		// A StringLiteral constituent always carries a string value; were it ever not to, the empty
+		// string is not a known type and the proof fails closed below. `allows` answers not-permitted
+		// for every unknown value, so one return decides both.
+		value, _ := constituent.AsLiteralType().Value().(string)
+		if permitted, _ := settings.allows(value); !permitted {
+			return false
+		}
+	}
+	return true
 }
 
 // buttonHasTypeLiteralValue renders a node upstream would treat as a `Literal`, if it is one.

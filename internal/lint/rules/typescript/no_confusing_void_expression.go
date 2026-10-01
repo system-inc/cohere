@@ -204,8 +204,16 @@ func checkConfusingVoidExpression(ctx rule.Context, node *ast.Node,
 	// The type test comes AFTER the ancestor walk, matching upstream's order. It matters for cost
 	// rather than for verdicts: the walk is a few pointer hops and the type query is not, so
 	// asking the cheap question first keeps the checker out of the common case.
+	//
+	// Deliberately quieter than upstream, which tests `TypeFlags.VoidLike` (void OR undefined) and so
+	// reports an `undefined` value as though it were nothing. `void` says there is no result;
+	// `undefined` is a value somebody returned on purpose, and the rule's name and every message are
+	// about void. Upstream's corpus writes no undefined-typed expression, so no imported case moves.
+	// The real sites were `Random.test.ts:6` and `TrackedPromise.test.ts:132` in ahra; see
+	// TestNoConfusingVoidExpressionJudgesVoidNotUndefined. The fixers' own `canFix` guards below keep
+	// VoidLike, because they are upstream's rewrite-safety test and only run once this one has passed.
 	nodeType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
-	if !type_checking.IsTypeFlagSet(nodeType, checker.TypeFlagsVoidLike) {
+	if !type_checking.IsTypeFlagSet(nodeType, checker.TypeFlagsVoid) {
 		return
 	}
 

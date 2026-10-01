@@ -37,7 +37,13 @@ func (acknowledged AcknowledgedDifference) Key() string {
 	return fmt.Sprintf("%s:%d:%s:%s", acknowledged.File, acknowledged.Line, acknowledged.Rule, acknowledged.Side)
 }
 
-// KnownGateDefects are the differences where cohere is right and the gate cannot see the case.
+// KnownGateDefects are the differences where cohere is right and the gate is wrong.
+//
+// Two directions. `SideCohere` is a true positive the gate cannot see. `SideGate` is a false positive
+// the gate reports and cohere deliberately does not, where a rule was made to tell with the type
+// checker rather than given an allowance (cohere's parity doctrine: never worse than ESLint, rule by
+// rule, and differing only in its favour). Each gate-side entry names the rule document (`.md` beside
+// the rule) that records the condition, and the fixture holding the site as a must-stay-silent case.
 //
 // Each one names a defect in the tool being replaced, so each is a reason the migration is worth
 // doing rather than a cost of it. They are listed here, in source, rather than passed in at the
@@ -53,6 +59,108 @@ var KnownGateDefects = []AcknowledgedDifference{
 			"expression, so it sees window.localStorage.getItem(...) and never window.localStorage " +
 			"passed as a value; this line is the latter and is a real violation of the rule's " +
 			"stated intent",
+	},
+	{
+		File: "libraries/structure/source/components/buttons/Button.tsx",
+		Line: 222,
+		Rule: "button-has-type",
+		Side: SideGate,
+		Reason: "the checker proves `type` is always 'button', 'submit' or 'reset' (a defaulted prop typed as that " +
+			"union), so nothing computed can submit a form; react/button_has_type.md, " +
+			"TestButtonHasTypeTrustsAProvenType",
+	},
+	{
+		File: "libraries/structure/libraries/nexus/source/types/UnionFromClasses.test.ts",
+		Line: 23,
+		Rule: "no-unnecessary-type-parameters",
+		Side: SideGate,
+		Reason: "both findings on this line are the exact type-equality idiom, where a type parameter used once as " +
+			"the check type of a deferred conditional is the mechanism; typescript/no_unnecessary_type_parameters.md, " +
+			"TestNoUnnecessaryTypeParametersRecognizesTheExactEqualityIdiom",
+	},
+	{
+		File: "libraries/structure/libraries/nexus/source/security/random/Random.test.ts",
+		Line: 6,
+		Rule: "no-confusing-void-expression",
+		Side: SideGate,
+		Reason: "the call types as undefined, a value, not void; typescript/no_confusing_void_expression.md, " +
+			"TestNoConfusingVoidExpressionJudgesVoidNotUndefined",
+	},
+	{
+		File: "libraries/structure/libraries/nexus/source/coordination/TrackedPromise.test.ts",
+		Line: 132,
+		Rule: "no-confusing-void-expression",
+		Side: SideGate,
+		Reason: "an await of Promise<undefined> is a value, not void; typescript/no_confusing_void_expression.md, " +
+			"TestNoConfusingVoidExpressionJudgesVoidNotUndefined",
+	},
+	{
+		File: "libraries/structure/libraries/nexus/source/validation/schema/StringSchema.ts",
+		Line: 37,
+		Rule: "class-literal-property-style",
+		Side: SideGate,
+		Reason: "the getter overrides a concrete base getter, so the suggested field is TS2610 and cannot compile; " +
+			"typescript/class_literal_property_style.md, " +
+			"TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile",
+	},
+	{
+		File: "libraries/structure/source/components/maps/Map.tsx",
+		Line: 747,
+		Rule: "no-implicit-coercion",
+		Side: SideGate,
+		Reason: "`1 * zoom` with zoom already a number coerces nothing; core/no_implicit_coercion.md, " +
+			"TestNoImplicitCoercionIsSilentWhenNothingIsCoerced",
+	},
+	{
+		File: "libraries/structure/source/components/maps/Map.tsx",
+		Line: 765,
+		Rule: "no-implicit-coercion",
+		Side: SideGate,
+		Reason: "`1 * zoom` with zoom already a number coerces nothing; core/no_implicit_coercion.md, " +
+			"TestNoImplicitCoercionIsSilentWhenNothingIsCoerced",
+	},
+	{
+		File: "libraries/structure/source/components/maps/Map.tsx",
+		Line: 784,
+		Rule: "no-implicit-coercion",
+		Side: SideGate,
+		Reason: "`1 * zoom` with zoom already a number coerces nothing; core/no_implicit_coercion.md, " +
+			"TestNoImplicitCoercionIsSilentWhenNothingIsCoerced",
+	},
+	{
+		File: "libraries/structure/source/components/maps/MapDrawing.ts",
+		Line: 220,
+		Rule: "no-implicit-coercion",
+		Side: SideGate,
+		Reason: "`1.0 * zoom` with zoom already a number coerces nothing; core/no_implicit_coercion.md, " +
+			"TestNoImplicitCoercionIsSilentWhenNothingIsCoerced",
+	},
+	{
+		File: "modules/tasks/TasksWatchCommandLineInterface.ts",
+		Line: 305,
+		Rule: "no-unmodified-loop-condition",
+		Side: SideGate,
+		Reason: "the loop awaits and `stopping` is set by a SIGINT handler registered before it, which runs while " +
+			"the loop is suspended; core/no_unmodified_loop_condition.md, " +
+			"TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended",
+	},
+	{
+		File: "modules/os/sensation/AhraOsMonitors.ts",
+		Line: 548,
+		Rule: "no-unmodified-loop-condition",
+		Side: SideGate,
+		Reason: "the loop awaits and `abortRequested` is set by an abort closure created before it; " +
+			"core/no_unmodified_loop_condition.md, " +
+			"TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended",
+	},
+	{
+		File: "modules/os/boot-screens/RainbowMatrix.ts",
+		Line: 689,
+		Rule: "no-unmodified-loop-condition",
+		Side: SideGate,
+		Reason: "the loop awaits and `stopped` is set by teardown, reached through a SIGINT handler registered " +
+			"before it; core/no_unmodified_loop_condition.md, " +
+			"TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended",
 	},
 }
 

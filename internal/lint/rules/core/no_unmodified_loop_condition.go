@@ -480,6 +480,12 @@ func unmodifiedLoopHasModifierInLoop(
 		return true
 	}
 
+	// Deliberately quieter than upstream: a write that can run while the loop is suspended. See
+	// unmodifiedLoopWriterRunsWhileSuspended.
+	if unmodifiedLoopWriterRunsWhileSuspended(condition.loop, modifier, referencesByDeclaration) {
+		return true
+	}
+
 	// Only a function declaration, and only a named one. Upstream's
 	// `getEncloseFunctionDeclaration` climbs to the first FunctionDeclaration and returns null when
 	// it has no id, and it does not consider a function expression or an arrow at all: those have
@@ -501,6 +507,128 @@ func unmodifiedLoopHasModifierInLoop(
 		}
 	}
 	return false
+}
+
+// unmodifiedLoopWriterRunsWhileSuspended reports whether a write outside the loop can still run
+// between two of its iterations. This is where cohere is deliberately quieter than upstream.
+//
+// Upstream credits a write only in the loop, or in a function declaration whose name the loop
+// references. A loop that awaits hands the thread to whatever else is queued, so a flag set by a
+// signal handler or an abort callback ends it, and upstream reports exactly that shape. The three real
+// sites are `TasksWatchCommandLineInterface.ts:305`, `AhraOsMonitors.ts:548` and `RainbowMatrix.ts:689`
+// in ahra; ESLint reports all three and all three are false.
+//
+// Two facts, both required:
+//
+//	the loop suspends        an `await` or `yield` in its test, body or update that belongs to the
+//	                         loop's own function rather than to one nested in it
+//	the write is elsewhere   in a different function activation from the loop's own, which can be
+//	                         running while the loop is suspended
+//
+// "Elsewhere" is narrowed by when that activation can exist. A closure the loop's own function creates
+// counts only if it is created before the loop could finish: a function or arrow expression written
+// before the loop's end, or a hoisted declaration whose name is referenced before the loop's end (a
+// handler registered in time). A hoisted declaration further out counts once anything references it.
+// A write in an enclosing function's own body counts as it stands, since that activation resumes the
+// moment the loop's function first suspends.
+func unmodifiedLoopWriterRunsWhileSuspended(
+	loop *ast.Node,
+	modifier *ast.Node,
+	referencesByDeclaration map[*ast.Node][]*ast.Node,
+) bool {
+	loopFunction := unmodifiedLoopNearestFunction(loop)
+	if unmodifiedLoopNearestFunction(modifier) == loopFunction {
+		// The loop's own activation, which cannot run while it is suspended.
+		return false
+	}
+
+	// The outermost function holding the write that does not also hold the loop. Nil means the write
+	// is in an enclosing function's own body, which is running whenever the loop is suspended.
+	var closure *ast.Node
+	for current := modifier.Parent; current != nil; current = current.Parent {
+		if !ast.IsFunctionLikeDeclaration(current) {
+			continue
+		}
+		if loop.Pos() >= current.Pos() && loop.End() <= current.End() {
+			// Every ancestor of this function holds the loop too, so stopping here is an economy
+			// rather than a decision: a mutant that kept climbing survived for exactly that reason.
+			break
+		}
+		closure = current
+	}
+
+	if closure != nil {
+		createdByTheLoopsFunction := unmodifiedLoopNearestFunction(closure) == loopFunction
+		if closure.Kind == ast.KindFunctionDeclaration {
+			if !unmodifiedLoopIsReferenced(closure, referencesByDeclaration, createdByTheLoopsFunction, loop.End()) {
+				return false
+			}
+		} else if createdByTheLoopsFunction && closure.Pos() >= loop.End() {
+			return false
+		}
+	}
+
+	return unmodifiedLoopSuspends(loop)
+}
+
+// unmodifiedLoopIsReferenced reports whether anything names a hoisted function declaration, which is
+// the only way it can run, and when `before` applies, whether it is named before that position.
+func unmodifiedLoopIsReferenced(
+	function *ast.Node,
+	referencesByDeclaration map[*ast.Node][]*ast.Node,
+	bounded bool,
+	before int,
+) bool {
+	name := function.Name()
+	for _, occurrence := range referencesByDeclaration[function] {
+		if occurrence == name {
+			continue
+		}
+		if !bounded || occurrence.Pos() < before {
+			return true
+		}
+	}
+	return false
+}
+
+// unmodifiedLoopNearestFunction returns the nearest function enclosing a node, or nil at the top level
+// of the file, which is where a module's top-level `await` suspends.
+func unmodifiedLoopNearestFunction(node *ast.Node) *ast.Node {
+	for current := node.Parent; current != nil; current = current.Parent {
+		if ast.IsFunctionLikeDeclaration(current) {
+			return current
+		}
+	}
+	return nil
+}
+
+// unmodifiedLoopSuspends reports whether a loop yields the thread on some iteration: an `await` or a
+// `yield` in its test, body or update, belonging to the loop's own function. A nested function's
+// `await` suspends that function, not the loop, so the walk does not descend into one. A `for`
+// initializer runs once before the first test, so a suspension there cannot end the loop.
+func unmodifiedLoopSuspends(loop *ast.Node) bool {
+	var initializer *ast.Node
+	if loop.Kind == ast.KindForStatement {
+		initializer = loop.AsForStatement().Initializer
+	}
+	found := false
+	var walk func(node *ast.Node) bool
+	walk = func(node *ast.Node) bool {
+		if found || node == nil || node == initializer {
+			return found
+		}
+		if ast.IsFunctionLikeDeclaration(node) {
+			return false
+		}
+		if node.Kind == ast.KindAwaitExpression || node.Kind == ast.KindYieldExpression {
+			found = true
+			return true
+		}
+		node.ForEachChild(walk)
+		return found
+	}
+	loop.ForEachChild(walk)
+	return found
 }
 
 // unmodifiedLoopEnclosingFunctionDeclaration returns the nearest enclosing function declaration, or

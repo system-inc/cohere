@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -375,7 +377,8 @@ func noImplicitCoercionCheckUnary(ctx rule.Context, node *ast.Node, settings NoI
 
 	// +foo
 	if *settings.Number && !noImplicitCoercionAllows(settings, "+") &&
-		unary.Operator == ast.KindPlusToken && !noImplicitCoercionIsNumeric(operand) {
+		unary.Operator == ast.KindPlusToken && !noImplicitCoercionIsNumeric(operand) &&
+		!noImplicitCoercionIsAlready(ctx, operand, checker.TypeFlagsNumberLike) {
 		recommendation := "Number(" + noImplicitCoercionOperandText(ctx, operand) + ")"
 		noImplicitCoercionReport(ctx, node, recommendation, true, false)
 	}
@@ -386,7 +389,9 @@ func noImplicitCoercionCheckUnary(ctx rule.Context, node *ast.Node, settings NoI
 		operand.Kind == ast.KindPrefixUnaryExpression &&
 		operand.AsPrefixUnaryExpression().Operator == ast.KindMinusToken {
 		inner := noImplicitCoercionUnwrapParentheses(operand.AsPrefixUnaryExpression().Operand)
-		if inner != nil && !noImplicitCoercionIsNumeric(inner) {
+		// A bigint too: `-(-x)` is an identity on a bigint, where `+x`, `1 * x` and `x - 0` throw.
+		if inner != nil && !noImplicitCoercionIsNumeric(inner) &&
+			!noImplicitCoercionIsAlready(ctx, inner, checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) {
 			recommendation := "Number(" + noImplicitCoercionOperandText(ctx, inner) + ")"
 			noImplicitCoercionReport(ctx, node, recommendation, true, false)
 		}
@@ -420,7 +425,8 @@ func noImplicitCoercionCheckBinary(ctx rule.Context, node *ast.Node, settings No
 		operator == ast.KindAsteriskToken &&
 		noImplicitCoercionIsMultiplyByOne(binary) &&
 		!noImplicitCoercionIsMultiplyByFractionOfOne(node) {
-		if operand := noImplicitCoercionNonNumericOperand(binary); operand != nil {
+		if operand := noImplicitCoercionNonNumericOperand(binary); operand != nil &&
+			!noImplicitCoercionIsAlready(ctx, operand, checker.TypeFlagsNumberLike) {
 			recommendation := "Number(" + noImplicitCoercionOperandText(ctx, operand) + ")"
 			noImplicitCoercionReport(ctx, node, recommendation, true, false)
 		}
@@ -430,7 +436,8 @@ func noImplicitCoercionCheckBinary(ctx rule.Context, node *ast.Node, settings No
 	if *settings.Number && !noImplicitCoercionAllows(settings, "-") &&
 		operator == ast.KindMinusToken &&
 		right.Kind == ast.KindNumericLiteral && right.Text() == "0" &&
-		!noImplicitCoercionIsNumeric(left) {
+		!noImplicitCoercionIsNumeric(left) &&
+		!noImplicitCoercionIsAlready(ctx, left, checker.TypeFlagsNumberLike) {
 		recommendation := "Number(" + noImplicitCoercionOperandText(ctx, left) + ")"
 		noImplicitCoercionReport(ctx, node, recommendation, true, false)
 	}
@@ -527,6 +534,46 @@ func noImplicitCoercionIsNumeric(node *ast.Node) bool {
 		}
 	}
 	return false
+}
+
+// noImplicitCoercionIsAlready reports whether the checker proves an operand already has the type a
+// number arm would coerce it to, in which case nothing is coerced and there is nothing to report.
+//
+// This is where cohere is deliberately quieter than upstream, whose `isNumeric` is syntactic (a
+// numeric literal or a call to `Number`, `parseInt` or `parseFloat`). The real sites are
+// `Map.tsx:747/765/784` and `MapDrawing.ts:220` in ahra, `1 * zoom` with `zoom: number`, where ESLint
+// reports and recommends `Number(zoom)`, which converts nothing.
+//
+// Every union constituent must carry one of `kinds`; an intersection constituent qualifies when any of
+// its parts does, which is a branded number such as `number & { unit: 'pixels' }`. So `any`,
+// `unknown`, `number | undefined` and an error type all keep reporting. The type is read through a
+// type parameter's constraint, since `T extends number` is a number at run time.
+func noImplicitCoercionIsAlready(ctx rule.Context, operand *ast.Node, kinds checker.TypeFlags) bool {
+	if ctx.TypeChecker == nil {
+		return false
+	}
+	operandType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, operand)
+	if operandType == nil {
+		return false
+	}
+	for _, constituent := range type_checking.UnionTypeParts(operandType) {
+		if type_checking.IsTypeFlagSet(constituent, kinds) {
+			continue
+		}
+		branded := false
+		if type_checking.IsIntersectionType(constituent) {
+			for _, part := range constituent.Types() {
+				if type_checking.IsTypeFlagSet(part, kinds) {
+					branded = true
+					break
+				}
+			}
+		}
+		if !branded {
+			return false
+		}
+	}
+	return true
 }
 
 // noImplicitCoercionIsEmptyString is upstream's `isEmptyString`.

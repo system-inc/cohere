@@ -181,6 +181,11 @@ func checkTypeParameterOwner(ctx rule.Context, node *ast.Node, descriptor string
 			continue
 		}
 
+		// Deliberately quieter than upstream. See isExactEqualityWitnessParameter.
+		if isExactEqualityWitnessParameter(ctx, node, typeParameter) {
+			continue
+		}
+
 		uses := "used only once"
 		if count == 1 {
 			uses = "never used"
@@ -190,6 +195,67 @@ func checkTypeParameterOwner(ctx rule.Context, node *ast.Node, descriptor string
 			buildSoleTypeParameterMessage(name.Text(), uses, descriptor),
 			rule.Suggestion{Message: buildReplaceUsagesWithConstraintMessage()})
 	}
+}
+
+// isExactEqualityWitnessParameter recognizes the exact type-equality idiom, where a type parameter
+// used once is the mechanism rather than decoration. This is where cohere is deliberately quieter
+// than upstream, which reports it (its own corpus pins `Equal<X, Y>` as invalid57).
+//
+//	(<T>() => T extends L ? 1 : 2) extends <T>() => T extends R ? 1 : 2 ? true : false
+//
+// The checker defers a conditional type whose check type is an unresolved type parameter, and it
+// relates two deferred conditionals only when their extends types are IDENTICAL, which is how this
+// asks "is L exactly R" where plain assignability would let `any` through. `T` has to be a fresh
+// parameter of the function type for the conditional to stay deferred, so the rule's suggestion,
+// replacing it with its constraint, resolves both sides eagerly and destroys the comparison.
+//
+// Three facts, all syntactic and all required, make the idiom and nothing else:
+//
+//	its return type is a conditional    whose check type is THIS parameter, by symbol
+//	the owner is a comparison operand   the check or extends type of an enclosing conditional
+//	                                    type, through any parentheses, so it is only ever compared
+//	                                    and never the type of a value a caller could invoke
+//
+// The operand test also decides the owner's kind. Of the kinds this rule listens on, only a function
+// type and a constructor type can stand where a conditional takes a type, so a declaration, a
+// `declare function`, a method or a call signature (any of which a caller can invoke as a disguised
+// cast) never qualifies. A separate kind check was mutated away and survived every fixture, because
+// the operand test already excludes everything it excluded; `new <T>() => T extends L ? 1 : 2` is the
+// same idiom and is silent too.
+//
+// The real site is `nexus/source/types/UnionFromClasses.test.ts:23` in ahra, two findings in ESLint.
+func isExactEqualityWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *ast.Node) bool {
+	returnType := owner.Type()
+	if returnType == nil {
+		return false
+	}
+	returnType = ast.SkipTypeParentheses(returnType)
+	if returnType.Kind != ast.KindConditionalType {
+		return false
+	}
+	checkType := ast.SkipTypeParentheses(returnType.AsConditionalTypeNode().CheckType)
+	if checkType == nil || checkType.Kind != ast.KindTypeReference {
+		return false
+	}
+	checkTypeName := checkType.AsTypeReferenceNode().TypeName
+	if checkTypeName == nil || !ast.IsIdentifier(checkTypeName) {
+		return false
+	}
+	declarationSymbol := ctx.TypeChecker.GetSymbolAtLocation(typeParameter.Name())
+	if declarationSymbol == nil || ctx.TypeChecker.GetSymbolAtLocation(checkTypeName) != declarationSymbol {
+		return false
+	}
+
+	operand := owner
+	for operand.Parent != nil && operand.Parent.Kind == ast.KindParenthesizedType {
+		operand = operand.Parent
+	}
+	enclosing := operand.Parent
+	if enclosing == nil || enclosing.Kind != ast.KindConditionalType {
+		return false
+	}
+	comparison := enclosing.AsConditionalTypeNode()
+	return comparison.CheckType == operand || comparison.ExtendsType == operand
 }
 
 // usesCountedBefore is upstream's `node.body?.range[0] ?? node.returnType?.range[1]`.

@@ -478,3 +478,267 @@ func TestNoUnmodifiedLoopConditionModifierReachedThroughACall(t *testing.T) {
 		})
 	}
 }
+
+// TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended is where cohere is
+// deliberately quieter than ESLint.
+//
+// Upstream credits a write only when it sits in the loop, or in a function DECLARATION whose name is
+// referenced from the loop. It cannot see the most common modern cancellation shape: a flag set by a
+// signal handler or an abort callback while the loop is suspended at an `await`. A suspended loop
+// hands the thread to whatever else is queued, so a write in another function activation, registered
+// before the loop could finish, can change the condition between iterations. ESLint reports all three
+// such loops in ahra, and all three are false.
+//
+// The first three silent rows are those sites, cut to the lines that decide them:
+// `modules/tasks/TasksWatchCommandLineInterface.ts:305` (a hoisted SIGINT handler),
+// `modules/os/sensation/AhraOsMonitors.ts:548` (an `abort` closure in the enclosing function of an async
+// IIFE), and `modules/os/boot-screens/RainbowMatrix.ts:689` (`teardown`, reached through `onSignal`).
+//
+// The reporting rows are the controls that keep the loop detector alive: an awaiting loop with no
+// writer at all, the same handler beside a loop that never suspends, an `await` that belongs to a
+// nested function rather than the loop, a write in the loop's own activation before the loop, a
+// closure created only after the loop, a hoisted writer nothing registers, one registered only after
+// the loop, and a closure writing a shadowing binding.
+func TestNoUnmodifiedLoopConditionSeesAWriterThatRunsWhileTheLoopIsSuspended(t *testing.T) {
+	t.Parallel()
+
+	const ambient = "declare const process: { on(event: string, handler: () => void): void };\n" +
+		"declare function sleep(): Promise<void>;\n" +
+		"declare function setTimeout(callback: (value?: unknown) => void, delay: number): void;\n"
+
+	cases := []struct {
+		name   string
+		source string
+		fires  bool
+	}{
+		{"TasksWatchCommandLineInterface.ts:305, a hoisted signal handler", `
+async function watch() {
+    let stopping = false;
+    function handleShutdown(): void {
+        if(stopping) return;
+        stopping = true;
+    }
+    process.on('SIGINT', handleShutdown);
+    while(!stopping) {
+        await new Promise(function(resolve) {
+            setTimeout(resolve, 10);
+        });
+        if(stopping) break;
+    }
+}
+`, false},
+		{"AhraOsMonitors.ts:548, an abort closure beside an async IIFE", `
+declare function driveMonitor(row: number): Promise<void>;
+declare function nextRow(row: number): number | null;
+function superviseMonitor(register: (child: { abort(): void }) => void): void {
+    let abortRequested = false;
+    const child = {
+        abort: function() {
+            abortRequested = true;
+        },
+    };
+    register(child);
+    (async function() {
+        let currentRow: number | null = 1;
+        while(!abortRequested && currentRow !== null) {
+            await driveMonitor(currentRow);
+            if(abortRequested) break;
+            currentRow = nextRow(currentRow);
+        }
+    })();
+}
+`, false},
+		{"RainbowMatrix.ts:689, teardown reached through a registered handler", `
+async function play() {
+    let stopped = false;
+    function teardown(): void {
+        if(stopped) return;
+        stopped = true;
+    }
+    function onSignal(): void {
+        teardown();
+    }
+    process.on('SIGINT', onSignal);
+    while(!stopped) {
+        await sleep();
+    }
+}
+`, false},
+		{"a generator suspended at a yield", `
+let stop = false;
+process.on('SIGINT', () => { stop = true; });
+function* ticks() {
+    while(!stop) {
+        yield 1;
+    }
+}
+`, false},
+		{"an enclosing function's own code, after it starts the loop", `
+function outer() {
+    let stop = false;
+    async function run() {
+        while(!stop) {
+            await sleep();
+        }
+    }
+    run();
+    stop = true;
+}
+`, false},
+		{"a hoisted handler declared after the loop and registered before it", `
+async function watch() {
+    let stop = false;
+    process.on('SIGINT', halt);
+    while(!stop) {
+        await sleep();
+    }
+    function halt(): void {
+        stop = true;
+    }
+}
+`, false},
+		{"an await in the update clause", `
+async function poll() {
+    let stop = false;
+    process.on('SIGINT', () => { stop = true; });
+    for(let index = 0; !stop; index = index + await sleep().then(() => 1)) {
+    }
+}
+`, false},
+
+		{"an enclosing function registers a closure after starting the loop", `
+function outer() {
+    let stop = false;
+    async function run() {
+        while(!stop) {
+            await sleep();
+        }
+    }
+    run();
+    process.on('SIGINT', () => { stop = true; });
+}
+`, false},
+		{"a hoisted handler further out, registered after the loop starts", `
+let stop = false;
+async function run() {
+    while(!stop) {
+        await sleep();
+    }
+}
+run();
+process.on('SIGINT', halt);
+function halt(): void {
+    stop = true;
+}
+`, false},
+
+		{"an await only in a for initializer, which runs once", `
+async function poll() {
+    let stop = false;
+    process.on('SIGINT', () => { stop = true; });
+    for(let index = await sleep(); !stop; ) {
+        Math.random();
+    }
+}
+`, true},
+		{"an awaiting loop with no writer at all", `
+async function watch() {
+    let stop = false;
+    while(!stop) {
+        await sleep();
+    }
+}
+`, true},
+		{"a registered handler beside a loop that never suspends", `
+function spin() {
+    let stop = false;
+    process.on('SIGINT', () => { stop = true; });
+    while(!stop) {
+        Math.random();
+    }
+}
+`, true},
+		{"an await that belongs to a nested function, not the loop", `
+declare const items: number[];
+function spin() {
+    let stop = false;
+    process.on('SIGINT', () => { stop = true; });
+    while(!stop) {
+        items.forEach(async () => { await sleep(); });
+    }
+}
+`, true},
+		{"a write in the loop's own activation before the loop", `
+async function watch() {
+    let stop = true;
+    stop = false;
+    while(!stop) {
+        await sleep();
+    }
+}
+`, true},
+		{"a closure created only after the loop", `
+async function watch() {
+    let stop = false;
+    while(!stop) {
+        await sleep();
+    }
+    process.on('SIGINT', () => { stop = true; });
+}
+`, true},
+		{"a hoisted writer nothing registers", `
+async function watch() {
+    let stop = false;
+    while(!stop) {
+        await sleep();
+    }
+    function halt(): void {
+        stop = true;
+    }
+}
+`, true},
+		{"a hoisted writer declared before the loop that nothing registers", `
+async function watch() {
+    let stop = false;
+    function halt(): void {
+        stop = true;
+    }
+    while(!stop) {
+        await sleep();
+    }
+}
+`, true},
+		{"a hoisted writer registered only after the loop", `
+async function watch() {
+    let stop = false;
+    while(!stop) {
+        await sleep();
+    }
+    process.on('SIGINT', halt);
+    function halt(): void {
+        stop = true;
+    }
+}
+`, true},
+		{"a closure writing a shadowing binding", `
+async function watch() {
+    let stop = false;
+    process.on('SIGINT', () => { let stop = false; stop = true; });
+    while(!stop) {
+        await sleep();
+    }
+}
+`, true},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, NoUnmodifiedLoopCondition, unmodifiedLoopFile, ambient+testCase.source)
+			if testCase.fires {
+				rule_testing.ExpectFindings(t, result, "loopConditionNotModified")
+			} else {
+				rule_testing.ExpectClean(t, result)
+			}
+		})
+	}
+}

@@ -820,3 +820,117 @@ func TestClassLiteralPropertyStyleSurvivesMalformedClassMembers(t *testing.T) {
 		})
 	}
 }
+
+// TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile is where cohere is deliberately
+// quieter than ESLint.
+//
+// Upstream skips a member written `override`, because converting an overriding member changes what
+// it overrides, but it only sees the KEYWORD. Without `noImplicitOverride` an override carries no
+// keyword, and upstream reports a conversion the compiler rejects: a property overriding a concrete
+// base ACCESSOR is TS2610, and an accessor overriding a concrete base PROPERTY is TS2611 (the
+// vendored checker's checkKindsOfPropertyMemberOverrides). cohere asks the checker for the base member
+// and stays silent exactly there.
+//
+// The first silent row is the real site: `nexus/source/validation/schema/StringSchema.ts:37` in ahra,
+// a `typeDefault` getter returning the empty string, overriding `BaseSchema`'s concrete getter.
+// ESLint reports it and its suggested field does not compile. The same class's `typeName`, which
+// implements an ABSTRACT getter, is a true positive (a field may implement an abstract accessor) and
+// stays in the reporting rows, as do overrides of abstract and interface-merged members, a member
+// with no base counterpart, and a static override, which the checker does not compare.
+func TestClassLiteralPropertyStyleDeclinesAConversionThatCannotCompile(t *testing.T) {
+	t.Parallel()
+
+	const schemaBase = "abstract class BaseSchema<TInput = unknown, TOutput = TInput> {\n" +
+		"    abstract get typeName(): string;\n" +
+		"    get typeDefault(): TOutput | undefined { return undefined; }\n" +
+		"}\n"
+
+	cases := []struct {
+		name          string
+		configuration string
+		sourceText    string
+		wantIds       []string
+	}{
+		{"StringSchema.ts:37, a getter over a concrete base getter, beside a true positive", "",
+			schemaBase + "class StringSchema extends BaseSchema<string> {\n" +
+				"    get typeName(): string { return 'string'; }\n" +
+				"    get typeDefault(): string { return ''; }\n" +
+				"}\n",
+			[]string{"preferFieldStyle"}},
+		{"a getter over a concrete getter-and-setter pair", "",
+			"class A { get x(): number { return Math.PI; } set x(value: number) {} }\nclass B extends A { get x(): number { return 1; } }\n",
+			nil},
+		{"a getter over a concrete getter two classes up", "",
+			"class A { get x(): number { return Math.PI; } }\nclass B extends A {}\nclass C extends B { get x(): number { return 1; } }\n",
+			nil},
+		{"a field over a concrete base property, getters style", "\"getters\"",
+			"class A { readonly x: number = Math.PI; }\nclass B extends A { readonly x = 1; }\n",
+			nil},
+		{"a getter over an abstract getter", "",
+			"abstract class A { abstract get x(): number; }\nclass B extends A { get x(): number { return 1; } }\n",
+			[]string{"preferFieldStyle"}},
+		{"a getter over an abstract property", "",
+			"abstract class A { abstract readonly x: number; }\nclass B extends A { get x(): number { return 1; } }\n",
+			[]string{"preferFieldStyle"}},
+		{"a getter over a base property, which the field restores", "",
+			"class A { readonly x: number = Math.PI; }\nclass B extends A { get x(): number { return 1; } }\n",
+			[]string{"preferFieldStyle"}},
+		{"a getter with no base counterpart", "",
+			"class A { get y(): number { return Math.PI; } }\nclass B extends A { get x(): number { return 1; } }\n",
+			[]string{"preferFieldStyle"}},
+		{"a static getter over a static base getter", "",
+			"class A { static get x(): number { return Math.PI; } }\nclass B extends A { static get x(): number { return 1; } }\n",
+			[]string{"preferFieldStyle"}},
+		{"a field over an abstract property, getters style", "\"getters\"",
+			"abstract class A { abstract readonly x: number; }\nclass B extends A { readonly x = 1; }\n",
+			[]string{"preferGetterStyle"}},
+		{"a field over a base getter, which the getter restores, getters style", "\"getters\"",
+			"class A { get x(): number { return Math.PI; } }\nclass B extends A { readonly x = 1; }\n",
+			[]string{"preferGetterStyle"}},
+		// A static member is compared only against the base's static side, which the checker never
+		// checks for kind, so an instance getter of the same name in the base is no obstacle.
+		{"a static getter beside a base instance getter of the same name", "",
+			"class A { get x(): number { return Math.PI; } }\nclass B extends A { static get x(): number { return 1; } }\n",
+			[]string{"preferFieldStyle"}},
+		// Members merged in from an interface are exempt from the kind check, accessor or not.
+		{"a getter over an interface-merged accessor", "",
+			"interface A { get x(): number; }\nclass A {}\nclass B extends A { get x(): number { return 1; } }\n",
+			[]string{"preferFieldStyle"}},
+		{"a field over an interface-merged property, getters style", "\"getters\"",
+			"interface A { readonly x: number; }\nclass A {}\nclass B extends A { readonly x = 1; }\n",
+			[]string{"preferGetterStyle"}},
+		// The three below are already compile errors before any conversion (a getter over a method,
+		// and a private on either side of a public), and the checker skips them when it compares
+		// kinds, so the conversion adds no error and upstream's report stands.
+		{"a getter over a base method", "",
+			"class A { x(): number { return Math.PI; } }\nclass B extends A { get x(): number { return 1; } }\n",
+			[]string{"preferFieldStyle"}},
+		{"a private getter over a public base getter", "",
+			"class A { get x(): number { return Math.PI; } }\nclass B extends A { private get x(): number { return 1; } }\n",
+			[]string{"preferFieldStyle"}},
+		// The checker skips a base property that came from a mapped type, so the getter compiles.
+		{"a field over a mapped-type base property, getters style", "\"getters\"",
+			"type Shape = { [K in 'x']: number };\ndeclare const Base: new () => Shape;\nclass B extends Base { readonly x = 1; }\n",
+			[]string{"preferGetterStyle"}},
+		// An intersection base property is exempt when ANY of its declarations is abstract or from an
+		// interface, where an ordinary one needs all of them; the checker accepts the getter.
+		{"a field over an intersection property, one side an interface, getters style", "\"getters\"",
+			"interface I { readonly x: number; }\ndeclare class C { readonly x: number; }\ndeclare const Base: new () => I & C;\nclass D extends Base { readonly x = 1; }\n",
+			[]string{"preferGetterStyle"}},
+		{"a getter over a private base getter", "",
+			"class A { private get x(): number { return Math.PI; } }\nclass B extends A { get x(): number { return 1; } }\n",
+			[]string{"preferFieldStyle"}},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTypedWithOptions(t, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
+				testCase.sourceText, decodeClassLiteralPropertyStyleOptions(t, testCase.configuration))
+			if len(testCase.wantIds) == 0 {
+				rule_testing.ExpectClean(t, result)
+				return
+			}
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
+}

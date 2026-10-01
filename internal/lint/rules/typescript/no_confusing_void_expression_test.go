@@ -253,46 +253,53 @@ func TestNoConfusingVoidExpressionStaysSilent(t *testing.T) {
 	}
 }
 
-// TestNoConfusingVoidExpressionCoversUndefinedReturns pins the VoidLike breadth.
+// TestNoConfusingVoidExpressionJudgesVoidNotUndefined is where cohere is deliberately quieter than
+// ESLint.
 //
 // Upstream tests `TypeFlags.VoidLike`, which is void OR undefined, and its corpus writes no
-// undefined-returning call anywhere. A mutation narrowing the test to `Void` alone therefore
-// survived all 110 imported cases, which is the corpus being silent rather than the breadth being
-// decorative.
+// undefined-typed expression anywhere, so all 110 imported cases agree either way. Measured against
+// the installed rule before this change: an undefined-returning call assigned or in an arrow
+// shorthand reports exactly as a void-returning one does. That is a false positive. `void` says
+// "there is no result, do not look", and `undefined` is a value somebody returned on purpose, which
+// a test asserting `toBeUndefined()` reads by design. The rule's name and messages are about void.
 //
-// Every verdict below was measured against the installed rule. An undefined-returning call in
-// statement position is clean and the same call assigned or in an arrow shorthand reports, exactly
-// as a void-returning one does.
-func TestNoConfusingVoidExpressionCoversUndefinedReturns(t *testing.T) {
+// The silent rows include the two real sites in ahra that ESLint reports:
+// `nexus/source/security/random/Random.test.ts:6`, `const result = arrayGetRandom([])` where `T`
+// infers to `never` and the call types as `undefined`, and
+// `nexus/source/coordination/TrackedPromise.test.ts:132`, an `await` of a `Promise<undefined>`.
+//
+// The reporting rows are the controls that keep this to undefined: the same positions with a real
+// `void`, including `nexus/source/coordination/RandomSleep.test.ts:250`, an `await` of a
+// `Promise<void>`, which is a true positive and stays one.
+func TestNoConfusingVoidExpressionJudgesVoidNotUndefined(t *testing.T) {
 	t.Parallel()
 
-	const declaration = "declare function returnsUndefined(): undefined;\n"
+	const declarations = "declare function returnsUndefined(): undefined;\n" +
+		"declare function returnsVoid(): void;\n" +
+		"declare function arrayGetRandom<T>(array: readonly T[]): T | undefined;\n" +
+		"declare const undefinedPromise: Promise<undefined>;\n" +
+		"declare function randomSleep(minimum: number, maximum: number): Promise<void>;\n"
 
 	for _, testCase := range []struct {
 		name       string
 		source     string
 		messageIds []string
 	}{
-		{
-			name:       "statement position is clean",
-			source:     "returnsUndefined();",
-			messageIds: nil,
-		},
-		{
-			name:       "assigned reports",
-			source:     "const value = returnsUndefined();",
-			messageIds: []string{"invalidVoidExpr"},
-		},
-		{
-			name:       "an arrow shorthand reports",
-			source:     "const wrapped = () => returnsUndefined();",
-			messageIds: []string{"invalidVoidExprArrow"},
-		},
+		{name: "an undefined call in statement position", source: "returnsUndefined();"},
+		{name: "an undefined call assigned", source: "const value = returnsUndefined();"},
+		{name: "an undefined call in an arrow shorthand", source: "const wrapped = () => returnsUndefined();"},
+		{name: "an undefined call returned", source: "function f() { return returnsUndefined(); }"},
+		{name: "Random.test.ts:6, a generic that infers to undefined", source: "const result = arrayGetRandom([]);"},
+		{name: "TrackedPromise.test.ts:132, awaiting Promise<undefined>", source: "async function f() { const result = await undefinedPromise; }"},
+		{name: "a void call assigned", source: "const value = returnsVoid();", messageIds: []string{"invalidVoidExpr"}},
+		{name: "a void call in an arrow shorthand", source: "const wrapped = () => returnsVoid();", messageIds: []string{"invalidVoidExprArrow"}},
+		{name: "a void call returned", source: "function f() { return returnsVoid(); }", messageIds: []string{"invalidVoidExprReturnLast"}},
+		{name: "RandomSleep.test.ts:250, awaiting Promise<void>", source: "async function f() { const result = await randomSleep(100, 200); }", messageIds: []string{"invalidVoidExpr"}},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTypedWithOptions(t, NoConfusingVoidExpression,
 				noConfusingVoidExpressionFile,
-				noConfusingVoidExpressionAmbientGlobals+declaration+testCase.source, nil)
+				noConfusingVoidExpressionAmbientGlobals+declarations+testCase.source, nil)
 			if len(testCase.messageIds) == 0 {
 				rule_testing.ExpectClean(t, result)
 				return

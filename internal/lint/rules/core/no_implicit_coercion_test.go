@@ -606,3 +606,78 @@ func TestDecodeNoImplicitCoercionOptions(t *testing.T) {
 		rule_testing.ExpectFindings(t, result, "implicitCoercion")
 	})
 }
+
+// TestNoImplicitCoercionIsSilentWhenNothingIsCoerced is where cohere is deliberately quieter than
+// ESLint.
+//
+// Upstream is type-blind, so `1 * zoom` reports and recommends `Number(zoom)` even when `zoom` is
+// already a `number`. Nothing is coerced there, and the advice is wrong. cohere asks the checker and
+// stays silent on the four number arms (`+x`, `-(-x)`, `1 * x`, `x - 0`) when every constituent of the
+// operand's type is already a number, and on `-(-x)` when it is a bigint, the one number arm that is an
+// identity on a bigint rather than a TypeError.
+//
+// The first two silent rows are the real sites in ahra, four findings in ESLint:
+// `libraries/structure/source/components/maps/Map.tsx:747/765/784` (`context.lineWidth = 1 * zoom`)
+// and `MapDrawing.ts:220` (`const dotRadius = 1.0 * zoom`), with `zoom: number`.
+//
+// The reporting rows keep the proof tight: a string, `number | undefined`, `any`, `unknown`, and a
+// bigint under `+`, `* 1` and `- 0` (each a compile error and a runtime TypeError, so still not
+// "already a number"), plus the string and boolean arms, which this change does not touch.
+func TestNoImplicitCoercionIsSilentWhenNothingIsCoerced(t *testing.T) {
+	t.Parallel()
+
+	const declarations = "declare const zoom: number;\n" +
+		"declare const context: { lineWidth: number };\n" +
+		"declare const level: 1 | 2 | 3;\n" +
+		"declare const branded: number & { readonly unit: 'pixels' };\n" +
+		"declare const big: bigint;\n" +
+		"declare const text: string;\n" +
+		"declare const maybe: number | undefined;\n" +
+		"declare const loose: any;\n" +
+		"declare const opaque: unknown;\n" +
+		"declare const flag: boolean;\n" +
+		"enum Size { Small = 1, Large = 2 }\n" +
+		"declare const size: Size;\n"
+
+	for _, testCase := range []struct {
+		name       string
+		sourceText string
+		wantIds    []string
+	}{
+		{name: "Map.tsx:747, one times a number", sourceText: "context.lineWidth = 1 * zoom;"},
+		{name: "MapDrawing.ts:220, one-point-zero times a number", sourceText: "const dotRadius = 1.0 * zoom;"},
+		{name: "a number times one", sourceText: "const n = zoom * 1;"},
+		{name: "unary plus on a number", sourceText: "const n = +zoom;"},
+		{name: "double negation on a number", sourceText: "const n = -(-zoom);"},
+		{name: "a number minus zero", sourceText: "const n = zoom - 0;"},
+		{name: "a union of number literals", sourceText: "const n = 1 * level;"},
+		{name: "a branded number", sourceText: "const n = +branded;"},
+		{name: "a numeric enum", sourceText: "const n = 1 * size;"},
+		{name: "double negation on a bigint", sourceText: "const n = -(-big);"},
+		{name: "a constrained type parameter", sourceText: "function f<T extends number>(value: T) { return 1 * value; }"},
+		{name: "one times a non-null-asserted number", sourceText: "const n = 1 * maybe!;"},
+
+		{name: "one times a string", sourceText: "const n = 1 * text;", wantIds: []string{"implicitCoercion"}},
+		{name: "unary plus on a string", sourceText: "const n = +text;", wantIds: []string{"implicitCoercion"}},
+		{name: "double negation on a string", sourceText: "const n = -(-text);", wantIds: []string{"implicitCoercion"}},
+		{name: "a string minus zero", sourceText: "const n = text - 0;", wantIds: []string{"implicitCoercion"}},
+		{name: "unary plus on a possibly undefined number", sourceText: "const n = +maybe;", wantIds: []string{"implicitCoercion"}},
+		{name: "one times any", sourceText: "const n = 1 * loose;", wantIds: []string{"implicitCoercion"}},
+		{name: "unary plus on unknown", sourceText: "const n = +opaque;", wantIds: []string{"implicitCoercion"}},
+		{name: "unary plus on a bigint", sourceText: "const n = +big;", wantIds: []string{"implicitCoercion"}},
+		{name: "one times a bigint", sourceText: "const n = 1 * big;", wantIds: []string{"implicitCoercion"}},
+		{name: "a bigint minus zero", sourceText: "const n = big - 0;", wantIds: []string{"implicitCoercion"}},
+		{name: "an empty string plus a string is a different arm", sourceText: "const s = '' + text;", wantIds: []string{"implicitCoercion"}},
+		{name: "double not on a boolean is a different arm", sourceText: "const b = !!flag;", wantIds: []string{"implicitCoercion"}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTypedWithOptions(t, NoImplicitCoercion, noImplicitCoercionFile,
+				declarations+testCase.sourceText, nil)
+			if len(testCase.wantIds) == 0 {
+				rule_testing.ExpectClean(t, result)
+				return
+			}
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
+}

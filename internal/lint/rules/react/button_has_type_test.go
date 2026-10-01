@@ -265,7 +265,10 @@ func TestButtonHasTypeReadsStaticValuesUpstreamsWay(t *testing.T) {
 		{"undefined is an identifier", "const a = <button type={undefined}/>;\n", []string{"complexType"}, ""},
 		{"a negative number is a unary expression", "const a = <button type={-1}/>;\n", []string{"complexType"}, ""},
 		{"concatenation is not static", "const a = <button type={'bu' + 'tton'}/>;\n", []string{"complexType"}, ""},
-		{"an interpolating template is not static", "const a = <button type={`bu${''}tton`}/>;\n", []string{"complexType"}, ""},
+		// Upstream measured this on `bu${''}tton`, which the checker folds to the literal "button",
+		// so cohere is deliberately silent there (pinned in TestButtonHasTypeTrustsAProvenType). The
+		// interpolation here is a `string`, which nothing can fold, and it still reports.
+		{"an interpolating template is not static", "declare const part: string;\nconst a = <button type={`bu${part}tton`}/>;\n", []string{"complexType"}, ""},
 	}
 
 	for _, testCase := range cases {
@@ -755,5 +758,76 @@ func TestButtonHasTypeMessagesReadAsWritten(t *testing.T) {
 	}
 	if !strings.HasPrefix(both.Diagnostics[1].Message.Description, `"bar"`+suffix) {
 		t.Errorf("second reads %q", both.Diagnostics[1].Message.Description)
+	}
+}
+
+// TestButtonHasTypeTrustsAProvenType is where cohere is deliberately quieter than ESLint.
+//
+// Upstream is type-blind, so every non-literal `type` is `complexType` there, including one the
+// checker proves can only be `button`, `submit` or `reset`. The silent rows are that shape, and the
+// first is the real site that motivated it: `libraries/structure/source/components/buttons/Button.tsx`
+// line 222, `<button type={type}>` with `type = 'button'` destructured from a prop typed
+// `'button' | 'submit' | 'reset'`. ESLint 7.37.5 reports it; it is a false positive, because the
+// default removes `undefined` and the annotation removes every other string.
+//
+// The reporting rows are the controls that keep the exemption exactly as wide as the proof: the same
+// prop WITHOUT the default (so `undefined` is a constituent and HTML's `submit` default can apply), a
+// `string`, a union with one bad member, `any`, and a fully valid union under a config that forbids
+// one of its members, where "permitted" rather than "known" is the test.
+func TestButtonHasTypeTrustsAProvenType(t *testing.T) {
+	t.Parallel()
+
+	const properties = "interface ButtonProperties { type?: 'button' | 'submit' | 'reset'; }\n"
+
+	silent := []struct {
+		name       string
+		sourceText string
+	}{
+		{"Button.tsx:222, a defaulted prop typed as the three literals",
+			properties + "function Button({ type = 'button' }: ButtonProperties) { return <button type={type} />; }\n"},
+		{"a single literal const",
+			"const kind = 'submit' as const;\nconst a = <button type={kind} />;\n"},
+		{"a typed branch of a ternary",
+			"declare const condition: boolean;\ndeclare const kind: 'reset' | 'button';\nconst a = <button type={condition ? 'submit' : kind} />;\n"},
+		{"a string enum whose members are all valid",
+			"enum Kind { Plain = 'button', Send = 'submit' }\ndeclare const kind: Kind;\nconst a = <button type={kind} />;\n"},
+		{"createElement with a typed shorthand",
+			"declare const React: { createElement(...a: unknown[]): unknown };\ndeclare const type: 'button' | 'submit';\nReact.createElement('button', { type });\n"},
+		// Upstream reports complexType here (measured, see TestButtonHasTypeReadsStaticValuesUpstreamsWay);
+		// the checker folds the template to the literal "button", so nothing can submit.
+		{"a template the checker folds to a literal",
+			"const a = <button type={`bu${''}tton`}/>;\n"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectClean(t, runButtonHasType(t, testCase.sourceText, ""))
+		})
+	}
+
+	reporting := []struct {
+		name       string
+		sourceText string
+		rawOptions string
+	}{
+		{"the same prop with no default can be undefined",
+			properties + "function Button({ type }: ButtonProperties) { return <button type={type} />; }\n", ""},
+		{"a string",
+			"declare const kind: string;\nconst a = <button type={kind} />;\n", ""},
+		{"a union with one invalid member",
+			"declare const kind: 'button' | 'foo';\nconst a = <button type={kind} />;\n", ""},
+		{"any",
+			"declare const kind: any;\nconst a = <button type={kind} />;\n", ""},
+		{"a valid union with a member the config forbids",
+			properties + "function Button({ type = 'button' }: ButtonProperties) { return <button type={type} />; }\n",
+			"{\"reset\":false}"},
+		{"a string enum with one invalid member",
+			"enum Kind { Plain = 'button', Odd = 'menu' }\ndeclare const kind: Kind;\nconst a = <button type={kind} />;\n", ""},
+		{"createElement with an untyped shorthand",
+			"declare const React: { createElement(...a: unknown[]): unknown };\ndeclare const type: string;\nReact.createElement('button', { type });\n", ""},
+	}
+	for _, testCase := range reporting {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectFindings(t, runButtonHasType(t, testCase.sourceText, testCase.rawOptions), "complexType")
+		})
 	}
 }

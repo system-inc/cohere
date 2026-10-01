@@ -566,14 +566,9 @@ interface StorageService {
   setItem<T>({ key: string, value: T }): Promise<void>;
 }
       `, ids: []string{"sole"}},
-	{name: "invalid57", source: `
-type Compute<A> = A extends Function ? A : { [K in keyof A]: Compute<A[K]> };
-type Equal<X, Y> =
-  (<T1>() => T1 extends Compute<X> ? 1 : 2) extends
-    (<T2>() => T2 extends Compute<Y> ? 1 : 2)
-  ? true
-  : false;
-      `, ids: []string{"sole", "sole"}},
+	// Upstream's invalid57, the `Equal<X, Y>` exact-equality idiom, reports twice upstream and is
+	// deliberately silent here. It lives in TestNoUnnecessaryTypeParametersRecognizesTheExactEqualityIdiom,
+	// verbatim, with the reasoning.
 	{name: "invalid58", source: `
 function f<T extends any>(x: T): void {
   // @ts-expect-error
@@ -1041,6 +1036,73 @@ func TestNoUnnecessaryTypeParametersIndexSignaturesCountTwice(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
 			rule_testing.ExpectClean(t, result)
+		})
+	}
+}
+
+// TestNoUnnecessaryTypeParametersRecognizesTheExactEqualityIdiom is where cohere is deliberately
+// quieter than ESLint.
+//
+// `(<T>() => T extends L ? 1 : 2) extends <T>() => T extends R ? 1 : 2` asks whether L and R are
+// IDENTICAL, not merely mutually assignable: the checker defers a conditional type whose check type
+// is an unresolved type parameter, and relates two deferred conditionals only when their extends
+// types are identical. `T` used once is the whole point, and the rule's suggestion, replacing it
+// with its constraint, makes both conditionals resolve eagerly and destroys the comparison. Neither
+// function type is ever the type of a value, so no cast can hide in it.
+//
+// The first silent row is the real site, verbatim: `nexus/source/types/UnionFromClasses.test.ts:23`
+// in ahra, two findings in ESLint and in cohere before this. The second is upstream's own invalid57,
+// which typescript-eslint pins as reporting twice; it is the same idiom and moved here from the
+// reporting table.
+//
+// The reporting rows keep the exemption exactly as wide as the idiom: the same conditional-returning
+// function type NOT used as a comparison operand (a disguised cast at every call site), a function
+// type that is an operand but whose return is not a conditional on its own parameter, an operand
+// whose conditional checks a different type, a function DECLARATION returning the conditional, a
+// method signature returning it inside a compared type literal (a member, never itself the operand),
+// and the conditional reached through a parameter rather than the return.
+func TestNoUnnecessaryTypeParametersRecognizesTheExactEqualityIdiom(t *testing.T) {
+	t.Parallel()
+
+	silent := []struct {
+		name   string
+		source string
+	}{
+		{name: "UnionFromClasses.test.ts:23", source: "type IsExactlyType<TLeft, TRight> =\n    (<T>() => T extends TLeft ? 1 : 2) extends <T>() => T extends TRight ? 1 : 2 ? true : false;\n"},
+		{name: "upstream invalid57, the same idiom", source: `
+type Compute<A> = A extends Function ? A : { [K in keyof A]: Compute<A[K]> };
+type Equal<X, Y> =
+  (<T1>() => T1 extends Compute<X> ? 1 : 2) extends
+    (<T2>() => T2 extends Compute<Y> ? 1 : 2)
+  ? true
+  : false;
+      `},
+		{name: "parenthesized check type inside the witness", source: "type Same<L, R> = (<T>() => (T) extends L ? 1 : 2) extends (<T>() => T extends R ? 1 : 2) ? true : false;\n"},
+		{name: "the constructor-type spelling of the idiom", source: "type Same<L, R> = (new <T>() => T extends L ? 1 : 2) extends (new <T>() => T extends R ? 1 : 2) ? true : false;\n"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectClean(t, result)
+		})
+	}
+
+	reporting := []struct {
+		name   string
+		source string
+		ids    []string
+	}{
+		{name: "the witness shape outside a comparison", source: "type Witness = <T>() => T extends string ? 1 : 2;\n", ids: []string{"sole"}},
+		{name: "an operand whose return is not a conditional", source: "type Same<L, R> = (<T>() => T) extends (<T>() => T) ? true : false;\n", ids: []string{"sole", "sole"}},
+		{name: "an operand whose conditional checks another type", source: "type Same<L, R> = (<T>() => L extends T ? 1 : 2) extends (<T>() => R extends T ? 1 : 2) ? true : false;\n", ids: []string{"sole", "sole"}},
+		{name: "a declaration returning the conditional", source: "declare function witness<T>(): T extends string ? 1 : 2;\n", ids: []string{"sole"}},
+		{name: "a method signature inside a compared type literal", source: "type Same<L> = { m<T>(): T extends L ? 1 : 2 } extends {} ? true : false;\n", ids: []string{"sole"}},
+		{name: "the conditional in a parameter of an operand", source: "type Same<L> = (<T>(input: T extends L ? 1 : 2) => void) extends (() => void) ? true : false;\n", ids: []string{"sole"}},
+	}
+	for _, testCase := range reporting {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			rule_testing.ExpectFindings(t, result, testCase.ids...)
 		})
 	}
 }

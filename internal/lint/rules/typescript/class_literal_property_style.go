@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -100,8 +101,22 @@ func messageClassLiteralPropertyStylePreferGetterSuggestion() rule.Message {
 // the decorator receives. Measured: `class C { @dec get x() { return 1; } }` reports one diagnostic
 // carrying zero suggestions. That is a decision to reproduce, not an omission, and it is the only
 // input in this rule where the count of suggestions differs from the count of findings.
+//
+// # Where cohere is deliberately quieter: an override the keyword does not mark
+//
+// Upstream's `override` guard reads the keyword, and without `noImplicitOverride` an override carries
+// none, so upstream reports conversions the compiler rejects. cohere asks the checker whether the
+// member overrides a concrete base member of the other kind and declines exactly there; see
+// classLiteralConversionBreaksAnOverride. This is the only use of the checker in the rule, which is
+// why it is declared needed and why, with no checker, the rule falls back to upstream's verdicts.
 var ClassLiteralPropertyStyle = rule.Rule{
 	Name: "@typescript-eslint/class-literal-property-style",
+
+	// For classLiteralConversionBreaksAnOverride alone. The base class is usually in another file
+	// (StringSchema.ts against BaseSchema.ts), so the verdict reads the program as well.
+	NeedsTypeChecker: true,
+	ReadsProgram:     true,
+
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
 			return nil
@@ -147,6 +162,11 @@ func reportClassLiteralGetterShouldBeField(ctx rule.Context, node *ast.Node) {
 	// Upstream's `node.override` guard. An overriding getter cannot become a field without changing
 	// what it overrides.
 	if classLiteralHasModifier(node, ast.KindOverrideKeyword) {
+		return
+	}
+	// The same guard for an override the keyword does not mark, and narrower: only where the field
+	// would not compile. Deliberately quieter than upstream.
+	if classLiteralConversionBreaksAnOverride(ctx, node, true) {
 		return
 	}
 
@@ -199,6 +219,103 @@ func reportClassLiteralGetterShouldBeField(ctx rule.Context, node *ast.Node) {
 				rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), replacement),
 			},
 		})
+}
+
+// classLiteralConversionBreaksAnOverride reports whether converting `member` to the other kind would
+// be a compile error because it overrides a concrete base member of the kind it is now.
+//
+// `becomesProperty` is true for a getter about to become a field and false for a field about to
+// become a getter. The two errors are TS2610 (a property overriding a base accessor) and TS2611 (an
+// accessor overriding a base property), and the conditions are the vendored checker's own, in
+// checkKindsOfPropertyMemberOverrides:
+//
+//	instance members only          the checker compares only the instance side, so a static
+//	                               conversion compiles and keeps reporting
+//	neither side private           a private member is not an override
+//	base not from a mapped type    the checker skips those
+//	base not abstract or interface a field may implement an abstract accessor, which is why the
+//	                               seven `typeName` getters over `abstract get typeName()` in
+//	                               ahra's schemas stay true positives
+//	base of the member's own kind  a getter over a base property is ALREADY TS2611, and the
+//	                               conversion repairs it, so that keeps reporting
+//
+// The real site is `nexus/source/validation/schema/StringSchema.ts:37` in ahra, a `typeDefault` getter
+// overriding `BaseSchema`'s concrete getter, where ESLint's suggested field is TS2610.
+func classLiteralConversionBreaksAnOverride(ctx rule.Context, member *ast.Node, becomesProperty bool) bool {
+	if ctx.TypeChecker == nil || classLiteralHasModifier(member, ast.KindStaticKeyword) {
+		return false
+	}
+	class := member.Parent
+	if class == nil || (class.Kind != ast.KindClassDeclaration && class.Kind != ast.KindClassExpression) {
+		return false
+	}
+	classSymbol := class.Symbol()
+	memberSymbol := member.Symbol()
+	if classSymbol == nil || memberSymbol == nil {
+		return false
+	}
+	if checker.GetDeclarationModifierFlagsFromSymbol(memberSymbol)&ast.ModifierFlagsPrivate != 0 {
+		return false
+	}
+
+	classType := ctx.TypeChecker.GetDeclaredTypeOfSymbol(classSymbol)
+	if classType == nil {
+		return false
+	}
+	for _, baseType := range ctx.TypeChecker.GetBaseTypes(classType) {
+		base := ctx.TypeChecker.GetPropertyOfType(baseType, memberSymbol.Name)
+		if base == nil {
+			continue
+		}
+		baseKind := base.Flags & ast.SymbolFlagsPropertyOrAccessor
+		if baseKind == 0 {
+			continue
+		}
+		baseModifiers := checker.GetDeclarationModifierFlagsFromSymbol(base)
+		if baseModifiers&ast.ModifierFlagsPrivate != 0 || base.CheckFlags&ast.CheckFlagsMapped != 0 {
+			continue
+		}
+		if classLiteralBaseIsAbstractOrInterface(base, baseModifiers) {
+			continue
+		}
+		if becomesProperty {
+			return baseKind != ast.SymbolFlagsProperty
+		}
+		return baseKind == ast.SymbolFlagsProperty
+	}
+	return false
+}
+
+// classLiteralBaseIsAbstractOrInterface is the checker's arePropertiesAbstractOrInterface: when it
+// holds, base and derived kinds need not match. A synthetic (intersection) property needs ANY
+// declaration to qualify, every other property needs ALL of them.
+//
+// The checker also requires an abstract PROPERTY to have no initializer. That clause is omitted: an
+// abstract property with an initializer is itself TS1267, so on compiling code it never decides, and
+// a mutation deleting it survived every fixture for that reason.
+func classLiteralBaseIsAbstractOrInterface(base *ast.Symbol, baseModifiers ast.ModifierFlags) bool {
+	qualifies := func(declaration *ast.Node) bool {
+		if declaration.Parent != nil && declaration.Parent.Kind == ast.KindInterfaceDeclaration {
+			return true
+		}
+		return baseModifiers&ast.ModifierFlagsAbstract != 0
+	}
+	// With no declarations the ALL arm answers true, which is the checker's `core.Every` on an empty
+	// list: no declaration to compare means no kind mismatch to report, so the rule keeps reporting.
+	if base.CheckFlags&ast.CheckFlagsSynthetic != 0 {
+		for _, declaration := range base.Declarations {
+			if qualifies(declaration) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, declaration := range base.Declarations {
+		if !qualifies(declaration) {
+			return false
+		}
+	}
+	return true
 }
 
 // classLiteralFieldReplacementFor builds upstream's field text for a getter.
@@ -307,6 +424,10 @@ func reportClassLiteralFieldsShouldBeGetters(ctx rule.Context, members []*ast.No
 			continue
 		}
 		if classLiteralHasModifier(member, ast.KindOverrideKeyword) {
+			continue
+		}
+		// An unmarked override whose getter would not compile. Deliberately quieter than upstream.
+		if classLiteralConversionBreaksAnOverride(ctx, member, false) {
 			continue
 		}
 

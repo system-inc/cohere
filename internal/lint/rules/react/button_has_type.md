@@ -12,6 +12,30 @@
 
 Disallow usage of `button` elements without an explicit `type` attribute
 
+## Where cohere is deliberately quieter than ESLint
+
+Upstream is type-blind: any `type` that is not a literal or a ternary of literals is `complexType`.
+cohere asks the checker first, and stays silent when the expression's type is a union whose every
+constituent is a string literal the configuration permits. `complexType` exists because a computed
+value could evaluate to something that submits a form; when the checker proves it cannot, the
+finding is false, and reporting it forces either a suppression that lies or a ternary that only
+placates the rule.
+
+The real site is `libraries/structure/source/components/buttons/Button.tsx:222`,
+`<button type={type}>` with `type = 'button'` destructured from a prop typed
+`'button' | 'submit' | 'reset'`. ESLint reports it; cohere does not (13 findings before, 12 after).
+
+The exemption is exactly as wide as the proof. It still reports when `undefined` is a constituent
+(an optional prop with no default, where HTML's `submit` applies), on `string`, `any`, an error type,
+a type parameter, a union with one invalid member, and a valid union containing a type the config
+switches off.
+
+Fixtures: `TestButtonHasTypeTrustsAProvenType` in `button_has_type_test.go` (five silent rows, the
+first being the `Button.tsx:222` shape, and seven reporting controls). One upstream-measured row moved:
+`` `bu${''}tton` `` folds to the literal `"button"` and is silent here, so the "interpolating template"
+row in `TestButtonHasTypeReadsStaticValuesUpstreamsWay` now interpolates a `string`. The differential
+harness records the site in `internal/differential/acknowledged.go` as a gate-only finding.
+
 ## Why this recommendation
 
 Stylistic. Small enough to adopt if we want the convention, not urgent if we do not.

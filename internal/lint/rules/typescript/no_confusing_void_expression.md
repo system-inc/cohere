@@ -12,6 +12,29 @@
 
 Require expressions of type void to appear in statement position
 
+## Where cohere is deliberately quieter than ESLint
+
+Upstream asks whether an expression's type has `TypeFlags.VoidLike`, which is void OR undefined, so an
+honestly `undefined` value in a non-statement position reports as if it were nothing. cohere asks for
+`TypeFlags.Void` alone. `void` says there is no result and nothing should look at it; `undefined` is a
+value somebody returned on purpose, and the rule's name and every message are about void. The
+fixers' `canFix` guards keep VoidLike, since they are upstream's rewrite-safety test and run only
+after a report.
+
+Upstream's corpus writes no undefined-typed expression, so none of its 110 imported cases moves. The
+real sites that went silent: `libraries/structure/libraries/nexus/source/security/random/Random.test.ts:6`
+(`const result = arrayGetRandom([])`, `T` infers to `never`, the call types as `undefined`) and
+`libraries/structure/libraries/nexus/source/coordination/TrackedPromise.test.ts:132` (`await` of a
+`Promise<undefined>`). 21 findings before, 19 after. `RandomSleep.test.ts:250`, an `await` of a
+`Promise<void>`, is a real void and still reports.
+
+Fixtures: `TestNoConfusingVoidExpressionJudgesVoidNotUndefined` in
+`no_confusing_void_expression_test.go`, six silent rows (both real sites, and an undefined call in
+statement, assigned, arrow and return position) and four reporting controls with a real `void`. It
+replaced `TestNoConfusingVoidExpressionCoversUndefinedReturns`, which pinned upstream's breadth. The
+differential harness records both sites in `internal/differential/acknowledged.go` as gate-only
+findings.
+
 ## Why this recommendation
 
 Catches a defect rather than a preference. The cleanup is real but bounded.
