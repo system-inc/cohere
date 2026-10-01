@@ -26,6 +26,15 @@ type Registration struct {
 	// array, which is upstream's `context.options`, or nil for a bare severity. Set at most one of
 	// Decode and DecodeOptionList; which one is set is how the config layer learns the rule's arity.
 	DecodeOptionList func(list []byte) (any, error)
+	// DecodeAt is Decode for a rule whose options name a place on disk, so decoding needs to know
+	// where the config was written and which project is being checked. It takes one option element,
+	// as Decode does, and is handed nil for a bare severity so it can fill in a default from the base.
+	// Set at most one of Decode, DecodeOptionList and DecodeAt.
+	//
+	// It exists because a path in a committed config is read on every machine and in every worktree.
+	// An absolute one is right on exactly one of them, and a rule whose root matches none of the files
+	// it is handed declines them all, which is the inert-rule defect with a path in front of it.
+	DecodeAt func(raw []byte, base OptionsBase) (any, error)
 	// RequiresOptions is whether the rule declines every file without its options.
 	//
 	// The load-bearing field, and the whole lesson of the inert-rule defect.
@@ -34,6 +43,19 @@ type Registration struct {
 	// indistinguishable from a rule with nothing to report. Marking it required turns that silence
 	// into a failure.
 	RequiresOptions bool
+}
+
+// OptionsBase is where a config's paths are anchored, for the decoders that read paths.
+//
+// Either field may be empty, which means the caller does not know it. A decoder that needs one it
+// was not given fails rather than guessing, because guessing is how a root ends up matching nothing.
+type OptionsBase struct {
+	// ConfigDirectory is the absolute directory of the config file the options were written in. A
+	// relative path in an option resolves against it, the way a relative path in a tsconfig does.
+	ConfigDirectory string
+
+	// ProjectRoot is the absolute root of the project being checked, as cohere discovered it.
+	ProjectRoot string
 }
 
 // registered is every rule any linked package has registered, keyed by name.
@@ -68,10 +90,16 @@ func Register(registrations ...Registration) {
 		if name == "" {
 			panic("rule.Register: a rule was registered with an empty name, so the config could never address it")
 		}
-		if registration.Decode != nil && registration.DecodeOptionList != nil {
+		decoders := 0
+		for _, set := range []bool{registration.Decode != nil, registration.DecodeOptionList != nil, registration.DecodeAt != nil} {
+			if set {
+				decoders++
+			}
+		}
+		if decoders > 1 {
 			panic(fmt.Sprintf(
-				"rule.Register: %q sets both Decode and DecodeOptionList; the config layer reads "+
-					"which one is set as the rule's option arity, so both is a contradiction",
+				"rule.Register: %q sets more than one of Decode, DecodeOptionList and DecodeAt; the "+
+					"config layer reads which one is set as the rule's option arity, so two is a contradiction",
 				name,
 			))
 		}

@@ -87,3 +87,13 @@ return !!name && /^on[A-Z]/.test(name);
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
 
+cohere's fix differs from ESLint's where ESLint's breaks the build. TypeScript narrows a reference
+through `!!x` and through a comparison, aliased into a const or not, and never through a call, so
+`Boolean(x)` can turn compiling code into TS18048. Two of the sites above are that shape:
+`!!propertiesTaskId && propertiesTaskId.length` and `!!value && /.../.test(value)`. So cohere writes
+`x !== undefined`, `x !== null`, or both when the type is nullish plus values that are never falsy
+(the hand repair www-phi-health made in `AppSidebarEnergyBalance.tsx`), keeps `Boolean(x)` where
+narrowing changes nothing (a call, a `string`, an object), and declines the fix, reporting with a
+suggestion, when the type also holds `0`, `''` or `false` and no comparison means `!!x`. Both of
+the sites above are the declined case, since their types are `string | undefined` and `string | null`.
+

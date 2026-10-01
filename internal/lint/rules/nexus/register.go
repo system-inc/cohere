@@ -66,7 +66,7 @@ func init() {
 		rule.Registration{Rule: ImportRequireNodeNamespace},
 		rule.Registration{
 			Rule:            ImportRequirePathAlias,
-			Decode:          rule.DecodeOptionsInto[ImportRequirePathAliasOptions](),
+			DecodeAt:        decodeImportRequirePathAliasOptions,
 			RequiresOptions: true,
 		},
 		rule.Registration{Rule: LocalizationNoUntranslatedValue},

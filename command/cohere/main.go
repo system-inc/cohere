@@ -337,12 +337,24 @@ func run() error {
 	// 3.042s and printed 5,201 findings; the whole tree took 3.003s and printed 5,201. Same cost,
 	// same output, and nothing in either run said the argument had been ignored.
 	lintScope := formatScope{Everything: true}
+
+	// What this run may write, which is a different set from what it checks and is decided once,
+	// here, from what the caller stated. Nothing below widens it.
+	//
+	// The checked set grows on purpose: a named file's importers are checked because its exported
+	// types reach them, and past the closure limit the whole tree is. Both are about seeing more.
+	// Writing used to ride along with them, so `cohere --fix app` in www-phi-health fell back to the
+	// whole tree and rewrote 15 files in libraries/structure and 2 in its nested nexus, none of them
+	// named. A caller who names paths has said which files the run is about, and a fixable finding
+	// outside them is reported, not repaired. With nothing named the whole project is the caller's.
+	writeScope := formatScope{Everything: true}
 	switch {
 	case len(flag.Args()) > 0 && !*listRules && !*listRulesEnabled:
 		scope, err := namedPathsScope(location.ArgumentBase, location.Root, flag.Args())
 		if err != nil {
 			return err
 		}
+		writeScope = scope
 		lintScope, projectFiles = narrowToClosure(graph, scope, projectFiles)
 
 	case askingWhatChanged:
@@ -356,6 +368,10 @@ func run() error {
 		//
 		// The scope itself was resolved before the graph was built; see changedScope above.
 		scope := changedScope
+
+		// Written is what changed, whatever the check widens to below: the closure's importers and the
+		// whole tree a changed config demands are checked, never rewritten.
+		writeScope = scope
 
 		// A changed rule config changes what every file means, and no import edge carries that.
 		//
@@ -476,7 +492,7 @@ func run() error {
 			return fmt.Errorf("validating the lint config: %w", err)
 		}
 		graph.LintConfig = lintConfig
-		graph.RuleOptions = registry.Options()
+		graph.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, location.Root))
 	}
 
 	switch {
@@ -495,20 +511,27 @@ func run() error {
 		// milliseconds.
 		scope := wholeTreeScope()
 		switch {
-		case *formatAll:
-			// Asked for by name, so it keeps the whole tree.
-
-		case !lintScope.Everything:
-			// A caller who named paths has already said which files this run is about, and asking git
-			// what changed answers a different question at the cost of a subprocess.
+		case !writeScope.Everything:
+			// A caller who named paths, or asked for what changed, has already said which files this
+			// run is about, and asking git what changed answers a different question at the cost of a
+			// subprocess.
 			//
 			// Measured: `git status --porcelain --untracked-files=all` is about 70ms on this tree, and
 			// it was most of the 116ms a scoped run spent outside any phase. On a run whose phases
 			// total 343ms that is not a rounding error.
 			//
-			// The named scope is the right answer rather than merely the cheap one. Formatting files
+			// The stated scope is the right answer rather than merely the cheap one. Formatting files
 			// the caller did not name would be a surprise in the one mode where they were explicit.
-			scope = lintScope
+			//
+			// It reads the write scope and not the check scope. The check scope becomes the whole tree
+			// past the closure limit, and keying on it sent a named run down to the changed-files
+			// default below, formatting every changed file in every submodule. It also comes before
+			// `--format-all`: that flag widens what is formatted from changed files to all of them, and
+			// with paths stated, all of them is all of the stated paths.
+			scope = writeScope
+
+		case *formatAll:
+			// Asked for by name, so it keeps the whole tree.
 
 		default:
 			resolved, scopeError := changedFilesScope(location.Root)
@@ -585,6 +608,7 @@ func run() error {
 			ctx, graph, projectFiles, registry.All(),
 			scopedTransform(formatTransform(formatter), scope),
 			scope.formatCandidates(),
+			writeScope,
 			*maxFixPasses,
 		)
 		fixDuration := time.Since(fixStart)
@@ -874,8 +898,22 @@ func rebuildGraph(
 		return nil, time.Since(start), err
 	}
 	rebuilt.LintConfig = lintConfig
-	rebuilt.RuleOptions = registry.Options()
+	rebuilt.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, directory))
 	return rebuilt, time.Since(start), nil
+}
+
+// optionsBase is where a rule's path options are anchored: the lint config's own directory for a
+// relative path, and the project root this run discovered for an absent one.
+//
+// Built at both places a graph receives its options, so the graph rebuilt after fixing anchors the
+// same way the first one did. A rebuilt graph that decoded with no base would refuse a relative root
+// the first graph accepted, and fail the run halfway through for a reason the config never changed.
+func optionsBase(lintConfig *configuration.Config, projectRoot string) rule.OptionsBase {
+	base := rule.OptionsBase{ProjectRoot: projectRoot}
+	if lintConfig != nil {
+		base.ConfigDirectory = lintConfig.Root
+	}
+	return base
 }
 
 // collectTypeDiagnostics gathers the compiler's own findings for our files.

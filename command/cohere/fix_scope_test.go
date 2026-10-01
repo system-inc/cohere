@@ -1,0 +1,178 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/system-inc/cohere/internal/types/program"
+)
+
+/*
+ * What a run checks and what it may write are two different sets.
+ *
+ * A named path is checked together with everything that imports it, because a change to an exported
+ * type breaks its consumers and a check that stopped at the named file would miss those findings.
+ * Above the closure limit the whole tree is checked. Both widenings are about seeing more, and both
+ * are honest when the coverage line says so.
+ *
+ * Writing is not seeing. The fix phase used to rewrite every file the checked set handed it, so
+ * `cohere --fix app` in www-phi-health reached past 500 files, fell back to the whole tree, and
+ * rewrote 15 files inside libraries/structure and 2 inside its nested nexus, none of them named.
+ * The caller said which files this run is about; widening the check must never widen that.
+ *
+ * Every case puts the same fixable violation in a file that was named and in one that was not, so
+ * the named file changing is the control that proves the fixer ran, and the other staying
+ * byte-identical is the boundary.
+ */
+
+const fixScopeTsconfig = `{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "noEmit": true
+    },
+    "include": ["**/*.ts"]
+}`
+
+// fixScopeProject writes a project where the named file, a file that imports it, and an unrelated
+// sibling all carry the same `debugger` statement, which `no-debugger` repairs.
+func fixScopeProject(t *testing.T, root string, extra map[string]string) {
+	t.Helper()
+	files := map[string]string{
+		"tsconfig.json":       fixScopeTsconfig,
+		"CohereSettings.json": `{"rules":{"no-debugger":"error"}}`,
+		"Producer.ts":         "export function value(): number {\n    debugger;\n    return 1;\n}\n",
+		"Consumer.ts":         "import { value } from './Producer';\n\nexport function doubled(): number {\n    debugger;\n    return value() * 2;\n}\n",
+		"Sibling.ts":          "export function alone(): number {\n    debugger;\n    return 3;\n}\n",
+	}
+	for name, contents := range extra {
+		files[name] = contents
+	}
+	writeTree(t, root, files)
+}
+
+func readForTest(t *testing.T, path string) string {
+	t.Helper()
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(contents)
+}
+
+// assertWroteOnlyNamed checks the control and the boundary together.
+func assertWroteOnlyNamed(t *testing.T, root string, before map[string]string, written string, output string) {
+	t.Helper()
+	if after := readForTest(t, filepath.Join(root, written)); after == before[written] || strings.Contains(after, "debugger") {
+		t.Fatalf("the control failed: %s was named and still carries its violation, so the fixer never ran:\n%s\n%s",
+			written, after, output)
+	}
+	for name, contents := range before {
+		if name == written {
+			continue
+		}
+		if after := readForTest(t, filepath.Join(root, name)); after != contents {
+			t.Errorf("%s was not named and was rewritten:\nbefore:\n%s\nafter:\n%s\noutput:\n%s", name, contents, after, output)
+		}
+	}
+}
+
+func TestAFixRunWritesOnlyWhatWasNamed(t *testing.T) {
+	binary := buildCohere(t)
+
+	// Within the closure limit: the consumer is checked because it imports the named file, and it
+	// is not written because nobody named it.
+	t.Run("a dependent is checked and not written", func(t *testing.T) {
+		root := t.TempDir()
+		fixScopeProject(t, root, nil)
+		before := map[string]string{
+			"Producer.ts": readForTest(t, filepath.Join(root, "Producer.ts")),
+			"Consumer.ts": readForTest(t, filepath.Join(root, "Consumer.ts")),
+			"Sibling.ts":  readForTest(t, filepath.Join(root, "Sibling.ts")),
+		}
+
+		output, code := runCohere(t, binary, root, "--fix", "Producer.ts")
+		if code != 0 {
+			t.Fatalf("exit %d:\n%s", code, output)
+		}
+		assertWroteOnlyNamed(t, root, before, "Producer.ts", output)
+		// The withheld repair is named rather than dropped, so a reader knows a fixable finding sits
+		// outside what they asked about.
+		if !strings.Contains(output, "Consumer.ts") || !strings.Contains(output, "not rewritten") {
+			t.Errorf("the withheld repair was not reported:\n%s", output)
+		}
+	})
+
+	// Past the closure limit the whole tree is checked, which used to make the whole tree writable.
+	t.Run("the whole-tree fallback checks everything and writes only the named file", func(t *testing.T) {
+		root := t.TempDir()
+		consumers := map[string]string{}
+		for index := 0; index <= program.DependentClosureLimit; index++ {
+			consumers[filepath.Join("consumers", "Consumer"+itoaForTest(index)+".ts")] =
+				"import { value } from '../Producer';\nexport const used" + itoaForTest(index) + " = value();\n"
+		}
+		fixScopeProject(t, root, consumers)
+		before := map[string]string{
+			"Producer.ts": readForTest(t, filepath.Join(root, "Producer.ts")),
+			"Consumer.ts": readForTest(t, filepath.Join(root, "Consumer.ts")),
+			"Sibling.ts":  readForTest(t, filepath.Join(root, "Sibling.ts")),
+		}
+
+		output, code := runCohere(t, binary, root, "--fix", "Producer.ts")
+		if code != 0 {
+			t.Fatalf("exit %d:\n%s", code, output)
+		}
+		// The premise: this run really did take the fallback. Without it the case would pass on a
+		// closure that stayed inside the limit and prove nothing about the fallback.
+		if !strings.Contains(output, "so the whole tree is checked") {
+			t.Fatalf("the fixture did not reach the whole-tree fallback:\n%s", output)
+		}
+		assertWroteOnlyNamed(t, root, before, "Producer.ts", output)
+	})
+
+	// `--changed` is the other scope a caller states, and the same boundary holds: the changed file
+	// is written, a committed consumer that imports it is checked and left alone.
+	t.Run("--changed writes only the changed file", func(t *testing.T) {
+		root := t.TempDir()
+		makeFixtureRepository(t, root)
+		fixScopeProject(t, root, nil)
+		clean := "export function value(): number {\n    return 1;\n}\n"
+		writeTree(t, root, map[string]string{"Producer.ts": clean})
+		gitIn(t, root, "add", ".")
+		gitIn(t, root, "commit", "--quiet", "-m", "fixture")
+
+		writeTree(t, root, map[string]string{"Producer.ts": "export function value(): number {\n    debugger;\n    return 1;\n}\n"})
+		before := map[string]string{
+			"Producer.ts": readForTest(t, filepath.Join(root, "Producer.ts")),
+			"Consumer.ts": readForTest(t, filepath.Join(root, "Consumer.ts")),
+			"Sibling.ts":  readForTest(t, filepath.Join(root, "Sibling.ts")),
+		}
+
+		output, code := runCohere(t, binary, root, "--fix", "--changed")
+		if code != 0 {
+			t.Fatalf("exit %d:\n%s", code, output)
+		}
+		assertWroteOnlyNamed(t, root, before, "Producer.ts", output)
+	})
+
+	// The control on the boundary: with nothing named, the whole project is the caller's, and every
+	// file with a repair is written as it always was.
+	t.Run("with nothing named, every repair lands", func(t *testing.T) {
+		root := t.TempDir()
+		fixScopeProject(t, root, nil)
+
+		output, code := runCohere(t, binary, root, "--fix")
+		if code != 0 {
+			t.Fatalf("exit %d:\n%s", code, output)
+		}
+		for _, name := range []string{"Producer.ts", "Consumer.ts", "Sibling.ts"} {
+			if strings.Contains(readForTest(t, filepath.Join(root, name)), "debugger") {
+				t.Errorf("%s kept its violation on a run that named nothing:\n%s", name, output)
+			}
+		}
+	})
+}

@@ -68,10 +68,26 @@ func Count() int {
 // A rule that registers no decoder takes no options, which is the common case, and the config layer
 // refuses any option written for it. Which decoder a rule registers is its arity: Decode for one
 // option element, DecodeOptionList for upstream's multi-element `context.options`.
+//
+// This form knows no base, so a rule whose options name a place on disk can only take an absolute
+// path from it and refuses a relative or absent one by name. The command uses OptionsAt.
 func Options() configuration.OptionsRegistry {
+	return OptionsAt(rule.OptionsBase{})
+}
+
+// OptionsAt is Options for a run that knows where its config lives and which project it checks, so a
+// rule registered with DecodeAt can anchor a relative path, or default an absent one, rather than
+// matching nothing.
+func OptionsAt(base rule.OptionsBase) configuration.OptionsRegistry {
 	options := configuration.OptionsRegistry{}
 	for _, registration := range rule.Registered() {
 		switch {
+		case registration.DecodeAt != nil:
+			decodeAt := registration.DecodeAt
+			options[registration.Rule.Name] = configuration.RuleOptions{
+				Decode:   func(raw json.RawMessage) (any, error) { return decodeAt(raw, base) },
+				Required: registration.RequiresOptions,
+			}
 		case registration.DecodeOptionList != nil:
 			decodeList := registration.DecodeOptionList
 			options[registration.Rule.Name] = configuration.RuleOptions{

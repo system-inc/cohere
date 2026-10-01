@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -33,6 +35,7 @@ func applyProposedFixes(
 	rules []rule.Rule,
 	transform edit.Transform,
 	formatCandidates []string,
+	writable formatScope,
 	maxPasses int,
 ) (edit.Summary, program.Result, error) {
 	// This walk is the run's FIRST walk over the program, and it is returned so the lint phase can
@@ -56,12 +59,23 @@ func applyProposedFixes(
 
 	// Group proposals by the file they belong to. A diagnostic carries its source file, so the
 	// grouping is exact rather than inferred from a range.
+	//
+	// A proposal in a file outside the write scope is withheld here, before the file can become a
+	// candidate. projectFiles is what this run checks, and that set grows past what the caller stated:
+	// importers of a named file, or the whole tree past the closure limit. Checking them is honest;
+	// rewriting them is not, because nobody asked for those files to change. The finding still
+	// reaches the lint phase, so a withheld repair is reported rather than lost.
 	byFileName := map[string][]edit.Proposal{}
+	withheld := map[string]struct{}{}
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.SourceFile == nil || len(diagnostic.Fixes) == 0 {
 			continue
 		}
 		fileName := diagnostic.SourceFile.FileName()
+		if !writable.Everything && !writable.includes(filepath.Clean(fileName)) {
+			withheld[fileName] = struct{}{}
+			continue
+		}
 		for _, proposed := range diagnostic.Fixes {
 			byFileName[fileName] = append(byFileName[fileName], edit.Proposal{
 				RuleName: diagnostic.RuleName,
@@ -69,6 +83,7 @@ func applyProposedFixes(
 			})
 		}
 	}
+	reportWithheld(withheld, writable)
 
 	// The file set is the union of "something proposed a fix here" and "this file can be formatted",
 	// and the union rather than the intersection is the whole point. Fixing is driven by findings, so
@@ -90,6 +105,10 @@ func applyProposedFixes(
 	// enumerates TypeScript by construction, so a `.css` was never a candidate, and the coverage line
 	// could not even report it as skipped. The scope already holds the right set, walked from the
 	// project root with the ignore layers applied and filtered by what the engine handles.
+	//
+	// These are not filtered against the write scope, because the caller already built the format
+	// scope from it: a run with stated paths formats exactly those paths. A second filter here would
+	// answer the same question twice and make neither answer observable.
 	for _, fileName := range formatCandidates {
 		candidates[fileName] = struct{}{}
 	}
@@ -142,6 +161,45 @@ func applyProposedFixes(
 	}
 
 	return edit.Summarize(results), result, nil
+}
+
+// reportWithheld names the files whose repairs were withheld because they sit outside what the
+// caller stated.
+//
+// Named rather than counted, and capped so a whole-tree fallback over thousands of files stays one
+// readable note. Silence here would let a reader believe the run repaired everything it could, when
+// the files it checked beyond the stated scope still carry fixable findings.
+func reportWithheld(withheld map[string]struct{}, writable formatScope) {
+	if len(withheld) == 0 {
+		return
+	}
+	names := make([]string, 0, len(withheld))
+	for fileName := range withheld {
+		names = append(names, fileName)
+	}
+	sort.Strings(names)
+
+	const shown = 5
+	listed := names
+	if len(listed) > shown {
+		listed = listed[:shown]
+	}
+	more := ""
+	if len(names) > shown {
+		more = fmt.Sprintf(" and %d more", len(names)-shown)
+	}
+
+	stated := writable.RequestDescription
+	if stated == "" {
+		stated = writable.Description
+	}
+	verb := "were"
+	if len(names) == 1 {
+		verb = "was"
+	}
+	fmt.Fprintf(os.Stderr,
+		"note: %d file%s outside %s had fixable findings and %s not rewritten, because only what was stated is written: %s%s\n",
+		len(names), plural(len(names)), stated, verb, strings.Join(listed, ", "), more)
 }
 
 // proposalsForText re-runs the rules against rewritten text.

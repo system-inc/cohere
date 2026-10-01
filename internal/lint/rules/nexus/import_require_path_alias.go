@@ -1,6 +1,9 @@
 package nexus
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,13 +28,99 @@ type ImportRequirePathAliasOptions struct {
 	// StrictRoots are directories where every relative import is reported, not only the deep ones.
 	StrictRoots []string
 
-	// RepositoryRoot is the absolute path the aliases are relative to.
+	// RepositoryRoot is the directory the aliases are relative to, absolute by the time the rule runs.
 	//
 	// The TypeScript original reads process.cwd() here. That makes the rule's verdict depend on
 	// where the linter was invoked from, which is the same latent defect boundary-no-internal-import
 	// carried: correct from the repository root, silently inert anywhere else. Passing the root
 	// explicitly makes the dependency visible and testable.
+	//
+	// In a config it may be relative, resolving against the config file's directory, or absent,
+	// defaulting to the project root cohere discovered. See decodeImportRequirePathAliasOptions.
 	RepositoryRoot string
+}
+
+// decodeImportRequirePathAliasOptions decodes the options and settles the root before any file runs.
+//
+// The root used to be taken as written, and a committed absolute path is right on one machine in one
+// checkout. In every worktree and on every other machine no file sits under it, so the rule declined
+// every file and reported nothing, which is indistinguishable from a tree with no deep imports. ahra
+// pinned `/Users/kirkouimet/Projects/ahra` and the rule went dark in each of its worktrees.
+//
+// So the root is anchored the way a tsconfig anchors its paths: a relative one resolves against the
+// directory of the config that wrote it, and an absent one is the project root. Whatever comes out
+// must be a directory that exists. A root that names nothing, or that this decoder has no base to
+// resolve, is refused by name, because refusing here is the only alternative to the silence.
+func decodeImportRequirePathAliasOptions(raw []byte, base rule.OptionsBase) (any, error) {
+	decoded, err := rule.DecodeOptionsInto[ImportRequirePathAliasOptions]()(raw)
+	if err != nil {
+		return nil, err
+	}
+	settings := decoded.(ImportRequirePathAliasOptions)
+
+	root := settings.RepositoryRoot
+	switch {
+	case root == "":
+		if base.ProjectRoot == "" {
+			return nil, fmt.Errorf("repositoryRoot is absent and no project root is known to default it to, " +
+				"so the rule could not tell which files its aliases describe. Write repositoryRoot, relative " +
+				"to the config file, such as \".\"")
+		}
+		root = base.ProjectRoot
+
+	case !filepath.IsAbs(root):
+		if base.ConfigDirectory == "" {
+			return nil, fmt.Errorf("repositoryRoot %q is relative and the config's directory is not known, "+
+				"so there is nothing to resolve it against", root)
+		}
+		root = filepath.Join(base.ConfigDirectory, root)
+	}
+	root = filepath.Clean(root)
+
+	information, statError := os.Stat(root)
+	if statError != nil {
+		return nil, fmt.Errorf("repositoryRoot %q resolves to %s, which cannot be read (%v), so no file "+
+			"would be inside it and the rule would report nothing", settings.RepositoryRoot, root, statError)
+	}
+	if !information.IsDir() {
+		return nil, fmt.Errorf("repositoryRoot %q resolves to %s, which is a file rather than a directory, "+
+			"so no file would be inside it and the rule would report nothing", settings.RepositoryRoot, root)
+	}
+
+	// Existing is not enough, and the worktree is why. In an ahra worktree the pinned
+	// `/Users/kirkouimet/Projects/ahra` exists, it is just another checkout, so not one file this run
+	// checks is under it. A root is useful only if it holds the project or sits inside it; a root
+	// beside the project makes the rule inert for every file it is handed.
+	if base.ProjectRoot != "" && !pathsNest(root, base.ProjectRoot) {
+		return nil, fmt.Errorf("repositoryRoot %q resolves to %s, which neither holds nor sits inside the "+
+			"project at %s, so no file checked here would be inside it and the rule would report nothing. "+
+			"A path pinned on one machine is another checkout in a worktree; write it relative to the "+
+			"config file, such as \".\"", settings.RepositoryRoot, root, base.ProjectRoot)
+	}
+
+	settings.RepositoryRoot = root
+	return settings, nil
+}
+
+// pathsNest reports whether one directory holds the other, either way round, or they are the same.
+//
+// Compared as written first and then with symlinks resolved, because one side can arrive through a
+// link the other did not take (macOS spells its temporary directories both /var and /private/var),
+// and refusing a root over a spelling would be a false alarm on a correct config.
+func pathsNest(first string, second string) bool {
+	nests := func(outer string, inner string) bool {
+		relative, err := filepath.Rel(outer, inner)
+		return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
+	}
+	if nests(first, second) || nests(second, first) {
+		return true
+	}
+	resolvedFirst, firstError := filepath.EvalSymlinks(first)
+	resolvedSecond, secondError := filepath.EvalSymlinks(second)
+	if firstError != nil || secondError != nil {
+		return false
+	}
+	return nests(resolvedFirst, resolvedSecond) || nests(resolvedSecond, resolvedFirst)
 }
 
 func messageUseAlias(importPath string, levels int, suggestion string) rule.Message {

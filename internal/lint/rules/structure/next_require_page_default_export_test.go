@@ -69,6 +69,30 @@ func TestNextRequirePageDefaultExportFires(t *testing.T) {
 			"export default class Settings {\n    render() { return null; }\n}\n",
 			[]string{"pageDefaultExportNameSuffix"},
 		},
+		// The specifier spelling of the separate-statement form. The function is declared in this
+		// file, so it could carry the export itself, and the name is this file's to choose.
+		{
+			"a local function exported as default through a specifier",
+			"function Settings() {\n    return null;\n}\nexport { Settings as default };\n",
+			[]string{"pageDefaultExportInline", "pageDefaultExportNameSuffix"},
+		},
+		{
+			"a correctly named local function exported as default through a specifier",
+			"function SettingsPageRoute() {\n    return null;\n}\nexport { SettingsPageRoute as default };\n",
+			[]string{"pageDefaultExportInline"},
+		},
+		// A type-only re-export carries no value, so Next still finds no page. Counting it would
+		// turn the specifier support into a way to silence a missing route.
+		{
+			"a type-only default re-export",
+			"export type { SettingsPage as default } from './SettingsPage';\n",
+			[]string{"pageRequireDefaultExport"},
+		},
+		{
+			"a type-only default specifier",
+			"export { type SettingsPage as default } from './SettingsPage';\n",
+			[]string{"pageRequireDefaultExport"},
+		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -128,6 +152,50 @@ func TestNextRequirePageDefaultExportStaysSilent(t *testing.T) {
 			pageFile,
 			"export function SettingsPageRoute() { return null; }\n" +
 				"export default function OtherPageRoute() { return null; }\n",
+		},
+		// Re-exported defaults, which Next resolves exactly as it resolves a declared one. Both are
+		// real pages, verbatim: www-phi-health has 78 page files in these two shapes and the rule
+		// reported every one of them as having no default export.
+		{
+			"a named page re-exported as default (www-phi-health app/ops/analytics/sessions/page.tsx)",
+			pageFile,
+			"// Dependencies - Frameworks\nimport type { Metadata } from 'next';\n\n" +
+				"// Next.js Metadata\nexport function generateMetadata(): Metadata {\n    return {\n" +
+				"        title: 'Sessions • Analytics • Ops',\n    };\n}\n\n" +
+				"// Shim the default export from Structure\n" +
+				"export { AnalyticsSessionsPage as default } from '@structure/source/modules/engagement/ops/sessions/AnalyticsSessionsPage';\n",
+		},
+		{
+			"another page's default re-exported (www-phi-health app/(main-layout)/research/page.tsx)",
+			pageFile,
+			"// Next.js Metadata\nexport function generateMetadata() {\n    return {\n        title: 'Research',\n    };\n}\n\n" +
+				"export { default } from './subscribe/page';\n",
+		},
+		// An imported binding exported as default. Its declaration is in another module, so it cannot
+		// be moved onto a declaration here and its name is not this file's to choose. Reporting
+		// either would demand an edit this file cannot make.
+		{
+			"a default import exported as default",
+			pageFile,
+			"import SettingsPage from '@structure/source/modules/account/SettingsPage';\n\nexport default SettingsPage;\n",
+		},
+		{
+			"a named import exported as default",
+			pageFile,
+			"import { SettingsPage } from '@structure/source/modules/account/SettingsPage';\n\nexport default SettingsPage;\n",
+		},
+		{
+			"a named import exported as default through a specifier",
+			pageFile,
+			"import { SettingsPage } from '@structure/source/modules/account/SettingsPage';\n\nexport { SettingsPage as default };\n",
+		},
+		// A wrapped component has no declaration to carry the export and no name of its own, so
+		// neither repair applies. ESLint's original reports neither; this rule used to report the
+		// inline form, asking for `export default function` on a call.
+		{
+			"a default export of a call",
+			pageFile,
+			"import { memo } from 'react';\nfunction SettingsPageRoute() {\n    return null;\n}\nexport default memo(SettingsPageRoute);\n",
 		},
 	}
 	for _, testCase := range cases {

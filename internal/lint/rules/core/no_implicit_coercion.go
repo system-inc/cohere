@@ -326,6 +326,197 @@ func noImplicitCoercionResolvesToTheGlobalBoolean(ctx rule.Context, at *ast.Node
 	return true
 }
 
+// noImplicitCoercionRewrite is which repair a `!!x` can take without changing what the program means
+// to the compiler.
+type noImplicitCoercionRewrite int
+
+const (
+	noImplicitCoercionRewriteDecline noImplicitCoercionRewrite = iota
+	noImplicitCoercionRewriteBoolean
+	noImplicitCoercionRewriteComparison
+)
+
+// noImplicitCoercionNarrowingRewrite chooses the repair for `!!x` that keeps TypeScript's narrowing.
+//
+// `Boolean(x)` evaluates to what `!!x` evaluates to, which is the whole of upstream's argument for
+// the fix, and it is not the whole of what the expression means. TypeScript narrows a reference
+// through `!!x` and through a comparison, including through a const that aliases the result, and it
+// does not narrow through a call. So `const hasData = !!data; hasData ? data.energy : 0` compiles and
+// its `Boolean(data)` rewrite is TS18048. That broke www-phi-health's
+// `AppSidebarEnergyBalance.tsx` and seven ahra sites in one morning, each repaired by hand to the
+// comparison this now writes.
+//
+// Three answers, decided by the operand and its type:
+//
+//	not a reference (a call, a literal)            Boolean(x), since nothing there can be narrowed
+//	narrowing changes nothing (string, any, Foo)   Boolean(x), upstream's fix
+//	nullish plus always-truthy (Foo | undefined)   the comparison: x !== undefined, x !== null, or both
+//	anything else (number | undefined, boolean)    declined: reported and suggested, never applied
+//
+// The comparison is chosen only when it is exactly `!!x`: every constituent besides null and
+// undefined must be one no value of which is falsy, so removing the nullish ones is removing every
+// falsy value. A type also holding `0`, `false` or an empty string has no comparison that means `!!x`, and the
+// truthiness narrowing there is visible, so neither rewrite is safe and a person decides.
+func noImplicitCoercionNarrowingRewrite(ctx rule.Context, node *ast.Node, operand *ast.Node) (noImplicitCoercionRewrite, string) {
+	if !noImplicitCoercionIsNarrowableReference(operand) {
+		return noImplicitCoercionRewriteBoolean, ""
+	}
+	if ctx.TypeChecker == nil {
+		return noImplicitCoercionRewriteDecline, ""
+	}
+	operandType := ctx.TypeChecker.GetTypeAtLocation(operand)
+	if operandType == nil {
+		return noImplicitCoercionRewriteDecline, ""
+	}
+
+	hasNull, hasUndefined, hasPossiblyFalsy := false, false, false
+	for _, constituent := range type_checking.UnionTypeParts(operandType) {
+		switch {
+		case type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsAny):
+			// `any` absorbs a union, and truthiness does not narrow it, so nothing can be lost.
+			return noImplicitCoercionRewriteBoolean, ""
+		case type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsUnknown|checker.TypeFlagsInstantiable):
+			// `unknown` narrows to `{}` and a type parameter to `T & {}`, neither expressible as a
+			// comparison and both visible to a later line.
+			return noImplicitCoercionRewriteDecline, ""
+		case type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsNull):
+			hasNull = true
+		case type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsUndefined|checker.TypeFlagsVoid):
+			hasUndefined = true
+		case noImplicitCoercionIsFalsyLiteral(constituent):
+			// `false`, `0` or `''`: truthiness removes it, so the narrowing is visible, and no
+			// comparison against null or undefined removes it.
+			return noImplicitCoercionRewriteDecline, ""
+		case !noImplicitCoercionIsAlwaysTruthy(constituent):
+			// A wide `string`, `number` or `bigint`: truthiness narrows it to itself, so on its own
+			// it costs nothing, and beside a nullish member it rules the comparison out.
+			hasPossiblyFalsy = true
+		}
+	}
+
+	switch {
+	case !hasNull && !hasUndefined:
+		return noImplicitCoercionRewriteBoolean, ""
+	case hasPossiblyFalsy:
+		return noImplicitCoercionRewriteDecline, ""
+	}
+
+	reference := noImplicitCoercionOperandText(ctx, operand)
+	var comparison string
+	switch {
+	case hasNull && hasUndefined:
+		comparison = reference + " !== null && " + reference + " !== undefined"
+	case hasNull:
+		comparison = reference + " !== null"
+	default:
+		comparison = reference + " !== undefined"
+	}
+	if noImplicitCoercionComparisonNeedsParentheses(node) {
+		comparison = "(" + comparison + ")"
+	}
+	return noImplicitCoercionRewriteComparison, comparison
+}
+
+// noImplicitCoercionIsNarrowableReference answers whether TypeScript can narrow this expression.
+//
+// Narrowing applies to references: a name, `this`, and property or element access built on them.
+// Anything else, a call above all, is evaluated fresh wherever it appears, so there is no narrowing
+// for `Boolean(x)` to lose and upstream's fix stands.
+func noImplicitCoercionIsNarrowableReference(node *ast.Node) bool {
+	for node != nil {
+		switch node.Kind {
+		case ast.KindIdentifier, ast.KindThisKeyword, ast.KindSuperKeyword:
+			return true
+		case ast.KindPropertyAccessExpression:
+			node = node.AsPropertyAccessExpression().Expression
+		case ast.KindElementAccessExpression:
+			node = node.AsElementAccessExpression().Expression
+		case ast.KindNonNullExpression:
+			node = node.AsNonNullExpression().Expression
+		case ast.KindParenthesizedExpression:
+			node = node.AsParenthesizedExpression().Expression
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+// noImplicitCoercionIsFalsyLiteral answers whether a type is one falsy literal: `false`, `0`, `-0`,
+// `NaN`, the empty string, or a bigint literal. A bigint literal counts whatever its value, which is the safe
+// direction: it declines a rewrite rather than writing a comparison that might not mean `!!x`.
+func noImplicitCoercionIsFalsyLiteral(candidate *checker.Type) bool {
+	switch {
+	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsBigIntLiteral):
+		return true
+	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsBooleanLiteral|checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral):
+		switch value := candidate.AsLiteralType().Value().(type) {
+		case bool:
+			return !value
+		case string:
+			return value == ""
+		case nil:
+			// A computed enum member, whose value the checker does not hold.
+			return true
+		default:
+			rendered := fmt.Sprint(value)
+			return rendered == "0" || rendered == "-0" || rendered == "NaN"
+		}
+	}
+	return false
+}
+
+// noImplicitCoercionIsAlwaysTruthy answers whether no value of a type is falsy: an object, a symbol,
+// or a truthy literal. An intersection qualifies only when every part does, so a branded primitive
+// such as `number & { unit: 'pixels' }` is still a number that can be zero.
+func noImplicitCoercionIsAlwaysTruthy(candidate *checker.Type) bool {
+	if type_checking.IsIntersectionType(candidate) {
+		for _, part := range candidate.Types() {
+			if !noImplicitCoercionIsAlwaysTruthy(part) {
+				return false
+			}
+		}
+		return true
+	}
+	switch {
+	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsObject|checker.TypeFlagsNonPrimitive|checker.TypeFlagsESSymbolLike):
+		return true
+	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsBooleanLiteral|checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral):
+		return !noImplicitCoercionIsFalsyLiteral(candidate)
+	}
+	return false
+}
+
+// noImplicitCoercionComparisonNeedsParentheses answers whether the comparison must be wrapped where
+// `!!x` stood.
+//
+// `!!x` binds tighter than anything around it, and a comparison does not: `fallback ?? !!x` becomes
+// `fallback ?? x !== null && x !== undefined`, which is a syntax error, and `await !!x` would compare
+// the awaited value. So the comparison goes bare only where the surrounding grammar takes any
+// expression, or where `&&` and `||` would bind looser than it anyway, and is wrapped everywhere else.
+func noImplicitCoercionComparisonNeedsParentheses(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil {
+		return true
+	}
+	switch parent.Kind {
+	case ast.KindVariableDeclaration, ast.KindParenthesizedExpression, ast.KindIfStatement,
+		ast.KindWhileStatement, ast.KindDoStatement, ast.KindForStatement, ast.KindReturnStatement,
+		ast.KindArrowFunction, ast.KindCallExpression, ast.KindNewExpression, ast.KindPropertyAssignment,
+		ast.KindJsxExpression, ast.KindConditionalExpression, ast.KindExpressionStatement,
+		ast.KindArrayLiteralExpression, ast.KindTemplateSpan, ast.KindExportAssignment,
+		ast.KindPropertyDeclaration, ast.KindParameter, ast.KindBindingElement, ast.KindThrowStatement,
+		ast.KindCaseClause, ast.KindSwitchStatement:
+		return false
+	case ast.KindBinaryExpression:
+		switch parent.AsBinaryExpression().OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindEqualsToken, ast.KindCommaToken:
+			return false
+		}
+	}
+	return true
+}
+
 // noImplicitCoercionUnwrapParentheses strips every layer of parentheses.
 //
 // Written as a loop with its own nil check rather than calling `ast.SkipParentheses`, which
@@ -353,10 +544,18 @@ func noImplicitCoercionCheckUnary(ctx rule.Context, node *ast.Node, settings NoI
 		inner := noImplicitCoercionUnwrapParentheses(operand.AsPrefixUnaryExpression().Operand)
 		if inner != nil {
 			recommendation := "Boolean(" + noImplicitCoercionOperandText(ctx, inner) + ")"
-			// The fix is withheld when `Boolean` is not the global, because the rewrite would then
-			// call whatever the name binds to instead. The finding still fires, as a suggestion.
-			booleanIsGlobal := noImplicitCoercionResolvesToTheGlobalBoolean(ctx, node)
-			noImplicitCoercionReport(ctx, node, recommendation, true, booleanIsGlobal)
+			switch rewrite, comparison := noImplicitCoercionNarrowingRewrite(ctx, node, inner); rewrite {
+			case noImplicitCoercionRewriteComparison:
+				noImplicitCoercionReport(ctx, node, comparison, true, true)
+			case noImplicitCoercionRewriteBoolean:
+				// The fix is withheld when `Boolean` is not the global, because the rewrite would
+				// then call whatever the name binds to instead. The finding still fires, as a
+				// suggestion.
+				booleanIsGlobal := noImplicitCoercionResolvesToTheGlobalBoolean(ctx, node)
+				noImplicitCoercionReport(ctx, node, recommendation, true, booleanIsGlobal)
+			default:
+				noImplicitCoercionReport(ctx, node, recommendation, true, false)
+			}
 		}
 	}
 
