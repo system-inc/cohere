@@ -9,6 +9,8 @@ public enum RuleRegistry {
         NoForceCast(),
         NoImplicitlyUnwrappedOptional(),
         NoLongLineComment(),
+        OneTypePerFile(),
+        FileNamedForType(),
     ]
 
     public static let packageRules: [any PackageRule] = [
