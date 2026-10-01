@@ -1,7 +1,9 @@
 package react
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/jsx"
@@ -23,11 +25,16 @@ var jsxNoScriptUrlMessage = rule.Message{
 
 // JsxNoScriptUrlOptions is the decoded option surface.
 //
-// Upstream's schema is an `anyOf` over two positional shapes, which is why this needs a hand-rolled
-// decoder. Both arms are carried:
+// Upstream's schema is an `anyOf` over two positional lists, which is why this needs a hand-rolled
+// decoder:
 //
 //	[[{name, props}], {includeFromSettings}]    the legacy array, optionally followed by the object
 //	[{includeFromSettings}]                     the object alone
+//
+// `includeFromSettings` has no field here. Upstream reads `settings.linkComponents` from ESLint's
+// shared settings when it is true, and cohere has no shared-settings surface, so `true` cannot be
+// honoured and the decoder refuses it by name; `false` is what the rule already does and is
+// accepted.
 type JsxNoScriptUrlOptions struct {
 	// Legacy is the list of component-and-attribute pairs to check, from the array arm.
 	//
@@ -36,15 +43,6 @@ type JsxNoScriptUrlOptions struct {
 	// entry's attribute list, and an entry naming `a` REPLACES the built-in `href` default rather
 	// than adding to it.
 	Legacy []JsxNoScriptUrlComponent
-
-	// IncludeFromSettings is decoded and, faithfully, decides nothing here.
-	//
-	// Upstream reads `settings.linkComponents` from ESLint's shared-settings surface when this is
-	// true. cohere has no shared-settings surface at all, so there is nothing to include from and
-	// the flag has no effect. It is decoded rather than dropped so a configuration written for
-	// upstream parses instead of erroring, and so the divergence is visible at one named field
-	// rather than as a silently rejected key. See the rule doc comment for what this costs.
-	IncludeFromSettings bool
 }
 
 // JsxNoScriptUrlComponent is one component-and-attributes pair from the legacy array.
@@ -67,56 +65,72 @@ type jsxNoScriptUrlWireObject struct {
 	IncludeFromSettings bool `json:"includeFromSettings"`
 }
 
-// DecodeJsxNoScriptUrlOptions turns the configured JSON into the struct the rule reads.
+// DecodeJsxNoScriptUrlOptions turns upstream's option list into the struct the rule reads.
 //
 // Exported so fixtures drive the same path the config drives, which is what puts the positional
 // union under test rather than assumed.
 //
-// The wire shape is cohere's, not upstream's. cohere's config layer strips the severity-and-options
-// tuple and hands the decoder the FIRST option value, but this rule's option surface is POSITIONAL
-// across two slots, which that convention cannot express. So the accepted body wraps upstream's own
-// list under a `positional` key:
+// The rule registers with `DecodeOptionList`, so it is handed upstream's own list:
 //
-//	{"positional": [[{"name": "Foo", "props": ["to"]}], {"includeFromSettings": true}]}
+//	[[{"name": "Foo", "props": ["to"]}], {"includeFromSettings": false}]
 //
-// That is a deliberate divergence in spelling and it is the only one available: a single unwrapped
-// object could not carry the legacy array and the flag at once. The DECISION each element drives is
-// reproduced exactly.
+// The config layer used to hand a decoder the first option element alone, so this decoder read the
+// list from under a cohere-only `{"positional": [...]}` wrapper. The wrapper is gone and refused:
+// it was never upstream's spelling and the config layer no longer needs it.
+//
+// The array arm and the object arm are told apart the way upstream tells them apart, by whether the
+// first element is an array. An object first takes no second element. Each legacy entry and the
+// object are read strictly, a key outside the schema refused, and `includeFromSettings: true` is
+// refused because nothing here can honour it; see JsxNoScriptUrlOptions.
 //
 // A rule configured as a bare severity is handed nil options, and the empty body has to produce
 // upstream's default of the built-in pair alone rather than an error.
-func DecodeJsxNoScriptUrlOptions(raw []byte) (any, error) {
+func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
 	options := JsxNoScriptUrlOptions{}
-	if len(raw) == 0 {
-		return options, nil
-	}
-
-	var wire struct {
-		Positional []json.RawMessage `json:"positional"`
-	}
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	elements, err := rule.OptionElements(list, 2)
+	if err != nil || len(elements) == 0 {
 		return options, err
 	}
 
-	for _, slot := range wire.Positional {
-		// The array arm and the object arm are told apart by trying the array first, which is
-		// upstream's own test on whether the first option is an array.
-		var asArray []jsxNoScriptUrlWireComponent
-		if err := json.Unmarshal(slot, &asArray); err == nil {
-			for _, entry := range asArray {
-				options.Legacy = append(options.Legacy, JsxNoScriptUrlComponent{
-					Name:  entry.Name,
-					Props: entry.Props,
-				})
-			}
-			continue
+	objectElement := elements[0]
+	if bytes.HasPrefix(bytes.TrimSpace(elements[0]), []byte("[")) {
+		var legacy []jsxNoScriptUrlWireComponent
+		if err := jsxNoScriptUrlDecodeStrictly(elements[0], &legacy); err != nil {
+			return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url element 1: %w", err)
 		}
-		var asObject jsxNoScriptUrlWireObject
-		if err := json.Unmarshal(slot, &asObject); err == nil {
-			options.IncludeFromSettings = asObject.IncludeFromSettings
+		for _, entry := range legacy {
+			options.Legacy = append(options.Legacy, JsxNoScriptUrlComponent{
+				Name:  entry.Name,
+				Props: entry.Props,
+			})
 		}
+		if len(elements) < 2 {
+			return options, nil
+		}
+		objectElement = elements[1]
+	} else if len(elements) > 1 {
+		return JsxNoScriptUrlOptions{}, fmt.Errorf(
+			"jsx-no-script-url: an options object first takes no second element, so %s would "+
+				"never be read", elements[1])
+	}
+
+	var object jsxNoScriptUrlWireObject
+	if err := jsxNoScriptUrlDecodeStrictly(objectElement, &object); err != nil {
+		return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url options object: %w", err)
+	}
+	if object.IncludeFromSettings {
+		return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url: includeFromSettings reads " +
+			"ESLint's shared settings, which cohere does not have, so `true` would be accepted and " +
+			"never honoured; list the link components in the first element instead")
 	}
 	return options, nil
+}
+
+// jsxNoScriptUrlDecodeStrictly decodes one element and refuses keys its schema does not declare.
+func jsxNoScriptUrlDecodeStrictly(element json.RawMessage, into any) error {
+	decoder := json.NewDecoder(bytes.NewReader(element))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(into)
 }
 
 // jsxNoScriptUrlIsInterleavingWhitespace reports whether a character may sit BETWEEN the letters of
@@ -229,21 +243,22 @@ func jsxNoScriptUrlLinkComponents(options JsxNoScriptUrlOptions) map[string][]st
 // upstream behaviour. This rule is ported from the authority, which has no such gate, so a `.ts`
 // file holding JSX is examined. A fixture pins that.
 //
-// # The shared-settings half of the option surface has no substrate here, and it costs findings
+// # The shared-settings half of the option surface has no substrate here, and it is refused
 //
 // Upstream reads `settings.linkComponents` from ESLint's shared settings when `includeFromSettings`
 // is true. cohere has no shared-settings surface anywhere, so that half of the rule cannot be
-// expressed and this port answers as though the settings were empty. Measured, this is exactly what
-// it costs on upstream's own corpus:
+// expressed, and a config writing `includeFromSettings: true` is refused at startup rather than
+// accepted and ignored. Measured, this is what the missing surface costs on upstream's own corpus:
 //
-//	valid 9, 10, 11    clean with the settings and clean without them, so imported unchanged
-//	invalid 6, 7       report ONLY because of settings, so silent here
-//	invalid 8          two findings upstream, one here, the settings-supplied one lost
+//	valid 9, 10        no `includeFromSettings: true`, so imported unchanged
+//	valid 11           clean with the settings, and its configuration is now refused
+//	invalid 6, 7       report ONLY because of settings, and their configuration is now refused
+//	invalid 8          two findings upstream, its configuration is now refused
 //
-// Those three are recorded as fixtures at the verdict this port actually produces, with the
-// upstream verdict named beside each, rather than deleted. Deleting them would hide a real gap; the
-// gap is a missing configuration surface, not a defect in the judgment. Anything a user configures
-// through the legacy array is reproduced exactly.
+// Those four are recorded in `TestJsxNoScriptUrlRefusesIncludeFromSettings` with the upstream
+// verdict named beside each, rather than deleted. Deleting them would hide a real gap; the gap is a
+// missing configuration surface, not a defect in the judgment. Anything a user configures through the
+// legacy array is reproduced exactly.
 //
 // # What counts as a value
 //

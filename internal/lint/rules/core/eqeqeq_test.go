@@ -1,7 +1,7 @@
 package core
 
 import (
-	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -48,15 +48,24 @@ func runEqeqeq(t *testing.T, testCase eqeqeqCase) rule_testing.Result {
 	if testCase.options == nil {
 		return rule_testing.Run(t, Eqeqeq, eqeqeqFile, testCase.sourceText)
 	}
-	encoded, err := json.Marshal(testCase.options)
-	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
-	}
-	decoded, err := DecodeEqeqeqOptions(encoded)
+	decoded, err := DecodeEqeqeqOptions([]byte(eqeqeqUpstreamList(testCase.options.(EqeqeqOptions))))
 	if err != nil {
 		t.Fatalf("could not decode options: %v", err)
 	}
 	return rule_testing.RunWithOptions(t, Eqeqeq, eqeqeqFile, testCase.sourceText, decoded)
+}
+
+// eqeqeqUpstreamList writes a case's options the way upstream's config writes them, so every case
+// crosses the decoder on the list shape the config layer delivers rather than on a struct.
+func eqeqeqUpstreamList(options EqeqeqOptions) string {
+	mode := strings.ToLower(string(options.Mode))
+	if mode == "" {
+		mode = "always"
+	}
+	if options.Null == "" {
+		return `["` + mode + `"]`
+	}
+	return `["` + mode + `", {"null": "` + strings.ToLower(string(options.Null)) + `"}]`
 }
 
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
@@ -67,10 +76,11 @@ func runEqeqeq(t *testing.T, testCase eqeqeqCase) rule_testing.Result {
 // findings and all 46 fix outcomes reproduced, so everything below is a measurement rather than a
 // transcription of the `errors` arrays.
 //
-// Upstream's options are a positional array whose legal second element depends on the first
-// (`["always", {null}]` is valid, `["smart", {null}]` is not). Ours are named keys, and the
-// dependency is enforced in the rule body where upstream enforces it. Its deprecated `"allow-null"`
-// spelling is rendered as the combination it stands for, `Always` plus `Null: Ignore`.
+// Upstream's options are a positional list whose legal second element depends on the first
+// (`["always", {null}]` is valid, `["smart", {null}]` is not). Each case below names the struct and
+// `eqeqeqUpstreamList` writes it back as that list, so the decoder reads upstream's spelling. Its
+// deprecated `"allow-null"` spelling is rendered as the combination it stands for, `Always` plus
+// `Null: Ignore`, and `TestDecodeEqeqeqOptions` pins that it decodes to the same.
 func eqeqeqFiresCases() []eqeqeqCase {
 	return []eqeqeqCase{
 		{"a == b", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
@@ -407,12 +417,10 @@ func TestEqeqeqRepairSpansOnlyTheOperator(t *testing.T) {
 	}
 }
 
-// The decoder, which has no upstream counterpart and carries a MODE-DEPENDENT default.
+// The decoder, which reads upstream's option list and carries a MODE-DEPENDENT default.
 //
-// Upstream's schema makes `["smart", {null: ...}]` unwritable. Ours cannot, so the rule discards a
-// null policy written beside Smart, matching `nullOption = config === "always" ? ... : "ignore"`.
-// A fixture that built the options struct directly would leave that line and the rejection of an
-// unknown spelling completely untested.
+// A fixture that built the options struct directly would leave the list reading, the mode-dependent
+// second element, and the rejection of an unknown spelling completely untested.
 func TestDecodeEqeqeqOptions(t *testing.T) {
 	t.Parallel()
 
@@ -427,27 +435,63 @@ func TestDecodeEqeqeqOptions(t *testing.T) {
 		}
 	})
 
-	t.Run("Smart forces the null policy to Ignore", func(t *testing.T) {
-		decoded, err := DecodeEqeqeqOptions([]byte(`{"mode":"Smart","null":"Never"}`))
+	t.Run("the second element is read: always plus null ignore", func(t *testing.T) {
+		decoded, err := DecodeEqeqeqOptions([]byte(`["always", {"null": "ignore"}]`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if settings := decoded.(EqeqeqOptions).resolve(); settings.null != EqeqeqNullIgnore {
-			t.Errorf("null policy resolved to %q beside Smart, wanted Ignore", settings.null)
+		if settings := decoded.(EqeqeqOptions).resolve(); settings.mode != EqeqeqAlways ||
+			settings.null != EqeqeqNullIgnore {
+			t.Errorf("resolved to %+v, wanted Always and Ignore", settings)
+		}
+	})
+
+	t.Run("allow-null is always plus null ignore, as upstream reads it", func(t *testing.T) {
+		decoded, err := DecodeEqeqeqOptions([]byte(`["allow-null"]`))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if settings := decoded.(EqeqeqOptions).resolve(); settings.mode != EqeqeqAlways ||
+			settings.null != EqeqeqNullIgnore {
+			t.Errorf("resolved to %+v, wanted Always and Ignore", settings)
+		}
+	})
+
+	t.Run("smart takes no second element, so one is refused rather than discarded", func(t *testing.T) {
+		if _, err := DecodeEqeqeqOptions([]byte(`["smart", {"null": "never"}]`)); err == nil {
+			t.Error("a null policy beside smart decoded, and the rule would never read it")
+		}
+	})
+
+	t.Run("a third element is refused", func(t *testing.T) {
+		if _, err := DecodeEqeqeqOptions([]byte(`["always", {"null": "ignore"}, "smart"]`)); err == nil {
+			t.Error("a third element decoded and would have been dropped")
 		}
 	})
 
 	t.Run("an unknown mode is rejected rather than disabling the rule", func(t *testing.T) {
-		// Upstream's own kebab spelling, which is not one of our two modes.
-		if _, err := DecodeEqeqeqOptions([]byte(`{"mode":"always"}`)); err == nil {
-			t.Error("the lowercase spelling decoded; every arm here is selected by equality, so " +
+		// The Go constant's spelling, which is not upstream's.
+		if _, err := DecodeEqeqeqOptions([]byte(`["Always"]`)); err == nil {
+			t.Error("an unrecognized mode decoded; every arm here is selected by equality, so " +
 				"an unrecognized string would report nothing at all")
 		}
 	})
 
 	t.Run("an unknown null policy is rejected", func(t *testing.T) {
-		if _, err := DecodeEqeqeqOptions([]byte(`{"null":"sometimes"}`)); err == nil {
+		if _, err := DecodeEqeqeqOptions([]byte(`["always", {"null": "sometimes"}]`)); err == nil {
 			t.Error("an unrecognized null policy decoded")
+		}
+	})
+
+	t.Run("an unknown key in the second element is rejected", func(t *testing.T) {
+		if _, err := DecodeEqeqeqOptions([]byte(`["always", {"nul": "ignore"}]`)); err == nil {
+			t.Error("a misspelled key decoded, so the null policy it carried would be ignored")
+		}
+	})
+
+	t.Run("the retired object spelling is rejected", func(t *testing.T) {
+		if _, err := DecodeEqeqeqOptions([]byte(`{"mode":"Smart","null":"Never"}`)); err == nil {
+			t.Error("the pre-list object spelling decoded, which the config layer never delivers")
 		}
 	})
 }

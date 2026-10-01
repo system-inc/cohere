@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -57,31 +58,21 @@ type noInnerDeclarationsSecondOption struct {
 	BlockScopedFunctions *string `json:"blockScopedFunctions"`
 }
 
-// DecodeNoInnerDeclarationsOptions turns the configured value into options.
+// DecodeNoInnerDeclarationsOptions turns upstream's option list into options.
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` for the reason the brief names: one default is
 // TRUE, so a zero-value struct silently inverts the rule and every fixture built from a struct
 // rather than routed through here would pass anyway.
 //
-// The wire shape is upstream's own positional array MINUS the severity, which cohere's config layer
-// has already stripped. A rule written as `["error", "both"]` reaches this as the JSON `"both"`;
-// one written as `["error", "both", {...}]` reaches it as `["both", {...}]`. Both spellings are
-// accepted because both are what the config layer can produce for a two-option rule.
-func DecodeNoInnerDeclarationsOptions(raw []byte) (any, error) {
+// The wire shape is upstream's own positional list minus the severity: the rule registers with
+// `DecodeOptionList`, so `["error", "both", {...}]` reaches this as `["both", {...}]` and
+// `["error", "both"]` as `["both"]`. A key the second element's schema does not declare is refused,
+// which is upstream's `additionalProperties: false`, and so is a third element.
+func DecodeNoInnerDeclarationsOptions(list []byte) (any, error) {
 	settings := DefaultNoInnerDeclarationsSettings()
-	if len(raw) == 0 {
-		return settings, nil
-	}
-
-	// A bare string is the first option alone.
-	var single string
-	if err := json.Unmarshal(raw, &single); err == nil {
-		return noInnerDeclarationsApplyFirst(settings, single)
-	}
-
-	var positional []json.RawMessage
-	if err := json.Unmarshal(raw, &positional); err != nil {
-		return DefaultNoInnerDeclarationsSettings(), err
+	positional, err := rule.OptionElements(list, 2)
+	if err != nil {
+		return settings, err
 	}
 	if len(positional) > 0 {
 		var first string
@@ -95,9 +86,12 @@ func DecodeNoInnerDeclarationsOptions(raw []byte) (any, error) {
 		settings = applied.(NoInnerDeclarationsOptions)
 	}
 	if len(positional) > 1 {
+		decoder := json.NewDecoder(bytes.NewReader(positional[1]))
+		decoder.DisallowUnknownFields()
 		var second noInnerDeclarationsSecondOption
-		if err := json.Unmarshal(positional[1], &second); err != nil {
-			return DefaultNoInnerDeclarationsSettings(), err
+		if err := decoder.Decode(&second); err != nil {
+			return DefaultNoInnerDeclarationsSettings(),
+				fmt.Errorf("no-inner-declarations element 2: %w", err)
 		}
 		if second.BlockScopedFunctions != nil {
 			switch *second.BlockScopedFunctions {

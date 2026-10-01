@@ -31,7 +31,9 @@ func runNoRestrictedImports(t *testing.T, testCase noRestrictedImportsCase) rule
 	if err != nil {
 		t.Fatalf("could not encode options: %v", err)
 	}
-	decoded, err := DecodeNoRestrictedImportsOptions(encoded)
+	// The struct is upstream's `{paths, patterns}` object form, so the list the config layer hands a
+	// list rule is that object as its one element.
+	decoded, err := DecodeNoRestrictedImportsOptions([]byte("[" + string(encoded) + "]"))
 	if err != nil {
 		t.Fatalf("could not decode options for %q: %v", testCase.sourceText, err)
 	}
@@ -440,17 +442,21 @@ func TestNoRestrictedImportsRejectsContradictoryConfiguration(t *testing.T) {
 		configured string
 		wantError  bool
 	}{
-		{"a path with no name", `{"paths":[{"message":"nope"}]}`, true},
-		{"importNames beside allowImportNames", `{"paths":[{"name":"m","importNames":["a"],"allowImportNames":["b"]}]}`, true},
-		{"a pattern with neither group nor regex", `{"patterns":[{"message":"nope"}]}`, true},
-		{"a pattern with both group and regex", `{"patterns":[{"group":["a"],"regex":"a"}]}`, true},
-		{"importNamePattern beside allowImportNamePattern", `{"patterns":[{"group":["a"],"importNamePattern":"^a","allowImportNamePattern":"^b"}]}`, true},
-		{"an uncompilable regex", `{"patterns":[{"regex":"("}]}`, true},
-		{"a bare string", `"fs"`, false},
-		{"a bare array", `["fs","os"]`, false},
-		{"the object form", `{"paths":["fs"],"patterns":["os/*"]}`, false},
-		{"patterns as bare strings", `{"patterns":["foo/*","!foo/bar"]}`, false},
-		{"a lookahead regex", `{"patterns":[{"regex":"foo/(?!bar)"}]}`, false},
+		{"a path with no name", `[{"paths":[{"message":"nope"}]}]`, true},
+		{"importNames beside allowImportNames", `[{"paths":[{"name":"m","importNames":["a"],"allowImportNames":["b"]}]}]`, true},
+		{"a pattern with neither group nor regex", `[{"patterns":[{"message":"nope"}]}]`, true},
+		{"a pattern with both group and regex", `[{"patterns":[{"group":["a"],"regex":"a"}]}]`, true},
+		{"importNamePattern beside allowImportNamePattern", `[{"patterns":[{"group":["a"],"importNamePattern":"^a","allowImportNamePattern":"^b"}]}]`, true},
+		{"an uncompilable regex", `[{"patterns":[{"regex":"("}]}]`, true},
+		{"a bare string, which the config layer never delivers to a list rule", `"fs"`, true},
+		{"upstream's variadic paths", `["fs","os"]`, false},
+		{"a path object among strings", `["fs",{"name":"os","importNames":["a"]}]`, false},
+		{"the object form with a second element", `[{"paths":["fs"]},"os"]`, true},
+		{"the object form with an unknown key", `[{"paths":["fs"],"pattern":["os/*"]}]`, true},
+		{"the nested workaround spelling", `[["fs","os"]]`, true},
+		{"the object form", `[{"paths":["fs"],"patterns":["os/*"]}]`, false},
+		{"patterns as bare strings", `[{"patterns":["foo/*","!foo/bar"]}]`, false},
+		{"a lookahead regex", `[{"patterns":[{"regex":"foo/(?!bar)"}]}]`, false},
 		{"no options at all", ``, false},
 	}
 	for _, testCase := range cases {
@@ -473,7 +479,7 @@ func TestNoRestrictedImportsRejectsContradictoryConfiguration(t *testing.T) {
 func TestNoRestrictedImportsFoldsPatternsAsStringsIntoOneGroup(t *testing.T) {
 	t.Parallel()
 
-	decoded, err := DecodeNoRestrictedImportsOptions([]byte(`{"patterns":["foo/*","!foo/bar"]}`))
+	decoded, err := DecodeNoRestrictedImportsOptions([]byte(`[{"patterns":["foo/*","!foo/bar"]}]`))
 	if err != nil {
 		t.Fatalf("could not decode: %v", err)
 	}

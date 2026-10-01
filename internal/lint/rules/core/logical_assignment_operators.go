@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -128,32 +129,21 @@ func DefaultLogicalAssignmentOperatorsSettings() LogicalAssignmentOperatorsOptio
 	return LogicalAssignmentOperatorsOptions{Require: &always}
 }
 
-// DecodeLogicalAssignmentOperatorsOptions turns the configured value into options.
+// DecodeLogicalAssignmentOperatorsOptions turns upstream's option list into options.
 //
-// Upstream's schema is a two-element positional array whose first element is a string and whose
-// second is an object, and whose `never` arm forbids the second element entirely. cohere's config
-// layer strips the severity from the head of the tuple and hands the decoder what remains, so the
-// wire value here is the positional array itself rather than a single object. That is why this is
-// hand-rolled rather than `rule.DecodeOptionsInto`: the generic helper decodes one object, and the
-// default is not the zero value.
+// Upstream's schema is a two-element positional list whose first element is a string and whose
+// second is an object, and whose `never` arm forbids the second element entirely. The rule registers
+// with `DecodeOptionList`, so the list arrives whole. That is why this is hand-rolled rather than
+// `rule.DecodeOptionsInto`: the generic helper decodes one object, and the default is not the zero
+// value.
 //
 // An unrecognised mode is an error rather than a quiet fallback, because falling back would
-// enforce a mode nobody asked for and say nothing about it.
-func DecodeLogicalAssignmentOperatorsOptions(raw []byte) (any, error) {
-	if len(raw) == 0 {
-		return DefaultLogicalAssignmentOperatorsSettings(), nil
-	}
-
-	// The positional array. A bare string is also accepted, because a config writing just
-	// `"never"` means the same thing and refusing it would be a spelling rule rather than a
-	// judgment.
-	var positional []json.RawMessage
-	if err := json.Unmarshal(raw, &positional); err != nil {
-		var configured string
-		if stringErr := json.Unmarshal(raw, &configured); stringErr != nil {
-			return DefaultLogicalAssignmentOperatorsSettings(), err
-		}
-		positional = []json.RawMessage{raw}
+// enforce a mode nobody asked for and say nothing about it. So is a key the second element's schema
+// does not declare, and a third element.
+func DecodeLogicalAssignmentOperatorsOptions(list []byte) (any, error) {
+	positional, err := rule.OptionElements(list, 2)
+	if err != nil {
+		return DefaultLogicalAssignmentOperatorsSettings(), err
 	}
 
 	settings := DefaultLogicalAssignmentOperatorsSettings()
@@ -185,11 +175,14 @@ func DecodeLogicalAssignmentOperatorsOptions(raw []byte) (any, error) {
 			fmt.Errorf("logical-assignment-operators takes no options beside \"never\"")
 	}
 
+	decoder := json.NewDecoder(bytes.NewReader(positional[1]))
+	decoder.DisallowUnknownFields()
 	var extra struct {
 		EnforceForIfStatements *bool `json:"enforceForIfStatements"`
 	}
-	if err := json.Unmarshal(positional[1], &extra); err != nil {
-		return DefaultLogicalAssignmentOperatorsSettings(), err
+	if err := decoder.Decode(&extra); err != nil {
+		return DefaultLogicalAssignmentOperatorsSettings(),
+			fmt.Errorf("logical-assignment-operators element 2: %w", err)
 	}
 	if extra.EnforceForIfStatements != nil {
 		settings.EnforceForIfStatements = *extra.EnforceForIfStatements

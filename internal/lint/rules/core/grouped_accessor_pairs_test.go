@@ -361,6 +361,7 @@ func TestDecodeGroupedAccessorPairsOptions(t *testing.T) {
 		{"an explicit anyOrder", `["anyOrder"]`, "anyOrder"},
 		{"getBeforeSet", `["getBeforeSet"]`, "getBeforeSet"},
 		{"setBeforeGet", `["setBeforeGet"]`, "setBeforeGet"},
+		{"a second element at its default is accepted", `["setBeforeGet", {"enforceForTSTypes": false}]`, "setBeforeGet"},
 	}
 
 	for _, testCase := range cases {
@@ -388,7 +389,16 @@ func TestDecodeGroupedAccessorPairsOptions(t *testing.T) {
 func TestDecodeGroupedAccessorPairsOptionsRefusesAValueOutsideTheEnum(t *testing.T) {
 	t.Parallel()
 
-	for _, raw := range []string{`["sideways"]`, `["GetBeforeSet"]`, `[""]`, `[123]`} {
+	for _, raw := range []string{
+		`["sideways"]`, `["GetBeforeSet"]`, `[""]`, `[123]`,
+		// A bare string, which the config layer never delivers to a list rule.
+		`"getBeforeSet"`,
+		// The second element: the one key it has is not implemented, so true is refused, and an
+		// unknown key and a third element are refused the way upstream's schema refuses them.
+		`["getBeforeSet", {"enforceForTSTypes": true}]`,
+		`["getBeforeSet", {"enforceForTypes": false}]`,
+		`["getBeforeSet", {"enforceForTSTypes": false}, "anyOrder"]`,
+	} {
 		t.Run(raw, func(t *testing.T) {
 			if _, err := DecodeGroupedAccessorPairsOptions(json.RawMessage(raw)); err == nil {
 				t.Errorf("the decoder accepted %s, which is outside upstream's enum", raw)

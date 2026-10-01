@@ -8,12 +8,12 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // concurrent port has to edit, so two ports landing at once conflict on a file neither is really
 // changing.
 //
-// The Decode entry names the rule's own decoder, and here that is required rather than defensive: the
-// option wire shape is a positional array whose first element is a bare mode string, which the
-// generic struct decoder cannot express at all.
+// DecodeOptionList rather than Decode, because upstream's option surface is a positional list whose
+// first element is a bare mode string and whose second carries `ignoreForLoopInit`:
+// `["error", "never", {"ignoreForLoopInit": true}]`. The generic struct decoder cannot express that.
 func init() {
 	rule.Register(rule.Registration{
-		Rule:   InitDeclarations,
-		Decode: DecodeInitDeclarationsOptions,
+		Rule:             InitDeclarations,
+		DecodeOptionList: DecodeInitDeclarationsOptions,
 	})
 }

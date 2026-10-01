@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -29,7 +30,7 @@ func TestRequiredOptionsFailLoudlyWhenAbsent(t *testing.T) {
 		t.Fatal("a required option was absent and no error was raised, so the rule would decline every file in silence")
 	}
 
-	decoded, err := registry.Decode("guard", json.RawMessage(`{"libraryDirectory":"/libraries/structure/"}`))
+	decoded, err := registry.Decode("guard", []json.RawMessage{json.RawMessage(`{"libraryDirectory":"/libraries/structure/"}`)})
 	if err != nil {
 		t.Fatalf("valid options failed to decode: %v", err)
 	}
@@ -60,12 +61,94 @@ func TestTuningOptionsFallBackToDefaults(t *testing.T) {
 
 // TestARuleWithNoDecoderGetsNil keeps the common case cheap: most rules take no options at all.
 func TestARuleWithNoDecoderGetsNil(t *testing.T) {
-	decoded, err := OptionsRegistry{}.Decode("plain", json.RawMessage(`{"ignored":true}`))
+	decoded, err := OptionsRegistry{}.Decode("plain", nil)
 	if err != nil {
-		t.Fatalf("a rule with no decoder errored: %v", err)
+		t.Fatalf("a rule with no decoder errored on a bare severity: %v", err)
 	}
 	if decoded != nil {
 		t.Fatalf("expected nil for a rule that takes no options, got %+v", decoded)
+	}
+}
+
+// TestARuleWithNoDecoderRefusesAnOption is the other half. This used to answer nil for
+// `{"ignored":true}`, and the key name was the defect stated as a fixture: an option written for a
+// rule that reads none was accepted and had no effect.
+func TestARuleWithNoDecoderRefusesAnOption(t *testing.T) {
+	_, err := OptionsRegistry{}.Decode("plain", []json.RawMessage{json.RawMessage(`{"ignored":true}`)})
+	if err == nil {
+		t.Fatal("an option given to a rule that takes none was accepted and would never be read")
+	}
+	for _, want := range []string{"plain", `element 1 {"ignored":true}`} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal does not name %q, so the author cannot tell what to remove: %v", want, err)
+		}
+	}
+}
+
+/*
+ * A second element given to a rule that takes one is refused, naming the rule and the element.
+ *
+ * This is the guard for every rule with a single-element decoder, which is most of them. Before it,
+ * `["error", {...}, {...}]` handed the decoder the first object, dropped the second, loaded clean and
+ * ran. The guard lives in the config layer rather than in each decoder because a decoder never sees
+ * the list it was sliced from, which is the boundary PortingARule.md section 7c is about.
+ */
+func TestASecondElementOnASingleElementRuleIsRefused(t *testing.T) {
+	registry := OptionsRegistry{"tunable": {Decode: DecodeInto[tuningOptions]()}}
+
+	_, err := registry.Decode("tunable", []json.RawMessage{
+		json.RawMessage(`{"maximumLineCount": 3}`),
+		json.RawMessage(`{"enforceForRenamedProperties": true}`),
+	})
+	if err == nil {
+		t.Fatal("a second option element was accepted by a rule that reads one, so it was dropped in silence")
+	}
+	for _, want := range []string{"tunable", `element 2 {"enforceForRenamedProperties": true}`} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal does not name %q: %v", want, err)
+		}
+	}
+
+	// The control: the same rule with only its first element decodes, so the refusal above is about
+	// the count and not about the first element.
+	decoded, err := registry.Decode("tunable", []json.RawMessage{json.RawMessage(`{"maximumLineCount": 3}`)})
+	if err != nil {
+		t.Fatalf("one element on a one-element rule was refused: %v", err)
+	}
+	if decoded.(tuningOptions).MaximumLineCount != 3 {
+		t.Fatalf("the single element did not reach the decoder: %+v", decoded)
+	}
+}
+
+// TestAListRuleReceivesEveryElement pins what DecodeList is handed: every element, as one JSON
+// array, in the order written. And nothing at all for a bare severity, so the rule's own defaults
+// apply.
+func TestAListRuleReceivesEveryElement(t *testing.T) {
+	var received []string
+	registry := OptionsRegistry{"listed": {DecodeList: func(raw json.RawMessage) (any, error) {
+		received = append(received, string(raw))
+		return string(raw), nil
+	}}}
+
+	if _, err := registry.Decode("listed", []json.RawMessage{
+		json.RawMessage(`"always"`),
+		json.RawMessage(`{"null": "ignore"}`),
+		json.RawMessage(`"third"`),
+	}); err != nil {
+		t.Fatalf("a list rule refused its elements: %v", err)
+	}
+	if _, err := registry.Decode("listed", nil); err != nil {
+		t.Fatalf("a list rule with a bare severity errored: %v", err)
+	}
+
+	want := []string{`["always",{"null":"ignore"},"third"]`, ``}
+	if len(received) != len(want) {
+		t.Fatalf("decoder called %d times, want %d", len(received), len(want))
+	}
+	for index := range want {
+		if received[index] != want[index] {
+			t.Errorf("call %d received %s, want %s", index, received[index], want[index])
+		}
 	}
 }
 
@@ -74,7 +157,7 @@ func TestARuleWithNoDecoderGetsNil(t *testing.T) {
 func TestMalformedOptionsAreAnError(t *testing.T) {
 	registry := OptionsRegistry{"guard": {Decode: DecodeInto[guardOptions](), Required: true}}
 
-	if _, err := registry.Decode("guard", json.RawMessage(`{"libraryDirectory": 42}`)); err == nil {
+	if _, err := registry.Decode("guard", []json.RawMessage{json.RawMessage(`{"libraryDirectory": 42}`)}); err == nil {
 		t.Fatal("options of the wrong JSON type decoded successfully")
 	}
 }
@@ -116,13 +199,16 @@ func TestTheLiveGuardRuleGetsItsOptions(t *testing.T) {
 		t.Skipf("the live config is not present: %v", err)
 	}
 
-	raw := loaded.Resolve("libraries/structure/source/api/Fetch.ts").RawOptionsFor("boundary-no-project-import")
-	if len(raw) == 0 {
+	elements := loaded.Resolve("libraries/structure/source/api/Fetch.ts").RawOptionsFor("boundary-no-project-import")
+	if len(elements) == 0 {
 		t.Fatal("boundary-no-project-import received no options from the live config, which is the inert-rule defect")
+	}
+	if len(elements) != 1 {
+		t.Fatalf("boundary-no-project-import takes one option element and the live config gives it %d", len(elements))
 	}
 
 	var typed guardOptions
-	if err := json.Unmarshal(raw, &typed); err != nil {
+	if err := json.Unmarshal(elements[0], &typed); err != nil {
 		t.Fatalf("the live options did not decode: %v", err)
 	}
 	if typed.LibraryDirectory != "/libraries/structure/" {

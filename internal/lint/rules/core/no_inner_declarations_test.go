@@ -55,32 +55,32 @@ func TestNoInnerDeclarationsStaysSilent(t *testing.T) {
 		{name: "valid8", source: "function decl(arg) { var fn; if (arg) { fn = function expr() { }; } }", optionsJson: ""},
 		{name: "valid9", source: "function decl(arg) { var fn; if (arg) { fn = function expr() { }; } }", optionsJson: ""},
 		{name: "valid10", source: "if (test) { var foo; }", optionsJson: ""},
-		{name: "valid11", source: "if (test) { let x = 1; }", optionsJson: "\"both\""},
-		{name: "valid12", source: "if (test) { const x = 1; }", optionsJson: "\"both\""},
+		{name: "valid11", source: "if (test) { let x = 1; }", optionsJson: `["both"]`},
+		{name: "valid12", source: "if (test) { const x = 1; }", optionsJson: `["both"]`},
 		// Upstream sets sourceType module for this case; expressed by making the file one.
-		{name: "valid13", source: "export {};\nif (test) { using x = 1; }", optionsJson: "\"both\""},
+		{name: "valid13", source: "export {};\nif (test) { using x = 1; }", optionsJson: `["both"]`},
 		// Upstream sets sourceType module for this case; expressed by making the file one.
-		{name: "valid14", source: "export {};\nif (test) { await using x = 1; }", optionsJson: "\"both\""},
+		{name: "valid14", source: "export {};\nif (test) { await using x = 1; }", optionsJson: `["both"]`},
 		{name: "valid15", source: "function doSomething() { while (test) { var foo; } }", optionsJson: ""},
-		{name: "valid16", source: "var foo;", optionsJson: "\"both\""},
-		{name: "valid17", source: "var foo = 42;", optionsJson: "\"both\""},
-		{name: "valid18", source: "function doSomething() { var foo; }", optionsJson: "\"both\""},
-		{name: "valid19", source: "(function() { var foo; }());", optionsJson: "\"both\""},
+		{name: "valid16", source: "var foo;", optionsJson: `["both"]`},
+		{name: "valid17", source: "var foo = 42;", optionsJson: `["both"]`},
+		{name: "valid18", source: "function doSomething() { var foo; }", optionsJson: `["both"]`},
+		{name: "valid19", source: "(function() { var foo; }());", optionsJson: `["both"]`},
 		{name: "valid20", source: "foo(() => { function bar() { } });", optionsJson: ""},
-		{name: "valid21", source: "var fn = () => {var foo;}", optionsJson: "\"both\""},
-		{name: "valid22", source: "var x = {doSomething() {var foo;}}", optionsJson: "\"both\""},
-		{name: "valid23", source: "export var foo;", optionsJson: "\"both\""},
-		{name: "valid24", source: "export function bar() {}", optionsJson: "\"both\""},
-		{name: "valid25", source: "export default function baz() {}", optionsJson: "\"both\""},
-		{name: "valid26", source: "exports.foo = () => {}", optionsJson: "\"both\""},
-		{name: "valid27", source: "exports.foo = function(){}", optionsJson: "\"both\""},
-		{name: "valid28", source: "module.exports = function foo(){}", optionsJson: "\"both\""},
-		{name: "valid29", source: "class C { method() { function foo() {} } }", optionsJson: "\"both\""},
-		{name: "valid30", source: "class C { method() { var x; } }", optionsJson: "\"both\""},
-		{name: "valid31", source: "class C { static { function foo() {} } }", optionsJson: "\"both\""},
-		{name: "valid32", source: "class C { static { var x; } }", optionsJson: "\"both\""},
+		{name: "valid21", source: "var fn = () => {var foo;}", optionsJson: `["both"]`},
+		{name: "valid22", source: "var x = {doSomething() {var foo;}}", optionsJson: `["both"]`},
+		{name: "valid23", source: "export var foo;", optionsJson: `["both"]`},
+		{name: "valid24", source: "export function bar() {}", optionsJson: `["both"]`},
+		{name: "valid25", source: "export default function baz() {}", optionsJson: `["both"]`},
+		{name: "valid26", source: "exports.foo = () => {}", optionsJson: `["both"]`},
+		{name: "valid27", source: "exports.foo = function(){}", optionsJson: `["both"]`},
+		{name: "valid28", source: "module.exports = function foo(){}", optionsJson: `["both"]`},
+		{name: "valid29", source: "class C { method() { function foo() {} } }", optionsJson: `["both"]`},
+		{name: "valid30", source: "class C { method() { var x; } }", optionsJson: `["both"]`},
+		{name: "valid31", source: "class C { static { function foo() {} } }", optionsJson: `["both"]`},
+		{name: "valid32", source: "class C { static { var x; } }", optionsJson: `["both"]`},
 		{name: "valid33", source: "'use strict' \n if (test) { function doSomething() { } }", optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]"},
-		{name: "valid34", source: "'use strict' \n if (test) { function doSomething() { } }", optionsJson: "\"functions\""},
+		{name: "valid34", source: "'use strict' \n if (test) { function doSomething() { } }", optionsJson: `["functions"]`},
 		{name: "valid35", source: "function foo() {'use strict' \n if (test) { function doSomething() { } } }", optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]"},
 		// Upstream sets sourceType module for this case; expressed by making the file one.
 		{name: "valid36", source: "export {};\nfunction foo() { { function bar() { } } }", optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]"},
@@ -107,33 +107,33 @@ func TestNoInnerDeclarationsFires(t *testing.T) {
 		optionsJson string
 		want        [][2]string
 	}{
-		{name: "invalid0", source: "if (test) { function doSomething() { } }", optionsJson: "\"both\"", want: [][2]string{{"function", "program"}}},
-		{name: "invalid1", source: "if (foo) var a; ", optionsJson: "\"both\"", want: [][2]string{{"variable", "program"}}},
-		{name: "invalid2", source: "if (foo) /* some comments */ var a; ", optionsJson: "\"both\"", want: [][2]string{{"variable", "program"}}},
-		{name: "invalid3", source: "if (foo){ function f(){ if(bar){ var a; } } }", optionsJson: "\"both\"", want: [][2]string{{"function", "program"}, {"variable", "function body"}}},
-		{name: "invalid4", source: "if (foo) function f(){ if(bar) var a; }", optionsJson: "\"both\"", want: [][2]string{{"function", "program"}, {"variable", "function body"}}},
-		{name: "invalid5", source: "if (foo) { var fn = function(){} } ", optionsJson: "\"both\"", want: [][2]string{{"variable", "program"}}},
+		{name: "invalid0", source: "if (test) { function doSomething() { } }", optionsJson: `["both"]`, want: [][2]string{{"function", "program"}}},
+		{name: "invalid1", source: "if (foo) var a; ", optionsJson: `["both"]`, want: [][2]string{{"variable", "program"}}},
+		{name: "invalid2", source: "if (foo) /* some comments */ var a; ", optionsJson: `["both"]`, want: [][2]string{{"variable", "program"}}},
+		{name: "invalid3", source: "if (foo){ function f(){ if(bar){ var a; } } }", optionsJson: `["both"]`, want: [][2]string{{"function", "program"}, {"variable", "function body"}}},
+		{name: "invalid4", source: "if (foo) function f(){ if(bar) var a; }", optionsJson: `["both"]`, want: [][2]string{{"function", "program"}, {"variable", "function body"}}},
+		{name: "invalid5", source: "if (foo) { var fn = function(){} } ", optionsJson: `["both"]`, want: [][2]string{{"variable", "program"}}},
 		{name: "invalid6", source: "if (foo)  function f(){} ", optionsJson: "", want: [][2]string{{"function", "program"}}},
-		{name: "invalid7", source: "function bar() { if (foo) function f(){}; }", optionsJson: "\"both\"", want: [][2]string{{"function", "function body"}}},
-		{name: "invalid8", source: "function bar() { if (foo) var a; }", optionsJson: "\"both\"", want: [][2]string{{"variable", "function body"}}},
-		{name: "invalid9", source: "if (foo) { var a; }", optionsJson: "\"both\"", want: [][2]string{{"variable", "program"}}},
+		{name: "invalid7", source: "function bar() { if (foo) function f(){}; }", optionsJson: `["both"]`, want: [][2]string{{"function", "function body"}}},
+		{name: "invalid8", source: "function bar() { if (foo) var a; }", optionsJson: `["both"]`, want: [][2]string{{"variable", "function body"}}},
+		{name: "invalid9", source: "if (foo) { var a; }", optionsJson: `["both"]`, want: [][2]string{{"variable", "program"}}},
 		{name: "invalid10", source: "function doSomething() { do { function somethingElse() { } } while (test); }", optionsJson: "", want: [][2]string{{"function", "function body"}}},
 		{name: "invalid11", source: "(function() { if (test) { function doSomething() { } } }());", optionsJson: "", want: [][2]string{{"function", "function body"}}},
-		{name: "invalid12", source: "while (test) { var foo; }", optionsJson: "\"both\"", want: [][2]string{{"variable", "program"}}},
-		{name: "invalid13", source: "function doSomething() { if (test) { var foo = 42; } }", optionsJson: "\"both\"", want: [][2]string{{"variable", "function body"}}},
-		{name: "invalid14", source: "(function() { if (test) { var foo; } }());", optionsJson: "\"both\"", want: [][2]string{{"variable", "function body"}}},
-		{name: "invalid15", source: "const doSomething = () => { if (test) { var foo = 42; } }", optionsJson: "\"both\"", want: [][2]string{{"variable", "function body"}}},
-		{name: "invalid16", source: "class C { method() { if(test) { var foo; } } }", optionsJson: "\"both\"", want: [][2]string{{"variable", "function body"}}},
-		{name: "invalid17", source: "class C { static { if (test) { var foo; } } }", optionsJson: "\"both\"", want: [][2]string{{"variable", "class static block body"}}},
+		{name: "invalid12", source: "while (test) { var foo; }", optionsJson: `["both"]`, want: [][2]string{{"variable", "program"}}},
+		{name: "invalid13", source: "function doSomething() { if (test) { var foo = 42; } }", optionsJson: `["both"]`, want: [][2]string{{"variable", "function body"}}},
+		{name: "invalid14", source: "(function() { if (test) { var foo; } }());", optionsJson: `["both"]`, want: [][2]string{{"variable", "function body"}}},
+		{name: "invalid15", source: "const doSomething = () => { if (test) { var foo = 42; } }", optionsJson: `["both"]`, want: [][2]string{{"variable", "function body"}}},
+		{name: "invalid16", source: "class C { method() { if(test) { var foo; } } }", optionsJson: `["both"]`, want: [][2]string{{"variable", "function body"}}},
+		{name: "invalid17", source: "class C { static { if (test) { var foo; } } }", optionsJson: `["both"]`, want: [][2]string{{"variable", "class static block body"}}},
 		{name: "invalid18", source: "class C { static { if (test) { function foo() {} } } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "class static block body"}}},
-		{name: "invalid19", source: "class C { static { if (test) { if (anotherTest) { var foo; } } } }", optionsJson: "\"both\"", want: [][2]string{{"variable", "class static block body"}}},
+		{name: "invalid19", source: "class C { static { if (test) { if (anotherTest) { var foo; } } } }", optionsJson: `["both"]`, want: [][2]string{{"variable", "class static block body"}}},
 		{name: "invalid21", source: "if (test) { function doSomething() { } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "program"}}},
 		{name: "invalid22", source: "'use strict' \n if (test) { function doSomething() { } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "program"}}},
 		{name: "invalid23", source: "'use strict' \n if (test) { function doSomething() { } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "program"}}},
 		{name: "invalid25", source: "function foo() {'use strict' \n { function bar() { } } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "function body"}}},
 		{name: "invalid26", source: "function foo() {'use strict' \n { function bar() { } } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "function body"}}},
 		{name: "invalid27", source: "function doSomething() { 'use strict' \n do { function somethingElse() { } } while (test); }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "function body"}}},
-		{name: "invalid28", source: "{ function foo () {'use strict' \n console.log('foo called'); } }", optionsJson: "\"both\"", want: [][2]string{{"function", "program"}}},
+		{name: "invalid28", source: "{ function foo () {'use strict' \n console.log('foo called'); } }", optionsJson: `["both"]`, want: [][2]string{{"function", "program"}}},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -166,9 +166,9 @@ func TestNoInnerDeclarationsSpan(t *testing.T) {
 		optionsJson string
 		wantText    string
 	}{
-		{"functionDeclaration", "if (foo) function f(){}", `"both"`, "function f(){}"},
-		{"variableStatement", "if (foo) var a;", `"both"`, "var a;"},
-		{"insideABareBlock", "{ var a; }", `"both"`, "var a;"},
+		{"functionDeclaration", "if (foo) function f(){}", `["both"]`, "function f(){}"},
+		{"variableStatement", "if (foo) var a;", `["both"]`, "var a;"},
+		{"insideABareBlock", "{ var a; }", `["both"]`, "var a;"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -196,8 +196,8 @@ func TestDecodeNoInnerDeclarationsOptions(t *testing.T) {
 		wantBlockScopedFunctions bool
 	}{
 		{"absentMeansFunctionsAndAllow", "", false, true},
-		{"bareFunctions", `"functions"`, false, true},
-		{"bareBoth", `"both"`, true, true},
+		{"bareFunctions", `["functions"]`, false, true},
+		{"bareBoth", `["both"]`, true, true},
 		{"bothWithAllow", `["both", {"blockScopedFunctions": "allow"}]`, true, true},
 		{"bothWithDisallow", `["both", {"blockScopedFunctions": "disallow"}]`, true, false},
 		{"functionsWithDisallow", `["functions", {"blockScopedFunctions": "disallow"}]`, false, false},
@@ -226,7 +226,15 @@ func TestDecodeNoInnerDeclarationsOptions(t *testing.T) {
 		})
 	}
 
-	for _, bad := range []string{`"neither"`, `["both", {"blockScopedFunctions": "maybe"}]`} {
+	for _, bad := range []string{
+		`["neither"]`,
+		`["both", {"blockScopedFunctions": "maybe"}]`,
+		// A bare string, which the config layer never delivers to a list rule.
+		`"both"`,
+		// A key the second element's schema does not declare, and a third element.
+		`["both", {"blockScopedFunction": "allow"}]`,
+		`["both", {"blockScopedFunctions": "allow"}, "functions"]`,
+	} {
 		if _, err := DecodeNoInnerDeclarationsOptions([]byte(bad)); err == nil {
 			t.Errorf("decoding %q should have failed, and a silent fallback to the default would "+
 				"turn a typo into a configuration nobody wrote", bad)

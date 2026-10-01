@@ -32,7 +32,8 @@ func runNoRestrictedProperties(
 		return rule_testing.Run(t, NoRestrictedProperties, noRestrictedPropertiesFile,
 			testCase.sourceText)
 	}
-	encoded, err := json.Marshal(testCase.options)
+	// Written the way upstream's config writes it: each restriction its own element.
+	encoded, err := json.Marshal(testCase.options.(NoRestrictedPropertiesOptions).Restrictions)
 	if err != nil {
 		t.Fatalf("could not encode options: %v", err)
 	}
@@ -50,9 +51,9 @@ func runNoRestrictedProperties(
 // came out as data with its restrictions attached, then replayed against the INSTALLED rule to
 // record what it reports. All 89 reproduced.
 //
-// Upstream's options are a bare positional array of restriction objects; ours carries them under a
-// named key because our config layer has no shape for a top-level array. Each entry keeps upstream's
-// own field names.
+// Upstream's options are a variadic list of restriction objects, one per element. The struct here
+// carries them as a slice and the runner writes that slice back as upstream's list, so each entry
+// keeps upstream's own field names and crosses the decoder on the shape the config layer delivers.
 func noRestrictedPropertiesFiresCases() []noRestrictedPropertiesCase {
 	return []noRestrictedPropertiesCase{
 		{"someObject.disallowedProperty", NoRestrictedPropertiesOptions{Restrictions: []NoRestrictedPropertiesRestriction{{Object: "someObject", Property: "disallowedProperty"}}}, []string{"restrictedObjectProperty"}},
@@ -192,7 +193,7 @@ func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(t *testing.T) {
 	// The control: the same source under a restriction reports, so the silence above is the empty
 	// configuration rather than a rule that cannot fire.
 	decoded, err := DecodeNoRestrictedPropertiesOptions(
-		[]byte(`{"restrictions":[{"object":"foo","property":"bar"}]}`))
+		[]byte(`[{"object":"foo","property":"bar"}]`))
 	if err != nil {
 		t.Fatalf("could not decode options: %v", err)
 	}
@@ -466,22 +467,49 @@ func TestDecodeNoRestrictedPropertiesOptions(t *testing.T) {
 
 	t.Run("an entry naming neither an object nor a property is rejected", func(t *testing.T) {
 		if _, err := DecodeNoRestrictedPropertiesOptions(
-			[]byte(`{"restrictions":[{"message":"nope"}]}`)); err == nil {
+			[]byte(`[{"message":"nope"}]`)); err == nil {
 			t.Error("an entry that can never match anything decoded")
 		}
 	})
 
 	t.Run("object paired with allowObjects is rejected", func(t *testing.T) {
 		if _, err := DecodeNoRestrictedPropertiesOptions(
-			[]byte(`{"restrictions":[{"object":"foo","allowObjects":["bar"]}]}`)); err == nil {
+			[]byte(`[{"object":"foo","allowObjects":["bar"]}]`)); err == nil {
 			t.Error("a self-contradictory pairing decoded")
 		}
 	})
 
 	t.Run("property paired with allowProperties is rejected", func(t *testing.T) {
 		if _, err := DecodeNoRestrictedPropertiesOptions(
-			[]byte(`{"restrictions":[{"property":"foo","allowProperties":["bar"]}]}`)); err == nil {
+			[]byte(`[{"property":"foo","allowProperties":["bar"]}]`)); err == nil {
 			t.Error("a self-contradictory pairing decoded")
+		}
+	})
+
+	t.Run("every element is a restriction, upstream's variadic spelling", func(t *testing.T) {
+		decoded, err := DecodeNoRestrictedPropertiesOptions(
+			[]byte(`[{"object":"foo","property":"bar"},{"property":"__proto__","message":"No."}]`))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		restrictions := decoded.(NoRestrictedPropertiesOptions).Restrictions
+		if len(restrictions) != 2 || restrictions[1].Property != "__proto__" || restrictions[1].Message != "No." {
+			t.Errorf("the second element was not read as a restriction: %+v", restrictions)
+		}
+	})
+
+	t.Run("shapes the config layer does not deliver, or upstream refuses, are rejected", func(t *testing.T) {
+		for _, raw := range []string{
+			// The wrapper this decoder used to read.
+			`{"restrictions":[{"object":"foo"}]}`,
+			// A restriction carrying a key upstream's schema does not declare.
+			`[{"object":"foo","mesage":"x"}]`,
+			// An element that is not a restriction object.
+			`["foo"]`,
+		} {
+			if decoded, err := DecodeNoRestrictedPropertiesOptions([]byte(raw)); err == nil {
+				t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+			}
 		}
 	})
 }

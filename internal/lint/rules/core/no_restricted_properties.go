@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -34,13 +35,14 @@ type NoRestrictedPropertiesRestriction struct {
 
 // NoRestrictedPropertiesOptions is the rule's whole configuration.
 //
-// Upstream's options are a bare positional array of restriction objects rather than a single object,
-// so the entries are carried under a named key here. That is the only shape change; each entry
-// keeps upstream's own field names.
+// Upstream's options are variadic: each restriction object is its own option element,
+// `["error", {"object": "a", "property": "b"}, {"property": "c"}]`. The rule registers with
+// `DecodeOptionList`, so the decoder reads that list, one restriction per element, with upstream's
+// own field names.
 type NoRestrictedPropertiesOptions struct {
 	// Restrictions is the list. Empty means the rule has nothing to enforce and registers nothing,
 	// which is upstream's `if (restrictedCalls.length === 0) return {}`.
-	Restrictions []NoRestrictedPropertiesRestriction `json:"restrictions"`
+	Restrictions []NoRestrictedPropertiesRestriction
 }
 
 // DecodeNoRestrictedPropertiesOptions reads this rule's configuration from the config layer.
@@ -48,13 +50,31 @@ type NoRestrictedPropertiesOptions struct {
 // Hand-rolled so an entry naming neither an object nor a property fails loudly rather than matching
 // everything or nothing silently. Upstream expresses that as a schema `anyOf`, which we have no
 // equivalent for, so the check lives here.
-func DecodeNoRestrictedPropertiesOptions(raw []byte) (any, error) {
+//
+// Every element is one restriction, read strictly: a key upstream's schema does not declare is
+// refused, which is its `additionalProperties: false`, because a misspelled `message` or
+// `allowObjects` would otherwise be accepted and silently have no effect. The `{"restrictions": [...]}`
+// wrapper this decoder used to read, when the config layer could deliver only one element, is gone
+// with it: it was never upstream's spelling.
+func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
 	var options NoRestrictedPropertiesOptions
-	if len(raw) == 0 {
+	if len(list) == 0 {
 		return options, nil
 	}
-	if err := json.Unmarshal(raw, &options); err != nil {
-		return options, err
+	var elements []json.RawMessage
+	if err := json.Unmarshal(list, &elements); err != nil {
+		return options, fmt.Errorf(
+			"no-restricted-properties: the option list is not a JSON array: %w", err)
+	}
+	for index, element := range elements {
+		decoder := json.NewDecoder(bytes.NewReader(element))
+		decoder.DisallowUnknownFields()
+		var restriction NoRestrictedPropertiesRestriction
+		if err := decoder.Decode(&restriction); err != nil {
+			return NoRestrictedPropertiesOptions{}, fmt.Errorf(
+				"no-restricted-properties element %d: %w", index+1, err)
+		}
+		options.Restrictions = append(options.Restrictions, restriction)
 	}
 	for index, restriction := range options.Restrictions {
 		if restriction.Object == "" && restriction.Property == "" {

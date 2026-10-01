@@ -89,49 +89,58 @@ type NoRestrictedImportsOptions struct {
 // which upstream folds into a single entry with all of them as its group.
 type noRestrictedImportsRawPattern = NoRestrictedImportsPattern
 
-// DecodeNoRestrictedImportsOptions reads this rule's configuration from the config layer.
+// DecodeNoRestrictedImportsOptions reads upstream's option list off the config.
 //
-// Hand-rolled because the configured value has four legal shapes that no single struct can accept,
+// Hand-rolled because upstream's schema is an `anyOf` of two LISTS that no single struct can accept,
 // and because three of upstream's schema constraints are cross-field rules with no struct-tag
-// spelling. The shapes, all of which upstream's corpus exercises:
+// spelling. The rule registers with `DecodeOptionList`, so the list arrives whole:
 //
-//	"foo"                              a bare string, one restricted path
-//	[{name: "foo", ...}]               a bare array of path objects
-//	{paths: [...], patterns: [...]}    the object form
-//	{patterns: ["foo/*", "bar"]}       patterns as bare strings, folded into one group entry
+//	["foo", {name: "bar", ...}]           every element a restricted path, a string or an object
+//	[{paths: [...], patterns: [...]}]     exactly one element, the object form
+//	[{patterns: ["foo/*", "bar"]}]        patterns as bare strings, folded into one group entry
 //
-// cohere's config layer strips the severity tuple, so a config writing `["error", "foo", "bar"]`
-// hands this the JSON `["foo", "bar"]`. That is why the bare-array arm reads paths rather than
-// erroring: it is the ordinary path, not a fallback.
-func DecodeNoRestrictedImportsOptions(raw []byte) (any, error) {
+// The object form is recognised the way upstream recognises it, by the first element being an
+// object with a `paths` or `patterns` key. It takes no second element and no other key, so either is
+// refused rather than dropped.
+//
+// The config layer used to keep only the first element after the severity, so upstream's variadic
+// `["error", "foo", "bar"]` arrived here as the bare string "foo" and restricted one module of two.
+func DecodeNoRestrictedImportsOptions(list []byte) (any, error) {
 	var options NoRestrictedImportsOptions
-	if len(raw) == 0 {
+	if len(list) == 0 {
 		return options, nil
 	}
 
-	// The object arm first, and only when it actually carries one of the two keys. An array cannot
-	// decode into a struct, so trying the object shape first cannot swallow the array case, but a
-	// JSON object with neither key would decode into an empty struct and silently discard whatever
-	// it did carry.
+	var elements []json.RawMessage
+	if err := json.Unmarshal(list, &elements); err != nil {
+		return options, fmt.Errorf("no-restricted-imports: the option list is not a JSON array: %w", err)
+	}
+	if len(elements) == 0 {
+		return options, nil
+	}
+
 	var probe map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &probe); err == nil {
+	if err := json.Unmarshal(elements[0], &probe); err == nil {
 		_, hasPaths := probe["paths"]
 		_, hasPatterns := probe["patterns"]
 		if hasPaths || hasPatterns {
+			if len(elements) > 1 {
+				return options, fmt.Errorf(
+					"no-restricted-imports: the {paths, patterns} object takes no second element, "+
+						"so %s would never be read", elements[1])
+			}
+			for key := range probe {
+				if key != "paths" && key != "patterns" {
+					return options, fmt.Errorf(
+						"no-restricted-imports: the {paths, patterns} object has no key %q", key)
+				}
+			}
 			return noRestrictedImportsDecodeObjectForm(probe)
 		}
-		// An object with neither key is a single path entry written inline, which upstream's
-		// corpus writes as `{name: "foo", importNames: [...]}` with no wrapper.
-		var single NoRestrictedImportsPath
-		if err := json.Unmarshal(raw, &single); err != nil {
-			return options, err
-		}
-		options.Paths = []NoRestrictedImportsPath{single}
-		return options, noRestrictedImportsValidate(&options)
 	}
 
-	// A bare string or a bare array of paths.
-	paths, err := noRestrictedImportsDecodePaths(raw)
+	// Every element is a restricted path, a string or a path object.
+	paths, err := noRestrictedImportsDecodePaths(list)
 	if err != nil {
 		return options, err
 	}

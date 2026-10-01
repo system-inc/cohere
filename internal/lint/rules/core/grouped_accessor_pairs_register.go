@@ -11,10 +11,11 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // The decoder is hand-rolled rather than `rule.DecodeOptionsInto`, and this rule is a case that
 // helper cannot serve at all: the first option is a bare string whose default is "anyOrder", so the
-// zero value is the empty string, which matches none of the three arms.
+// zero value is the empty string, which matches none of the three arms. DecodeOptionList rather than
+// Decode, because upstream's schema is a two-element list: `["error", "getBeforeSet", {...}]`.
 func init() {
 	rule.Register(rule.Registration{
-		Rule:   GroupedAccessorPairs,
-		Decode: DecodeGroupedAccessorPairsOptions,
+		Rule:             GroupedAccessorPairs,
+		DecodeOptionList: DecodeGroupedAccessorPairsOptions,
 	})
 }

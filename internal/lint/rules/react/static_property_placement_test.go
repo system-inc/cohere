@@ -155,42 +155,42 @@ func TestStaticPropertyPlacementPositionMatrix(t *testing.T) {
 		{
 			"a static getter under the getter position is correct",
 			"class MyComponent extends React.Component { static get propTypes(){ return {}; } render(){ return null; } }",
-			`"static getter"`, nil,
+			`["static getter"]`, nil,
 		},
 		{
 			"a static getter under the field position reports as a field",
 			"class MyComponent extends React.Component { static get propTypes(){ return {}; } render(){ return null; } }",
-			`"static public field"`, []string{"notStaticClassProp"},
+			`["static public field"]`, []string{"notStaticClassProp"},
 		},
 		{
 			"a non static field under the field position still reports",
 			"class MyComponent extends React.Component { propTypes = {}; render(){ return null; } }",
-			`"static public field"`, []string{"notStaticClassProp"},
+			`["static public field"]`, []string{"notStaticClassProp"},
 		},
 		{
 			"a non static field under the getter position reports as a getter",
 			"class MyComponent extends React.Component { propTypes = {}; render(){ return null; } }",
-			`"static getter"`, []string{"notGetterClassFunc"},
+			`["static getter"]`, []string{"notGetterClassFunc"},
 		},
 		{
 			"a non static field under the assignment position reports as an assignment",
 			"class MyComponent extends React.Component { propTypes = {}; render(){ return null; } }",
-			`"property assignment"`, []string{"declareOutsideClass"},
+			`["property assignment"]`, []string{"declareOutsideClass"},
 		},
 		{
 			"a static field under the assignment position reports",
 			"class MyComponent extends React.Component { static propTypes = {}; render(){ return null; } }",
-			`"property assignment"`, []string{"declareOutsideClass"},
+			`["property assignment"]`, []string{"declareOutsideClass"},
 		},
 		{
 			"displayName is one of the six names",
 			"class MyComponent extends React.Component { static displayName = \"x\"; render(){ return null; } }",
-			`"property assignment"`, []string{"declareOutsideClass"},
+			`["property assignment"]`, []string{"declareOutsideClass"},
 		},
 		{
 			"a NON static getter is silent under the getter position",
 			"class MyComponent extends React.Component { get propTypes(){ return {}; } render(){ return null; } }",
-			`"static getter"`, nil,
+			`["static getter"]`, nil,
 		},
 		{
 			// The two rows below are what make the getter arm's static gate visible. Under the
@@ -199,17 +199,17 @@ func TestStaticPropertyPlacementPositionMatrix(t *testing.T) {
 			// separates a rule that gates from one that does not. Both measured silent upstream.
 			"a NON static getter is silent under the field position too",
 			"class MyComponent extends React.Component { get propTypes(){ return {}; } render(){ return null; } }",
-			`"static public field"`, nil,
+			`["static public field"]`, nil,
 		},
 		{
 			"a NON static getter is silent under the assignment position too",
 			"class MyComponent extends React.Component { get propTypes(){ return {}; } render(){ return null; } }",
-			`"property assignment"`, nil,
+			`["property assignment"]`, nil,
 		},
 		{
 			"a static field with an unrelated name is not judged",
 			"class MyComponent extends React.Component { static other = {}; render(){ return null; } }",
-			`"property assignment"`, nil,
+			`["property assignment"]`, nil,
 		},
 	}
 	for _, testCase := range cases {
@@ -283,7 +283,7 @@ func TestStaticPropertyPlacementAssignmentReceiver(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
-				staticPropertyPlacementDecode(t, `"static public field"`))
+				staticPropertyPlacementDecode(t, `["static public field"]`))
 			if len(testCase.messageIds) == 0 {
 				rule_testing.ExpectClean(t, result)
 				return
@@ -307,7 +307,7 @@ func TestStaticPropertyPlacementMessageText(t *testing.T) {
 		{
 			"the field message names the property",
 			"class MyComponent extends React.Component { propTypes = {}; render(){ return null; } }",
-			`"static public field"`,
+			`["static public field"]`,
 			"notStaticClassProp",
 			"'propTypes' should be declared as a static class property. This file's configuration " +
 				"puts React statics in the class body as static fields, and a reader looking for " +
@@ -316,7 +316,7 @@ func TestStaticPropertyPlacementMessageText(t *testing.T) {
 		{
 			"the getter message names the property",
 			"class MyComponent extends React.Component { defaultProps = {}; render(){ return null; } }",
-			`"static getter"`,
+			`["static getter"]`,
 			"notGetterClassFunc",
 			"'defaultProps' should be declared as a static getter class function. This file's " +
 				"configuration puts React statics in the class body as getters, and a reader " +
@@ -325,7 +325,7 @@ func TestStaticPropertyPlacementMessageText(t *testing.T) {
 		{
 			"the assignment message names the property",
 			"class MyComponent extends React.Component { static displayName = \"x\"; render(){ return null; } }",
-			`"property assignment"`,
+			`["property assignment"]`,
 			"declareOutsideClass",
 			"'displayName' should be declared outside the class body. This file's configuration " +
 				"puts React statics after the class as assignments, and a reader looking for them " +
@@ -365,19 +365,19 @@ func TestStaticPropertyPlacementSpans(t *testing.T) {
 		{
 			"a class field spans the whole member",
 			"class MyComponent extends React.Component { propTypes = {}; render(){ return null; } }",
-			`"static public field"`,
+			`["static public field"]`,
 			"propTypes = {};",
 		},
 		{
 			"a static getter spans the whole member",
 			"class MyComponent extends React.Component { static get propTypes(){ return {}; } render(){ return null; } }",
-			`"static public field"`,
+			`["static public field"]`,
 			"static get propTypes(){ return {}; }",
 		},
 		{
 			"an assignment spans the left side only",
 			"class MyComponent extends React.Component { render(){ return null; } }\nMyComponent.propTypes = {};",
-			`"static public field"`,
+			`["static public field"]`,
 			"MyComponent.propTypes",
 		},
 	}
@@ -400,7 +400,7 @@ func TestStaticPropertyPlacementSpans(t *testing.T) {
 	}
 }
 
-// TestDecodeStaticPropertyPlacementOptions covers the decoder's three accepted shapes.
+// TestDecodeStaticPropertyPlacementOptions covers the decoder's accepted list shapes.
 //
 // This is the port's own code with no upstream counterpart: upstream reads two POSITIONAL options
 // and applies the default lazily per property, while this flattens both into one map at decode
@@ -422,13 +422,6 @@ func TestDecodeStaticPropertyPlacementOptions(t *testing.T) {
 			},
 		},
 		{
-			"a bare string sets the default for every property",
-			`"static getter"`,
-			map[string]StaticPropertyPlacementPosition{
-				"propTypes": StaticGetter, "displayName": StaticGetter,
-			},
-		},
-		{
 			"a positional array with only a default",
 			`["property assignment"]`,
 			map[string]StaticPropertyPlacementPosition{
@@ -440,20 +433,6 @@ func TestDecodeStaticPropertyPlacementOptions(t *testing.T) {
 			`["property assignment", {"displayName": "static getter"}]`,
 			map[string]StaticPropertyPlacementPosition{
 				"propTypes": PropertyAssignment, "displayName": StaticGetter,
-			},
-		},
-		{
-			"an unrecognised default falls back rather than erroring",
-			`"nonsense"`,
-			map[string]StaticPropertyPlacementPosition{
-				"propTypes": StaticPublicField, "displayName": StaticPublicField,
-			},
-		},
-		{
-			"an override naming a property this rule does not judge is ignored",
-			`["static getter", {"notAThing": "property assignment"}]`,
-			map[string]StaticPropertyPlacementPosition{
-				"propTypes": StaticGetter, "displayName": StaticGetter,
 			},
 		},
 	}
@@ -477,6 +456,27 @@ func TestDecodeStaticPropertyPlacementOptions(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestDecodeStaticPropertyPlacementOptionsRefusesWhatUpstreamRefuses is the other half.
+//
+// Each of these used to decode to the default, so a typo in a position or a property name produced a
+// rule enforcing something the author did not write. Upstream's schema refuses every one.
+func TestDecodeStaticPropertyPlacementOptionsRefusesWhatUpstreamRefuses(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{
+		`["nonsense"]`,
+		`["static getter", {"notAThing": "property assignment"}]`,
+		`["static getter", {"displayName": "nonsense"}]`,
+		`["static getter", {"displayName": "property assignment"}, "static public field"]`,
+		// A bare string, which the config layer never delivers to a list rule.
+		`"static getter"`,
+	} {
+		if decoded, err := DecodeStaticPropertyPlacementOptions([]byte(raw)); err == nil {
+			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+		}
 	}
 }
 
@@ -546,7 +546,7 @@ func TestStaticPropertyPlacementFlowAliases(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
-				staticPropertyPlacementDecode(t, `"property assignment"`))
+				staticPropertyPlacementDecode(t, `["property assignment"]`))
 			rule_testing.ExpectFindings(t, result, testCase.wantId)
 			if !strings.Contains(result.Diagnostics[0].Message.Description, "'"+testCase.wantName+"'") {
 				t.Fatalf("message %q does not name %q",
@@ -560,7 +560,7 @@ func TestStaticPropertyPlacementFlowAliases(t *testing.T) {
 	plain := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
 		staticPropertyPlacementFile,
 		"class MyComponent extends React.Component { props = {}; render(){ return null; } }",
-		staticPropertyPlacementDecode(t, `"property assignment"`))
+		staticPropertyPlacementDecode(t, `["property assignment"]`))
 	rule_testing.ExpectClean(t, plain)
 }
 
@@ -576,6 +576,6 @@ func TestStaticPropertyPlacementMergedReceiverDeclaration(t *testing.T) {
 	result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
 		staticPropertyPlacementFile,
 		"interface MyComponent { a: number }\nclass MyComponent extends React.Component { render(){ return null; } }\nMyComponent.propTypes = {};",
-		staticPropertyPlacementDecode(t, `"static public field"`))
+		staticPropertyPlacementDecode(t, `["static public field"]`))
 	rule_testing.ExpectFindings(t, result, "notStaticClassProp")
 }

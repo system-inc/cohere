@@ -34,7 +34,7 @@ var funcNameMatchingFiresCases = []funcNameMatchingCase{
 	{
 		name:    "invalid-0",
 		source:  "let foo = function bar() {};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 		ids:     []string{"matchVariable"},
 	},
 	{
@@ -106,7 +106,7 @@ var funcNameMatchingFiresCases = []funcNameMatchingCase{
 	{
 		name:    "invalid-12",
 		source:  "module.exports = function foo(name) {};",
-		options: "{\"includeCommonJSModuleExports\": true}",
+		options: "[{\"includeCommonJSModuleExports\": true}]",
 		ids:     []string{"matchProperty"},
 	},
 	{
@@ -124,7 +124,7 @@ var funcNameMatchingFiresCases = []funcNameMatchingCase{
 	{
 		name:    "invalid-15",
 		source:  "module['exports'] = function foo(name) {};",
-		options: "{\"includeCommonJSModuleExports\": true}",
+		options: "[{\"includeCommonJSModuleExports\": true}]",
 		ids:     []string{"matchProperty"},
 	},
 	{
@@ -142,13 +142,13 @@ var funcNameMatchingFiresCases = []funcNameMatchingCase{
 	{
 		name:    "invalid-18",
 		source:  "var foo = function foo(name) {};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 		ids:     []string{"notMatchVariable"},
 	},
 	{
 		name:    "invalid-19",
 		source:  "obj.foo = function foo(name) {};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 		ids:     []string{"notMatchProperty"},
 	},
 	{
@@ -268,61 +268,61 @@ var funcNameMatchingFiresCases = []funcNameMatchingCase{
 	{
 		name:    "invalid-39",
 		source:  "class C { x = function y() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 		ids:     []string{"matchProperty"},
 	},
 	{
 		name:    "invalid-40",
 		source:  "class C { x = function x() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 		ids:     []string{"notMatchProperty"},
 	},
 	{
 		name:    "invalid-41",
 		source:  "class C { 'x' = function y() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 		ids:     []string{"matchProperty"},
 	},
 	{
 		name:    "invalid-42",
 		source:  "class C { 'x' = function x() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 		ids:     []string{"notMatchProperty"},
 	},
 	{
 		name:    "invalid-43",
 		source:  "class C { ['x'] = function y() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 		ids:     []string{"matchProperty"},
 	},
 	{
 		name:    "invalid-44",
 		source:  "class C { ['x'] = function x() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 		ids:     []string{"notMatchProperty"},
 	},
 	{
 		name:    "invalid-45",
 		source:  "class C { static x = function y() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 		ids:     []string{"matchProperty"},
 	},
 	{
 		name:    "invalid-46",
 		source:  "class C { static x = function x() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 		ids:     []string{"notMatchProperty"},
 	},
 	{
 		name:    "invalid-47",
 		source:  "(class { x = function y() {}; })",
-		options: "\"always\"",
+		options: "[\"always\"]",
 		ids:     []string{"matchProperty"},
 	},
 	{
 		name:    "invalid-48",
 		source:  "(class { x = function x() {}; })",
-		options: "\"never\"",
+		options: "[\"never\"]",
 		ids:     []string{"notMatchProperty"},
 	},
 	{
@@ -348,12 +348,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-2",
 		source:  "var foo = function foo() {};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-3",
 		source:  "var foo = function bar() {};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-4",
@@ -373,12 +373,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-7",
 		source:  "foo = function foo() {};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-8",
 		source:  "foo = function bar() {};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-9",
@@ -403,12 +403,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-13",
 		source:  "obj.foo = function foo() {};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-14",
 		source:  "obj.foo = function bar() {};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-15",
@@ -418,12 +418,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-16",
 		source:  "obj.foo = function() {};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-17",
 		source:  "obj.foo = function() {};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-18",
@@ -433,12 +433,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-19",
 		source:  "obj.bar.foo = function foo() {};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-20",
 		source:  "obj.bar.foo = function baz() {};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-21",
@@ -448,12 +448,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-22",
 		source:  "obj['foo'] = function foo() {};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-23",
 		source:  "obj['foo'] = function bar() {};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-24",
@@ -463,12 +463,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-25",
 		source:  "obj['foo//bar'] = function foo() {};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-26",
 		source:  "obj['foo//bar'] = function foo() {};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-27",
@@ -478,12 +478,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-28",
 		source:  "obj[foo] = function bar() {};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-29",
 		source:  "obj[foo] = function bar() {};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-30",
@@ -493,12 +493,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-31",
 		source:  "var obj = {foo: function foo() {}};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-32",
 		source:  "var obj = {foo: function bar() {}};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-33",
@@ -508,12 +508,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-34",
 		source:  "var obj = {'foo': function foo() {}};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-35",
 		source:  "var obj = {'foo': function bar() {}};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-36",
@@ -523,12 +523,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-37",
 		source:  "var obj = {'foo//bar': function foo() {}};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-38",
 		source:  "var obj = {'foo//bar': function foo() {}};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-39",
@@ -538,12 +538,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-40",
 		source:  "var obj = {foo: function() {}};",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-41",
 		source:  "var obj = {foo: function() {}};",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-42",
@@ -583,7 +583,7 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-49",
 		source:  "module.exports = function foo(name) {};",
-		options: "{\"includeCommonJSModuleExports\": false}",
+		options: "[{\"includeCommonJSModuleExports\": false}]",
 	},
 	{
 		name:    "valid-50",
@@ -598,7 +598,7 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-52",
 		source:  "module['exports'] = function foo(name) {};",
-		options: "{\"includeCommonJSModuleExports\": false}",
+		options: "[{\"includeCommonJSModuleExports\": false}]",
 	},
 	{
 		name:    "valid-53",
@@ -618,12 +618,12 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-56",
 		source:  "({['foo']: function foo() {}})",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-57",
 		source:  "({['foo']: function bar() {}})",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-58",
@@ -713,7 +713,7 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-75",
 		source:  "({ value: function value() {} })",
-		options: "{\"considerPropertyDescriptor\": true}",
+		options: "[{\"considerPropertyDescriptor\": true}]",
 	},
 	{
 		name:    "valid-76",
@@ -808,242 +808,242 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 	{
 		name:    "valid-94",
 		source:  "class C { x = function () {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-95",
 		source:  "class C { x = function () {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-96",
 		source:  "class C { 'x' = function () {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-97",
 		source:  "class C { 'x' = function () {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-98",
 		source:  "class C { #x = function () {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-99",
 		source:  "class C { #x = function () {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-100",
 		source:  "class C { [x] = function () {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-101",
 		source:  "class C { [x] = function () {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-102",
 		source:  "class C { ['x'] = function () {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-103",
 		source:  "class C { ['x'] = function () {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-104",
 		source:  "class C { x = function x() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-105",
 		source:  "class C { x = function y() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-106",
 		source:  "class C { 'x' = function x() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-107",
 		source:  "class C { 'x' = function y() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-108",
 		source:  "class C { #x = function x() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-109",
 		source:  "class C { #x = function x() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-110",
 		source:  "class C { #x = function y() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-111",
 		source:  "class C { #x = function y() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-112",
 		source:  "class C { [x] = function x() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-113",
 		source:  "class C { [x] = function x() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-114",
 		source:  "class C { [x] = function y() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-115",
 		source:  "class C { [x] = function y() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-116",
 		source:  "class C { ['x'] = function x() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-117",
 		source:  "class C { ['x'] = function y() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-118",
 		source:  "class C { 'xy ' = function foo() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-119",
 		source:  "class C { 'xy ' = function xy() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-120",
 		source:  "class C { ['xy '] = function foo() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-121",
 		source:  "class C { ['xy '] = function xy() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-122",
 		source:  "class C { 1 = function x0() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-123",
 		source:  "class C { 1 = function x1() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-124",
 		source:  "class C { [1] = function x0() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-125",
 		source:  "class C { [1] = function x1() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-126",
 		source:  "class C { [f()] = function g() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-127",
 		source:  "class C { [f()] = function f() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-128",
 		source:  "class C { static x = function x() {}; }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-129",
 		source:  "class C { static x = function y() {}; }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-130",
 		source:  "class C { x = (function y() {})(); }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-131",
 		source:  "class C { x = (function x() {})(); }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-132",
 		source:  "(class { x = function x() {}; })",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-133",
 		source:  "(class { x = function y() {}; })",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-134",
 		source:  "class C { #x; foo() { this.#x = function x() {}; } }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-135",
 		source:  "class C { #x; foo() { this.#x = function x() {}; } }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-136",
 		source:  "class C { #x; foo() { this.#x = function y() {}; } }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-137",
 		source:  "class C { #x; foo() { this.#x = function y() {}; } }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-138",
 		source:  "class C { #x; foo() { a.b.#x = function x() {}; } }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-139",
 		source:  "class C { #x; foo() { a.b.#x = function x() {}; } }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 	{
 		name:    "valid-140",
 		source:  "class C { #x; foo() { a.b.#x = function y() {}; } }",
-		options: "\"always\"",
+		options: "[\"always\"]",
 	},
 	{
 		name:    "valid-141",
 		source:  "class C { #x; foo() { a.b.#x = function y() {}; } }",
-		options: "\"never\"",
+		options: "[\"never\"]",
 	},
 }
 
@@ -1121,5 +1121,49 @@ func TestFuncNameMatchingResolvesAVersionGateTowardEs6(t *testing.T) {
 	// The control. Without it an always-true predicate would satisfy the check above.
 	if funcNameMatchingIsIdentifier("0not-an-identifier") {
 		t.Error("the identifier predicate accepts everything, so the assertion above proved nothing")
+	}
+}
+
+// TestDecodeFuncNameMatchingOptions pins the list shapes the config layer delivers and the ones it
+// must refuse. Every row above reaches the decoder with a list this file wrote, so this is where the
+// refusals are, and where the second element is proved to be read rather than defaulted.
+func TestDecodeFuncNameMatchingOptions(t *testing.T) {
+	t.Parallel()
+
+	accepted := []struct {
+		raw  string
+		want FuncNameMatchingOptions
+	}{
+		{``, FuncNameMatchingOptions{Direction: "always"}},
+		{`["never"]`, FuncNameMatchingOptions{Direction: "never"}},
+		{`["never", {"considerPropertyDescriptor": true}]`,
+			FuncNameMatchingOptions{Direction: "never", ConsiderPropertyDescriptor: true}},
+		{`["always", {"includeCommonJSModuleExports": true}]`,
+			FuncNameMatchingOptions{Direction: "always", IncludeCommonJSModuleExports: true}},
+		{`[{"considerPropertyDescriptor": true}]`,
+			FuncNameMatchingOptions{Direction: "always", ConsiderPropertyDescriptor: true}},
+	}
+	for _, testCase := range accepted {
+		decoded, err := DecodeFuncNameMatchingOptions([]byte(testCase.raw))
+		if err != nil {
+			t.Errorf("%s was refused: %v", testCase.raw, err)
+			continue
+		}
+		if decoded.(FuncNameMatchingOptions) != testCase.want {
+			t.Errorf("%s decoded to %+v, want %+v", testCase.raw, decoded, testCase.want)
+		}
+	}
+
+	for _, raw := range []string{
+		`["sometimes"]`,
+		`["never", {"considerPropertyDescriptor": true}, "always"]`,
+		`[{"considerPropertyDescriptor": true}, "never"]`,
+		`["never", {"considerPropertyDescriptors": true}]`,
+		`"never"`,
+		`{"considerPropertyDescriptor": true}`,
+	} {
+		if decoded, err := DecodeFuncNameMatchingOptions([]byte(raw)); err == nil {
+			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+		}
 	}
 }

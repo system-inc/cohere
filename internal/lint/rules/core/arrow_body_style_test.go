@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -33,16 +32,27 @@ func runArrowBodyStyle(t *testing.T, testCase arrowBodyStyleCase) rule_testing.R
 	if testCase.options == nil {
 		return rule_testing.Run(t, ArrowBodyStyle, arrowBodyStyleFile, testCase.sourceText)
 	}
-	encoded, err := json.Marshal(testCase.options)
-	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
-	}
-	decoded, err := DecodeArrowBodyStyleOptions(encoded)
+	decoded, err := DecodeArrowBodyStyleOptions([]byte(arrowBodyStyleUpstreamList(testCase.options.(ArrowBodyStyleOptions))))
 	if err != nil {
 		t.Fatalf("could not decode options: %v", err)
 	}
 	return rule_testing.RunWithOptions(t, ArrowBodyStyle, arrowBodyStyleFile,
 		testCase.sourceText, decoded)
+}
+
+// arrowBodyStyleUpstreamList writes a case's options the way upstream's config writes them, so
+// every case crosses the decoder on the list shape the config layer delivers.
+func arrowBodyStyleUpstreamList(options ArrowBodyStyleOptions) string {
+	mode := map[ArrowBodyStyleMode]string{
+		"":                     "as-needed",
+		ArrowBodyStyleAsNeeded: "as-needed",
+		ArrowBodyStyleAlways:   "always",
+		ArrowBodyStyleNever:    "never",
+	}[options.Mode]
+	if !options.RequireReturnForObjectLiteral {
+		return `["` + mode + `"]`
+	}
+	return `["` + mode + `", {"requireReturnForObjectLiteral": true}]`
 }
 
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
@@ -52,10 +62,10 @@ func runArrowBodyStyle(t *testing.T, testCase arrowBodyStyleCase) rule_testing.R
 // what it reports and what its fixer writes. All 87 findings and all 63 fix outputs reproduced, so
 // everything below is a measurement rather than a transcription.
 //
-// Upstream's options are a positional array whose second element is only legal beside one spelling
-// of the first. That shape has no equivalent in our config layer, so the two are named keys here
-// and the mode is a string-literal union. Only the spelling moved; the decision each selects is
-// identical, and the mapping is applied by the generator rather than by hand.
+// Upstream's options are a positional list whose second element is only legal beside one spelling
+// of the first. Each case names the struct, and `arrowBodyStyleUpstreamList` writes it back as that
+// list, so the decoder reads upstream's spelling. Only the Go spelling of the mode moved; the
+// decision each selects is identical, and the mapping is applied by the generator rather than by hand.
 func arrowBodyStyleFiresCases() []arrowBodyStyleCase {
 	return []arrowBodyStyleCase{
 		{"for (var foo = () => { return a in b ? bar : () => {} } ;;);", ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}, []string{"unexpectedSingleBlock"}, "for (var foo = () => (a in b ? bar : () => {}) ;;);"},
@@ -294,12 +304,10 @@ func TestArrowBodyStyleChoosesTheMessageByShape(t *testing.T) {
 	}
 }
 
-// The decoder, which has no upstream counterpart and is therefore the line most likely to be wrong.
-//
-// Upstream's options are a positional array whose second element is only legal beside one spelling
-// of the first. Ours are named keys, so the default and the rejection of an unknown mode are both
-// written here rather than inherited, and neither would be exercised by a fixture that built the
-// options struct directly.
+// The decoder, which reads upstream's option list and whose second element is only legal beside one
+// spelling of the first. The default, the mode-dependent second element and the rejection of an
+// unknown mode are written here rather than inherited, and none would be exercised by a fixture that
+// built the options struct directly.
 func TestDecodeArrowBodyStyleOptions(t *testing.T) {
 	t.Parallel()
 
@@ -313,8 +321,9 @@ func TestDecodeArrowBodyStyleOptions(t *testing.T) {
 		}
 	})
 
-	t.Run("an empty mode falls back rather than matching no arm", func(t *testing.T) {
-		decoded, err := DecodeArrowBodyStyleOptions([]byte(`{"requireReturnForObjectLiteral":true}`))
+	t.Run("the second element is read beside as-needed", func(t *testing.T) {
+		decoded, err := DecodeArrowBodyStyleOptions(
+			[]byte(`["as-needed", {"requireReturnForObjectLiteral": true}]`))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -323,13 +332,40 @@ func TestDecodeArrowBodyStyleOptions(t *testing.T) {
 			t.Errorf("mode came back %q, wanted AsNeeded", options.Mode)
 		}
 		if !options.RequireReturnForObjectLiteral {
-			t.Error("the option that was written did not survive")
+			t.Error("the second element was handed over and not read")
+		}
+	})
+
+	t.Run("a second element beside always is refused rather than ignored", func(t *testing.T) {
+		if _, err := DecodeArrowBodyStyleOptions(
+			[]byte(`["always", {"requireReturnForObjectLiteral": true}]`)); err == nil {
+			t.Error("an option the always mode never reads decoded")
+		}
+	})
+
+	t.Run("a third element is refused", func(t *testing.T) {
+		if _, err := DecodeArrowBodyStyleOptions(
+			[]byte(`["as-needed", {"requireReturnForObjectLiteral": true}, "never"]`)); err == nil {
+			t.Error("a third element decoded and would have been dropped")
+		}
+	})
+
+	t.Run("an unknown key in the second element is refused", func(t *testing.T) {
+		if _, err := DecodeArrowBodyStyleOptions(
+			[]byte(`["as-needed", {"requireReturnForObjectLiterals": true}]`)); err == nil {
+			t.Error("a misspelled key decoded, so the option it carried would be ignored")
 		}
 	})
 
 	t.Run("an unknown mode is rejected rather than silently disabling the rule", func(t *testing.T) {
-		if _, err := DecodeArrowBodyStyleOptions([]byte(`{"mode":"as-needed"}`)); err == nil {
-			t.Error("upstream's kebab spelling decoded; it is not one of our three modes")
+		if _, err := DecodeArrowBodyStyleOptions([]byte(`["AsNeeded"]`)); err == nil {
+			t.Error("the Go constant's spelling decoded; it is not one of upstream's three modes")
+		}
+	})
+
+	t.Run("the retired object spelling is rejected", func(t *testing.T) {
+		if _, err := DecodeArrowBodyStyleOptions([]byte(`{"mode":"Always"}`)); err == nil {
+			t.Error("the pre-list object spelling decoded, which the config layer never delivers")
 		}
 	})
 }

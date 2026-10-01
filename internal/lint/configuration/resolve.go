@@ -66,13 +66,20 @@ func (r Resolved) StatusOf(ruleName string) (Status, RuleSetting) {
 	return StatusEnabled, setting
 }
 
-// RawOptionsFor returns a rule's configured options as JSON, or nil when it has none.
+// RawOptionsFor returns every option element a rule was configured with, as JSON, or nil when it
+// has none.
+//
+// Every element, not the first. This is ESLint's `context.options`, and it used to be `tuple[1]`
+// alone, which is how `["error", {"object": true}, {"enforceForRenamedProperties": true}]` loaded
+// clean, ran, and reported nothing on source the second element exists to flag. The list goes to
+// `OptionsRegistry.Decode` whole, which is the one place that knows how many elements each rule
+// takes and refuses the rest by name.
 //
 // Raw rather than decoded, because only the rule's own package knows the struct its options should
 // become. The registry pairs each rule with a decoder; this returns the bytes that decoder reads.
 // Handing a rule this JSON directly would fail its type assertion and make it decline every file,
 // which is the inert-rule defect wearing a different hat.
-func (r Resolved) RawOptionsFor(ruleName string) json.RawMessage {
+func (r Resolved) RawOptionsFor(ruleName string) []json.RawMessage {
 	setting, configured := r.settingFor(ruleName)
 	if !configured {
 		return nil

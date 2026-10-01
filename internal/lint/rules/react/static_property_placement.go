@@ -2,6 +2,7 @@ package react
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -56,65 +57,58 @@ func DefaultStaticPropertyPlacementOptions() StaticPropertyPlacementOptions {
 	return StaticPropertyPlacementOptions{Positions: positions}
 }
 
-// staticPropertyPlacementWire is the on-the-wire shape.
+// DecodeStaticPropertyPlacementOptions reads upstream's option list off the config.
 //
-// Upstream's option surface is POSITIONAL: `[default, overrides]` rather than one object. Our config
-// layer strips the severity and hands the rest through, so this decoder accepts the remaining array
-// and reads its two slots. A bare string is also accepted, because a rule configured with only the
-// default has nothing to put in slot two.
-type staticPropertyPlacementWire struct {
-	Default   string
-	Overrides map[string]string
-}
-
-// DecodeStaticPropertyPlacementOptions reads this rule's configuration from the config layer.
+// Upstream's option surface is POSITIONAL, `[default, overrides]`, and the rule registers with
+// `DecodeOptionList` so both slots arrive:
 //
-// Three accepted shapes, because upstream's positional pair does not survive the unwrap cleanly:
-//
-//	nothing            every property expects a static public field
-//	"static getter"    that position becomes the default for every property
+//	nothing                                                    a static public field everywhere
+//	["static getter"]                                          that position for every property
 //	["property assignment", {"displayName": "static getter"}]  default plus per-property overrides
 //
-// An unrecognised position string falls back to the default rather than erroring, matching upstream,
-// whose schema would have rejected it before the rule ran. We have no schema layer, so the fallback
-// is where that lands.
-func DecodeStaticPropertyPlacementOptions(raw []byte) (any, error) {
+// Upstream's schema refuses a position outside its three-value enum and an override key outside its
+// six properties, before the rule runs. This decoder used to let each fall back to the default
+// instead, which is a configured value read and then ignored. Each is refused now, as is a third
+// element. The bare-string spelling this decoder accepted while the config layer delivered one
+// element is refused too: it was never upstream's.
+func DecodeStaticPropertyPlacementOptions(list []byte) (any, error) {
 	options := DefaultStaticPropertyPlacementOptions()
-	if len(raw) == 0 {
+	slots, err := rule.OptionElements(list, 2)
+	if err != nil || len(slots) == 0 {
+		return options, err
+	}
+
+	var defaultSpelling string
+	if err := json.Unmarshal(slots[0], &defaultSpelling); err != nil {
+		return options, fmt.Errorf("static-property-placement element 1 takes a position string, got %s", slots[0])
+	}
+	position, recognised := staticPropertyPlacementPositionFor(defaultSpelling)
+	if !recognised {
+		return options, fmt.Errorf("static-property-placement: unknown position %q, wanted one of "+
+			"\"static public field\", \"static getter\", \"property assignment\"", defaultSpelling)
+	}
+	for _, property := range staticPropertyPlacementProperties {
+		options.Positions[property] = position
+	}
+	if len(slots) < 2 {
 		return options, nil
 	}
 
-	wire := staticPropertyPlacementWire{}
-
-	// A bare string is the default-only spelling.
-	var single string
-	if err := json.Unmarshal(raw, &single); err == nil {
-		wire.Default = single
-	} else {
-		// Otherwise it is upstream's positional array, whose slots have different types.
-		var slots []json.RawMessage
-		if err := json.Unmarshal(raw, &slots); err != nil {
-			return options, err
-		}
-		if len(slots) > 0 {
-			_ = json.Unmarshal(slots[0], &wire.Default)
-		}
-		if len(slots) > 1 {
-			_ = json.Unmarshal(slots[1], &wire.Overrides)
-		}
+	var overrides map[string]string
+	if err := json.Unmarshal(slots[1], &overrides); err != nil {
+		return options, fmt.Errorf("static-property-placement element 2: %w", err)
 	}
-
-	if position, recognised := staticPropertyPlacementPositionFor(wire.Default); recognised {
-		for _, property := range staticPropertyPlacementProperties {
-			options.Positions[property] = position
+	for property, spelling := range overrides {
+		if _, isKnown := options.Positions[property]; !isKnown {
+			return options, fmt.Errorf("static-property-placement: %q is not a property this rule "+
+				"judges, so its override would never be read", property)
 		}
-	}
-	for property, spelling := range wire.Overrides {
-		if position, recognised := staticPropertyPlacementPositionFor(spelling); recognised {
-			if _, isKnown := options.Positions[property]; isKnown {
-				options.Positions[property] = position
-			}
+		overridePosition, recognised := staticPropertyPlacementPositionFor(spelling)
+		if !recognised {
+			return options, fmt.Errorf("static-property-placement: unknown position %q for %s",
+				spelling, property)
 		}
+		options.Positions[property] = overridePosition
 	}
 	return options, nil
 }

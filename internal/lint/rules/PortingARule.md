@@ -1392,16 +1392,21 @@ config layer and the rule, and a fixture never crosses that boundary: it hands t
 decoder a literal it wrote itself, so the decoder is exercised on the shape the fixture
 author already believed in.
 
-The mechanism is one line. `internal/lint/configuration/configuration.go` parses a rule
-setting as `["severity", <options>]` and keeps exactly one element:
+The measured instance was one line. `internal/lint/configuration/configuration.go` parsed a
+rule setting as `["severity", <options>]` and kept exactly one element, `tuple[1]`, while
+ESLint's `context.options` is **every** element after the severity. Every rule whose upstream
+option surface has more than one element was configured differently from upstream, and each
+decoder had to accept a cohere-only shape or be wrong on every real config while right on every
+fixture. The two rules below are what that cost.
 
-    setting.Options = tuple[1]
-
-ESLint does not. `context.options` is **every** element after the severity, so an
-upstream rule with more than one option reads a variadic list where cohere reads a single
-JSON value. Any rule whose upstream option surface is variadic is therefore configured
-differently here, and its decoder has to accept the cohere shape or it is wrong on every
-real config while being right on every fixture.
+That line is gone. The config layer now keeps every element, and **the rule declares its
+arity at registration**: `Decode` for a rule taking one option element (it is handed that
+element), `DecodeOptionList` for a rule whose upstream `meta.schema` takes more than one (it is
+handed every element as one JSON array, upstream's `context.options` exactly). A second element
+for a `Decode` rule, or any element for a rule with no decoder, is refused at startup naming the
+rule and the element. `internal/lint/registry/option_elements_test.go` pins all of it through the
+real config layer. The blindness this section names has not gone anywhere: a fixture still hands
+your decoder bytes the test built.
 
 Measured, on two rules ported together, and the pair is the point because **they fail in
 opposite directions:**
@@ -1457,22 +1462,27 @@ that reports on the right things look identical from the first file alone, and a
 that silently dropped your options usually still reports SOMETHING.
 
 Then write the contract into the test suite, because a dry run is a thing you did once
-and a fixture is a thing that keeps being true. The rows to pin are the shapes the config
-layer can actually deliver:
+and a fixture is a thing that keeps being true. For a `DecodeOptionList` rule the rows to pin
+are the lists the config layer delivers, which are upstream's own spellings minus the severity:
 
-    ["error", ["data", "err"]]      the cohere spelling: one options value after the severity
-    ["error", "data"]               upstream's variadic form, collapsed to its first element
-    ["error", []]                   explicitly empty
+    ["data", "err"]                 upstream's variadic form, every element read
+    ["data"]                        one element
+    nil                             a bare severity, which must decode to upstream's default
     a shape that is neither         must ERROR, never decode to an empty configuration
+
+and add the rule to `optionElementRules` and `optionElementCases` in
+`internal/lint/registry/option_elements_test.go`, with a control that omits the second element
+and a treatment that writes it, whose finding counts differ.
 
 That last row matters more than it looks. A decoder that answers "no options" to a
 malformed config produces exactly the inert rule this section is about, one layer further
 in. Refuse instead.
 
-**The general form, for any rule with an option surface:** upstream's spelling of its
-options is not necessarily the spelling this tree can hand you. Check `meta.schema` for
-how many elements it declares, and if the answer is more than one, your decoder has a
-second shape to accept and your fixtures cannot tell you whether it does.
+**The general form, for any rule with an option surface:** check `meta.schema` for how many
+elements it declares. One element is `Decode`. More than one, or an `anyOf` of lists, or a
+variadic `type: "array"` schema, is `DecodeOptionList`, and the decoder reads upstream's list as
+written. A key or element your port cannot honour is refused by name rather than accepted and
+ignored.
 
 ### A presence check followed by a truthiness fallback is a family, and a written zero splits it
 

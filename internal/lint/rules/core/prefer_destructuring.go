@@ -21,39 +21,24 @@ type PreferDestructuringKindOptions struct {
 
 // PreferDestructuringOptions is the decoded option surface.
 //
-// # Upstream's option surface is TWO schema elements and this tree can only deliver one
+// # Upstream's option surface is TWO schema elements, and both arrive
 //
 // `meta.schema` declares two entries: an enabling object, and a separate object carrying
 // `enforceForRenamedProperties`. ESLint's `context.options` is every element after the severity, so
-// upstream reads `context.options[1].enforceForRenamedProperties`.
-//
-// cohere's config layer keeps `setting.Options = tuple[1]` and DISCARDS everything after it, with no
-// error (`internal/lint/configuration/configuration.go:391`). So a config written the upstream way:
+// upstream reads `context.options[1].enforceForRenamedProperties`, and that is the spelling read here:
 //
 //	["error", {"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": true}]
 //
-// loads without complaint, runs, and silently ignores the second object. That is the `id-match`
-// failure exactly: a rule that registers, passes a complete fixture pair, appears in `--rules`, and
-// enforces something other than what the config says. Thirty of upstream's 103 corpus cases pass a
-// second element, so this is the common spelling rather than an exotic one.
+// The config layer used to keep `tuple[1]` and discard the rest with no error, so that spelling
+// loaded clean, ran, and reported 0 on source the second element exists to flag. Measured on a
+// seeded tree with the built binary before the repair: 0 findings, exit 0, with the merged
+// one-object spelling reporting 1 on the same source. Thirty of upstream's 103 corpus cases pass a
+// second element, so it was the common spelling rather than an exotic one.
 //
-// The fix is to accept `enforceForRenamedProperties` INSIDE the single object this layer delivers.
-//
-// # The upstream spelling CANNOT be refused from here, and that is a measured limit rather than a
-// # design choice
-//
-// The obvious guard is to refuse options that arrive as an array. It is written below and it can
-// never fire through the real config layer, because the slice happens BEFORE the decoder is called:
-// `["error", {enabling}, {enforceForRenamedProperties}]` reaches this function as the enabling
-// object alone, indistinguishable from a config that named only that object. Measured on a seeded
-// tree with the built binary -- the upstream spelling loads clean, runs, and reports zero on a
-// source the option would flag, with the merged spelling reporting one on the same source.
-//
-// So the array branch below guards only a caller that hands the raw array directly, which the tests
-// do. The real exposure is documented rather than defended, because there is nothing at this layer
-// to defend it with: closing it means teaching `parseRuleSetting` to reject a tuple longer than two,
-// which is a config-layer change affecting every rule and belongs in its own commit with its own
-// probe rather than smuggled in beside a port.
+// The rule now registers with `DecodeOptionList` and is handed the whole list. The merged one-object
+// spelling that worked around the drop is refused rather than kept, because it was never upstream's
+// and nothing configures it: `enforceForRenamedProperties` inside the first element is the same
+// unknown key upstream's `additionalProperties: false` refuses.
 type PreferDestructuringOptions struct {
 	// VariableDeclarator gates `var foo = ...`.
 	VariableDeclarator PreferDestructuringKindOptions
@@ -63,53 +48,53 @@ type PreferDestructuringOptions struct {
 	EnforceForRenamedProperties bool
 }
 
-// preferDestructuringWire is the object shape the config layer can deliver.
+// preferDestructuringEnablingWire is upstream's first schema element.
 //
-// It carries BOTH of upstream's spellings at once. Upstream's first schema element is a `oneOf`: an
-// object with `VariableDeclarator` / `AssignmentExpression` keys, or a flat `{array, object}` pair
-// that applies to both kinds. Which one was written is decided by whether `array` or `object` is
-// present at the top level, which is upstream's own test.
-type preferDestructuringWire struct {
+// It carries BOTH arms of upstream's `oneOf` at once: an object with `VariableDeclarator` /
+// `AssignmentExpression` keys, or a flat `{array, object}` pair that applies to both kinds. Which one
+// was written is decided by whether `array` or `object` is present at the top level, which is
+// upstream's own test.
+type preferDestructuringEnablingWire struct {
 	VariableDeclarator   *PreferDestructuringKindOptions `json:"VariableDeclarator"`
 	AssignmentExpression *PreferDestructuringKindOptions `json:"AssignmentExpression"`
 	Array                *bool                           `json:"array"`
 	Object               *bool                           `json:"object"`
-	// The second schema element's only key, folded in here because the config layer cannot deliver
-	// a second element at all.
+}
+
+// preferDestructuringRenamedWire is upstream's second schema element, whose only key is this one.
+type preferDestructuringRenamedWire struct {
 	EnforceForRenamedProperties *bool `json:"enforceForRenamedProperties"`
 }
 
-// DecodePreferDestructuringOptions reads the option object off the config.
-func DecodePreferDestructuringOptions(raw []byte) (any, error) {
+// DecodePreferDestructuringOptions reads upstream's option list, `[enabling, {renamed}]`, off the
+// config.
+//
+// Each element refuses keys its schema does not declare, which is upstream's
+// `additionalProperties: false` and is how a misplaced `enforceForRenamedProperties` in the first
+// element is caught rather than ignored. A third element is refused by `rule.OptionElements`.
+func DecodePreferDestructuringOptions(list []byte) (any, error) {
 	enabled := true
 	options := PreferDestructuringOptions{
 		VariableDeclarator:   PreferDestructuringKindOptions{Array: &enabled, Object: &enabled},
 		AssignmentExpression: PreferDestructuringKindOptions{Array: &enabled, Object: &enabled},
 	}
-	if len(raw) == 0 {
-		return options, nil
+	elements, err := rule.OptionElements(list, 2)
+	if err != nil || len(elements) == 0 {
+		return options, err
 	}
 
-	// The upstream array spelling is refused rather than partially honoured. Decoding `tuple[0]` and
-	// discarding the rest is exactly how `enforceForRenamedProperties` would go missing in silence.
-	trimmed := bytes.TrimSpace(raw)
-	if len(trimmed) > 0 && trimmed[0] == '[' {
-		return options, fmt.Errorf(
-			"prefer-destructuring: options arrived as an array. Upstream's schema has two elements " +
-				"and this config layer delivers only the first, so `enforceForRenamedProperties` " +
-				"would be silently dropped. Write one object instead, with the enabling keys and " +
-				"enforceForRenamedProperties together")
+	var enabling preferDestructuringEnablingWire
+	if err := preferDestructuringDecodeStrictly(elements[0], &enabling); err != nil {
+		return options, fmt.Errorf("prefer-destructuring element 1: %w", err)
 	}
-
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	var wire preferDestructuringWire
-	if err := decoder.Decode(&wire); err != nil {
-		return options, fmt.Errorf("prefer-destructuring: %w", err)
-	}
-
-	if wire.EnforceForRenamedProperties != nil {
-		options.EnforceForRenamedProperties = *wire.EnforceForRenamedProperties
+	if len(elements) > 1 {
+		var renamed preferDestructuringRenamedWire
+		if err := preferDestructuringDecodeStrictly(elements[1], &renamed); err != nil {
+			return options, fmt.Errorf("prefer-destructuring element 2: %w", err)
+		}
+		if renamed.EnforceForRenamedProperties != nil {
+			options.EnforceForRenamedProperties = *renamed.EnforceForRenamedProperties
+		}
 	}
 
 	// Upstream's normalisation, verbatim: a top-level `array` or `object` key means the flat
@@ -117,23 +102,31 @@ func DecodePreferDestructuringOptions(raw []byte) (any, error) {
 	// and a kind that is absent is entirely disabled rather than defaulted on -- upstream replaces
 	// `normalizedOptions` wholesale, so `{"VariableDeclarator": {...}}` leaves AssignmentExpression
 	// undefined and `shouldCheck` answers false for it.
-	if wire.Array != nil || wire.Object != nil {
-		flat := PreferDestructuringKindOptions{Array: wire.Array, Object: wire.Object}
+	if enabling.Array != nil || enabling.Object != nil {
+		flat := PreferDestructuringKindOptions{Array: enabling.Array, Object: enabling.Object}
 		options.VariableDeclarator = flat
 		options.AssignmentExpression = flat
 		return options, nil
 	}
-	if wire.VariableDeclarator != nil || wire.AssignmentExpression != nil {
-		options.VariableDeclarator = PreferDestructuringKindOptions{}
-		options.AssignmentExpression = PreferDestructuringKindOptions{}
-		if wire.VariableDeclarator != nil {
-			options.VariableDeclarator = *wire.VariableDeclarator
-		}
-		if wire.AssignmentExpression != nil {
-			options.AssignmentExpression = *wire.AssignmentExpression
-		}
+	options.VariableDeclarator = PreferDestructuringKindOptions{}
+	options.AssignmentExpression = PreferDestructuringKindOptions{}
+	if enabling.VariableDeclarator != nil {
+		options.VariableDeclarator = *enabling.VariableDeclarator
+	}
+	if enabling.AssignmentExpression != nil {
+		options.AssignmentExpression = *enabling.AssignmentExpression
 	}
 	return options, nil
+}
+
+// preferDestructuringDecodeStrictly decodes one element as an object and refuses unknown keys.
+func preferDestructuringDecodeStrictly(element json.RawMessage, into any) error {
+	if bytes.Equal(bytes.TrimSpace(element), []byte("null")) {
+		return fmt.Errorf("takes an object, got null")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(element))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(into)
 }
 
 // enabled reads one switch, where an absent switch means off.

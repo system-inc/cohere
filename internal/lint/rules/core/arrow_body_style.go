@@ -1,7 +1,9 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -29,43 +31,68 @@ const (
 
 // ArrowBodyStyleOptions configures the rule.
 //
-// Upstream's option surface is a two-element positional array whose second element is only legal
-// beside the first spelling, which is a shape our config layer does not have. Both are read here as
-// named keys instead, and the mode is the string-literal union our conventions want rather than
-// upstream's kebab spelling. The decision each one selects is identical; only the spelling moved.
+// Upstream's option surface is a two-element positional list whose second element is only legal
+// beside `as-needed`: `["error", "as-needed", {"requireReturnForObjectLiteral": true}]`.
+// `DecodeArrowBodyStyleOptions` reads that list, and the mode here is the string-literal union our
+// conventions want rather than upstream's kebab spelling. The decision each one selects is
+// identical; only the Go spelling moved.
 type ArrowBodyStyleOptions struct {
 	// Mode is which body shape the rule wants. Absent means AsNeeded, which is upstream's default.
-	Mode ArrowBodyStyleMode `json:"mode"`
+	Mode ArrowBodyStyleMode
 
 	// RequireReturnForObjectLiteral turns the AsNeeded judgment around for an object literal.
 	//
 	// Only meaningful under AsNeeded, matching upstream's schema, where it is the second element of
-	// the array whose first element is `as-needed`. With it on, `() => ({})` is reported and wants
+	// the list whose first element is `as-needed`. With it on, `() => ({})` is reported and wants
 	// braces, and a braced body returning an object literal stops being reported.
-	RequireReturnForObjectLiteral bool `json:"requireReturnForObjectLiteral"`
+	RequireReturnForObjectLiteral bool
 }
 
-// DecodeArrowBodyStyleOptions reads this rule's configuration from the config layer.
+// DecodeArrowBodyStyleOptions reads upstream's option list off the config.
 //
-// Hand-rolled rather than `rule.DecodeOptionsInto` so an unrecognized mode fails loudly. The
-// generic helper would leave an unknown string in place, and this rule's three modes disagree about
-// every input, so a typo would silently select a fourth behaviour of reporting nothing at all.
-func DecodeArrowBodyStyleOptions(raw []byte) (any, error) {
+// Hand-rolled rather than `rule.DecodeOptionsInto` so an unrecognized mode fails loudly. This rule's
+// three modes disagree about every input, so a typo would silently select a fourth behaviour of
+// reporting nothing at all. A second element beside `always` or `never` is refused rather than
+// ignored, which is upstream's schema: its `anyOf` gives those two a one-element list.
+func DecodeArrowBodyStyleOptions(list []byte) (any, error) {
 	options := ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}
-	if len(raw) == 0 {
-		return options, nil
-	}
-	if err := json.Unmarshal(raw, &options); err != nil {
+	elements, err := rule.OptionElements(list, 2)
+	if err != nil || len(elements) == 0 {
 		return options, err
 	}
-	if options.Mode == "" {
+
+	var mode string
+	if err := json.Unmarshal(elements[0], &mode); err != nil {
+		return options, fmt.Errorf("arrow-body-style element 1 takes a string, got %s", elements[0])
+	}
+	switch mode {
+	case "as-needed":
 		options.Mode = ArrowBodyStyleAsNeeded
-	}
-	switch options.Mode {
-	case ArrowBodyStyleAsNeeded, ArrowBodyStyleAlways, ArrowBodyStyleNever:
+	case "always":
+		options.Mode = ArrowBodyStyleAlways
+	case "never":
+		options.Mode = ArrowBodyStyleNever
 	default:
-		return options, &arrowBodyStyleModeError{mode: string(options.Mode)}
+		return options, &arrowBodyStyleModeError{mode: mode}
 	}
+	if len(elements) < 2 {
+		return options, nil
+	}
+	if options.Mode != ArrowBodyStyleAsNeeded {
+		return options, fmt.Errorf(
+			"arrow-body-style: %q takes no second element, so %s would never be read; only "+
+				"\"as-needed\" reads requireReturnForObjectLiteral", mode, elements[1])
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(elements[1]))
+	decoder.DisallowUnknownFields()
+	var second struct {
+		RequireReturnForObjectLiteral bool `json:"requireReturnForObjectLiteral"`
+	}
+	if err := decoder.Decode(&second); err != nil {
+		return options, fmt.Errorf("arrow-body-style element 2: %w", err)
+	}
+	options.RequireReturnForObjectLiteral = second.RequireReturnForObjectLiteral
 	return options, nil
 }
 
@@ -74,7 +101,7 @@ type arrowBodyStyleModeError struct{ mode string }
 
 func (e *arrowBodyStyleModeError) Error() string {
 	return "arrow-body-style: unknown mode " + e.mode +
-		", wanted one of AsNeeded, Always, Never"
+		", wanted one of as-needed, always, never"
 }
 
 // The five findings. Upstream splits the braced case four ways by what the block holds, because the

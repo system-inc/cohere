@@ -7,13 +7,12 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // Its own file rather than a line in the package's register.go: that shared list is one file every
 // concurrent port has to edit, so two ports landing at once conflict on a file neither is changing.
 //
-// The Decode entry is load bearing for this rule beyond the usual reason. Upstream's option surface
-// is two schema elements and this config layer delivers one, so the decoder is where
-// `enforceForRenamedProperties` is rescued from silent loss and where the upstream array spelling is
-// refused loudly instead of being half-honoured.
+// DecodeOptionList rather than Decode, because upstream's option surface is two schema elements and
+// `enforceForRenamedProperties` lives in the second. Registered with Decode, the config layer would
+// refuse that second element; with DecodeOptionList the decoder is handed both.
 func init() {
 	rule.Register(rule.Registration{
-		Rule:   PreferDestructuring,
-		Decode: DecodePreferDestructuringOptions,
+		Rule:             PreferDestructuring,
+		DecodeOptionList: DecodePreferDestructuringOptions,
 	})
 }

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -56,7 +57,11 @@ func (entry *noRestrictedGlobalsEntry) UnmarshalJSON(raw []byte) error {
 		Name    string `json:"name"`
 		Message string `json:"message"`
 	}
-	if err := json.Unmarshal(raw, &object); err != nil {
+	// Strict, which is upstream's `additionalProperties: false`: a misspelled `message` key would
+	// otherwise be accepted and the custom message silently never shown.
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&object); err != nil {
 		return err
 	}
 	if object.Name == "" {
@@ -74,36 +79,61 @@ type noRestrictedGlobalsObjectWire struct {
 	GlobalObjects     []string                   `json:"globalObjects"`
 }
 
-// DecodeNoRestrictedGlobalsOptions reads either option shape off the config.
+// DecodeNoRestrictedGlobalsOptions reads either of upstream's option shapes off the config.
 //
-// Hand rolled rather than routed through the generic helper because the wire shape is a union: the
-// same option key may hold a bare array of strings, an array mixing strings and objects, or a
-// single object carrying that array plus two flags. `rule.DecodeOptionsInto` expresses none of
-// those alternatives.
+// Hand rolled rather than routed through the generic helper because upstream's schema is an `anyOf`
+// of two LISTS: every element a restricted global (a string or a `{name, message}` object), as in
+// `["error", "event", {"name": "fdescribe", "message": "..."}]`, or exactly one element that is an
+// object carrying that list plus two flags, `["error", {"globals": [...], "checkGlobalObject":
+// true}]`. The rule registers with `DecodeOptionList` and is handed that list whole.
 //
-// The array form is tried first because the object form would happily decode an array into a
-// zero-valued struct and silently produce an empty globals list, which disables the rule rather
-// than failing.
-func DecodeNoRestrictedGlobalsOptions(raw []byte) (any, error) {
+// The object form is recognised the way upstream recognises it, by the first element being an
+// object with a `globals` key. That form takes no second element, so one is refused rather than
+// dropped. Its keys are read strictly, which is upstream's `additionalProperties: false`: a
+// misspelled `checkGlobalObject` would otherwise leave the flag silently off.
+func DecodeNoRestrictedGlobalsOptions(list []byte) (any, error) {
 	settings := DefaultNoRestrictedGlobalsSettings()
-	if len(raw) == 0 {
+	if len(list) == 0 {
 		return settings, nil
 	}
 
-	var entries []noRestrictedGlobalsEntry
-	if err := json.Unmarshal(raw, &entries); err == nil {
-		return buildNoRestrictedGlobalsSettings(entries, false, nil), nil
+	var elements []json.RawMessage
+	if err := json.Unmarshal(list, &elements); err != nil {
+		return settings, fmt.Errorf("no-restricted-globals: the option list is not a JSON array: %w", err)
+	}
+	if len(elements) == 0 {
+		return settings, nil
 	}
 
-	var object noRestrictedGlobalsObjectWire
-	if err := json.Unmarshal(raw, &object); err != nil {
-		return settings, err
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal(elements[0], &probe); err == nil {
+		if _, isGlobalsObject := probe["globals"]; isGlobalsObject {
+			if len(elements) > 1 {
+				return settings, fmt.Errorf(
+					"no-restricted-globals: the {globals} object takes no second element, so %s "+
+						"would never be read", elements[1])
+			}
+			decoder := json.NewDecoder(bytes.NewReader(elements[0]))
+			decoder.DisallowUnknownFields()
+			var object noRestrictedGlobalsObjectWire
+			if err := decoder.Decode(&object); err != nil {
+				return settings, fmt.Errorf("no-restricted-globals element 1: %w", err)
+			}
+			checkGlobalObject := false
+			if object.CheckGlobalObject != nil {
+				checkGlobalObject = *object.CheckGlobalObject
+			}
+			return buildNoRestrictedGlobalsSettings(object.Globals, checkGlobalObject, object.GlobalObjects), nil
+		}
 	}
-	checkGlobalObject := false
-	if object.CheckGlobalObject != nil {
-		checkGlobalObject = *object.CheckGlobalObject
+
+	entries := make([]noRestrictedGlobalsEntry, len(elements))
+	for index, element := range elements {
+		if err := json.Unmarshal(element, &entries[index]); err != nil {
+			return settings, fmt.Errorf("no-restricted-globals element %d: %w", index+1, err)
+		}
 	}
-	return buildNoRestrictedGlobalsSettings(object.Globals, checkGlobalObject, object.GlobalObjects), nil
+	return buildNoRestrictedGlobalsSettings(entries, false, nil), nil
 }
 
 // buildNoRestrictedGlobalsSettings turns the decoded entries into the lookup the rule uses.

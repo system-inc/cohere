@@ -50,29 +50,23 @@ func (s Severity) String() string {
 type RuleSetting struct {
 	Severity Severity
 
-	// Options is the rule's configuration, decoded but not interpreted. Nil when the rule was
-	// configured with a bare severity.
+	// Options is every element the config wrote after the severity, in order, decoded but not
+	// interpreted. Nil when the rule was configured with a bare severity.
+	//
+	// This is ESLint's `context.options` exactly: the wire format is `[severity, ...options]`, and a
+	// rule whose upstream schema has more than one element reads all of them. `eqeqeq` is
+	// `["error", "always", {"null": "ignore"}]`, `consistent-this` is `["error", "self", "vm"]`.
+	//
+	// It used to hold `tuple[1]` alone, and then `tuple[1]` plus an `AdditionalOptions` remainder that
+	// nothing outside a test read. Both were the same defect: a config entry that loads, a rule that
+	// runs, and an option the author wrote that has no effect. What happens to the elements now is
+	// `OptionsRegistry.Decode`'s business, and its answer is that each one is either handed to the
+	// rule or refused by name. None is dropped.
 	//
 	// A rule that requires an option and is handed nil either guards everything or nothing, and both
 	// are silent. Four rules in the gate cohere replaces were dead for months underneath exactly
 	// that, so the distinction between "no options" and "options I did not read" is kept.
-	Options json.RawMessage
-
-	// AdditionalOptions are the option elements after the first, kept rather than dropped.
-	//
-	// eslint's wire format is `[severity, ...options]` and a handful of core rules use more than one
-	// element: `eqeqeq` is `['error', 'always', { null: 'ignore' }]`, and `no-unused-expressions`
-	// and `camelcase` have the same shape. Every one of cohere's 120 decoders reads `Options` as the
-	// single first element, so widening that field would have to change all of them at once.
-	//
-	// Keeping the remainder here instead means nothing currently reading `Options` changes, and a
-	// decoder that needs the second element has somewhere to find it. Nil for the common case.
-	//
-	// Recorded rather than repaired further because the exposure was measured: no rule in the ahra
-	// configuration carries more than one option element today, so this is a latent defect. The
-	// alternative was to leave the elements dropped, which is the shape where a config entry is
-	// accepted and silently does nothing.
-	AdditionalOptions []json.RawMessage
+	Options []json.RawMessage
 }
 
 // Override is a glob-scoped block that changes rule settings for matching files.
@@ -376,10 +370,12 @@ type rawOverride struct {
 	Rules map[string]json.RawMessage `json:"rules"`
 }
 
-// parseRuleSetting decodes the two shapes a rule value takes: a bare severity, or a two-element
-// array of severity and options.
+// parseRuleSetting decodes the two shapes a rule value takes: a bare severity, or an array of the
+// severity followed by every option element, which is ESLint's `[severity, ...options]`.
 //
-// Both appear in the live config: 173 rules are bare strings and 9 carry options.
+// Every element after the severity is kept. Whether a rule accepts that many is decided by
+// `OptionsRegistry.Decode`, which knows each rule's arity; this layer does not, so the one thing it
+// must not do is decide by truncating.
 func parseRuleSetting(value json.RawMessage) (RuleSetting, error) {
 	var severityName string
 	if err := json.Unmarshal(value, &severityName); err == nil {
@@ -389,7 +385,7 @@ func parseRuleSetting(value json.RawMessage) (RuleSetting, error) {
 
 	var tuple []json.RawMessage
 	if err := json.Unmarshal(value, &tuple); err != nil {
-		return RuleSetting{}, fmt.Errorf("expected a severity string or a [severity, options] array, got %s", truncate(string(value)))
+		return RuleSetting{}, fmt.Errorf("expected a severity string or a [severity, ...options] array, got %s", truncate(string(value)))
 	}
 	if len(tuple) == 0 {
 		return RuleSetting{}, fmt.Errorf("empty rule configuration array")
@@ -405,12 +401,7 @@ func parseRuleSetting(value json.RawMessage) (RuleSetting, error) {
 
 	setting := RuleSetting{Severity: severity}
 	if len(tuple) > 1 {
-		setting.Options = tuple[1]
-	}
-	if len(tuple) > 2 {
-		// Everything after the first option element. Previously discarded here, which meant a config
-		// entry could be accepted and silently do nothing beyond its first option.
-		setting.AdditionalOptions = tuple[2:]
+		setting.Options = tuple[1:]
 	}
 	return setting, nil
 }

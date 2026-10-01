@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"unicode"
@@ -17,9 +18,8 @@ import (
 //	["always" | "never", {options}]     a direction followed by an options object
 //	[{options}]                         an options object alone, direction defaulting to "always"
 //
-// So the FIRST element is either a string or the object. Our config layer unwraps the severity tuple
-// and hands the decoder what remains, and both spellings have to survive that; see
-// DecodeFuncNameMatchingOptions, which accepts either.
+// So the FIRST element is either a string or the object. The rule registers with `DecodeOptionList`
+// and is handed upstream's list as written; see DecodeFuncNameMatchingOptions, which reads both.
 type FuncNameMatchingOptions struct {
 	// Direction is upstream's `nameMatches`: "always" requires the names to match, "never" requires
 	// them to differ. Empty means "always".
@@ -580,60 +580,53 @@ func DefaultFuncNameMatchingOptions() FuncNameMatchingOptions {
 	return FuncNameMatchingOptions{Direction: "always"}
 }
 
-// DecodeFuncNameMatchingOptions reads this rule's configuration from the config layer.
+// DecodeFuncNameMatchingOptions reads upstream's option list off the config.
 //
-// Hand-rolled because upstream's schema is an `anyOf` of two ARRAY shapes rather than a single
-// object, and the generic decoder has no way to express that. What arrives here is whatever remains
-// after the severity is stripped, and three spellings have to work:
+// Hand-rolled because upstream's schema is an `anyOf` of two LIST shapes rather than a single
+// object, and the generic decoder has no way to express that:
 //
-//	"never"                          the direction alone
-//	{"considerPropertyDescriptor": true}  the options object alone, direction defaults to "always"
-//	["never", {"...": true}]              both, in upstream's own order
+//	["never"]                                 the direction alone
+//	["never", {"considerPropertyDescriptor": true}]  both, in upstream's order
+//	[{"considerPropertyDescriptor": true}]    the options object alone, direction "always"
 //
-// A direction that is neither "always" nor "never" is ignored rather than erroring, and the default
-// applies: upstream's schema would reject it before the rule ever ran, so there is no upstream
-// behaviour to reproduce, and refusing here would turn a config typo into a dead rule.
-func DecodeFuncNameMatchingOptions(raw []byte) (any, error) {
+// Upstream reads the object from `options[0]` when that is an object and from `options[1]`
+// otherwise, which is the order below. Anything else is refused rather than defaulted: a direction
+// that is neither "always" nor "never", a key the schema does not declare, a second element after an
+// object, or a third element. Each was silently read as the default by the decoder this replaced,
+// and the defaults are exactly what the author wrote the option to change.
+func DecodeFuncNameMatchingOptions(list []byte) (any, error) {
 	options := DefaultFuncNameMatchingOptions()
-	if len(raw) == 0 {
-		return options, nil
-	}
-
-	// The direction alone.
-	var direction string
-	if err := json.Unmarshal(raw, &direction); err == nil {
-		if direction == "never" || direction == "always" {
-			options.Direction = direction
-		}
-		return options, nil
-	}
-
-	// The options object alone.
-	var object FuncNameMatchingOptions
-	if err := json.Unmarshal(raw, &object); err == nil {
-		object.Direction = options.Direction
-		return object, nil
-	}
-
-	// Both, as upstream's array.
-	var tuple []json.RawMessage
-	if err := json.Unmarshal(raw, &tuple); err != nil {
+	elements, err := rule.OptionElements(list, 2)
+	if err != nil || len(elements) == 0 {
 		return options, err
 	}
-	for _, element := range tuple {
-		var asString string
-		if err := json.Unmarshal(element, &asString); err == nil {
-			if asString == "never" || asString == "always" {
-				options.Direction = asString
-			}
-			continue
+
+	objectElement := elements[0]
+	var direction string
+	if err := json.Unmarshal(elements[0], &direction); err == nil {
+		if direction != "always" && direction != "never" {
+			return options, fmt.Errorf(
+				"func-name-matching: unknown direction %q, wanted always or never", direction)
 		}
-		var asObject FuncNameMatchingOptions
-		if err := json.Unmarshal(element, &asObject); err == nil {
-			options.ConsiderPropertyDescriptor = asObject.ConsiderPropertyDescriptor
-			options.IncludeCommonJSModuleExports = asObject.IncludeCommonJSModuleExports
+		options.Direction = direction
+		if len(elements) < 2 {
+			return options, nil
 		}
+		objectElement = elements[1]
+	} else if len(elements) > 1 {
+		return options, fmt.Errorf(
+			"func-name-matching: an options object first takes no second element, so %s would "+
+				"never be read", elements[1])
 	}
+
+	decoder := json.NewDecoder(bytes.NewReader(objectElement))
+	decoder.DisallowUnknownFields()
+	var object FuncNameMatchingOptions
+	if err := decoder.Decode(&object); err != nil {
+		return options, fmt.Errorf("func-name-matching options object: %w", err)
+	}
+	options.ConsiderPropertyDescriptor = object.ConsiderPropertyDescriptor
+	options.IncludeCommonJSModuleExports = object.IncludeCommonJSModuleExports
 	return options, nil
 }
 

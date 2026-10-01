@@ -20,9 +20,9 @@ type yodaExpectation struct {
 // yodaCase is one upstream case.
 //
 // `optionsJson` is raw config text rather than a built struct, so every case is routed through the
-// rule's own decoder. That matters more here than usual: upstream's option is a two element tuple
-// and this config layer keeps only one element, so the decoder is where that difference is
-// absorbed and a fixture built from a struct would leave it untested.
+// rule's own decoder. That matters more here than usual: upstream's option is a two element list
+// whose second element carries both flags, and a fixture built from a struct would leave the
+// decoder's reading of it untested.
 type yodaCase struct {
 	source      string
 	optionsJson string
@@ -400,5 +400,36 @@ func TestYodaRangeTestRequiresLessThanOperators(t *testing.T) {
 			rule_testing.ExpectFindings(t,
 				rule_testing.RunWithOptions(t, Yoda, yodaFile, source, options), "expected")
 		})
+	}
+}
+
+// TestDecodeYodaOptions pins the list shapes the config layer delivers and the ones it must refuse.
+// The second element is where `exceptRange` and `onlyEquality` live, and it used to be dropped by
+// the config layer, so the row reading it is the one that matters.
+func TestDecodeYodaOptions(t *testing.T) {
+	t.Parallel()
+
+	decoded, err := DecodeYodaOptions([]byte(`["always", {"exceptRange": true, "onlyEquality": true}]`))
+	if err != nil {
+		t.Fatalf("upstream's spelling was refused: %v", err)
+	}
+	if settings := decoded.(YodaSettings); !settings.Always || !settings.ExceptRange || !settings.OnlyEquality {
+		t.Errorf("the second element was not read: %+v", settings)
+	}
+
+	for _, raw := range []string{
+		// A bare string, which the config layer never delivers to a list rule.
+		`"always"`,
+		// The one-object workaround, and the nested one.
+		`{"when": "always", "exceptRange": true}`,
+		`[["always", {"exceptRange": true}]]`,
+		// A key upstream does not declare, a third element, a mode outside the two.
+		`["always", {"exceptRanges": true}]`,
+		`["always", {"exceptRange": true}, "never"]`,
+		`["sometimes"]`,
+	} {
+		if decoded, err := DecodeYodaOptions([]byte(raw)); err == nil {
+			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+		}
 	}
 }

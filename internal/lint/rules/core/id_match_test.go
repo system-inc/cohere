@@ -523,43 +523,41 @@ func TestIdMatchPrivateNamesAreMatchedWithoutTheHash(t *testing.T) {
 // TestIdMatchDecoderAcceptsTheConfigLayersShape pins the wire contract, which every other fixture
 // in this file bypasses.
 //
-// Fixtures reach the decoder with bytes the TEST built. The config layer builds different bytes: it
-// parses `["error", <options>]` and hands the rule ONLY `tuple[1]`, one element. Upstream's option
-// surface is a tuple spread across the config array -- `["error", "^[a-z]+$", {...}]` -- so a
-// decoder written to upstream's shape receives the bare pattern string and drops every flag.
-//
-// That failure is quieter than id-denylist's, which errored outright: here the pattern still
-// arrives and the rule still runs, with every option silently off. Nothing in the suite could see
-// it, and it is exactly the "registered, plausible, and wrong" shape the standard warns about.
+// Fixtures reach the decoder with bytes the TEST built. The config layer hands a list rule every
+// element after the severity, which for upstream's `["error", "^[a-z]+$", {...}]` is
+// `["^[a-z]+$", {...}]`. It used to hand over the bare pattern alone, so the rule ran with every
+// flag silently off: the "registered, plausible, and wrong" shape the standard warns about.
 func TestIdMatchDecoderAcceptsTheConfigLayersShape(t *testing.T) {
 	t.Parallel()
 
-	// The cohere spelling: one options value after the severity, carrying the whole tuple.
+	// Upstream's spelling: the pattern, then the flags as the second element.
 	decoded, err := DecodeIdMatchOptions([]byte(`["^[a-z]+$", {"properties": true, "classFields": true}]`))
 	if err != nil {
-		t.Fatalf("decoding the nested tuple: %v", err)
+		t.Fatalf("decoding the option list: %v", err)
 	}
 	settings, _ := decoded.(IdMatchSettings)
 	if settings.PatternText != "^[a-z]+$" {
 		t.Errorf("expected the pattern to be read, got %q", settings.PatternText)
 	}
 	if !settings.CheckProperties || !settings.CheckClassFields {
-		t.Errorf("expected the flags to survive the nesting, got %+v", settings)
+		t.Errorf("expected the second element's flags to be read, got %+v", settings)
 	}
 
-	// A bare pattern with no flags, which is both a legal cohere spelling and what upstream's
-	// variadic form collapses to. Every flag stays off, which is upstream's own default.
-	decoded, err = DecodeIdMatchOptions([]byte(`"^[a-z]+$"`))
-	if err != nil {
-		t.Fatalf("decoding a bare pattern: %v", err)
-	}
-	settings, _ = decoded.(IdMatchSettings)
-	if settings.PatternText != "^[a-z]+$" || settings.Pattern == nil {
-		t.Errorf("expected a bare pattern string to configure the rule, got %+v", settings)
-	}
-	if settings.CheckProperties || settings.CheckClassFields ||
-		settings.OnlyDeclarations || settings.IgnoreDestructuring {
-		t.Errorf("expected every flag off for a bare pattern, got %+v", settings)
+	// Shapes the config layer does not deliver, or that upstream's schema refuses, are refused
+	// rather than read as a default.
+	for _, raw := range []string{
+		// The bare pattern the config layer used to deliver.
+		`"^[a-z]+$"`,
+		// The nested workaround spelling.
+		`[["^[a-z]+$", {"properties": true}]]`,
+		// A flag upstream does not declare.
+		`["^[a-z]+$", {"property": true}]`,
+		// A third element.
+		`["^[a-z]+$", {"properties": true}, {"classFields": true}]`,
+	} {
+		if _, err := DecodeIdMatchOptions([]byte(raw)); err == nil {
+			t.Errorf("expected %s to be refused, got no error", raw)
+		}
 	}
 
 	// And end to end through the rule, so the contract is pinned at the surface a config reaches
@@ -567,7 +565,7 @@ func TestIdMatchDecoderAcceptsTheConfigLayersShape(t *testing.T) {
 	result := rule_testing.RunTypedWithOptions(t, IdMatch, idMatchFile, "class C { no_under = 1; }",
 		mustDecodeIdMatch(t, `["^[^_]+$", {"classFields": true}]`))
 	if len(result.Diagnostics) != 1 {
-		t.Errorf("expected the nested tuple's classFields flag to reach the rule, got %d findings: %v",
+		t.Errorf("expected the second element's classFields flag to reach the rule, got %d findings: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 }

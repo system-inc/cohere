@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -42,25 +43,24 @@ const (
 
 // EqeqeqOptions configures the rule.
 //
-// Upstream's option surface is a positional array whose legal second element depends on the value of
-// the first: `["always", {null: ...}]` is valid and `["smart", {null: ...}]` is not, which its schema
-// expresses as a two-branch `anyOf`. Our config layer has no shape for that, so both are named keys
-// here and the dependency is enforced in the same place upstream enforces it -- in the rule body,
-// where `smart` forces the null policy to Ignore regardless of what was written.
+// Upstream's option surface is a positional list whose legal second element depends on the first:
+// `["always", {"null": ...}]` is valid and `["smart", {"null": ...}]` is not, which its schema
+// expresses as a two-branch `anyOf`. `DecodeEqeqeqOptions` reads that list and enforces the same
+// dependency, and this struct is what it decodes to.
 //
-// Upstream also accepts `"allow-null"` as a deprecated first element meaning
-// `["always", {null: "ignore"}]`. That spelling is not carried: it is deprecated upstream, it has no
-// natural rendering in our casing, and the combination it stands for is expressible directly.
+// Upstream also accepts `"allow-null"` as a deprecated first element. Its own code reads it as
+// `nullOption = config === "always" ? ... : "ignore"` with no smart exemption, which is Always plus
+// a null policy of Ignore, so that is what it decodes to.
 type EqeqeqOptions struct {
 	// Mode is how strictly to ask. Absent means Always, which is upstream's default.
-	Mode EqeqeqMode `json:"mode"`
+	Mode EqeqeqMode
 
 	// Null is what to do about a comparison against the `null` literal.
 	//
 	// Absent means Always under the Always mode, matching upstream's `options.null || "always"`.
 	// Under Smart it is forced to Ignore, because Smart already exempts every null comparison and
 	// upstream hardcodes `nullOption = "ignore"` for it.
-	Null EqeqeqNullPolicy `json:"null"`
+	Null EqeqeqNullPolicy
 }
 
 // eqeqeqSettings is the decoded form with the mode-dependency already resolved.
@@ -87,30 +87,66 @@ func (options EqeqeqOptions) resolve() eqeqeqSettings {
 	return settings
 }
 
-// DecodeEqeqeqOptions reads this rule's configuration from the config layer.
+// DecodeEqeqeqOptions reads upstream's option list off the config: `["always", {"null": ...}]`,
+// `["smart"]`, `["allow-null"]`, or nothing.
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` so an unrecognized mode or policy fails loudly.
-// The generic helper leaves an unknown string in the field, and every arm of this rule is selected
-// by string equality, so a typo would silently pick a fourth behaviour of reporting nothing.
-func DecodeEqeqeqOptions(raw []byte) (any, error) {
+// Every arm of this rule is selected by string equality, so a typo would silently pick a fourth
+// behaviour of reporting nothing. A second element beside anything but "always" is refused, which is
+// upstream's schema: its `anyOf` gives `smart` and `allow-null` a one-element list.
+func DecodeEqeqeqOptions(list []byte) (any, error) {
 	options := EqeqeqOptions{}
-	if len(raw) == 0 {
-		return options, nil
-	}
-	if err := json.Unmarshal(raw, &options); err != nil {
+	elements, err := rule.OptionElements(list, 2)
+	if err != nil || len(elements) == 0 {
 		return options, err
 	}
-	switch options.Mode {
-	case "", EqeqeqAlways, EqeqeqSmart:
-	default:
-		return options, fmt.Errorf(
-			"eqeqeq: unknown mode %q, wanted one of Always, Smart", options.Mode)
+
+	var mode string
+	if err := json.Unmarshal(elements[0], &mode); err != nil {
+		return options, fmt.Errorf("eqeqeq element 1 takes a string, got %s", elements[0])
 	}
-	switch options.Null {
-	case "", EqeqeqNullAlways, EqeqeqNullNever, EqeqeqNullIgnore:
+	switch mode {
+	case "always":
+		options.Mode = EqeqeqAlways
+	case "smart":
+		options.Mode = EqeqeqSmart
+	case "allow-null":
+		options.Mode = EqeqeqAlways
+		options.Null = EqeqeqNullIgnore
 	default:
 		return options, fmt.Errorf(
-			"eqeqeq: unknown null policy %q, wanted one of Always, Never, Ignore", options.Null)
+			"eqeqeq: unknown mode %q, wanted one of always, smart, allow-null", mode)
+	}
+	if len(elements) < 2 {
+		return options, nil
+	}
+	if mode != "always" {
+		return options, fmt.Errorf(
+			"eqeqeq: %q takes no second element, so %s would never be read; only \"always\" "+
+				"reads a null policy", mode, elements[1])
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(elements[1]))
+	decoder.DisallowUnknownFields()
+	var second struct {
+		Null *string `json:"null"`
+	}
+	if err := decoder.Decode(&second); err != nil {
+		return options, fmt.Errorf("eqeqeq element 2: %w", err)
+	}
+	if second.Null == nil {
+		return options, nil
+	}
+	switch *second.Null {
+	case "always":
+		options.Null = EqeqeqNullAlways
+	case "never":
+		options.Null = EqeqeqNullNever
+	case "ignore":
+		options.Null = EqeqeqNullIgnore
+	default:
+		return options, fmt.Errorf(
+			"eqeqeq: unknown null policy %q, wanted one of always, never, ignore", *second.Null)
 	}
 	return options, nil
 }

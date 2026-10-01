@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -15,9 +16,16 @@ import (
 // rule package builds the decoder with a generic helper and hands it over as an opaque function.
 type Registration struct {
 	Rule Rule
-	// Decode turns this rule's raw JSON options into its own options struct, or nil if the rule
-	// takes no options, which is the common case.
+	// Decode turns this rule's single option element into its own options struct, or nil if the
+	// rule takes no options, which is the common case. A config giving a rule with Decode more than
+	// one option element is refused by name, never truncated.
 	Decode func(raw []byte) (any, error)
+	// DecodeOptionList is Decode for a rule whose upstream schema takes more than one option
+	// element: `eqeqeq`'s `["error", "always", {"null": "ignore"}]`, or `consistent-this`'s
+	// variadic `["error", "self", "vm"]`. It is handed every element after the severity as one JSON
+	// array, which is upstream's `context.options`, or nil for a bare severity. Set at most one of
+	// Decode and DecodeOptionList; which one is set is how the config layer learns the rule's arity.
+	DecodeOptionList func(list []byte) (any, error)
 	// RequiresOptions is whether the rule declines every file without its options.
 	//
 	// The load-bearing field, and the whole lesson of the inert-rule defect.
@@ -60,6 +68,13 @@ func Register(registrations ...Registration) {
 		if name == "" {
 			panic("rule.Register: a rule was registered with an empty name, so the config could never address it")
 		}
+		if registration.Decode != nil && registration.DecodeOptionList != nil {
+			panic(fmt.Sprintf(
+				"rule.Register: %q sets both Decode and DecodeOptionList; the config layer reads "+
+					"which one is set as the rule's option arity, so both is a contradiction",
+				name,
+			))
+		}
 		if existing, taken := registered[name]; taken {
 			panic(fmt.Sprintf(
 				"rule.Register: two rules answer to %q (%T and %T); the config addresses rules by "+
@@ -92,6 +107,34 @@ func Registered() []Registration {
 		ordered = append(ordered, registered[name])
 	}
 	return ordered
+}
+
+// OptionElements splits the list a DecodeOptionList decoder is handed into its elements, refusing
+// more than `maximum` by naming each extra one.
+//
+// The refusal is the point. A rule whose upstream schema has two elements and is handed three would
+// otherwise read two and drop the third, which is the defect this whole arity mechanism exists to
+// end, moved one layer in. Nil or empty input is no elements, which is a bare severity.
+//
+// The message leaves out the rule's name because the config layer prefixes every decoder error with
+// it.
+func OptionElements(list []byte, maximum int) ([]json.RawMessage, error) {
+	if len(list) == 0 {
+		return nil, nil
+	}
+	var elements []json.RawMessage
+	if err := json.Unmarshal(list, &elements); err != nil {
+		return nil, fmt.Errorf("the option list is not a JSON array: %w", err)
+	}
+	if len(elements) <= maximum {
+		return elements, nil
+	}
+	extras := make([]string, 0, len(elements)-maximum)
+	for index := maximum; index < len(elements); index++ {
+		extras = append(extras, fmt.Sprintf("element %d %s", index+1, elements[index]))
+	}
+	return nil, fmt.Errorf("takes at most %d option elements, and the config gives it %d: %s would never be read",
+		maximum, len(elements), strings.Join(extras, ", "))
 }
 
 // DecodeOptionsInto builds the decoder a Registration carries, for any options struct.

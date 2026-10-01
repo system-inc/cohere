@@ -21,12 +21,11 @@ func initDeclarationsCaseName(index int) string {
 // decodeInitDeclarationsOptionsForTest routes a fixture through the rule's own decoder.
 //
 // The wire shape is the unusual part of this rule and the reason every option fixture goes through
-// the decoder rather than building the struct. Upstream's schema is a positional array whose first
-// element is a bare mode string, and cohere's config layer stores only the SECOND element of a
-// [severity, options] pair, so what reaches this decoder is that mode string on its own rather than
-// any array. Building the options struct directly in a fixture would leave that entirely untested,
-// which is exactly what happened: the first version of this decoder read an array, every fixture
-// passed, and it failed at run time on the first real configuration.
+// the decoder rather than building the struct. Upstream's schema is a positional list whose first
+// element is a bare mode string, and the config layer hands this rule that list whole. It used to
+// store only the first element after the severity, so the first version of this decoder read a list,
+// every fixture passed, and it failed at run time on the first real configuration. The fixtures here
+// pass the list, which is now what the config layer delivers; the decoder test pins that it does.
 func decodeInitDeclarationsOptionsForTest(t *testing.T, raw string) any {
 	t.Helper()
 	decoded, err := DecodeInitDeclarationsOptions(json.RawMessage(raw))
@@ -515,14 +514,10 @@ func TestInitDeclarationsExemptsEveryConstantBindingUnderNever(t *testing.T) {
 // TestInitDeclarationsDecoderReadsThePositionalArray pins the lines of the decoder that have no
 // upstream counterpart.
 //
-// The wire shape is a positional array rather than an object, so the mode has no key name and the
+// The wire shape is a positional list rather than an object, so the mode has no key name and the
 // second element is optional. Three of those lines decide something no rule fixture can see: an
-// empty array, a value outside the schema's enum, and an absent second element. Two mutations of
+// empty list, a value outside the schema's enum, and an absent second element. Two mutations of
 // them survived the whole imported corpus, because every option row there names a mode explicitly.
-//
-// The unknown-mode fallback is deliberately the DEFAULT rather than an error. A mistyped
-// configuration should keep the rule doing what it does by default rather than silently inverting
-// it, which is what a zero-valued mode would do.
 func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
 	t.Parallel()
 
@@ -530,32 +525,11 @@ func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
 		raw  string
 		want InitDeclarationsOptions
 	}{
-		// The spelling cohere actually delivers: `parseRuleSetting` stores tuple[1] and nothing
-		// after it, so `["error", "never"]` reaches this decoder as the bare string `"never"`.
-		// These four rows are the ones that matter, and the first version of this decoder failed
-		// every one of them at run time while passing every array row below.
-		{raw: `"always"`, want: InitDeclarationsOptions{Mode: InitDeclarationsAlways}},
-		{raw: `"never"`, want: InitDeclarationsOptions{Mode: InitDeclarationsNever}},
-		{raw: `"bogus"`, want: InitDeclarationsOptions{Mode: InitDeclarationsUnconfigured}},
-		{
-			raw:  `{"mode": "never", "ignoreForLoopInit": true}`,
-			want: InitDeclarationsOptions{Mode: InitDeclarationsNever, IgnoreForLoopInit: true},
-		},
-		{
-			raw:  `{"mode": "always"}`,
-			want: InitDeclarationsOptions{Mode: InitDeclarationsAlways},
-		},
-
 		// Measured on the installed build: `["error"]` with no mode reports nothing at all on
 		// `var foo; var bar = 1;`, the same as a bare `"error"`.
 		{raw: `[]`, want: InitDeclarationsOptions{Mode: InitDeclarationsUnconfigured}},
 		{raw: `["always"]`, want: InitDeclarationsOptions{Mode: InitDeclarationsAlways}},
 		{raw: `["never"]`, want: InitDeclarationsOptions{Mode: InitDeclarationsNever}},
-		// A mode outside the schema's enum is a CONFIGURATION error upstream and never reaches the
-		// rule: ESLint refuses the key outright rather than running with a fallback. Measured. There
-		// is no config-rejection surface to reproduce here, so it resolves to the unconfigured mode,
-		// which is the closest available spelling of "this rule never ran".
-		{raw: `["bogus"]`, want: InitDeclarationsOptions{Mode: InitDeclarationsUnconfigured}},
 		{
 			raw:  `["never", {"ignoreForLoopInit": true}]`,
 			want: InitDeclarationsOptions{Mode: InitDeclarationsNever, IgnoreForLoopInit: true},
@@ -577,6 +551,32 @@ func TestInitDeclarationsDecoderReadsThePositionalArray(t *testing.T) {
 				t.Errorf("decoded to %+v, wanted %+v", settings, testCase.want)
 			}
 		})
+	}
+}
+
+// TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses is the other half of the table above.
+//
+// A mode outside the schema's enum is a CONFIGURATION error upstream and never reaches the rule:
+// ESLint refuses the key outright rather than running with a fallback. Measured. This decoder used to
+// resolve it to the inert unconfigured mode, the closest spelling of "this rule never ran" it had,
+// which is silence; the config layer now surfaces a decoder error at startup, so it is refused.
+func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{
+		`["bogus"]`,
+		// A second element beside "always", which upstream's anyOf does not allow.
+		`["always", {"ignoreForLoopInit": true}]`,
+		// A key upstream does not declare, and a third element.
+		`["never", {"ignoreForLoopInits": true}]`,
+		`["never", {"ignoreForLoopInit": true}, "always"]`,
+		// The two one-slot workarounds from when the config layer delivered only the first element.
+		`"never"`,
+		`{"mode": "never", "ignoreForLoopInit": true}`,
+	} {
+		if decoded, err := DecodeInitDeclarationsOptions(json.RawMessage(raw)); err == nil {
+			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+		}
 	}
 }
 

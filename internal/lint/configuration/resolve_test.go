@@ -49,45 +49,47 @@ func TestSettingForStillReconcilesABarePluginRule(t *testing.T) {
 }
 
 /*
- * Option elements after the first survive parsing rather than being dropped.
+ * Every option element survives parsing, in order, rather than the first alone.
  *
  * eslint's wire format is `[severity, ...options]`, and several core rules use more than one
- * element: `eqeqeq` is `['error', 'always', { null: 'ignore' }]`. `parseRuleSetting` kept
- * `tuple[1]` and discarded the rest, so such an entry was accepted and silently did nothing beyond
- * its first option, which is the worst available outcome for a configuration file: the author sees
- * their setting in the file, the tool reports no error, and half the setting has no effect.
+ * element: `eqeqeq` is `['error', 'always', { null: 'ignore' }]`. `parseRuleSetting` kept `tuple[1]`
+ * and discarded the rest, so such an entry was accepted and silently did nothing beyond its first
+ * option. Measured before the first repair: a config carrying `["error", "always", {"null":
+ * "ignore"}]` resolved its options to the string `"always"` alone.
  *
- * Measured before the repair: a config carrying `["error", "always", {"null": "ignore"}]` resolved
- * its options to the string `"always"` alone.
+ * The first repair kept the remainder in a separate `AdditionalOptions` field that nothing outside
+ * this test read, so the option was still dropped one layer further in, which is why the field is
+ * gone and the whole list is `Options`. Whether a rule may take that many is
+ * `OptionsRegistry.Decode`'s decision, and decode_test.go pins it.
  *
- * The exposure on the ahra tree was zero, since no rule there carries more than one option element,
- * so this was latent rather than live. It was repaired anyway because the failure mode is silence,
- * and a silent config defect is discovered by someone spending an afternoon on why their second
- * option does nothing.
- *
- * The single-option case below is the load-bearing half. `Options` is read by 120 decoders as the
- * first element alone, so a repair that widened that field to carry the whole array would break
- * every one of them, and a table testing only the multi-option case would not notice.
+ * The single-option and bare-severity rows are the load-bearing half: a single element must still
+ * arrive as itself, and a bare severity as nil rather than an empty list a decoder might read as
+ * "configured with nothing".
  */
-func TestParseRuleSettingKeepsOptionsAfterTheFirst(t *testing.T) {
+func TestParseRuleSettingKeepsEveryOptionElement(t *testing.T) {
 	t.Parallel()
 
 	for name, testCase := range map[string]struct {
-		body           string
-		wantOptions    string
-		wantAdditional []string
+		body        string
+		wantOptions []string
 	}{
 		"twoOptionElements": {
-			body:           `["error", "always", {"null": "ignore"}]`,
-			wantOptions:    `"always"`,
-			wantAdditional: []string{`{"null": "ignore"}`},
+			body:        `["error", "always", {"null": "ignore"}]`,
+			wantOptions: []string{`"always"`, `{"null": "ignore"}`},
+		},
+		"threeOptionElements": {
+			body:        `["error", "self", "vm", "that"]`,
+			wantOptions: []string{`"self"`, `"vm"`, `"that"`},
 		},
 		"oneOptionElement": {
 			body:        `["error", {"allow": ["warn"]}]`,
-			wantOptions: `{"allow": ["warn"]}`,
+			wantOptions: []string{`{"allow": ["warn"]}`},
 		},
 		"bareSeverity": {
 			body: `"error"`,
+		},
+		"severityAloneInAnArray": {
+			body: `["error"]`,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -96,16 +98,15 @@ func TestParseRuleSettingKeepsOptionsAfterTheFirst(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse: %v", err)
 			}
-			if got := string(setting.Options); got != testCase.wantOptions {
-				t.Errorf("Options = %s, want %s", got, testCase.wantOptions)
+			if testCase.wantOptions == nil && setting.Options != nil {
+				t.Fatalf("Options = %s, want nil for a rule with no option elements", setting.Options)
 			}
-			if len(setting.AdditionalOptions) != len(testCase.wantAdditional) {
-				t.Fatalf("AdditionalOptions has %d entries, want %d",
-					len(setting.AdditionalOptions), len(testCase.wantAdditional))
+			if len(setting.Options) != len(testCase.wantOptions) {
+				t.Fatalf("Options has %d elements, want %d", len(setting.Options), len(testCase.wantOptions))
 			}
-			for index, want := range testCase.wantAdditional {
-				if got := string(setting.AdditionalOptions[index]); got != want {
-					t.Errorf("AdditionalOptions[%d] = %s, want %s", index, got, want)
+			for index, want := range testCase.wantOptions {
+				if got := string(setting.Options[index]); got != want {
+					t.Errorf("Options[%d] = %s, want %s", index, got, want)
 				}
 			}
 		})

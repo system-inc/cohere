@@ -43,46 +43,38 @@ func DefaultConsistentThisSettings() ConsistentThisSettings {
 //
 // Hand rolled rather than routed through the generic helper for two reasons. The default is
 // `["that"]` rather than the zero value, and a generic decoder would turn an absent option into an
-// empty list, which silently inverts the rule rather than disabling it. And the wire shape is a bare
-// array of strings rather than an object, which the generic helper does not express.
+// empty list, which silently inverts the rule rather than disabling it. And upstream's option
+// surface is VARIADIC: each alias is its own option element, `["error", "self", "vm"]`, so the rule
+// registers with `DecodeOptionList` and is handed that list, which is upstream's `context.options`
+// exactly.
 //
-// Both a bare string and an array are accepted, and that is a divergence worth stating at the line.
-// Upstream spells several aliases as several tuple ELEMENTS -- `["error", "self", "vm"]` -- and this
-// config layer keeps only `tuple[1]` (internal/configuration/configuration.go:392), discarding the
-// rest. So upstream's own spelling for two aliases would silently arrive here as one. The array form
-// `["error", ["self", "vm"]]` is the shape that survives the tuple, and the string form is accepted
-// because it is what a single alias naturally looks like once the tuple has been unwrapped.
-func DecodeConsistentThisOptions(raw []byte) (any, error) {
-	if len(raw) == 0 {
+// The config layer used to keep only the first element, so that spelling arrived here as `"self"`
+// alone with `"vm"` dropped, and this decoder accepted a nested `["error", ["self", "vm"]]` to work
+// around it. The workaround is refused now: an element that is not a string is an error, because
+// upstream's schema says every element is a non-empty string.
+func DecodeConsistentThisOptions(list []byte) (any, error) {
+	if len(list) == 0 {
 		return DefaultConsistentThisSettings(), nil
 	}
 
-	// The string arm first, because it is the narrower shape and cannot swallow an array.
-	var single string
-	if err := json.Unmarshal(raw, &single); err == nil {
-		if single == "" {
-			return DefaultConsistentThisSettings(), fmt.Errorf(
-				"consistent-this takes a non-empty alias, got an empty string")
-		}
-		return ConsistentThisSettings{Aliases: []string{single}}, nil
-	}
-
-	var list []string
-	if err := json.Unmarshal(raw, &list); err != nil {
-		return DefaultConsistentThisSettings(), err
+	var aliases []string
+	if err := json.Unmarshal(list, &aliases); err != nil {
+		return DefaultConsistentThisSettings(), fmt.Errorf(
+			"consistent-this takes each alias as its own string element, as in "+
+				"[\"error\", \"self\", \"vm\"]: %w", err)
 	}
 	// Upstream's schema says `minLength: 1` on each item, so an empty name is refused rather than
 	// quietly matching every unnamed thing.
-	for _, alias := range list {
+	for _, alias := range aliases {
 		if alias == "" {
 			return DefaultConsistentThisSettings(), fmt.Errorf(
 				"consistent-this takes non-empty aliases, got an empty string")
 		}
 	}
-	if len(list) == 0 {
+	if len(aliases) == 0 {
 		return DefaultConsistentThisSettings(), nil
 	}
-	return ConsistentThisSettings{Aliases: list}, nil
+	return ConsistentThisSettings{Aliases: aliases}, nil
 }
 
 // ConsistentThis flags a capture of `this` under a name other than the designated alias, and a

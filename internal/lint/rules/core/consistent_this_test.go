@@ -14,7 +14,7 @@ const consistentThisFile = "/repository/source/ConsistentThis.ts"
 //
 // Building the settings struct directly would leave the decoder untested, and the decoder is
 // where this rule's two most dangerous lines live: the default of ["that"] rather than the zero
-// value, and the acceptance of both a bare string and an array. A struct built by hand passes
+// value, and reading upstream's variadic list, one alias per element. A struct built by hand passes
 // every fixture while an inverted default ships.
 func consistentThisOptions(t *testing.T, aliases ...string) any {
 	t.Helper()
@@ -225,10 +225,10 @@ func TestDecodeConsistentThisOptions(t *testing.T) {
 			consistentThisFile, "var that = this", nil))
 	})
 
-	t.Run("a bare string is one alias", func(t *testing.T) {
-		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`"self"`))
+	t.Run("one element is one alias", func(t *testing.T) {
+		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`["self"]`))
 		if err != nil {
-			t.Fatalf("the decoder refused a bare string: %v", err)
+			t.Fatalf("the decoder refused one alias: %v", err)
 		}
 		settings := decoded.(ConsistentThisSettings)
 		if len(settings.Aliases) != 1 || settings.Aliases[0] != "self" {
@@ -236,10 +236,10 @@ func TestDecodeConsistentThisOptions(t *testing.T) {
 		}
 	})
 
-	t.Run("an array is several aliases", func(t *testing.T) {
+	t.Run("every element is an alias, upstream's variadic spelling", func(t *testing.T) {
 		decoded, err := DecodeConsistentThisOptions(json.RawMessage(`["self","vm"]`))
 		if err != nil {
-			t.Fatalf("the decoder refused an array: %v", err)
+			t.Fatalf("the decoder refused two aliases: %v", err)
 		}
 		settings := decoded.(ConsistentThisSettings)
 		if len(settings.Aliases) != 2 || settings.Aliases[0] != "self" || settings.Aliases[1] != "vm" {
@@ -247,8 +247,14 @@ func TestDecodeConsistentThisOptions(t *testing.T) {
 		}
 	})
 
+	t.Run("the nested-array workaround is refused rather than read", func(t *testing.T) {
+		if _, err := DecodeConsistentThisOptions(json.RawMessage(`[["self","vm"]]`)); err == nil {
+			t.Error("an element that is not a string decoded; upstream's schema refuses it")
+		}
+	})
+
 	t.Run("an empty name is refused", func(t *testing.T) {
-		if _, err := DecodeConsistentThisOptions(json.RawMessage(`""`)); err == nil {
+		if _, err := DecodeConsistentThisOptions(json.RawMessage(`[""]`)); err == nil {
 			t.Error("expected the decoder to refuse an empty alias")
 		}
 		if _, err := DecodeConsistentThisOptions(json.RawMessage(`["self",""]`)); err == nil {

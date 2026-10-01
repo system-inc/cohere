@@ -1,7 +1,9 @@
 package typescript
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -53,80 +55,60 @@ func DefaultInitDeclarationsSettings() InitDeclarationsOptions {
 	return InitDeclarationsOptions{Mode: InitDeclarationsUnconfigured}
 }
 
-// DecodeInitDeclarationsOptions reads the rule's configuration.
+// DecodeInitDeclarationsOptions reads upstream's option list: `["always"]`, `["never"]`,
+// `["never", {"ignoreForLoopInit": true}]`, or nothing.
 //
-// # The wire shape here is ONE element, not upstream's array, and that cost a cycle
+// # The list arrives whole, and the first port of this decoder is why that matters
 //
-// Upstream's `meta.schema` is a positional tuple: the mode is `options[0]` and an object holding
-// `ignoreForLoopInit` is `options[1]`, so the ESLint spelling is
-// `["error", "never", {"ignoreForLoopInit": true}]`.
+// Upstream's `meta.schema` is an `anyOf` of two positional lists: the mode is `options[0]` and an
+// object holding `ignoreForLoopInit` is `options[1]`, legal only beside "never". The rule registers
+// with `DecodeOptionList`, so it is handed exactly that.
 //
-// cohere's config layer does not pass that through. `parseRuleSetting` reads a rule value as either a
-// bare severity or a `[severity, options]` PAIR, and stores `tuple[1]` and nothing after it, so a
-// decoder here is handed exactly one JSON value. For this rule that value is the bare string
-// `"never"`. A decoder written to upstream's shape fails at run time with an unmarshal error naming a
-// string where an array was wanted, which is how this was found: the fixtures all passed, because they
-// were written to the same wrong belief, and only a seeded probe tree disagreed.
+// The config layer used to store `tuple[1]` and nothing after it, so a decoder written to upstream's
+// list shape failed at run time on the bare string `"never"` while every fixture passed, and the
+// repair was a cohere-only `{"mode": ..., "ignoreForLoopInit": ...}` object to carry the second
+// element through one slot. Both the bare string and the object are refused now: neither is
+// upstream's, and the config layer no longer delivers either.
 //
-// So the accepted spellings here are the single element:
-//
-//	"always"                              the mode alone
-//	"never"
-//	{"mode": "never", "ignoreForLoopInit": true}   an object, for the second option
-//
-// The object form has no upstream counterpart and exists because there is no other way to reach
-// `ignoreForLoopInit` through a two-element tuple. It is a divergence in SPELLING rather than in
-// judgment, it is stated here, and the array form is accepted too so a configuration copied from
-// ESLint is read rather than refused.
-func DecodeInitDeclarationsOptions(raw []byte) (any, error) {
+// A mode outside the enum is refused rather than resolved to the inert unconfigured mode. Upstream's
+// schema refuses it before the rule runs, and resolving it to "never ran" was the same silence one
+// layer further in. So is a second element beside "always", a key the second element's schema does
+// not declare, and a third element.
+func DecodeInitDeclarationsOptions(list []byte) (any, error) {
 	options := DefaultInitDeclarationsSettings()
-	if len(raw) == 0 {
-		return options, nil
+	elements, err := rule.OptionElements(list, 2)
+	if err != nil || len(elements) == 0 {
+		return options, err
 	}
 
-	// The spelling cohere actually delivers: the mode as a bare string.
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err == nil {
-		options.Mode = initDeclarationsModeOf(mode)
-		return options, nil
-	}
-
-	// An object, which is the only way to carry ignoreForLoopInit through a two-element tuple.
-	var object struct {
-		Mode              string `json:"mode"`
-		IgnoreForLoopInit *bool  `json:"ignoreForLoopInit"`
-	}
-	if err := json.Unmarshal(raw, &object); err == nil {
-		options.Mode = initDeclarationsModeOf(object.Mode)
-		if object.IgnoreForLoopInit != nil {
-			options.IgnoreForLoopInit = *object.IgnoreForLoopInit
-		}
-		return options, nil
-	}
-
-	// Upstream's own array, accepted so a configuration copied from an ESLint config is read rather
-	// than refused. It cannot arrive through the live config today, and reading it costs one branch.
-	var wire []json.RawMessage
-	if err := json.Unmarshal(raw, &wire); err != nil {
-		return options, err
-	}
-	if len(wire) == 0 {
-		return options, nil
-	}
-	if err := json.Unmarshal(wire[0], &mode); err != nil {
-		return options, err
+	if err := json.Unmarshal(elements[0], &mode); err != nil {
+		return options, fmt.Errorf("init-declarations element 1 takes a mode string, got %s", elements[0])
 	}
 	options.Mode = initDeclarationsModeOf(mode)
-	if len(wire) > 1 {
-		var second struct {
-			IgnoreForLoopInit *bool `json:"ignoreForLoopInit"`
-		}
-		if err := json.Unmarshal(wire[1], &second); err != nil {
-			return options, err
-		}
-		if second.IgnoreForLoopInit != nil {
-			options.IgnoreForLoopInit = *second.IgnoreForLoopInit
-		}
+	if options.Mode == InitDeclarationsUnconfigured {
+		return DefaultInitDeclarationsSettings(), fmt.Errorf(
+			"init-declarations: unknown mode %q, wanted always or never", mode)
+	}
+	if len(elements) < 2 {
+		return options, nil
+	}
+	if options.Mode != InitDeclarationsNever {
+		return DefaultInitDeclarationsSettings(), fmt.Errorf(
+			"init-declarations: %q takes no second element, so %s would never be read; only "+
+				"\"never\" reads ignoreForLoopInit", mode, elements[1])
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(elements[1]))
+	decoder.DisallowUnknownFields()
+	var second struct {
+		IgnoreForLoopInit *bool `json:"ignoreForLoopInit"`
+	}
+	if err := decoder.Decode(&second); err != nil {
+		return DefaultInitDeclarationsSettings(), fmt.Errorf("init-declarations element 2: %w", err)
+	}
+	if second.IgnoreForLoopInit != nil {
+		options.IgnoreForLoopInit = *second.IgnoreForLoopInit
 	}
 	return options, nil
 }

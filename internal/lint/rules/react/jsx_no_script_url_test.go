@@ -24,13 +24,14 @@ const jsxNoScriptUrlFile = "/repository/source/JsxNoScriptUrl.tsx"
 // All 22 were replayed against the installed build, eslint-plugin-react 7.37.5, through the ESLint
 // Linter API before any Go was written, and the corpus and the running rule agreed on every one.
 //
-// # Six cases depend on a configuration surface cohere does not have
+// # Some cases depend on a configuration surface cohere does not have
 //
-// Upstream reads `settings.linkComponents` from ESLint's shared settings. cohere has no
-// shared-settings surface, so this port answers as though the settings were empty. Each affected
-// case is kept, at the verdict this port actually produces, with the upstream verdict named beside
-// it. The no-settings verdicts were measured by replaying the same cases against the installed
-// build with the settings stripped, which is exactly the configuration this port can express.
+// Upstream reads `settings.linkComponents` from ESLint's shared settings when a case configures
+// `includeFromSettings: true`. cohere has no shared-settings surface, so those four cases' options
+// are refused at configuration, recorded with upstream's verdicts in
+// TestJsxNoScriptUrlRefusesIncludeFromSettings. The cases with settings but no flag are kept at
+// the verdict this port produces, measured by replaying them against the installed build with the
+// settings stripped, which is exactly the configuration this port can express.
 
 // jsxNoScriptUrlOptions decodes a raw option body the way the config layer does.
 //
@@ -61,26 +62,18 @@ func TestJsxNoScriptUrlFires(t *testing.T) {
 		// The interleaved-whitespace case, carrying real newline, carriage return and tab
 		// characters rather than typed escapes.
 		{"invalid 2", "<a href=\"j\n\n\na\rv\tascript:\"></a>", ``, 1},
-		{"invalid 3", `<Foo to="javascript:"></Foo>`, `{"positional":[[{"name":"Foo","props":["to","href"]}]]}`, 1},
-		{"invalid 4", `<Foo href="javascript:"></Foo>`, `{"positional":[[{"name":"Foo","props":["to","href"]}]]}`, 1},
-		{"invalid 5", `<a href="javascript:void(0)"></a>`, `{"positional":[[{"name":"Foo","props":["to","href"]}]]}`, 1},
-		// Upstream reports TWO here: the `Bar` finding from the legacy array and the `Foo` one from
-		// settings. This port has no settings surface, so only the `Bar` finding survives. The
-		// upstream verdict was measured; so was this one, by stripping the settings.
-		{"invalid 8", `
-      <div>
-        <Foo href="javascript:"></Foo>
-        <Bar link="javascript:"></Bar>
-      </div>
-    `, `{"positional":[[{"name":"Bar","props":["link"]}],{"includeFromSettings":true}]}`, 1},
-		// The same source with no `includeFromSettings`, which upstream also answers with one
-		// finding. The pair is what shows the flag is the only difference upstream.
+		{"invalid 3", `<Foo to="javascript:"></Foo>`, `[[{"name":"Foo","props":["to","href"]}]]`, 1},
+		{"invalid 4", `<Foo href="javascript:"></Foo>`, `[[{"name":"Foo","props":["to","href"]}]]`, 1},
+		{"invalid 5", `<a href="javascript:void(0)"></a>`, `[[{"name":"Foo","props":["to","href"]}]]`, 1},
+		// Upstream's invalid 8 is this source with `includeFromSettings: true` added and reports
+		// twice; its configuration is refused here, see TestJsxNoScriptUrlRefusesIncludeFromSettings.
+		// Without the flag upstream answers with one finding, and so does this port.
 		{"invalid 9", `
       <div>
         <Foo href="javascript:"></Foo>
         <Bar link="javascript:"></Bar>
       </div>
-    `, `{"positional":[[{"name":"Bar","props":["link"]}]]}`, 1},
+    `, `[[{"name":"Bar","props":["link"]}]]`, 1},
 
 		// Cases upstream's corpus does not write, each measured against the installed build before
 		// being written here.
@@ -104,12 +97,10 @@ func TestJsxNoScriptUrlFires(t *testing.T) {
 		{"self-closing anchor", `<a href="javascript:" />`, ``, 1},
 		// A legacy entry naming a component twice keeps the LAST entry's prop list. Measured both
 		// ways; the partner case in the silent table uses the first entry's prop and is clean.
-		{"repeated name keeps the last props", `<Foo to="javascript:"></Foo>`, `{"positional":[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]}`, 1},
+		{"repeated name keeps the last props", `<Foo to="javascript:"></Foo>`, `[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`, 1},
 		// An entry named `a` REPLACES the built-in href pair rather than adding to it, so the
 		// replacement's own prop reports. Its partner below shows `href` going clean.
-		{"an entry named a replaces the default", `<a to="javascript:"></a>`, `{"positional":[[{"name":"a","props":["to"]}]]}`, 1},
-		// `includeFromSettings` with nothing to include from leaves the built-in pair working.
-		{"includeFromSettings with no settings still checks a", `<a href="javascript:"></a>`, `{"positional":[{"includeFromSettings":true}]}`, 1},
+		{"an entry named a replaces the default", `<a to="javascript:"></a>`, `[[{"name":"a","props":["to"]}]]`, 1},
 	}
 
 	for _, testCase := range cases {
@@ -144,17 +135,12 @@ func TestJsxNoScriptUrlStaysSilent(t *testing.T) {
 		{"valid 5", `<a href={"javascript:"}></a>`, ``},
 		{"valid 6", `<Foo href="javascript:"></Foo>`, ``},
 		{"valid 7", `<a href />`, ``},
-		{"valid 8", `<Foo other="javascript:"></Foo>`, `{"positional":[[{"name":"Foo","props":["to","href"]}]]}`},
+		{"valid 8", `<Foo other="javascript:"></Foo>`, `[[{"name":"Foo","props":["to","href"]}]]`},
 		// Clean upstream WITH its settings and clean here without them, so the missing surface
-		// costs nothing on these three. Measured both ways.
+		// costs nothing on these two. Measured both ways. Upstream's valid 11 carries
+		// `includeFromSettings: true` and is in TestJsxNoScriptUrlRefusesIncludeFromSettings.
 		{"valid 9", `<Foo href="javascript:"></Foo>`, ``},
-		{"valid 10", `<Foo href="javascript:"></Foo>`, `{"positional":[[],{"includeFromSettings":false}]}`},
-		{"valid 11", `<Foo other="javascript:"></Foo>`, `{"positional":[[],{"includeFromSettings":true}]}`},
-		// These two report upstream ONLY because settings supply the component, so they are silent
-		// here. Recorded at this port's verdict rather than deleted, because the gap is a missing
-		// configuration surface and deleting the case would hide it.
-		{"invalid 6, silent without a settings surface", `<Foo to="javascript:"></Foo>`, `{"positional":[[{"name":"Bar","props":["to","href"]}],{"includeFromSettings":true}]}`},
-		{"invalid 7, silent without a settings surface", `<Foo href="javascript:"></Foo>`, `{"positional":[{"includeFromSettings":true}]}`},
+		{"valid 10", `<Foo href="javascript:"></Foo>`, `[[],{"includeFromSettings":false}]`},
 
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
@@ -180,11 +166,11 @@ func TestJsxNoScriptUrlStaysSilent(t *testing.T) {
 		{"template literal value", "<a href={`javascript:`}></a>", ``},
 		// The partner to the replacement case above: once `a` is redefined, its built-in `href`
 		// pair is gone and the same source goes clean.
-		{"an entry named a drops the built-in href", `<a href="javascript:"></a>`, `{"positional":[[{"name":"a","props":["to"]}]]}`},
+		{"an entry named a drops the built-in href", `<a href="javascript:"></a>`, `[[{"name":"a","props":["to"]}]]`},
 		// The partner to the repeated-name case: the FIRST entry's prop no longer applies.
-		{"repeated name drops the first props", `<Foo href="javascript:"></Foo>`, `{"positional":[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]}`},
+		{"repeated name drops the first props", `<Foo href="javascript:"></Foo>`, `[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`},
 		// An empty prop list matches nothing.
-		{"empty props list", `<Foo href="javascript:"></Foo>`, `{"positional":[[{"name":"Foo","props":[]}]]}`},
+		{"empty props list", `<Foo href="javascript:"></Foo>`, `[[{"name":"Foo","props":[]}]]`},
 	}
 
 	for _, testCase := range cases {
@@ -299,7 +285,7 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 	})
 
 	t.Run("the array arm alone", func(t *testing.T) {
-		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`{"positional":[[{"name":"Foo","props":["to","href"]}]]}`))
+		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Foo","props":["to","href"]}]]`))
 		if err != nil {
 			t.Fatalf("decoding the array arm: %v", err)
 		}
@@ -310,27 +296,20 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 		if got := strings.Join(options.Legacy[0].Props, ","); got != "to,href" {
 			t.Fatalf("props are %q, want %q", got, "to,href")
 		}
-		if options.IncludeFromSettings {
-			t.Fatal("includeFromSettings is true with no object slot")
-		}
 	})
 
-	t.Run("the object arm alone", func(t *testing.T) {
-		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`{"positional":[{"includeFromSettings":true}]}`))
+	t.Run("the object arm alone, at its default", func(t *testing.T) {
+		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[{"includeFromSettings":false}]`))
 		if err != nil {
 			t.Fatalf("decoding the object arm: %v", err)
 		}
-		options := decoded.(JsxNoScriptUrlOptions)
-		if len(options.Legacy) != 0 {
+		if options := decoded.(JsxNoScriptUrlOptions); len(options.Legacy) != 0 {
 			t.Fatalf("legacy list is %v, want empty", options.Legacy)
-		}
-		if !options.IncludeFromSettings {
-			t.Fatal("includeFromSettings is false, want true")
 		}
 	})
 
 	t.Run("both arms in order", func(t *testing.T) {
-		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`{"positional":[[{"name":"Bar","props":["link"]}],{"includeFromSettings":true}]}`))
+		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":false}]`))
 		if err != nil {
 			t.Fatalf("decoding both arms: %v", err)
 		}
@@ -338,27 +317,61 @@ func TestDecodeJsxNoScriptUrlOptions(t *testing.T) {
 		if len(options.Legacy) != 1 || options.Legacy[0].Name != "Bar" {
 			t.Fatalf("legacy list is %v, want one entry named Bar", options.Legacy)
 		}
-		if !options.IncludeFromSettings {
-			t.Fatal("includeFromSettings is false, want true")
-		}
 	})
 
 	t.Run("an empty array slot is not the object arm", func(t *testing.T) {
-		// `[[], {...}]` is upstream's own spelling in two corpus cases. An empty JSON array
-		// decodes into the array arm, so the object slot must still be read from the second
-		// position rather than the first.
-		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`{"positional":[[],{"includeFromSettings":true}]}`))
-		if err != nil {
-			t.Fatalf("decoding an empty array slot: %v", err)
+		// `[[], {...}]` is upstream's own spelling in two corpus cases. An empty JSON array is the
+		// array arm, so the object must still be read from the second position: the refusal of
+		// `true` there is what proves it was read at all.
+		if _, err := DecodeJsxNoScriptUrlOptions([]byte(`[[],{"includeFromSettings":true}]`)); err == nil {
+			t.Fatal("the object in the second position was not read, so its `true` was not refused")
 		}
-		options := decoded.(JsxNoScriptUrlOptions)
-		if len(options.Legacy) != 0 {
-			t.Fatalf("legacy list is %v, want empty", options.Legacy)
-		}
-		if !options.IncludeFromSettings {
-			t.Fatal("includeFromSettings is false, want true")
+		if _, err := DecodeJsxNoScriptUrlOptions([]byte(`[[],{"includeFromSettings":false}]`)); err != nil {
+			t.Fatalf("the same list at the default was refused: %v", err)
 		}
 	})
+
+	t.Run("shapes the config layer does not deliver, or upstream refuses, are refused", func(t *testing.T) {
+		for _, raw := range []string{
+			// The wrapper this decoder used to read.
+			`{"positional":[[{"name":"Foo","props":["to"]}]]}`,
+			// An object first takes no second element.
+			`[{"includeFromSettings":false},[{"name":"Foo","props":["to"]}]]`,
+			// A third element.
+			`[[],{"includeFromSettings":false},{}]`,
+			// Keys outside the schema, in a legacy entry and in the object.
+			`[[{"name":"Foo","prop":["to"]}]]`,
+			`[{"includeFromSetting":false}]`,
+		} {
+			if decoded, err := DecodeJsxNoScriptUrlOptions([]byte(raw)); err == nil {
+				t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+			}
+		}
+	})
+}
+
+// TestJsxNoScriptUrlRefusesIncludeFromSettings records upstream's four corpus cases that carry
+// `includeFromSettings: true`, with upstream's verdict beside each.
+//
+// Upstream reads `settings.linkComponents` when the flag is true, and cohere has no shared-settings
+// surface, so the flag cannot be honoured. These used to be accepted and run as though the settings
+// were empty, which made invalid 6 and 7 silent and invalid 8 report once where upstream reports
+// twice, with nothing telling the author their flag had no effect. They are refused at configuration
+// now, so the gap is a startup error naming the flag rather than a quiet difference in findings.
+func TestJsxNoScriptUrlRefusesIncludeFromSettings(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{
+		`[[],{"includeFromSettings":true}]`,                                     // valid 11, clean upstream
+		`[[{"name":"Bar","props":["to","href"]}],{"includeFromSettings":true}]`, // invalid 6, one finding upstream
+		`[{"includeFromSettings":true}]`,                                        // invalid 7, one finding upstream
+		`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":true}]`,      // invalid 8, two findings upstream
+	} {
+		_, err := DecodeJsxNoScriptUrlOptions([]byte(raw))
+		if err == nil || !strings.Contains(err.Error(), "includeFromSettings") {
+			t.Errorf("%s: want a refusal naming includeFromSettings, got %v", raw, err)
+		}
+	}
 }
 
 // TestJsxNoScriptUrlProtocolScan probes the predicate directly at its edges.

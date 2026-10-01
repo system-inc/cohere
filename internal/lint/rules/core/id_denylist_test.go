@@ -542,32 +542,24 @@ func TestIdDenylistImportAttributeKeysStopAtTheImportCall(t *testing.T) {
 // TestIdDenylistDecoderAcceptsTheConfigLayersShape pins the wire contract, which every other
 // fixture in this file bypasses.
 //
-// Fixtures reach the decoder with bytes the TEST built. The config layer builds different bytes:
-// it parses `["error", <options>]` and hands the rule ONLY `tuple[1]`, one element. Upstream's
-// option surface is variadic -- `["error", "data", "err", "cb"]` -- so a decoder written to
-// upstream's shape receives the bare string `"data"` and either errors or silently denies one name.
+// Fixtures reach the decoder with bytes the TEST built. The config layer hands a list rule every
+// element after the severity as one list, which for upstream's variadic `["error", "data", "err",
+// "cb"]` is `["data", "err", "cb"]`. It used to hand over only `"data"`, which errored on the first
+// dry run and, once a bare string was accepted to stop the error, silently denied one name of three.
 //
-// It errored, and only a dry run found it:
-//
-//	rule configuration: rule id-denylist: decoding []string: json: cannot unmarshal string
-//	into Go value of type []string
-//
-// These rows are the shapes the config layer can actually deliver, so a future change that breaks
-// the contract fails here rather than at the next dry run.
+// These rows are the shapes the config layer delivers, and the ones it must not be read as.
 func TestIdDenylistDecoderAcceptsTheConfigLayersShape(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		// raw is what the config layer hands the decoder: the single element after the severity.
+		// raw is what the config layer hands the decoder: every element after the severity.
 		raw    string
 		denied []string
 	}{
-		// The cohere spelling, which is what every configured rule in the live config looks like.
+		// Upstream's variadic spelling, every name its own element.
 		{raw: `["data", "err", "cb"]`, denied: []string{"data", "err", "cb"}},
-		// Upstream's variadic spelling, collapsed by the config layer to its first element. Denying
-		// one name is a weaker configuration than intended, and it is still a working rule rather
-		// than a startup failure.
-		{raw: `"data"`, denied: []string{"data"}},
+		// One name.
+		{raw: `["data"]`, denied: []string{"data"}},
 		// An explicitly empty list denies nothing.
 		{raw: `[]`, denied: nil},
 	}
@@ -597,7 +589,15 @@ func TestIdDenylistDecoderAcceptsTheConfigLayersShape(t *testing.T) {
 
 	// A shape that is neither is an error rather than a silently empty denylist, because a rule
 	// that looks configured and denies nothing is the worse of the two failures.
-	if _, err := DecodeIdDenylistOptions([]byte(`{"names": ["data"]}`)); err == nil {
-		t.Error("expected an object to be refused, got no error")
+	for _, raw := range []string{
+		`{"names": ["data"]}`,
+		// The bare string the config layer used to deliver, which the decoder read as one name.
+		`"data"`,
+		// The nested workaround spelling, an element that is not a string.
+		`[["data", "err"]]`,
+	} {
+		if _, err := DecodeIdDenylistOptions([]byte(raw)); err == nil {
+			t.Errorf("expected %s to be refused, got no error", raw)
+		}
 	}
 }

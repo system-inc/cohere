@@ -28,55 +28,41 @@ func DefaultIdDenylistSettings() IdDenylistSettings {
 // DecodeIdDenylistOptions reads the denied names off the config.
 //
 // Hand rolled rather than routed through `rule.DecodeOptionsInto` because the wire shape is a JSON
-// array rather than an object, and the generic helper decodes into a struct.
+// list of strings rather than an object, and the generic helper decodes into a struct.
 //
-// # Two spellings, because ESLint's option surface is VARIADIC and cohere's is not
+// # Upstream's option surface is VARIADIC, and the list arrives whole
 //
-// Upstream reads `context.options`, which is every element of the config array after the severity,
-// so its own spelling is:
+// Upstream reads `context.options`, which is every element of the config array after the severity:
 //
 //	"id-denylist": ["error", "data", "err", "cb"]
 //
-// cohere's config layer takes only ONE element after the severity -- `setting.Options = tuple[1]`
-// in internal/lint/configuration/configuration.go -- so a rule written that way is handed the bare
-// string `"data"` and the rest is silently dropped. Measured: the first dry run against a seeded
-// tree failed outright with
+// The rule registers with `DecodeOptionList`, so this is handed `["data", "err", "cb"]`, upstream's
+// list exactly. The config layer used to keep only the first element, and the first dry run against
+// a seeded tree failed outright on the bare string it delivered:
 //
 //	rule configuration: rule id-denylist: decoding []string: json: cannot unmarshal string
 //	into Go value of type []string
 //
-// and it is worth saying that no fixture could have found this, because every fixture reaches the
-// decoder with bytes the TEST built rather than with bytes the config layer sliced. This is exactly
-// the "run it dry against the real tree" step earning its place.
-//
-// So the cohere spelling is the nested array, which is what every configured rule in the live
-// config already looks like -- one options value after the severity:
-//
-//	"id-denylist": ["error", ["data", "err", "cb"]]
-//
-// Both are accepted. A single bare string is also accepted as a one-name list, so upstream's
-// spelling degrades to denying its first name rather than to an error, and neither shape can be
-// mistaken for the other: an array is an array and a string is a string.
+// The workaround was a nested spelling, `["error", ["data", "err", "cb"]]`, plus reading a bare
+// string as a one-name list so the variadic spelling degraded to its first name. Both are gone: the
+// first is an element that is not a string, which upstream's schema refuses, and the second was a
+// silent drop of every name after the first.
 //
 // Empty input decodes to an empty list rather than failing. A rule configured as a bare "error" is
-// handed nil options, and for this rule the correct answer is "deny nothing" rather than an error,
-// which is the same answer upstream gives: its `denyList` is built from `context.options`, and an
-// unconfigured rule has none.
-func DecodeIdDenylistOptions(raw []byte) (any, error) {
+// handed nil options, and for this rule the correct answer is "deny nothing", which is the same
+// answer upstream gives: its `denyList` is built from `context.options`, and an unconfigured rule
+// has none.
+func DecodeIdDenylistOptions(list []byte) (any, error) {
 	settings := DefaultIdDenylistSettings()
-	if len(raw) == 0 {
+	if len(list) == 0 {
 		return settings, nil
 	}
 
 	var names []string
-	if err := json.Unmarshal(raw, &names); err != nil {
-		// A single name written without the array, which is what upstream's variadic spelling
-		// collapses to once the config layer has taken only the first element after the severity.
-		var single string
-		if singleErr := json.Unmarshal(raw, &single); singleErr != nil {
-			return settings, err
-		}
-		names = []string{single}
+	if err := json.Unmarshal(list, &names); err != nil {
+		return settings, fmt.Errorf(
+			"id-denylist takes each name as its own string element, as in "+
+				"[\"error\", \"data\", \"err\"]: %w", err)
 	}
 	if len(names) == 0 {
 		return settings, nil

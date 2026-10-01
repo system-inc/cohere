@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -60,78 +61,93 @@ func DefaultObjectShorthandSettings() ObjectShorthandSettings {
 
 // DecodeObjectShorthandOptions reads the mode and flags off the config.
 //
-// # Three tuple shapes, and section 7c's warning applies twice over
+// # Three list shapes, and which flags are legal depends on the mode
 //
-// Upstream's schema is an `anyOf` over three array shapes, and which flags are legal depends on
-// which mode is written: `avoidQuotes` with always/methods/properties, `ignoreConstructors` and
-// `methodsIgnorePattern` with always/methods, `avoidExplicitReturnArrows` likewise. The rule itself
-// does not enforce that pairing -- it reads `context.options[1] || {}` and takes whatever is there
-// -- so this decoder accepts any flag with any mode, which is upstream's runtime behaviour rather
-// than its schema's.
+// Upstream's schema is an `anyOf` over three lists, and the rule registers with `DecodeOptionList`
+// so it is handed upstream's list as written:
 //
-// The cohere config layer hands over ONE element after the severity, so the tuple has to arrive
-// nested. Both spellings are accepted, for the reason section 7c gives:
+//	["always" | "methods" | "properties" | "never" | "consistent" | "consistent-as-needed"]
+//	["always" | "methods" | "properties", {"avoidQuotes"}]
+//	["always" | "methods", {"ignoreConstructors", "methodsIgnorePattern", "avoidQuotes",
+//	                        "avoidExplicitReturnArrows"}]
 //
-//	"object-shorthand": ["error", ["always", { "avoidQuotes": true }]]   the cohere spelling
-//	"object-shorthand": ["error", "always"]                             a bare mode
+// That pairing is enforced here. The rule body reads `context.options[1] || {}` whatever the mode,
+// but upstream's schema refuses a flag beside a mode that cannot use it before the rule runs, so a
+// config doing it is a config error there, and accepting it here would be a flag read and never
+// honoured. A key outside the four is refused for the same reason.
+//
+// The config layer used to keep only the first element after the severity, so this decoder accepted
+// a nested `["error", ["always", {...}]]` to reach the flags. That spelling is refused now: its first
+// element is not a string.
 //
 // A mode that is not one of the six is an error rather than a silent fallback to "always". A typo
 // in a mode name would otherwise produce a rule that looks configured and enforces the default.
-func DecodeObjectShorthandOptions(raw []byte) (any, error) {
+func DecodeObjectShorthandOptions(list []byte) (any, error) {
 	settings := DefaultObjectShorthandSettings()
-	if len(raw) == 0 {
-		return settings, nil
+	elements, err := rule.OptionElements(list, 2)
+	if err != nil || len(elements) == 0 {
+		return settings, err
 	}
 
 	var modeText string
-	var flagsRaw json.RawMessage
-
-	if err := json.Unmarshal(raw, &modeText); err != nil {
-		var tuple []json.RawMessage
-		if tupleErr := json.Unmarshal(raw, &tuple); tupleErr != nil {
-			return settings, tupleErr
-		}
-		if len(tuple) == 0 {
-			return settings, nil
-		}
-		if modeErr := json.Unmarshal(tuple[0], &modeText); modeErr != nil {
-			return settings, modeErr
-		}
-		if len(tuple) > 1 {
-			flagsRaw = tuple[1]
-		}
+	if err := json.Unmarshal(elements[0], &modeText); err != nil {
+		return settings, fmt.Errorf("object-shorthand element 1 takes a mode string, got %s", elements[0])
 	}
-
 	mode, ok := objectShorthandModeFor(modeText)
 	if !ok {
 		return settings, fmt.Errorf("object-shorthand mode %q is not one of "+
 			"always, methods, properties, never, consistent, consistent-as-needed", modeText)
 	}
 	settings.Mode = mode
+	if len(elements) < 2 {
+		return settings, nil
+	}
 
-	if len(flagsRaw) > 0 {
-		var wire struct {
-			AvoidQuotes               bool   `json:"avoidQuotes"`
-			IgnoreConstructors        bool   `json:"ignoreConstructors"`
-			MethodsIgnorePattern      string `json:"methodsIgnorePattern"`
-			AvoidExplicitReturnArrows bool   `json:"avoidExplicitReturnArrows"`
+	decoder := json.NewDecoder(bytes.NewReader(elements[1]))
+	decoder.DisallowUnknownFields()
+	var wire struct {
+		AvoidQuotes               *bool   `json:"avoidQuotes"`
+		IgnoreConstructors        *bool   `json:"ignoreConstructors"`
+		MethodsIgnorePattern      *string `json:"methodsIgnorePattern"`
+		AvoidExplicitReturnArrows *bool   `json:"avoidExplicitReturnArrows"`
+	}
+	if err := decoder.Decode(&wire); err != nil {
+		return settings, fmt.Errorf("object-shorthand element 2: %w", err)
+	}
+
+	// Upstream's schema: no flags beside never or the consistent modes, only avoidQuotes beside
+	// properties, all four beside always and methods.
+	switch mode {
+	case ObjectShorthandAlways, ObjectShorthandMethods:
+	case ObjectShorthandProperties:
+		if wire.IgnoreConstructors != nil || wire.MethodsIgnorePattern != nil ||
+			wire.AvoidExplicitReturnArrows != nil {
+			return settings, fmt.Errorf("object-shorthand %q reads only avoidQuotes, so %s would "+
+				"never be read in full", modeText, elements[1])
 		}
-		if err := json.Unmarshal(flagsRaw, &wire); err != nil {
-			return settings, err
+	default:
+		return settings, fmt.Errorf("object-shorthand %q takes no second element, so %s would "+
+			"never be read", modeText, elements[1])
+	}
+
+	if wire.AvoidQuotes != nil {
+		settings.AvoidQuotes = *wire.AvoidQuotes
+	}
+	if wire.IgnoreConstructors != nil {
+		settings.IgnoreConstructors = *wire.IgnoreConstructors
+	}
+	if wire.AvoidExplicitReturnArrows != nil {
+		settings.AvoidExplicitReturnArrows = *wire.AvoidExplicitReturnArrows
+	}
+	if wire.MethodsIgnorePattern != nil && *wire.MethodsIgnorePattern != "" {
+		compiled, err := regexp.Compile(*wire.MethodsIgnorePattern)
+		if err != nil {
+			return settings, fmt.Errorf(
+				"object-shorthand methodsIgnorePattern %q does not compile: %w",
+				*wire.MethodsIgnorePattern, err)
 		}
-		settings.AvoidQuotes = wire.AvoidQuotes
-		settings.IgnoreConstructors = wire.IgnoreConstructors
-		settings.AvoidExplicitReturnArrows = wire.AvoidExplicitReturnArrows
-		if wire.MethodsIgnorePattern != "" {
-			compiled, err := regexp.Compile(wire.MethodsIgnorePattern)
-			if err != nil {
-				return settings, fmt.Errorf(
-					"object-shorthand methodsIgnorePattern %q does not compile: %w",
-					wire.MethodsIgnorePattern, err)
-			}
-			settings.MethodsIgnorePattern = compiled
-			settings.MethodsIgnorePatternText = wire.MethodsIgnorePattern
-		}
+		settings.MethodsIgnorePattern = compiled
+		settings.MethodsIgnorePatternText = *wire.MethodsIgnorePattern
 	}
 	return settings, nil
 }

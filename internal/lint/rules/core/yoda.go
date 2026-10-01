@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -11,10 +12,8 @@ import (
 
 // YodaSettings is the decoded option surface.
 //
-// Upstream's schema is a two element tuple: an enum, then an object. The config layer here unwraps
-// the `[severity, options]` tuple and keeps only `tuple[1]`, so the second element of upstream's
-// own spelling cannot survive. Both are therefore accepted through one object, and the enum is
-// accepted alongside the flags rather than beside them; see the decoder.
+// Upstream's schema is a two element list: an enum, then an object. The rule registers with
+// `DecodeOptionList`, so both arrive as written; see the decoder.
 type YodaSettings struct {
 	// Always requires the literal on the LEFT. Upstream's `"always"`; the default is `"never"`.
 	Always bool
@@ -29,73 +28,45 @@ func DefaultYodaSettings() YodaSettings {
 	return YodaSettings{}
 }
 
+// yodaObjectWire is upstream's second option element, whose keys are exactly these two.
 type yodaObjectWire struct {
-	// When is the enum, accepted inside the object because the tuple's first element cannot reach
-	// this decoder.
-	When         string `json:"when"`
-	ExceptRange  *bool  `json:"exceptRange"`
-	OnlyEquality *bool  `json:"onlyEquality"`
+	ExceptRange  *bool `json:"exceptRange"`
+	OnlyEquality *bool `json:"onlyEquality"`
 }
 
-// DecodeYodaOptions reads the option surface off the config.
+// DecodeYodaOptions reads upstream's option list off the config: `["always", {"exceptRange":
+// true}]`, `["never"]`, or nothing.
 //
-// Three wire shapes are accepted and the reason is a real difference between upstream's config
-// layer and ours. Upstream writes `["error", "always", {exceptRange: true}]`, three tuple elements,
-// and this config layer keeps only `tuple[1]` (internal/configuration/configuration.go), so the
-// object would be discarded silently. So a bare string is accepted for the common case, and an
-// object carrying `when` alongside the flags is accepted for the case that needs both. An array is
-// accepted too, for the spelling closest to upstream's, and it is read as
-// `[when, {flags}]`.
-//
-// Written out rather than routed through the generic helper for that reason: three alternatives,
-// and two flags whose absence must stay distinguishable from an explicit false.
-func DecodeYodaOptions(raw []byte) (any, error) {
+// The rule registers with `DecodeOptionList`, so both elements arrive. The config layer used to keep
+// only the first, so this decoder accepted the flags inside one object beside a `when` key, and a
+// nested array, to reach them; both workarounds are refused now, since neither was ever upstream's.
+// A key the second element's schema does not declare is refused, which is its
+// `additionalProperties: false`, and so is a third element.
+func DecodeYodaOptions(list []byte) (any, error) {
 	settings := DefaultYodaSettings()
-	if len(raw) == 0 {
-		return settings, nil
-	}
-
-	// The string arm first, because it is the narrowest shape and cannot swallow the others.
-	var when string
-	if err := json.Unmarshal(raw, &when); err == nil {
-		return yodaSettingsFromWhen(when)
-	}
-
-	// The array arm, which is upstream's own spelling collapsed into one argument.
-	var tuple []json.RawMessage
-	if err := json.Unmarshal(raw, &tuple); err == nil {
-		if len(tuple) == 0 {
-			return settings, nil
-		}
-		var first string
-		if err := json.Unmarshal(tuple[0], &first); err != nil {
-			return settings, fmt.Errorf("yoda takes \"always\" or \"never\" first")
-		}
-		decoded, err := yodaSettingsFromWhen(first)
-		if err != nil {
-			return settings, err
-		}
-		settings = decoded.(YodaSettings)
-		if len(tuple) > 1 {
-			var object yodaObjectWire
-			if err := json.Unmarshal(tuple[1], &object); err != nil {
-				return settings, err
-			}
-			applyYodaFlags(&settings, object)
-		}
-		return settings, nil
-	}
-
-	var object yodaObjectWire
-	if err := json.Unmarshal(raw, &object); err != nil {
+	elements, err := rule.OptionElements(list, 2)
+	if err != nil || len(elements) == 0 {
 		return settings, err
 	}
-	if object.When != "" {
-		decoded, err := yodaSettingsFromWhen(object.When)
-		if err != nil {
-			return settings, err
-		}
-		settings = decoded.(YodaSettings)
+
+	var when string
+	if err := json.Unmarshal(elements[0], &when); err != nil {
+		return settings, fmt.Errorf("yoda takes \"always\" or \"never\" first, got %s", elements[0])
+	}
+	decoded, err := yodaSettingsFromWhen(when)
+	if err != nil {
+		return settings, err
+	}
+	settings = decoded.(YodaSettings)
+	if len(elements) < 2 {
+		return settings, nil
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(elements[1]))
+	decoder.DisallowUnknownFields()
+	var object yodaObjectWire
+	if err := decoder.Decode(&object); err != nil {
+		return DefaultYodaSettings(), fmt.Errorf("yoda element 2: %w", err)
 	}
 	applyYodaFlags(&settings, object)
 	return settings, nil

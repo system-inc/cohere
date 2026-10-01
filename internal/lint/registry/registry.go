@@ -65,17 +65,25 @@ func Count() int {
 // report. A liveness harness reporting `fixtures=54 live=53 dead=1` was the only thing that ever
 // caught it. Marking it required turns that silence into a failure.
 //
-// A rule that registers no decoder takes no options, which is the common case.
+// A rule that registers no decoder takes no options, which is the common case, and the config layer
+// refuses any option written for it. Which decoder a rule registers is its arity: Decode for one
+// option element, DecodeOptionList for upstream's multi-element `context.options`.
 func Options() configuration.OptionsRegistry {
 	options := configuration.OptionsRegistry{}
 	for _, registration := range rule.Registered() {
-		if registration.Decode == nil {
-			continue
-		}
-		decode := registration.Decode
-		options[registration.Rule.Name] = configuration.RuleOptions{
-			Decode:   func(raw json.RawMessage) (any, error) { return decode(raw) },
-			Required: registration.RequiresOptions,
+		switch {
+		case registration.DecodeOptionList != nil:
+			decodeList := registration.DecodeOptionList
+			options[registration.Rule.Name] = configuration.RuleOptions{
+				DecodeList: func(raw json.RawMessage) (any, error) { return decodeList(raw) },
+				Required:   registration.RequiresOptions,
+			}
+		case registration.Decode != nil:
+			decode := registration.Decode
+			options[registration.Rule.Name] = configuration.RuleOptions{
+				Decode:   func(raw json.RawMessage) (any, error) { return decode(raw) },
+				Required: registration.RequiresOptions,
+			}
 		}
 	}
 	return options

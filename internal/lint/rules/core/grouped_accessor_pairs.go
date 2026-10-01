@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -24,13 +25,14 @@ const (
 
 // GroupedAccessorPairsOptions carries the part of upstream's option surface this port implements.
 //
-// The wire shape is an ARRAY, unlike most rules here, because upstream's schema is positional:
-// `["getBeforeSet", { enforceForTSTypes: true }]`. cohere's config layer strips the severity from
-// the front, so what reaches the decoder is that array rather than a bare object.
+// The wire shape is a LIST, unlike most rules here, because upstream's schema is positional:
+// `["error", "getBeforeSet", { enforceForTSTypes: true }]`. The rule registers with
+// `DecodeOptionList`, so the decoder is handed that list with the severity removed.
 //
 // `enforceForTSTypes` is deliberately not implemented; see the rule's doc comment and
 // `TestGroupedAccessorPairsTypeMembersAreNotChecked`. It defaults to false, so declining it matches
-// what an unset project gets.
+// what an unset project gets, and the decoder refuses `true` by name rather than accepting an
+// option the rule would never honour.
 type GroupedAccessorPairsOptions struct {
 	Order GroupedAccessorPairsOrder
 }
@@ -45,18 +47,11 @@ type GroupedAccessorPairsOptions struct {
 //
 // A value outside the enum is refused rather than folded into an arm. Upstream gets that refusal
 // from its schema before the rule runs; there is no schema layer here, so it lives here.
-func DecodeGroupedAccessorPairsOptions(raw []byte) (any, error) {
+func DecodeGroupedAccessorPairsOptions(list []byte) (any, error) {
 	options := GroupedAccessorPairsOptions{Order: GroupedAccessorPairsAnyOrder}
-	if len(raw) == 0 {
-		return options, nil
-	}
-
-	var configured []json.RawMessage
-	if err := json.Unmarshal(raw, &configured); err != nil {
-		return options, fmt.Errorf("grouped-accessor-pairs takes an array, %q: %w", string(raw), err)
-	}
-	if len(configured) == 0 {
-		return options, nil
+	configured, err := rule.OptionElements(list, 2)
+	if err != nil || len(configured) == 0 {
+		return options, err
 	}
 
 	var order string
@@ -67,11 +62,32 @@ func DecodeGroupedAccessorPairsOptions(raw []byte) (any, error) {
 	switch GroupedAccessorPairsOrder(order) {
 	case GroupedAccessorPairsAnyOrder, GroupedAccessorPairsGetBeforeSet, GroupedAccessorPairsSetBeforeGet:
 		options.Order = GroupedAccessorPairsOrder(order)
+	default:
+		return options, fmt.Errorf("grouped-accessor-pairs takes %q, %q or %q, got %q",
+			GroupedAccessorPairsAnyOrder, GroupedAccessorPairsGetBeforeSet,
+			GroupedAccessorPairsSetBeforeGet, order)
+	}
+	if len(configured) < 2 {
 		return options, nil
 	}
-	return options, fmt.Errorf("grouped-accessor-pairs takes %q, %q or %q, got %q",
-		GroupedAccessorPairsAnyOrder, GroupedAccessorPairsGetBeforeSet,
-		GroupedAccessorPairsSetBeforeGet, order)
+
+	// The second element's only key is `enforceForTSTypes`, which this port does not implement. Its
+	// default, false, is what the rule already does, so false is accepted; true is refused, because
+	// accepting it would be the option-read-and-ignored shape this decoder exists to refuse.
+	decoder := json.NewDecoder(bytes.NewReader(configured[1]))
+	decoder.DisallowUnknownFields()
+	var second struct {
+		EnforceForTSTypes bool `json:"enforceForTSTypes"`
+	}
+	if err := decoder.Decode(&second); err != nil {
+		return options, fmt.Errorf("grouped-accessor-pairs element 2: %w", err)
+	}
+	if second.EnforceForTSTypes {
+		return options, fmt.Errorf("grouped-accessor-pairs: enforceForTSTypes is not implemented " +
+			"in this port, so `true` would be accepted and never honoured; see " +
+			"TestGroupedAccessorPairsTypeMembersAreNotChecked")
+	}
+	return options, nil
 }
 
 var messageGroupedAccessorPairsNotGrouped = rule.Message{

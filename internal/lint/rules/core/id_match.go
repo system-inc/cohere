@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -55,30 +56,20 @@ type idMatchRawOptions struct {
 // DecodeIdMatchOptions reads the pattern and the flag object off the config.
 //
 // Hand rolled rather than routed through `rule.DecodeOptionsInto` because the wire shape is a
-// heterogeneous TUPLE: element zero is a string and element one is an object, which no single Go
+// heterogeneous list: element one is a string and element two is an object, which no single Go
 // struct decodes.
 //
-// # Two spellings, because ESLint's option surface is VARIADIC and cohere's is not
+// # Upstream's option surface is two elements, and both arrive
 //
-// Upstream reads `context.options` as a tuple spread across the config array after the severity:
+// Upstream reads `context.options` as a pattern followed by a flag object:
 //
 //	"id-match": ["error", "^[a-z]+$", { "properties": true }]
 //
-// cohere's config layer takes only ONE element after the severity -- `setting.Options = tuple[1]`
-// in internal/lint/configuration/configuration.go -- so a rule written that way is handed the bare
-// string `"^[a-z]+$"` and the flag object is silently dropped. That failure is quieter than
-// id-denylist's, which errored outright: here the pattern still arrives and the rule still works,
-// with every option silently off. No fixture could see it, because a fixture reaches the decoder
-// with bytes the TEST built rather than with bytes the config layer sliced.
-//
-// So the cohere spelling nests the tuple, which is what every configured rule in the live config
-// already looks like -- one options value after the severity:
-//
-//	"id-match": ["error", ["^[a-z]+$", { "properties": true }]]
-//
-// Both are accepted, and so is a bare pattern string with no flags at all. The three cannot be
-// confused: a string is a pattern, an array is a tuple, and an array's first element is a string
-// either way.
+// The rule registers with `DecodeOptionList` and is handed `["^[a-z]+$", {"properties": true}]`.
+// The config layer used to keep only the first element, so that spelling arrived as the bare
+// pattern with every flag silently off, quieter than id-denylist's outright error on the same cause.
+// The nested `["error", ["^[a-z]+$", {...}]]` workaround is refused now: its first element is not a
+// string.
 //
 // Empty input decodes to the default settings rather than failing, which is the answer for a rule
 // configured as a bare "error": upstream's default pattern matches every name, so such a rule
@@ -86,31 +77,31 @@ type idMatchRawOptions struct {
 //
 // A pattern that does not compile is returned as an error rather than silently ignored. Upstream
 // would throw at `new RegExp(pattern, "u")`, and a rule that quietly matched everything instead
-// would be inert while looking configured, which is the worst of the two failures.
-func DecodeIdMatchOptions(raw []byte) (any, error) {
+// would be inert while looking configured, which is the worst of the two failures. So is a flag key
+// upstream's schema does not declare, which `additionalProperties: false` refuses there.
+func DecodeIdMatchOptions(list []byte) (any, error) {
 	settings := DefaultIdMatchSettings()
-	if len(raw) == 0 {
-		return settings, nil
+	elements, err := rule.OptionElements(list, 2)
+	if err != nil || len(elements) == 0 {
+		return settings, err
 	}
 
 	var patternText string
-	var flagsRaw json.RawMessage
+	if err := json.Unmarshal(elements[0], &patternText); err != nil {
+		return settings, fmt.Errorf("id-match element 1 takes a pattern string, got %s", elements[0])
+	}
 
-	if err := json.Unmarshal(raw, &patternText); err != nil {
-		// Not a bare pattern, so it is the tuple form.
-		var tuple []json.RawMessage
-		if tupleErr := json.Unmarshal(raw, &tuple); tupleErr != nil {
-			return settings, tupleErr
+	if len(elements) > 1 {
+		decoder := json.NewDecoder(bytes.NewReader(elements[1]))
+		decoder.DisallowUnknownFields()
+		var flags idMatchRawOptions
+		if err := decoder.Decode(&flags); err != nil {
+			return settings, fmt.Errorf("id-match element 2: %w", err)
 		}
-		if len(tuple) == 0 {
-			return settings, nil
-		}
-		if patternErr := json.Unmarshal(tuple[0], &patternText); patternErr != nil {
-			return settings, patternErr
-		}
-		if len(tuple) > 1 {
-			flagsRaw = tuple[1]
-		}
+		settings.CheckProperties = flags.Properties
+		settings.CheckClassFields = flags.ClassFields
+		settings.OnlyDeclarations = flags.OnlyDeclarations
+		settings.IgnoreDestructuring = flags.IgnoreDestructuring
 	}
 
 	if patternText == "" {
@@ -126,17 +117,6 @@ func DecodeIdMatchOptions(raw []byte) (any, error) {
 	}
 	settings.Pattern = compiled
 	settings.PatternText = patternText
-
-	if len(flagsRaw) > 0 {
-		var flags idMatchRawOptions
-		if err := json.Unmarshal(flagsRaw, &flags); err != nil {
-			return settings, err
-		}
-		settings.CheckProperties = flags.Properties
-		settings.CheckClassFields = flags.ClassFields
-		settings.OnlyDeclarations = flags.OnlyDeclarations
-		settings.IgnoreDestructuring = flags.IgnoreDestructuring
-	}
 	return settings, nil
 }
 

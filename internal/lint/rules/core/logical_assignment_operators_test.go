@@ -1945,9 +1945,9 @@ func TestLogicalAssignmentOperatorsSuggestionMessages(t *testing.T) {
 
 // TestDecodeLogicalAssignmentOperatorsOptions puts the decoder under test directly.
 //
-// The wire shape has no upstream counterpart. cohere's config layer strips the severity from the
-// head of the tuple, so what arrives here is upstream's positional array rather than the single
-// object `rule.DecodeOptionsInto` would decode. The default is also not the zero value: an absent
+// The wire shape is upstream's own option list: the rule registers with `DecodeOptionList`, so the
+// config layer hands over every element after the severity rather than the single object
+// `rule.DecodeOptionsInto` would decode. The default is also not the zero value: an absent
 // option means `always`, while the zero value of the setting is the empty string, which matches
 // neither arm and would make the rule silent on every file it exists to catch.
 func TestDecodeLogicalAssignmentOperatorsOptions(t *testing.T) {
@@ -1973,7 +1973,11 @@ func TestDecodeLogicalAssignmentOperatorsOptions(t *testing.T) {
 		{"always with an empty object leaves the if check off", `["always", {}]`,
 			&always, false, false},
 		{"never", `["never"]`, &never, false, false},
-		{"a bare string is accepted", `"never"`, &never, false, false},
+		{"a bare string, which the config layer never delivers to a list rule, is refused",
+			`"never"`, nil, false, true},
+		{"an unknown key in the second element is refused",
+			`["always", {"enforceForIfStatement": true}]`, nil, false, true},
+		{"a third element is refused", `["always", {}, "never"]`, nil, false, true},
 		{"an unknown mode is an error rather than a silent default", `["sometimes"]`,
 			nil, false, true},
 		{"options beside never are refused", `["never", {"enforceForIfStatements": true}]`,

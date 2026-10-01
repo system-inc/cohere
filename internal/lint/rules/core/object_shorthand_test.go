@@ -11,8 +11,8 @@ const objectShorthandFile = "/repository/source/ObjectShorthand.ts"
 
 // objectShorthandOf builds the settings a config carrying this option would decode to.
 //
-// The argument is the option as JSON TEXT, exactly the bytes the config layer hands the decoder, so
-// the fixtures exercise the three-shape `anyOf` decoder rather than bypassing it.
+// The argument is the option list as JSON TEXT, exactly the bytes the config layer hands the
+// decoder, so the fixtures exercise the three-shape `anyOf` decoder rather than bypassing it.
 func objectShorthandOf(optionJson string) any {
 	settings, err := DecodeObjectShorthandOptions([]byte(optionJson))
 	if err != nil {
@@ -83,32 +83,32 @@ func TestObjectShorthandFires(t *testing.T) {
 		{source: "({ foo: function *() {} })", settings: nil, findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ *foo() {} })"), declinesRepair: false},
 		{source: "({ [  foo   ]: function() {} })", settings: nil, findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ [  foo   ]() {} })"), declinesRepair: false},
 		{source: "({ [  foo]: function() {} })", settings: nil, findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ [  foo]() {} })"), declinesRepair: false},
-		{source: "var x = {y: function() {}}", settings: objectShorthandOf("\"methods\""), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {y() {}}"), declinesRepair: false},
-		{source: "var x = {x, y() {}, z: function() {}}", settings: objectShorthandOf("\"methods\""), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {x, y() {}, z() {}}"), declinesRepair: false},
-		{source: "var x = {ConstructorFunction: function(){}, a: b}", settings: objectShorthandOf("\"methods\""), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {ConstructorFunction(){}, a: b}"), declinesRepair: false},
-		{source: "var x = {[y]: function() {}}", settings: objectShorthandOf("\"methods\""), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {[y]() {}}"), declinesRepair: false},
+		{source: "var x = {y: function() {}}", settings: objectShorthandOf("[\"methods\"]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {y() {}}"), declinesRepair: false},
+		{source: "var x = {x, y() {}, z: function() {}}", settings: objectShorthandOf("[\"methods\"]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {x, y() {}, z() {}}"), declinesRepair: false},
+		{source: "var x = {ConstructorFunction: function(){}, a: b}", settings: objectShorthandOf("[\"methods\"]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {ConstructorFunction(){}, a: b}"), declinesRepair: false},
+		{source: "var x = {[y]: function() {}}", settings: objectShorthandOf("[\"methods\"]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {[y]() {}}"), declinesRepair: false},
 		{source: "({ [(foo)]: function() { return; } })", settings: nil, findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ [(foo)]() { return; } })"), declinesRepair: false},
 		{source: "({ [(foo)]: async function() { return; } })", settings: nil, findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ async [(foo)]() { return; } })"), declinesRepair: false},
 		{source: "({ [(((((((foo)))))))]: function() { return; } })", settings: nil, findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ [(((((((foo)))))))]() { return; } })"), declinesRepair: false},
-		{source: "({ [(foo)]() { return; } })", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ [(foo)]: function() { return; } })"), declinesRepair: false},
-		{source: "({ async [(foo)]() { return; } })", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ [(foo)]: async function() { return; } })"), declinesRepair: false},
-		{source: "({ *[((foo))]() { return; } })", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ [((foo))]: function*() { return; } })"), declinesRepair: false},
-		{source: "({ [(((((((foo)))))))]() { return; } })", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ [(((((((foo)))))))]: function() { return; } })"), declinesRepair: false},
-		{source: "({ 'foo bar'() { return; } })", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ 'foo bar': function() { return; } })"), declinesRepair: false},
-		{source: "({ *foo() { return; } })", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ foo: function*() { return; } })"), declinesRepair: false},
-		{source: "({ async foo() { return; } })", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ foo: async function() { return; } })"), declinesRepair: false},
-		{source: "({ *['foo bar']() { return; } })", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ ['foo bar']: function*() { return; } })"), declinesRepair: false},
-		{source: "var x = {x: x}", settings: objectShorthandOf("\"properties\""), findings: []string{messageObjectShorthandExpectedPropertyShorthand.Id}, fixed: pointerTo("var x = {x}"), declinesRepair: false},
-		{source: "var x = {a, b, c(){}, x: x}", settings: objectShorthandOf("\"properties\""), findings: []string{messageObjectShorthandExpectedPropertyShorthand.Id}, fixed: pointerTo("var x = {a, b, c(){}, x}"), declinesRepair: false},
-		{source: "var x = {y() {}}", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("var x = {y: function() {}}"), declinesRepair: false},
-		{source: "var x = {*y() {}}", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("var x = {y: function*() {}}"), declinesRepair: false},
-		{source: "var x = {y}", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedPropertyLongform.Id}, fixed: pointerTo("var x = {y: y}"), declinesRepair: false},
-		{source: "var x = {y, a: b, *x(){}}", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedPropertyLongform.Id, messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("var x = {y: y, a: b, x: function*(){}}"), declinesRepair: false},
-		{source: "var x = {y: {x}}", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedPropertyLongform.Id}, fixed: pointerTo("var x = {y: {x: x}}"), declinesRepair: false},
-		{source: "var x = {ConstructorFunction(){}, a: b}", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("var x = {ConstructorFunction: function(){}, a: b}"), declinesRepair: false},
-		{source: "var x = {notConstructorFunction(){}, b: c}", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("var x = {notConstructorFunction: function(){}, b: c}"), declinesRepair: false},
-		{source: "var x = {foo: foo, bar: baz, ...qux}", settings: objectShorthandOf("\"always\""), findings: []string{messageObjectShorthandExpectedPropertyShorthand.Id}, fixed: pointerTo("var x = {foo, bar: baz, ...qux}"), declinesRepair: false},
-		{source: "var x = {foo, bar: baz, ...qux}", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedPropertyLongform.Id}, fixed: pointerTo("var x = {foo: foo, bar: baz, ...qux}"), declinesRepair: false},
+		{source: "({ [(foo)]() { return; } })", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ [(foo)]: function() { return; } })"), declinesRepair: false},
+		{source: "({ async [(foo)]() { return; } })", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ [(foo)]: async function() { return; } })"), declinesRepair: false},
+		{source: "({ *[((foo))]() { return; } })", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ [((foo))]: function*() { return; } })"), declinesRepair: false},
+		{source: "({ [(((((((foo)))))))]() { return; } })", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ [(((((((foo)))))))]: function() { return; } })"), declinesRepair: false},
+		{source: "({ 'foo bar'() { return; } })", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ 'foo bar': function() { return; } })"), declinesRepair: false},
+		{source: "({ *foo() { return; } })", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ foo: function*() { return; } })"), declinesRepair: false},
+		{source: "({ async foo() { return; } })", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ foo: async function() { return; } })"), declinesRepair: false},
+		{source: "({ *['foo bar']() { return; } })", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ ['foo bar']: function*() { return; } })"), declinesRepair: false},
+		{source: "var x = {x: x}", settings: objectShorthandOf("[\"properties\"]"), findings: []string{messageObjectShorthandExpectedPropertyShorthand.Id}, fixed: pointerTo("var x = {x}"), declinesRepair: false},
+		{source: "var x = {a, b, c(){}, x: x}", settings: objectShorthandOf("[\"properties\"]"), findings: []string{messageObjectShorthandExpectedPropertyShorthand.Id}, fixed: pointerTo("var x = {a, b, c(){}, x}"), declinesRepair: false},
+		{source: "var x = {y() {}}", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("var x = {y: function() {}}"), declinesRepair: false},
+		{source: "var x = {*y() {}}", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("var x = {y: function*() {}}"), declinesRepair: false},
+		{source: "var x = {y}", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedPropertyLongform.Id}, fixed: pointerTo("var x = {y: y}"), declinesRepair: false},
+		{source: "var x = {y, a: b, *x(){}}", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedPropertyLongform.Id, messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("var x = {y: y, a: b, x: function*(){}}"), declinesRepair: false},
+		{source: "var x = {y: {x}}", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedPropertyLongform.Id}, fixed: pointerTo("var x = {y: {x: x}}"), declinesRepair: false},
+		{source: "var x = {ConstructorFunction(){}, a: b}", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("var x = {ConstructorFunction: function(){}, a: b}"), declinesRepair: false},
+		{source: "var x = {notConstructorFunction(){}, b: c}", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("var x = {notConstructorFunction: function(){}, b: c}"), declinesRepair: false},
+		{source: "var x = {foo: foo, bar: baz, ...qux}", settings: objectShorthandOf("[\"always\"]"), findings: []string{messageObjectShorthandExpectedPropertyShorthand.Id}, fixed: pointerTo("var x = {foo, bar: baz, ...qux}"), declinesRepair: false},
+		{source: "var x = {foo, bar: baz, ...qux}", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedPropertyLongform.Id}, fixed: pointerTo("var x = {foo: foo, bar: baz, ...qux}"), declinesRepair: false},
 		{source: "var x = {y: function() {}}", settings: objectShorthandOf("[\"methods\", {\"ignoreConstructors\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {y() {}}"), declinesRepair: false},
 		{source: "var x = {_y: function() {}}", settings: objectShorthandOf("[\"methods\", {\"ignoreConstructors\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {_y() {}}"), declinesRepair: false},
 		{source: "var x = {$y: function() {}}", settings: objectShorthandOf("[\"methods\", {\"ignoreConstructors\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {$y() {}}"), declinesRepair: false},
@@ -126,14 +126,14 @@ func TestObjectShorthandFires(t *testing.T) {
 		{source: "var x = {[a]: function(){}}", settings: objectShorthandOf("[\"methods\", {\"avoidQuotes\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("var x = {[a](){}}"), declinesRepair: false},
 		{source: "var x = {'a'(){}}", settings: objectShorthandOf("[\"always\", {\"avoidQuotes\": true}]"), findings: []string{messageObjectShorthandExpectedLiteralMethodLongform.Id}, fixed: pointerTo("var x = {'a': function(){}}"), declinesRepair: false},
 		{source: "var x = {['a'](){}}", settings: objectShorthandOf("[\"methods\", {\"avoidQuotes\": true}]"), findings: []string{messageObjectShorthandExpectedLiteralMethodLongform.Id}, fixed: pointerTo("var x = {['a']: function(){}}"), declinesRepair: false},
-		{source: "var x = {a: a, b}", settings: objectShorthandOf("\"consistent\""), findings: []string{messageObjectShorthandUnexpectedMix.Id}, fixed: nil, declinesRepair: true},
-		{source: "var x = {b, c: d, f: g}", settings: objectShorthandOf("\"consistent\""), findings: []string{messageObjectShorthandUnexpectedMix.Id}, fixed: nil, declinesRepair: true},
-		{source: "var x = {foo, bar: baz, ...qux}", settings: objectShorthandOf("\"consistent\""), findings: []string{messageObjectShorthandUnexpectedMix.Id}, fixed: nil, declinesRepair: true},
-		{source: "var x = {a: a, b: b}", settings: objectShorthandOf("\"consistent-as-needed\""), findings: []string{messageObjectShorthandExpectedAllPropertiesShorthanded.Id}, fixed: nil, declinesRepair: true},
-		{source: "var x = {a, z: function z(){}}", settings: objectShorthandOf("\"consistent-as-needed\""), findings: []string{messageObjectShorthandUnexpectedMix.Id}, fixed: nil, declinesRepair: true},
-		{source: "var x = {foo: function() {}}", settings: objectShorthandOf("\"consistent-as-needed\""), findings: []string{messageObjectShorthandExpectedAllPropertiesShorthanded.Id}, fixed: nil, declinesRepair: true},
-		{source: "var x = {a: a, b: b, ...baz}", settings: objectShorthandOf("\"consistent-as-needed\""), findings: []string{messageObjectShorthandExpectedAllPropertiesShorthanded.Id}, fixed: nil, declinesRepair: true},
-		{source: "var x = {foo, bar: bar, ...qux}", settings: objectShorthandOf("\"consistent-as-needed\""), findings: []string{messageObjectShorthandUnexpectedMix.Id}, fixed: nil, declinesRepair: true},
+		{source: "var x = {a: a, b}", settings: objectShorthandOf("[\"consistent\"]"), findings: []string{messageObjectShorthandUnexpectedMix.Id}, fixed: nil, declinesRepair: true},
+		{source: "var x = {b, c: d, f: g}", settings: objectShorthandOf("[\"consistent\"]"), findings: []string{messageObjectShorthandUnexpectedMix.Id}, fixed: nil, declinesRepair: true},
+		{source: "var x = {foo, bar: baz, ...qux}", settings: objectShorthandOf("[\"consistent\"]"), findings: []string{messageObjectShorthandUnexpectedMix.Id}, fixed: nil, declinesRepair: true},
+		{source: "var x = {a: a, b: b}", settings: objectShorthandOf("[\"consistent-as-needed\"]"), findings: []string{messageObjectShorthandExpectedAllPropertiesShorthanded.Id}, fixed: nil, declinesRepair: true},
+		{source: "var x = {a, z: function z(){}}", settings: objectShorthandOf("[\"consistent-as-needed\"]"), findings: []string{messageObjectShorthandUnexpectedMix.Id}, fixed: nil, declinesRepair: true},
+		{source: "var x = {foo: function() {}}", settings: objectShorthandOf("[\"consistent-as-needed\"]"), findings: []string{messageObjectShorthandExpectedAllPropertiesShorthanded.Id}, fixed: nil, declinesRepair: true},
+		{source: "var x = {a: a, b: b, ...baz}", settings: objectShorthandOf("[\"consistent-as-needed\"]"), findings: []string{messageObjectShorthandExpectedAllPropertiesShorthanded.Id}, fixed: nil, declinesRepair: true},
+		{source: "var x = {foo, bar: bar, ...qux}", settings: objectShorthandOf("[\"consistent-as-needed\"]"), findings: []string{messageObjectShorthandUnexpectedMix.Id}, fixed: nil, declinesRepair: true},
 		{source: "({ x: (arg => { return; }) })", settings: objectShorthandOf("[\"always\", {\"avoidExplicitReturnArrows\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ x(arg) { return; } })"), declinesRepair: false},
 		{source: "({ x: () => { return; } })", settings: objectShorthandOf("[\"always\", {\"avoidExplicitReturnArrows\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ x() { return; } })"), declinesRepair: false},
 		{source: "({ x() { return; }, y: () => { return; } })", settings: objectShorthandOf("[\"always\", {\"avoidExplicitReturnArrows\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ x() { return; }, y() { return; } })"), declinesRepair: false},
@@ -161,8 +161,8 @@ func TestObjectShorthandFires(t *testing.T) {
 		{source: "({ a: (async () => { return foo; }) })", settings: objectShorthandOf("[\"always\", {\"avoidExplicitReturnArrows\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ async a() { return foo; } })"), declinesRepair: false},
 		{source: "({ a: (async (arg) => { return foo; }) })", settings: objectShorthandOf("[\"always\", {\"avoidExplicitReturnArrows\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ async a(arg) { return foo; } })"), declinesRepair: false},
 		{source: "({ a: (async (arg, arg2) => { return foo; }) })", settings: objectShorthandOf("[\"always\", {\"avoidExplicitReturnArrows\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ async a(arg, arg2) { return foo; } })"), declinesRepair: false},
-		{source: "({ a: async function*() {} })", settings: objectShorthandOf("\"always\""), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ async *a() {} })"), declinesRepair: false},
-		{source: "({ async* a() {} })", settings: objectShorthandOf("\"never\""), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ a: async function*() {} })"), declinesRepair: false},
+		{source: "({ a: async function*() {} })", settings: objectShorthandOf("[\"always\"]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("({ async *a() {} })"), declinesRepair: false},
+		{source: "({ async* a() {} })", settings: objectShorthandOf("[\"never\"]"), findings: []string{messageObjectShorthandExpectedMethodLongform.Id}, fixed: pointerTo("({ a: async function*() {} })"), declinesRepair: false},
 		{source: "const test = {\n    key: <T>(): void => { },\n    key: async <T>(): Promise<void> => { },\n\n    key: <T>(arg: T): T => { return arg },\n    key: async <T>(arg: T): Promise<T> => { return arg },\n}", settings: objectShorthandOf("[\"always\", {\"avoidExplicitReturnArrows\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("const test = {\n    key<T>(): void { },\n    async key<T>(): Promise<void> { },\n\n    key<T>(arg: T): T { return arg },\n    async key<T>(arg: T): Promise<T> { return arg },\n}"), declinesRepair: false},
 		{source: "const test = {\n    key: (): void => {x()},\n    key: ( (): void => {x()} ),\n    key: ( (): (void) => {x()} ),\n\n    key: (arg: t): void => {x()},\n    key: ( (arg: t): void => {x()} ),\n    key: ( (arg: t): (void) => {x()} ),\n\n    key: (arg: t, arg2: t): void => {x()},\n    key: ( (arg: t, arg2: t): void => {x()} ),\n    key: ( (arg: t, arg2: t): (void) => {x()} ),\n\n    key: async (): void => {x()},\n    key: ( async (): void => {x()} ),\n    key: ( async (): (void) => {x()} ),\n\n    key: async (arg: t): void => {x()},\n    key: ( async (arg: t): void => {x()} ),\n    key: ( async (arg: t): (void) => {x()} ),\n\n    key: async (arg: t, arg2: t): void => {x()},\n    key: ( async (arg: t, arg2: t): void => {x()} ),\n    key: ( async (arg: t, arg2: t): (void) => {x()} ),\n}", settings: objectShorthandOf("[\"always\", {\"avoidExplicitReturnArrows\": true}]"), findings: []string{messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id, messageObjectShorthandExpectedMethodShorthand.Id}, fixed: pointerTo("const test = {\n    key(): void {x()},\n    key(): void {x()},\n    key(): (void) {x()},\n\n    key(arg: t): void {x()},\n    key(arg: t): void {x()},\n    key(arg: t): (void) {x()},\n\n    key(arg: t, arg2: t): void {x()},\n    key(arg: t, arg2: t): void {x()},\n    key(arg: t, arg2: t): (void) {x()},\n\n    async key(): void {x()},\n    async key(): void {x()},\n    async key(): (void) {x()},\n\n    async key(arg: t): void {x()},\n    async key(arg: t): void {x()},\n    async key(arg: t): (void) {x()},\n\n    async key(arg: t, arg2: t): void {x()},\n    async key(arg: t, arg2: t): void {x()},\n    async key(arg: t, arg2: t): (void) {x()},\n}"), declinesRepair: false},
 		{source: "({ val: /** regular comment */ (val) })", settings: nil, findings: []string{messageObjectShorthandExpectedPropertyShorthand.Id}, fixed: nil, declinesRepair: false},
@@ -255,18 +255,18 @@ func TestObjectShorthandStaysSilent(t *testing.T) {
 		{source: "doSomething({get y() {}})", settings: nil},
 		{source: "doSomething({set y(z) {}})", settings: nil},
 		{source: "doSomething({get y() {}, set y(z) {}})", settings: nil},
-		{source: "var x = {[y]: y}", settings: objectShorthandOf("\"properties\"")},
-		{source: "var x = {['y']: 'y'}", settings: objectShorthandOf("\"properties\"")},
-		{source: "var x = {['y']: y}", settings: objectShorthandOf("\"properties\"")},
-		{source: "var x = {[y]() {}}", settings: objectShorthandOf("\"methods\"")},
-		{source: "var x = {[y]: function x() {}}", settings: objectShorthandOf("\"methods\"")},
-		{source: "var x = {[y]: y}", settings: objectShorthandOf("\"methods\"")},
-		{source: "var x = {y() {}}", settings: objectShorthandOf("\"methods\"")},
-		{source: "var x = {x, y() {}, a:b}", settings: objectShorthandOf("\"methods\"")},
-		{source: "var x = {y}", settings: objectShorthandOf("\"properties\"")},
-		{source: "var x = {y: {b}}", settings: objectShorthandOf("\"properties\"")},
-		{source: "var x = {a: n, c: d, f: g}", settings: objectShorthandOf("\"never\"")},
-		{source: "var x = {a: function(){}, b: {c: d}}", settings: objectShorthandOf("\"never\"")},
+		{source: "var x = {[y]: y}", settings: objectShorthandOf("[\"properties\"]")},
+		{source: "var x = {['y']: 'y'}", settings: objectShorthandOf("[\"properties\"]")},
+		{source: "var x = {['y']: y}", settings: objectShorthandOf("[\"properties\"]")},
+		{source: "var x = {[y]() {}}", settings: objectShorthandOf("[\"methods\"]")},
+		{source: "var x = {[y]: function x() {}}", settings: objectShorthandOf("[\"methods\"]")},
+		{source: "var x = {[y]: y}", settings: objectShorthandOf("[\"methods\"]")},
+		{source: "var x = {y() {}}", settings: objectShorthandOf("[\"methods\"]")},
+		{source: "var x = {x, y() {}, a:b}", settings: objectShorthandOf("[\"methods\"]")},
+		{source: "var x = {y}", settings: objectShorthandOf("[\"properties\"]")},
+		{source: "var x = {y: {b}}", settings: objectShorthandOf("[\"properties\"]")},
+		{source: "var x = {a: n, c: d, f: g}", settings: objectShorthandOf("[\"never\"]")},
+		{source: "var x = {a: function(){}, b: {c: d}}", settings: objectShorthandOf("[\"never\"]")},
 		{source: "var x = {ConstructorFunction: function(){}, a: b}", settings: objectShorthandOf("[\"always\", {\"ignoreConstructors\": true}]")},
 		{source: "var x = {_ConstructorFunction: function(){}, a: b}", settings: objectShorthandOf("[\"always\", {\"ignoreConstructors\": true}]")},
 		{source: "var x = {$ConstructorFunction: function(){}, a: b}", settings: objectShorthandOf("[\"always\", {\"ignoreConstructors\": true}]")},
@@ -279,8 +279,8 @@ func TestObjectShorthandStaysSilent(t *testing.T) {
 		{source: "var x = {__ConstructorFunction: function(){}, a: b}", settings: objectShorthandOf("[\"methods\", {\"ignoreConstructors\": true}]")},
 		{source: "var x = {_0ConstructorFunction: function(){}, a: b}", settings: objectShorthandOf("[\"methods\", {\"ignoreConstructors\": true}]")},
 		{source: "var x = {notConstructorFunction(){}, b: c}", settings: objectShorthandOf("[\"methods\", {\"ignoreConstructors\": true}]")},
-		{source: "var x = {ConstructorFunction: function(){}, a: b}", settings: objectShorthandOf("\"never\"")},
-		{source: "var x = {notConstructorFunction: function(){}, b: c}", settings: objectShorthandOf("\"never\"")},
+		{source: "var x = {ConstructorFunction: function(){}, a: b}", settings: objectShorthandOf("[\"never\"]")},
+		{source: "var x = {notConstructorFunction: function(){}, b: c}", settings: objectShorthandOf("[\"never\"]")},
 		{source: "var x = { foo: function() {}  }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"^foo$\"}]")},
 		{source: "var x = { foo: function() {}  }", settings: objectShorthandOf("[\"methods\", {\"methodsIgnorePattern\": \"^foo$\"}]")},
 		{source: "var x = { foo: function*() {}  }", settings: objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"^foo$\"}]")},
@@ -295,27 +295,27 @@ func TestObjectShorthandStaysSilent(t *testing.T) {
 		{source: "var x = {'a': function(){}}", settings: objectShorthandOf("[\"always\", {\"avoidQuotes\": true}]")},
 		{source: "var x = {['a']: function(){}}", settings: objectShorthandOf("[\"methods\", {\"avoidQuotes\": true}]")},
 		{source: "var x = {'y': y}", settings: objectShorthandOf("[\"properties\", {\"avoidQuotes\": true}]")},
-		{source: "let {a, b} = o;", settings: objectShorthandOf("\"never\"")},
-		{source: "var x = {foo: foo, bar: bar, ...baz}", settings: objectShorthandOf("\"never\"")},
-		{source: "var x = {a: a, b: b}", settings: objectShorthandOf("\"consistent\"")},
-		{source: "var x = {a: b, c: d, f: g}", settings: objectShorthandOf("\"consistent\"")},
-		{source: "var x = {a, b}", settings: objectShorthandOf("\"consistent\"")},
-		{source: "var x = {a, b, get test() { return 1; }}", settings: objectShorthandOf("\"consistent\"")},
-		{source: "var x = {...bar}", settings: objectShorthandOf("\"consistent-as-needed\"")},
-		{source: "var x = {foo, bar, ...baz}", settings: objectShorthandOf("\"consistent\"")},
-		{source: "var x = {bar: baz, ...qux}", settings: objectShorthandOf("\"consistent\"")},
-		{source: "var x = {...foo, bar: bar, baz: baz}", settings: objectShorthandOf("\"consistent\"")},
-		{source: "var x = {a, b}", settings: objectShorthandOf("\"consistent-as-needed\"")},
-		{source: "var x = {a, b, get test(){return 1;}}", settings: objectShorthandOf("\"consistent-as-needed\"")},
-		{source: "var x = {0: 'foo'}", settings: objectShorthandOf("\"consistent-as-needed\"")},
-		{source: "var x = {'key': 'baz'}", settings: objectShorthandOf("\"consistent-as-needed\"")},
-		{source: "var x = {foo: 'foo'}", settings: objectShorthandOf("\"consistent-as-needed\"")},
-		{source: "var x = {[foo]: foo}", settings: objectShorthandOf("\"consistent-as-needed\"")},
-		{source: "var x = {foo: function foo() {}}", settings: objectShorthandOf("\"consistent-as-needed\"")},
-		{source: "var x = {[foo]: 'foo'}", settings: objectShorthandOf("\"consistent-as-needed\"")},
-		{source: "var x = {bar, ...baz}", settings: objectShorthandOf("\"consistent-as-needed\"")},
-		{source: "var x = {bar: baz, ...qux}", settings: objectShorthandOf("\"consistent-as-needed\"")},
-		{source: "var x = {...foo, bar, baz}", settings: objectShorthandOf("\"consistent-as-needed\"")},
+		{source: "let {a, b} = o;", settings: objectShorthandOf("[\"never\"]")},
+		{source: "var x = {foo: foo, bar: bar, ...baz}", settings: objectShorthandOf("[\"never\"]")},
+		{source: "var x = {a: a, b: b}", settings: objectShorthandOf("[\"consistent\"]")},
+		{source: "var x = {a: b, c: d, f: g}", settings: objectShorthandOf("[\"consistent\"]")},
+		{source: "var x = {a, b}", settings: objectShorthandOf("[\"consistent\"]")},
+		{source: "var x = {a, b, get test() { return 1; }}", settings: objectShorthandOf("[\"consistent\"]")},
+		{source: "var x = {...bar}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
+		{source: "var x = {foo, bar, ...baz}", settings: objectShorthandOf("[\"consistent\"]")},
+		{source: "var x = {bar: baz, ...qux}", settings: objectShorthandOf("[\"consistent\"]")},
+		{source: "var x = {...foo, bar: bar, baz: baz}", settings: objectShorthandOf("[\"consistent\"]")},
+		{source: "var x = {a, b}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
+		{source: "var x = {a, b, get test(){return 1;}}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
+		{source: "var x = {0: 'foo'}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
+		{source: "var x = {'key': 'baz'}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
+		{source: "var x = {foo: 'foo'}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
+		{source: "var x = {[foo]: foo}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
+		{source: "var x = {foo: function foo() {}}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
+		{source: "var x = {[foo]: 'foo'}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
+		{source: "var x = {bar, ...baz}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
+		{source: "var x = {bar: baz, ...qux}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
+		{source: "var x = {...foo, bar, baz}", settings: objectShorthandOf("[\"consistent-as-needed\"]")},
 		{source: "({ x: () => foo })", settings: objectShorthandOf("[\"always\", {\"avoidExplicitReturnArrows\": false}]")},
 		{source: "({ x: () => { return; } })", settings: objectShorthandOf("[\"always\", {\"avoidExplicitReturnArrows\": false}]")},
 		{source: "({ x: () => foo })", settings: objectShorthandOf("[\"always\", {\"avoidExplicitReturnArrows\": true}]")},
@@ -451,13 +451,13 @@ func TestObjectShorthandIgnoresAccessors(t *testing.T) {
 		mode     string
 		findings []string
 	}{
-		{source: "var o = { get a() {} };", mode: `"never"`},
-		{source: "var o = { set a(v) {} };", mode: `"never"`},
-		{source: "var o = { get a() {} };", mode: `"always"`},
-		{source: "var o = { get a() {}, b: b };", mode: `"consistent"`},
-		{source: "var o = { get a() {}, b };", mode: `"consistent"`},
+		{source: "var o = { get a() {} };", mode: `["never"]`},
+		{source: "var o = { set a(v) {} };", mode: `["never"]`},
+		{source: "var o = { get a() {} };", mode: `["always"]`},
+		{source: "var o = { get a() {}, b: b };", mode: `["consistent"]`},
+		{source: "var o = { get a() {}, b };", mode: `["consistent"]`},
 		{
-			source: "var o = { get a() {}, b: b };", mode: `"consistent-as-needed"`,
+			source: "var o = { get a() {}, b: b };", mode: `["consistent-as-needed"]`,
 			findings: []string{messageObjectShorthandExpectedAllPropertiesShorthanded.Id},
 		},
 	}
@@ -473,6 +473,43 @@ func TestObjectShorthandIgnoresAccessors(t *testing.T) {
 		}
 		if len(testCase.findings) > 0 {
 			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		}
+	}
+}
+
+// TestDecodeObjectShorthandOptions pins the list shapes the config layer delivers and the ones it
+// must refuse, including upstream's mode-dependent flag pairing. Every fixture above passes a list
+// this file wrote, so the refusals live here.
+func TestDecodeObjectShorthandOptions(t *testing.T) {
+	t.Parallel()
+
+	decoded, err := DecodeObjectShorthandOptions([]byte(`["methods", {"ignoreConstructors": true, "avoidQuotes": true}]`))
+	if err != nil {
+		t.Fatalf("a legal mode and flags were refused: %v", err)
+	}
+	settings := decoded.(ObjectShorthandSettings)
+	if settings.Mode != ObjectShorthandMethods || !settings.IgnoreConstructors || !settings.AvoidQuotes {
+		t.Errorf("the second element was not read: %+v", settings)
+	}
+
+	for _, raw := range []string{
+		// A bare string, which the config layer never delivers to a list rule.
+		`"always"`,
+		// The nested workaround spelling.
+		`[["always", {"avoidQuotes": true}]]`,
+		// Flags beside a mode upstream's schema gives none.
+		`["never", {"avoidQuotes": true}]`,
+		`["consistent-as-needed", {"ignoreConstructors": true}]`,
+		// Beside properties, only avoidQuotes.
+		`["properties", {"ignoreConstructors": true}]`,
+		// A key outside the four, and a third element.
+		`["always", {"avoidQuote": true}]`,
+		`["always", {"avoidQuotes": true}, "never"]`,
+		// A mode outside the six.
+		`["sometimes"]`,
+	} {
+		if decoded, err := DecodeObjectShorthandOptions([]byte(raw)); err == nil {
+			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}
 }
