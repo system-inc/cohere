@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	release "github.com/system-inc/cohere/internal/release/packaging"
 )
@@ -19,7 +20,7 @@ import (
 // formats all of them through goja. Driven by environment:
 //
 //	COHERE_FORMAT_CORPORA     colon-separated repository roots, e.g. ~/Projects/ahra:~/Projects/phi/www-phi-health
-//	COHERE_FORMAT_CANDIDATE   none (default: no native printer yet), unchanged, or oracle
+//	COHERE_FORMAT_CANDIDATE   native (the printers that replace Prettier), none, unchanged, or oracle
 //	COHERE_FORMAT_CACHE       oracle cache directory (default: the user cache directory)
 //
 // "none" is the honest candidate today and reads 0%. "unchanged" and "oracle" are the two controls,
@@ -91,7 +92,7 @@ func TestCorpora(t *testing.T) {
 		}
 		options := resolution.Options
 		newOracle := func() (Formatter, error) { return prettier.New(options) }
-		newCandidate := candidateFor(t, candidateName, newOracle)
+		newCandidate := candidateFor(t, candidateName, newOracle, options)
 		cache := &OracleCache{
 			Directory: directory,
 			Identity:  digest + "|" + string(bundles.Origin) + "|" + describeOptions(options),
@@ -108,8 +109,13 @@ func TestCorpora(t *testing.T) {
 	}
 }
 
-func candidateFor(t *testing.T, name string, newOracle NewFormatter) NewFormatter {
+func candidateFor(t *testing.T, name string, newOracle NewFormatter, options prettier.Options) NewFormatter {
 	switch name {
+	case "native":
+		// The printers that replace Prettier. A file type with no printer yet is refused, so this reads
+		// 0% for it rather than crediting work that has not been done.
+		t.Logf("native printers registered for %v", native.Extensions())
+		return func() (Formatter, error) { return native.Formatter{Options: options}, nil }
 	case "", "none":
 		return func() (Formatter, error) { return refuser{}, nil }
 	case "unchanged":
@@ -117,7 +123,7 @@ func candidateFor(t *testing.T, name string, newOracle NewFormatter) NewFormatte
 	case "oracle":
 		return newOracle
 	default:
-		t.Fatalf("unknown COHERE_FORMAT_CANDIDATE %q: none, unchanged or oracle", name)
+		t.Fatalf("unknown COHERE_FORMAT_CANDIDATE %q: native, none, unchanged or oracle", name)
 		return nil
 	}
 }
