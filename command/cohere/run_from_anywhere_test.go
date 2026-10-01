@@ -1,0 +1,317 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/system-inc/cohere/internal/types/program"
+)
+
+// incrementalFixtureConfig is a tsconfig that writes its build info inside the project, so a test can
+// watch the one file `--no-fix` used to rewrite.
+const incrementalFixtureConfig = `{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "noEmit": true,
+        "incremental": true,
+        "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
+    },
+    "include": ["**/*.ts"]
+}`
+
+// fixtureProject writes a small project: a tsconfig at the root, a lint config beside it, and a file
+// two directories down so a run can start somewhere other than the root.
+func fixtureProject(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"tsconfig.json":       incrementalFixtureConfig,
+		"CohereSettings.json": `{"rules":{}}`,
+		"index.ts":            "export const value: number = 1;\n",
+		"sub/deeper/Thing.ts": "export const thing: number = 2;\n",
+		".gitignore":          "tsconfig.tsbuildinfo\n",
+	})
+	return root
+}
+
+// buildCohere builds this command once for the calling test. A build failure is fatal rather than a
+// skip: a skipped binary test reads exactly like a passing one, which is the failure this suite is
+// about.
+func buildCohere(t *testing.T) string {
+	t.Helper()
+	binary := filepath.Join(t.TempDir(), "cohere")
+	build := exec.Command("go", "build", "-o", binary, ".")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("cannot build cohere: %v\n%s", err, output)
+	}
+	return binary
+}
+
+// runCohere runs the binary from a directory and returns its combined output and exit code.
+func runCohere(t *testing.T, binary string, directory string, arguments ...string) (string, int) {
+	t.Helper()
+	command := exec.Command(binary, arguments...)
+	command.Dir = directory
+	output, err := command.CombinedOutput()
+	if err == nil {
+		return string(output), 0
+	}
+	exitError, isExit := err.(*exec.ExitError)
+	if !isExit {
+		t.Fatalf("running cohere: %v\n%s", err, output)
+	}
+	return string(output), exitError.ExitCode()
+}
+
+// TestCohereRunsFromAnywhere holds the three behaviors of the command a caller sees from a shell:
+// where it finds the project, whether `--no-fix` writes, and what `--changed` says over nothing.
+//
+// One binary for all three, because each subtest asserts a property of the live command rather than
+// of a helper. The helpers have their own fixtures; these are the composition, which is where the
+// lint config's path, the type phase's write, and the empty change set each went wrong before.
+func TestCohereRunsFromAnywhere(t *testing.T) {
+	binary := buildCohere(t)
+
+	// From two directories down, with a path typed relative to there. Before discovery this failed
+	// with "no tsconfig at .../sub/deeper/tsconfig.json".
+	t.Run("from a subdirectory, with a path typed there", func(t *testing.T) {
+		root := fixtureProject(t)
+		deeper := filepath.Join(root, "sub", "deeper")
+
+		output, code := runCohere(t, binary, deeper, "--no-fix", "--lint", "Thing.ts")
+		if code != 0 {
+			t.Fatalf("exit %d from a subdirectory of a clean project:\n%s", code, output)
+		}
+		if !strings.Contains(output, "1 in scope (Thing.ts)") {
+			t.Errorf("the typed path did not resolve where it was typed:\n%s", output)
+		}
+		if !strings.Contains(output, "checked the project at ") || !strings.Contains(output, "sub/deeper") {
+			t.Errorf("the report did not say which project it checked from where:\n%s", output)
+		}
+	})
+
+	// The control on the note: started at the root, the run says nothing about roots.
+	t.Run("from the root, no root note", func(t *testing.T) {
+		root := fixtureProject(t)
+		output, code := runCohere(t, binary, root, "--no-fix", "--lint")
+		if code != 0 {
+			t.Fatalf("exit %d at the root of a clean project:\n%s", code, output)
+		}
+		if strings.Contains(output, "checked the project at") {
+			t.Errorf("a run at its own root printed a root note:\n%s", output)
+		}
+	})
+
+	t.Run("outside any project, a loud failure", func(t *testing.T) {
+		outside := t.TempDir()
+		output, code := runCohere(t, binary, outside, "--no-fix", "--lint")
+		if code == 0 {
+			t.Fatalf("a run with no tsconfig anywhere above exited 0:\n%s", output)
+		}
+		if !strings.Contains(output, "no tsconfig.json in") {
+			t.Errorf("the failure does not say what it looked for:\n%s", output)
+		}
+	})
+
+	// `--no-fix` promised not to write a byte, and the type phase rewrote the build info on every
+	// run. The source edit between the runs is what makes the comparison mean something: a writing
+	// run would record the new file's hash, so identical bytes prove the write was withheld rather
+	// than that it happened to produce the same content.
+	t.Run("--no-fix writes no build info", func(t *testing.T) {
+		root := fixtureProject(t)
+		buildInfo := filepath.Join(root, "tsconfig.tsbuildinfo")
+
+		if output, code := runCohere(t, binary, root, "--no-fix", "--types"); code != 0 {
+			t.Fatalf("exit %d:\n%s", code, output)
+		}
+		if _, err := os.Stat(buildInfo); !os.IsNotExist(err) {
+			t.Fatalf("a --no-fix run created the build info (stat: %v)", err)
+		}
+
+		// The control: without --no-fix the same run writes it, so the absence above is the flag.
+		if output, code := runCohere(t, binary, root, "--types"); code != 0 {
+			t.Fatalf("exit %d:\n%s", code, output)
+		}
+		before, err := os.ReadFile(buildInfo)
+		if err != nil {
+			t.Fatalf("a writing run left no build info, so this fixture cannot tell writing from not: %v", err)
+		}
+		information, err := os.Stat(buildInfo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		modified := information.ModTime()
+
+		writeTree(t, root, map[string]string{"index.ts": "export const value: number = 3;\nexport const more = 4;\n"})
+		// Past the filesystem's timestamp resolution, so a write would move the mtime visibly.
+		time.Sleep(20 * time.Millisecond)
+
+		if output, code := runCohere(t, binary, root, "--no-fix", "--types"); code != 0 {
+			t.Fatalf("exit %d:\n%s", code, output)
+		}
+		after, err := os.ReadFile(buildInfo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(before, after) {
+			t.Error("a --no-fix run rewrote the build info")
+		}
+		if information, err := os.Stat(buildInfo); err != nil || !information.ModTime().Equal(modified) {
+			t.Errorf("a --no-fix run touched the build info: mtime %v, was %v (stat: %v)", information.ModTime(), modified, err)
+		}
+	})
+
+	t.Run("--changed on a clean tree is a clean answer", func(t *testing.T) {
+		root := fixtureProject(t)
+		makeFixtureRepository(t, root)
+		gitIn(t, root, "add", ".")
+		gitIn(t, root, "commit", "--quiet", "-m", "baseline")
+
+		output, code := runCohere(t, binary, root, "--no-fix", "--changed")
+		if code != 0 {
+			t.Fatalf("a clean tree under --changed exited %d:\n%s", code, output)
+		}
+		for _, want := range []string{"nothing changed against HEAD", "0 files checked"} {
+			if !strings.Contains(output, want) {
+				t.Errorf("want %q in:\n%s", want, output)
+			}
+		}
+		// No graph was needed, so none may be reported as built.
+		if strings.Contains(output, "graph built") {
+			t.Errorf("a clean tree still built the graph:\n%s", output)
+		}
+
+		// A change outside the program is the same kind of answer, reached after the graph.
+		writeTree(t, root, map[string]string{"README.md": "notes\n"})
+		output, code = runCohere(t, binary, root, "--no-fix", "--changed")
+		if code != 0 {
+			t.Fatalf("a change outside the program exited %d:\n%s", code, output)
+		}
+		if !strings.Contains(output, "none of the 1 changed files are in the program: 0 files checked") {
+			t.Errorf("the run did not say why it checked nothing:\n%s", output)
+		}
+
+		// The control that keeps the two answers above honest: a real change in the program is still
+		// checked, and a real error in it still fails the run. Without this, a --changed that had
+		// stopped looking at all would pass both assertions above.
+		writeTree(t, root, map[string]string{"sub/deeper/Thing.ts": "export const thing: number = \"not a number\";\n"})
+		output, code = runCohere(t, binary, root, "--no-fix", "--changed")
+		if code == 0 {
+			t.Fatalf("a type error in a changed file passed under --changed:\n%s", output)
+		}
+		if !strings.Contains(output, "Thing.ts") || !strings.Contains(output, "TS2322") {
+			t.Errorf("the planted error was not the reported one:\n%s", output)
+		}
+	})
+
+	// The other direction of the honesty doctrine: an unknown change set is never green.
+	t.Run("--changed where git cannot answer is a loud failure", func(t *testing.T) {
+		root := fixtureProject(t)
+		output, code := runCohere(t, binary, root, "--no-fix", "--changed")
+		if code == 0 {
+			t.Fatalf("--changed outside a repository exited 0:\n%s", output)
+		}
+		if !strings.Contains(output, "asking what changed") {
+			t.Errorf("the failure does not say what could not be determined:\n%s", output)
+		}
+		if strings.Contains(output, "nothing changed") {
+			t.Errorf("a failed git call was described as nothing changing:\n%s", output)
+		}
+	})
+}
+
+// TestAScopedRunKeepsItsScopeAfterAFixRewritesAFile holds the scope across the rebuild the fix phase
+// triggers.
+//
+// The rebuild reset the file list to every project file, so a run asked about one file reported
+// `1 in scope` on the graph line and then type-checked and linted the whole program. Three files is
+// enough to see it: the scoped one carries a debugger statement for the fixer to remove, and the two
+// unrelated ones must not appear in either phase's count.
+func TestAScopedRunKeepsItsScopeAfterAFixRewritesAFile(t *testing.T) {
+	binary := buildCohere(t)
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"tsconfig.json":       incrementalFixtureConfig,
+		"CohereSettings.json": `{"rules":{"no-debugger":"error"}}`,
+		"Scoped.ts":           "export function scoped(): number {\n    debugger;\n    return 1;\n}\n",
+		"Other.ts":            "export const other: number = 2;\n",
+		"Another.ts":          "export const another: number = 3;\n",
+	})
+
+	output, code := runCohere(t, binary, root, "Scoped.ts")
+	if code != 0 {
+		t.Fatalf("exit %d:\n%s", code, output)
+	}
+
+	// The precondition: a fix landed and the graph was rebuilt. Without it this test would pass on a
+	// run that never reached the code it is about.
+	if !strings.Contains(output, "graph rebuilt") {
+		t.Fatalf("no fix was applied, so the rebuild this test is about never ran:\n%s", output)
+	}
+	if fixed, err := os.ReadFile(filepath.Join(root, "Scoped.ts")); err != nil || strings.Contains(string(fixed), "debugger") {
+		t.Fatalf("the debugger statement was not removed (read error %v):\n%s", err, fixed)
+	}
+
+	for _, want := range []string{"types: 0 diagnostics over 1 files", "rules over 1 files"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("the scope did not survive the rebuild, want %q in:\n%s", want, output)
+		}
+	}
+}
+
+// TestTheTypePhaseReadsButDoesNotWriteWhenAskedNotTo holds collectTypeDiagnostics' own half of the
+// `--no-fix` promise, below the flag wiring the binary test covers.
+//
+// Both halves are asserted. Not writing is the fix; still reading is what keeps a `--no-fix` run warm,
+// and a version that skipped the session entirely would satisfy the first half while making every
+// CI run cold. The warm half is observed through findings: a planted error must still be found on a
+// run that read a build info recorded before the error existed.
+func TestTheTypePhaseReadsButDoesNotWriteWhenAskedNotTo(t *testing.T) {
+	root := fixtureProject(t)
+	buildInfo := filepath.Join(root, "tsconfig.tsbuildinfo")
+
+	build := func() *program.Graph {
+		t.Helper()
+		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: root})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return graph
+	}
+
+	graph := build()
+	collectTypeDiagnostics(context.Background(), graph, graph.ProjectFiles(), false)
+	if _, err := os.Stat(buildInfo); !os.IsNotExist(err) {
+		t.Fatalf("persist=false wrote the build info (stat: %v)", err)
+	}
+
+	graph = build()
+	collectTypeDiagnostics(context.Background(), graph, graph.ProjectFiles(), true)
+	before, err := os.ReadFile(buildInfo)
+	if err != nil {
+		t.Fatalf("persist=true wrote nothing, so the assertion above cannot distinguish the flag: %v", err)
+	}
+
+	writeTree(t, root, map[string]string{"index.ts": "export const value: number = \"planted\";\n"})
+	graph = build()
+	diagnostics := collectTypeDiagnostics(context.Background(), graph, graph.ProjectFiles(), false)
+	if len(diagnostics) == 0 {
+		t.Error("a planted type error was not found by a run that read a build info and did not write one")
+	}
+	after, err := os.ReadFile(buildInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Error("persist=false rewrote an existing build info")
+	}
+}

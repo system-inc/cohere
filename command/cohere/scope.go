@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -50,6 +51,13 @@ type formatScope struct {
 	// directory enumerates every file under it, most of which the program never contained, so the
 	// enumerated count is not a number anybody wants beside the count actually checked.
 	RequestDescription string
+
+	// UnreadableSubmodules names each submodule git could not be asked about, with why.
+	//
+	// Carried rather than returned as an error because the two callers want opposite things from
+	// it: the format phase can proceed without one directory's worth of scope, and `--changed`
+	// cannot, since its scope is the claim the run reports. See changedScopeForCheck.
+	UnreadableSubmodules []string
 }
 
 // narrowTo reports how many of the scope's files are in a given population, and re-describes the
@@ -137,7 +145,7 @@ func wholeTreeScope() formatScope {
 // subprocess failed would turn a five-minute surprise into the default, so the failure is returned
 // and the caller reports the phase as skipped with the reason.
 func changedFilesScope(workingDirectory string) (formatScope, error) {
-	names, err := gitChangedFiles(workingDirectory)
+	names, unreadable, err := gitChangedFiles(workingDirectory, "")
 	if err != nil {
 		return formatScope{}, err
 	}
@@ -178,8 +186,30 @@ func changedFilesScope(workingDirectory string) (formatScope, error) {
 		// Named for the coverage line, which asks what the caller requested rather than what was
 		// found. Without it a `--changed` run printed `3 in scope ()`, which is a true count beside
 		// an empty reason.
-		RequestDescription: "what git reports as changed",
+		RequestDescription:   "what git reports as changed",
+		UnreadableSubmodules: unreadable,
 	}, nil
+}
+
+// changedScopeForCheck is changedFilesScope for a run that will report a verdict on what it finds.
+//
+// The format phase can live with a partial answer, because formatting fewer files than changed
+// withholds nothing a reader is told was checked. `--changed` cannot. Its scope IS the claim, so a
+// submodule whose changes could not be read is a hole in the verdict that reads exactly like a
+// submodule with nothing changed, and once an empty change set is a green run that hole is a green
+// run over edits nobody looked at. So here it is an error, naming every submodule it could not read.
+func changedScopeForCheck(workingDirectory string) (formatScope, error) {
+	scope, err := changedFilesScope(workingDirectory)
+	if err != nil {
+		return formatScope{}, err
+	}
+	if len(scope.UnreadableSubmodules) > 0 {
+		return formatScope{}, fmt.Errorf(
+			"could not read what changed in %s, so the change set is incomplete and a verdict over it would not be one",
+			strings.Join(scope.UnreadableSubmodules, "; "),
+		)
+	}
+	return scope, nil
 }
 
 // gitChangedFiles asks git what has changed, in one call.
@@ -187,7 +217,22 @@ func changedFilesScope(workingDirectory string) (formatScope, error) {
 // `git status --porcelain` covers all three states at once: modified in the working tree, staged,
 // and untracked. Three separate commands would be three chances for the sets to disagree if a file
 // changed between them, which on a tree with nine writers is not hypothetical.
-func gitChangedFiles(workingDirectory string) ([]string, error) {
+//
+// Names come back relative to workingDirectory, whatever directory of the repository that is. Git
+// does not do this on its own: porcelain paths are always relative to the repository's top level,
+// whatever directory git ran in, so a project whose root sits below its repository's top had every
+// changed path joined onto the wrong prefix and silently matched nothing. That was latent while the
+// root had to be the directory cohere ran from; it is reachable now that the root is found by walking
+// up, and an empty change set became a green run in the same change, so a wrong prefix would now
+// print "nothing changed" over real edits.
+//
+// since is the commit the caller's repository records for this one, and empty for the outermost
+// repository. See the submodule loop for why a submodule needs it.
+//
+// The second result names each submodule whose changes could not be read, and why. Collected
+// rather than failing the call, because what to do about one is the caller's decision: see
+// formatScope.UnreadableSubmodules.
+func gitChangedFiles(workingDirectory string, since string) ([]string, []string, error) {
 	// --untracked-files=all is load-bearing rather than a detail. By default git collapses an
 	// untracked directory to a single entry ending in a slash, so `code-quality/` arrives as one
 	// "changed file" that matches no real path and every file inside it silently leaves the scope.
@@ -200,15 +245,71 @@ func gitChangedFiles(workingDirectory string) ([]string, error) {
 	// This is the failure this whole scope layer exists to prevent, arriving through the tool that
 	// computes the scope: a subset that looks deliberate and was actually an accident of output
 	// formatting.
-	command := exec.Command("git", "status", "--porcelain=v1", "--no-renames", "--untracked-files=all")
-	command.Dir = workingDirectory
-
-	output, err := command.Output()
+	//
+	// `-- .` keeps the answer to the directory asked about rather than the whole repository, which
+	// matters once that directory can be a project below the top level. --ignore-submodules=all is
+	// because every submodule is asked directly below, and the parent's own opinion of one adds
+	// nothing but a failure mode: a submodule git cannot open fails the parent's call outright, which
+	// would name the whole repository as unreadable rather than the one directory that was.
+	output, err := gitOutput(workingDirectory,
+		"status", "--porcelain=v1", "--no-renames", "--untracked-files=all", "--ignore-submodules=all", "--", ".")
 	if err != nil {
-		return nil, fmt.Errorf("asking git what changed: %w", err)
+		return nil, nil, fmt.Errorf("asking git what changed: %w", err)
 	}
 
-	changed := parsePorcelain(string(output))
+	prefixOutput, err := gitOutput(workingDirectory, "rev-parse", "--show-prefix")
+	if err != nil {
+		return nil, nil, fmt.Errorf("asking git where %s sits in its repository: %w", workingDirectory, err)
+	}
+	prefix := strings.TrimSpace(prefixOutput)
+
+	changed := parsePorcelain(output)
+
+	// A submodule whose checked-out commit is not the one its parent records has changed files that
+	// its own status cannot see, because status compares against the submodule's HEAD and the
+	// submodule's HEAD moved with them. Committing inside `libraries/structure` without updating the
+	// pointer, or a pull that moved it, leaves every edited file clean to the submodule and invisible
+	// to the parent, and an empty change set is now a green run.
+	//
+	// So the files that differ between the recorded commit and the working tree are added. Deleted
+	// files are filtered for the same reason parsePorcelain drops them: there is nothing to read.
+	if since != "" {
+		head, err := gitOutput(workingDirectory, "rev-parse", "HEAD")
+		if err != nil {
+			return nil, nil, fmt.Errorf("asking git which commit is checked out: %w", err)
+		}
+		if strings.TrimSpace(head) != since {
+			moved, err := gitOutput(workingDirectory, "diff", "--name-only", "--no-renames", "--diff-filter=d", since, "--", ".")
+			if err != nil {
+				return nil, nil, fmt.Errorf("asking git what differs from the recorded commit %s: %w", since, err)
+			}
+			for _, line := range strings.Split(moved, "\n") {
+				if line = strings.TrimSpace(line); line != "" {
+					changed = append(changed, unquoteGitPath(line))
+				}
+			}
+		}
+	}
+
+	// Every path above is relative to the repository's top level; strip that back to this directory.
+	// `-- .` guarantees each one starts with the prefix, so one that does not is git saying something
+	// this parser does not understand, and that is said rather than guessed at.
+	relative := make([]string, 0, len(changed))
+	seen := make(map[string]struct{}, len(changed))
+	for _, name := range changed {
+		if !strings.HasPrefix(name, prefix) {
+			return nil, nil, fmt.Errorf("git reported %s, which is outside %s", name, workingDirectory)
+		}
+		name = strings.TrimPrefix(name, prefix)
+		// The status and the recorded-commit diff overlap whenever a file is both uncommitted and
+		// behind the recorded commit, and one file counted twice is a count that is wrong.
+		if _, duplicate := seen[name]; duplicate {
+			continue
+		}
+		seen[name] = struct{}{}
+		relative = append(relative, name)
+	}
+	changed = relative
 
 	// A modified submodule arrives here looking exactly like a modified file.
 	//
@@ -223,10 +324,10 @@ func gitChangedFiles(workingDirectory string) ([]string, error) {
 	// that reads it.
 	submodules, err := gitSubmodulePaths(workingDirectory)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(submodules) == 0 {
-		return changed, nil
+		return changed, nil, nil
 	}
 
 	kept := make([]string, 0, len(changed))
@@ -248,25 +349,102 @@ func gitChangedFiles(workingDirectory string) ([]string, error) {
 	//
 	// Each submodule is asked with the same flags for the same reasons, and its answers are prefixed
 	// back to the parent's path space so every caller downstream keeps receiving paths it can
-	// resolve. A submodule that cannot be read is skipped rather than failing the run: it is one
-	// directory's worth of scope, and the parent's answer is still useful without it.
+	// resolve. A submodule that cannot be read does not fail this call, and it is not dropped in
+	// silence either: it is named in the second result, and each caller decides whether a partial
+	// answer is one it can report on. The first version skipped it without a word, which was
+	// tolerable while the only consumer was the formatter and stopped being so once `--changed`
+	// started reporting an empty change set as green.
+	//
+	// A submodule that is not checked out has nothing on disk, so nothing in it can have changed or be
+	// in the program; it is passed over rather than asked, since git run inside its empty directory
+	// answers for the parent instead.
 	//
 	// Recursive on purpose, and the first version was not. `libraries/structure` holds `nexus`, so a
 	// single level returned that nested pointer as an ordinary path and the formatter reported one
 	// file it could not process, which is a true statement about a path that was never a file. The
 	// same drop has to happen at every level, which is what calling back into this function does.
 	// Each level prefixes only its own segment, so the paths compose rather than doubling.
+	unreadable := []string{}
 	for submodule := range submodules {
-		inside, err := gitChangedFiles(filepath.Join(workingDirectory, submodule))
+		directory := filepath.Join(workingDirectory, submodule)
+		if _, err := os.Stat(filepath.Join(directory, ".git")); err != nil {
+			continue
+		}
+
+		recorded, err := gitRecordedCommit(workingDirectory, submodule, directory)
 		if err != nil {
+			unreadable = append(unreadable, fmt.Sprintf("%s (%v)", submodule, err))
+			continue
+		}
+
+		inside, insideUnreadable, err := gitChangedFiles(directory, recorded)
+		if err != nil {
+			unreadable = append(unreadable, fmt.Sprintf("%s (%v)", submodule, err))
 			continue
 		}
 		for _, name := range inside {
 			kept = append(kept, filepath.Join(submodule, name))
 		}
+		for _, description := range insideUnreadable {
+			// Concatenated rather than joined: the description carries git's error text, and Join
+			// would clean the paths inside it.
+			unreadable = append(unreadable, submodule+string(filepath.Separator)+description)
+		}
+	}
+	sort.Strings(unreadable)
+
+	return kept, unreadable, nil
+}
+
+// gitRecordedCommit is the commit the parent's HEAD records for a submodule.
+//
+// A submodule the parent's HEAD does not hold yet, because it was added since or because the parent
+// has no commits, has had every file in it change against HEAD. That is answered with the empty
+// tree, so the diff against it lists every tracked file, rather than with an empty string that would
+// read as "nothing to compare" and list none.
+//
+// The empty tree is asked of the submodule rather than written as a constant, because its name
+// depends on the repository's hash function.
+func gitRecordedCommit(parentDirectory string, submodule string, submoduleDirectory string) (string, error) {
+	command := exec.Command("git", "rev-parse", "--verify", "--quiet", "HEAD:./"+filepath.ToSlash(submodule))
+	command.Dir = parentDirectory
+	output, err := command.Output()
+	if err == nil {
+		return strings.TrimSpace(string(output)), nil
 	}
 
-	return kept, nil
+	// --verify --quiet exits 1 with nothing on stderr for a name that does not resolve, and anything
+	// else is git failing rather than answering.
+	var exitError *exec.ExitError
+	if !errors.As(err, &exitError) || exitError.ExitCode() != 1 {
+		return "", fmt.Errorf("asking git which commit HEAD records: %w", err)
+	}
+
+	emptyTree, err := gitOutput(submoduleDirectory, "hash-object", "-t", "tree", os.DevNull)
+	if err != nil {
+		return "", fmt.Errorf("asking git for the empty tree: %w", err)
+	}
+	return strings.TrimSpace(emptyTree), nil
+}
+
+// gitOutput runs one git command in a directory and returns what it printed.
+//
+// Git's own stderr is carried into the error, because `exit status 128` alone names no cause and the
+// cause is always on stderr: not a repository, a broken gitdir, an object that was never fetched.
+func gitOutput(directory string, arguments ...string) (string, error) {
+	command := exec.Command("git", arguments...)
+	command.Dir = directory
+	output, err := command.Output()
+	if err != nil {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			if message := strings.TrimSpace(string(exitError.Stderr)); message != "" {
+				return "", fmt.Errorf("%w: %s", err, message)
+			}
+		}
+		return "", err
+	}
+	return string(output), nil
 }
 
 // gitSubmodulePaths is the set of paths in this repository that are submodules.
@@ -552,7 +730,12 @@ func (s formatScope) formatCandidates() []string {
 // Resolution is against the working directory the caller gave, not the process's own, because
 // `--directory` already redefines what a relative path means everywhere else in this binary and a
 // second answer here would be a bug nobody could see from the output.
-func namedPathsScope(workingDirectory string, names []string) (formatScope, error) {
+//
+// The whole-tree answer belongs to the project root and not to the working directory, and the two
+// stopped being the same directory once the root could be found by walking up. `cohere .` from
+// `modules/tasks` means that directory, and reading it as the whole project would turn the
+// narrowest thing a caller can type into the widest run there is.
+func namedPathsScope(workingDirectory string, root string, names []string) (formatScope, error) {
 	// `--directory` defaults to empty, meaning the process's own. Resolving against empty leaves a
 	// relative path, which never matches a source file name because those are absolute, so every
 	// named path fell out of scope and the run checked nothing while reporting success. That is the
@@ -564,6 +747,9 @@ func namedPathsScope(workingDirectory string, names []string) (formatScope, erro
 			return formatScope{}, fmt.Errorf("resolving the working directory: %w", err)
 		}
 		workingDirectory = current
+	}
+	if root == "" {
+		root = workingDirectory
 	}
 
 	absolute := make([]string, 0, len(names))
@@ -588,7 +774,7 @@ func namedPathsScope(workingDirectory string, names []string) (formatScope, erro
 			continue
 		}
 
-		if path == filepath.Clean(workingDirectory) {
+		if path == filepath.Clean(root) {
 			return wholeTreeScope(), nil
 		}
 

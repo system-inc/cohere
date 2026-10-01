@@ -124,6 +124,40 @@ type pipelineReport struct {
 	// about two thirds of the wall clock, and the missing third was invisible until this field
 	// existed.
 	processStart time.Time
+
+	// rootNote says which project was checked when that is not the directory the run started in.
+	// Empty otherwise. See projectLocation.rootNote.
+	rootNote string
+
+	// nothingToCheck is set when `--changed` asked git, git answered, and the answer held nothing the
+	// program contains. It is the reason, in words, and it replaces the coverage warning rather than
+	// sitting beside it: every phase was skipped, and "did not check everything" would call a clean
+	// answer a gap.
+	nothingToCheck string
+
+	// graphNotBuilt is set when the run ended before the graph was needed, so the accounting line
+	// says so rather than reporting a graph that took 0s.
+	graphNotBuilt bool
+}
+
+// recordNothingToCheck marks every phase skipped for one reason, and the run as a clean answer
+// over zero files.
+//
+// Skipped rather than not reached, because nothing failed upstream: there was nothing for any phase
+// to look at. The opt-in phase keeps its own wording when nobody asked for it, for the reason
+// markRemainingNotReachedFor states.
+func (r *pipelineReport) recordNothingToCheck(reason string, requested requestedPhases) {
+	r.nothingToCheck = reason
+	for _, name := range phaseOrder {
+		if r.has(name) {
+			continue
+		}
+		if optInPhases[name] && !requested[name] {
+			r.record(name, outcomeSkipped, 0, "not requested — this is a report, ask for it with --unused")
+			continue
+		}
+		r.record(name, outcomeSkipped, 0, reason)
+	}
 }
 
 // record notes what a phase did. Called once per phase, in order.
@@ -278,6 +312,18 @@ func (r *pipelineReport) Write(out io.Writer) {
 	// cost exactly the case it exists for.
 	r.writeProvenanceWarning(out, release.Current().SourceTreeModified)
 
+	if r.rootNote != "" {
+		fmt.Fprintf(out, "  %s\n", r.rootNote)
+	}
+
+	// A clean answer over zero files says exactly that, and nothing else about coverage. The scope
+	// line below would have nothing to compare, and the coverage warning would describe skipped
+	// phases as a gap when skipping them was the whole of the right answer.
+	if r.nothingToCheck != "" {
+		fmt.Fprintf(out, "  %s: 0 files checked\n", r.nothingToCheck)
+		return
+	}
+
 	// File scope is its own dimension and the phase lines cannot express it. A run narrowed to one
 	// file ran every phase it was asked for, so `the phases above say what was not checked` points a
 	// reader at lines that answer a different question.
@@ -310,6 +356,10 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 	}
 
 	total := time.Since(r.processStart)
+	if r.graphNotBuilt {
+		fmt.Fprintf(out, "  total %s — no graph was built and no phase ran\n", round(total))
+		return
+	}
 	accounted := r.graph
 	for _, record := range r.records {
 		// Only phases that actually spent the time are summed. A reused phase records a zero elapsed

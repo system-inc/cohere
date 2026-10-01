@@ -134,6 +134,19 @@ func developmentBinaryIsCurrent(paths Paths, hash string) (bool, error) {
 }
 
 // recordDevelopmentHash stores the hash the development binary was built from.
+//
+// This is one of the launcher's three writes, with the binary and the Go build cache beside it, and
+// all three land under Paths.CacheDirectory: `.cache/cohere/` in the cohere checkout, which that
+// checkout's .gitignore excludes. None of them is relative to the working directory or to the project
+// being checked, so `cohere --no-fix` keeps its promise about the project while this still runs. The
+// promise is about the tree cohere checks, not about cohere's own build, and a rebuild has to be
+// allowed under `--no-fix` or the flag would run a binary that does not match the rules on disk.
+//
+// The checkout is found from the launcher's own resolved path before the working directory (see
+// findModuleDirectory in command/cohere-dispatch), so an installed launcher writes into the checkout
+// it lives in wherever it is run from. The one arrangement where these bytes sit inside a checked
+// project is a cohere checkout placed inside that project's tree, and then they are still that
+// checkout's ignored cache rather than the project's files.
 func recordDevelopmentHash(paths Paths, hash string) error {
 	if err := os.WriteFile(paths.developmentHashPath(), []byte(hash+"\n"), 0o644); err != nil {
 		return fmt.Errorf("recording the development build hash: %w", err)

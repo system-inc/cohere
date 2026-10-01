@@ -52,14 +52,24 @@ func run() error {
 		return runRenameVerb(os.Args[2:])
 	}
 
-	configFileName := flag.String("tsconfig", "tsconfig.json", "the tsconfig that defines the program")
-	directory := flag.String("directory", "", "the working directory paths resolve against (default: the process's own)")
+	configFileName := flag.String("tsconfig", projectMarker,
+		"the tsconfig that defines the program, relative to where you typed it (default: the nearest tsconfig.json at or above the working directory)")
+	directory := flag.String("directory", "",
+		"the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json at or above the working directory)")
 	typesOnly := flag.Bool("types", false, "build the graph and report TypeScript's own diagnostics, running no rules")
 	lintOnly := flag.Bool("lint", false, "run the rules, reporting no type diagnostics")
-	lintConfigFileName := flag.String("lint-config", "CohereSettings.json", "the config that says which rules apply to which files")
+	lintConfigFileName := flag.String("lint-config", "CohereSettings.json",
+		"the config that says which rules apply to which files (default: the one at the project root)")
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
 	fixOnly := flag.Bool("fix", false, "fix and format only, running no other phase")
-	noFix := flag.Bool("no-fix", false, "mutate nothing: report what would change without writing a byte")
+	// The promise is about the project being checked, and it is stated with its boundary because one
+	// write sits outside it on purpose: the launcher rebuilds cohere itself when its rules changed,
+	// into the gitignored `.cache/cohere/` of the cohere checkout. That is cohere's own build rather
+	// than the checked tree, and withholding it would run a binary that does not match the rules on
+	// disk. See recordDevelopmentHash in internal/release/dispatch.
+	noFix := flag.Bool("no-fix", false,
+		"mutate nothing in the checked project: report what would change without writing a byte to it, "+
+			"its source or its caches (cohere may still rebuild itself in its own checkout's .cache/cohere)")
 	formatAll := flag.Bool("format-all", false, "format every file rather than only the ones that changed")
 	// A binary that implements no rule and a binary whose rule found nothing produce the same empty
 	// finding list, and the differential harness cannot tell them apart from the outside. This is how
@@ -126,10 +136,37 @@ func run() error {
 		return nil
 	}
 
+	// Where the project is, decided once, before anything reads a path.
+	//
+	// The failure is held rather than returned here, because `-version` and an explicitly named lint
+	// config do not need a project at all, and refusing them for standing outside one would be a
+	// refusal with no reason behind it. Every path that does need one returns it at the point of use.
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("resolving the working directory: %w", err)
+	}
+	given := map[string]bool{}
+	flag.Visit(func(set *flag.Flag) { given[set.Name] = true })
+	location, locateError := locateProject(locationRequest{
+		WorkingDirectory:        workingDirectory,
+		Directory:               *directory,
+		ConfigFileName:          *configFileName,
+		ConfigFileNameGiven:     given["tsconfig"],
+		LintConfigFileName:      *lintConfigFileName,
+		LintConfigFileNameGiven: given["lint-config"],
+	})
+
 	if *listRulesEnabled {
-		lintConfig, err := configuration.Load(*lintConfigFileName)
+		lintConfigPath := location.LintConfigFileName
+		if locateError != nil {
+			if !given["lint-config"] {
+				return locateError
+			}
+			lintConfigPath = absoluteFrom(absoluteFrom(workingDirectory, *directory), *lintConfigFileName)
+		}
+		lintConfig, err := configuration.Load(lintConfigPath)
 		if err != nil {
-			return fmt.Errorf("reading %s: %w", *lintConfigFileName, err)
+			return fmt.Errorf("reading %s: %w", lintConfigPath, err)
 		}
 
 		// Resolution is per file, because an override can turn a rule off for one path and leave it
@@ -137,9 +174,13 @@ func run() error {
 		// which file the answer is about, and it defaults to a plain TypeScript source at the root
 		// rather than to nothing: a caller who forgets to pass one gets the ordinary case rather
 		// than an error, and a caller who wants the generated-file answer asks for it by name.
+		//
+		// A typed probe is resolved where it was typed. Left relative, the config reads it as relative
+		// to its own directory, so asking about `Thing.ts` from `modules/tasks` answered for a file at
+		// the root that does not exist.
 		probePath := "index.ts"
 		if arguments := flag.Args(); len(arguments) > 0 {
-			probePath = arguments[0]
+			probePath = absoluteFrom(absoluteFrom(workingDirectory, *directory), arguments[0])
 		}
 		resolved := lintConfig.Resolve(probePath)
 		if resolved.Ignored {
@@ -237,10 +278,44 @@ func run() error {
 
 	ctx := context.Background()
 
+	// Everything from here checks a project, so standing outside one stops the run, naming where it
+	// looked.
+	if locateError != nil {
+		return locateError
+	}
+
+	// `--changed` asks git before the graph is built, because the most common answer needs no graph.
+	//
+	// A clean tree used to exit 1 with "nothing to walk: the file set is empty", after paying for the
+	// graph and a type pass over zero files (about 390ms on ahra for the types alone). That is a red
+	// run over a correct answer. Git ran, git answered, and the answer was that nothing differs from
+	// HEAD, so there is nothing this run could find, and saying so and exiting 0 is the verdict.
+	//
+	// What keeps that honest is that only an answer counts. Git failing, the directory not being a
+	// repository, or a submodule that could not be read all mean the change set is unknown rather
+	// than empty, and every one of them is still an error here: see changedScopeForCheck. A named
+	// path wins over `--changed`, as it does in the switch below, so this only runs when it will be
+	// used.
+	var changedScope formatScope
+	askingWhatChanged := *changedOnly && len(flag.Args()) == 0
+	if askingWhatChanged {
+		changedScope, err = changedScopeForCheck(location.Root)
+		if err != nil {
+			return fmt.Errorf("asking what changed: %w", err)
+		}
+		if len(changedScope.FileNames) == 0 {
+			fmt.Printf("nothing changed against HEAD in %s (working tree, staged, and untracked)\n", location.Root)
+			nothingChanged := &pipelineReport{processStart: processStart, rootNote: location.rootNote(), graphNotBuilt: true}
+			nothingChanged.recordNothingToCheck("nothing changed against HEAD", unusedRequest)
+			nothingChanged.Write(os.Stdout)
+			return nil
+		}
+	}
+
 	buildStart := time.Now()
 	graph, err := program.Build(program.Options{
-		ConfigFileName:   *configFileName,
-		CurrentDirectory: *directory,
+		ConfigFileName:   location.ConfigFileName,
+		CurrentDirectory: location.Root,
 		SingleThreaded:   *singleThreaded,
 	})
 	if err != nil {
@@ -264,13 +339,13 @@ func run() error {
 	lintScope := formatScope{Everything: true}
 	switch {
 	case len(flag.Args()) > 0 && !*listRules && !*listRulesEnabled:
-		scope, err := namedPathsScope(*directory, flag.Args())
+		scope, err := namedPathsScope(location.ArgumentBase, location.Root, flag.Args())
 		if err != nil {
 			return err
 		}
 		lintScope, projectFiles = narrowToClosure(graph, scope, projectFiles)
 
-	case *changedOnly:
+	case askingWhatChanged:
 		// Opt-in, and it has to stay that way. Measured on this tree with nothing edited: the changed
 		// set is three files, and linting them reports 6 findings against a real 5,201 in 93ms and
 		// exits green. As a default that is the silent-green failure this binary exists to have
@@ -278,10 +353,9 @@ func run() error {
 		//
 		// As a flag it is a statement: the caller has said they want the answer about what they
 		// touched, and the coverage line says how many files that was.
-		scope, err := changedFilesScope(graph.Config.GetCurrentDirectory())
-		if err != nil {
-			return fmt.Errorf("asking what changed: %w", err)
-		}
+		//
+		// The scope itself was resolved before the graph was built; see changedScope above.
+		scope := changedScope
 
 		// A changed rule config changes what every file means, and no import edge carries that.
 		//
@@ -300,7 +374,7 @@ func run() error {
 		// would leave a relative path that never matches an absolute scope entry. That is the same
 		// defect `namedPathsScope` hit and the same one its fixture asserts against, arriving here
 		// through a different door.
-		if changedConfig := changedConfiguration(scope, graph, *lintConfigFileName); changedConfig != "" {
+		if changedConfig := changedConfiguration(scope, graph, location.LintConfigFileName); changedConfig != "" {
 			fmt.Fprintf(os.Stderr,
 				"note: %s changed, which changes what every file means, so the whole tree is checked\n",
 				filepath.Base(changedConfig))
@@ -346,6 +420,21 @@ func run() error {
 		processStart:   processStart,
 		filesInScope:   len(projectFiles),
 		filesInProgram: wholeProgramCount,
+		rootNote:       location.rootNote(),
+	}
+
+	// The other clean answer over zero files: git reported changes and none of them is in the program,
+	// such as a README edit, or a file under a directory the tsconfig excludes. The change set was
+	// determined and the program was built, so there is a real answer, and it is that this program has
+	// nothing to check. Before this, every phase was handed an empty slice and the walk refused it,
+	// which reported a red run for an edit to a markdown file.
+	if askingWhatChanged && !lintScope.Everything && len(projectFiles) == 0 {
+		report.recordNothingToCheck(
+			fmt.Sprintf("none of the %d changed files are in the program", len(changedScope.FileNames)),
+			unusedRequest,
+		)
+		report.Write(os.Stdout)
+		return nil
 	}
 
 	// Phase 2: fix and format. Mutation runs before anything reports, so every phase downstream sees
@@ -366,7 +455,7 @@ func run() error {
 		// A config that cannot be read is a hard failure and never a permissive default. Linting
 		// everything with nothing configured produces output indistinguishable from a clean run, and
 		// that exact confusion is what this tool exists to make impossible.
-		loaded, err := configuration.Load(resolveLintConfigPath(*lintConfigFileName, *directory))
+		loaded, err := configuration.Load(location.LintConfigFileName)
 		if err != nil {
 			return fmt.Errorf("loading the lint config: %w", err)
 		}
@@ -422,12 +511,18 @@ func run() error {
 			scope = lintScope
 
 		default:
-			resolved, scopeError := changedFilesScope(graph.Config.GetCurrentDirectory())
+			resolved, scopeError := changedFilesScope(location.Root)
 			if scopeError != nil {
 				// Falling back to the whole tree would turn a failed subprocess into a five-minute
 				// surprise, so the scope becomes empty and says why. Fixing still runs; only formatting
 				// is withheld, and the reason reaches the coverage line.
 				resolved = formatScope{Description: fmt.Sprintf("nothing (could not determine what changed: %v)", scopeError)}
+			}
+			// Formatting proceeds without a submodule it could not read, which withholds no finding,
+			// but it says so: a file left unformatted with no word is the shape this scope exists to
+			// prevent.
+			for _, unreadable := range resolved.UnreadableSubmodules {
+				fmt.Fprintf(os.Stderr, "note: could not read what changed in %s, so nothing in it is formatted\n", unreadable)
 			}
 			scope = resolved
 		}
@@ -474,7 +569,7 @@ func run() error {
 		default:
 			enumeration, enumerateError := formatter.Enumerate(
 				graph.Config.GetCurrentDirectory(),
-				resolveStructureIgnorePath(*directory),
+				resolveStructureIgnorePath(location.Root),
 			)
 			if enumerateError != nil {
 				// A failed walk withholds formatting and says why, rather than falling back to a
@@ -515,14 +610,22 @@ func run() error {
 		// longer exists — which is the same stale-read corruption the edit engine refuses internally,
 		// one level up.
 		if fixSummary.FilesChanged > 0 && (runTypes || runLint) {
-			rebuiltGraph, rebuildDuration, err := rebuildGraph(*configFileName, *directory, *singleThreaded, lintConfig)
+			rebuiltGraph, rebuildDuration, err := rebuildGraph(location.ConfigFileName, location.Root, *singleThreaded, lintConfig)
 			if err != nil {
 				report.markRemainingNotReachedFor(phaseFix, fmt.Sprintf("the graph could not be rebuilt after fixing: %v", err), unusedRequest)
 				report.Write(os.Stdout)
 				return fmt.Errorf("rebuilding the type graph after fixing: %w", err)
 			}
 			graph = rebuiltGraph
-			projectFiles = graph.ProjectFiles()
+			// The scope survives the rebuild. Taking every project file here turned a run scoped to
+			// one named path, or to what changed, into a whole-tree run the moment a fixer landed:
+			// the graph line said `1 in scope` and the types and lint lines then reported every file
+			// in the program, with nothing saying the scope had been dropped.
+			rescoped, lost := rescopeAfterRebuild(graph.ProjectFiles(), projectFiles, lintScope.Everything)
+			for _, fileName := range lost {
+				fmt.Fprintf(os.Stderr, "note: %s was in scope and is not in the rebuilt program, so it is not checked\n", fileName)
+			}
+			projectFiles = rescoped
 			fmt.Printf(
 				"graph rebuilt in %s — %d files changed, so every later phase reads the new text\n",
 				round(rebuildDuration), fixSummary.FilesChanged,
@@ -549,7 +652,10 @@ func run() error {
 		report.record(phaseTypes, outcomeSkipped, 0, "not requested")
 	} else {
 		typesStart := time.Now()
-		typeDiagnostics := collectTypeDiagnostics(ctx, graph, projectFiles)
+		// `--no-fix` promises not to write a byte, and the incremental build info is a byte. It was
+		// rewritten on every run regardless, which made the flag's own help text false: measured, the
+		// mtime of ahra's tsconfig.tsbuildinfo moved across a `--no-fix` run.
+		typeDiagnostics := collectTypeDiagnostics(ctx, graph, projectFiles, !*noFix)
 		typesDuration := time.Since(typesStart)
 
 		for _, diagnostic := range typeDiagnostics {
@@ -660,7 +766,14 @@ func run() error {
 			// Explained after the run rather than instead of it, so the reader sees the whole-tree
 			// verdict and the single-file account together. Asking why one file behaved the way it
 			// did is usually a question about a run that already happened.
-			subject := findExplainSubject(projectFiles, *explainFile)
+			//
+			// The typed path is tried where it was typed first, and only then by suffix. From a
+			// subdirectory the suffix alone can name a same-named file in another module, and the
+			// explanation would be about a file the caller was not asking after.
+			subject := findExplainSubject(projectFiles, absoluteFrom(location.ArgumentBase, *explainFile))
+			if subject == nil {
+				subject = findExplainSubject(projectFiles, *explainFile)
+			}
 			if subject == nil {
 				// Naming the file that was not found rather than explaining nothing, because an
 				// empty explanation reads as a file with nothing to say.
@@ -778,7 +891,13 @@ func rebuildGraph(
 // produced a diagnostic was still checked. Discarding that on failure would make the slow path
 // the one a person hits while iterating on an error, which is exactly the loop where the pause
 // costs most.
-func collectTypeDiagnostics(ctx context.Context, graph *program.Graph, files []*ast.SourceFile) []*ast.Diagnostic {
+//
+// persist is false under `--no-fix`. The build info is still read, so the run is as warm as the last
+// writing run left it, and only the write is withheld. A `--no-fix` run is therefore warm against a
+// slightly older snapshot rather than cold, which costs it the files changed since then and nothing
+// else; reading costs nothing the promise forbids, and refusing to read would make every CI run cold
+// for no reason.
+func collectTypeDiagnostics(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, persist bool) []*ast.Diagnostic {
 	ours := make(map[*ast.SourceFile]struct{}, len(files))
 	for _, sourceFile := range files {
 		ours[sourceFile] = struct{}{}
@@ -791,12 +910,15 @@ func collectTypeDiagnostics(ctx context.Context, graph *program.Graph, files []*
 	var checked []*ast.Diagnostic
 	if session := graph.NewIncrementalSession(); session != nil {
 		checked = session.Diagnostics(ctx)
-		if writeDiagnostics := session.Write(ctx); len(writeDiagnostics) > 0 {
-			// A failed build-info write must not pass silently. The next run would be cold while
-			// this one reported success, and the symptom is a saving that quietly never appears.
-			for _, diagnostic := range writeDiagnostics {
-				fmt.Fprintf(os.Stderr, "cohere: writing the incremental cache: %s\n",
-					diagnostic.MessageKey())
+		// The read already happened inside NewIncrementalSession; only the write is conditional.
+		if persist {
+			if writeDiagnostics := session.Write(ctx); len(writeDiagnostics) > 0 {
+				// A failed build-info write must not pass silently. The next run would be cold while
+				// this one reported success, and the symptom is a saving that quietly never appears.
+				for _, diagnostic := range writeDiagnostics {
+					fmt.Fprintf(os.Stderr, "cohere: writing the incremental cache: %s\n",
+						diagnostic.MessageKey())
+				}
 			}
 		}
 	} else {
@@ -1285,6 +1407,43 @@ func filterToScope(projectFiles []*ast.SourceFile, scope formatScope) []*ast.Sou
 		}
 	}
 	return kept
+}
+
+// rescopeAfterRebuild carries a scoped file set onto a rebuilt graph.
+//
+// Matched by name, because a rebuild parses every file again and the old source file pointers
+// belong to a graph nothing reads any more. The set is the one already decided, closure included,
+// rather than a closure recomputed on the new graph: the scope is what the run told the reader it
+// would check, and the graph line has already printed its size.
+//
+// A scoped file the rebuilt program no longer holds is returned by name rather than dropped, so a
+// file that left the scope says so instead of shrinking the count without a word.
+func rescopeAfterRebuild(rebuilt []*ast.SourceFile, scoped []*ast.SourceFile, everything bool) ([]*ast.SourceFile, []string) {
+	if everything {
+		return rebuilt, nil
+	}
+
+	wanted := make(map[string]bool, len(scoped))
+	for _, sourceFile := range scoped {
+		wanted[sourceFile.FileName()] = false
+	}
+
+	kept := make([]*ast.SourceFile, 0, len(scoped))
+	for _, sourceFile := range rebuilt {
+		if _, inScope := wanted[sourceFile.FileName()]; inScope {
+			wanted[sourceFile.FileName()] = true
+			kept = append(kept, sourceFile)
+		}
+	}
+
+	lost := []string{}
+	for fileName, found := range wanted {
+		if !found {
+			lost = append(lost, fileName)
+		}
+	}
+	sort.Strings(lost)
+	return kept, lost
 }
 
 // narrowToClosure turns a scope into the files a run should visit, and says when it declined.

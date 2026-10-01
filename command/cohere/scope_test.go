@@ -831,7 +831,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 	elsewhere := write("other/Elsewhere.ts")
 
 	t.Run("one file is one file", func(t *testing.T) {
-		scope, err := namedPathsScope(directory, []string{"source/Named.ts"})
+		scope, err := namedPathsScope(directory, directory, []string{"source/Named.ts"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -848,7 +848,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 	})
 
 	t.Run("a directory is everything under it", func(t *testing.T) {
-		scope, err := namedPathsScope(directory, []string{"source"})
+		scope, err := namedPathsScope(directory, directory, []string{"source"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -865,7 +865,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 	// `cohere --lint .` has always meant the whole tree and has to keep meaning it. A prefix match
 	// would make it a subset of one directory entry, silently.
 	t.Run("the working directory itself is the whole tree", func(t *testing.T) {
-		scope, err := namedPathsScope(directory, []string{"."})
+		scope, err := namedPathsScope(directory, directory, []string{"."})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -877,7 +877,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 	// A typo must fail loudly. An empty scope reporting success is the green-over-zero-files failure,
 	// and this scope reached it once during development by resolving against an empty directory.
 	t.Run("a path that does not exist is an error", func(t *testing.T) {
-		if _, err := namedPathsScope(directory, []string{"source/Missing.ts"}); err == nil {
+		if _, err := namedPathsScope(directory, directory, []string{"source/Missing.ts"}); err == nil {
 			t.Fatal("a nonexistent path resolved without error")
 		}
 	})
@@ -886,7 +886,7 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(t *testing.T) {
 	// against empty leaves a relative path, which never matches an absolute source file name, so
 	// every named path fell out of scope and the run checked nothing while reporting success.
 	t.Run("an empty working directory resolves against the process", func(t *testing.T) {
-		scope, err := namedPathsScope("", []string{"scope.go"})
+		scope, err := namedPathsScope("", "", []string{"scope.go"})
 		if err != nil {
 			t.Fatal(err)
 		}
