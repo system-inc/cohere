@@ -21,11 +21,11 @@ func TestPlatformManifestDeclaresTheOperatingSystemAndArchitectureNpmResolvesBy(
 		expectedOperatingSystem string
 		expectedArchitecture    string
 	}{
-		{Target{"darwin", "arm64"}, "@cohere/darwin-arm64", "darwin", "arm64"},
-		{Target{"darwin", "amd64"}, "@cohere/darwin-x64", "darwin", "x64"},
-		{Target{"linux", "amd64"}, "@cohere/linux-x64", "linux", "x64"},
-		{Target{"windows", "amd64"}, "@cohere/win32-x64", "win32", "x64"},
-		{Target{"windows", "arm64"}, "@cohere/win32-arm64", "win32", "arm64"},
+		{Target{"darwin", "arm64"}, "@system-inc/cohere-darwin-arm64", "darwin", "arm64"},
+		{Target{"darwin", "amd64"}, "@system-inc/cohere-darwin-x64", "darwin", "x64"},
+		{Target{"linux", "amd64"}, "@system-inc/cohere-linux-x64", "linux", "x64"},
+		{Target{"windows", "amd64"}, "@system-inc/cohere-win32-x64", "win32", "x64"},
+		{Target{"windows", "arm64"}, "@system-inc/cohere-win32-arm64", "win32", "arm64"},
 	}
 
 	for _, testCase := range cases {
@@ -52,7 +52,7 @@ func TestPlatformManifestMatchesWhatTheLauncherLooksFor(t *testing.T) {
 	for _, target := range Targets {
 		manifest := decodeManifest(t, mustPlatformManifest(t, target, "1.2.3"))
 
-		expected := PlatformPackageScope + "/" + singleString(t, manifest["os"]) + "-" + singleString(t, manifest["cpu"])
+		expected := PlatformPackagePrefix + singleString(t, manifest["os"]) + "-" + singleString(t, manifest["cpu"])
 		if manifest["name"] != expected {
 			t.Errorf(
 				"%s publishes as %v, but the launcher on that machine asks for %s",
@@ -102,6 +102,30 @@ func TestDispatcherDependsOnEveryPlatformExactly(t *testing.T) {
 	}
 }
 
+// The published name is a contract with code outside this repository, so it is pinned as a literal
+// rather than compared against the constant that produces it.
+//
+// Structure tells a consumer whose gate found no binary to run `pnpm add -D @system-inc/cohere`. A
+// constant renamed here alone would still pass every other test, publish cleanly, and leave that
+// instruction naming a package that does not exist, which is how this name came to be decided: the
+// error text and the registry disagreed, and the error text is what people read.
+func TestDispatcherPublishesUnderTheNameStructureTellsPeopleToInstall(t *testing.T) {
+	t.Parallel()
+
+	manifest := decodeManifest(t, mustDispatcherManifest(t, "1.2.3"))
+	if manifest["name"] != "@system-inc/cohere" {
+		t.Errorf("the dispatcher publishes as %v, but Structure tells people to install @system-inc/cohere", manifest["name"])
+	}
+
+	// Every platform package lives in the same scope, so one scope's access settings govern the
+	// whole release and no binary publishes somewhere the dispatcher's owner does not control.
+	for _, target := range Targets {
+		if !strings.HasPrefix(target.PackageName(), PackageScope+"/") {
+			t.Errorf("%s publishes outside %s", target.PackageName(), PackageScope)
+		}
+	}
+}
+
 // Both command names must be installed, and both must reach the same launcher.
 //
 // Two entries rather than one because `v` is what gets typed on the loop and `cohere` is what reads
@@ -142,11 +166,11 @@ func TestLauncherHoldsTheNoFallbackRule(t *testing.T) {
 	// bare command name appears as something it could run instead.
 	launcher := DispatcherLauncher()
 
-	if strings.Contains(launcher, "__SCOPE__") || strings.Contains(launcher, "__OVERRIDE_VARIABLE__") {
+	if strings.Contains(launcher, "__PLATFORM_PACKAGE_PREFIX__") || strings.Contains(launcher, "__OVERRIDE_VARIABLE__") {
 		t.Fatalf("the launcher shipped with an unreplaced placeholder, so it would resolve nothing")
 	}
-	if !strings.Contains(launcher, PlatformPackageScope) {
-		t.Errorf("the launcher never names the %s scope, so it cannot find a platform package", PlatformPackageScope)
+	if !strings.Contains(launcher, "'"+PlatformPackagePrefix+"'") {
+		t.Errorf("the launcher never names the %s prefix, so it cannot find a platform package", PlatformPackagePrefix)
 	}
 	if !strings.Contains(launcher, BinaryOverrideVariable) {
 		t.Errorf("the launcher never reads %s, so a local build cannot be pointed at", BinaryOverrideVariable)

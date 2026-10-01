@@ -201,14 +201,25 @@ clean tree.
 binary package, the same shape oxlint and tsgo use:
 
 ```
-cohere                  the package you install; a Node launcher, no binary
-@cohere/darwin-arm64    ~43 MB Go binary, stripped
-@cohere/darwin-x64
-@cohere/linux-arm64     for CI and containers
-@cohere/linux-x64
-@cohere/win32-arm64
-@cohere/win32-x64
+@system-inc/cohere                 the package you install; a Node launcher, no binary
+@system-inc/cohere-darwin-arm64    ~43 MB Go binary, stripped
+@system-inc/cohere-darwin-x64
+@system-inc/cohere-linux-arm64     for CI and containers
+@system-inc/cohere-linux-x64
+@system-inc/cohere-win32-arm64
+@system-inc/cohere-win32-x64
 ```
+
+```sh
+pnpm add -D @system-inc/cohere
+```
+
+The command is still `cohere`, with `c` beside it: npm's `bin` names the command, not the package.
+The scope is there because the bare name `cohere` is taken on npm. The platform packages carry the
+dispatcher's name as a stem rather than a scope of their own, the shape biome and rollup use,
+because `@system-inc` holds other tools and `@system-inc/darwin-arm64` would not say whose binary it
+is. Each one stages in a directory named for its package without the scope, so `dist/` reads the
+same way `node_modules/@system-inc/` does.
 
 Every size here names the build that produced it, because the same commit measures 43.1 MB stripped
 and 61.9 MB from a plain `go build`. An 18 MB spread under one label is not a measurement, it is two

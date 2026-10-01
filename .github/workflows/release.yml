@@ -168,8 +168,8 @@ jobs:
               # for. A binary that builds, packages, and cannot run is the failure that reaches
               # users, and it is invisible to every check that does not execute it.
               run: |
-                  ./dist/darwin-arm64/bin/cohere --version
-                  reported=$(./dist/darwin-arm64/bin/cohere --version | head -1 | awk '{print $2}')
+                  ./dist/cohere-darwin-arm64/bin/cohere --version
+                  reported=$(./dist/cohere-darwin-arm64/bin/cohere --version | head -1 | awk '{print $2}')
                   if [ "$reported" != "${{ inputs.version }}" ]; then
                       echo "the binary reports $reported but this release is ${{ inputs.version }}"
                       exit 1

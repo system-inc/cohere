@@ -5,8 +5,22 @@ import (
 	"fmt"
 )
 
+// PackageScope is the npm scope every cohere package publishes under.
+//
+// A scope rather than a bare name because the bare name is not ours: `cohere` is published on npm
+// by someone else, and so was `verify` before it. Two bare names taken in a row is the evidence that
+// a scope is the durable answer rather than a fallback. `@system-inc` matches the repository at
+// `github.com/system-inc/cohere`, and it is the name Structure already tells a consumer to install.
+const PackageScope = "@system-inc"
+
+// UnscopedDispatcherPackageName is the dispatcher's name inside the scope.
+//
+// It is also the directory the dispatcher is staged in, so a staged release reads the same way
+// `node_modules/@system-inc/` does, and the stem every platform package's name begins with.
+const UnscopedDispatcherPackageName = "cohere"
+
 // DispatcherPackageName is the package a consumer actually installs.
-const DispatcherPackageName = "cohere"
+const DispatcherPackageName = PackageScope + "/" + UnscopedDispatcherPackageName
 
 // ShortCommandName is what a consumer types on the loop they sit in all day.
 //

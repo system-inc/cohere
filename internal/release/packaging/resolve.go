@@ -17,8 +17,15 @@ import (
 // rather than resolved.
 const BinaryOverrideVariable = "COHERE_BINARY"
 
-// PlatformPackageScope is the npm scope the platform binaries publish under.
-const PlatformPackageScope = "@cohere"
+// PlatformPackagePrefix is what every platform binary's package name begins with, the "@system-inc/
+// cohere-" of "@system-inc/cohere-darwin-arm64".
+//
+// The platform packages share the dispatcher's scope and carry its name as a stem, the shape biome
+// (`@biomejs/cli-darwin-arm64`) and rollup (`@rollup/rollup-darwin-arm64`) publish under, rather than
+// esbuild's scope of their own (`@esbuild/darwin-arm64`). esbuild can drop the stem because its
+// scope holds nothing else. `@system-inc` holds other tools, so `@system-inc/darwin-arm64` would not
+// say whose binary it is, and a second tool shipping binaries the same way would collide with it.
+const PlatformPackagePrefix = DispatcherPackageName + "-"
 
 // ErrNoBinary reports that no cohere binary could be found for this platform.
 //
@@ -27,7 +34,7 @@ const PlatformPackageScope = "@cohere"
 var ErrNoBinary = errors.New("no cohere binary for this platform")
 
 // PlatformPackageName is the npm package holding the binary for a Go GOOS and GOARCH, like
-// "@cohere/darwin-arm64".
+// "@system-inc/cohere-darwin-arm64".
 //
 // The arguments are Go's names and the result is npm's, because npm is what resolves the package
 // while Go is what built it. They disagree in two places: Go says `windows` where npm says `win32`,
@@ -37,8 +44,8 @@ var ErrNoBinary = errors.New("no cohere binary for this platform")
 // names in.
 func PlatformPackageName(goOperatingSystem string, goArchitecture string) string {
 	return fmt.Sprintf(
-		"%s/%s-%s",
-		PlatformPackageScope,
+		"%s%s-%s",
+		PlatformPackagePrefix,
 		NpmOperatingSystem(goOperatingSystem),
 		NpmArchitecture(goArchitecture),
 	)
@@ -126,9 +133,9 @@ func Resolve(searchRoots []string) (string, error) {
 	}
 
 	return "", fmt.Errorf(
-		"%w: %s/%s wants %s, and it is not installed.\nLooked in:\n  %s\nInstall it, or point %s at a local build.",
+		"%w: %s/%s wants %s, and it is not installed.\nLooked in:\n  %s\nInstall %s without skipping optional dependencies, which brings it in, or point %s at a local build.",
 		ErrNoBinary, runtime.GOOS, runtime.GOARCH, packageName,
-		strings.Join(attempted, "\n  "), BinaryOverrideVariable,
+		strings.Join(attempted, "\n  "), DispatcherPackageName, BinaryOverrideVariable,
 	)
 }
 

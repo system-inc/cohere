@@ -33,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	directory := filepath.Join(os.Args[1], release.DispatcherPackageName)
+	directory := filepath.Join(os.Args[1], release.UnscopedDispatcherPackageName)
 	if err := os.MkdirAll(filepath.Join(directory, "bin"), 0o755); err != nil {
 		panic(err)
 	}

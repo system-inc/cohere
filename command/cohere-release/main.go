@@ -137,10 +137,10 @@ func printSummary(result release.Result, requested []release.Target, signing rel
 	fmt.Println()
 	for _, staged := range result.Packages {
 		if staged.SizeInBytes == 0 {
-			fmt.Printf("  %-24s %s\n", staged.Name, staged.Directory)
+			fmt.Printf("  %-32s %s\n", staged.Name, staged.Directory)
 			continue
 		}
-		fmt.Printf("  %-24s %6.1f MB  %s\n", staged.Name, float64(staged.SizeInBytes)/(1<<20), staged.Directory)
+		fmt.Printf("  %-32s %6.1f MB  %s\n", staged.Name, float64(staged.SizeInBytes)/(1<<20), staged.Directory)
 	}
 	fmt.Printf("\nsizes are stripped release builds: %s\n", release.DescribeBuild())
 

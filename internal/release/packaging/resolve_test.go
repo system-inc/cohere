@@ -30,7 +30,7 @@ func TestResolveFailsLoudlyWhenNothingIsInstalled(t *testing.T) {
 	// The message has to be actionable on its own, because the person reading it is looking at a
 	// failed install and has no other source of truth about what was wanted.
 	message := err.Error()
-	for _, required := range []string{runtime.GOOS, runtime.GOARCH, CurrentPlatformPackageName(), BinaryOverrideVariable} {
+	for _, required := range []string{runtime.GOOS, runtime.GOARCH, CurrentPlatformPackageName(), DispatcherPackageName, BinaryOverrideVariable} {
 		if !strings.Contains(message, required) {
 			t.Errorf("the failure never mentions %q, so it does not say what was missing: %s", required, message)
 		}
@@ -148,12 +148,12 @@ func TestPlatformPackageNameTranslatesGoNamesToNpmNames(t *testing.T) {
 	// Go spelling installs correctly and is never found, which on the machine is indistinguishable
 	// from a platform we never shipped. The keys here are Go's names, which is the contract.
 	cases := map[string]string{
-		"darwin/amd64":  "@cohere/darwin-x64",
-		"darwin/arm64":  "@cohere/darwin-arm64",
-		"linux/amd64":   "@cohere/linux-x64",
-		"linux/arm64":   "@cohere/linux-arm64",
-		"windows/amd64": "@cohere/win32-x64",
-		"windows/arm64": "@cohere/win32-arm64",
+		"darwin/amd64":  "@system-inc/cohere-darwin-x64",
+		"darwin/arm64":  "@system-inc/cohere-darwin-arm64",
+		"linux/amd64":   "@system-inc/cohere-linux-x64",
+		"linux/arm64":   "@system-inc/cohere-linux-arm64",
+		"windows/amd64": "@system-inc/cohere-win32-x64",
+		"windows/arm64": "@system-inc/cohere-win32-arm64",
 	}
 	for platform, expected := range cases {
 		goOperatingSystem, goArchitecture, _ := strings.Cut(platform, "/")

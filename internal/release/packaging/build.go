@@ -42,8 +42,10 @@ type Options struct {
 	// ModuleDirectory is the root of the cohere module.
 	ModuleDirectory string
 
-	// OutputDirectory is where the staged packages are written. Each platform package lands in a
-	// subdirectory named for the platform, and the dispatcher package in "cohere".
+	// OutputDirectory is where the staged packages are written, each in a directory named for its
+	// package without the scope: the dispatcher in "cohere" and each platform in one like
+	// "cohere-darwin-arm64". A scoped name would nest the dispatcher in "@system-inc/cohere" and turn
+	// the publish loop's one directory per package into a directory holding a package.
 	OutputDirectory string
 
 	// Version is the published version, like "0.3.1".
@@ -232,7 +234,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 // It takes no compiler pin and no toolchain for that reason: there is nothing here to stamp them
 // into, and threading them in would imply this package carries provenance that it does not.
 func buildDispatcherPackage(options Options) (StagedPackage, error) {
-	directory := filepath.Join(options.OutputDirectory, DispatcherPackageName)
+	directory := filepath.Join(options.OutputDirectory, UnscopedDispatcherPackageName)
 	if err := os.MkdirAll(filepath.Join(directory, "bin"), 0o755); err != nil {
 		return StagedPackage{}, fmt.Errorf("creating the dispatcher package directory: %w", err)
 	}

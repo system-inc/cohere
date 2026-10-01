@@ -9,18 +9,19 @@ import (
 // The launcher is Node rather than Go, which is a deliberate reversal of the obvious design. A Go
 // dispatcher would have to be cross-compiled per platform, which makes it a seventh platform
 // package rather than one package everyone installs — and the whole point of the dispatcher package
-// is that a consumer runs one `pnpm add cohere` and gets the right binary. Node is already present
-// by construction (this is an npm install), and `require.resolve` asks the package manager where a
-// package actually is, which is more reliable than any filesystem walk: it understands pnpm's
-// isolated store, npm's hoisting, and yarn's layouts without having to model any of them.
+// is that a consumer runs one `pnpm add -D @system-inc/cohere` and gets the right binary. Node is
+// already present by construction (this is an npm install), and `require.resolve` asks the package
+// manager where a package actually is, which is more reliable than any filesystem walk: it
+// understands pnpm's isolated store, npm's hoisting, and yarn's layouts without having to model any
+// of them.
 //
 // The script embeds here rather than living as a checked-in `.js` file so that the platform names,
-// the scope, and the binary names have exactly one definition. A launcher whose idea of the package
-// name drifted from the manifest's would resolve nothing on every machine, and that failure looks
-// identical to an unsupported platform.
+// the package prefix, and the binary names have exactly one definition. A launcher whose idea of the
+// package name drifted from the manifest's would resolve nothing on every machine, and that failure
+// looks identical to an unsupported platform.
 func DispatcherLauncher() string {
 	replacements := []string{
-		"__SCOPE__", PlatformPackageScope,
+		"__PLATFORM_PACKAGE_PREFIX__", PlatformPackagePrefix,
 		"__OVERRIDE_VARIABLE__", BinaryOverrideVariable,
 	}
 	return strings.NewReplacer(replacements...).Replace(launcherSource)
@@ -46,12 +47,12 @@ const childProcess = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const scope = '__SCOPE__';
+const platformPackagePrefix = '__PLATFORM_PACKAGE_PREFIX__';
 const overrideVariable = '__OVERRIDE_VARIABLE__';
 
 // Node's process.arch and process.platform are already npm's spelling, which is the same spelling
 // the platform packages publish under. No translation belongs here.
-const platformPackage = scope + '/' + process.platform + '-' + process.arch;
+const platformPackage = platformPackagePrefix + process.platform + '-' + process.arch;
 const binaryFileName = process.platform === 'win32' ? 'cohere.exe' : 'cohere';
 
 function fail(message) {

@@ -1,6 +1,6 @@
 package release
 
-import "fmt"
+import "strings"
 
 // Target is one platform a release ships a binary for.
 type Target struct {
@@ -34,12 +34,12 @@ func (target Target) PackageName() string {
 	return PlatformPackageName(target.GoOperatingSystem, target.GoArchitecture)
 }
 
-// DirectoryName is the on-disk directory for this target's package, like "darwin-arm64".
+// DirectoryName is the on-disk directory for this target's package, like "cohere-darwin-arm64".
 //
 // It is the package name without the scope, so that a staged release directory reads the same way
-// `node_modules/@cohere/` does.
+// `node_modules/@system-inc/` does, the dispatcher's "cohere" beside each platform's.
 func (target Target) DirectoryName() string {
-	return fmt.Sprintf("%s-%s", NpmOperatingSystem(target.GoOperatingSystem), NpmArchitecture(target.GoArchitecture))
+	return strings.TrimPrefix(target.PackageName(), PackageScope+"/")
 }
 
 // BinaryFileName is the executable's name inside this target's package.
