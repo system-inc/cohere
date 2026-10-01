@@ -683,7 +683,7 @@ func run() error {
 		}
 	}
 
-	// Phase 5: unused_exports. A report, run only when asked for, and never a reason to fail a build.
+	// Phase 5: unused. A report, run only when asked for, and never a reason to fail a build.
 	if !runUnused {
 		report.record(phaseUnused, outcomeSkipped, 0, "not requested — this is a report, ask for it with --unused")
 	} else {

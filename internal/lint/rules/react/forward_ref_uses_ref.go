@@ -130,7 +130,7 @@ var messageForwardRefRemoveWrapper = rule.Message{
 // # No options and no type checker
 //
 // oxc's struct is a unit struct with no configuration parsing, and its single tester block carries
-// no option tuples, so the surface is empty rather than merely unused_exports. Every question here is
+// no option tuples, so the surface is empty rather than merely unused. Every question here is
 // syntactic: which name the callee spells, how many parameters the function has, what kind the
 // parent node is. Nothing asks what an identifier binds to, so nothing declares `NeedsTypeChecker`,
 // and declaring it would not let the rule answer the aliased-import case anyway, because upstream

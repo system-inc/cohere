@@ -131,7 +131,7 @@ func extensionOf(fileName string) string {
 // Returning nil rather than quietly wiring the native formatter is the whole point. `formatdiff`
 // exists in-tree and would compile, and it is the wrong engine: FormatCodeSettings has no
 // printWidth, so it has no line-breaking engine at all, and 21.8% of tracked files diverge from our
-// Prettier after every settings-reachable edit. A bare `cohere` running it would reformat about a
+// Prettier after every settings-reachable fix. A bare `cohere` running it would reformat about a
 // fifth of the tree away from what the existing gate produces, which is worse than not formatting.
 //
 // A nil engine skips with "no formatter is configured" and that reaches the coverage line, so a run

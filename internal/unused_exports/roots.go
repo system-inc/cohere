@@ -175,7 +175,7 @@ const (
 	// This is the class that would have done the most damage. Measured on the ahra tree: 532 locale
 	// files under `translations/` directories are loaded exclusively as
 	// `import(`.../translations/${localeCode}`)`, so no static import to them exists and a naive
-	// reference index reports every one as unused_exports. The specifier is computed at runtime, so no
+	// reference index reports every one as unused. The specifier is computed at runtime, so no
 	// static analysis can resolve it — which means the honest answer is to treat the directory a
 	// computed specifier points into as rooted, rather than to pretend the reference was found.
 	rootDynamicImportTarget rootReason = "reachable only through a computed import() specifier"
@@ -267,7 +267,7 @@ func (r *RootSet) IsRoot(fileName string) (bool, rootReason) {
 	}
 
 	// A test runner loads test files by glob. They import the code under test and nothing imports
-	// them, which is exactly the shape the reference index reports as unused_exports.
+	// them, which is exactly the shape the reference index reports as unused.
 	if isTestFile(stem) {
 		return true, rootTest
 	}

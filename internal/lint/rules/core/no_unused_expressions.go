@@ -99,7 +99,7 @@ var NoUnusedExpressions = rule.Rule{
 	},
 }
 
-// unusedExpressionVerdict answers whether one expression's value goes unused_exports.
+// unusedExpressionVerdict answers whether one expression's value goes unused.
 type unusedExpressionVerdict struct {
 	options NoUnusedExpressionsOptions
 }

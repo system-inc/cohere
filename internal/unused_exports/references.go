@@ -22,7 +22,7 @@ type Unreferenced struct {
 	// Range is the declaration's own span.
 	Range TextSpan
 
-	// Intentional is set when the author marked this as deliberately unused_exports.
+	// Intentional is set when the author marked this as deliberately unused.
 	Intentional intentionalReason
 
 	// WholeFileUnused is set when nothing in the file is referenced, so the reader can be told about
@@ -245,7 +245,7 @@ func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.So
 						from := symbolOfDeclaration(enclosingDeclarationNode(node))
 						index.record(symbol, from)
 						// An import binding is an alias; the thing actually used is what it points
-						// at. Recording only the alias leaves every real declaration looking unused_exports.
+						// at. Recording only the alias leaves every real declaration looking unused.
 						if symbol.Flags&ast.SymbolFlagsAlias != 0 {
 							if aliased := checker.GetAliasedSymbol(symbol); aliased != nil {
 								index.record(aliased, from)

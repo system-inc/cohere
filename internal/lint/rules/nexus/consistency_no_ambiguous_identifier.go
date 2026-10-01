@@ -39,7 +39,7 @@ func messageNoSingleLetter(name string) rule.Message {
 var messageNoUnderscore = rule.Message{
 	Id: "noUnderscore",
 	Description: `Identifier "_" is not descriptive enough. Name it explicitly, or prefix an underscore ` +
-		`to a real name such as "_event" when the point is that the value is deliberately unused_exports.`,
+		`to a real name such as "_event" when the point is that the value is deliberately unused.`,
 }
 
 // ConsistencyNoAmbiguousIdentifier bans single-letter identifiers and the bare underscore.
