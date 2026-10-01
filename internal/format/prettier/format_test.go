@@ -145,3 +145,23 @@ func TestSyntaxErrorSurfaces(t *testing.T) {
 		t.Fatalf("error %q does not name a syntax error, so the pipeline will count it as a crash", err)
 	}
 }
+
+// TestFilepathReachesPrettier pins that the engine passes the file name, because Prettier's output
+// depends on it: `<T,>` on a single-parameter generic arrow is required in .tsx and dropped in .ts, and
+// Prettier tells the two apart by the path, not by the parser. Without a filepath both keep the comma.
+func TestFilepathReachesPrettier(t *testing.T) {
+	engine := newTestEngine(t)
+	source := "const identity = <T,>(value: T) => value;\n"
+	for fileName, want := range map[string]string{
+		"probe.ts":  "const identity = <T>(value: T) => value;\n",
+		"probe.tsx": "const identity = <T,>(value: T) => value;\n",
+	} {
+		formatted, err := engine.Format(fileName, source)
+		if err != nil {
+			t.Fatalf("%s: %v", fileName, err)
+		}
+		if formatted != want {
+			t.Errorf("%s formatted %q, want %q", fileName, formatted, want)
+		}
+	}
+}

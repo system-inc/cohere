@@ -9,12 +9,19 @@ import (
 
 // formatScript calls into the loaded bundles.
 //
+// The file name is passed as filepath because Prettier's output depends on it, and `s p` always passes
+// it. Without it, a single-parameter generic arrow in a .ts file keeps the `<T,>` that only .tsx needs
+// (print/type-parameters.js tests the path against /\.ts$/), and the TypeScript parser guesses JSX with
+// a regex instead of knowing it from the extension. Found by @system_cohere_format_typescript porting
+// the printer against this engine; until then the oracle disagreed with the tree on those files.
+//
 // The options are passed explicitly rather than resolved inside the runtime, because this runtime has
 // no filesystem: the config is the caller's to supply, through ResolveOptions in config.go, and
 // hardcoding it here would silently ignore a project that configured something else.
 const formatScript = `
 	(function () {
 		return prettier.format(__source, {
+			filepath: __fileName,
 			parser: __parser,
 			plugins: prettierPlugins,
 			tabWidth: __tabWidth,
@@ -123,6 +130,7 @@ func (engine *Engine) Format(fileName string, text string) (string, error) {
 	defer engine.mutex.Unlock()
 
 	engine.runtime.Set("__source", text)
+	engine.runtime.Set("__fileName", fileName)
 	engine.runtime.Set("__parser", parser)
 	engine.runtime.Set("__tabWidth", engine.options.TabWidth)
 	engine.runtime.Set("__useTabs", engine.options.UseTabs)

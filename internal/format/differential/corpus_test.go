@@ -95,7 +95,9 @@ func TestCorpora(t *testing.T) {
 		newCandidate := candidateFor(t, candidateName, newOracle, options)
 		cache := &OracleCache{
 			Directory: directory,
-			Identity:  digest + "|" + string(bundles.Origin) + "|" + describeOptions(options),
+			// "filepath" marks oracle output computed with the file name passed to Prettier. Answers
+			// cached before that changed had no filepath, and a cache serving them would hide the fix.
+			Identity: digest + "|" + string(bundles.Origin) + "|filepath|" + describeOptions(options),
 		}
 
 		report, err := Compare(root, enumeration.Files, newOracle, newCandidate, runtime.NumCPU(), cache)
