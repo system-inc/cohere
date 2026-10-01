@@ -39,12 +39,19 @@ let package = Package(
     ],
     targets: [
         /*
+         Type declarations for the part of libclang that reads the compiler's serialized diagnostics. Only
+         declarations: the library itself is loaded at run time from the toolchain `xcrun` names, so the
+         binary never carries one Xcode's path. See the header.
+         */
+        .target(name: "ClangDiagnosticsShim"),
+        /*
          Everything the engine knows, as a library so the tests reach the same code the command runs.
          The command target is only the process boundary: arguments in, records out, an exit code.
          */
         .target(
             name: "CohereSwift",
             dependencies: [
+                "ClangDiagnosticsShim",
                 .product(name: "SwiftSyntax", package: "swift-syntax"),
                 .product(name: "SwiftParser", package: "swift-syntax"),
                 .product(name: "SwiftParserDiagnostics", package: "swift-syntax"),

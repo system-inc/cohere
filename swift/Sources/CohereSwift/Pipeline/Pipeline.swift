@@ -110,12 +110,33 @@ public struct Pipeline {
             return try writer.finish(complete: false)
         }
 
+        var typeErrors = 0
         if !options.runTypes {
             try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not requested"))
         } else {
-            /* Not built yet. Skipped with the reason rather than omitted, and the run is incomplete until it lands. */
-            try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not built yet for Swift, so no compiler diagnostic was checked"))
-            complete = false
+            /* The whole package, whatever the scope: a change in one file changes what the rest of its module means. */
+            let types = try TypesPhase(
+                package: package,
+                files: fileSet.owned,
+                scratchPath: Self.scratchPath(for: root),
+                resolutionAllowed: !options.noFix,
+                runner: runner
+            ).run()
+            for finding in types.findings {
+                try writer.write(finding)
+            }
+            try writer.write(types.record)
+            try writer.write(PhaseRecord(name: .types, outcome: .ran, elapsedMilliseconds: types.record.elapsedMilliseconds))
+            if !types.record.filesWithoutRecord.isEmpty {
+                complete = false
+            }
+            typeErrors = types.findings.filter { $0.severity == .error }.count
+        }
+
+        if typeErrors > 0 && options.runLint {
+            try writer.write(PhaseRecord(name: .lint, outcome: .notReached, detail: "types bailed: \(typeErrors) type errors — lint findings against wrong semantics are noise"))
+            try writer.write(unusedPhase())
+            return try writer.finish(complete: false)
         }
 
         if !options.runLint {
