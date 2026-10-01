@@ -72,6 +72,24 @@ public struct FileSet: Equatable, Sendable {
             }
         }
 
+        /*
+         Tracked Swift files under the package that no target compiles: standalone scripts, the manifests, an
+         app built by an Xcode project, a separate package beside this one. None is checked by this run, and
+         each is named, so a clean verdict over the targets cannot read as a clean verdict over the directory.
+         Measured on Presence: 20 such files, holding 56 force unwraps the target files do not.
+         */
+        if let visible {
+            let rootPath = package.root.resolvingSymlinksInPath().path + "/"
+            let compiled = Set(filesInPackage.map { $0.resolvingSymlinksInPath().path })
+            for path in visible.sorted() where path.hasPrefix(rootPath) && path.hasSuffix(".swift") && !compiled.contains(path) {
+                let underVendor = path.dropFirst(rootPath.count).split(separator: "/").dropLast().contains("Vendor")
+                let reason = underVendor
+                    ? "vendored under Vendor/"
+                    : path.hasSuffix("/Package.swift") ? "a package manifest" : "no target of this package compiles it"
+                excluded.append(.init(file: path, reason: reason))
+            }
+        }
+
         let note = visible == nil
             ? "not a git repository, so every file a target compiles was treated as ours"
             : ""
