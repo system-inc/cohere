@@ -8,6 +8,7 @@ public enum RuleRegistry {
         NoForceTry(),
         NoForceCast(),
         NoImplicitlyUnwrappedOptional(),
+        NoLongLineComment(),
     ]
 
     public static let packageRules: [any PackageRule] = [

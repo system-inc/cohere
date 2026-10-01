@@ -97,21 +97,49 @@ public struct Pipeline {
             try writer.write(PhaseRecord(name: .fix, outcome: .skipped, detail: "not requested"))
         } else if filesThatDoNotParse > 0 {
             /* Nothing is rewritten in a run where any file does not parse: the bail below says why, and the fix line says nothing moved. */
-            try writer.write(fixRecord(scope: scope, considered: parsed.files.count, rewritten: 0, notFormatted: ["a file in scope does not parse, so nothing was rewritten": parsed.files.count]))
+            try writer.write(fixRecord(
+                scope: scope,
+                considered: parsed.files.count,
+                rewritten: 0,
+                fixesApplied: 0,
+                refusals: [:],
+                reformatted: 0,
+                notFormatted: ["a file in scope does not parse, so nothing was rewritten": parsed.files.count]
+            ))
             try writer.write(PhaseRecord(name: .fix, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: fixStart)))
         } else {
             let boundary = try repositoryRoot(of: root)
-            let formatting = await FormatPhase(boundary: boundary).run(parsed.files)
+            /*
+             Fixers first, then the formatter over the fixed text, so the formatter has the last word on layout
+             and a fixer's output is always formatted. Under `--no-fix` nothing is fixed: the fixable findings
+             surface in lint, and the formatter is asked only what it would change.
+             */
+            var fixesApplied = 0
+            var refusals: [String: Int] = [:]
+            var toFormat = parsed.files
+            if options.mutate {
+                let fixer = FileFixer(configuration: configuration, maximumPasses: options.fixPasses)
+                toFormat = parsed.files.map { file in
+                    let result = fixer.fix(file)
+                    fixesApplied += result.applied
+                    refusals.merge(result.refusalsByReason, uniquingKeysWith: +)
+                    return result.file
+                }
+            }
+            let originals = Dictionary(parsed.files.map { ($0.url.path, $0.source) }, uniquingKeysWith: { first, _ in first })
+            let formatting = await FormatPhase(boundary: boundary).run(toFormat)
             var rewritten: [FileSet.OwnedFile] = []
+            var reformatted = 0
             var notFormatted: [String: Int] = [:]
             for (file, outcome) in formatting.outcomes {
+                var final = file.source
                 switch outcome {
                 case .unchanged:
                     break
                 case let .changed(formatted):
                     if options.mutate {
-                        try formatted.write(to: file.url, atomically: true, encoding: .utf8)
-                        rewritten.append(FileSet.OwnedFile(url: file.url, targetName: file.targetName, targetKind: file.targetKind))
+                        final = formatted
+                        reformatted += 1
                     } else {
                         /* `--no-fix` writes nothing and reports what it would have changed, one finding per file, at the first line that moves. */
                         let line = FormatPhase.firstDifferingLine(file.source, formatted)
@@ -132,6 +160,11 @@ public struct Pipeline {
                     notFormatted["the formatter failed: \(reason)", default: 0] += 1
                     complete = false
                 }
+                /* One write per file, of the fixed and formatted text, and only when it differs from what was read. */
+                if options.mutate, final != originals[file.url.path] {
+                    try final.write(to: file.url, atomically: true, encoding: .utf8)
+                    rewritten.append(FileSet.OwnedFile(url: file.url, targetName: file.targetName, targetKind: file.targetKind))
+                }
             }
             /* Rewritten files are parsed again, so lint reads the text that is on disk now rather than the text that was. */
             if !rewritten.isEmpty {
@@ -139,7 +172,15 @@ public struct Pipeline {
                 let replacements = Dictionary(reparsed.files.map { ($0.url.path, $0) }, uniquingKeysWith: { first, _ in first })
                 parsed.files = parsed.files.map { replacements[$0.url.path] ?? $0 }
             }
-            try writer.write(fixRecord(scope: scope, considered: parsed.files.count, rewritten: rewritten.count, notFormatted: notFormatted))
+            try writer.write(fixRecord(
+                scope: scope,
+                considered: parsed.files.count,
+                rewritten: rewritten.count,
+                fixesApplied: fixesApplied,
+                refusals: refusals,
+                reformatted: reformatted,
+                notFormatted: notFormatted
+            ))
             try writer.write(PhaseRecord(name: .fix, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: fixStart)))
         }
 
@@ -236,18 +277,23 @@ public struct Pipeline {
         )
     }
 
-    /*
-     The fix line's numbers. Rewrites and reformats are the same count until native fixers land, because the
-     formatter is the only thing that writes today; they stay separate fields so the first fixer cannot blur them.
-     */
-    private func fixRecord(scope: FileScope, considered: Int, rewritten: Int, notFormatted: [String: Int]) -> FixRecord {
+    /* The fix line's numbers. Rewrites, fixes and reformats are separate counts, so a run where only the formatter moved reads differently from one where a fixer did. */
+    private func fixRecord(
+        scope: FileScope,
+        considered: Int,
+        rewritten: Int,
+        fixesApplied: Int,
+        refusals: [String: Int],
+        reformatted: Int,
+        notFormatted: [String: Int]
+    ) -> FixRecord {
         FixRecord(
             filesConsidered: considered,
             filesRewritten: rewritten,
-            fixesApplied: 0,
-            fixesRefused: 0,
-            refusalsByReason: [:],
-            filesReformatted: rewritten,
+            fixesApplied: fixesApplied,
+            fixesRefused: refusals.values.reduce(0, +),
+            refusalsByReason: refusals,
+            filesReformatted: reformatted,
             filesNotFormatted: notFormatted.values.reduce(0, +),
             notFormattedReasons: notFormatted,
             formatScope: scope.everything ? "every file in the package" : scope.description
