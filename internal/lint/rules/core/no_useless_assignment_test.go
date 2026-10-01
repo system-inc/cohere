@@ -620,3 +620,52 @@ func TestNoUselessAssignmentSwitchFlow(t *testing.T) {
 		})
 	}
 }
+
+// TestNoUselessAssignmentLeavesANeverReadBindingToNoUnusedVars pins upstream's `is_used` guard on
+// the shape that slipped past it.
+//
+// ESLint's rule says it "will not report variables that are never read", leaving them to
+// `no-unused-vars`, so a binding nothing reads gets ONE finding there and none here. cohere carried
+// the same guard and still reported every write to `let provenance: string;` in
+// `modules/finance/FinancePositionCommandLineInterface.ts` (three writes, beside the one
+// `no-unused-vars` finding), because a declarator with no initializer is classified as a read for
+// the liveness pass's sake and that classification was reused to decide whether the binding is
+// read at all. It is not a read; it only errs safe inside the dataflow.
+//
+// Both directions: the uninitialized never-read binding is silent, and the same binding read once
+// after a dead write still reports that write, so the guard cannot be swallowing the rule.
+func TestNoUselessAssignmentLeavesANeverReadBindingToNoUnusedVars(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+		wantCount  int
+	}{
+		{
+			name:       "an uninitialized binding written on every branch and never read",
+			sourceText: "function accountLine(valued: boolean): string {\n\tlet provenance: string;\n\tif (valued) {\n\t\tprovenance = 'valued';\n\t} else {\n\t\tprovenance = 'unvalued';\n\t}\n\treturn 'line';\n}",
+			wantCount:  0,
+		},
+		{
+			name:       "an uninitialized binding written twice and never read",
+			sourceText: "function f(): void {\n\tlet v: number;\n\tv = 1;\n\tv = 2;\n}",
+			wantCount:  0,
+		},
+		{
+			name:       "the control: the same binding read once still reports the dead write",
+			sourceText: "function f(): number {\n\tlet v: number;\n\tv = 1;\n\tv = 2;\n\treturn v;\n}",
+			wantCount:  1,
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunTyped(t, NoUselessAssignment, noUselessAssignmentFile, testCase.sourceText)
+			if len(result.Diagnostics) != testCase.wantCount {
+				t.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
+			}
+		})
+	}
+}

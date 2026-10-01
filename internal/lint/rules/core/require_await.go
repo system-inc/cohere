@@ -706,6 +706,13 @@ func requireAwaitSatisfiesPromiseContract(ctx rule.Context, node *ast.Node) bool
 		return false
 	}
 
+	// A position inside a generic call is judged by what the call DECLARES, not by what it inferred.
+	// See requireAwaitDeclaredGenericDemand for why the inferred answer is the function grading its
+	// own homework.
+	if declared, substitutions, throughGenericCall := requireAwaitDeclaredGenericDemand(ctx, node); throughGenericCall {
+		return requireAwaitTypesDemandPromise(ctx, node, declared, substitutions)
+	}
+
 	contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone)
 	if contextualType == nil {
 		// A class method has no contextual type of its own; its contract comes from whatever the
@@ -718,10 +725,19 @@ func requireAwaitSatisfiesPromiseContract(ctx rule.Context, node *ast.Node) bool
 		return false
 	}
 
-	// Every signature the position offers has to demand a promise. If any one of them accepts a
-	// plain value, the author had a choice and the keyword is not required of them.
+	return requireAwaitTypesDemandPromise(ctx, node, []*checker.Type{contextualType}, nil)
+}
+
+// requireAwaitTypesDemandPromise answers whether every call signature the position's types offer
+// returns a thenable.
+//
+// Every signature the position offers has to demand a promise. If any one of them accepts a plain
+// value, the author had a choice and the keyword is not required of them. A type parameter with a
+// substitution is read as the types standing in for it, and one without is read through its
+// apparent type, which is its constraint: an unconstrained `U` offers no signature and no `then`.
+func requireAwaitTypesDemandPromise(ctx rule.Context, node *ast.Node, types []*checker.Type, substitutions map[*checker.Type][]*checker.Type) bool {
 	sawSignature := false
-	for _, part := range type_checking.UnionTypeParts(contextualType) {
+	for _, part := range requireAwaitExpandTypes(types, substitutions) {
 		for _, signature := range type_checking.GetCallSignatures(ctx.TypeChecker, part) {
 			sawSignature = true
 			returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
@@ -730,7 +746,7 @@ func requireAwaitSatisfiesPromiseContract(ctx rule.Context, node *ast.Node) bool
 			// `T | Promise<T>` offers one signature whose return is a union, and the author may
 			// legitimately answer with either, so the keyword is optional and the finding stands.
 			// Only a return type that is thenable in every branch actually demands a promise.
-			for _, returnPart := range type_checking.UnionTypeParts(returnType) {
+			for _, returnPart := range requireAwaitExpandTypes([]*checker.Type{returnType}, substitutions) {
 				if !type_checking.IsThenableType(ctx.TypeChecker, node, returnPart) {
 					return false
 				}
@@ -739,6 +755,349 @@ func requireAwaitSatisfiesPromiseContract(ctx rule.Context, node *ast.Node) bool
 	}
 
 	return sawSignature
+}
+
+// requireAwaitExpandTypes splits each type into its union parts and replaces a substituted type
+// parameter with the types standing in for it.
+func requireAwaitExpandTypes(types []*checker.Type, substitutions map[*checker.Type][]*checker.Type) []*checker.Type {
+	var expanded []*checker.Type
+	for _, t := range types {
+		for _, part := range type_checking.UnionTypeParts(t) {
+			if standIns, substituted := substitutions[part]; substituted {
+				for _, standIn := range standIns {
+					expanded = append(expanded, type_checking.UnionTypeParts(standIn)...)
+				}
+				continue
+			}
+			expanded = append(expanded, part)
+		}
+	}
+	return expanded
+}
+
+// requireAwaitContextStepKind is one way a contextual type is handed from a container to a child.
+type requireAwaitContextStepKind int
+
+const (
+	// requireAwaitStepProperty reads a named property: an object literal hands it to its member.
+	requireAwaitStepProperty requireAwaitContextStepKind = iota
+	// requireAwaitStepElement reads an array or tuple element at an index.
+	requireAwaitStepElement
+	// requireAwaitStepReturn reads the return type of the container's call signatures: a function
+	// hands it to the expression it returns.
+	requireAwaitStepReturn
+)
+
+// requireAwaitContextStep is one step from a container's contextual type down to a child's.
+type requireAwaitContextStep struct {
+	kind  requireAwaitContextStepKind
+	name  string
+	index int
+}
+
+// requireAwaitDeclaredGenericDemand finds the type a generic call DECLARES for the position this
+// function is written into, when the position's contextual type comes from a generic call.
+//
+// # Why the inferred contextual type is the wrong question here
+//
+// A generic call infers its type parameters from its arguments, and this function is one of them.
+// After inference, `[1, 2].map(async (n) => n + sync())` resolves to `map<Promise<number>>`, so the
+// contextual type of the callback is `(value: number) => Promise<number>` and the position appears
+// to demand exactly the promise the callback produced. It demands nothing: drop the keyword and `U`
+// becomes `number`, and the call still compiles. Measured on ahra before this existed, the same
+// self-inference exempted `onSelected: async function () {...}` inside `React.useMemo(() => [...])`
+// at `useMetricsExportMenu.tsx:74` and `:92`, both of which ESLint reported and was right about.
+//
+// TypeScript's own `ContextFlagsIgnoreNodeInferences` does not close this. It blocks an inference
+// only when the inferred source type's own symbol is the blocked node, which catches
+// `identity(async () => 1)` and misses `map`, whose `U` is inferred from the callback's RETURN type
+// (a `Promise` whose symbol is the global one). It also works by re-resolving the enclosing calls
+// with inference blocked, which leaves expression types cached from that blocked run on a checker
+// every other rule reads afterwards. This walk only reads.
+//
+// # What the walk does
+//
+// From the function up to the nearest call it is an argument of, record each step a contextual
+// type takes on the way down: an object literal's property, an array's element, a contextually
+// typed function's return. If that call resolved to an instantiation of a generic signature and
+// wrote no explicit type arguments, replay the steps over the DECLARED parameter type instead of
+// the instantiated one. A type parameter met on the way is read through its constraint, which is
+// how `(api) => Promise<T>` and `T extends () => Promise<void>` still demand a promise and `() => U`
+// does not, with two stand-ins where the parameter is fixed by something other than this function:
+//
+//   - another argument whose declared parameter type is exactly the type parameter, as in
+//     `pick<T>(first: T, second: T)`, stands in with its instantiated type. That type still
+//     carries this function's contribution, so the stand-in errs toward silence, never toward a
+//     report the code cannot satisfy;
+//   - a call whose declared return type is exactly the type parameter and which sits in a typed
+//     position, as in `const items: Item[] = useMemo(() => [...])`, stands in with that position's
+//     type. If `Item` declares the member as returning a promise, removing the keyword breaks the
+//     assignment, so the demand is real.
+//
+// A deeper mention of the parameter in another argument is not followed, and an overload chosen
+// BECAUSE this function returns a promise is not undone; both are named here rather than claimed.
+//
+// The third result is false when the position does not come from a generic call, or when the walk
+// meets a shape it does not model; the caller then asks for the ordinary contextual type, which is
+// what this rule did before the walk existed.
+func requireAwaitDeclaredGenericDemand(ctx rule.Context, node *ast.Node) ([]*checker.Type, map[*checker.Type][]*checker.Type, bool) {
+	var steps []requireAwaitContextStep
+	current := node
+
+	if ast.IsMethodDeclaration(node) {
+		// An object literal's method takes its contextual type from the literal, by name. A class
+		// method is not in a call and its contract comes from the heritage clause instead.
+		object := node.Parent
+		if object == nil || !ast.IsObjectLiteralExpression(object) {
+			return nil, nil, false
+		}
+		name := node.Name()
+		if name == nil {
+			return nil, nil, false
+		}
+		text, ok := requireAwaitNameText(name)
+		if !ok {
+			return nil, nil, false
+		}
+		steps = append(steps, requireAwaitContextStep{kind: requireAwaitStepProperty, name: text})
+		current = object
+	}
+
+	for {
+		parent := current.Parent
+		if parent == nil {
+			return nil, nil, false
+		}
+
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+			// A parenthesis hands its contextual type straight through.
+
+		case ast.KindConditionalExpression:
+			conditional := parent.AsConditionalExpression()
+			if conditional.WhenTrue != current && conditional.WhenFalse != current {
+				return nil, nil, false
+			}
+
+		case ast.KindBinaryExpression:
+			// `a || b` and `a ?? b` give both operands the expression's contextual type.
+			operator := parent.AsBinaryExpression().OperatorToken.Kind
+			if operator != ast.KindBarBarToken && operator != ast.KindQuestionQuestionToken {
+				return nil, nil, false
+			}
+
+		case ast.KindPropertyAssignment:
+			if parent.AsPropertyAssignment().Initializer != current {
+				return nil, nil, false
+			}
+			name := parent.Name()
+			if name == nil {
+				return nil, nil, false
+			}
+			text, ok := requireAwaitNameText(name)
+			if !ok {
+				return nil, nil, false
+			}
+			steps = append(steps, requireAwaitContextStep{kind: requireAwaitStepProperty, name: text})
+			parent = parent.Parent
+
+		case ast.KindArrayLiteralExpression:
+			index := -1
+			for elementIndex, element := range parent.Elements() {
+				if element == current {
+					index = elementIndex
+					break
+				}
+				// A spread before this element moves its position by an amount the syntax does
+				// not state.
+				if element.Kind == ast.KindSpreadElement {
+					return nil, nil, false
+				}
+			}
+			if index < 0 {
+				return nil, nil, false
+			}
+			steps = append(steps, requireAwaitContextStep{kind: requireAwaitStepElement, index: index})
+
+		case ast.KindReturnStatement:
+			function := ast.GetContainingFunction(parent)
+			if function == nil || !requireAwaitReturnTakesContextualType(function) {
+				return nil, nil, false
+			}
+			steps = append(steps, requireAwaitContextStep{kind: requireAwaitStepReturn})
+			parent = function
+
+		case ast.KindArrowFunction:
+			if parent.Body() != current || !requireAwaitReturnTakesContextualType(parent) {
+				return nil, nil, false
+			}
+			steps = append(steps, requireAwaitContextStep{kind: requireAwaitStepReturn})
+
+		case ast.KindCallExpression, ast.KindNewExpression:
+			return requireAwaitDemandFromGenericCall(ctx, parent, current, steps)
+
+		default:
+			return nil, nil, false
+		}
+
+		current = parent
+	}
+}
+
+// requireAwaitReturnTakesContextualType answers whether a function's returned expression is typed
+// by the function's contextual signature, which is what makes a return a step in the walk.
+//
+// A declared return type fixes the demand without any call's help, and an async or generator
+// function hands its returned expression the awaited or yielded type rather than the signature's
+// return type. Neither is modelled, so both end the walk.
+func requireAwaitReturnTakesContextualType(function *ast.Node) bool {
+	if !ast.IsFunctionExpression(function) && !ast.IsArrowFunction(function) {
+		return false
+	}
+	if function.Type() != nil {
+		return false
+	}
+	return ast.GetFunctionFlags(function) == ast.FunctionFlagsNormal
+}
+
+// requireAwaitDemandFromGenericCall replays the recorded steps over the parameter type a generic
+// call declares at the argument's position.
+func requireAwaitDemandFromGenericCall(ctx rule.Context, call *ast.Node, argument *ast.Node, steps []requireAwaitContextStep) ([]*checker.Type, map[*checker.Type][]*checker.Type, bool) {
+	// Explicit type arguments are written by the author, so nothing was inferred from this function.
+	if len(call.TypeArguments()) != 0 {
+		return nil, nil, false
+	}
+
+	arguments := call.Arguments()
+	argumentIndex := -1
+	for index, candidate := range arguments {
+		if candidate == argument {
+			argumentIndex = index
+			break
+		}
+		if candidate.Kind == ast.KindSpreadElement {
+			return nil, nil, false
+		}
+	}
+	if argumentIndex < 0 {
+		// The callee, not an argument.
+		return nil, nil, false
+	}
+
+	resolved := checker.Checker_getResolvedSignature(ctx.TypeChecker, call, nil, checker.CheckModeNormal)
+	if resolved == nil {
+		return nil, nil, false
+	}
+	declared := resolved.Target()
+	if declared == nil || len(declared.TypeParameters()) == 0 {
+		// Not an instantiation of a generic signature, so the contextual type was not inferred
+		// from anything and the ordinary question is the right one.
+		return nil, nil, false
+	}
+
+	parameterType := requireAwaitParameterTypeAt(ctx, declared, argumentIndex)
+	if parameterType == nil {
+		return nil, nil, false
+	}
+
+	substitutions := requireAwaitTypeParameterStandIns(ctx, call, resolved, declared, argumentIndex)
+
+	types := []*checker.Type{parameterType}
+	for stepIndex := len(steps) - 1; stepIndex >= 0; stepIndex-- {
+		types = requireAwaitApplyContextStep(ctx, requireAwaitExpandTypes(types, substitutions), steps[stepIndex])
+	}
+	return types, substitutions, true
+}
+
+// requireAwaitParameterTypeAt is the type a signature declares for the argument at an index,
+// reading a rest parameter's element type.
+func requireAwaitParameterTypeAt(ctx rule.Context, signature *checker.Signature, index int) *checker.Type {
+	parameters := signature.Parameters()
+	if signature.HasRestParameter() && index >= len(parameters)-1 {
+		restType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, parameters[len(parameters)-1])
+		return checker.Checker_getIndexTypeOfType(ctx.TypeChecker, restType, checker.Checker_numberType(ctx.TypeChecker))
+	}
+	if index >= len(parameters) {
+		return nil
+	}
+	return checker.Checker_getTypeOfSymbol(ctx.TypeChecker, parameters[index])
+}
+
+// requireAwaitTypeParameterStandIns finds, for each of the declared signature's type parameters,
+// the types that fix it independently of the argument being judged.
+func requireAwaitTypeParameterStandIns(ctx rule.Context, call *ast.Node, resolved *checker.Signature, declared *checker.Signature, argumentIndex int) map[*checker.Type][]*checker.Type {
+	substitutions := map[*checker.Type][]*checker.Type{}
+	typeParameters := declared.TypeParameters()
+	isTypeParameter := func(t *checker.Type) bool {
+		for _, typeParameter := range typeParameters {
+			if t == typeParameter {
+				return true
+			}
+		}
+		return false
+	}
+
+	declaredParameters := declared.Parameters()
+	resolvedParameters := resolved.Parameters()
+	for index := range call.Arguments() {
+		if index == argumentIndex || index >= len(declaredParameters) || index >= len(resolvedParameters) {
+			continue
+		}
+		if declared.HasRestParameter() && index >= len(declaredParameters)-1 {
+			continue
+		}
+		declaredType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, declaredParameters[index])
+		if !isTypeParameter(declaredType) {
+			continue
+		}
+		resolvedType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, resolvedParameters[index])
+		substitutions[declaredType] = append(substitutions[declaredType], resolvedType)
+	}
+
+	declaredReturn := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, declared)
+	if isTypeParameter(declaredReturn) {
+		if positionType := checker.Checker_getContextualType(ctx.TypeChecker, call, checker.ContextFlagsNone); positionType != nil {
+			substitutions[declaredReturn] = append(substitutions[declaredReturn], positionType)
+		}
+	}
+
+	return substitutions
+}
+
+// requireAwaitApplyContextStep takes one step down from a container's types to a child's.
+//
+// Property and signature lookups read a type parameter through its apparent type, so an
+// unconstrained one yields nothing here, which is the point: nothing is demanded of the child.
+func requireAwaitApplyContextStep(ctx rule.Context, types []*checker.Type, step requireAwaitContextStep) []*checker.Type {
+	var next []*checker.Type
+	for _, part := range types {
+		switch step.kind {
+		case requireAwaitStepProperty:
+			if property := checker.Checker_getPropertyOfType(ctx.TypeChecker, part, step.name); property != nil {
+				next = append(next, checker.Checker_getTypeOfSymbol(ctx.TypeChecker, property))
+				continue
+			}
+			if indexed := checker.Checker_getIndexTypeOfType(ctx.TypeChecker, part, checker.Checker_stringType(ctx.TypeChecker)); indexed != nil {
+				next = append(next, indexed)
+			}
+		case requireAwaitStepElement:
+			if checker.Checker_isArrayOrTupleType(ctx.TypeChecker, part) && !checker.Checker_isArrayType(ctx.TypeChecker, part) {
+				elements := checker.Checker_getTypeArguments(ctx.TypeChecker, part)
+				if step.index < len(elements) {
+					next = append(next, elements[step.index])
+				}
+				continue
+			}
+			if indexed := checker.Checker_getIndexTypeOfType(ctx.TypeChecker, part, checker.Checker_numberType(ctx.TypeChecker)); indexed != nil {
+				next = append(next, indexed)
+			}
+		case requireAwaitStepReturn:
+			for _, signature := range type_checking.GetCallSignatures(ctx.TypeChecker, part) {
+				next = append(next, checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature))
+			}
+		}
+	}
+	return next
 }
 
 // requireAwaitHeritageMemberType finds the type a class's own interface declares for this method.

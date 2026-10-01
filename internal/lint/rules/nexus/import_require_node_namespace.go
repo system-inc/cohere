@@ -81,23 +81,37 @@ func expectedAlias(source string) string {
 	return builder.String()
 }
 
-var (
-	messageRequireNamespaceImport = rule.Message{
+// The three messages interpolate what the TypeScript original interpolates: the specifier as
+// written, the alias it should be imported under, and for the alias arm the alias it actually has.
+// An earlier port carried a fixed example, "import * as NodeFileSystem from 'node:fs'", in the
+// namespace message, which told `import NodePath from 'node:path'` to import a different module
+// under a different name. The reasons are cohere's own and stay; the specifics are the original's.
+
+func messageRequireNamespaceImport(source string, expected string, bare string) rule.Message {
+	return rule.Message{
 		Id: "requireNamespaceImport",
-		Description: "Node built-in must use a namespace import, so every call site says which module it came " +
-			"from. Use: import * as NodeFileSystem from 'node:fs'",
+		Description: "Node built-in '" + source + "' must use a namespace import, so every call site says " +
+			"which module it came from. Use: import * as " + expected + " from 'node:" + bare + "'",
 	}
-	messageRequireNodePrefix = rule.Message{
+}
+
+func messageRequireNodePrefix(source string, expected string, bare string) rule.Message {
+	return rule.Message{
 		Id: "requireNodePrefix",
-		Description: "Node built-in must use the 'node:' prefix, which says the module is Node's rather than a " +
-			"package that happens to share its name.",
+		Description: "Node built-in '" + source + "' must use the 'node:' prefix, which says the module is " +
+			"Node's rather than a package that happens to share its name. Use: import * as " + expected +
+			" from 'node:" + bare + "'",
 	}
-	messageRequireCorrectAlias = rule.Message{
+}
+
+func messageRequireCorrectAlias(expected string, actual string, bare string) rule.Message {
+	return rule.Message{
 		Id: "requireCorrectAlias",
-		Description: "Node namespace alias must be the Node-prefixed expansion, so a reader forty lines down " +
-			"knows what they are looking at without finding the import.",
+		Description: "Node namespace alias must be '" + expected + "', got '" + actual + "'. The alias is the " +
+			"Node-prefixed expansion of the module, so a reader forty lines down knows what they are " +
+			"looking at without finding the import. Use: import * as " + expected + " from 'node:" + bare + "'",
 	}
-)
+}
 
 // ImportRequireNodeNamespace enforces namespace imports with a Node-prefixed alias for Node
 // built-ins, in both the bare and "node:" spellings.
@@ -135,36 +149,41 @@ var ImportRequireNodeNamespace = rule.Rule{
 				bare := bareModuleName(source)
 				expected := expectedAlias(source)
 
-				namespaceAlias, hasNamespaceImport := namespaceImportAlias(declaration)
+				namespaceImport, hasNamespaceImport := namespaceImportOf(declaration)
 				if !hasNamespaceImport {
-					ctx.ReportNode(node, messageRequireNamespaceImport)
+					ctx.ReportNode(node, messageRequireNamespaceImport(source, expected, bare))
 					return
 				}
 
 				// The prefix and the alias are independent defects, so a line can carry both and
 				// must report both. Returning after the first would hide the second until the
 				// first was fixed and the gate run again.
+				//
+				// Each finding points where the original's does: the prefix at the whole declaration
+				// (its `node`), with the repair still confined to the specifier inside it, and the
+				// alias at the `* as alias` specifier (its `namespaceSpecifier`) rather than at the
+				// name alone.
 				if !strings.HasPrefix(source, "node:") {
 					ctx.ReportNodeWithFixes(
-						declaration.ModuleSpecifier,
-						messageRequireNodePrefix,
+						node,
+						messageRequireNodePrefix(source, expected, bare),
 						ctx.ReplaceNode(declaration.ModuleSpecifier, "'node:"+bare+"'"),
 					)
 				}
 
-				if namespaceAlias != nil && namespaceAlias.Text() != expected {
+				if alias := namespaceImport.Name(); alias != nil && alias.Text() != expected {
 					// No fix: renaming the alias without renaming its references through scope
 					// would leave the file uncompilable, the same trap as the namespace case above.
-					ctx.ReportNode(namespaceAlias, messageRequireCorrectAlias)
+					ctx.ReportNode(namespaceImport, messageRequireCorrectAlias(expected, alias.Text(), bare))
 				}
 			},
 		}
 	},
 }
 
-// namespaceImportAlias returns the alias node of a namespace import, and whether the declaration
+// namespaceImportOf returns the `* as alias` node of a namespace import, and whether the declaration
 // is one at all. A declaration with no import clause (a bare side-effect import) is neither.
-func namespaceImportAlias(declaration *ast.ImportDeclaration) (*ast.Node, bool) {
+func namespaceImportOf(declaration *ast.ImportDeclaration) (*ast.Node, bool) {
 	if declaration.ImportClause == nil {
 		return nil, false
 	}
@@ -175,9 +194,5 @@ func namespaceImportAlias(declaration *ast.ImportDeclaration) (*ast.Node, bool) 
 	if clause.NamedBindings.Kind != ast.KindNamespaceImport {
 		return nil, false
 	}
-	namespaceImport := clause.NamedBindings.AsNamespaceImport()
-	if namespaceImport == nil {
-		return nil, false
-	}
-	return namespaceImport.Name(), true
+	return clause.NamedBindings, true
 }

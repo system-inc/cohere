@@ -10,15 +10,32 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageNoUnusedVars = rule.Message{
-	Id: "noUnusedVars",
-	Description: "This binding is declared and nothing ever reads it. A name that is written but " +
-		"never read is almost always the residue of an edit that moved on: an import whose call " +
-		"site was deleted, a parameter left behind when a signature changed, a variable holding a " +
-		"value nobody asked for. It costs nothing at runtime, which is what lets it accumulate, " +
-		"and it costs the next reader real time, because an unused name reads exactly like a used " +
-		"one until you search the file and find nothing. Delete it, or prefix it with an " +
-		"underscore to say the omission is deliberate.",
+// noUnusedVarsMessage renders the finding for one binding.
+//
+// It names the binding and says whether it was ever given a value, the two facts ESLint's
+// "'x' is assigned a value but never used" carries, so a reader of a list of findings can tell them
+// apart without opening every file. It offers the underscore escape only when the resolved config
+// honours it, so the advice can never name a rename that leaves the finding standing: under a `^$`
+// ignore pattern, or with no pattern at all, the only repair offered is deletion.
+func noUnusedVarsMessage(name string, assigned bool, underscoreSilences bool) rule.Message {
+	action := "declared"
+	if assigned {
+		action = "assigned a value"
+	}
+	repair := "Delete it."
+	if underscoreSilences {
+		repair = "Delete it, or prefix it with an underscore, which the configured ignore pattern " +
+			"accepts, to say the omission is deliberate."
+	}
+	return rule.Message{
+		Id: "noUnusedVars",
+		Description: "'" + name + "' is " + action + " and nothing ever reads it. A name that is " +
+			"written but never read is almost always the residue of an edit that moved on: an import " +
+			"whose call site was deleted, a parameter left behind when a signature changed, a variable " +
+			"holding a value nobody asked for. It costs nothing at runtime, which is what lets it " +
+			"accumulate, and it costs the next reader real time, because an unused name reads exactly " +
+			"like a used one until you search the file and find nothing. " + repair,
+	}
 }
 
 // NoUnusedVars flags a variable, import, parameter, or type that nothing reads.
@@ -26,12 +43,12 @@ var messageNoUnusedVars = rule.Message{
 //	valid:   const x = 10; alert(x);
 //	valid:   function getY([, y]) { return y; }
 //	valid:   export const x = 1;
-//	valid:   const _unused = compute();
 //	valid:   import type { T } from './t'; const a: T = read();
 //	invalid: const x = 10;
 //	invalid: function add(a, b) { return a; }
 //	invalid: import { unusedThing } from './module';
 //	invalid: let z = 0; z = z + 1;
+//	invalid: const _unused = compute();   // no name is exempt unless a pattern is configured
 //
 // # What this rule decides, and at what scope
 //
@@ -81,59 +98,43 @@ var messageNoUnusedVars = rule.Message{
 //
 // # What this reports against upstream, measured
 //
-// 408 of 408 clean cases stay clean, 301 of 303 reporting cases report, and all 51 JSX cases agree.
+// 407 of 407 clean cases stay clean, 301 of 303 reporting cases report, and all 51 JSX cases agree.
+// oxc's corpus ships two more clean cases that are clean only under its leading-underscore default;
+// ESLint reports both, and so does this rule now (see the next section).
 // The two that do not are named with their causes in `noUnusedVarsKnownGaps`, and one of them is a
 // case upstream cannot report either and documents as such in its own test file.
 //
 // Zero false positives is the property that matters most here and it is the one held fixed: every
-// change that closed a gap was measured against all 408 clean cases first, and two changes that
+// change that closed a gap was measured against all the clean cases first, and two changes that
 // closed gaps at the cost of a clean case were reworked rather than kept. A rule that misses
 // something costs a finding nobody had; a rule that accuses wrongly costs trust in every finding it
 // makes.
 //
-// # The leading-underscore default, which is a real divergence between the two upstreams
+// # No name is ignored by default, which is ESLint's answer and no longer oxc's
 //
 // oxc ignores any binding whose name begins with `_` under default options; ESLint does not. This
-// is not a reading of the sources, it is measured on both: ESLint's own Linter API reports `_a` in
-// `const _a = 1;` with no options configured, and oxc's `ignored.rs:455` resolves
-// `IgnorePattern::Default` to `haystack.starts_with('_')`. The corpus corroborates it independently
-// at `tests/oxc.rs:89`, where `let _a = 1` is a PASS carrying only an `argsIgnorePattern` — a case
-// that can only be clean if the vars default already ignores the underscore.
+// is measured on both: ESLint's own Linter API reports `_a` in `const _a = 1;` with no options
+// configured, and oxc's `ignored.rs:455` resolves `IgnorePattern::Default` to
+// `haystack.starts_with('_')`.
 //
-// oxc wins, because oxc is what the differential runs against. ESLint's answer is recorded here so
-// the next reader does not helpfully correct this back.
+// This rule took oxc's answer while oxc was what the differential compared against, and reversed it
+// on 2026-10-01 under the parity doctrine: never worse than ESLint, rule by rule. Measured on the
+// installed `@typescript-eslint/no-unused-vars` 8.67.0 with no options, `const _deliberate = 1`,
+// `const _ = 1`, `function f(_) {}` and `catch (_) {}` all report, so oxc's default was a set of
+// findings ESLint makes and this rule did not. It was also an allowance built into the rule rather
+// than written in a config: the ahra config carried `varsIgnorePattern`, `argsIgnorePattern` and
+// `caughtErrorsIgnorePattern` at `^$` for no reason but to switch it off, and those three lines are
+// now redundant. An exemption a project wants is still available by configuring a pattern, where it
+// is visible.
 //
-// One sub-case is not symmetric and is easy to miss: a parameter named exactly `_` is NOT ignored
-// under the default args pattern (`ignored.rs:424`), while a variable named `_` is. That asymmetry
-// is upstream's and is reproduced.
+// History worth keeping, because it explains the `^$` lines a reader will still find in configs: on
+// 2026-09-05 the one finding ESLint made on ahra and this rule did not was `_nextContent` at
+// `modules/pensieve/PensieveBootstrap.test.ts`, missing only because of the oxc default, and the
+// `^$` patterns were added to close it.
 //
-// # This underscore default was the entire measured gap, and config has since closed it
-//
-// Measured on the ahra tree on 2026-09-05, driving the installed 8.67.0 rule through the ESLint
-// Linter API over 4,961 files and comparing against this rule's own dry run over the same tree.
-// The namespaced rule reported three findings; this rule reported two of them, at identical
-// file, line and column:
-//
-//	modules/google/analytics/AnalyticsTypes.ts:30:6   AnalyticsColumnWidthsInterface   both report
-//	modules/planetscale/PlanetScaleTypes.ts:6:6       ParsedRowInterface               both report
-//	modules/pensieve/PensieveBootstrap.test.ts:509:58 _nextContent                     only upstream
-//
-// The single missing finding was a destructured binding named `_nextContent`, missing because of
-// the underscore default above rather than because of anything structural. That reading said the
-// remedy was `varsIgnorePattern` set to `^$` in the config, which is a configuration decision
-// rather than a rule change, because reversing the default in the rule would reverse it for the
-// oxc differential too.
-//
-// Re-measured on 2026-09-07 against the ahra tree's uncached differential: all three sites now
-// report from both engines, `_nextContent` at 509:58 included. `CohereSettings.json` carries
-// `varsIgnorePattern` and `argsIgnorePattern` at `^$`, so the remedy the paragraph above predicted
-// is what someone applied. The default described in this comment is unchanged and still oxc's; it
-// is simply no longer reached on this tree.
-//
-// Both readings are kept because they are both true, of different configurations, and a reader who
-// finds only the first will go looking for a defect that a config file already answered. The gap is
-// a property of the config rather than of this rule, which is also why it can come back: that
-// setting closes it, and removing it opens it again.
+// The message offers the underscore escape only when the resolved config honours it, which is to
+// say only when `_` plus the name matches the pattern configured for that kind of binding. Before,
+// it told every finding to prefix an underscore, including `_nextContent` under a `^$` config.
 //
 // Worth stating plainly because it has been assumed twice in the other direction: the missing
 // finding is NOT evidence that this rule is blind to type declarations. It is not. A seeded probe
@@ -253,14 +254,89 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 		interesting[candidate.name.Text()] = true
 	}
 
-	reads := collectReadSymbols(ctx, sourceFile, interesting)
+	reads, writes := collectReadSymbols(ctx, sourceFile, interesting)
 
 	for _, candidate := range candidates {
 		if isExemptFromUnusedReport(ctx, candidate, candidates, settings, reads) {
 			continue
 		}
-		ctx.ReportNode(candidate.name, messageNoUnusedVars)
+		name := candidate.name.Text()
+		var candidateWrites []*ast.Node
+		if symbol := ctx.TypeChecker.GetSymbolAtLocation(candidate.name); symbol != nil {
+			candidateWrites = writes[symbol]
+		}
+		ctx.ReportNode(
+			unusedBindingReportNode(candidate, candidateWrites),
+			noUnusedVarsMessage(
+				name,
+				len(candidateWrites) != 0 || declaringNameIsInitialized(candidate.name),
+				nameMatchesIgnorePattern("_"+name, candidate.kind, settings),
+			),
+		)
 	}
+}
+
+// unusedBindingReportNode is where a finding points: the last write in the binding's own variable
+// scope, or the declaring name when there is none.
+//
+// ESLint's position, measured on the installed `@typescript-eslint/no-unused-vars` 8.67.0: it reports
+// the identifier of the last write reference whose variable scope is the binding's, and falls back
+// to the declaration. `let provenance: string;` written on three branches and never read reports at
+// the third write, which is the line a reader needs, since that is where the value was last
+// produced for nobody. A write inside a nested function is skipped, so
+// `let v = 1; v = 2; function g() { v = 3; }` reports at `v = 2`.
+//
+// A declaring name that initializes, `let v = 1`, is itself a write in ESLint's model, so a write
+// that precedes it in source order (only possible for a hoisted `var`) does not win over it.
+func unusedBindingReportNode(candidate candidateBinding, writes []*ast.Node) *ast.Node {
+	var last *ast.Node
+	for _, write := range writes {
+		if !sameVariableScope(write, candidate.declaration) {
+			continue
+		}
+		if last == nil || write.Pos() > last.Pos() {
+			last = write
+		}
+	}
+	if last == nil {
+		return candidate.name
+	}
+	if last.Pos() < candidate.name.Pos() && declaringNameIsInitialized(candidate.name) {
+		return candidate.name
+	}
+	return last
+}
+
+// declaringNameIsInitialized reports whether the declaring name receives a value where it is
+// declared: a variable or a destructured element whose declarator has an initializer, a binding
+// element or parameter with a default, or a `for...in`/`for...of` head, which assigns on every
+// iteration.
+func declaringNameIsInitialized(name *ast.Node) bool {
+	for current := name.Parent; current != nil; current = current.Parent {
+		switch current.Kind {
+		case ast.KindBindingElement:
+			if current.Initializer() != nil {
+				return true
+			}
+		case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
+			// Climb to the declarator or parameter that owns the pattern.
+		case ast.KindVariableDeclaration:
+			if current.Initializer() != nil {
+				return true
+			}
+			list := current.Parent
+			if list != nil && list.Parent != nil &&
+				(list.Parent.Kind == ast.KindForInStatement || list.Parent.Kind == ast.KindForOfStatement) {
+				return true
+			}
+			return false
+		case ast.KindParameter:
+			return current.Initializer() != nil
+		default:
+			return false
+		}
+	}
+	return false
 }
 
 // collectReadSymbols resolves every identifier that could be a read of a candidate, and returns the
@@ -270,8 +346,13 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 // declaring position is not a read of itself, and a pure write is not a read: `y = 5` does not make
 // `y` used, which upstream states outright in its documentation ("Write-only variables are not
 // considered as used"). Both exclusions are what make the rule find anything at all.
-func collectReadSymbols(ctx rule.Context, sourceFile *ast.Node, interesting map[string]bool) map[*ast.Symbol]bool {
+//
+// It also returns every write to those symbols, which the report needs and the read test does not:
+// where the finding points, and whether the binding was ever given a value. A write here is any
+// non-declaring occurrence that stores, update forms included, which is ESLint's `isWrite()`.
+func collectReadSymbols(ctx rule.Context, sourceFile *ast.Node, interesting map[string]bool) (map[*ast.Symbol]bool, map[*ast.Symbol][]*ast.Node) {
 	reads := map[*ast.Symbol]bool{}
+	writes := map[*ast.Symbol][]*ast.Node{}
 
 	var visit func(*ast.Node)
 	visit = func(current *ast.Node) {
@@ -280,7 +361,11 @@ func collectReadSymbols(ctx rule.Context, sourceFile *ast.Node, interesting map[
 		}
 
 		if current.Kind == ast.KindIdentifier && interesting[current.Text()] {
+			isWrite := !isDeclaringName(current) && reference.WritesToBinding(current)
 			for _, symbol := range resolveIdentifierSymbols(ctx, current) {
+				if isWrite {
+					writes[symbol] = append(writes[symbol], current)
+				}
 				if !countsAsRead(current, declaringScopeOf(symbol)) {
 					continue
 				}
@@ -297,7 +382,7 @@ func collectReadSymbols(ctx rule.Context, sourceFile *ast.Node, interesting map[
 	}
 	visit(sourceFile)
 
-	return reads
+	return reads, writes
 }
 
 // declaringScopeOf returns the variable scope a symbol is declared in, or nil when that cannot be
@@ -1648,40 +1733,30 @@ func hasExportModifier(node *ast.Node) bool {
 }
 
 // matchesIgnorePattern reports whether a binding's name says the omission is deliberate.
-//
-// The default is a leading underscore for every kind, which is oxc's answer and NOT ESLint's — see
-// the rule's doc comment, where both are measured. The one asymmetry: a parameter named exactly `_`
-// is still reported under the default, while a variable named `_` is ignored. That is upstream's
-// special case at `ignored.rs:424` and it is reproduced rather than smoothed over.
 func matchesIgnorePattern(candidate candidateBinding, settings NoUnusedVarsOptions) bool {
-	name := candidate.name.Text()
+	return nameMatchesIgnorePattern(candidate.name.Text(), candidate.kind, settings)
+}
 
+// nameMatchesIgnorePattern reports whether a name, declared as this kind of binding, matches the
+// ignore pattern configured for that kind.
+//
+// An unconfigured pattern ignores nothing, for every kind, which is ESLint's default. This rule used
+// to default to a leading underscore, oxc's answer, back when oxc was the reference the differential
+// compared against; the parity doctrine (2026-10-01) made ESLint the floor, and under it a default
+// that exempts `_deliberate` is a finding ESLint makes and cohere does not. It was also an allowance
+// built into the rule: the ahra config had to write `^$` three times to switch it off. See the rule's
+// doc comment for the history.
+//
+// Asked by name rather than by candidate so the report can ask the same question of a name the
+// binding does not have yet: whether prefixing an underscore would silence it, which decides
+// whether the message may offer that escape.
+func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUnusedVarsOptions) bool {
 	pattern := settings.VarsIgnorePattern
-	isDefaultPattern := settings.varsPatternIsDefault
-
-	switch candidate.kind {
+	switch kind {
 	case bindingParameter:
-		pattern, isDefaultPattern = settings.ArgsIgnorePattern, settings.argsPatternIsDefault
-		if isDefaultPattern && name == "_" {
-			return false
-		}
+		pattern = settings.ArgsIgnorePattern
 	case bindingCaughtError:
-		// A caught error has NO default ignore pattern, unlike a variable or a parameter. Upstream
-		// defaults `caughtErrorsIgnorePattern` to `IgnorePattern::None` at `options.rs:378` while
-		// the other two default to `IgnorePattern::Default`, so `try {} catch(_) {}` reports.
-		//
-		// This port applied the underscore default to all three and recorded the asymmetry as a
-		// deliberate gap, on the reasoning that our tree has many `catch (_)`. Measured rather than
-		// assumed: the tree has none that this rule reaches, so reproducing upstream costs nothing
-		// here and the gap was being paid for a cost that did not exist.
-		if settings.CaughtErrorsIgnorePattern == "" {
-			return false
-		}
-		pattern, isDefaultPattern = settings.CaughtErrorsIgnorePattern, false
-	}
-
-	if isDefaultPattern {
-		return strings.HasPrefix(name, "_")
+		pattern = settings.CaughtErrorsIgnorePattern
 	}
 	if pattern == "" {
 		return false
@@ -1698,11 +1773,11 @@ func matchesIgnorePattern(candidate candidateBinding, settings NoUnusedVarsOptio
 
 // NoUnusedVarsOptions is the rule's configuration surface.
 //
-// Every field and every default is taken from oxc's `options.rs` rather than from the inventory,
-// which records this rule as having no options and is wrong: the option module alone is 891 lines.
-// The defaults that are not the zero value are the ones worth pinning with a fixture, and three of
-// them are not: the ignore patterns default to a leading underscore rather than to nothing, `args`
-// defaults to `after-used` rather than to `all`, and `caughtErrors` defaults to `all`.
+// Every field is taken from oxc's `options.rs` rather than from the inventory, which records this
+// rule as having no options and is wrong: the option module alone is 891 lines. The defaults are
+// ESLint's. Two are not the zero value and are pinned with fixtures: `args` defaults to
+// `after-used` rather than to `all`, and `caughtErrors` defaults to `all`. Every ignore pattern
+// defaults to nothing, so an unconfigured rule exempts no name.
 type NoUnusedVarsOptions struct {
 	// Vars is `all` or `local`. Default `all`.
 	Vars string `json:"vars"`
@@ -1722,22 +1797,14 @@ type NoUnusedVarsOptions struct {
 	IgnoreRestSiblings bool `json:"ignoreRestSiblings"`
 	// DestructuredArrayIgnorePattern names array-destructured elements to skip.
 	DestructuredArrayIgnorePattern string `json:"destructuredArrayIgnorePattern"`
-
-	// The three `...IsDefault` fields record whether a pattern was configured at all, which is a
-	// distinction the string alone cannot carry. An absent pattern means "leading underscore" and
-	// an explicitly empty one means "ignore nothing", and collapsing them would make an empty
-	// string in a config file silently turn on the underscore default.
-	varsPatternIsDefault   bool
-	argsPatternIsDefault   bool
-	caughtPatternIsDefault bool
 }
 
 // resolveNoUnusedVarsOptions applies the defaults to whatever the config supplied.
 //
 // A rule configured as bare `"error"` is handed nil, and the zero value of this struct is not the
-// rule's default state: it would set `args` to the empty string and both ignore patterns to
-// "configured as empty", which is three wrong answers. So the nil case is written explicitly rather
-// than relying on the zero value, which is the shape a shipped rule got wrong on 3,407 files.
+// rule's default state: it would set `args` and `caughtErrors` to the empty string, which is two
+// wrong answers. So the nil case is written explicitly rather than relying on the zero value, which
+// is the shape a shipped rule got wrong on 3,407 files.
 func resolveNoUnusedVarsOptions(options any) NoUnusedVarsOptions {
 	settings, _ := options.(NoUnusedVarsOptions)
 
@@ -1750,10 +1817,6 @@ func resolveNoUnusedVarsOptions(options any) NoUnusedVarsOptions {
 	if settings.CaughtErrors == "" {
 		settings.CaughtErrors = "all"
 	}
-
-	settings.varsPatternIsDefault = settings.VarsIgnorePattern == ""
-	settings.argsPatternIsDefault = settings.ArgsIgnorePattern == ""
-	settings.caughtPatternIsDefault = settings.CaughtErrorsIgnorePattern == ""
 
 	return settings
 }

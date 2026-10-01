@@ -174,7 +174,11 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) map[*ast.Symbol]
 		// only itself. A first attempt used one flag for both, which fixed the second shape and
 		// silently gave up the first.
 		captured := control_flow_graph.RootOf(identifier) != control_flow_graph.RootOf(symbol.Declarations[0])
-		if occurrenceKindOf(identifier) != occurrenceWrite {
+		// A declarator with no initializer is classified as a read so the liveness pass errs safe,
+		// but it reads nothing, and counting it here made `let provenance: string;` look read. Every
+		// write to a binding nothing reads was then reported, once per write, beside the single
+		// `no-unused-vars` finding upstream leaves the whole judgment to.
+		if occurrenceKindOf(identifier) != occurrenceWrite && !isUninitializedDeclaratorName(identifier) {
 			entry.hasRead = true
 			if captured {
 				entry.capturedRead = true
@@ -644,6 +648,17 @@ func occurrenceKindOf(identifier *ast.Node) occurrenceKind {
 	}
 
 	return occurrenceRead
+}
+
+// isUninitializedDeclaratorName reports whether an identifier is the name of a declarator that has
+// no initializer, `let v;`, which neither stores nor loads anything.
+func isUninitializedDeclaratorName(identifier *ast.Node) bool {
+	parent := identifier.Parent
+	if parent == nil || parent.Kind != ast.KindVariableDeclaration {
+		return false
+	}
+	declaration := parent.AsVariableDeclaration()
+	return declaration.Name() == identifier && declaration.Initializer == nil
 }
 
 // writeTargetOfIncludingUpdates reports whether this identifier is written, by any form.

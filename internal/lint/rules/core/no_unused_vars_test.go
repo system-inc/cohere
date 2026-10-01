@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -41,24 +42,121 @@ func TestNoUnusedVarsReportsAtTheBindingName(t *testing.T) {
 	}
 }
 
-// TestNoUnusedVarsMessageIdAndDescription asserts the message against literals typed here rather
-// than against the rule's own constant. Comparing a finding to the constant it was reported with is
-// equality that cannot fail: both sides move together under mutation, so a message-text mutant
-// survives a test written that way.
+// TestNoUnusedVarsMessageIdAndDescription asserts the whole message against literals typed here
+// rather than against the rule's own builder. Comparing a finding to the value it was reported with
+// is equality that cannot fail: both sides move together under mutation.
+//
+// Three things the message used to get wrong, each pinned: it did not name the binding, it said
+// "declared" whether or not a value was ever stored, and it told every finding to "prefix it with an
+// underscore" even under the ahra config's `^$` patterns, where an underscore silences nothing. That
+// advice reached `_nextContent` in `PensieveBootstrap.test.ts`, a binding already carrying the
+// underscore and reported anyway. The escape is now offered only when the configured pattern for
+// that kind of binding accepts `_` plus the name.
 func TestNoUnusedVarsMessageIdAndDescription(t *testing.T) {
 	t.Parallel()
 
-	result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const forgotten = 1;")
-	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+	const body = " and nothing ever reads it. A name that is written but never read is almost always " +
+		"the residue of an edit that moved on: an import whose call site was deleted, a parameter left " +
+		"behind when a signature changed, a variable holding a value nobody asked for. It costs " +
+		"nothing at runtime, which is what lets it accumulate, and it costs the next reader real time, " +
+		"because an unused name reads exactly like a used one until you search the file and find " +
+		"nothing. "
+	const deleteOnly = "Delete it."
+	const withEscape = "Delete it, or prefix it with an underscore, which the configured ignore pattern " +
+		"accepts, to say the omission is deliberate."
+
+	strict := `{"varsIgnorePattern":"^$","argsIgnorePattern":"^$","caughtErrorsIgnorePattern":"^$"}`
+	underscore := `{"varsIgnorePattern":"^_","argsIgnorePattern":"^_","caughtErrorsIgnorePattern":"^_"}`
+
+	for _, testCase := range []struct {
+		name    string
+		source  string
+		options string
+		want    string
+	}{
+		{"an initialized variable is assigned a value", "const forgotten = 1;", "",
+			"'forgotten' is assigned a value" + body + deleteOnly},
+		{"a parameter is declared", "function f(leftBehind: number) {} f(1);", `{"args":"all"}`,
+			"'leftBehind' is declared" + body + deleteOnly},
+		{"an uninitialized variable written later is assigned a value",
+			"function f(): void {\n\tlet provenance: string;\n\tprovenance = 'a';\n}\nf();", "",
+			"'provenance' is assigned a value" + body + deleteOnly},
+		{"an import is declared", "import { unusedThing } from './m';", "",
+			"'unusedThing' is declared" + body + deleteOnly},
+		{"a strict config offers no underscore, even to a name that has one",
+			"const files = [{ nextContent: 1, a: 2 }].map(({ nextContent: _nextContent, ...file }) => file);\nconsole.log(files);",
+			strict, "'_nextContent' is declared" + body + deleteOnly},
+		{"an underscore-accepting config offers the escape", "const forgotten = 1;", underscore,
+			"'forgotten' is assigned a value" + body + withEscape},
+		{"the escape follows the pattern for the binding's own kind",
+			"function f(leftBehind: number) {} f(1);", `{"args":"all","varsIgnorePattern":"^_"}`,
+			"'leftBehind' is declared" + body + deleteOnly},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var options any
+			if testCase.options != "" {
+				decoded, err := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
+				if err != nil {
+					t.Fatalf("decoding failed: %v", err)
+				}
+				options = decoded
+			}
+			result := rule_testing.RunTypedWithOptions(t, NoUnusedVars, "a.ts", testCase.source, options)
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+			}
+			if got := result.Diagnostics[0].Message.Id; got != "noUnusedVars" {
+				t.Errorf("message id is %q, want %q", got, "noUnusedVars")
+			}
+			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
+				t.Errorf("description is\n%q\nwant\n%q", got, testCase.want)
+			}
+		})
 	}
-	if got := result.Diagnostics[0].Message.Id; got != "noUnusedVars" {
-		t.Errorf("message id is %q, want %q", got, "noUnusedVars")
-	}
-	const wantPrefix = "This binding is declared and nothing ever reads it."
-	if got := result.Diagnostics[0].Message.Description; len(got) < len(wantPrefix) ||
-		got[:len(wantPrefix)] != wantPrefix {
-		t.Errorf("description does not start with the sentence naming the defect; got %q", got)
+}
+
+// TestNoUnusedVarsReportsAtTheLastWrite pins ESLint's position, which is not the declaration.
+//
+// Measured on the installed `@typescript-eslint/no-unused-vars` 8.67.0: a binding with writes is
+// reported at the identifier of its last write in its own variable scope, so `provenance`, declared
+// at 109 and written at 112, 115 and 119 in `FinancePositionCommandLineInterface.ts`, reported at
+// 119:9 there and at 109:9 here. A write inside a nested function does not count, and a binding
+// whose only write is its initializer still reports at the declaration.
+func TestNoUnusedVarsReportsAtTheLastWrite(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name   string
+		source string
+		want   string
+	}{
+		{"the last of three branch writes",
+			"function accountLine(valued: boolean): string {\n  let provenance: string;\n  if (valued) {\n    provenance = 'a';\n  } else {\n    provenance = 'b';\n  }\n  return 'line';\n}\naccountLine(true);",
+			"provenance = 'b'"},
+		{"a write in a nested function is skipped",
+			"let v = 1;\nv = 2;\nfunction g() { v = 3; }\ng();",
+			"v = 2"},
+		{"an initializer alone reports at the declaration",
+			"const forgotten = 1;",
+			"forgotten = 1"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", testCase.source)
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+			}
+			source := result.SourceFile.Text()
+			start := int(result.Diagnostics[0].Range.Pos())
+			end := int(result.Diagnostics[0].Range.End())
+			name := source[start:end]
+			if !strings.HasPrefix(source[start:], testCase.want) || !strings.HasPrefix(testCase.want, name) {
+				t.Errorf("finding points at %q followed by %q, want the %q at the start of %q", name, source[end:min(end+12, len(source))], name, testCase.want)
+			}
+		})
 	}
 }
 
@@ -100,8 +198,8 @@ func TestDecodeNoUnusedVarsOptions(t *testing.T) {
 		if decoded.CaughtErrors != "all" {
 			t.Errorf("caughtErrors default is %q, want %q", decoded.CaughtErrors, "all")
 		}
-		if !decoded.varsPatternIsDefault || !decoded.argsPatternIsDefault {
-			t.Error("an absent ignore pattern must record as default, which means leading underscore")
+		if decoded.VarsIgnorePattern != "" || decoded.ArgsIgnorePattern != "" || decoded.CaughtErrorsIgnorePattern != "" {
+			t.Error("an absent ignore pattern must stay absent, which ignores nothing, ESLint's default")
 		}
 	})
 
@@ -114,39 +212,38 @@ func TestDecodeNoUnusedVarsOptions(t *testing.T) {
 		if decoded.Args != "none" {
 			t.Errorf("args is %q, want %q", decoded.Args, "none")
 		}
-		if decoded.varsPatternIsDefault {
-			t.Error("an explicitly configured pattern must not record as default")
+		if decoded.VarsIgnorePattern != "^ignore" {
+			t.Errorf("varsIgnorePattern is %q, want %q", decoded.VarsIgnorePattern, "^ignore")
 		}
 	})
 }
 
-// TestNoUnusedVarsIgnorePatternDefaults pins the leading-underscore default through the rule rather
-// than through the decoder, since that default is the single largest behavioral difference between
-// oxc and ESLint and the one a later reader is most likely to "correct".
-func TestNoUnusedVarsIgnorePatternDefaults(t *testing.T) {
+// TestNoUnusedVarsIgnoresNoNameByDefault pins ESLint's default through the rule rather than through
+// the decoder: with no pattern configured, a leading underscore exempts nothing.
+//
+// This rule used to take oxc's leading-underscore default. Every case below reports under the
+// installed `@typescript-eslint/no-unused-vars` 8.67.0 with no options, measured, and every one was
+// silent here before the default was reversed under the parity doctrine.
+func TestNoUnusedVarsIgnoresNoNameByDefault(t *testing.T) {
 	t.Parallel()
 
-	// Routed through the shared harness assertions rather than through a length comparison, so the
-	// fixture-pair guard can see that this rule is shown both to fire and to stay quiet.
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const _ignored = 1;"))
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const reported = 1;"), "noUnusedVars")
+	for _, source := range []string{
+		"const _deliberate = 1;",
+		"const _ = 1;",
+		"function f(_) {} f();",
+		"try {} catch(_) { }",
+	} {
+		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source), "noUnusedVars")
+	}
 
-	// oxc ignores a leading underscore by default. ESLint reports it. oxc wins.
-	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const _deliberate = 1;"); len(result.Diagnostics) != 0 {
-		t.Errorf("a leading underscore is ignored by default upstream; got %d findings",
-			len(result.Diagnostics))
+	// The control on the other side: a configured pattern still exempts, so the reports above come
+	// from the missing default rather than from a rule that stopped reading patterns.
+	options, err := DecodeNoUnusedVarsOptions(json.RawMessage(`{"varsIgnorePattern":"^_","argsIgnorePattern":"^_"}`))
+	if err != nil {
+		t.Fatalf("decoding failed: %v", err)
 	}
-	// The control, so the case above cannot pass because the rule sees nothing.
-	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const deliberate = 1;"); len(result.Diagnostics) != 1 {
-		t.Errorf("control: want 1 finding on the same shape without the underscore, got %d",
-			len(result.Diagnostics))
-	}
-	// A parameter named exactly `_` is NOT ignored, while a variable named `_` is. Upstream's
-	// asymmetry at `ignored.rs:424`, reproduced.
-	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const _ = 1;"); len(result.Diagnostics) != 0 {
-		t.Errorf("a variable named `_` is ignored; got %d findings", len(result.Diagnostics))
-	}
+	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoUnusedVars, "a.ts", "const _deliberate = 1;", options))
+	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoUnusedVars, "a.ts", "function f(_unused: number) {} f(1);", options))
 }
 
 // TestNoUnusedVarsJsxFactoryImport pins the exemption that removed 510 false positives from our own
@@ -423,9 +520,8 @@ func TestNoUnusedVarsReExportFromModuleIsNotALocalRead(t *testing.T) {
 	}
 }
 
-// TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern pins the asymmetry between the three ignore
-// patterns: a variable or parameter named with a leading underscore is ignored by default, a caught
-// error is not.
+// TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern pins that a caught error is reported by
+// default and silenced only by its own pattern, not by the variables pattern.
 func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(t *testing.T) {
 	t.Parallel()
 
@@ -433,11 +529,15 @@ func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(t *testing.T) {
 		t.Errorf("caughtErrorsIgnorePattern has no default, so `catch(_)` reports; got %d",
 			len(result.Diagnostics))
 	}
-	// The control on the other side of the asymmetry: a VARIABLE named `_` is ignored.
-	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.ts", "const _ = 1;"); len(result.Diagnostics) != 0 {
-		t.Errorf("control: a variable named `_` is ignored by default; got %d", len(result.Diagnostics))
+	// The variables pattern does not reach a caught error.
+	varsOnly, err := DecodeNoUnusedVarsOptions(json.RawMessage(`{"varsIgnorePattern":"^_"}`))
+	if err != nil {
+		t.Fatalf("decoding failed: %v", err)
 	}
-	// And configuring a pattern turns it back off.
+	if result := rule_testing.RunTypedWithOptions(t, NoUnusedVars, "a.ts", "try {} catch(_) { }", varsOnly); len(result.Diagnostics) != 1 {
+		t.Errorf("varsIgnorePattern does not cover a caught error; got %d", len(result.Diagnostics))
+	}
+	// And configuring its own pattern turns it off.
 	options, err := DecodeNoUnusedVarsOptions(json.RawMessage(`{"caughtErrorsIgnorePattern":"^_"}`))
 	if err != nil {
 		t.Fatalf("decoding failed: %v", err)

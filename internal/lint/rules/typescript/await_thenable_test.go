@@ -2,6 +2,7 @@ package typescript
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -367,5 +368,117 @@ func TestAwaitThenableRequiresTheTypedHarness(t *testing.T) {
 	// registration path always supplies a checker, so nothing else can reach this branch.
 	if listeners := AwaitThenable.Run(rule.Context{}, nil); listeners != nil {
 		t.Errorf("a nil checker produced %d listeners, want the rule to decline the file", len(listeners))
+	}
+}
+
+// TestAwaitThenableUpstreamCorpus replays typescript-eslint 8.67.0's whole corpus, 122 cases, and
+// asserts every finding's id and the exact text it covers.
+//
+// # Why this table exists, and what it caught
+//
+// The rule was absorbed from tsgolint and replayed tsgolint's 48 cases, which agreed. tsgolint
+// predates the `invalidPromiseAggregatorInput` arm, so that replay could not see the arm was
+// missing: cohere was silent on `await Promise.all([getCalendarContext(), getDailyPartialContext()])`
+// at `modules/art/ArtGenerator.ts:210`, where the second element is a synchronous `string`, and
+// ESLint reported it and was right. The doctrine is never worse than ESLint rule by rule, so the
+// reference became the installed typescript-eslint and the reference corpus became its own.
+//
+// Built mechanically rather than retyped: upstream's test file was transpiled and loaded with
+// `RuleTester` stubbed to collect every case (122 from one `run` call), then each case was replayed
+// through the installed rule in its own program on the bytes this harness writes. The generated
+// literals were then decoded with `go/parser` and compared with the replayed sources byte for byte.
+// Before the aggregator arm existed, 25 of the 122 cases failed here, every one an aggregator case.
+//
+// The globals file supplies `Disposable` and `AsyncDisposable`, which lib ES2022 lacks; see
+// disposeGlobals for why it is a second file.
+func TestAwaitThenableUpstreamCorpus(t *testing.T) {
+	t.Parallel()
+
+	if len(awaitThenableCorpus) != 122 {
+		t.Fatalf("the corpus table holds %d cases, want 122; a shorter table proves less while passing", len(awaitThenableCorpus))
+	}
+
+	for _, corpusCase := range awaitThenableCorpus {
+		t.Run(strconv.Itoa(corpusCase.index), func(t *testing.T) {
+			t.Parallel()
+
+			result := rule_testing.RunTypedFiles(t, AwaitThenable, map[string]string{
+				"Globals.ts": disposeGlobals,
+				"Subject.ts": corpusCase.source,
+			}, "Subject.ts")
+
+			if len(result.Diagnostics) != len(corpusCase.findings) {
+				t.Fatalf("got %d findings %v, want %d %v\n%s", len(result.Diagnostics), result.MessageIds(), len(corpusCase.findings), corpusCase.findings, corpusCase.source)
+			}
+			sort.SliceStable(result.Diagnostics, func(left, right int) bool {
+				return result.Diagnostics[left].Range.Pos() < result.Diagnostics[right].Range.Pos()
+			})
+			for index, finding := range corpusCase.findings {
+				diagnostic := result.Diagnostics[index]
+				reported := corpusCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if diagnostic.Message.Id != finding.id || reported != finding.text {
+					t.Errorf("finding %d is %s at %q, want %s at %q\n%s", index, diagnostic.Message.Id, reported, finding.id, finding.text, corpusCase.source)
+				}
+			}
+		})
+	}
+}
+
+// TestAwaitThenableAggregatorShapesTheCorpusDoesNotWrite pins five aggregator inputs upstream's
+// corpus never writes, each verdict measured on the installed rule (8.67.0) rather than reasoned.
+//
+// A mutation sweep of the aggregator arm left three survivors with the corpus alone: the
+// `PromiseConstructor` receiver check, the parenthesis unwrap on the argument, and the
+// element-access spelling `Promise['all']`. Each case below kills one. The fourth is the ahra site
+// that motivated the arm, `modules/art/ArtGenerator.ts:210`, reduced to its shape, and the fifth
+// pins that a parenthesized element reports without its parentheses, as ESTree's range does.
+//
+// The tuple branch of awaitThenableValueTypesOfArrayLike also survives deletion, and that one is an
+// equivalent mutant rather than a blind spot: a tuple is array-like, its number index type is the
+// union of its members, and "some member part is never awaitable" asks the same question of either.
+func TestAwaitThenableAggregatorShapesTheCorpusDoesNotWrite(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		source string
+		want   []string
+	}{
+		{"an object that merely has an all method is not an aggregator",
+			"async function run() {\n  const fake = { all(values: number[]): Promise<void> { return Promise.resolve(); } };\n  await fake.all([1, 2]);\n}",
+			nil},
+		{"a parenthesized array argument is still an array of elements",
+			"async function run() {\n  await Promise.all(([1, Promise.resolve(2)]));\n}",
+			[]string{"1"}},
+		{"an element access names the aggregator too",
+			"async function run() {\n  await Promise['all']([1, Promise.resolve(2)]);\n}",
+			[]string{"1"}},
+		{"the ahra shape: a synchronous call inside Promise.all",
+			"function getDailyPartialContext(): string {\n  return 'today';\n}\nasync function getCalendarContext(): Promise<string> {\n  return 'calendar';\n}\nasync function run() {\n  const [calendar, daily] = await Promise.all([getCalendarContext(), getDailyPartialContext()]);\n  return calendar + daily;\n}",
+			[]string{"getDailyPartialContext()"}},
+		{"a parenthesized element reports without its parentheses",
+			"async function run() {\n  await Promise.all([(1), Promise.resolve(2)]);\n}",
+			[]string{"1"}},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := rule_testing.RunTyped(t, AwaitThenable, awaitThenableFile, testCase.source)
+			if len(result.Diagnostics) != len(testCase.want) {
+				t.Fatalf("got %d findings %v, want %d %v", len(result.Diagnostics), result.MessageIds(), len(testCase.want), testCase.want)
+			}
+			for index, want := range testCase.want {
+				diagnostic := result.Diagnostics[index]
+				reported := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if diagnostic.Message.Id != "invalidPromiseAggregatorInput" || reported != want {
+					t.Errorf("finding %d is %s at %q, want invalidPromiseAggregatorInput at %q", index, diagnostic.Message.Id, reported, want)
+				}
+				if diagnostic.Message.Description != "Unexpected iterable of non-Promise (non-\"Thenable\") values passed to promise aggregator." {
+					t.Errorf("message text is %q", diagnostic.Message.Description)
+				}
+			}
+		})
 	}
 }

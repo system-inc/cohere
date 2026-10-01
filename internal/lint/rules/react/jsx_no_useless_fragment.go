@@ -9,12 +9,6 @@ import (
 )
 
 var (
-	messageJsxNoUselessFragmentNeedsMoreChildren = rule.Message{
-		Id: "NeedsMoreChildren",
-		Description: "This fragment wraps one thing, so it does nothing. A fragment exists to give " +
-			"several siblings a single parent without emitting an element; around a single child " +
-			"it is pure noise in the tree and in the source. Write the child on its own.",
-	}
 	messageJsxNoUselessFragmentChildOfHtmlElement = rule.Message{
 		Id: "ChildOfHtmlElement",
 		Description: "This fragment is the child of an HTML element, which already accepts any " +
@@ -22,6 +16,45 @@ var (
 			"accept anyway, so it only adds a layer for a reader to see through.",
 	}
 )
+
+// messageJsxNoUselessFragmentNeedsMoreChildren describes the first arm's finding by what the
+// fragment actually holds.
+//
+// The arm covers three shapes and one sentence used to describe all of them as "wraps one thing".
+// Two ahra findings, `AddressesPage.tsx` and `NotificationsPage.tsx`, wrap only a commented-out
+// block of dead JSX: there is no thing, and the repair is to delete the comment and return `null`
+// rather than to "write the child on its own". An empty fragment has no child either.
+func messageJsxNoUselessFragmentNeedsMoreChildren(ctx rule.Context, children []*ast.Node) rule.Message {
+	const why = " A fragment exists to give several siblings a single parent without emitting an element"
+	description := "This fragment wraps one thing, so it does nothing." + why +
+		"; around a single child it is pure noise in the tree and in the source. Write the child on its own."
+
+	kept := jsxNoUselessFragmentNonPaddingChildren(children)
+	switch {
+	case len(kept) == 0:
+		description = "This fragment is empty, so it renders nothing." + why +
+			", and here there is nothing to group. Delete it; where a value is still required, write `null`."
+	case len(kept) == 1 && kept[0].Kind == ast.KindJsxExpression && kept[0].AsJsxExpression().Expression == nil:
+		// `{/* ... */}` parses as an expression container with no expression. Braces holding
+		// nothing at all, `{}`, are the same node with no comment, and render nothing the same way.
+		if jsxNoUselessFragmentHoldsComment(ctx, kept[0]) {
+			description = "This fragment holds only a comment, which renders nothing, so the fragment " +
+				"renders nothing either." + why + ", and here there is nothing to group. Delete it, and the " +
+				"comment with it if that is dead code; where a value is still required, write `null`."
+		} else {
+			description = "This fragment is empty, so it renders nothing." + why +
+				", and here there is nothing to group. Delete it; where a value is still required, write `null`."
+		}
+	}
+	return rule.Message{Id: "NeedsMoreChildren", Description: description}
+}
+
+// jsxNoUselessFragmentHoldsComment reports whether an expression container's source carries a
+// comment, read from the file text because a comment is trivia and has no node.
+func jsxNoUselessFragmentHoldsComment(ctx rule.Context, container *ast.Node) bool {
+	text := ctx.SourceFile.Text()[container.Pos():container.End()]
+	return strings.Contains(text, "/*") || strings.Contains(text, "//")
+}
 
 // JsxNoUselessFragmentOptions is the decoded option object.
 //
@@ -119,7 +152,7 @@ var JsxNoUselessFragment = rule.Rule{
 			if jsxNoUselessFragmentHasLessThanTwoChildren(children) &&
 				!jsxNoUselessFragmentIsOnlyTextAndNotChild(node, children) &&
 				!(settings.AllowExpressions && jsxNoUselessFragmentIsSingleExpression(children)) {
-				jsxNoUselessFragmentReport(ctx, node, messageJsxNoUselessFragmentNeedsMoreChildren)
+				jsxNoUselessFragmentReport(ctx, node, messageJsxNoUselessFragmentNeedsMoreChildren(ctx, children))
 			}
 
 			if jsxNoUselessFragmentIsChildOfHtmlElement(node) {

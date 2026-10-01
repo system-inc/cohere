@@ -9,9 +9,13 @@ import (
 
 var messageUnexpectedConcat = rule.Message{
 	Id: "unexpectedConcat",
-	Description: "These two literals are joined at runtime to produce a constant the source could " +
-		"have spelled directly. Nothing is computed between them, so the concatenation only adds " +
-		"an operator for a reader to follow and a chance for the two halves to drift apart.",
+	// "One literal" rather than "a constant": a template with a substitution reports too, as
+	// `${name}` + ' suffix' does, and joining that produces a template, which is one literal and
+	// not a constant. The earlier wording said "constant" and was false on two of the four ahra
+	// findings.
+	Description: "These two literals are joined at runtime where the source could have written one " +
+		"literal. Nothing is computed between them, so the concatenation only adds an operator for a " +
+		"reader to follow and a chance for the two halves to drift apart.",
 }
 
 // NoUselessConcat flags a `+` whose two adjacent operands are both literal strings.

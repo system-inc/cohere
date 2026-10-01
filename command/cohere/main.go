@@ -719,6 +719,12 @@ func run() error {
 		if reusedWalk {
 			result = *reusableWalk
 		} else {
+			// Named paths that reached no program file are refused with the reason rather than with
+			// the walk's bare "the file set is empty", which could not say that the file was left out
+			// by the tsconfig or ignored by git. See explainNamedPathsOutsideProgram.
+			if len(projectFiles) == 0 && !lintScope.Everything && len(flag.Args()) > 0 && !askingWhatChanged {
+				return errNamedPathsOutsideProgram(location, flag.Args())
+			}
 			walked, err := graph.Walk(ctx, projectFiles, rules)
 			if err != nil {
 				return fmt.Errorf("running rules: %w", err)

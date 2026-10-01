@@ -487,8 +487,12 @@ func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 	// check, which matters: a shorthand arrow with a non-void annotation reports here rather than
 	// at the annotation. Missing it cost 54 of 107 reporting cases on the first writing, all of
 	// them this shape, because the block-body walk below has nothing to walk.
+	//
+	// The parentheses are unwrapped for the span. ESTree has no parenthesis node, so upstream's body
+	// in `(chunk) => (total += chunk)` is the assignment and its finding starts at `total`; reporting
+	// our `ParenthesizedExpression` pointed one column early on eight ahra sites.
 	if body := strictVoidReturnBody(node); body != nil && body.Kind != ast.KindBlock {
-		s.ctx.ReportNode(body, strictVoidReturnNonVoidReturnMessage())
+		s.ctx.ReportNode(ast.SkipParentheses(body), strictVoidReturnNonVoidReturnMessage())
 		return
 	}
 

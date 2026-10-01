@@ -159,14 +159,129 @@ func resolveNoUseBeforeDefineSettings(options any) noUseBeforeDefineSettings {
 	}
 }
 
-var messageUsedBeforeDefined = rule.Message{
-	Id: "usedBeforeDefined",
-	Description: "This name is read above the line that declares it. For a `let`, a `const`, or a " +
-		"class this throws at runtime: the binding exists from the top of its block but cannot be " +
-		"touched until its declaration runs, so the read lands in the temporal dead zone and the " +
-		"program stops. For a `var` it is quieter and not better, because the binding is hoisted " +
-		"without its value and the read silently yields `undefined`, so the failure surfaces later " +
-		"and somewhere else. Move the declaration above its first use.",
+// useBeforeDefineMessage renders the finding for one read, true to the kind of binding it reads.
+//
+// One fixed message used to tell every finding that the read "throws at runtime" or "yields
+// `undefined`". Measured on ahra, 10 of the 12 findings read a function declaration, which is
+// hoisted together with its body: the read works, and the message described a crash that cannot
+// happen. The same message told a read inside a function written above a `const` that it throws,
+// when it throws only if that function is called before the declaration runs. So the consequence is
+// chosen by what was declared and by whether the read runs now or later, and the binding is named.
+func useBeforeDefineMessage(identifier *ast.Node, declaration *ast.Node) rule.Message {
+	name := "'" + identifier.Text() + "'"
+	const repair = " Move the declaration above its first use."
+	const readingOrder = "the cost is reading order: the reader meets the name before learning what it is, " +
+		"and has to jump down the file to find out."
+
+	var description string
+	switch kind := useBeforeDefineDeclarationKind(declaration); {
+	case kind == useBeforeDefineType || isTypeReferencePosition(identifier):
+		description = name + " is used as a type above the line that declares it. A type is erased " +
+			"before the program runs, so nothing fails at runtime; " + readingOrder
+
+	case kind == useBeforeDefineFunction:
+		description = name + " is read above the function declaration that defines it. A function " +
+			"declaration is hoisted together with its body, so the read works at runtime; " + readingOrder
+
+	case kind == useBeforeDefineClass || kind == useBeforeDefineVariable && useBeforeDefineIsBlockScoped(declaration):
+		keyword := "`" + useBeforeDefineKeyword(declaration) + "`"
+		if useBeforeDefineRunsLater(identifier, declaration) {
+			description = name + " is read inside a function written above the " + keyword + " that " +
+				"declares it. That is safe only while nothing calls the function before the declaration " +
+				"runs: an earlier call, such as one made while the module is still loading, reaches the " +
+				"binding in its temporal dead zone and throws a ReferenceError."
+		} else {
+			description = name + " is read above the " + keyword + " that declares it. The binding " +
+				"exists from the top of its block but cannot be touched until its declaration runs, so " +
+				"this read lands in the temporal dead zone and throws a ReferenceError."
+		}
+
+	case kind == useBeforeDefineVariable || kind == useBeforeDefineEnum:
+		keyword := "`" + useBeforeDefineKeyword(declaration) + "`"
+		if useBeforeDefineRunsLater(identifier, declaration) {
+			description = name + " is read inside a function written above the " + keyword + " that " +
+				"declares it. The binding is hoisted without its value, so a call made before the " +
+				"declaration runs reads `undefined` silently, and the failure surfaces later and " +
+				"somewhere else."
+		} else {
+			description = name + " is read above the " + keyword + " that declares it. The binding is " +
+				"hoisted without its value, so this read silently yields `undefined`, and the failure " +
+				"surfaces later and somewhere else."
+		}
+
+	default:
+		description = name + " is read above the line that declares it, so the reader meets the name " +
+			"before learning what it is."
+	}
+
+	return rule.Message{Id: "usedBeforeDefined", Description: description + repair}
+}
+
+// useBeforeDefineIsBlockScoped reports whether a variable's declaration list is `let`, `const` or
+// a `using` form, which have a temporal dead zone, rather than `var`, which is hoisted with
+// `undefined`.
+func useBeforeDefineIsBlockScoped(declaration *ast.Node) bool {
+	list := useBeforeDefineDeclarationList(declaration)
+	return list != nil && list.Flags&ast.NodeFlagsBlockScoped != 0
+}
+
+// useBeforeDefineDeclarationList climbs from a variable declaration or a destructured element to
+// the declaration list that carries the `var`, `let` or `const`.
+func useBeforeDefineDeclarationList(declaration *ast.Node) *ast.Node {
+	for current := declaration; current != nil; current = current.Parent {
+		switch current.Kind {
+		case ast.KindVariableDeclarationList:
+			return current
+		case ast.KindVariableDeclaration, ast.KindBindingElement,
+			ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
+			continue
+		}
+		return nil
+	}
+	return nil
+}
+
+// useBeforeDefineKeyword is the word the source used to declare the binding.
+func useBeforeDefineKeyword(declaration *ast.Node) string {
+	switch declaration.Kind {
+	case ast.KindClassDeclaration, ast.KindClassExpression:
+		return "class"
+	case ast.KindEnumDeclaration:
+		return "enum"
+	}
+	list := useBeforeDefineDeclarationList(declaration)
+	if list == nil {
+		return "var"
+	}
+	// The flags are compared as a set, because `await using` is spelled `Const | Using`.
+	switch list.Flags & ast.NodeFlagsBlockScoped {
+	case ast.NodeFlagsConst:
+		return "const"
+	case ast.NodeFlagsLet:
+		return "let"
+	case ast.NodeFlagsUsing:
+		return "using"
+	case ast.NodeFlagsAwaitUsing:
+		return "await using"
+	}
+	return "var"
+}
+
+// useBeforeDefineRunsLater reports whether the read sits inside a function that does not also
+// contain the declaration, so it runs when that function is called rather than where it is written.
+func useBeforeDefineRunsLater(identifier *ast.Node, declaration *ast.Node) bool {
+	for current := identifier.Parent; current != nil; current = current.Parent {
+		if !ast.IsFunctionLike(current) {
+			continue
+		}
+		for container := declaration.Parent; container != nil; container = container.Parent {
+			if container == current {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // NoUseBeforeDefine flags a reference to a binding that appears above the binding's declaration.
@@ -343,7 +458,7 @@ func checkIdentifierForUseBeforeDefine(ctx rule.Context, identifier *ast.Node, s
 		return
 	}
 
-	ctx.ReportNode(identifier, messageUsedBeforeDefined)
+	ctx.ReportNode(identifier, useBeforeDefineMessage(identifier, declaration))
 }
 
 // useBeforeDefineBindingDeclaration picks which of a symbol's declarations the rule judges against.

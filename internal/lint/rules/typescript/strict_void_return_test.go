@@ -457,3 +457,43 @@ func TestStrictVoidReturnFiresOnJsxCases(t *testing.T) {
 		})
 	}
 }
+
+// TestStrictVoidReturnReportsAConciseBodyWithoutItsParentheses pins where a concise arrow body's
+// finding points.
+//
+// ESTree has no parenthesis node, so upstream's body is the expression inside the parentheses and
+// its finding starts there. Ours kept the `ParenthesizedExpression` and reported it, one column
+// early: measured on ahra, eight sites in `modules/data/` written
+// `(chunk: Buffer) => (tarError += chunk.toString())` disagreed with ESLint by exactly that column.
+// The spans below were measured on the installed 8.67.0 build, including a doubled parenthesis.
+func TestStrictVoidReturnReportsAConciseBodyWithoutItsParentheses(t *testing.T) {
+	t.Parallel()
+
+	const prelude = "declare function on(callback: (chunk: string) => void): void;\nlet total = '';\n"
+	for _, testCase := range []struct {
+		name   string
+		source string
+	}{
+		{"parenthesized", "on((chunk: string) => (total += chunk));\nvoid total;"},
+		{"doubly parenthesized", "on((chunk: string) => ((total += chunk)));\nvoid total;"},
+		{"bare", "on((chunk: string) => total += chunk);\nvoid total;"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			sourceText := prelude + testCase.source
+			result := rule_testing.RunTypedWithOptions(t, StrictVoidReturn, strictVoidReturnFile, sourceText,
+				DefaultStrictVoidReturnSettings())
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+			}
+			diagnostic := result.Diagnostics[0]
+			if reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; reported != "total += chunk" {
+				t.Errorf("the finding covers %q, want %q", reported, "total += chunk")
+			}
+			if diagnostic.Message.Id != "nonVoidReturn" {
+				t.Errorf("message id is %q", diagnostic.Message.Id)
+			}
+		})
+	}
+}

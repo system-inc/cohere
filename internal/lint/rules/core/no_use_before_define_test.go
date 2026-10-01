@@ -1204,7 +1204,7 @@ func TestNoUseBeforeDefineFires(t *testing.T) {
 
 			expected := make([]string, testCase.findings)
 			for index := range expected {
-				expected[index] = messageUsedBeforeDefined.Id
+				expected[index] = "usedBeforeDefined"
 			}
 			rule_testing.ExpectFindings(t, result, expected...)
 		})
@@ -2201,33 +2201,99 @@ func TestNoUseBeforeDefineReportsTheUseNotTheDeclaration(t *testing.T) {
 	}
 }
 
-// TestNoUseBeforeDefineMessageText asserts the rendered description exactly.
+// TestNoUseBeforeDefineMessageText asserts the rendered description exactly, per kind of binding.
 //
-// A rule.Message carries no format verbs, so there is nothing to interpolate and nothing that can
-// double a character the way an interpolated private name did elsewhere in this tree. What this
-// still guards is the pairing: a mutation swapping the id or the description reaches no other
-// assertion in this file, because ExpectFindings compares the id against the rule's own constant and
-// both sides would move together. The literals below are typed out rather than referenced.
+// The message used to be one constant telling every finding that the read "throws at runtime" (for
+// `let`, `const` or a class) or "yields `undefined`" (for `var`). Measured on ahra, 10 of the 12
+// findings read a FUNCTION DECLARATION, which is hoisted with its body, so the read works and the
+// message described a crash that cannot happen; the other two read a module-level `let` and `const`
+// from inside a function written above them, which throws only if that function is called first.
+// Each row below is a kind the message now distinguishes, asserted against literals typed here.
 func TestNoUseBeforeDefineMessageText(t *testing.T) {
 	t.Parallel()
 
-	if messageUsedBeforeDefined.Id != "usedBeforeDefined" {
-		t.Errorf("message id is %q, want %q", messageUsedBeforeDefined.Id, "usedBeforeDefined")
-	}
+	const repair = " Move the declaration above its first use."
+	const readingOrder = "the cost is reading order: the reader meets the name before learning what it is, " +
+		"and has to jump down the file to find out."
 
-	if !strings.HasPrefix(
-		messageUsedBeforeDefined.Description,
-		"This name is read above the line that declares it.",
-	) {
-		t.Errorf("message description opens with %q", messageUsedBeforeDefined.Description[:60])
-	}
+	for _, testCase := range []struct {
+		name    string
+		source  string
+		options string
+		want    string
+	}{
+		{"a type is erased, so only reading order is at stake",
+			"let total: Amount = 1;\nconsole.log(total);\ntype Amount = number;",
+			`{"ignoreTypeReferences": false}`,
+			"'Amount' is used as a type above the line that declares it. A type is erased before the " +
+				"program runs, so nothing fails at runtime; " + readingOrder + repair},
+		{"a class used only as a type is erased too",
+			"let held: Widget | undefined;\nconsole.log(held);\nclass Widget {}",
+			`{"ignoreTypeReferences": false}`,
+			"'Widget' is used as a type above the line that declares it. A type is erased before the " +
+				"program runs, so nothing fails at runtime; " + readingOrder + repair},
+		{"a function declaration is hoisted with its body",
+			"normalize('a');\nfunction normalize(text: string): string { return text; }",
+			"",
+			"'normalize' is read above the function declaration that defines it. A function declaration " +
+				"is hoisted together with its body, so the read works at runtime; " + readingOrder + repair},
+		{"a const read where it is written",
+			"console.log(limit);\nconst limit = 1;",
+			"",
+			"'limit' is read above the `const` that declares it. The binding exists from the top of its " +
+				"block but cannot be touched until its declaration runs, so this read lands in the " +
+				"temporal dead zone and throws a ReferenceError." + repair},
+		{"a const read inside a function written above it",
+			"export function floor(): number { return shortenedAnchorFloor; }\nconst shortenedAnchorFloor = 3;",
+			"",
+			"'shortenedAnchorFloor' is read inside a function written above the `const` that declares it. " +
+				"That is safe only while nothing calls the function before the declaration runs: an earlier " +
+				"call, such as one made while the module is still loading, reaches the binding in its " +
+				"temporal dead zone and throws a ReferenceError." + repair},
+		{"a let read inside a function written above it",
+			"export function model(): string { return dynamicLocalModel; }\nlet dynamicLocalModel = 'a';\ndynamicLocalModel = 'b';",
+			"",
+			"'dynamicLocalModel' is read inside a function written above the `let` that declares it. " +
+				"That is safe only while nothing calls the function before the declaration runs: an earlier " +
+				"call, such as one made while the module is still loading, reaches the binding in its " +
+				"temporal dead zone and throws a ReferenceError." + repair},
+		{"a class",
+			"new Widget();\nclass Widget {}",
+			"",
+			"'Widget' is read above the `class` that declares it. The binding exists from the top of its " +
+				"block but cannot be touched until its declaration runs, so this read lands in the " +
+				"temporal dead zone and throws a ReferenceError." + repair},
+		{"a var",
+			"console.log(count);\nvar count = 1;",
+			"",
+			"'count' is read above the `var` that declares it. The binding is hoisted without its value, " +
+				"so this read silently yields `undefined`, and the failure surfaces later and somewhere else." +
+				repair},
+		{"a var read inside a function written above it",
+			"export function current(): number { return count; }\nvar count = 1;",
+			"",
+			"'count' is read inside a function written above the `var` that declares it. The binding is " +
+				"hoisted without its value, so a call made before the declaration runs reads `undefined` " +
+				"silently, and the failure surfaces later and somewhere else." + repair},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 
-	// The description must name both halves of the consequence, because the rule's whole argument is
-	// that the `var` case is quieter than the `let` case and not safer.
-	for _, required := range []string{"temporal dead zone", "undefined"} {
-		if !strings.Contains(messageUsedBeforeDefined.Description, required) {
-			t.Errorf("message description does not mention %q", required)
-		}
+			result := runUseBeforeDefineCase(t, useBeforeDefineCase{
+				fileName:   "a.ts",
+				source:     testCase.source,
+				rawOptions: testCase.options,
+			})
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+			}
+			if got := result.Diagnostics[0].Message.Id; got != "usedBeforeDefined" {
+				t.Errorf("message id is %q, want %q", got, "usedBeforeDefined")
+			}
+			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
+				t.Errorf("description is\n%q\nwant\n%q", got, testCase.want)
+			}
+		})
 	}
 }
 
@@ -2282,7 +2348,7 @@ func TestNoUseBeforeDefineDefaultsSurviveAnAbsentConfiguration(t *testing.T) {
 
 	// And the rule must actually report through that path, not merely hold the right settings.
 	result := rule_testing.RunTypedWithOptions(t, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;", nil)
-	rule_testing.ExpectFindings(t, result, messageUsedBeforeDefined.Id)
+	rule_testing.ExpectFindings(t, result, "usedBeforeDefined")
 }
 
 // TestNoUseBeforeDefineRequiresTheTypedHarness pins the checker guard.
@@ -2301,7 +2367,7 @@ func TestNoUseBeforeDefineRequiresTheTypedHarness(t *testing.T) {
 	// The control: the same source through the typed harness must report, or the case above is
 	// passing because the rule is broken rather than because the guard fired.
 	typed := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;")
-	rule_testing.ExpectFindings(t, typed, messageUsedBeforeDefined.Id)
+	rule_testing.ExpectFindings(t, typed, "usedBeforeDefined")
 }
 
 // TestNoUseBeforeDefineSubstrateDivergences records the five imported cases this port does not
@@ -2351,7 +2417,7 @@ func TestNoUseBeforeDefineSubstrateDivergences(t *testing.T) {
 	// The control. Without it every row above passes for any reason at all, including a rule that
 	// reports nothing anywhere, which is the failure mode this whole file exists to catch.
 	control := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", "a(); function a() {}")
-	rule_testing.ExpectFindings(t, control, messageUsedBeforeDefined.Id)
+	rule_testing.ExpectFindings(t, control, "usedBeforeDefined")
 }
 
 // TestNoUseBeforeDefineMergedDeclarations pins which declaration of a merged symbol the rule judges
@@ -2384,7 +2450,7 @@ func TestNoUseBeforeDefineMergedDeclarations(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
-			rule_testing.ExpectFindings(t, result, messageUsedBeforeDefined.Id)
+			rule_testing.ExpectFindings(t, result, "usedBeforeDefined")
 
 			// The span matters as much as the count here. Reporting once against the wrong
 			// declaration produces the same id and the same total.
@@ -2468,7 +2534,7 @@ func TestNoUseBeforeDefineQualifiedNames(t *testing.T) {
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
-				expected[index] = messageUsedBeforeDefined.Id
+				expected[index] = "usedBeforeDefined"
 			}
 			rule_testing.ExpectFindings(t, result, expected...)
 		})
@@ -2510,7 +2576,7 @@ func TestNoUseBeforeDefineJsxAttributes(t *testing.T) {
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.tsx", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
-				expected[index] = messageUsedBeforeDefined.Id
+				expected[index] = "usedBeforeDefined"
 			}
 			rule_testing.ExpectFindings(t, result, expected...)
 		})
@@ -2549,7 +2615,7 @@ func TestNoUseBeforeDefineShorthandProperties(t *testing.T) {
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
-				expected[index] = messageUsedBeforeDefined.Id
+				expected[index] = "usedBeforeDefined"
 			}
 			rule_testing.ExpectFindings(t, result, expected...)
 		})
@@ -2593,7 +2659,7 @@ func TestNoUseBeforeDefineDestructuringPropertyNames(t *testing.T) {
 			result := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", testCase.source)
 			expected := make([]string, testCase.findings)
 			for index := range expected {
-				expected[index] = messageUsedBeforeDefined.Id
+				expected[index] = "usedBeforeDefined"
 			}
 			rule_testing.ExpectFindings(t, result, expected...)
 		})
@@ -2638,5 +2704,5 @@ func TestNoUseBeforeDefineObjectMethodParameters(t *testing.T) {
 	// method still reports. Without this, dropping the whole initialization arm would pass the rows
 	// above.
 	control := rule_testing.RunTyped(t, NoUseBeforeDefine, "fixture.ts", "const o = { start() { return later; } }; const later = 1;")
-	rule_testing.ExpectFindings(t, control, messageUsedBeforeDefined.Id)
+	rule_testing.ExpectFindings(t, control, "usedBeforeDefined")
 }

@@ -419,6 +419,198 @@ void handler;
 	rule_testing.ExpectFindings(t, result, "missingAwait")
 }
 
+// TestRequireAwaitDoesNotLetAGenericInferItsOwnContract guards the exemption against self-inference.
+//
+// A generic position's type parameter is inferred FROM the function being judged, so asking for the
+// contextual type after inference reads the function's own `Promise` back as the position's demand,
+// and every async callback handed to `map`, `useMemo`, `useCallback` or an identity helper exempted
+// itself. Measured on ahra before the fix: `useMetricsExportMenu.tsx:74` and `:92`, an
+// `onSelected: async function() {...}` inside `React.useMemo(() => [...])` that awaits nothing,
+// were silent here and reported by ESLint, and ESLint was right. `[1, 2].map(async (n) => ...)` is
+// the rule's classic true positive and was silent too. Each shape below reported nothing before the
+// contextual type was asked for with inference from the node blocked.
+func TestRequireAwaitDoesNotLetAGenericInferItsOwnContract(t *testing.T) {
+	t.Parallel()
+
+	shapes := []struct {
+		name       string
+		sourceText string
+	}{
+		{"Array.map", `
+function sync(): number {
+    return 1;
+}
+const values = [1, 2].map(async (n) => n + sync());
+void values;
+`},
+		{"identity", `
+function identity<T>(value: T): T {
+    return value;
+}
+const handler = identity(async () => {
+    return 1;
+});
+void handler;
+`},
+		{"useCallback", `
+function useCallback<T extends Function>(callback: T, dependencies: unknown[]): T {
+    void dependencies;
+    return callback;
+}
+const handler = useCallback(async () => {
+    return 1;
+}, []);
+void handler;
+`},
+		{"useMemo over an object literal", `
+function useMemo<T>(factory: () => T, dependencies: unknown[]): T {
+    void dependencies;
+    return factory();
+}
+function exportFile(): void {}
+const items = useMemo(function () {
+    return [
+        {
+            label: 'Export',
+            onSelected: async function () {
+                exportFile();
+            },
+        },
+    ];
+}, []);
+void items;
+`},
+	}
+
+	for _, shape := range shapes {
+		t.Run(shape.name, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", shape.sourceText)
+			rule_testing.ExpectFindings(t, result, "missingAwait")
+		})
+	}
+}
+
+// TestRequireAwaitKeepsAGenericContractThatDemandsAPromise is the control for the test above.
+//
+// Blocking inference from the node must not throw away a promise the position genuinely demands. A
+// generic callback parameter typed `(api) => Promise<T>` still demands a promise when `T` cannot be
+// inferred, and a type parameter constrained to a promise-returning function falls back to that
+// constraint. Measured on ahra: `withDiscord<T>(callback: (api) => Promise<T>)` and its callers in
+// `DiscordCommandLineInterface.ts` are the shape, and they must stay silent.
+func TestRequireAwaitKeepsAGenericContractThatDemandsAPromise(t *testing.T) {
+	t.Parallel()
+
+	result := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+async function withClient<T>(callback: (client: { name: string }) => Promise<T>): Promise<T> {
+    return await callback({ name: 'client' });
+}
+function runTask<T extends () => Promise<void>>(task: T): T {
+    return task;
+}
+void withClient(async function (client) {
+    return client.name;
+});
+void runTask(async function () {
+    return;
+});
+`)
+	rule_testing.ExpectClean(t, result)
+
+	// A method of a generic INTERFACE is an instantiated signature with no type parameters of its
+	// own: `T` was fixed by the declared receiver, not inferred from this argument. Reading its
+	// uninstantiated parameter type would lose the demand and report code that cannot drop the
+	// keyword.
+	interfaceMethod := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+interface RegistryInterface<T> {
+    register(handler: T): void;
+}
+declare const registry: RegistryInterface<() => Promise<number>>;
+registry.register(async () => {
+    return 1;
+});
+`)
+	rule_testing.ExpectClean(t, interfaceMethod)
+
+	// Explicit type arguments are the author's, so nothing was inferred from the callback and the
+	// instantiated parameter type is the real demand.
+	explicit := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", `
+function identity<T>(value: T): T {
+    return value;
+}
+const handler = identity<() => Promise<number>>(async () => {
+    return 1;
+});
+void handler;
+`)
+	rule_testing.ExpectClean(t, explicit)
+}
+
+// TestRequireAwaitReadsAGenericReturnFromItsTypedPosition covers the return-type stand-in.
+//
+// `const items: ItemType[] = useMemo(() => [...])` fixes `T` from the annotation as well as from
+// the factory. When the annotated member returns a promise, removing the keyword breaks the
+// assignment, so the demand is real and the case stays silent. When the annotated type does not
+// declare the member at all, which is the ahra shape (`MenuItemButtonProperties[]` has no
+// `onSelected`), nothing demands a promise and the finding stands.
+func TestRequireAwaitReadsAGenericReturnFromItsTypedPosition(t *testing.T) {
+	t.Parallel()
+
+	prelude := `
+function useMemo<T>(factory: () => T, dependencies: unknown[]): T {
+    void dependencies;
+    return factory();
+}
+function exportFile(): void {}
+`
+
+	demanded := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", prelude+`
+const items: { label: string; onSelected: () => Promise<void> }[] = useMemo(function () {
+    return [
+        {
+            label: 'Export',
+            onSelected: async function () {
+                exportFile();
+            },
+        },
+    ];
+}, []);
+void items;
+`)
+	rule_testing.ExpectClean(t, demanded)
+
+	// A factory with its own return annotation fixes the demand without the call's help, so the walk
+	// stops there and the annotation answers.
+	annotatedFactory := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", prelude+`
+const items = useMemo(function (): { onSelected: () => Promise<void> }[] {
+    return [
+        {
+            onSelected: async function () {
+                exportFile();
+            },
+        },
+    ];
+}, []);
+void items;
+`)
+	rule_testing.ExpectClean(t, annotatedFactory)
+
+	undeclared := rule_testing.RunTyped(t, RequireAwait, "Subject.ts", prelude+`
+const items: { label: string }[] = useMemo(function () {
+    return [
+        {
+            label: 'Export',
+            onSelected: async function () {
+                exportFile();
+            },
+        },
+    ];
+}, []);
+void items;
+`)
+	rule_testing.ExpectFindings(t, undeclared, "missingAwait")
+}
+
 // TestRequireAwaitExemptsAnInterfaceMethod covers the class-method half of the contract check.
 //
 // `implements` puts the contract on the class rather than on the method, so the method has no

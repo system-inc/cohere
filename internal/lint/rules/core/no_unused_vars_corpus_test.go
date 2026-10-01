@@ -185,7 +185,6 @@ var noUnusedVarsUpstreamClean = []string{
 	"module.exports.foo = () => function bar() { }",
 	"\n        export function log(message: string, ...interpolations: unknown[]): void;\n        export function log(message: string, ...interpolations: unknown[]): void {\n            console.log(message, interpolations);\n        }\n        ",
 	"declare function func(strings: any, ...values: any[]): object",
-	"const _thunk = (function createThunk(count) {\n            if (count === 0) return () => count\n            return () => createThunk(count - 1)()\n        })()",
 	"import { a } from 'b'; console.log(a)",
 	"import * as a from 'a'; console.log(a)",
 	"import a from 'a'; console.log(a)",
@@ -303,7 +302,6 @@ var noUnusedVarsUpstreamClean = []string{
 	"for (let len = 10; len;) {}",
 	"for (let len = 10;; len++) {}",
 	"for (let len = 10; len < 0; len += 1) {}",
-	"for (const _unused of []) {}",
 	"const foo = 123; export type Foo = typeof foo;",
 	"\n        import { ClassDecoratorFactory } from 'decorators';\n        @ClassDecoratorFactory()\n        export class Foo {}\n            ",
 	"\n        import { ClassDecorator } from 'decorators';\n        @ClassDecorator\n        export class Foo {}\n            ",
@@ -743,7 +741,10 @@ var noUnusedVarsUpstreamReports = []string{
 }
 
 // TestNoUnusedVarsStaysSilentOnUpstreamCleanCases asserts every clean case upstream ships stays
-// clean here. All 409 pass, which is the half of the corpus that catches a rule reporting too much.
+// clean here. All 407 pass, which is the half of the corpus that catches a rule reporting too much.
+//
+// oxc ships 409. Two of them are clean only under oxc's leading-underscore default, which this rule
+// no longer has, and they moved to noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault below.
 func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(t *testing.T) {
 	t.Parallel()
 
@@ -813,4 +814,24 @@ var noUnusedVarsKnownGaps = []string{
 	// weakening that guard everywhere, and the second would cost clean cases to gain one finding on
 	// a construct our own tree uses zero times and TypeScript forbids in every module.
 	"with (a) var foo;",
+}
+
+// noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault are the two oxc clean cases that were clean
+// only because oxc ignores a leading underscore by default.
+//
+// ESLint has no such default, and under the parity doctrine ESLint is the floor. Measured on the
+// installed `@typescript-eslint/no-unused-vars` 8.67.0 with no options: `_thunk` reports at 1:7 and
+// `_unused` at 1:12, both "is assigned a value but never used".
+var noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault = []string{
+	"const _thunk = (function createThunk(count) {\n            if (count === 0) return () => count\n            return () => createThunk(count - 1)()\n        })()",
+	"for (const _unused of []) {}",
+}
+
+// TestNoUnusedVarsReportsWhatOnlyTheUnderscoreDefaultHid pins the two cases above as reporting.
+func TestNoUnusedVarsReportsWhatOnlyTheUnderscoreDefaultHid(t *testing.T) {
+	t.Parallel()
+
+	for _, source := range noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault {
+		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnusedVars, "a.ts", source), "noUnusedVars")
+	}
 }

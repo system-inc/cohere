@@ -208,21 +208,32 @@ func TestNoUselessConcatSameLine(t *testing.T) {
 	}
 }
 
-// TestNoUselessConcatMessage asserts the message.
+// TestNoUselessConcatMessage asserts the message against a literal typed here, on a plain pair and
+// on a template carrying a substitution.
 //
-// Nothing is interpolated, so this is equality on a constant.
+// The second row is why this is not equality on the rule's own constant. The message used to say
+// the join produces "a constant the source could have spelled directly", which is false when one
+// side is a template with an expression: `${orgFlag}` + ' --dir' joins into a template, one literal
+// but no constant. Two of the four ahra findings were that shape (`PlanetScaleApi.ts:627`,
+// `GraphQlOperationsMetadataPlugin.ts:476`), and comparing against the constant could never notice.
 func TestNoUselessConcatMessage(t *testing.T) {
 	t.Parallel()
 
-	if messageUnexpectedConcat.Id != "unexpectedConcat" {
-		t.Fatalf("expected id %q, got %q", "unexpectedConcat", messageUnexpectedConcat.Id)
-	}
-	result := rule_testing.Run(t, NoUselessConcat, noUselessConcatFile, "'a' + 'b'")
-	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
-	}
-	if result.Diagnostics[0].Message.Description != messageUnexpectedConcat.Description {
-		t.Fatalf("the reported description is not the rule's own")
+	const want = "These two literals are joined at runtime where the source could have written one " +
+		"literal. Nothing is computed between them, so the concatenation only adds an operator for a " +
+		"reader to follow and a chance for the two halves to drift apart."
+
+	for _, source := range []string{"'a' + 'b'", "`--org ${orgFlag}` + ' --dir'"} {
+		result := rule_testing.Run(t, NoUselessConcat, noUselessConcatFile, source)
+		if len(result.Diagnostics) != 1 {
+			t.Fatalf("expected one finding for %s, got %d", source, len(result.Diagnostics))
+		}
+		if got := result.Diagnostics[0].Message.Id; got != "unexpectedConcat" {
+			t.Errorf("expected id %q, got %q", "unexpectedConcat", got)
+		}
+		if got := result.Diagnostics[0].Message.Description; got != want {
+			t.Errorf("description for %s is\n%q\nwant\n%q", source, got, want)
+		}
 	}
 }
 

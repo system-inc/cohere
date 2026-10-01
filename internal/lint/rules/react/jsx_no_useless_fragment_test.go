@@ -698,3 +698,49 @@ func TestJsxNoUselessFragmentReadsBothFragmentSpellings(t *testing.T) {
 		})
 	}
 }
+
+// TestJsxNoUselessFragmentNeedsMoreChildrenSaysWhatTheFragmentHolds pins the first arm's message for
+// each shape it covers, as whole literals.
+//
+// The arm reports a fragment with fewer than two children, and its message used to say "wraps one
+// thing" whatever it held. Two ahra findings wrap nothing but a commented-out block of dead JSX,
+// `AddressesPage.tsx` and `NotificationsPage.tsx`, where "wraps one thing" sent the reader looking
+// for a child that is not there, and the honest repair is to delete the comment and return `null`.
+// An empty fragment is the third shape. The finding and its id are unchanged; only the sentence
+// that describes the contents follows them.
+func TestJsxNoUselessFragmentNeedsMoreChildrenSaysWhatTheFragmentHolds(t *testing.T) {
+	t.Parallel()
+
+	const why = " A fragment exists to give several siblings a single parent without emitting an element"
+	for _, testCase := range []struct {
+		name   string
+		source string
+		want   string
+	}{
+		{"one child", "declare const x: any;\nconst a = <>{x}</>;\n",
+			"This fragment wraps one thing, so it does nothing." + why +
+				"; around a single child it is pure noise in the tree and in the source. Write the child on its own."},
+		{"only a comment", "const a = (\n    <>\n        {/* <div>dead</div> */}\n    </>\n);\n",
+			"This fragment holds only a comment, which renders nothing, so the fragment renders nothing either." + why +
+				", and here there is nothing to group. Delete it, and the comment with it if that is dead code; " +
+				"where a value is still required, write `null`."},
+		{"nothing", "const a = <></>;\n",
+			"This fragment is empty, so it renders nothing." + why +
+				", and here there is nothing to group. Delete it; where a value is still required, write `null`."},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := runJsxNoUselessFragment(t, testCase.source, "")
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+			}
+			if result.Diagnostics[0].Message.Id != "NeedsMoreChildren" {
+				t.Errorf("id is %q", result.Diagnostics[0].Message.Id)
+			}
+			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
+				t.Errorf("description is\n%q\nwant\n%q", got, testCase.want)
+			}
+		})
+	}
+}

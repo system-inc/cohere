@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Recommendation** | **No** |
-| Violations in ahra | **436** |
+| Violations in ahra | **436** when audited; not re-measured since, see below |
 | Plugin | `@typescript-eslint` |
 | Auto-fixable | no |
 | Needs type information | yes |
@@ -23,7 +23,14 @@ All 6 samples are `export async function generateMetadata(): Promise<Metadata>`,
 
 ## Violations
 
-436 in the tree. Showing the first few.
+**Stale, kept as the audit's record.** The 436 below were the `generateMetadata` world, and that world
+is gone: on 2026-10-01, 43 route files write `generateMetadata` without `async`, and the core
+`require-await` rule cohere enables reports none of the 22 that keep it. The core rule's current numbers
+(cohere 3, ESLint 89, and why 86 of ESLint's are contract sites cohere is right to leave) are in
+`../core/require_await.md`. This typed variant is not ported, so it has no cohere count, and its
+ESLint count was not re-measured.
+
+436 in the tree when audited. Showing the first few.
 
 **`app/(os-layout)/ahra/page.tsx:12`**
 

@@ -146,3 +146,67 @@ func TestTheNodePrefixFixWritesTheSpecifierItPromises(t *testing.T) {
 	rule_testing.ExpectFixedSource(t, result,
 		"import * as NodeFileSystem from 'node:fs';\n")
 }
+
+// TestImportRequireNodeNamespaceNamesTheModuleAndPointsWhereTheOriginalDoes asserts each arm's whole
+// message and span against the TypeScript original, ImportRequireNodeNamespaceRule.ts.
+//
+// Three defects, found on ahra by comparing with ESLint. The namespace message carried a hardcoded
+// example, "import * as NodeFileSystem from 'node:fs'", so `import NodePath from 'node:path'` at
+// `AhraOsMindLaunch.ts:17` was told to import the wrong module under the wrong alias; the original
+// interpolates the module and its expected alias. The alias message dropped the expected and actual
+// names the original gives ("must be 'NodeFileSystemPromises', got 'NodeFileSystem'"). And the alias
+// finding pointed at the alias name where the original reports the whole `* as alias` specifier,
+// column 13 against 8, while the prefix finding pointed at the specifier where the original reports
+// the declaration.
+func TestImportRequireNodeNamespaceNamesTheModuleAndPointsWhereTheOriginalDoes(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name     string
+		source   string
+		wantId   string
+		wantText string
+		wantSpan string
+	}{
+		{"a default import names its own module and alias",
+			"import NodePath from 'node:path';\n",
+			"requireNamespaceImport",
+			"Node built-in 'node:path' must use a namespace import, so every call site says which module " +
+				"it came from. Use: import * as NodePath from 'node:path'",
+			"import NodePath from 'node:path';"},
+		{"an alias names what it should be and what it is",
+			"import * as NodeFileSystem from 'node:fs/promises';\n",
+			"requireCorrectAlias",
+			"Node namespace alias must be 'NodeFileSystemPromises', got 'NodeFileSystem'. The alias is the " +
+				"Node-prefixed expansion of the module, so a reader forty lines down knows what they are " +
+				"looking at without finding the import. Use: import * as NodeFileSystemPromises from " +
+				"'node:fs/promises'",
+			"* as NodeFileSystem"},
+		{"a missing prefix names the module",
+			"import * as NodeChildProcess from 'child_process';\n",
+			"requireNodePrefix",
+			"Node built-in 'child_process' must use the 'node:' prefix, which says the module is Node's " +
+				"rather than a package that happens to share its name. Use: import * as NodeChildProcess " +
+				"from 'node:child_process'",
+			"import * as NodeChildProcess from 'child_process';"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := rule_testing.Run(t, ImportRequireNodeNamespace, "probe.ts", testCase.source)
+			if len(result.Diagnostics) != 1 {
+				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+			}
+			diagnostic := result.Diagnostics[0]
+			if diagnostic.Message.Id != testCase.wantId {
+				t.Errorf("message id is %q, want %q", diagnostic.Message.Id, testCase.wantId)
+			}
+			if diagnostic.Message.Description != testCase.wantText {
+				t.Errorf("description is\n%q\nwant\n%q", diagnostic.Message.Description, testCase.wantText)
+			}
+			if span := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]; span != testCase.wantSpan {
+				t.Errorf("the finding covers %q, want %q", span, testCase.wantSpan)
+			}
+		})
+	}
+}
