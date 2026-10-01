@@ -25,6 +25,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 
 	_ "github.com/system-inc/cohere/internal/lint/rules/base"
+	_ "github.com/system-inc/cohere/internal/lint/rules/boundaries"
 	_ "github.com/system-inc/cohere/internal/lint/rules/core"
 	_ "github.com/system-inc/cohere/internal/lint/rules/next"
 	_ "github.com/system-inc/cohere/internal/lint/rules/nexus"

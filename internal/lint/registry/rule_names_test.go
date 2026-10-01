@@ -49,7 +49,9 @@ func TestRegisteredNamesMatchTheirUpstreamSpelling(t *testing.T) {
 		// `base` is api-phi-health's own lint layer, the same kind of namespace as structure and
 		// nexus below: rules this organization wrote rather than ported from a plugin. It is not an
 		// ESLint plugin prefix, so nothing translates it on the way out.
-		"base":               true,
+		"base": true,
+		// eslint-plugin-boundaries, which Base's config loads to keep its layers pointing one way.
+		"boundaries":         true,
 		"react":              true,
 		"react-hooks":        true,
 		"@next/next":         true,
