@@ -239,11 +239,11 @@ it where a run that did not finish prints green.
 
 | Flag | Swift meaning in phase 1 |
 |---|---|
-| `--no-fix` | Writes nothing to the project: no source, no `.build`, no `Package.resolved`. Builds go to the engine's cache outside the project, and package resolution is disabled. Fix and format record what they would change as findings. |
+| `--no-fix` | Writes nothing to the project: no source, no `.build`, no `Package.resolved`. Builds go to the engine's cache outside the project, and package resolution is disabled. The fix phase runs in check mode, recorded as `ran`: each file the formatter would rewrite becomes one `format` finding at its first changed line. |
 | `--fix` | Fix and format only. |
 | `--types`, `--lint` | That phase alone, as for TypeScript. |
 | `--format` | Formatting is on by default for Swift, unlike TypeScript, where it waits on parity with the existing gate. For Swift that parity is measured: swift-format 604.0.0 as a library is byte-identical to `xcrun swift-format` on 952 of our files. The flag is accepted and changes nothing. |
-| `--format-all` | Format every file rather than changed files. |
+| `--format-all` | Accepted and changes nothing. Swift formats every file in scope by default, because formatting all of Presence costs a few seconds, not the minutes that made TypeScript format only changed files. Named paths and `--changed` still narrow the scope. |
 | `--changed`, `[paths]` | Narrow fix, format and lint to the scope. Types still reports the whole package (see `types`). |
 | `--lint-config <file>` | The `CohereSettings.json` whose `swift` block configures rules. |
 | `--fix-passes <n>`, `--single-threaded` | As for TypeScript. |

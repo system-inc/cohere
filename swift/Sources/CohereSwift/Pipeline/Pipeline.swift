@@ -81,7 +81,7 @@ public struct Pipeline {
 
         /* Parsing is the fix phase's first step: it is what the fixers and the formatter would rewrite. */
         let fixStart = Date()
-        let parsed = await SourceParser().parse(scope.files)
+        var parsed = await SourceParser().parse(scope.files)
         for error in parsed.parseErrors {
             try writer.write(error)
         }
@@ -95,10 +95,51 @@ public struct Pipeline {
 
         if !options.runFix {
             try writer.write(PhaseRecord(name: .fix, outcome: .skipped, detail: "not requested"))
-        } else if !options.mutate {
-            try writer.write(PhaseRecord(name: .fix, outcome: .skipped, detail: "--no-fix"))
+        } else if filesThatDoNotParse > 0 {
+            /* Nothing is rewritten in a run where any file does not parse: the bail below says why, and the fix line says nothing moved. */
+            try writer.write(fixRecord(scope: scope, considered: parsed.files.count, rewritten: 0, notFormatted: ["a file in scope does not parse, so nothing was rewritten": parsed.files.count]))
+            try writer.write(PhaseRecord(name: .fix, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: fixStart)))
         } else {
-            try writer.write(fixRecord(scope: scope, considered: parsed.files.count))
+            let boundary = try repositoryRoot(of: root)
+            let formatting = await FormatPhase(boundary: boundary).run(parsed.files)
+            var rewritten: [FileSet.OwnedFile] = []
+            var notFormatted: [String: Int] = [:]
+            for (file, outcome) in formatting.outcomes {
+                switch outcome {
+                case .unchanged:
+                    break
+                case let .changed(formatted):
+                    if options.mutate {
+                        try formatted.write(to: file.url, atomically: true, encoding: .utf8)
+                        rewritten.append(FileSet.OwnedFile(url: file.url, targetName: file.targetName, targetKind: file.targetKind))
+                    } else {
+                        /* `--no-fix` writes nothing and reports what it would have changed, one finding per file, at the first line that moves. */
+                        let line = FormatPhase.firstDifferingLine(file.source, formatted)
+                        try writer.write(FindingRecord(
+                            source: .format,
+                            file: file.url.path,
+                            line: line,
+                            column: 1,
+                            severity: .error,
+                            rule: "cohere-swift/format",
+                            messageId: "notFormatted",
+                            message: "not formatted the way the nearest .swift-format says; a run without --no-fix rewrites it"
+                        ))
+                    }
+                case let .declined(reason):
+                    notFormatted[reason, default: 0] += 1
+                case let .failed(reason):
+                    notFormatted["the formatter failed: \(reason)", default: 0] += 1
+                    complete = false
+                }
+            }
+            /* Rewritten files are parsed again, so lint reads the text that is on disk now rather than the text that was. */
+            if !rewritten.isEmpty {
+                let reparsed = await SourceParser().parse(rewritten)
+                let replacements = Dictionary(reparsed.files.map { ($0.url.path, $0) }, uniquingKeysWith: { first, _ in first })
+                parsed.files = parsed.files.map { replacements[$0.url.path] ?? $0 }
+            }
+            try writer.write(fixRecord(scope: scope, considered: parsed.files.count, rewritten: rewritten.count, notFormatted: notFormatted))
             try writer.write(PhaseRecord(name: .fix, outcome: .ran, elapsedMilliseconds: Self.milliseconds(since: fixStart)))
         }
 
@@ -196,22 +237,29 @@ public struct Pipeline {
     }
 
     /*
-     The fix phase before fixers and the formatter exist: every file considered, nothing rewritten, and every
-     file counted as not formatted with the reason, so this cannot read as a formatter that found everything
-     already correct.
+     The fix line's numbers. Rewrites and reformats are the same count until native fixers land, because the
+     formatter is the only thing that writes today; they stay separate fields so the first fixer cannot blur them.
      */
-    private func fixRecord(scope: FileScope, considered: Int) -> FixRecord {
+    private func fixRecord(scope: FileScope, considered: Int, rewritten: Int, notFormatted: [String: Int]) -> FixRecord {
         FixRecord(
             filesConsidered: considered,
-            filesRewritten: 0,
+            filesRewritten: rewritten,
             fixesApplied: 0,
             fixesRefused: 0,
             refusalsByReason: [:],
-            filesReformatted: 0,
-            filesNotFormatted: considered,
-            notFormattedReasons: considered > 0 ? ["the format phase is not built yet": considered] : [:],
+            filesReformatted: rewritten,
+            filesNotFormatted: notFormatted.values.reduce(0, +),
+            notFormattedReasons: notFormatted,
             formatScope: scope.everything ? "every file in the package" : scope.description
         )
+    }
+
+    /* The top of the git repository holding the package, or the package itself outside git: the highest directory a `.swift-format` may apply from. */
+    private func repositoryRoot(of root: URL) throws -> URL {
+        let result = try runner.run("git", ["rev-parse", "--show-toplevel"], in: root)
+        guard result.succeeded else { return root }
+        let path = String(decoding: result.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return URL(fileURLWithPath: path, isDirectory: true)
     }
 
     /* Each owned package's manifest, parsed, so package rules can point at the line that would fix them. A manifest that cannot be read is absent, and its findings point at line 1. */
