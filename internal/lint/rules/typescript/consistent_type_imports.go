@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/imports"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -311,6 +312,7 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile) 
 	// Built once and only when an import that could report actually exists, so a file with no
 	// value imports at all pays nothing for the index.
 	var byText map[string][]*ast.Node
+	var metadataRoots map[*ast.Node]bool
 
 	for _, statement := range sourceFile.Statements.Nodes {
 		if statement.Kind != ast.KindImportDeclaration {
@@ -330,6 +332,7 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile) 
 
 		if byText == nil {
 			byText = consistentTypeImportsIdentifiers(sourceFile)
+			metadataRoots = decoratorMetadataRoots(ctx, sourceFile)
 		}
 
 		bindings := imports.BindingsOf(statement)
@@ -352,7 +355,7 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile) 
 			if alreadyTypeOnly {
 				return
 			}
-			if isReferencedOnlyAsType(ctx, byText, local) {
+			if isReferencedOnlyAsType(ctx, byText, metadataRoots, local) {
 				typeOnlyNames = append(typeOnlyNames, local.Text())
 			}
 		}
@@ -422,7 +425,12 @@ func consistentTypeImportsIdentifiers(sourceFile *ast.SourceFile) map[string][]*
 //
 // False when the name has no references at all, which is upstream's own first line and not an
 // accident of the loop: an unused import is a different rule's finding.
-func isReferencedOnlyAsType(ctx rule.Context, byText map[string][]*ast.Node, local *ast.Node) bool {
+func isReferencedOnlyAsType(
+	ctx rule.Context,
+	byText map[string][]*ast.Node,
+	metadataRoots map[*ast.Node]bool,
+	local *ast.Node,
+) bool {
 	target := ctx.TypeChecker.GetSymbolAtLocation(local)
 	if target == nil {
 		return false
@@ -438,8 +446,213 @@ func isReferencedOnlyAsType(ctx rule.Context, byText map[string][]*ast.Node, loc
 			// One value use settles it, and the remaining candidates cannot change the answer.
 			return false
 		}
+		if metadataRoots[candidate] && isRuntimeValueImport(ctx, target) {
+			// A type position that decorator metadata emits as a runtime reference. See
+			// `decoratorMetadataRoots`.
+			return false
+		}
 	}
 	return found
+}
+
+// decoratorMetadataRoots names the identifiers that decorator metadata turns into runtime references.
+//
+// Under `emitDecoratorMetadata`, TypeScript serializes the types of a decorated declaration into
+// `design:paramtypes`, `design:type` and `design:returntype`, and a type that names a class is
+// emitted as a reference to that class's value. Rewriting its import to `import type` erases the
+// binding, the metadata silently becomes `Object`, and nothing fails until a framework reads the
+// metadata at run time. Measured on api-phi-health, whose Base GraphQL layer reads it: 1,295
+// findings where ESLint reports none.
+//
+// typescript-eslint answers this by skipping every file that contains a decorator. This mirrors
+// what the compiler itself keeps instead, `markDecoratorAliasReferenced` and
+// `getEntityNameForDecoratorMetadata` in the vendored checker, so the rest of such a file still
+// reports. The answer is one identifier per serialized type: the first identifier of the entity
+// name the checker extracts, which is the only part of the type the emitted code references.
+//
+// Empty when the option is off, which is the whole gate: without metadata no type position reaches
+// run time.
+func decoratorMetadataRoots(ctx rule.Context, sourceFile *ast.SourceFile) map[*ast.Node]bool {
+	roots := map[*ast.Node]bool{}
+	options := ctx.Program.Options()
+	if !options.EmitDecoratorMetadata.IsTrue() {
+		return roots
+	}
+	legacyDecorators := options.ExperimentalDecorators.IsTrue()
+	strictNullChecks := type_checking.IsStrictCompilerOptionEnabled(options, options.StrictNullChecks)
+
+	mark := func(typeNode *ast.Node) {
+		entityName := decoratorMetadataEntityName(typeNode, strictNullChecks)
+		if entityName != nil && ast.IsEntityName(entityName) {
+			roots[ast.GetFirstIdentifier(entityName)] = true
+		}
+	}
+
+	var visit func(*ast.Node)
+	visit = func(current *ast.Node) {
+		if current == nil {
+			return
+		}
+		if ast.CanHaveDecorators(current) && ast.HasDecorators(current) && current.Modifiers() != nil &&
+			ast.NodeCanBeDecorated(legacyDecorators, current, current.Parent, current.Parent.Parent) {
+			switch current.Kind {
+			case ast.KindClassDeclaration:
+				if constructor := ast.GetFirstConstructorWithBody(current); constructor != nil {
+					for _, parameter := range constructor.Parameters() {
+						mark(decoratorMetadataParameterType(parameter))
+					}
+				}
+			case ast.KindGetAccessor, ast.KindSetAccessor:
+				annotation := decoratorMetadataAccessorType(current)
+				if annotation == nil {
+					annotation = decoratorMetadataAccessorType(decoratorMetadataOtherAccessor(current))
+				}
+				mark(annotation)
+			case ast.KindMethodDeclaration:
+				for _, parameter := range current.Parameters() {
+					mark(decoratorMetadataParameterType(parameter))
+				}
+				mark(current.Type())
+			case ast.KindPropertyDeclaration:
+				mark(current.Type())
+			case ast.KindParameter:
+				// A decorated parameter serializes its whole signature, siblings and return included.
+				signature := current.Parent
+				for _, parameter := range signature.Parameters() {
+					mark(decoratorMetadataParameterType(parameter))
+				}
+				mark(signature.Type())
+			}
+		}
+		current.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return false
+		})
+	}
+	visit(sourceFile.AsNode())
+	return roots
+}
+
+// decoratorMetadataEntityName is the checker's `getEntityNameForDecoratorMetadata`.
+//
+// A union or intersection serializes to one reference only when every member names the same
+// identifier, after `never` and, without strict null checks, `null` and `undefined` are elided. With
+// strict null checks on, `Foo | null` yields no entity name at all, so the import is not kept by
+// metadata and the rule still reports it, which is what the compiler would emit.
+func decoratorMetadataEntityName(node *ast.Node, strictNullChecks bool) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	switch node.Kind {
+	case ast.KindIntersectionType:
+		return decoratorMetadataCommonEntityName(node.AsIntersectionTypeNode().Types.Nodes, strictNullChecks)
+	case ast.KindUnionType:
+		return decoratorMetadataCommonEntityName(node.AsUnionTypeNode().Types.Nodes, strictNullChecks)
+	case ast.KindConditionalType:
+		conditional := node.AsConditionalTypeNode()
+		return decoratorMetadataCommonEntityName(
+			[]*ast.Node{conditional.TrueType, conditional.FalseType}, strictNullChecks)
+	case ast.KindParenthesizedType:
+		return decoratorMetadataEntityName(node.AsParenthesizedTypeNode().Type, strictNullChecks)
+	case ast.KindNamedTupleMember:
+		return decoratorMetadataEntityName(node.AsNamedTupleMember().Type, strictNullChecks)
+	case ast.KindTypeReference:
+		return node.AsTypeReferenceNode().TypeName
+	}
+	return nil
+}
+
+// decoratorMetadataCommonEntityName is the checker's `getEntityNameForDecoratorMetadataFromTypeList`.
+func decoratorMetadataCommonEntityName(typeNodes []*ast.Node, strictNullChecks bool) *ast.Node {
+	var common *ast.Node
+	for _, typeNode := range typeNodes {
+		if typeNode.Kind == ast.KindNeverKeyword {
+			continue
+		}
+		if !strictNullChecks && (typeNode.Kind == ast.KindUndefinedKeyword ||
+			typeNode.Kind == ast.KindLiteralType && typeNode.AsLiteralTypeNode().Literal.Kind == ast.KindNullKeyword) {
+			continue
+		}
+		individual := decoratorMetadataEntityName(typeNode, strictNullChecks)
+		if individual == nil {
+			return nil
+		}
+		if common == nil {
+			common = individual
+			continue
+		}
+		if !ast.IsIdentifier(common) || !ast.IsIdentifier(individual) || common.Text() != individual.Text() {
+			return nil
+		}
+	}
+	return common
+}
+
+// decoratorMetadataParameterType is the checker's `getParameterTypeNodeForDecoratorCheck`: a rest
+// parameter serializes its element type.
+func decoratorMetadataParameterType(parameter *ast.Node) *ast.Node {
+	typeNode := parameter.Type()
+	if parameter.AsParameterDeclaration().DotDotDotToken != nil {
+		return ast.GetRestParameterElementType(typeNode)
+	}
+	return typeNode
+}
+
+// decoratorMetadataAccessorType is the checker's `getAnnotatedAccessorTypeNode`: a getter's return
+// annotation, or a setter's parameter annotation.
+func decoratorMetadataAccessorType(accessor *ast.Node) *ast.Node {
+	if accessor == nil {
+		return nil
+	}
+	if accessor.Kind == ast.KindGetAccessor {
+		return accessor.Type()
+	}
+	for _, parameter := range accessor.Parameters() {
+		if !ast.IsThisParameter(parameter) {
+			return parameter.Type()
+		}
+	}
+	return nil
+}
+
+// decoratorMetadataOtherAccessor finds the accessor of the opposite kind for the same member.
+//
+// The checker reaches it through the member's symbol. The same member is the same name with the
+// same staticness in the same class body, which is what that symbol groups, and asking the AST keeps
+// a type-graph call out of a walk that otherwise needs none.
+func decoratorMetadataOtherAccessor(accessor *ast.Node) *ast.Node {
+	otherKind := ast.KindSetAccessor
+	if accessor.Kind == ast.KindSetAccessor {
+		otherKind = ast.KindGetAccessor
+	}
+	name := accessor.Name()
+	if name == nil || name.Kind != ast.KindIdentifier {
+		return nil
+	}
+	for _, member := range accessor.Parent.Members() {
+		if member.Kind != otherKind || ast.IsStatic(member) != ast.IsStatic(accessor) {
+			continue
+		}
+		if memberName := member.Name(); memberName != nil && memberName.Kind == ast.KindIdentifier &&
+			memberName.Text() == name.Text() {
+			return member
+		}
+	}
+	return nil
+}
+
+// isRuntimeValueImport reports whether an import binding names something that exists at run time.
+//
+// The checker keeps an import for metadata only when `symbolIsValue` holds of it and its target is
+// not a const enum, whose uses are inlined. An interface or type alias is serialized as `Object`
+// and needs no binding; under `isolatedModules` the compiler goes further and requires those to be
+// imported with `import type` (TS1272), so continuing to report them is exactly what tsc asks for.
+func isRuntimeValueImport(ctx rule.Context, binding *ast.Symbol) bool {
+	resolved := ctx.TypeChecker.GetAliasedSymbol(binding)
+	if resolved == nil {
+		return false
+	}
+	return resolved.Flags&ast.SymbolFlagsValue != 0 && resolved.Flags&ast.SymbolFlagsConstEnum == 0
 }
 
 // resolvesToImport reports whether an identifier binds to the import's symbol.

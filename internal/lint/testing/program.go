@@ -175,9 +175,14 @@ func runTypedFiles(
 		// directory that the program or a rule will then find.
 		setup(directory)
 
+		// A hook that wrote its own tsconfig keeps it. A rule whose verdict depends on a compiler
+		// option the default does not set, `emitDecoratorMetadata` for one, has no other way to reach
+		// a program built under that option.
 		configPath := filepath.Join(directory, "tsconfig.json")
-		if err := os.WriteFile(configPath, []byte(defaultTsConfig), 0o644); err != nil {
-			t.Fatalf("writing the tsconfig: %v", err)
+		if _, statError := os.Stat(configPath); os.IsNotExist(statError) {
+			if err := os.WriteFile(configPath, []byte(defaultTsConfig), 0o644); err != nil {
+				t.Fatalf("writing the tsconfig: %v", err)
+			}
 		}
 
 		built, err := program.Build(program.Options{
