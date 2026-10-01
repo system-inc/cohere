@@ -63,7 +63,7 @@ var noArrayIndexKeyIteratorPositions = map[string]int{
 // then asks whether a key expression names anything currently on the stack. Our walk is pre-order
 // with no exit hook, so the whole rule runs inside one `KindSourceFile` listener that walks the
 // tree itself and maintains the stack across the recursion. That is the shape
-// `react_component_no_multiple_primary.go` and `no_class_assign.go` both use.
+// `no_multi_comp.go` and `no_class_assign.go` both use.
 //
 // The stack rather than a single name is load-bearing: nested iterators each contribute a name, and
 // `foo.map((a, i) => bar.map((b, j) => <Foo key={i} />))` reports on the OUTER index from inside the

@@ -901,8 +901,7 @@ options parameter, including one with no option surface.**
 and neither found it. If your rule has to gather before it can judge, do both inside a
 `KindSourceFile` listener: it fires before its children, so you can walk the tree
 yourself, collect, and report at the end.
-`internal/lint/rules/structure/react_component_no_multiple_primary.go` is the shipped
-example, and `internal/lint/rules/core/no_class_assign.go` uses the same shape for a
+`internal/lint/rules/react/no_multi_comp.go` is the shipped example, and `internal/lint/rules/core/no_class_assign.go` uses the same shape for a
 declaration anchor.
 
 `ExpectFindings` takes one id per finding, so an input reporting twice passes two ids.

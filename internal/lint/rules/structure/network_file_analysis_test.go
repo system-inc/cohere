@@ -1,6 +1,7 @@
 package structure
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -26,7 +27,7 @@ var networkAnalysisProbe = rule.Rule{
 					}
 					ctx.ReportNode(hook.NameNode, rule.Message{
 						Id:          "hook",
-						Description: hook.Name + " " + exported + " parameters=" + itoa(len(hook.Parameters)),
+						Description: hook.Name + " " + exported + " parameters=" + strconv.Itoa(len(hook.Parameters)),
 					})
 				}
 			},

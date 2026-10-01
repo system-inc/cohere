@@ -14,7 +14,7 @@ Disallow the use of variables before they are defined
 
 ## Why this recommendation
 
-The sampled sites are helper components defined below the primary component, which is exactly the layout the house rule ReactComponentNoMultiplePrimaryRule prescribes, and function/component declarations are hoisted.
+The sampled sites are helper components defined below the primary component, which was the layout the house rules prescribed when this was audited, and function/component declarations are hoisted. Since 2026-10-01 `react/no-multi-comp` is strict and those helpers move to files of their own, and this count has not been re-measured since.
 
 > Reviewed against real violation sites and the house conventions in `CLAUDE.md`,
 > which moved this from **Maybe** to **No**. The first pass classified rules by

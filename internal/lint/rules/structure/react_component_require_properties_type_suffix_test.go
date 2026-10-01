@@ -229,7 +229,7 @@ func TestReactComponentRequirePropertiesTypeSuffixIsOrderIndependent(t *testing.
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix,
-				componentFile, testCase.sourceText)
+				typeSuffixFile, testCase.sourceText)
 
 			// Both halves have to be renamed or the file stops compiling, so the count is the
 			// assertion rather than a detail of it.
@@ -276,7 +276,7 @@ func TestReactComponentRequirePropertiesTypeSuffixRefusesATakenName(t *testing.T
 		"export type MenuItemInterface = MenuItemProperties;\n" +
 		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
 
-	result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, componentFile, source)
+	result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile, source)
 	if len(result.Diagnostics) == 0 {
 		t.Fatal("wanted the convention violation still reported, got no findings")
 	}
@@ -298,7 +298,7 @@ func TestReactComponentRequirePropertiesTypeSuffixStillFixesWhenTheNameIsFree(t 
 	source := "export interface MenuItemInterface { a: string }\n" +
 		"export function MenuItem(properties: MenuItemInterface) { return null; }\n"
 
-	result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, componentFile, source)
+	result := rule_testing.Run(t, ReactComponentRequirePropertiesTypeSuffix, typeSuffixFile, source)
 	if len(result.Diagnostics) != 2 {
 		t.Fatalf("wanted two findings, got %d", len(result.Diagnostics))
 	}

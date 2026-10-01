@@ -35,10 +35,6 @@ func init() {
 		rule.Registration{Rule: ReactComponentNoDestructuring},
 		rule.Registration{Rule: ReactComponentNoDisplayName},
 		rule.Registration{Rule: ReactComponentNoForwardRef},
-		rule.Registration{
-			Rule:   ReactComponentNoMultiplePrimary,
-			Decode: rule.DecodeOptionsInto[ReactComponentNoMultiplePrimaryOptions](),
-		},
 		rule.Registration{Rule: ReactComponentNoSeparateNamedExport},
 		rule.Registration{Rule: ReactComponentRequireNamedExport},
 		rule.Registration{Rule: ReactComponentRequirePropertiesParameter},

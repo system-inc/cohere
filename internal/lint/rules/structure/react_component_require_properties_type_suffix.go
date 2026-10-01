@@ -136,9 +136,8 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 			// which `ExpectFindings` cannot distinguish from correct behavior.
 			//
 			// The source-file listener fires before its children, so filling the map here removes
-			// the ordering assumption rather than reversing it. Same shape as
-			// `react-component-no-multiple-primary`, which collects in this listener for the same
-			// reason.
+			// the ordering assumption rather than reversing it. Same shape as `react/no-multi-comp`,
+			// which collects in this listener for the same reason.
 			ast.KindSourceFile: func(node *ast.Node) {
 				// Every type name the file declares, so a rename can refuse a target that is
 				// already taken. The four declaration kinds are the shelf's, which counts an enum

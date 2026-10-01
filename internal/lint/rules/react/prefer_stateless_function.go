@@ -176,7 +176,7 @@ var PreferStatelessFunction = rule.Rule{
 		// A gather-then-judge shape, because the disqualifiers live anywhere in the file while the
 		// finding anchors on the component. There is no rule.OnExit and the walk is pre-order, so
 		// the whole judgment happens inside a KindSourceFile listener, which fires before its
-		// children. `react_component_no_multiple_primary.go` is the shipped example of this shape.
+		// children. `no_multi_comp.go` is the shipped example of this shape.
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
 				// A JSX `ref` attribute anywhere in the file disqualifies every component in it.
