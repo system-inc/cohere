@@ -260,3 +260,39 @@ func TestConsistentTypeDefinitionsKeepsHeritageOrder(t *testing.T) {
 		rule_testing.ExpectFixedSource(t, result, testCase.want)
 	}
 }
+
+// TestConsistentTypeDefinitionsKeepsTheDeclarationModifiers pins what the rewrite must not delete.
+//
+// Swept after `consistent-indexed-object-style` shipped an interface-to-alias repair that replaced
+// the declaration from its first modifier and rebuilt only `type <name> = `, unexporting six
+// interfaces. This rule rewrites only the keyword and the punctuation around the body, so `export`,
+// `declare`, the JSDoc above and a comment between the modifier and the keyword all stay where they
+// were, in both directions. Every expected output is byte-identical to upstream's installed build.
+func TestConsistentTypeDefinitionsKeepsTheDeclarationModifiers(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		style      string
+		sourceText string
+		want       string
+	}{
+		{"type", "export interface Foo { a: string }\n", "export type Foo = { a: string }\n"},
+		{"type", "declare interface Foo { a: string }\n", "declare type Foo = { a: string }\n"},
+		{"type", "/** Doc. */\nexport interface Foo { a: string }\n", "/** Doc. */\nexport type Foo = { a: string }\n"},
+		{"type", "export /* c */ interface Foo { a: string }\n", "export /* c */ type Foo = { a: string }\n"},
+		{"type", "namespace N {\n  export interface Foo { a: string }\n}\n", "namespace N {\n  export type Foo = { a: string }\n}\n"},
+		{"interface", "export type Foo = { a: string };\n", "export interface Foo { a: string }\n"},
+		{"interface", "declare type Foo = { a: string };\n", "declare interface Foo { a: string }\n"},
+		{"interface", "/** Doc. */\nexport type Foo = { a: string };\n", "/** Doc. */\nexport interface Foo { a: string }\n"},
+		{"interface", "export /* c */ type Foo = { a: string };\n", "export /* c */ interface Foo { a: string }\n"},
+	}
+	for _, testCase := range cases {
+		decoded, err := DecodeConsistentTypeDefinitionsOptions([]byte(`"` + testCase.style + `"`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		result := rule_testing.RunWithOptions(t, ConsistentTypeDefinitions,
+			consistentTypeDefinitionsFile, testCase.sourceText, decoded)
+		rule_testing.ExpectFixedSource(t, result, testCase.want)
+	}
+}

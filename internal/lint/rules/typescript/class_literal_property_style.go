@@ -333,6 +333,18 @@ func reportClassLiteralFieldsShouldBeGetters(ctx rule.Context, members []*ast.No
 			continue
 		}
 
+		// A decorated field reports with no suggestion, mirroring the getter direction above. This
+		// one is this port's decision rather than upstream's: upstream offers the suggestion, and it
+		// replaces the whole member from the decorator on while `classLiteralPrintModifiers` carries
+		// only accessibility and `static`, so `@dec public static readonly foo = 'x'` became
+		// `public static get foo() { return 'x'; }` with the decorator gone. Carrying it would not be
+		// right either, because a field decorator and an accessor decorator receive different
+		// arguments, which is the same reason upstream withholds the repair in the other direction.
+		if classLiteralHasDecorator(member) {
+			ctx.ReportNode(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferGetter())
+			continue
+		}
+
 		replacement := classLiteralPrintModifiers(member, "get") + nameText +
 			"() { return " + valueText + "; }"
 

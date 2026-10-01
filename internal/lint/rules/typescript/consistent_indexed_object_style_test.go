@@ -696,6 +696,85 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(t *testing.T) {
 	}
 }
 
+// TestConsistentIndexedObjectStyleCarriesTheInterfaceModifiers pins what the repair must not delete.
+//
+// This shipped broken. The interface repair replaced the whole declaration starting at its first
+// MODIFIER while building the alias from `type <name> = `, so `export interface X { [k: string]: V }`
+// became `type X = Record<string, V>;` and six imports across the structure library stopped
+// resolving. Upstream never had this defect only because estree hangs `export` on a wrapper node
+// outside the replaced range; our declaration owns its modifiers.
+//
+// `declare` is carried too, which is a measured divergence: upstream's installed build rewrites
+// `declare interface X` to `type X`, dropping it. That is harmless for a type alias, and carrying it
+// is equally valid source, so the rewrite keeps every byte it did not need to change.
+//
+// The leading JSDoc and a comment between a modifier and the keyword sit outside the replaced
+// range, so they survive and do not downgrade the fix to a suggestion.
+func TestConsistentIndexedObjectStyleCarriesTheInterfaceModifiers(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		sourceText string
+		wantSpan   string
+		wantFixed  string
+	}{
+		{
+			sourceText: "export interface Foo {\n  [key: string]: number;\n}\n",
+			wantSpan:   "interface Foo {\n  [key: string]: number;\n}",
+			wantFixed:  "export type Foo = Record<string, number>;\n",
+		},
+		{
+			sourceText: "declare interface Foo {\n  [key: string]: number;\n}\n",
+			wantSpan:   "interface Foo {\n  [key: string]: number;\n}",
+			wantFixed:  "declare type Foo = Record<string, number>;\n",
+		},
+		{
+			sourceText: "export declare interface Foo<T> {\n  [key: string]: T;\n}\n",
+			wantSpan:   "interface Foo<T> {\n  [key: string]: T;\n}",
+			wantFixed:  "export declare type Foo<T> = Record<string, T>;\n",
+		},
+		{
+			sourceText: "export interface Foo<A = any, B extends string = string> {\n  readonly [key: string]: A | B;\n}\n",
+			wantSpan:   "interface Foo<A = any, B extends string = string> {\n  readonly [key: string]: A | B;\n}",
+			wantFixed:  "export type Foo<A = any, B extends string = string> = Readonly<Record<string, A | B>>;\n",
+		},
+		{
+			sourceText: "/** The widths. */\nexport interface Foo {\n  [key: string]: number;\n}\n",
+			wantSpan:   "interface Foo {\n  [key: string]: number;\n}",
+			wantFixed:  "/** The widths. */\nexport type Foo = Record<string, number>;\n",
+		},
+		{
+			sourceText: "export /* kept */ interface Foo {\n  [key: string]: number;\n}\n",
+			wantSpan:   "interface Foo {\n  [key: string]: number;\n}",
+			wantFixed:  "export /* kept */ type Foo = Record<string, number>;\n",
+		},
+		{
+			sourceText: "namespace Outer {\n  export interface Foo {\n    [key: string]: number;\n  }\n}\n",
+			wantSpan:   "interface Foo {\n    [key: string]: number;\n  }",
+			wantFixed:  "namespace Outer {\n  export type Foo = Record<string, number>;\n}\n",
+		},
+	}
+
+	for index, testCase := range cases {
+		t.Run(consistentIndexedObjectStyleCaseName(index), func(t *testing.T) {
+			result := rule_testing.RunTypedWithOptions(t, ConsistentIndexedObjectStyle,
+				consistentIndexedObjectStyleFile, testCase.sourceText,
+				DefaultConsistentIndexedObjectStyleSettings())
+			rule_testing.ExpectFindings(t, result, "preferRecord")
+
+			diagnostic := result.Diagnostics[0]
+			gotSpan := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
+			if gotSpan != testCase.wantSpan {
+				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+			}
+			if len(diagnostic.Suggestions) != 0 {
+				t.Fatalf("expected an unattended fix, got %d suggestions", len(diagnostic.Suggestions))
+			}
+			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+		})
+	}
+}
+
 // TestConsistentIndexedObjectStyleNeedsTheTypedHarness pins the checker declaration.
 //
 // The circularity test resolves an identifier to its declaration, which is a checker call. Under

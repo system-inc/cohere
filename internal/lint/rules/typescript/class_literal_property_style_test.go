@@ -669,6 +669,70 @@ func TestClassLiteralPropertyStyleDiscriminatesOnCasesUpstreamDoesNotWrite(t *te
 	}
 }
 
+// TestClassLiteralPropertyStyleKeepsWhatTheMemberCarries pins the repair's treatment of everything
+// in front of the member's name.
+//
+// The first row was broken: a decorated readonly field was offered a getter suggestion that replaced
+// the member from its decorator on and rebuilt only accessibility and `static`, deleting `@dec`.
+// Upstream's installed build offers the identical suggestion. It now reports with no suggestion,
+// which is what upstream itself does in the opposite direction for a decorated getter, for the same
+// reason: a field decorator and an accessor decorator do not receive the same thing.
+//
+// The other rows are what the suggestion keeps in both directions: the JSDoc above the member, which
+// sits outside the replaced span, and the accessibility and `static` modifiers, which are rebuilt.
+func TestClassLiteralPropertyStyleKeepsWhatTheMemberCarries(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a decorated field is offered nothing", func(t *testing.T) {
+		result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
+			"declare const dec: any;\nclass C {\n  @dec\n  public static readonly foo = 'x';\n}\n",
+			decodeClassLiteralPropertyStyleOptions(t, "\"getters\""))
+		rule_testing.ExpectFindings(t, result, "preferGetterStyle")
+		if suggestions := result.Diagnostics[0].Suggestions; len(suggestions) != 0 {
+			t.Fatalf("a decorated field was offered %d suggestion(s), which would delete the decorator", len(suggestions))
+		}
+	})
+
+	cases := []struct {
+		name          string
+		configuration string
+		sourceText    string
+		wantApplied   string
+	}{
+		{
+			"a documented static field becomes a getter",
+			"\"getters\"",
+			"class C {\n  /** Doc. */\n  protected static readonly foo = 'x';\n}\n",
+			"class C {\n  /** Doc. */\n  protected static get foo() { return 'x'; }\n}\n",
+		},
+		{
+			"a documented static getter becomes a field",
+			"\"fields\"",
+			"class C {\n  /** Doc. */\n  protected static get foo() {\n    return 'x';\n  }\n}\n",
+			"class C {\n  /** Doc. */\n  protected static readonly foo = 'x';\n}\n",
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunWithOptions(t, ClassLiteralPropertyStyle, classLiteralPropertyStyleFile,
+				testCase.sourceText, decodeClassLiteralPropertyStyleOptions(t, testCase.configuration))
+			if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
+				t.Fatalf("expected one finding carrying one suggestion, got %d findings", len(result.Diagnostics))
+			}
+			if len(result.Diagnostics[0].Fixes) != 0 {
+				t.Fatalf("expected a suggestion only, got %d fixes", len(result.Diagnostics[0].Fixes))
+			}
+			applied := testCase.sourceText
+			for _, fix := range result.Diagnostics[0].Suggestions[0].Fixes {
+				applied = applied[:fix.Range.Pos()] + fix.Text + applied[fix.Range.End():]
+			}
+			if applied != testCase.wantApplied {
+				t.Fatalf("suggestion applied:\n  %q\nwant:\n  %q", applied, testCase.wantApplied)
+			}
+		})
+	}
+}
+
 // TestClassLiteralPropertyStyleDecoderResolvesTheStyle puts the one line with no upstream
 // counterpart under test.
 //

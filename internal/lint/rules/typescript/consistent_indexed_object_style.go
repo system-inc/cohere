@@ -68,6 +68,7 @@ func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 //	a mapped type's `-?`   becomes `Required<...>`
 //	a mapped type's `-readonly`   has NO Record equivalent, so the repair is DECLINED
 //	an interface's type parameters   are carried onto the generated type alias
+//	an interface's `export` / `declare`   stay OUTSIDE the replaced span, so they survive
 //
 // That last decline is upstream's and it is the shape this brief keeps asking for: there is no
 // builtin `Mutable<T>`, so a minus-readonly mapped type cannot be written as a Record at all.
@@ -118,7 +119,12 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		}
 
 		// hasUnpreservedComments answers upstream's helper of the same name: is there a comment
-		// inside the node that does not sit inside one of the sub-nodes the repair copies out?
+		// inside the replaced range that does not sit inside one of the sub-nodes the repair copies
+		// out?
+		//
+		// It takes the RANGE the repair replaces rather than a node, because for an interface those
+		// differ: the modifiers sit inside the node and outside the replacement, so a comment between
+		// `export` and `interface` survives the rewrite and must not downgrade it.
 		//
 		// A comment that survives the rewrite is one wholly contained in a preserved sub-node, so
 		// the test is "no preserved range contains it".
@@ -131,8 +137,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		// comment falls in a different gap, before the key of a mapped type. The question here is
 		// narrower than the one that helper answers, being only "is any byte in this range inside a
 		// comment", so it is answered directly.
-		hasUnpreservedComments := func(node *ast.Node, preserved ...*ast.Node) bool {
-			nodeRange := rule.TokenRange(ctx.SourceFile, node)
+		hasUnpreservedComments := func(nodeRange core.TextRange, preserved ...*ast.Node) bool {
 			text := ctx.SourceFile.Text()
 
 			survives := func(start int, end int) bool {
@@ -332,8 +337,14 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		//
 		// `prefix` and `postfix` wrap the generated Record so that an interface becomes a whole
 		// type alias while a type literal is replaced in place.
+		//
+		// `replacedRange` is both what the finding underlines and what the repair overwrites, and for
+		// an interface it starts at the `interface` keyword, AFTER the modifiers. That is what keeps
+		// `export` and `declare`: the repair rebuilds only `type <name><generics> = ...`, so it must
+		// replace only the text that spelling covers. Replacing from the first modifier is how this
+		// fixer once turned `export interface X` into `type X` and broke six imports.
 		reportIndexSignature := func(members []*ast.Node, node *ast.Node, declarationName *ast.Node,
-			prefix string, postfix string, repairIsSafe bool, reportRange core.TextRange) {
+			prefix string, postfix string, repairIsSafe bool, replacedRange core.TextRange) {
 			if len(members) != 1 {
 				return
 			}
@@ -369,21 +380,18 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			replacement := prefix + record + postfix
 
 			if !repairIsSafe {
-				ctx.ReportRange(reportRange, buildPreferRecordMessage())
+				ctx.ReportRange(replacedRange, buildPreferRecordMessage())
 				return
 			}
-			// The repair replaces the WHOLE node including any modifiers, while the finding points
-			// only at the interface. Those are different ranges and conflating them would either
-			// leave `export default` stranded in front of a type alias or move the caret.
-			fix := rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), replacement)
-			if hasUnpreservedComments(node, keyType, valueType) {
-				ctx.ReportRangeWithSuggestions(reportRange, buildPreferRecordMessage(), rule.Suggestion{
+			fix := rule.ReplaceRange(replacedRange, replacement)
+			if hasUnpreservedComments(replacedRange, keyType, valueType) {
+				ctx.ReportRangeWithSuggestions(replacedRange, buildPreferRecordMessage(), rule.Suggestion{
 					Message: buildPreferRecordSuggestionMessage(),
 					Fixes:   []rule.Fix{fix},
 				})
 				return
 			}
-			ctx.ReportRangeWithFixes(reportRange, buildPreferRecordMessage(), fix)
+			ctx.ReportRangeWithFixes(replacedRange, buildPreferRecordMessage(), fix)
 		}
 
 		listeners := rule.Listeners{}
@@ -413,7 +421,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 				replacement := "{ [key: " + textOf(keyArgument) + "]: " + textOf(valueArgument) + " }"
 				fix := rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), replacement)
 
-				if repairIsSafe && !hasUnpreservedComments(node, keyArgument, valueArgument) {
+				if repairIsSafe && !hasUnpreservedComments(rule.TokenRange(ctx.SourceFile, node), keyArgument, valueArgument) {
 					ctx.ReportNodeWithFixes(node, buildPreferIndexSignatureMessage(), fix)
 					return
 				}
@@ -425,13 +433,16 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			return listeners
 		}
 
-		// interfaceReportRange is the interface's span WITHOUT its leading modifiers.
+		// interfaceReplacedRange is the interface's span WITHOUT its leading modifiers.
 		//
-		// `rule.TokenRange` starts at the first token, which for `export default interface Foo` is
-		// `export`. Upstream's node begins at the `interface` keyword, because estree hangs the
-		// export off a separate wrapper node. The one corpus case that shows this is an
-		// export-default interface, whose finding underlines only the interface.
-		interfaceReportRange := func(node *ast.Node) core.TextRange {
+		// `rule.TokenRange` starts at the first token, which for `export interface Foo` is `export`.
+		// Upstream's node begins at the `interface` keyword, because estree hangs the export off a
+		// separate wrapper node, so both its finding and its repair leave `export` alone. The one
+		// corpus case that shows the span is an export-default interface, whose finding underlines
+		// only the interface; the repair inherits the same start, which is what carries the
+		// modifiers. Upstream's estree does put `declare` inside its node and drops it; this keeps it,
+		// since `declare type` is equally valid and the rewrite has no reason to touch it.
+		interfaceReplacedRange := func(node *ast.Node) core.TextRange {
 			nodeRange := rule.TokenRange(ctx.SourceFile, node)
 			if node.Modifiers() != nil && len(node.Modifiers().Nodes) != 0 {
 				last := node.Modifiers().Nodes[len(node.Modifiers().Nodes)-1]
@@ -469,7 +480,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 				return
 			}
 			reportIndexSignature(declaration.Members.Nodes, node, name,
-				"type "+name.Text()+generics+" = ", ";", repairIsSafe, interfaceReportRange(node))
+				"type "+name.Text()+generics+" = ", ";", repairIsSafe, interfaceReplacedRange(node))
 		}
 
 		listeners[ast.KindTypeLiteral] = func(node *ast.Node) {
@@ -557,7 +568,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 				return
 			}
 			fix := rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), record)
-			if hasUnpreservedComments(node, constraint, mapped.Type) {
+			if hasUnpreservedComments(rule.TokenRange(ctx.SourceFile, node), constraint, mapped.Type) {
 				ctx.ReportNodeWithSuggestions(node, buildPreferRecordMessage(), rule.Suggestion{
 					Message: buildPreferRecordSuggestionMessage(),
 					Fixes:   []rule.Fix{fix},

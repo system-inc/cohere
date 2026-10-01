@@ -859,6 +859,59 @@ func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(t *testing.T) {
 	}
 }
 
+// TestNoArrowFunctionLifecycleKeepsTheHeadWhole pins what the rewrite carries and where it declines.
+//
+// The first row shipped broken. The scan for comments "before the body" started at the KEY, so a
+// comment between `=` and the parameter list stopped the replaced head early and left `() =>`
+// standing: `render = /* c */ () => {...}` became `render() /* c */ () => {...}`, which does not
+// parse. Upstream's installed build writes `render() {...}`, dropping the comment; this declines
+// instead, because the fix runs unattended and the comment is someone's.
+//
+// The remaining rows are what the rewrite must keep: a decorator, an accessibility modifier and the
+// JSDoc above the field all sit before the key, outside the replaced head, and a comment after the
+// `=>` still travels into the block as upstream's corpus asserts.
+func TestNoArrowFunctionLifecycleKeepsTheHeadWhole(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a comment before the arrow declines", func(t *testing.T) {
+		for _, sourceText := range []string{
+			"class H extends React.Component {\n  render = /* c */ () => {\n    return <div />;\n  };\n}\n",
+			"class H extends React.Component {\n  render /* c */ = () => {\n    return <div />;\n  };\n}\n",
+			"class H extends React.Component {\n  render = () /* c */ => {\n    return <div />;\n  };\n}\n",
+		} {
+			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, sourceText)
+			rule_testing.ExpectFindings(t, result, "lifecycle")
+			if fixes := result.Diagnostics[0].Fixes; len(fixes) != 0 {
+				t.Fatalf("a repair was offered that would delete a comment in the head of %q", sourceText)
+			}
+		}
+	})
+
+	cases := []struct {
+		name       string
+		sourceText string
+		wantFixed  string
+	}{
+		{
+			"a decorated public field with JSDoc",
+			"declare const bound: any;\nclass H extends React.Component {\n  /** Draws. */\n  @bound\n  public render = () => {\n    return <div />;\n  };\n}\n",
+			"declare const bound: any;\nclass H extends React.Component {\n  /** Draws. */\n  @bound\n  public render() {\n    return <div />;\n  };\n}\n",
+		},
+		{
+			"a comment after the arrow travels into the block",
+			"class H extends React.Component {\n  render = () => /* c */ <div />;\n}\n",
+			"class H extends React.Component {\n  render() { return /* c */<div />; }\n}\n",
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "lifecycle")
+			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+		})
+	}
+}
+
 // TestNoArrowFunctionLifecycleMessageText asserts the rendered finding exactly.
 //
 // The message interpolates the property name, so an id assertion cannot see anything the format

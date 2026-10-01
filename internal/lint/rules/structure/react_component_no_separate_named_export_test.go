@@ -183,19 +183,110 @@ func TestReactComponentNoSeparateNamedExportStaysSilent(t *testing.T) {
 // Worth writing down because I expected the clean text and this assertion is what told me
 // otherwise, on the first fixable rule I have written since it existed. An id-only fixture would
 // have agreed with me.
-func TestReactComponentNoSeparateNamedExportFixDeletesTheStatement(t *testing.T) {
+//
+// This test used to assert the DEFECT. Its expected outputs were the source with the list deleted
+// and no `export` anywhere, so every component the fixer touched was unexported and the suite
+// stayed green, because the fixture recorded what the fixer did rather than what the file needed.
+// The outputs below carry the export onto each declaration, which is the only rewrite that leaves
+// every importer resolving.
+func TestReactComponentNoSeparateNamedExportFixMovesTheExportOntoTheDeclaration(t *testing.T) {
 	t.Parallel()
 
-	source := "function Button() {\n    return <button />;\n}\nexport { Button };\n"
-	rule_testing.ExpectFixedSource(t,
-		rule_testing.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, source),
-		"function Button() {\n    return <button />;\n}\n\n")
+	cases := []struct {
+		name       string
+		sourceText string
+		wantFixed  string
+	}{
+		{
+			"a function component",
+			"function Button() {\n    return <button />;\n}\nexport { Button };\n",
+			"export function Button() {\n    return <button />;\n}\n\n",
+		},
+		// A list holding several names goes as one statement and one edit, which is what makes the
+		// single report per statement the right shape.
+		{
+			"two components in one list",
+			"function Button() {\n    return <button />;\n}\nfunction Panel() {\n    return <div />;\n}\n" +
+				"export { Button, Panel };\n",
+			"export function Button() {\n    return <button />;\n}\nexport function Panel() {\n    return <div />;\n}\n\n",
+		},
+		// The keyword lands on the token, below the JSDoc that documents the declaration.
+		{
+			"a documented component",
+			"/** The button. */\nfunction Button() {\n    return <button />;\n}\nexport { Button };\n",
+			"/** The button. */\nexport function Button() {\n    return <button />;\n}\n\n",
+		},
+		// In front of `async`, which is where `export` has to go.
+		{
+			"an async component",
+			"async function Button() {\n    return <button />;\n}\nexport { Button };\n",
+			"export async function Button() {\n    return <button />;\n}\n\n",
+		},
+		{
+			"an arrow component",
+			"const Button = () => <button />;\nexport { Button };\n",
+			"export const Button = () => <button />;\n\n",
+		},
+		// A list written ABOVE the declaration it names, which hoisting makes legal.
+		{
+			"a list before its declaration",
+			"export { Button };\nfunction Button() {\n    return <button />;\n}\n",
+			"\nexport function Button() {\n    return <button />;\n}\n",
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "noSeparateNamedExport")
+			if len(result.Diagnostics[0].Fixes) != 1 {
+				// One edit, not a deletion plus insertions. The engine applies a diagnostic's fixes
+				// independently, and a deletion landing without its insertion is the original
+				// defect.
+				t.Fatalf("expected the repair as one edit, got %d", len(result.Diagnostics[0].Fixes))
+			}
+			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+		})
+	}
+}
 
-	// A list holding several names goes as one statement, which is what makes the single report
-	// per statement the right shape.
-	multiple := "function Button() {\n    return <button />;\n}\nfunction Panel() {\n    return <div />;\n}\n" +
-		"export { Button, Panel };\n"
-	rule_testing.ExpectFixedSource(t,
-		rule_testing.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, multiple),
-		"function Button() {\n    return <button />;\n}\nfunction Panel() {\n    return <div />;\n}\n\n")
+// TestReactComponentNoSeparateNamedExportDeclinesWhereTheExportCannotMove pins every decline.
+//
+// Each is reported, because the list is still the shape the rule exists to flag, and none carries a
+// repair, because moving the export would change what the module offers. The first row is the one
+// the deleting fixer got most wrong: it unexported `value`, a name the rule has no opinion on.
+func TestReactComponentNoSeparateNamedExportDeclinesWhereTheExportCannotMove(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+	}{
+		{
+			"a component listed beside a name that is not one",
+			"function Button() {\n    return <button />;\n}\nconst value = 1;\nexport { value, Button };\n",
+		},
+		{
+			"a component listed beside an imported name",
+			"import { other } from './other';\nfunction Button() {\n    return <button />;\n}\nexport { Button, other };\n",
+		},
+		{
+			"a component declared alongside a sibling binding",
+			"const Button = () => <button />, value = 1;\nexport { Button };\n",
+		},
+		{
+			"a component declared through overloads",
+			"function Button(): JSX.Element;\nfunction Button() {\n    return <button />;\n}\nexport { Button };\n",
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, ReactComponentNoSeparateNamedExport, separateExportFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "noSeparateNamedExport")
+			diagnostic := result.Diagnostics[0]
+			if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
+				t.Fatalf("expected no repair, got %d fixes and %d suggestions",
+					len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			}
+		})
+	}
 }

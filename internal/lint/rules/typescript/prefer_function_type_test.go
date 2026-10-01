@@ -508,3 +508,28 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 		})
 	}
 }
+
+// TestPreferFunctionTypeKeepsTheExport pins the modifier this repair rebuilds rather than copies.
+//
+// Swept after `consistent-indexed-object-style` shipped an interface-to-alias repair that replaced
+// the declaration from its first modifier and rebuilt only `type <name> = `, unexporting six
+// interfaces. This one replaces the same span and survives because it writes `export ` back
+// explicitly. `declare` is dropped, as upstream's installed build drops it; a type alias emits
+// nothing either way, so that is a spelling and not a meaning. Both outputs are byte-identical to
+// upstream's.
+func TestPreferFunctionTypeKeepsTheExport(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		sourceText string
+		want       string
+	}{
+		{"export declare interface Foo<T> {\n  (a: T): void;\n}\n", "export type Foo<T> = (a: T) => void;\n"},
+		{"/** Doc. */\nexport interface Foo {\n  (): void;\n}\n", "/** Doc. */\nexport type Foo = () => void;\n"},
+	}
+	for _, testCase := range cases {
+		result := rule_testing.Run(t, PreferFunctionType, preferFunctionTypeFile, testCase.sourceText)
+		rule_testing.ExpectFindings(t, result, "functionTypeOverCallableType")
+		rule_testing.ExpectFixedSource(t, result, testCase.want)
+	}
+}

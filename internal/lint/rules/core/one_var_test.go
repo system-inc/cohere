@@ -1290,6 +1290,72 @@ func TestOneVarSplitStillRepairsExports(t *testing.T) {
 	rule_testing.ExpectFixedSource(t, result, "export const foo=1; export const bar=2;")
 }
 
+// TestOneVarCarriesDeclareThroughTheSplit pins the `declare` modifier on every statement a split
+// creates.
+//
+// Both rows were broken, and both the same way upstream's installed build is broken: the split
+// repeated `export` and dropped `declare`, so `declare let a: number, b: number;` became
+// `declare let a: number; let b: number;`, a binding that now exists at runtime, and the exported
+// const form became `export const b: number;`, which does not compile. The third row is the
+// control that the plain split is untouched.
+func TestOneVarCarriesDeclareThroughTheSplit(t *testing.T) {
+	t.Parallel()
+	for _, testCase := range []oneVarFixCase{
+		{name: "declare", source: "declare let a: number, b: number;",
+			options: "\"never\"", wanted: "declare let a: number; declare let b: number;"},
+		{name: "export-declare", source: "export declare const a: number, b: number;",
+			options: "\"never\"", wanted: "export declare const a: number; export declare const b: number;"},
+		{name: "control-plain", source: "let a: number, b: number;",
+			options: "\"never\"", wanted: "let a: number; let b: number;"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(t, testCase.options))
+			rule_testing.ExpectFindings(t, result, "split")
+			rule_testing.ExpectFixedSource(t, result, testCase.wanted)
+		})
+	}
+}
+
+// TestOneVarDeclinesToJoinAmbientDeclarations pins the join's decline on `declare`.
+//
+// The join turned `declare let a: number; declare let b: number;` into `declare let a: number;
+// declare,  b: number;`, because the token before the second keyword is that statement's own
+// `declare`, not the first statement's semicolon. It is still reported; it is no longer repaired.
+// A mixed pair declines too, since joining an ambient binding into a real one changes whether it
+// exists at runtime. The control shows the join is otherwise alive.
+func TestOneVarDeclinesToJoinAmbientDeclarations(t *testing.T) {
+	t.Parallel()
+	cases := []oneVarExportCase{
+		{name: "both-ambient", source: "declare let a: number;\ndeclare let b: number;",
+			options: "\"always\"", findings: 1, fixes: 0},
+		{name: "ambient-then-plain", source: "declare let a: number;\nlet b: number;",
+			options: "\"always\"", findings: 1, fixes: 0},
+		{name: "plain-then-ambient", source: "let a: number;\ndeclare let b: number;",
+			options: "\"always\"", findings: 1, fixes: 0},
+		{name: "control-plain-join-repairs", source: "let a: number;\nlet b: number;",
+			options: "\"always\"", findings: 1, fixes: 2},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			result := rule_testing.RunWithOptions(t, OneVar, oneVarFile, testCase.source,
+				decodedOneVar(t, testCase.options))
+			if len(result.Diagnostics) != testCase.findings {
+				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.findings)
+			}
+			proposed := 0
+			for _, diagnostic := range result.Diagnostics {
+				proposed += len(diagnostic.Fixes)
+			}
+			if proposed != testCase.fixes {
+				t.Errorf("proposed %d fix(es), want %d", proposed, testCase.fixes)
+			}
+		})
+	}
+}
+
 // TestOneVarJoinDeclinesAgainstADifferentKindPredecessor pins the fixer's own same-kind check.
 //
 // The check appears twice in upstream: once in the CONSECUTIVE arm, which tests

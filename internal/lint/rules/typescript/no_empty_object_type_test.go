@@ -129,3 +129,28 @@ func TestNoEmptyObjectTypeStaysSilent(t *testing.T) {
 		})
 	}
 }
+
+// TestNoEmptyObjectTypeNeverRewritesAnInterface pins that an empty interface is reported bare.
+//
+// Swept after `consistent-indexed-object-style` shipped an interface-to-alias repair that deleted
+// `export`. typescript-eslint's version of this rule offers `export type Foo = Bar` for an interface
+// extending one name; this port follows oxc and offers no repair on an interface at all, so there is
+// no rebuilt declaration to lose a modifier from. Asserted rather than assumed, across the modifier
+// shapes the other sweeps broke on.
+func TestNoEmptyObjectTypeNeverRewritesAnInterface(t *testing.T) {
+	t.Parallel()
+
+	for _, sourceText := range []string{
+		"export interface Base {}\n",
+		"interface Base {\n    name: string;\n}\nexport interface Derived extends Base {}\n",
+		"interface Base {\n    name: string;\n}\ndeclare interface Derived extends Base {}\n",
+		"interface Base<T> {\n    value: T;\n}\nexport declare interface Derived<T> extends Base<T> {}\n",
+	} {
+		result := rule_testing.Run(t, NoEmptyObjectType, emptyObjectFile, sourceText)
+		rule_testing.ExpectFindings(t, result, "noEmptyInterface")
+		if diagnostic := result.Diagnostics[0]; len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
+			t.Fatalf("expected no repair on %q, got %d fixes and %d suggestions",
+				sourceText, len(diagnostic.Fixes), len(diagnostic.Suggestions))
+		}
+	}
+}

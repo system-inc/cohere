@@ -820,6 +820,23 @@ func oneVarIsExported(statement *ast.Node) bool {
 	return false
 }
 
+// oneVarIsAmbient answers whether a statement carries a `declare` modifier.
+//
+// Read off the statement for the same reason `oneVarIsExported` is: our parser hangs the modifier
+// there, beside `export`, rather than on the declaration list.
+func oneVarIsAmbient(statement *ast.Node) bool {
+	modifiers := statement.Modifiers()
+	if modifiers == nil {
+		return false
+	}
+	for _, modifier := range modifiers.Nodes {
+		if modifier.Kind == ast.KindDeclareKeyword {
+			return true
+		}
+	}
+	return false
+}
+
 // oneVarChecker holds what one file's walk needs.
 type oneVarChecker struct {
 	context  rule.Context
@@ -1096,6 +1113,20 @@ func (checker *oneVarChecker) joinFixes(statement *ast.Node, list *ast.Node,
 		return nil
 	}
 
+	// An AMBIENT declaration is declined, which is this port's own decision and a measured one.
+	// `declare let a: number; declare let b: number;` was joined to `declare let a: number;
+	// declare,  b: number;`, because the token before this statement's keyword is its own `declare`
+	// rather than the previous statement's semicolon. That does not parse. Upstream's installed
+	// build writes `declare let a: number,\n let b: number;`, which does not parse either.
+	//
+	// Repairing it properly would mean deleting the second `declare` too, and is only meaning-
+	// preserving when BOTH statements are ambient: joining an ambient binding into a real one, or the
+	// reverse, changes whether a variable exists at runtime. Reporting without a repair is the subset
+	// that can be shown correct.
+	if oneVarIsAmbient(statement) || oneVarIsAmbient(previous) {
+		return nil
+	}
+
 	sourceFile := checker.context.SourceFile
 	if sourceFile == nil {
 		return nil
@@ -1217,6 +1248,14 @@ func (checker *oneVarChecker) reportSplit(statement *ast.Node, list *ast.Node,
 //
 // Each comma becomes `; <kind> `, with an `export ` prefix when the statement is exported, and the
 // three shapes upstream distinguishes are about where the comment and the newline go.
+//
+// A `declare ` prefix is carried too, which upstream does not do. Measured on the installed build:
+// `declare let a: number, b: number;` splits to `declare let a: number; let b: number;`, turning an
+// ambient binding into one that exists at runtime, and `export declare const a: number, b: number;`
+// splits to `export declare const a: number; export const b: number;`, which does not compile
+// because a non-ambient `const` needs an initializer. Upstream's estree hangs `declare` on the
+// declaration as a flag it never consults here; ours is a modifier on the statement, beside
+// `export`, and both have to be repeated on every statement the split creates.
 func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 	kind oneVarKind) []rule.Fix {
 	if !oneVarIsInStatementList(statement) {
@@ -1228,9 +1267,12 @@ func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 	}
 	text := sourceFile.Text()
 
-	exportPrefix := ""
+	modifierPrefix := ""
 	if oneVarIsExported(statement) {
-		exportPrefix = "export "
+		modifierPrefix = "export "
+	}
+	if oneVarIsAmbient(statement) {
+		modifierPrefix += "declare "
 	}
 
 	fixes := []rule.Fix{}
@@ -1254,7 +1296,7 @@ func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 		if afterCommaPos == comma.End() {
 			fixes = append(fixes, rule.ReplaceRange(
 				core.NewTextRange(comma.Pos(), comma.End()),
-				"; "+exportPrefix+kind.text()+" "))
+				"; "+modifierPrefix+kind.text()+" "))
 			continue
 		}
 
@@ -1266,7 +1308,7 @@ func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 			lastCommentStart := oneVarLastCommentRunStart(text, comma.End())
 			fixes = append(fixes, rule.ReplaceRange(
 				core.NewTextRange(comma.Pos(), lastCommentStart),
-				";"+text[comma.End():lastCommentStart]+exportPrefix+kind.text()+" "))
+				";"+text[comma.End():lastCommentStart]+modifierPrefix+kind.text()+" "))
 			continue
 		}
 
@@ -1274,7 +1316,7 @@ func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 		// replacement text ending without one.
 		fixes = append(fixes, rule.ReplaceRange(
 			core.NewTextRange(comma.Pos(), comma.End()),
-			"; "+exportPrefix+kind.text()))
+			"; "+modifierPrefix+kind.text()))
 	}
 	return fixes
 }

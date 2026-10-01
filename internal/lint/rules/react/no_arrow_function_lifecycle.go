@@ -295,8 +295,27 @@ var NoArrowFunctionLifecycle = rule.Rule{
 			// parameter list, the arrow and any type annotation between them. Comments before the
 			// body belong to the body's replacement rather than to the head, so the head stops at
 			// the first of them.
+			//
+			// "Before the body" means after the `=>`, which is upstream's `getCommentsBefore(body)`:
+			// the comments between the body and the token preceding it. The scan once started at the
+			// key instead, so `render = /* c */ () => {...}` stopped the head at the comment and left
+			// the old parameter list and arrow standing behind it, writing
+			// `render() /* c */ () => {...}`, which does not parse.
+			//
+			// A comment in the head itself, before the `=>`, is declined rather than dropped.
+			// Upstream's head range swallows it, so its output parses and the comment is gone; a fix
+			// runs unattended, and deleting what someone wrote is not a spelling change.
 			bodyStart := rule.TokenRange(ctx.SourceFile, body).Pos()
-			leading := commentsBetween(sourceText, key.End(), bodyStart)
+			if arrow.EqualsGreaterThanToken == nil {
+				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				return
+			}
+			arrowEnd := rule.TokenRange(ctx.SourceFile, arrow.EqualsGreaterThanToken).End()
+			if len(commentsBetween(sourceText, key.End(), arrowEnd)) > 0 {
+				ctx.ReportNode(property, noArrowFunctionLifecycleMessage(propertyName))
+				return
+			}
+			leading := commentsBetween(sourceText, arrowEnd, bodyStart)
 			headEnd := bodyStart
 			if len(leading) > 0 {
 				headEnd = leading[0].start
