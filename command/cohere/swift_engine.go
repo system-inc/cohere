@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
+	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // swiftPassThroughSwitches are the boolean flags the Swift engine reads with the meaning the contract
@@ -50,8 +51,12 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	return runEngineBinary(binaryPath, arguments, run, os.Stderr)
 }
 
-// resolveSwiftEngineBinary picks the engine: the one the caller named, or the one this module's
-// sources build.
+// resolveSwiftEngineBinary picks the engine: the one the caller named, or the one this module builds.
+//
+// A cohere binary that names its commit and has nothing uncommitted in it, which is what the launcher
+// builds for every gate, gets an engine built from that same commit. Any other cohere, a `--dev` build
+// from a dirty tree included, gets one built from the working tree, so a development run checks
+// development rules in both engines and says so through both provenance records.
 func resolveSwiftEngineBinary(location projectLocation) (string, error) {
 	if named := os.Getenv(dispatch.SwiftEngineOverrideVariable); named != "" {
 		if !isRegularFile(named) {
@@ -66,7 +71,11 @@ func resolveSwiftEngineBinary(location projectLocation) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%s is a Swift package, and the Swift engine is built from a cohere checkout: %w", location.Root, err)
 	}
-	binaryPath, _, err := dispatch.ResolveSwiftEngine(dispatch.DefaultPaths(moduleDirectory))
+	commit := ""
+	if provenance := release.Current(); provenance.SelfCommit != "" && !provenance.SourceTreeModified {
+		commit = provenance.SelfCommit
+	}
+	binaryPath, _, err := dispatch.ResolveSwiftEngine(dispatch.DefaultPaths(moduleDirectory), commit, swiftContractVersion)
 	return binaryPath, err
 }
 

@@ -59,11 +59,19 @@ func (paths Paths) SwiftEngineBinaryPath(hash string) string {
 // saying so after the change is committed, until its sources move. That errs toward the warning,
 // which is the direction to err.
 //
+// That is the working-tree half. When commit is not empty the engine is built from that commit
+// instead, which is what a gate gets: see resolveCommittedSwiftEngine. The contract is the one the
+// caller speaks, used only to ask a freshly built committed engine for its provenance.
+//
 // The returned boolean reports whether a build ran.
-func ResolveSwiftEngine(paths Paths) (string, bool, error) {
+func ResolveSwiftEngine(paths Paths, commit string, contract int) (string, bool, error) {
 	toolchain, err := swiftToolchain()
 	if err != nil {
 		return "", false, err
+	}
+
+	if commit != "" {
+		return resolveCommittedSwiftEngine(paths, commit, toolchain, contract)
 	}
 
 	hash, err := swiftEngineHash(paths.SwiftEngineDirectory(), toolchain)
@@ -76,7 +84,7 @@ func ResolveSwiftEngine(paths Paths) (string, bool, error) {
 		return binaryPath, false, nil
 	}
 
-	if err := buildSwiftEngine(paths, binaryPath); err != nil {
+	if err := buildSwiftProduct(paths.SwiftEngineDirectory(), paths.SwiftBuildDirectory(), binaryPath); err != nil {
 		return "", false, err
 	}
 	return binaryPath, true, nil
@@ -151,7 +159,13 @@ func swiftEngineHash(engineDirectory string, toolchain string) (string, error) {
 	return hex.EncodeToString(digest.Sum(nil))[:hashLength], nil
 }
 
-// buildSwiftEngine builds the engine in release mode and copies the product to binaryPath.
+// buildSwiftProduct builds the engine package at packageDirectory and copies the product to binaryPath.
+//
+// A variable so a test can stand in for SwiftPM: a cold build compiles swift-syntax and swift-format,
+// measured at 225s, and the decisions worth testing are which tree is built and when, not SwiftPM.
+var buildSwiftProduct = buildSwiftProductWithSwiftPM
+
+// buildSwiftProductWithSwiftPM builds the engine in release mode and copies the product to binaryPath.
 //
 // A cold build compiles swift-syntax and swift-format and takes minutes, so it announces itself on
 // stderr before starting, whatever the verbosity: a command that is silent for three minutes reads as
@@ -159,18 +173,18 @@ func swiftEngineHash(engineDirectory string, toolchain string) (string, error) {
 //
 // Copied rather than linked, because the next build replaces the product in place, and a link would
 // turn every hash-named binary into whichever engine was built last.
-func buildSwiftEngine(paths Paths, binaryPath string) error {
-	if err := os.MkdirAll(paths.BinaryDirectory(), 0o755); err != nil {
+func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory string, binaryPath string) error {
+	if err := os.MkdirAll(filepath.Dir(binaryPath), 0o755); err != nil {
 		return fmt.Errorf("creating the binary cache directory: %w", err)
 	}
 
 	fmt.Fprintf(os.Stderr, "cohere: building the Swift engine from %s (its sources or the toolchain changed; a cold build takes minutes)\n",
-		paths.SwiftEngineDirectory())
+		packageDirectory)
 
 	arguments := []string{
 		"build", "-c", "release",
-		"--package-path", paths.SwiftEngineDirectory(),
-		"--scratch-path", paths.SwiftBuildDirectory(),
+		"--package-path", packageDirectory,
+		"--scratch-path", scratchDirectory,
 		"--product", "cohere-swift",
 	}
 	build := exec.Command("swift", arguments...)
