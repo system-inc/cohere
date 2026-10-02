@@ -23,6 +23,8 @@ func TestByteOrderMarksAndCarriageReturnsMatchTheForkInEveryLanguage(t *testing.
 		"probe.md":      "# Title\n\nSome *text*\nacross lines.\n\n- a\n- b\n",
 		"probe.css":     "a{color:red;\nmargin:0}\n/* comment */\n",
 		"probe.graphql": "query Q { a\n b(c: 1) }\n",
+		"probe.yaml":    "a:   1\n# comment\nb: [ x,y ]\nc: |\n  line\n  line\n",
+		"probe.yml":     "- a\n-   b: 'c'\n",
 	}
 	variants := map[string]func(string) string{
 		"byte order mark":   func(text string) string { return "\ufeff" + text },
