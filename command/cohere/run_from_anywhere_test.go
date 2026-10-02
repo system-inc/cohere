@@ -117,7 +117,7 @@ func TestCohereRunsFromAnywhere(t *testing.T) {
 		if code == 0 {
 			t.Fatalf("a run with no tsconfig anywhere above exited 0:\n%s", output)
 		}
-		if !strings.Contains(output, "no tsconfig.json in") {
+		if !strings.Contains(output, "no tsconfig.json or Package.swift in") {
 			t.Errorf("the failure does not say what it looked for:\n%s", output)
 		}
 	})

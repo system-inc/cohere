@@ -96,7 +96,9 @@ package described in 412ms — 152 Swift files in the package, 149 of them ours
 package described in 412ms — 152 Swift files in the package, 149 of them ours, 3 in scope (Sources/AhraOsIpc)
 ```
 
-Each excluded file prints as a coverage note under the lint line: `  not checked: <file> (<reason>)`.
+Excluded files print as coverage notes under the lint line, grouped by reason. Up to five files of a
+reason are named, `  not checked: <file> (<reason>)`; more are counted, `  not checked: <n> files
+(<reason>)`, because 107 vendored files named one per line buried the verdict on the first real run.
 
 ### `finding`
 

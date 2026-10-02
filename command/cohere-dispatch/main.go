@@ -9,11 +9,9 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
@@ -90,7 +88,7 @@ func execute(binaryPath string, arguments []string) error {
 // A stated limitation is not a lie; silence would be. This prints to stderr so it survives a caller
 // piping stdout, and it prints before the exec because after the exec there is no "after".
 func resolveFrozenBinary() (string, error) {
-	moduleDirectory, err := findModuleDirectory()
+	moduleDirectory, err := dispatch.FindModuleDirectory()
 	if err != nil {
 		return "", err
 	}
@@ -125,7 +123,7 @@ func resolveBinary(development bool, verbose bool) (string, error) {
 		return release.Resolve(nil)
 	}
 
-	moduleDirectory, moduleErr := findModuleDirectory()
+	moduleDirectory, moduleErr := dispatch.FindModuleDirectory()
 
 	// No module means an installed package: there is no source to build from, so the shipped
 	// binary is the only option, and a missing one is an error naming the platform.
@@ -175,61 +173,4 @@ func resolveInstalled(reason error) (string, error) {
 		return "", fmt.Errorf("%w\n(no local build was possible: %s)", err, reason)
 	}
 	return binaryPath, nil
-}
-
-// findModuleDirectory walks up from this executable and from the working directory looking for the
-// cohere module.
-//
-// It returns an error naming what it looked for rather than guessing. A resolver that gives up and
-// returns a bare command name is exactly the bug this tool was built to stop shipping.
-func findModuleDirectory() (string, error) {
-	candidates := []string{}
-
-	if executable, err := os.Executable(); err == nil {
-		if resolved, err := filepath.EvalSymlinks(executable); err == nil {
-			executable = resolved
-		}
-		candidates = append(candidates, filepath.Dir(executable))
-	}
-	if workingDirectory, err := os.Getwd(); err == nil {
-		candidates = append(candidates, workingDirectory)
-	}
-
-	for _, candidate := range candidates {
-		if directory, found := walkUpForModule(candidate); found {
-			return directory, nil
-		}
-	}
-
-	return "", errors.New("could not find the cohere module: no go.mod declaring github.com/system-inc/cohere in any parent of this binary or the working directory")
-}
-
-// walkUpForModule climbs toward the filesystem root looking for the cohere module's go.mod.
-func walkUpForModule(start string) (string, bool) {
-	directory := start
-	for {
-		contents, err := os.ReadFile(filepath.Join(directory, "go.mod"))
-		if err == nil && isVerifyModule(contents) {
-			return directory, true
-		}
-
-		parent := filepath.Dir(directory)
-		if parent == directory {
-			return "", false
-		}
-		directory = parent
-	}
-}
-
-// isVerifyModule reports whether a go.mod declares this module.
-//
-// The module path is matched rather than just the presence of a go.mod, so that a shim sitting
-// inside some other Go project does not mistake that project for its own module.
-func isVerifyModule(contents []byte) bool {
-	for line := range strings.SplitSeq(string(contents), "\n") {
-		if strings.TrimSpace(line) == "module github.com/system-inc/cohere" {
-			return true
-		}
-	}
-	return false
 }

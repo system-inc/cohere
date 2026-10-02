@@ -22,6 +22,31 @@ import (
 // there, naming the lint config it could not find, which is the answer a reader can act on.
 const projectMarker = "tsconfig.json"
 
+// swiftProjectMarker is the file whose directory is a Swift package's root, and the run there belongs
+// to the Swift engine rather than to this binary's own phases.
+//
+// Discovery looks for both markers at each directory on the way up, and the nearest directory holding
+// either wins, for the reason projectMarker gives: the nearer project is the one the caller is
+// standing in. From inside `projects/ahraos-macos` that is its Package.swift, never ahra's tsconfig
+// above it, which would check a program that excludes `projects/` and print a green about Swift code
+// nothing looked at.
+//
+// A directory holding both is TypeScript's until mixed repositories are designed. The Swift engine
+// checks one package and the TypeScript engine one program, and running both from one root is a
+// decision about whose verdict the exit code is, which this file should not make by accident.
+const swiftProjectMarker = "Package.swift"
+
+// projectEngine is which engine checks the project at a root.
+type projectEngine string
+
+const (
+	// engineTypeScript is this binary's own pipeline, over the program a tsconfig defines.
+	engineTypeScript projectEngine = "TypeScript"
+
+	// engineSwift is cohere-swift, which this binary runs and whose records it renders.
+	engineSwift projectEngine = "Swift"
+)
+
 // projectLocation is where a run is anchored, and which directory each kind of path resolves against.
 //
 // Two directories, because there are two kinds of path and they mean different things. A path the
@@ -34,7 +59,11 @@ type projectLocation struct {
 	// changed, and where the format walk starts.
 	Root string
 
-	// ConfigFileName is the absolute path of the tsconfig that defines the program.
+	// Engine is which engine checks the project at Root, decided by the marker that made it the root.
+	Engine projectEngine
+
+	// ConfigFileName is the absolute path of the tsconfig that defines the program, and empty for a
+	// Swift package, which has none.
 	ConfigFileName string
 
 	// LintConfigFileName is the absolute path of the lint config.
@@ -72,7 +101,12 @@ type locationRequest struct {
 //   - `--tsconfig` names the project, so the root is the directory that holds it. The name itself was
 //     typed, so it resolves against the working directory.
 //   - Otherwise the root is the nearest directory at or above the working directory that holds a
-//     tsconfig.json. See projectMarker for why that file alone.
+//     tsconfig.json or a Package.swift. See projectMarker for why the tsconfig and not the lint
+//     config, and swiftProjectMarker for how the two markers share the walk.
+//
+// The engine follows the marker. `--tsconfig` names a TypeScript program, so it is always TypeScript.
+// `--directory` is a `cd`, so the directory it names is read for markers the way discovery reads each
+// directory it passes.
 //
 // Discovery does not stop at a repository boundary, and that is deliberate: a submodule such as
 // `libraries/structure` holds no tsconfig of its own and is part of the program above it, so
@@ -88,18 +122,28 @@ func locateProject(request locationRequest) (projectLocation, error) {
 	case request.Directory != "":
 		location.Root = base
 		location.ConfigFileName = absoluteFrom(base, request.ConfigFileName)
+		// A directory with neither marker stays TypeScript, so the graph builder fails naming the
+		// tsconfig it could not find, as it did before Swift existed.
+		location.Engine = engineTypeScript
+		if engine, found := engineAt(base); found {
+			location.Engine = engine
+		}
 
 	case request.ConfigFileNameGiven:
 		location.ConfigFileName = absoluteFrom(base, request.ConfigFileName)
 		location.Root = filepath.Dir(location.ConfigFileName)
+		location.Engine = engineTypeScript
 
 	default:
-		root, err := findProjectRoot(base)
+		root, engine, err := findProjectRoot(base)
 		if err != nil {
 			return projectLocation{}, err
 		}
 		location.Root = root
-		location.ConfigFileName = filepath.Join(root, request.ConfigFileName)
+		location.Engine = engine
+		if engine == engineTypeScript {
+			location.ConfigFileName = filepath.Join(root, request.ConfigFileName)
+		}
 	}
 
 	if request.LintConfigFileNameGiven {
@@ -110,29 +154,48 @@ func locateProject(request locationRequest) (projectLocation, error) {
 	return location, nil
 }
 
-// findProjectRoot walks up from a directory to the nearest one holding a tsconfig.json.
+// findProjectRoot walks up from a directory to the nearest one holding a tsconfig.json or a
+// Package.swift, and says which engine that marker belongs to.
 //
 // Finding nothing is an error that names where the walk began, never a fallback to the starting
 // directory. A fallback would hand the graph builder a tsconfig path that does not exist, and the
 // error that came back would name a file in the wrong directory, which sends a reader looking for a
 // typo rather than for the fact that they are standing outside any project.
-func findProjectRoot(start string) (string, error) {
+func findProjectRoot(start string) (string, projectEngine, error) {
 	directory := filepath.Clean(start)
 	for {
-		information, err := os.Stat(filepath.Join(directory, projectMarker))
-		if err == nil && !information.IsDir() {
-			return directory, nil
+		if engine, found := engineAt(directory); found {
+			return directory, engine, nil
 		}
 		parent := filepath.Dir(directory)
 		if parent == directory {
-			return "", fmt.Errorf(
-				"no %s in %s or any directory above it, so there is no project here to check: "+
+			return "", "", fmt.Errorf(
+				"no %s or %s in %s or any directory above it, so there is no project here to check: "+
 					"run from inside one, or name it with -tsconfig or -directory",
-				projectMarker, start,
+				projectMarker, swiftProjectMarker, start,
 			)
 		}
 		directory = parent
 	}
+}
+
+// engineAt says which engine owns a directory by the marker it holds, TypeScript first. See
+// swiftProjectMarker for why a directory holding both is TypeScript's.
+func engineAt(directory string) (projectEngine, bool) {
+	if isRegularFile(filepath.Join(directory, projectMarker)) {
+		return engineTypeScript, true
+	}
+	if isRegularFile(filepath.Join(directory, swiftProjectMarker)) {
+		return engineSwift, true
+	}
+	return "", false
+}
+
+// isRegularFile reports whether a path names something that is not a directory. A directory named
+// `tsconfig.json` is not a project, and treating it as one would build a graph from nothing.
+func isRegularFile(path string) bool {
+	information, err := os.Stat(path)
+	return err == nil && !information.IsDir()
 }
 
 // absoluteFrom resolves a path against a directory unless it is already absolute.

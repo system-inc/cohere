@@ -143,7 +143,7 @@ func developmentBinaryIsCurrent(paths Paths, hash string) (bool, error) {
 // allowed under `--no-fix` or the flag would run a binary that does not match the rules on disk.
 //
 // The checkout is found from the launcher's own resolved path before the working directory (see
-// findModuleDirectory in command/cohere-dispatch), so an installed launcher writes into the checkout
+// FindModuleDirectory in module.go), so an installed launcher writes into the checkout
 // it lives in wherever it is run from. The one arrangement where these bytes sit inside a checked
 // project is a cohere checkout placed inside that project's tree, and then they are still that
 // checkout's ignored cache rather than the project's files.

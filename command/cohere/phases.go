@@ -138,6 +138,22 @@ type pipelineReport struct {
 	// graphNotBuilt is set when the run ended before the graph was needed, so the accounting line
 	// says so rather than reporting a graph that took 0s.
 	graphNotBuilt bool
+
+	// graphLabel and graphNotBuiltSentence name the step nothing can skip, in the accounting line.
+	// Empty means a TypeScript run, whose step is building the graph. A Swift run's is describing the
+	// package, and its accounting says so rather than billing a graph that was never built.
+	graphLabel            string
+	graphNotBuiltSentence string
+
+	// engineSourceTreeModified is set when an external engine reports that it, too, was built from a
+	// modified tree. Its findings are the run's findings, so its provenance is the run's provenance.
+	engineSourceTreeModified bool
+
+	// incompleteBeyondPhases says what was not checked when every phase ran and the run still fell
+	// short: a file the compiler left no record for, a file a rule crashed on, a file the engine could
+	// not read. Empty when nothing like that happened. The phase line cannot express it, so the
+	// coverage warning names it instead of pointing at phases that all say they ran.
+	incompleteBeyondPhases string
 }
 
 // recordNothingToCheck marks every phase skipped for one reason, and the run as a clean answer
@@ -310,7 +326,7 @@ func (r *pipelineReport) Write(out io.Writer) {
 	//
 	// Silent on a clean build. A line on every ordinary run is one people learn to skip, which would
 	// cost exactly the case it exists for.
-	r.writeProvenanceWarning(out, release.Current().SourceTreeModified)
+	r.writeProvenanceWarning(out, release.Current().SourceTreeModified || r.engineSourceTreeModified)
 
 	if r.rootNote != "" {
 		fmt.Fprintf(out, "  %s\n", r.rootNote)
@@ -337,6 +353,8 @@ func (r *pipelineReport) Write(out io.Writer) {
 
 	if !r.checkedEverything() {
 		fmt.Fprintf(out, "  this run did not check everything — the phases above say what was not checked\n")
+	} else if r.incompleteBeyondPhases != "" {
+		fmt.Fprintf(out, "  this run did not check everything — %s\n", r.incompleteBeyondPhases)
 	}
 }
 
@@ -356,8 +374,12 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 	}
 
 	total := time.Since(r.processStart)
+	graphLabel, graphNotBuiltSentence := "graph", "no graph was built and no phase ran"
+	if r.graphLabel != "" {
+		graphLabel, graphNotBuiltSentence = r.graphLabel, r.graphNotBuiltSentence
+	}
 	if r.graphNotBuilt {
-		fmt.Fprintf(out, "  total %s — no graph was built and no phase ran\n", round(total))
+		fmt.Fprintf(out, "  total %s — %s\n", round(total), graphNotBuiltSentence)
 		return
 	}
 	accounted := r.graph
@@ -375,13 +397,13 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 		// The phases run concurrently with each other in places, so a sum can exceed the wall
 		// clock. Reporting a negative remainder would be nonsense; reporting the overlap honestly
 		// is the useful reading.
-		fmt.Fprintf(out, "  total %s — graph %s plus phases, overlapping by %s\n",
-			round(total), round(r.graph), round(-unaccounted))
+		fmt.Fprintf(out, "  total %s — %s %s plus phases, overlapping by %s\n",
+			round(total), graphLabel, round(r.graph), round(-unaccounted))
 		return
 	}
 
-	fmt.Fprintf(out, "  total %s — graph %s, phases %s, %s outside any phase\n",
-		round(total), round(r.graph), round(accounted-r.graph), round(unaccounted))
+	fmt.Fprintf(out, "  total %s — %s %s, phases %s, %s outside any phase\n",
+		round(total), graphLabel, round(r.graph), round(accounted-r.graph), round(unaccounted))
 }
 
 // writeProvenanceWarning says when the binary cannot be traced to a commit.

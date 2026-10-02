@@ -148,14 +148,109 @@ func TestLocateProjectWalksUpToTheNearestTsconfig(t *testing.T) {
 	})
 }
 
+// TestLocateProjectFindsSwiftPackages holds the second marker: the nearest directory holding either
+// marker is the root, and the marker decides the engine.
+//
+// The tree mirrors ahra's: a TypeScript root with a Swift package under `projects/`, a Swift package
+// vendored inside that one, and a TypeScript project inside a Swift package. Each case is one sentence
+// of swiftProjectMarker's rule, asserted both ways so neither marker can win by always winning.
+func TestLocateProjectFindsSwiftPackages(t *testing.T) {
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"tsconfig.json":                                  "{}",
+		"projects/macos/Package.swift":                   "",
+		"projects/macos/Sources/App/Main.swift":          "",
+		"projects/macos/Vendor/Term/Package.swift":       "",
+		"projects/macos/Vendor/Term/Sources/Term.swift":  "",
+		"projects/macos/web/tsconfig.json":               "{}",
+		"projects/both/tsconfig.json":                    "{}",
+		"projects/both/Package.swift":                    "",
+		"projects/macos/Sources/App/tsconfig.json/empty": "",
+	})
+	request := func(workingDirectory string) locationRequest {
+		return locationRequest{WorkingDirectory: workingDirectory, ConfigFileName: projectMarker, LintConfigFileName: "CohereSettings.json"}
+	}
+	macos := filepath.Join(root, "projects", "macos")
+
+	cases := []struct {
+		name       string
+		standingIn string
+		wantRoot   string
+		wantEngine projectEngine
+	}{
+		{"a Swift package under a TypeScript root is the Swift package's", filepath.Join(macos, "Sources", "App"), macos, engineSwift},
+		{"the TypeScript root is still TypeScript's", root, root, engineTypeScript},
+		{"a vendored package is its own root", filepath.Join(macos, "Vendor", "Term", "Sources"), filepath.Join(macos, "Vendor", "Term"), engineSwift},
+		{"a TypeScript project inside a Swift package is TypeScript's", filepath.Join(macos, "web"), filepath.Join(macos, "web"), engineTypeScript},
+		{"a directory holding both markers is TypeScript's", filepath.Join(root, "projects", "both"), filepath.Join(root, "projects", "both"), engineTypeScript},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			location, err := locateProject(request(testCase.standingIn))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if location.Root != testCase.wantRoot || location.Engine != testCase.wantEngine {
+				t.Errorf("root %s engine %s, want root %s engine %s", location.Root, location.Engine, testCase.wantRoot, testCase.wantEngine)
+			}
+			// A Swift root carries no tsconfig path, so nothing downstream can build a graph from one.
+			if location.Engine == engineSwift && location.ConfigFileName != "" {
+				t.Errorf("a Swift root carried a tsconfig path: %s", location.ConfigFileName)
+			}
+			if location.LintConfigFileName != filepath.Join(testCase.wantRoot, "CohereSettings.json") {
+				t.Errorf("the default lint config is not beside the marker: %s", location.LintConfigFileName)
+			}
+		})
+	}
+
+	// A directory named like a marker is not a marker. Sources/App holds a directory called
+	// tsconfig.json, and the walk must pass it and reach the Package.swift above.
+	t.Run("a directory named tsconfig.json is not a project", func(t *testing.T) {
+		location, err := locateProject(request(filepath.Join(macos, "Sources", "App", "tsconfig.json")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if location.Root != macos || location.Engine != engineSwift {
+			t.Errorf("stopped at a directory named like a marker: root %s engine %s", location.Root, location.Engine)
+		}
+	})
+
+	t.Run("--directory reads the markers of the directory it names", func(t *testing.T) {
+		location, err := locateProject(locationRequest{
+			WorkingDirectory: root, Directory: "projects/macos", ConfigFileName: projectMarker, LintConfigFileName: "CohereSettings.json",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if location.Root != macos || location.Engine != engineSwift {
+			t.Errorf("--directory at a Swift package: root %s engine %s", location.Root, location.Engine)
+		}
+	})
+
+	t.Run("--tsconfig is always TypeScript", func(t *testing.T) {
+		location, err := locateProject(locationRequest{
+			WorkingDirectory:    filepath.Join(macos, "Sources", "App"),
+			ConfigFileName:      filepath.Join(root, "tsconfig.json"),
+			ConfigFileNameGiven: true,
+			LintConfigFileName:  "CohereSettings.json",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if location.Root != root || location.Engine != engineTypeScript {
+			t.Errorf("an explicit tsconfig inside a Swift package: root %s engine %s", location.Root, location.Engine)
+		}
+	})
+}
+
 // TestLocateProjectFailsLoudlyOutsideAnyProject holds that finding nothing is an error naming where
 // the walk began, never a fallback to the working directory.
 func TestLocateProjectFailsLoudlyOutsideAnyProject(t *testing.T) {
 	// t.TempDir is under the system temp directory, which has no tsconfig.json at or above it.
 	outside := t.TempDir()
 	for directory := outside; ; directory = filepath.Dir(directory) {
-		if _, err := os.Stat(filepath.Join(directory, projectMarker)); err == nil {
-			t.Skipf("%s holds a tsconfig.json, so there is no outside to test from", directory)
+		if _, found := engineAt(directory); found {
+			t.Skipf("%s holds a project marker, so there is no outside to test from", directory)
 		}
 		if filepath.Dir(directory) == directory {
 			break
@@ -168,7 +263,7 @@ func TestLocateProjectFailsLoudlyOutsideAnyProject(t *testing.T) {
 	if err == nil {
 		t.Fatal("no tsconfig anywhere above, and locateProject returned a location")
 	}
-	if !strings.Contains(err.Error(), outside) || !strings.Contains(err.Error(), projectMarker) {
+	if !strings.Contains(err.Error(), outside) || !strings.Contains(err.Error(), projectMarker) || !strings.Contains(err.Error(), swiftProjectMarker) {
 		t.Errorf("the error does not say what it looked for and where: %v", err)
 	}
 }

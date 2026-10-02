@@ -55,7 +55,7 @@ func run() error {
 	configFileName := flag.String("tsconfig", projectMarker,
 		"the tsconfig that defines the program, relative to where you typed it (default: the nearest tsconfig.json at or above the working directory)")
 	directory := flag.String("directory", "",
-		"the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json at or above the working directory)")
+		"the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json or Package.swift at or above the working directory)")
 	typesOnly := flag.Bool("types", false, "build the graph and report TypeScript's own diagnostics, running no rules")
 	lintOnly := flag.Bool("lint", false, "run the rules, reporting no type diagnostics")
 	lintConfigFileName := flag.String("lint-config", "CohereSettings.json",
@@ -105,6 +105,41 @@ func run() error {
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
+	// Where the project is, decided once, before anything reads a path.
+	//
+	// The failure is held rather than returned here, because `-rules`, `-version` and an explicitly
+	// named lint config do not need a project at all, and refusing them for standing outside one would
+	// be a refusal with no reason behind it. Every path that does need one returns it at the point of
+	// use.
+	//
+	// Decided before the listings rather than after them, because inside a Swift package every one of
+	// them is the Swift engine's question: `cohere --rules` there lists the rules that would run there.
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("resolving the working directory: %w", err)
+	}
+	given := map[string]bool{}
+	flag.Visit(func(set *flag.Flag) { given[set.Name] = true })
+	location, locateError := locateProject(locationRequest{
+		WorkingDirectory:        workingDirectory,
+		Directory:               *directory,
+		ConfigFileName:          *configFileName,
+		ConfigFileNameGiven:     given["tsconfig"],
+		LintConfigFileName:      *lintConfigFileName,
+		LintConfigFileNameGiven: given["lint-config"],
+	})
+
+	if locateError == nil && location.Engine == engineSwift {
+		exitCode, err := runSwiftEngine(location, given, flag.Args())
+		if err != nil {
+			return err
+		}
+		if exitCode != 0 {
+			os.Exit(exitCode)
+		}
+		return nil
+	}
+
 	if *listRules {
 		// Sorted so two binaries can be diffed directly. The registry's own order is the order rules
 		// were added, which is meaningful to a reader and useless to `diff`.
@@ -135,26 +170,6 @@ func run() error {
 		}
 		return nil
 	}
-
-	// Where the project is, decided once, before anything reads a path.
-	//
-	// The failure is held rather than returned here, because `-version` and an explicitly named lint
-	// config do not need a project at all, and refusing them for standing outside one would be a
-	// refusal with no reason behind it. Every path that does need one returns it at the point of use.
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("resolving the working directory: %w", err)
-	}
-	given := map[string]bool{}
-	flag.Visit(func(set *flag.Flag) { given[set.Name] = true })
-	location, locateError := locateProject(locationRequest{
-		WorkingDirectory:        workingDirectory,
-		Directory:               *directory,
-		ConfigFileName:          *configFileName,
-		ConfigFileNameGiven:     given["tsconfig"],
-		LintConfigFileName:      *lintConfigFileName,
-		LintConfigFileNameGiven: given["lint-config"],
-	})
 
 	if *listRulesEnabled {
 		lintConfigPath := location.LintConfigFileName
@@ -1094,12 +1109,7 @@ func writeRuleCoverage(out io.Writer, rules []rule.Rule, coverage program.Covera
 	// Two false positives shipped past a full fixture pair tonight and were caught only by running
 	// against the tree. That check was a habit rather than a line of output, and a habit is not a
 	// guard. This is the smallest version of it that survives being forgotten.
-	if watchedAndQuiet > 0 {
-		fmt.Fprintf(out,
-			"  note: %d rules watched files and reported nothing — a clean tree and a rule that cannot see look identical here\n",
-			watchedAndQuiet,
-		)
-	}
+	writeWatchedAndQuietNote(out, watchedAndQuiet)
 
 	if len(silent) == 0 {
 		return
@@ -1156,9 +1166,39 @@ func writeRuleCoverage(out io.Writer, rules []rule.Rule, coverage program.Covera
 // That is the same rule the ignored, scoped-off and declined lines already follow.
 func printCrashCoverage(coverage program.Coverage) {
 	for _, crash := range coverage.FilesCrashed {
-		fmt.Printf("  crashed: %s could not be linted, so nothing in it was checked: %v\n",
-			crash.FileName, crash.Cause)
+		writeCrashedNote(os.Stdout, crash.FileName, crash.Cause)
 	}
+}
+
+// The coverage sentences both engines print, kept in one place so a Swift run and a TypeScript run
+// say the same thing about the same fact. The reasoning for each lives at the TypeScript printer that
+// calls it; these only hold the words.
+
+// writeWatchedAndQuietNote counts the rules that looked at real code and had nothing to say. See
+// writeRuleCoverage.
+func writeWatchedAndQuietNote(out io.Writer, watchedAndQuiet int) {
+	if watchedAndQuiet == 0 {
+		return
+	}
+	fmt.Fprintf(out,
+		"  note: %d rules watched files and reported nothing — a clean tree and a rule that cannot see look identical here\n",
+		watchedAndQuiet,
+	)
+}
+
+// writeCrashedNote names one file a rule could not finish. See printCrashCoverage.
+func writeCrashedNote(out io.Writer, fileName string, cause any) {
+	fmt.Fprintf(out, "  crashed: %s could not be linted, so nothing in it was checked: %v\n", fileName, cause)
+}
+
+// writeScopedOffNote names one rule the config turned off for some files. See printConfigCoverage.
+func writeScopedOffNote(out io.Writer, name string, files int) {
+	fmt.Fprintf(out, "  config: rule %s scoped off for %d files by the config\n", name, files)
+}
+
+// writeUnconfiguredNote names one rule the config never mentions. See printConfigCoverage.
+func writeUnconfiguredNote(out io.Writer, name string) {
+	fmt.Fprintf(out, "  config: rule %s is not in the config, so it ran on no files — nobody has said whether it should\n", name)
 }
 
 func printSuppressionCoverage(coverage program.Coverage) {
@@ -1283,7 +1323,7 @@ func printConfigCoverage(coverage program.Coverage) {
 	}
 	sort.Strings(scopedOff)
 	for _, name := range scopedOff {
-		fmt.Printf("  config: rule %s scoped off for %d files by the config\n", name, coverage.RulesScopedOff[name])
+		writeScopedOffNote(os.Stdout, name, coverage.RulesScopedOff[name])
 	}
 
 	// Reported separately from scoped-off on purpose. "Someone turned this rule off" and "nobody has
@@ -1296,8 +1336,25 @@ func printConfigCoverage(coverage program.Coverage) {
 	}
 	sort.Strings(unconfigured)
 	for _, name := range unconfigured {
-		fmt.Printf("  config: rule %s is not in the config, so it ran on no files — nobody has said whether it should\n", name)
+		writeConfiguredElsewhereNote(os.Stdout, name, coverage.RulesUnconfigured[name], coverage.RulesOffered[name])
 	}
+}
+
+// writeConfiguredElsewhereNote says what an unconfigured count means for one rule, which depends on
+// whether anything configured it at all.
+//
+// A rule enabled only inside an override is unconfigured for every file the override does not reach,
+// so it lands in the unconfigured count and used to print "ran on no files" while it reported
+// thousands of findings in the files the override does reach. Found on the boundaries dry run by
+// @system_cohere_base_rules. A rule that was offered files ran on them, so its sentence says where it
+// did not run instead of claiming it ran nowhere.
+func writeConfiguredElsewhereNote(out io.Writer, name string, unconfiguredFiles int, offeredFiles int) {
+	if offeredFiles == 0 {
+		writeUnconfiguredNote(out, name)
+		return
+	}
+	fmt.Fprintf(out, "  config: rule %s ran on %d files and is not in the config for %d others, so it did not run there\n",
+		name, offeredFiles, unconfiguredFiles)
 }
 
 // printOrphanedConfigKeys says which config entries name a rule that does not exist.
