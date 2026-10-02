@@ -197,6 +197,15 @@ func jsxNoConstructedContextValuesMessage(
 // `defaultMsgFunc` appears in none of the twenty-three failing cases, though the rule can plainly
 // emit it and does: an inline arrow reports it, measured. The corpus reaching only three of four
 // ids is upstream's gap, not a statement that the fourth is unreachable.
+//
+// # Where cohere is deliberately stricter than upstream
+//
+// A memoized value is stable only if every input is. Upstream is satisfied by the `useMemo`
+// wrapper; this rule also reports a memoized provider value whose dependency is proven to be a new
+// identity on a render (`unstableDependencyMsg`) or whose memo has no dependency list at all
+// (`memoWithoutDependenciesMsg`). Kirk's ruling, 2026-10-01. The analysis and its one-sided
+// definition of "proven" live in jsx_no_constructed_context_values_stability.go, and the divergence
+// is recorded in jsx_no_constructed_context_values.md.
 var JsxNoConstructedContextValues = rule.Rule{
 	Name:             "react/jsx-no-constructed-context-values",
 	NeedsTypeChecker: true,
@@ -220,6 +229,12 @@ var JsxNoConstructedContextValues = rule.Rule{
 
 			construction := jsxNoConstructedContextValuesConstructionOf(ctx, value, 0)
 			if construction == nil {
+				// Upstream stops here. cohere goes one level further: a memoized value whose inputs
+				// change every render is not stable either. See
+				// jsx_no_constructed_context_values_stability.go.
+				if jsxNoConstructedContextValuesInComponent(node) {
+					jsxNoConstructedContextValuesCheckMemo(ctx, value, node)
+				}
 				return
 			}
 
@@ -567,6 +582,21 @@ func jsxNoConstructedContextValuesFollowIdentifier(
 	// this name" and a loop would be wider than upstream.
 	declaration := declarations[len(declarations)-1]
 	if declaration == nil {
+		return nil
+	}
+
+	// Only a declaration evaluated each time the function using it runs is a construction. A
+	// module-scope `const v = {...}` is evaluated once and keeps its identity forever, and so does a
+	// declaration in a function enclosing the component (a factory that returns the component): the
+	// component re-renders on its own state while the outer value stands still.
+	//
+	// Upstream gets the same answer by a narrower test: it resolves the name only in the scope the
+	// JSX itself sits in (`callScope.set`, no walk up the chain). Measured on 7.37.5: a module-scope
+	// object or function and an outer-function object are silent, and so is a component-level object
+	// used by a provider inside an `if` block, which is a true positive upstream misses because the
+	// block is its own scope. cohere compares functions rather than scopes, so it stays silent on the
+	// first three and reports the fourth. The divergence is recorded in the rule's `.md`.
+	if jsxNoConstructedContextValuesNearestFunction(declaration) != jsxNoConstructedContextValuesNearestFunction(identifier) {
 		return nil
 	}
 
