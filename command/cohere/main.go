@@ -40,7 +40,7 @@ func main() {
 		// error prints so the message reaches the terminal rather than a pipe nobody is reading.
 		abandonRunCache()
 		fmt.Fprintf(os.Stderr, "cohere: %v\n", err)
-		os.Exit(1)
+		exitProcess(1)
 	}
 	finishRunCache(0)
 }
@@ -118,7 +118,15 @@ func run() error {
 	// path leaves on stdout, with nothing written to disk. See stdin.go.
 	stdinFilePath := flag.String("stdin-filepath", "",
 		"with --fix, read one file's text from stdin and print what --fix would write for the file at this path, writing nothing to disk")
+	// A profile of a cold run: a profiled run is never one the run cache replays, since only a bare run
+	// or `--no-fix` is.
+	profilePath := flag.String("profile", "", "write a Go CPU profile of the run to this file, for `go tool pprof`")
 	flag.Parse()
+	if *profilePath != "" {
+		if err := startProfile(*profilePath); err != nil {
+			return err
+		}
+	}
 
 	// Where the project is, decided once, before anything reads a path.
 	//
@@ -150,7 +158,7 @@ func run() error {
 			return err
 		}
 		if exitCode != 0 {
-			os.Exit(exitCode)
+			exitProcess(exitCode)
 		}
 		return nil
 	}

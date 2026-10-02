@@ -274,7 +274,8 @@ func replayRunCache(stored *program.RunCache) {
 	os.Stderr.Write(stored.Errors)
 	fmt.Fprintf(os.Stdout, "phases: replayed the run at %s · fix, types and lint did not run\n", recorded)
 	fmt.Fprintf(os.Stdout, "  this run: %s, after checking %d inputs\n", round(time.Since(processStart)), len(stored.Inputs))
-	os.Exit(stored.ExitCode)
+	fmt.Fprintf(os.Stdout, "  %s\n", activeMemoryPolicy.line())
+	exitProcess(stored.ExitCode)
 }
 
 // declareRunCacheInputs marks the build as having succeeded, and adds inputs the command reads itself.
@@ -320,7 +321,7 @@ func finishRunCache(exitCode int) {
 		}
 		session.write(recorded)
 	}
-	os.Exit(exitCode)
+	exitProcess(exitCode)
 }
 
 // record captures this run, or returns nil when it cannot.

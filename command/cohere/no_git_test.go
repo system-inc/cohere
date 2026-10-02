@@ -78,7 +78,8 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs)\b`)
+	// Gigabytes too: the memory line reads available memory live, so two runs a second apart differ there.
+	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs| GB)\b`)
 	clock := regexp.MustCompile(`\d\d:\d\d:\d\d`)
 	run := func(arguments ...string) (string, int) {
 		t.Helper()

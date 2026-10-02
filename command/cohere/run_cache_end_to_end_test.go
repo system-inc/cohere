@@ -106,7 +106,8 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		return string(output), exitError.ExitCode()
 	}
 
-	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs)\b`)
+	// Gigabytes too: the memory line reads available memory live, so two runs a second apart differ there.
+	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs| GB)\b`)
 	// The findings cache's clause says how much of the verdict was remembered; a cold run never has it,
 	// so it comes off before a comparison and is required or forbidden separately per scenario.
 	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?`)
@@ -130,13 +131,13 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// A replay must equal the cold run's verdict: its lines minus the ones that describe that
 	// invocation, which a replay deliberately does not print. Its own framing comes off first.
 	verdict := func(cold string) string {
-		return keepLines(cold, "graph built in ", "types: ", "lint: ", "phases: ", "  total ")
+		return keepLines(cold, "graph built in ", "types: ", "lint: ", "phases: ", "  total ", "  memory: ")
 	}
 	// A replay says which run a phase's line came from; that label comes off before the comparison,
 	// and is required separately below so a replay that lost it fails.
 	provenance := regexp.MustCompile(`^fix \(from the cached run at \d\d:\d\d:\d\d\): `)
 	replayBody := func(replay string) string {
-		lines := strings.Split(keepLines(replay, "cached: ", "phases: replayed ", "  this run: "), "\n")
+		lines := strings.Split(keepLines(replay, "cached: ", "phases: replayed ", "  this run: ", "  memory: "), "\n")
 		for index, line := range lines {
 			lines[index] = provenance.ReplaceAllString(line, "fix: ")
 		}

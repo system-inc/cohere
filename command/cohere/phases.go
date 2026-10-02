@@ -310,6 +310,11 @@ func (r *pipelineReport) Write(out io.Writer) {
 	fmt.Fprintf(invocationOutput(out), "phases: %s\n", strings.Join(parts, " · "))
 
 	r.writeAccounting(out)
+	// Under the same condition as the total: both describe the process, and a report with no process
+	// behind it has neither.
+	if !r.processStart.IsZero() {
+		fmt.Fprintf(invocationOutput(out), "  %s\n", activeMemoryPolicy.line())
+	}
 
 	// The explicit sentence for the case that matters most. A reader who takes only the last line
 	// away from a bailed run must not take away a clean bill of health.
