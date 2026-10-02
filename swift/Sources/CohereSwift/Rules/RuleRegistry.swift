@@ -11,6 +11,11 @@ public enum RuleRegistry {
         NoLongLineComment(),
         OneTypePerFile(),
         FileNamedForType(),
+        NoPrint(),
+        RequireEscapeHatchReason(),
+        NoDiscardedTryOptional(),
+        FatalErrorMessage(),
+        NoTodoComment(),
     ]
 
     public static let packageRules: [any PackageRule] = [

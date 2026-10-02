@@ -52,6 +52,7 @@ public struct FileSet: Equatable, Sendable {
         for member in package.allPackages {
             let vendored = member.root != package.root && package.isVendored(member)
             for target in member.targets {
+                let kind = try Self.isApplication(target) ? "application" : target.kind
                 for source in target.sources where seen.insert(source.path).inserted {
                     filesInPackage.append(source)
                     if vendored {
@@ -67,7 +68,7 @@ public struct FileSet: Equatable, Sendable {
                         excluded.append(.init(file: source.path, reason: "marked @generated"))
                         continue
                     }
-                    owned.append(OwnedFile(url: source, targetName: target.name, targetKind: target.kind))
+                    owned.append(OwnedFile(url: source, targetName: target.name, targetKind: kind))
                 }
             }
         }
@@ -113,6 +114,24 @@ public struct FileSet: Equatable, Sendable {
         let repository = URL(fileURLWithPath: repositoryRoot, isDirectory: true)
         let names = listing.standardOutput.split(separator: 0).map { String(decoding: $0, as: UTF8.self) }
         return Set(names.map { repository.appendingPathComponent($0).resolvingSymlinksInPath().path })
+    }
+
+    /*
+     Whether an executable target is an app rather than a command-line tool. SwiftPM spells both
+     `executableTarget`, and the rules that care (print, where stdout means something) need to know which.
+     An app is a target where any file imports SwiftUI, AppKit or UIKit. Decided per target, not per file:
+     an app's model files import only Foundation and are still app code, and a per-file test would call
+     their prints tool output.
+     */
+    static func isApplication(_ target: PackageModel.Target) throws -> Bool {
+        guard target.kind == "executable" else { return false }
+        for source in target.sources {
+            let text = try String(contentsOf: source, encoding: .utf8)
+            if text.range(of: #"(?m)^\s*(@\w+\s+)*import\s+(SwiftUI|AppKit|UIKit)\b"#, options: .regularExpression) != nil {
+                return true
+            }
+        }
+        return false
     }
 
     /* A file that declares itself generated in its header: `// @generated`, the marker Apollo and most generators write. */
