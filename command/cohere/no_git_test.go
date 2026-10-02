@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -86,14 +87,20 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 		command := exec.Command(binary, arguments...)
 		command.Dir = root
 		command.Env = append(os.Environ(), path, "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, ".cache"))
-		output, err := command.CombinedOutput()
+		// The streams are read apart and joined after, not combined as they arrive. A run the run cache
+		// records tees both through pipes of their own, so the order their lines interleave in is the
+		// scheduler's, and two runs that printed the same things would compare as different.
+		var stdout, stderr bytes.Buffer
+		command.Stdout, command.Stderr = &stdout, &stderr
+		err := command.Run()
+		output := stdout.String() + "\n--- stderr\n" + stderr.String()
 		code := 0
 		if exitError, isExit := err.(*exec.ExitError); isExit {
 			code = exitError.ExitCode()
 		} else if err != nil {
 			t.Fatalf("running cohere: %v\n%s", err, output)
 		}
-		normalized := strings.ReplaceAll(string(output), resolvedRoot, "ROOT")
+		normalized := strings.ReplaceAll(output, resolvedRoot, "ROOT")
 		normalized = strings.ReplaceAll(normalized, root, "ROOT")
 		normalized = durations.ReplaceAllString(normalized, "D")
 		normalized = clock.ReplaceAllString(normalized, "T")

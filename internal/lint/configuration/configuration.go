@@ -286,6 +286,7 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 		Departures: map[string]Departure{},
 	}
 	declaredPlugins := map[string]bool{}
+	reach := newRuleReach(registeredNames)
 
 	for index, layer := range layers {
 		isBase := index < len(layers)-1
@@ -307,7 +308,7 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 				return nil, fmt.Errorf("rule %q in %s: %w", name, layer.path, err)
 			}
 
-			inheritedName, inherited, isInherited, replacesInherited := inheritedRuleSetting(fromBases, name, registeredNames)
+			inheritedName, inherited, isInherited, replacesInherited := inheritedRuleSetting(fromBases, name, reach)
 			if isInherited {
 				if setting.Options == nil {
 					setting.Options = inherited.Options
@@ -360,7 +361,7 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 				if !coversEverything {
 					continue
 				}
-				_, inherited, isInherited, _ := inheritedRuleSetting(fromBases, name, registeredNames)
+				_, inherited, isInherited, _ := inheritedRuleSetting(fromBases, name, reach)
 				if !isInherited {
 					continue
 				}
@@ -490,13 +491,13 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 // The same key is always the same ruling. A different spelling is the same ruling when the two keys
 // reach a registered rule in common (see sameRuling), so a project cannot step around a house ruling
 // by spelling the key differently. Without registered names only the same key matches.
-func inheritedRuleSetting(rules map[string]RuleSetting, name string, registeredNames []string) (string, RuleSetting, bool, bool) {
+func inheritedRuleSetting(rules map[string]RuleSetting, name string, reach *ruleReach) (string, RuleSetting, bool, bool) {
 	if setting, found := rules[name]; found {
 		return name, setting, true, true
 	}
 	matches := make([]string, 0, 1)
 	for inheritedName := range rules {
-		if sameRuling(inheritedName, name, registeredNames) {
+		if reach.sameRuling(inheritedName, name) {
 			matches = append(matches, inheritedName)
 		}
 	}
@@ -506,17 +507,38 @@ func inheritedRuleSetting(rules map[string]RuleSetting, name string, registeredN
 	// Sorted so two spellings in one base resolve the same way on every run.
 	sort.Strings(matches)
 	inheritedName := matches[0]
-	return inheritedName, rules[inheritedName], true, reachesEvery(name, inheritedName, registeredNames)
+	return inheritedName, rules[inheritedName], true, reach.reachesEvery(name, inheritedName)
 }
 
-// rulesReached is the registered rules a config key configures, by the resolver's own test.
-func rulesReached(key string, registeredNames []string) map[string]bool {
+// ruleReach is which registered rules each config key configures, by the resolver's own test, each
+// key asked once.
+//
+// Matching one key to the inherited spellings of its ruling compares it with every key the layers
+// below wrote, and each comparison asked the whole registry about both keys again: on ahra that was a
+// fresh 464-name scan, and a fresh map, for every pair, and it was 590ms of every run, the whole of
+// what the run spent outside its phases (#kgv1pry). A key reaches the same rules every time it is
+// asked, so each is asked once per load. One load runs on one goroutine, so a plain map does.
+type ruleReach struct {
+	registeredNames []string
+	byKey           map[string]map[string]bool
+}
+
+func newRuleReach(registeredNames []string) *ruleReach {
+	return &ruleReach{registeredNames: registeredNames, byKey: map[string]map[string]bool{}}
+}
+
+// of is the registered rules key configures.
+func (reach *ruleReach) of(key string) map[string]bool {
+	if reached, found := reach.byKey[key]; found {
+		return reached
+	}
 	reached := map[string]bool{}
-	for _, registered := range registeredNames {
+	for _, registered := range reach.registeredNames {
 		if KeyReachesRule(key, registered) {
 			reached[registered] = true
 		}
 	}
+	reach.byKey[key] = reached
 	return reached
 }
 
@@ -526,9 +548,9 @@ func rulesReached(key string, registeredNames []string) map[string]bool {
 // when only `x` is registered. `@typescript-eslint/no-invalid-this` and `no-invalid-this` look the same
 // way and are two rules, a core rule and its typescript-eslint twin; they still share a ruling, because
 // the resolver lets the qualified key configure the core rule when no key names it exactly (#hprjh4s).
-func sameRuling(left string, right string, registeredNames []string) bool {
-	leftReached := rulesReached(left, registeredNames)
-	for registered := range rulesReached(right, registeredNames) {
+func (reach *ruleReach) sameRuling(left string, right string) bool {
+	leftReached := reach.of(left)
+	for registered := range reach.of(right) {
 		if leftReached[registered] {
 			return true
 		}
@@ -538,9 +560,9 @@ func sameRuling(left string, right string, registeredNames []string) bool {
 
 // reachesEvery reports whether key reaches every registered rule inherited reaches, so that inherited
 // can be removed without leaving any rule it configured unconfigured.
-func reachesEvery(key string, inherited string, registeredNames []string) bool {
-	reached := rulesReached(key, registeredNames)
-	for registered := range rulesReached(inherited, registeredNames) {
+func (reach *ruleReach) reachesEvery(key string, inherited string) bool {
+	reached := reach.of(key)
+	for registered := range reach.of(inherited) {
 		if !reached[registered] {
 			return false
 		}
