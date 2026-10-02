@@ -176,9 +176,12 @@ var (
 
 	notNewline  = regexp.MustCompile(`[^\n]`)
 	jsDocGutter = regexp.MustCompile(`^\s*\*?\s?`)
-	exampleTag  = regexp.MustCompile(`^@example\b`)
-	anyJsDocTag = regexp.MustCompile(`^@\w+`)
-	commandLine = regexp.MustCompile(`^\s*(\$|ahra\s|git\s|pnpm\s|npm\s|sqlite3\s|curl\s|s\s+c\b)`)
+	// A block comment's gutter alone, leading whitespace, the asterisk and one space or tab, which
+	// unlike jsDocGutter leaves a line with no asterisk untouched so its indentation can be measured.
+	blockCommentGutter = regexp.MustCompile(`^[ \t]*\*(?: |\t|$)`)
+	exampleTag         = regexp.MustCompile(`^@example\b`)
+	anyJsDocTag        = regexp.MustCompile(`^@\w+`)
+	commandLine        = regexp.MustCompile(`^\s*(\$|ahra\s|git\s|pnpm\s|npm\s|sqlite3\s|curl\s|s\s+c\b)`)
 )
 
 // maskCodeAndCommands blanks out anything that is code, so nothing inside it is ever read as
@@ -190,6 +193,7 @@ var (
 // line after the fence then reports against the wrong source line.
 func maskCodeAndCommands(text string) string {
 	masked := blankKeepingNewlines(fencedBlock, text)
+	masked = maskIndentedCodeBlocks(masked)
 	masked = blankKeepingNewlines(inlineBackticks, masked)
 	masked = blankAll(doubleQuoted, masked)
 	masked = maskWrappedDoubleQuotes(masked)
@@ -322,6 +326,42 @@ func maskJsDocExamples(text string) string {
 			insideExample = false
 		}
 		if insideExample {
+			lines[index] = strings.Repeat(" ", len(line))
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// maskIndentedCodeBlocks blanks an indented code block, the markdown form of a fence: lines indented
+// four spaces or a tab, opened after a blank line (or at the start of the text) and running until a
+// line that is not indented. Without it, a sandbox command posted as an indented block had its
+// $HOME and TMPDIR read as shouting, and the quieted draft lowercased them into a command that no
+// longer ran, while the same command in a fence survived (#vy055vj).
+//
+// An indented line straight after prose is a paragraph continuation in CommonMark, not code, so it
+// is still read; that is what the blank-line condition is for. A block comment's gutter is set aside
+// before the indentation is measured, so a comment's own indentation is never mistaken for a code
+// block, while an indented block written inside a JSDoc comment still is one. Mirrors nexus's
+// Shouting.ts, so the quieter and this rule agree on what is code.
+func maskIndentedCodeBlocks(text string) string {
+	// Nothing can be indented four deep without four spaces or a tab somewhere.
+	if !strings.Contains(text, "    ") && !strings.ContainsRune(text, '\t') {
+		return text
+	}
+
+	lines := strings.Split(text, "\n")
+	previousIsBlank := true
+	insideBlock := false
+	for index, line := range lines {
+		content := blockCommentGutter.ReplaceAllString(line, "")
+		if strings.TrimSpace(content) == "" {
+			previousIsBlank = true
+			continue
+		}
+		isIndented := strings.HasPrefix(content, "    ") || strings.HasPrefix(content, "\t")
+		insideBlock = isIndented && (insideBlock || previousIsBlank)
+		previousIsBlank = false
+		if insideBlock {
 			lines[index] = strings.Repeat(" ", len(line))
 		}
 	}

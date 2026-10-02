@@ -189,6 +189,48 @@ func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(t *testing.T) {
 	}
 }
 
+// An indented code block is code, like a fence (#vy055vj): a sandbox command's TMPDIR and $HOME are
+// not a raised voice. The blank line before it is what makes it a block; an indented line straight
+// after prose continues the paragraph and is still read. A block comment's own indentation is set
+// aside first, so only a block indented past the gutter counts. Mirrors nexus's Shouting.test.ts.
+func TestConsistencyNoShoutingMasksAnIndentedCodeBlock(t *testing.T) {
+	t.Parallel()
+
+	silent := []struct {
+		name       string
+		sourceText string
+	}{
+		{"indented block in a block comment", "/**\n * Run it sandboxed:\n *\n *     TMPDIR=$HOME/tmp sandbox-exec -f profile.sb node run.mjs\n */\nexport const Value = 1;\n"},
+		{"tab-indented block", "/*\nRun it:\n\n\tHOME=/x TMPDIR=/y node run.mjs\n*/\nexport const Value = 1;\n"},
+		{"fenced block, the control", "/**\n * Run it:\n * ```\n * TMPDIR=$HOME/tmp node run.mjs\n * ```\n */\nexport const Value = 1;\n"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectClean(t, result)
+		})
+	}
+
+	fires := []struct {
+		name       string
+		sourceText string
+		token      string
+	}{
+		{"indented line straight after prose", "/*\nThis is prose\n    and you must NEVER do it\n*/\nexport const Value = 1;\n", "NEVER"},
+		{"prose after an indented block", "/**\n * Run:\n *\n *     HOME=/x run\n *\n * Then ALWAYS check.\n */\nexport const Value = 1;\n", "ALWAYS"},
+		{"a deeply indented comment line is prose", "export function run() {\n    /**\n     * You must NEVER do this.\n     */\n    return 1;\n}\n", "NEVER"},
+	}
+	for _, testCase := range fires {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, "shoutingInComment")
+			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
+				t.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
+			}
+		})
+	}
+}
+
 // Kirk's ruling: a quoted all-caps phrase is a literal, and a block comment that reflows a quote
 // onto the next line has not unquoted it. The first silent row is ahra's Shouting.ts verbatim, where
 // the quote opens on one line and closes behind the next line's gutter. The reporting rows pin the
