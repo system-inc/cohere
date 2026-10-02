@@ -1,0 +1,88 @@
+import CryptoKit
+import Foundation
+
+/*
+ A fingerprint of everything a `swift build` reads, so the types phase can tell that nothing changed since the
+ last build that succeeded and read that build's compiler records instead of building again. The no-op build
+ costs 5.1s on ahraos-macos and 7.0s on ahraos-presence warm, most of a warm run; the walk below costs 7ms
+ and 39ms.
+
+ What goes in, and why each is enough:
+
+ - every file under each package root and each path dependency, by path, size and modification time, hidden
+   directories and `.build` left out. That is the signal SwiftPM's own incremental build trusts, so this is
+   exactly as safe as the build it replaces, and it catches what a source-only walk would miss: a header
+   outside a target, a resource, `Packages/` from `swift package edit`;
+ - the root's `Package.resolved` by content, which pins every remote dependency's checkout;
+ - the toolchain and the build's own arguments, so a toolchain change or `--no-fix`'s disabled resolution is
+   a different build.
+
+ The fingerprint is taken before a build starts and stored only after every build succeeded, so an edit made
+ while a build ran, or a build that failed or was killed, always means building next time. A cache that
+ never invalidates reports the last answer forever, which on a measurement looks exactly like a clean tree,
+ so the test that matters is warm-after-a-change (`BuildInputSnapshotTests`, and the pipeline control that
+ plants a type error after a warm run).
+ */
+struct BuildInputSnapshot: Equatable {
+    let fingerprint: String
+
+    static func take(roots: [URL], resolved: URL, toolchain: String, arguments: [String]) -> BuildInputSnapshot {
+        var lines: [String] = ["toolchain\t\(toolchain)", "arguments\t\(arguments.joined(separator: " "))"]
+        lines.append("resolved\t\(PackageDescriptionCache.fingerprint(of: resolved))")
+        let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey]
+        for root in roots {
+            let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])
+            while let item = walker?.nextObject() as? URL {
+                guard let values = try? item.resourceValues(forKeys: Set(keys)) else {
+                    lines.append("unreadable\t\(item.path)")
+                    continue
+                }
+                if values.isDirectory == true {
+                    if item.lastPathComponent == ".build" {
+                        walker?.skipDescendants()
+                    }
+                    continue
+                }
+                let modified = values.contentModificationDate?.timeIntervalSinceReferenceDate ?? -1
+                lines.append("\(item.path)\t\(values.fileSize ?? -1)\t\(modified)")
+            }
+        }
+        lines.sort()
+        let digest = SHA256.hash(data: Data(lines.joined(separator: "\n").utf8))
+        return BuildInputSnapshot(fingerprint: digest.map { String(format: "%02x", $0) }.joined())
+    }
+
+    /* Where the last successful build's snapshot is kept, beside that build in the engine's scratch. */
+    static func storeFile(scratchPath: URL) -> URL {
+        scratchPath.appendingPathComponent("build-inputs.fingerprint")
+    }
+
+    static func stored(scratchPath: URL) -> BuildInputSnapshot? {
+        guard let text = try? String(contentsOf: storeFile(scratchPath: scratchPath), encoding: .utf8), !text.isEmpty else { return nil }
+        return BuildInputSnapshot(fingerprint: text)
+    }
+
+    func store(scratchPath: URL) {
+        do {
+            try FileManager.default.createDirectory(at: scratchPath, withIntermediateDirectories: true)
+            try fingerprint.write(to: Self.storeFile(scratchPath: scratchPath), atomically: true, encoding: .utf8)
+        } catch {
+            /* Not stored, so the next run builds: slower, and still right. */
+        }
+    }
+
+    /*
+     Forgotten after a build that did not succeed, so the next run cannot read a failed build's records as
+     current. Overwritten with nothing rather than removed: an empty store reads as no snapshot, and a removal
+     that failed would have left the old fingerprint standing.
+     */
+    static func forget(scratchPath: URL) {
+        let file = storeFile(scratchPath: scratchPath)
+        guard FileManager.default.fileExists(atPath: file.path) else { return }
+        do {
+            try Data().write(to: file, options: .atomic)
+        } catch {
+            /* Only an unwritable scratch reaches here, and then nothing can be stored either, so the next run builds. */
+        }
+    }
+}

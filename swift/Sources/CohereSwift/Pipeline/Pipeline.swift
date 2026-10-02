@@ -258,6 +258,7 @@ public struct Pipeline {
                 files: fileSet.owned,
                 scratchPath: Self.scratchPath(for: root),
                 resolutionAllowed: !options.noFix,
+                toolchain: toolchain,
                 runner: runner
             ).run()
             for finding in types.findings {

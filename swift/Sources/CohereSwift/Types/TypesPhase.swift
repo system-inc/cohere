@@ -32,6 +32,8 @@ struct TypesPhase {
     let files: [FileSet.OwnedFile]
     let scratchPath: URL
     let resolutionAllowed: Bool
+    /* The toolchain `swift --version` named; an unknown one never reuses a build, so a toolchain change can never be missed. */
+    let toolchain: String
     let runner: ProcessRunner
 
     /*
@@ -48,16 +50,62 @@ struct TypesPhase {
         return [(package.root, scratchPath)] + locals.map { ($0.root, scratchPath.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true)) }
     }
 
+    private func arguments(for build: (root: URL, scratchPath: URL)) -> [String] {
+        var arguments = ["build", "--build-tests", "--scratch-path", build.scratchPath.path]
+        if !resolutionAllowed {
+            arguments.append("--disable-automatic-resolution")
+        }
+        return arguments
+    }
+
+    /* The package roots and every path dependency, which together hold every file a build of them reads. */
+    private var inputRoots: [URL] {
+        let roots = package.allPackages.flatMap { [$0.root] + $0.pathDependencyRoots }
+        var seen = Set<String>()
+        return roots.filter { root in
+            !roots.contains { other in PackageModel.isInside(root, other) } && seen.insert(root.resolvingSymlinksInPath().path).inserted
+        }
+    }
+
     func run() throws -> Result {
         let start = Date()
+        let snapshot = toolchain.hasPrefix("unknown")
+            ? nil
+            : BuildInputSnapshot.take(
+                roots: inputRoots,
+                resolved: package.root.appendingPathComponent("Package.resolved"),
+                toolchain: toolchain,
+                arguments: builds.flatMap { arguments(for: $0) }
+            )
+
+        /*
+         Nothing a build reads changed since the last build that succeeded, so its records are this build's
+         records. Read them, and keep them only if every file of ours has one newer than its source: anything
+         less (a scratch someone cleaned, a record gone) means building after all.
+         */
+        if let snapshot, BuildInputSnapshot.stored(scratchPath: scratchPath) == snapshot {
+            do {
+                let directories = try builds.flatMap { try buildDirectories(under: $0.scratchPath) }
+                if !directories.isEmpty {
+                    let reused = try read(
+                        targetDirectories: directories,
+                        failedBuilds: [],
+                        start: start,
+                        build: "no input changed since the last successful build, so its compiler records were read without building"
+                    )
+                    if reused.record.filesWithoutRecord.isEmpty {
+                        return reused
+                    }
+                }
+            } catch {
+                /* The records could not be read as they stood: build, which rewrites them. */
+            }
+        }
+
         var failedBuilds: [ProcessRunner.Result] = []
         var targetDirectories: [(String, URL)] = []
         for build in builds {
-            var arguments = ["build", "--build-tests", "--scratch-path", build.scratchPath.path]
-            if !resolutionAllowed {
-                arguments.append("--disable-automatic-resolution")
-            }
-            let result = try runner.run("swift", arguments, in: build.root)
+            let result = try runner.run("swift", arguments(for: build), in: build.root)
             if !result.succeeded {
                 failedBuilds.append(result)
             }
@@ -75,7 +123,21 @@ struct TypesPhase {
             }
             targetDirectories.append(contentsOf: directories)
         }
+        if let snapshot, failedBuilds.isEmpty {
+            snapshot.store(scratchPath: scratchPath)
+        } else {
+            BuildInputSnapshot.forget(scratchPath: scratchPath)
+        }
+        return try read(
+            targetDirectories: targetDirectories,
+            failedBuilds: failedBuilds,
+            start: start,
+            build: "swift build --build-tests of \(builds.count) packages, scratch \(scratchPath.path)"
+        )
+    }
 
+    /* Every owned file's diagnostics from the records under these target directories, and which files have none. */
+    private func read(targetDirectories: [(String, URL)], failedBuilds: [ProcessRunner.Result], start: Date, build: String) throws -> Result {
         let reader = try SerializedDiagnosticsReader(libraryPath: SerializedDiagnosticsReader.toolchainLibraryPath(runner: runner))
 
         let ours = Dictionary(files.map { ($0.url.resolvingSymlinksInPath().path, $0) }, uniquingKeysWith: { first, _ in first })
@@ -140,7 +202,7 @@ struct TypesPhase {
             files: files.count,
             elapsedMilliseconds: Pipeline.milliseconds(since: start),
             filesWithoutRecord: withoutRecord.sorted(),
-            build: "swift build --build-tests of \(builds.count) packages, scratch \(scratchPath.path)"
+            build: build
         )
         return Result(findings: findings, record: record, hasErrors: findings.contains { $0.severity == .error })
     }

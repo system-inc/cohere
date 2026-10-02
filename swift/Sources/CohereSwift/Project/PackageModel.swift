@@ -54,6 +54,8 @@ public struct PackageModel: Equatable, Sendable {
     public var targets: [Target]
     /* Paths of the local packages this one depends on that sit inside its directory. */
     public var localDependencyRoots: [URL]
+    /* Every local package this one depends on by path, inside its directory or not: what a build reads beyond the root. */
+    public var pathDependencyRoots: [URL] = []
     /* Those packages, loaded. Filled by `load`; empty when built from output alone. */
     public var localPackages: [PackageModel]
 
@@ -189,10 +191,10 @@ public struct PackageModel: Equatable, Sendable {
             )
         }
         .sorted { $0.name < $1.name }
-        self.localDependencyRoots = (description.dependencies ?? [])
+        self.pathDependencyRoots = (description.dependencies ?? [])
             .filter { $0.type == "fileSystem" }
             .compactMap { $0.path.map { URL(fileURLWithPath: $0, isDirectory: true) } }
-            .filter { PackageModel.isInside($0, root) }
+        self.localDependencyRoots = pathDependencyRoots.filter { PackageModel.isInside($0, root) }
         self.localPackages = []
     }
 
