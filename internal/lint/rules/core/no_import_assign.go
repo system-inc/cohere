@@ -104,6 +104,8 @@ var NoImportAssign = rule.Rule{
 	// See the doc above: three of upstream's clean cases shadow an imported name with a local and are
 	// textually identical to failing forms.
 	NeedsTypeChecker: true,
+	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
@@ -238,10 +240,12 @@ func resolvedDeclarationOf(ctx rule.Context, identifier *ast.Node) *ast.Node {
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindShorthandPropertyAssignment {
 		symbol = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
 	}
-	if symbol == nil || len(symbol.Declarations) == 0 {
+	// An import binding is declared in this file, so only this file's declarations can be one.
+	declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+	if len(declarations) == 0 {
 		return nil
 	}
-	return symbol.Declarations[0]
+	return declarations[0]
 }
 
 // writesThroughMemberExpression returns the member expression through which an identifier's
@@ -459,22 +463,9 @@ func isArgumentOfWellKnownMutationFunction(ctx rule.Context, identifier *ast.Nod
 // `lib.d.ts` is always present, and answering false there is the direction that costs a missed
 // finding rather than a false positive.
 func resolvesToAGlobalObject(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
-	if symbol == nil || len(symbol.Declarations) == 0 {
-		return false
-	}
-	for _, declaration := range symbol.Declarations {
-		sourceFile := ast.GetSourceFileOfNode(declaration)
-		if sourceFile == nil {
-			return false
-		}
-		// A shadowing `var Object` declares in the file under lint. Any declaration there disproves
-		// the global, so this refuses on the first one rather than requiring all of them to be
-		// local: the real `Object` is declared several times across the lib files and a shadow adds
-		// one more, so "every declaration is local" would answer wrongly.
-		if !sourceFile.IsDeclarationFile {
-			return false
-		}
-	}
-	return true
+	// A shadowing `var Object` declares in the file under lint. Any declaration there disproves the
+	// global, so this refuses on the first one rather than requiring all of them to be local: the real
+	// `Object` is declared several times across the lib files and a shadow adds one more, so "every
+	// declaration is local" would answer wrongly.
+	return rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
 }

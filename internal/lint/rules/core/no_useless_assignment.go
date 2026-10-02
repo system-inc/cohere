@@ -120,6 +120,8 @@ var NoUselessAssignment = rule.Rule{
 	// walks are populated by the binder as a side effect of building the program, so a run without
 	// the checker sees `FlowNode == nil` everywhere and the rule goes silent rather than wrong.
 	NeedsTypeChecker: true,
+	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

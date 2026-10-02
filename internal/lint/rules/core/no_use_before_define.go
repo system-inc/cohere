@@ -313,6 +313,8 @@ func useBeforeDefineRunsLater(identifier *ast.Node, declaration *ast.Node) bool 
 var NoUseBeforeDefine = rule.Rule{
 	Name:             "no-use-before-define",
 	NeedsTypeChecker: true,
+	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		// Declared once for the file rather than once per listener. `NeedsTypeChecker` governs the
 		// REGISTRATION path and says nothing about a Context built by hand, which
@@ -404,12 +406,14 @@ func checkIdentifierForUseBeforeDefine(ctx rule.Context, identifier *ast.Node, s
 		return
 	}
 
-	symbol := useBeforeDefineResolveBinding(ctx, identifier)
-	if symbol == nil || len(symbol.Declarations) == 0 {
+	// This file's declarations only: positions are compared below, and a declaration in another
+	// file has no position here.
+	declarations := rule.DeclarationsIn(ctx.SourceFile, useBeforeDefineResolveBinding(ctx, identifier))
+	if len(declarations) == 0 {
 		return
 	}
 
-	declaration := useBeforeDefineBindingDeclaration(symbol)
+	declaration := useBeforeDefineBindingDeclaration(declarations)
 	if declaration == nil {
 		return
 	}
@@ -472,9 +476,9 @@ func checkIdentifierForUseBeforeDefine(ctx rule.Context, identifier *ast.Node, s
 // earliest and is not guaranteed to be: a value declaration can sort ahead of a type declaration
 // written above it, which the brief records as measured. Taking the minimum by position makes the
 // answer independent of the ordering rather than resting on it.
-func useBeforeDefineBindingDeclaration(symbol *ast.Symbol) *ast.Node {
+func useBeforeDefineBindingDeclaration(declarations []*ast.Node) *ast.Node {
 	var earliest *ast.Node
-	for _, candidate := range symbol.Declarations {
+	for _, candidate := range declarations {
 		if candidate == nil || candidate.Name() == nil {
 			continue
 		}
@@ -1053,16 +1057,12 @@ func useBeforeDefineResolveBinding(ctx rule.Context, identifier *ast.Node) *ast.
 		return symbol
 	}
 
-	aliased := ctx.TypeChecker.GetAliasedSymbol(symbol)
-	if aliased == nil || aliased == symbol || len(aliased.Declarations) == 0 {
-		return symbol
-	}
-
 	// An alias pointing into ANOTHER file is an import, and an import declares a local binding here
 	// whose position is its own. Following it would compare this file's positions against a
-	// different file's and answer nonsense, so the alias is kept in that case and the caller's
-	// same-file guard then declines it.
-	if ast.GetSourceFileOfNode(aliased.Declarations[0]) != ast.GetSourceFileOfNode(identifier) {
+	// different file's and answer nonsense, so the alias is kept unless it resolves to a declaration
+	// in this file.
+	aliased := ctx.TypeChecker.GetAliasedSymbol(symbol)
+	if aliased == nil || aliased == symbol || len(rule.DeclarationsIn(ctx.SourceFile, aliased)) == 0 {
 		return symbol
 	}
 

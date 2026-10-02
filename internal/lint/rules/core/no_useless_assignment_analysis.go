@@ -92,6 +92,9 @@ type symbolFacts struct {
 	capturedRead bool
 	// eligible records whether the binding is a mutable local this rule may judge at all.
 	eligible bool
+	// declaration is the binding's first declaration in this file. A mutable local is declared here,
+	// so a binding with no declaration in this file is not one this rule judges.
+	declaration *ast.Node
 }
 
 // collectSymbolFacts resolves every identifier occurrence in the file once and files the per-binding
@@ -136,13 +139,13 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) map[*ast.Symbol]
 			continue
 		}
 		symbol := resolveOccurrence(ctx, identifier)
-		if symbol == nil || len(symbol.Declarations) == 0 {
-			continue
-		}
-
 		entry := facts[symbol]
 		if entry == nil {
-			entry = &symbolFacts{eligible: isLocalVariableDeclaration(symbol.Declarations[0])}
+			declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+			if len(declarations) == 0 {
+				continue
+			}
+			entry = &symbolFacts{eligible: isLocalVariableDeclaration(declarations[0]), declaration: declarations[0]}
 			facts[symbol] = entry
 		}
 		if !entry.eligible {
@@ -173,7 +176,7 @@ func collectSymbolFacts(ctx rule.Context, sourceFile *ast.Node) map[*ast.Symbol]
 		// So a cross-root read silences every write to the binding, and a cross-root write silences
 		// only itself. A first attempt used one flag for both, which fixed the second shape and
 		// silently gave up the first.
-		captured := control_flow_graph.RootOf(identifier) != control_flow_graph.RootOf(symbol.Declarations[0])
+		captured := control_flow_graph.RootOf(identifier) != control_flow_graph.RootOf(entry.declaration)
 		// A declarator with no initializer is classified as a read so the liveness pass errs safe,
 		// but it reads nothing, and counting it here made `let provenance: string;` look read. Every
 		// write to a binding nothing reads was then reported, once per write, beside the single
@@ -544,7 +547,7 @@ func recordDeadStoreEvent(
 		// An update's store half is as reportable as a plain write's; only a read is never a
 		// candidate. The event this flag rides on is emitted by the Write hook in both cases, so a
 		// read event never carries it regardless.
-		reportable: kind != occurrenceRead && isReportableWrite(node, symbol.Declarations[0]),
+		reportable: kind != occurrenceRead && isReportableWrite(node, facts.declaration),
 	})
 }
 

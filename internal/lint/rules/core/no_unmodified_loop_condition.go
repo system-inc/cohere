@@ -98,6 +98,8 @@ var NoUnmodifiedLoopCondition = rule.Rule{
 	// ++foo; }` and the same source without the parameter differ only in what `foo` binds to, and
 	// upstream answers them differently.
 	NeedsTypeChecker: true,
+	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		return rule.Listeners{

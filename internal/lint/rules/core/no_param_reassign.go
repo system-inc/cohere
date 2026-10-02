@@ -105,6 +105,8 @@ var NoParamReassign = rule.Rule{
 	// See the doc above: four clean cases are textually identical to failing ones and differ only in
 	// what the name resolves to.
 	NeedsTypeChecker: true,
+	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		if ctx.SourceFile == nil {
@@ -299,7 +301,8 @@ func anchoredParameterName(ctx rule.Context, identifier *ast.Node, anchors map[*
 	if symbol == nil {
 		return "", false
 	}
-	for _, declaration := range symbol.Declarations {
+	// The anchors are this file's parameters, so only this file's declarations can be one.
+	for _, declaration := range rule.DeclarationsIn(ctx.SourceFile, symbol) {
 		if name, isAnchored := anchors[declaration]; isAnchored {
 			return name, true
 		}

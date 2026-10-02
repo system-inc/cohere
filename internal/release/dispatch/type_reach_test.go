@@ -68,9 +68,85 @@ type typeReachScan struct {
 	callsNodeInterfaces []string
 }
 
-// importedDeclarationAccessors are the ways the checker hands a rule a node that can live in another file.
-var importedDeclarationAccessors = map[string]bool{
-	"Declarations": true, "ValueDeclaration": true, "Declaration": true, "GetTypeOnlyAliasDeclaration": true,
+// ownFileDeclarationReaders are functions that read a symbol's declarations and hand back nothing of
+// another file's syntax, so reaching one is not reaching an imported declaration, and the scan does not
+// follow into them, since the accessor inside each is the point of it (#9bjjk4a). Their own tests prove
+// them:
+//
+//   - rule.DeclarationsIn filters to the file it is handed, and is trusted only when handed the rule's
+//     own ctx.SourceFile;
+//   - rule.IsDeclaredOnlyInDeclarationFiles answers a bool about which files declare a symbol.
+var ownFileDeclarationReaders = map[string]bool{"rule.DeclarationsIn": true, "rule.IsDeclaredOnlyInDeclarationFiles": true}
+
+// isImportedDeclarationField reports a symbol's own declaration fields, the nodes a symbol carries from
+// whichever file declared it. Matched on the receiver rather than the name: VariableDeclarationList and
+// VariableStatement also have a field called Declarations, and that is the rule's own file's syntax.
+func isImportedDeclarationField(selection *types.Selection) bool {
+	if selection.Kind() != types.FieldVal {
+		return false
+	}
+	name := selection.Obj().Name()
+	return (name == "Declarations" || name == "ValueDeclaration") && isCompilerType(selection.Recv(), "ast", "Symbol")
+}
+
+// isImportedDeclarationAccessor reports a compiler function or method that takes a symbol or a signature
+// and hands back nodes, or any checker method that hands back nodes: Signature.Declaration,
+// Checker.GetTypeOnlyAliasDeclaration and GetIndexSignaturesAtLocation, and the compiler's own helpers,
+// like ast.GetDeclarationOfKind, that read a symbol's declarations where this scan does not follow.
+// Matched by shape rather than by a list of names, so a helper nobody listed still counts.
+func isImportedDeclarationAccessor(object types.Object) bool {
+	function, ok := object.(*types.Func)
+	if !ok {
+		return false
+	}
+	signature, ok := function.Type().(*types.Signature)
+	if !ok {
+		return false
+	}
+	takes := signature.Recv() != nil && (isDeclarationSource(signature.Recv().Type()) ||
+		isCompilerType(signature.Recv().Type(), "checker", "Checker"))
+	for index := range signature.Params().Len() {
+		takes = takes || isDeclarationSource(signature.Params().At(index).Type())
+	}
+	if !takes {
+		return false
+	}
+	for index := range signature.Results().Len() {
+		if isCompilerType(signature.Results().At(index).Type(), "ast", "Node") {
+			return true
+		}
+	}
+	return false
+}
+
+// isDeclarationSource reports the types a declaration can be read off: a symbol or a signature.
+func isDeclarationSource(subject types.Type) bool {
+	return isCompilerType(subject, "ast", "Symbol") || isCompilerType(subject, "checker", "Signature")
+}
+
+// isCompilerType reports whether subject is the compiler's packageName.typeName, through pointers,
+// slices and aliases. The shim spells every compiler type as an alias (`type Symbol = ast.Symbol`), so a
+// rule's variable can carry the alias rather than the named type, and a check that missed it went blind
+// to every such read.
+func isCompilerType(subject types.Type, packageName string, typeName string) bool {
+	for {
+		subject = types.Unalias(subject)
+		if pointer, ok := subject.(*types.Pointer); ok {
+			subject = pointer.Elem()
+			continue
+		}
+		if slice, ok := subject.(*types.Slice); ok {
+			subject = slice.Elem()
+			continue
+		}
+		break
+	}
+	named, ok := subject.(*types.Named)
+	if !ok || named.Obj().Pkg() == nil {
+		return false
+	}
+	return strings.Contains(named.Obj().Pkg().Path(), "TypeScript/tsc") && named.Obj().Pkg().Name() == packageName &&
+		named.Obj().Name() == typeName
 }
 
 // isDescentAccessor reports the ways a rule reads below a node it was handed: its body, its children, its
@@ -165,7 +241,7 @@ func scanTypeReach(t *testing.T) typeReachScan {
 	// reaches answers, for one predicate, whether a node or anything it refers to touches a matching
 	// compiler accessor, memoized per object and safe on recursion. matchesSelector, when set, decides a
 	// selector on its own, for a match that depends on the receiver as well as the accessor.
-	reaches := func(matches func(types.Object) bool, matchesSelector func(*ast.SelectorExpr, *types.Selection, *types.Info) bool) func(ast.Node, *types.Info) bool {
+	reaches := func(matches func(types.Object) bool, matchesSelector func(*ast.SelectorExpr, *types.Selection, *types.Info) bool, matchesCall func(*ast.CallExpr, *types.Info) bool) func(ast.Node, *types.Info) bool {
 		memo := map[types.Object]int{} // 1 visiting, 2 no, 3 yes
 		var walk func(ast.Node, *types.Info) bool
 		var follow func(types.Object) bool
@@ -175,6 +251,9 @@ func scanTypeReach(t *testing.T) typeReachScan {
 				return false
 			case 3:
 				return true
+			}
+			if object.Pkg() != nil && ownFileDeclarationReaders[object.Pkg().Name()+"."+object.Name()] {
+				return false
 			}
 			target, known := bodies[object]
 			if !known {
@@ -195,6 +274,10 @@ func scanTypeReach(t *testing.T) typeReachScan {
 					return false
 				}
 				switch typed := child.(type) {
+				case *ast.CallExpr:
+					if matchesCall != nil && matchesCall(typed, info) {
+						found = true
+					}
 				case *ast.SelectorExpr:
 					selection := info.Selections[typed]
 					if selection != nil && matchesSelector != nil && matchesSelector(typed, selection, info) {
@@ -216,13 +299,29 @@ func scanTypeReach(t *testing.T) typeReachScan {
 		}
 		return walk
 	}
-	reachesDeclaration := reaches(func(object types.Object) bool { return importedDeclarationAccessors[object.Name()] }, nil)
+	reachesDeclaration := reaches(isImportedDeclarationAccessor,
+		func(_ *ast.SelectorExpr, selection *types.Selection, _ *types.Info) bool {
+			return isImportedDeclarationField(selection)
+		},
+		// The trusted reader is trusted only when handed the rule's own file.
+		func(call *ast.CallExpr, info *types.Info) bool {
+			selector, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return false
+			}
+			object := info.Uses[selector.Sel]
+			if object == nil || object.Pkg() == nil || object.Pkg().Name()+"."+object.Name() != "rule.DeclarationsIn" {
+				return false
+			}
+			return len(call.Args) == 0 || !isOwnSourceFile(call.Args[0], info)
+		})
 	reachesDescent := reaches(
 		func(object types.Object) bool { return isDescentAccessor(object.Name()) },
 		func(selector *ast.SelectorExpr, selection *types.Selection, info *types.Info) bool {
 			return selector.Sel.Name == "Text" && compiler(selection.Obj()) && selection.Kind() == types.MethodVal &&
 				strings.Contains(types.TypeString(selection.Recv(), nil), "SourceFile") && !isOwnSourceFile(selector.X, info)
 		},
+		nil,
 	)
 	reachesNodeInterface := reaches(func(types.Object) bool { return false },
 		func(selector *ast.SelectorExpr, selection *types.Selection, info *types.Info) bool {
@@ -240,6 +339,7 @@ func scanTypeReach(t *testing.T) typeReachScan {
 			}
 			return false
 		},
+		nil,
 	)
 
 	scan := typeReachScan{mayReadImportedBodies: map[string]bool{}, reason: map[string]string{}}

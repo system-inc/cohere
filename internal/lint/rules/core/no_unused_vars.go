@@ -151,6 +151,8 @@ var NoUnusedVars = rule.Rule{
 	// and a name-matching rule calls both used. That is the quiet direction of the mistake, and for
 	// this rule the quiet direction is where every missed finding lives.
 	NeedsTypeChecker: true,
+	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
+	TypeReach: rule.TypeReachShapes,
 
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		settings := resolveNoUnusedVarsOptions(options)
@@ -415,7 +417,7 @@ func collectReadSymbols(ctx rule.Context, sourceFile *ast.Node, interesting map[
 				if isWrite {
 					writes[symbol] = append(writes[symbol], current)
 				}
-				if !countsAsRead(current, declaringScopeOf(symbol)) {
+				if !countsAsRead(current, declaringScopeOf(ctx, symbol)) {
 					continue
 				}
 				if isSelfReferenceWithinOwnDeclaration(ctx, current, symbol) {
@@ -461,11 +463,13 @@ func isInsideTypeQuery(identifier *ast.Node) bool {
 // "where does this name live", which every declaration of a merged symbol answers identically: a
 // symbol's declarations all bind the same name in the same scope, which is what makes them merge.
 // A rule asking a different question of a merged symbol would need a different choice.
-func declaringScopeOf(symbol *ast.Symbol) *ast.Node {
-	if symbol == nil || len(symbol.Declarations) == 0 {
+func declaringScopeOf(ctx rule.Context, symbol *ast.Symbol) *ast.Node {
+	// This file's declarations only: the bindings this rule reports are the ones this file declares.
+	declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+	if len(declarations) == 0 {
 		return nil
 	}
-	return enclosingVariableScope(symbol.Declarations[0])
+	return enclosingVariableScope(declarations[0])
 }
 
 // countsAsRead reports whether an identifier occurrence loads the binding's value.
@@ -1000,7 +1004,7 @@ func isExemptFromUnusedReport(
 	// declaration export this", where more declarations only mean more chances to match. An
 	// index-zero test goes silent whenever the exporting declaration is not written first, and the
 	// corpus pins exactly that ordering.
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range rule.DeclarationsIn(ctx.SourceFile, symbol) {
 		if isExportedBinding(declaration) {
 			return true
 		}

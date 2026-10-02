@@ -164,11 +164,13 @@ var NoClassAssign = rule.Rule{
 // question. Asking the AST for one side and the checker for the other would compare two things that
 // happen to agree today.
 func declarationAnchoredAt(ctx rule.Context, name *ast.Node) *ast.Node {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
-	if symbol == nil || len(symbol.Declarations) == 0 {
+	// Only this file's declarations, as ESLint's scope manager sees one file: a binding declared in
+	// another file is not one this rule can say was reassigned from a class, function or import.
+	declarations := rule.DeclarationsIn(ctx.SourceFile, ctx.TypeChecker.GetSymbolAtLocation(name))
+	if len(declarations) == 0 {
 		return nil
 	}
-	return symbol.Declarations[0]
+	return declarations[0]
 }
 
 // resolvesToDeclaration reports whether an identifier binds to a specific declaration node.
@@ -186,8 +188,7 @@ func resolvesToDeclaration(ctx rule.Context, identifier *ast.Node, declaration *
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindShorthandPropertyAssignment {
 		symbol = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)
 	}
-	if symbol == nil || len(symbol.Declarations) == 0 {
-		return false
-	}
-	return symbol.Declarations[0] == declaration
+	// The anchor is a declaration in this file, so only this file's declarations can be it.
+	declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+	return len(declarations) > 0 && declarations[0] == declaration
 }

@@ -677,8 +677,10 @@ func loopFuncDeclarationFor(ctx rule.Context, identifier *ast.Node) *ast.Node {
 	if ctx.TypeChecker == nil {
 		return nil
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
-	if symbol == nil || len(symbol.Declarations) == 0 {
+	// This file's declarations only: a position is compared below, and positions in two files do not
+	// compare.
+	declarations := rule.DeclarationsIn(ctx.SourceFile, ctx.TypeChecker.GetSymbolAtLocation(identifier))
+	if len(declarations) == 0 {
 		return nil
 	}
 	// The earliest declaration by position, so every reference to one binding agrees on which node
@@ -703,8 +705,8 @@ func loopFuncDeclarationFor(ctx rule.Context, identifier *ast.Node) *ast.Node {
 	//
 	// Written this way because "any consistent choice" is only true while that stays true, and
 	// because indexing zero is the pattern this tree has already been bitten by.
-	earliest := symbol.Declarations[0]
-	for _, declaration := range symbol.Declarations[1:] {
+	earliest := declarations[0]
+	for _, declaration := range declarations[1:] {
 		if declaration.Pos() < earliest.Pos() {
 			earliest = declaration
 		}
