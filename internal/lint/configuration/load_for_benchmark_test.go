@@ -2,19 +2,26 @@ package configuration_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 )
 
-// BenchmarkLoadForTheLiveConfig loads ahra's real config against the real registry, which is what every
-// run pays before its first phase. It was 590ms when every pair of keys rescanned the registry, and is
-// about 7ms with each key asked once (#kgv1pry).
+// BenchmarkLoadForTheLiveConfig loads a real project's config against the real registry, which is what
+// every run pays before its first phase. It was 590ms on ahra when every pair of keys rescanned the
+// registry, and is about 7ms with each key asked once (#kgv1pry).
+//
+// The config is COHERE_BENCHMARK_CONFIG when set, and otherwise ahra's beside this checkout's parent, so
+// the benchmark names no one's home directory and runs on any machine that has a config to load.
 func BenchmarkLoadForTheLiveConfig(b *testing.B) {
-	const path = "/Users/kirkouimet/Projects/ahra/CohereSettings.json"
+	path := os.Getenv("COHERE_BENCHMARK_CONFIG")
+	if path == "" {
+		path = filepath.Join("..", "..", "..", "..", "..", "ahra", "CohereSettings.json")
+	}
 	if _, err := os.Stat(path); err != nil {
-		b.Skipf("the live config is not present at %s", path)
+		b.Skipf("no config to load at %s; set COHERE_BENCHMARK_CONFIG", path)
 	}
 	names := registry.Names()
 	for b.Loop() {

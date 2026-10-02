@@ -35,6 +35,13 @@ func TestRuleReachAnswersAsTheScanAndAsksEachKeyOnce(t *testing.T) {
 				if got := reach.sameRuling(left, right); got != want {
 					t.Errorf("sameRuling(%q, %q) = %v, a scan says %v", left, right, got, want)
 				}
+				every := true
+				for name := range scan(right) {
+					every = every && scan(left)[name]
+				}
+				if got := reach.reachesEvery(left, right); got != every {
+					t.Errorf("reachesEvery(%q, %q) = %v, a scan says %v", left, right, got, every)
+				}
 			}
 		}
 	}
