@@ -8,6 +8,10 @@
 | Auto-fixable | no |
 | Needs type information | no |
 
+## Where cohere differs from ESLint
+
+A class declared inside a function, a method's body included, does not count. ESLint counts every class in the file. Kirk ruled it on #mbbg6js: one class per file names the design unit a reader greps for, and a class declared inside a test's `describe` or `it` is a fixture, not a unit. A class in a namespace still counts. Class expressions are left out through upstream's own `ignoreExpressions`, which ahra and the ESLint configuration both set. The three nexus type tests where ESLint still reports are recorded in `internal/differential/acknowledged.go`.
+
 ## What it checks
 
 Enforce a maximum number of classes per file

@@ -158,10 +158,9 @@ func TestMaxClassesPerFileSpansTheProgramBody(t *testing.T) {
 // TestMaxClassesPerFileCountsEveryClassInTheFile covers shapes the corpus does not write and the
 // rule does judge.
 //
-// Upstream hooks the two class node kinds and nothing else, so the count is over the whole file
-// rather than its top level. Every case here was measured against the installed build at 10.8.1
-// before being written, and a port counting only top-level statements passes all 18 imported cases
-// while going silent on every one of these.
+// Every case here was measured against the installed build at 10.8.1 before being written, and a
+// port counting only top-level statements passes all 18 imported cases while going silent on every
+// one of these. Classes declared inside a function are the ruled exception, in the test below.
 func TestMaxClassesPerFileCountsEveryClassInTheFile(t *testing.T) {
 	t.Parallel()
 
@@ -169,8 +168,6 @@ func TestMaxClassesPerFileCountsEveryClassInTheFile(t *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"a class nested in another class's method", "class A { m() { class B {} } }"},
-		{"a class inside a function", "function f(){ class A {} }\nclass B {}"},
 		{"two exported classes", "export class A {}\nexport class B {}"},
 		{"a default export beside a declaration", "class A {}\nexport default class B {}"},
 		{"two expressions passed straight to a call", "f(class {});\nf(class {});"},
@@ -255,4 +252,42 @@ func TestDecodeMaxClassesPerFileOptions(t *testing.T) {
 			"class Foo {}", nil)
 		rule_testing.ExpectClean(t, clean)
 	})
+}
+
+// TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction pins Kirk's ruling on #mbbg6js.
+//
+// A class declared inside any function body, a method's included, is not a design unit of the file,
+// so it does not count; ESLint counts it, and the sites where it still reports are recorded in
+// internal/differential/acknowledged.go. The first two cases are the ones upstream reports, measured
+// at 10.8.1. The controls show the exclusion is about functions and nothing wider: a namespace is
+// not a function, a bare block is not either, and an expression still answers to ignoreExpressions.
+func TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name       string
+		sourceText string
+		reports    bool
+	}{
+		{"a class nested in another class's method", "class A { m() { class B {} } }", false},
+		{"a class inside a function", "function f(){ class A {} }\nclass B {}", false},
+		{"classes inside a test callback, as the nexus type tests write them", "describe('x', () => {\n    class A {}\n    class B {}\n    it('y', () => { class C {} });\n});", false},
+		{"a class inside an arrow beside a top-level one", "class A {}\nconst f = () => { class B {} };", false},
+		{"a class in a namespace still counts", "class A {}\nnamespace N { class B {} }", true},
+		{"a class in a bare block still counts", "class A {}\n{ class B {} }", true},
+		{"an expression inside a function still counts without ignoreExpressions", "class A {}\nfunction f() { return class {}; }", true},
+		{"two top-level classes beside a nested one still report", "class A {}\nclass B {}\nfunction f() { class C {} }", true},
+		// After a function the walk is at the top level again, so later classes count.
+		{"two top-level classes after a function still report", "function f() { class C {} }\nclass A {}\nclass B {}", true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunWithOptions(t, MaxClassesPerFile, maxClassesPerFileFile,
+				testCase.sourceText, decodedMaxClassesPerFileOptions(t, ""))
+			if testCase.reports {
+				rule_testing.ExpectFindings(t, result, "maximumExceeded")
+				return
+			}
+			rule_testing.ExpectClean(t, result)
+		})
+	}
 }

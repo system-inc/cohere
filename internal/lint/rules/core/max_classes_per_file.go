@@ -126,14 +126,19 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 //	invalid: class Foo {}\nclass Bar {}
 //	invalid: var x = class {};\nvar y = class {};
 //
-// # Every class in the file counts, wherever it is written
+// # A class declared inside a function does not count, which is where cohere leaves upstream
 //
-// Upstream hooks the two class node kinds and nothing else, so the count is over the whole file
-// rather than over its top level. Measured against the installed build at 10.8.1, each of these
-// reports: a class nested inside another class's method body, a class inside a function, two
-// exported classes, and a class expression passed straight to a call. The corpus writes none of
-// those shapes, so a port counting only top-level statements passes every imported case and then
-// goes silent on the file that actually has five classes buried in it.
+// Upstream hooks the two class node kinds and counts every one in the file. Measured against the
+// installed build at 10.8.1, a class nested inside another class's method body and a class inside a
+// function both report. Kirk ruled 2026-10-02 (#mbbg6js) that they should not: "one class per file"
+// names the design unit a reader greps for and whose history they read, and a class declared
+// inside a function, the shape a test's `describe` or `it` fixture takes, is not one. Four nexus
+// type tests carried nothing but those. So a declaration counts only outside every function body; a
+// class in a namespace still counts, since a namespace is not a function. The divergence is
+// recorded in internal/differential/acknowledged.go at each site where ESLint still reports.
+//
+// Upstream's own `ignoreExpressions` is the other half of the ruling, and it is configuration rather
+// than code here: ahra sets it, and so does the ESLint side, so expressions need no divergence.
 //
 // A class EXPRESSION counts too, and that is the half `ignoreExpressions` exists to turn off. The
 // option drops expressions from the count while leaving declarations, rather than lowering the
@@ -183,18 +188,28 @@ var MaxClassesPerFile = rule.Rule{
 			ast.KindSourceFile: func(node *ast.Node) {
 				classCount := 0
 
+				// insideFunction is whether the walk is inside any function body, a method, a
+				// constructor or an arrow included. See the rule's doc comment for why a declaration
+				// there does not count.
+				insideFunction := false
 				var visit func(*ast.Node) bool
 				visit = func(current *ast.Node) bool {
 					switch current.Kind {
 					case ast.KindClassDeclaration:
-						classCount++
+						if !insideFunction {
+							classCount++
+						}
 					case ast.KindClassExpression:
 						if !ignoreExpressions {
 							classCount++
 						}
 					}
-					// Recurse unconditionally. A class nested inside another class, or inside a
-					// function, counts upstream, so nothing here may prune.
+					if ast.IsFunctionLike(current) && !insideFunction {
+						insideFunction = true
+						current.ForEachChild(visit)
+						insideFunction = false
+						return false
+					}
 					current.ForEachChild(visit)
 					return false
 				}

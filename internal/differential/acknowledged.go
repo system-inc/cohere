@@ -51,6 +51,36 @@ func (acknowledged AcknowledgedDifference) Key() string {
 // green result, and this list is reviewed like any other code.
 var KnownGateDefects = []AcknowledgedDifference{
 	{
+		File: "libraries/structure/libraries/nexus/source/types/Constructor.test.ts",
+		Line: 2,
+		Rule: "max-classes-per-file",
+		Side: SideGate,
+		Reason: "every class beyond the first is declared inside a describe or it callback, a test fixture rather " +
+			"than a design unit of the file, and cohere counts only classes declared outside every function " +
+			"(Kirk, #mbbg6js); core/max_classes_per_file.md, " +
+			"TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction",
+	},
+	{
+		File: "libraries/structure/libraries/nexus/source/types/TypeFunction.test.ts",
+		Line: 6,
+		Rule: "max-classes-per-file",
+		Side: SideGate,
+		Reason: "every class beyond the first is declared inside a describe or it callback, a test fixture rather " +
+			"than a design unit of the file, and cohere counts only classes declared outside every function " +
+			"(Kirk, #mbbg6js); core/max_classes_per_file.md, " +
+			"TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction",
+	},
+	{
+		File: "libraries/structure/libraries/nexus/source/types/UnionFromClasses.test.ts",
+		Line: 2,
+		Rule: "max-classes-per-file",
+		Side: SideGate,
+		Reason: "every class beyond the first is declared inside a describe or it callback, a test fixture rather " +
+			"than a design unit of the file, and cohere counts only classes declared outside every function " +
+			"(Kirk, #mbbg6js); core/max_classes_per_file.md, " +
+			"TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction",
+	},
+	{
 		File: "libraries/structure/source/services/network/NetworkService.ts",
 		Line: 228,
 		Rule: "storage-no-direct-local-storage",
