@@ -127,6 +127,13 @@ type coverageCrash struct {
 	Cause string
 }
 
+// coverageRuleCrash is one rule that panicked on one file while the file's other rules finished.
+type coverageRuleCrash struct {
+	Rule  string
+	File  string
+	Cause string
+}
+
 // suppressionCoverage is what disable comments withheld. Nil when the engine reports none.
 type suppressionCoverage struct {
 	Suppressed              int
@@ -152,6 +159,7 @@ type coverageSummary struct {
 	// `--coverage`: a Swift rule counted as quiet that the record also names as off for some files.
 	PartialFacts []string
 	Crashes      []coverageCrash
+	RuleCrashes  []coverageRuleCrash
 	FilesIgnored int
 	Suppression  *suppressionCoverage
 }
@@ -272,6 +280,15 @@ func classifyTypeScriptCoverage(
 	for _, crash := range coverage.FilesCrashed {
 		summary.Crashes = append(summary.Crashes, coverageCrash{File: crash.FileName, Cause: fmt.Sprint(crash.Cause)})
 	}
+	for _, crash := range coverage.RulesCrashed {
+		summary.RuleCrashes = append(summary.RuleCrashes, coverageRuleCrash{Rule: crash.RuleName, File: crash.FileName, Cause: fmt.Sprint(crash.Cause)})
+	}
+	sort.Slice(summary.RuleCrashes, func(first, second int) bool {
+		if summary.RuleCrashes[first].Rule != summary.RuleCrashes[second].Rule {
+			return summary.RuleCrashes[first].Rule < summary.RuleCrashes[second].Rule
+		}
+		return summary.RuleCrashes[first].File < summary.RuleCrashes[second].File
+	})
 
 	summary.sortEntries()
 	return summary
@@ -336,6 +353,9 @@ func (s coverageSummary) coverageCountedLine() string {
 // the convention be tightened later from evidence rather than from a guess.
 func (s coverageSummary) coverageFilesLine(details bool) string {
 	terms := []string{fmt.Sprintf("%d files crashed", len(s.Crashes))}
+	if len(s.RuleCrashes) > 0 {
+		terms = append(terms, fmt.Sprintf("%d rule crashes, each costing one rule one file", len(s.RuleCrashes)))
+	}
 	if s.FilesIgnored > 0 {
 		terms = append(terms, fmt.Sprintf("%d files excluded by ignorePatterns", s.FilesIgnored))
 	}
@@ -412,6 +432,10 @@ func writeCrashedNote(out io.Writer, fileName string, cause any) {
 // namedGapsSentence is what "this run did not check everything" says when every phase ran and a file
 // still went unchecked, named in the notes above it. One sentence for both engines.
 const namedGapsSentence = "the notes above name the files nothing checked"
+
+// namedRuleGapsSentence is the same fact when what went unchecked is one rule's verdict on a file rather
+// than the whole file: the file's other rules ran, and saying nothing checked it would be its own lie.
+const namedRuleGapsSentence = "the notes above name the rules that could not finish a file"
 
 // unportedConfiguredRules names the rules the config turns on that this binary does not implement.
 //
@@ -554,6 +578,10 @@ func writeDepartures(out io.Writer, lintConfig *configuration.Config) {
 func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 	for _, crash := range summary.Crashes {
 		writeCrashedNote(out, crash.File, crash.Cause)
+	}
+	for _, crash := range summary.RuleCrashes {
+		fmt.Fprintf(out, "  crashed: rule %s could not finish %s, so its verdict on that file is missing and the file's other rules ran: %s\n",
+			crash.Rule, crash.File, crash.Cause)
 	}
 	if details {
 		writeCoverageDetails(out, summary)

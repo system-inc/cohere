@@ -380,17 +380,19 @@ func codesOf(diagnostics []*ast.Diagnostic) []int32 {
 	return codes
 }
 
-// A rule that panics loses its file and nothing else.
+// A rule that panics loses its own verdict on the file and nothing else.
 //
 // Rules walk a tree they did not build, and the compiler's own accessors panic rather than error on
 // shapes they do not handle: Node.Text() panics on any kind outside its switch, and the rules reach
 // it from 220 call sites. Files are walked in goroutines, a panic in a goroutine cannot be recovered
 // by its parent, and nothing else in this codebase recovers.
 //
-// Measured before the boundary existed: one panic on the branch producing this tree's 128 findings
-// ended the run at exit 2 with no lint line and no phases line, discarding a completed types phase
-// along with everything else.
-func TestAPanickingRuleLosesOnlyItsFile(t *testing.T) {
+// The boundary used to be the file, so one rule's panic cost every rule its verdict there:
+// prefer-arrow-callback's shared arm crashed 71 files and took all 446 rules down on each, under an
+// ordinary-looking summary (#qa9nttp). The panicking rules here are type-aware, one crashing in a
+// listener after reading the checker and one crashing in Run, and the rule beside them must still
+// report on every file.
+func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(t *testing.T) {
 	directory := writeProject(t, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "const counted: number = 41 + 1;\n",
@@ -402,33 +404,74 @@ func TestAPanickingRuleLosesOnlyItsFile(t *testing.T) {
 		t.Fatalf("building: %v", err)
 	}
 
-	panicking := rule.Rule{
-		Name: "test-panics-on-every-declaration",
+	panicsInAListener := rule.Rule{
+		Name:             "test-typed-panics-in-a-listener",
+		NeedsTypeChecker: true,
 		Run: func(ctx rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindVariableDeclaration: func(node *ast.Node) {
+					if ctx.TypeChecker == nil {
+						t.Error("a type-aware rule ran without a checker, so this is not the typed path")
+					}
 					panic("simulated accessor panic on an unhandled kind")
 				},
 			}
 		},
 	}
+	panicsInRun := rule.Rule{
+		Name:             "test-typed-panics-in-run",
+		NeedsTypeChecker: true,
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			panic("simulated panic before any listener")
+		},
+	}
+	witness := rule.Rule{
+		Name: "test-reports-every-declaration",
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			return rule.Listeners{
+				ast.KindVariableDeclaration: func(node *ast.Node) {
+					ctx.ReportNode(node, rule.Message{Id: "sawDeclaration", Description: "saw a declaration"})
+				},
+			}
+		},
+	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{panicking})
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{panicsInAListener, panicsInRun, witness})
 	if err != nil {
 		t.Fatalf("a panic in one rule ended the whole walk: %v", err)
 	}
 
-	if len(result.Coverage.FilesCrashed) == 0 {
-		t.Fatal("the walk survived a panicking rule and reported no crashed file, which is the silent " +
-			"loss this boundary exists to prevent")
+	if len(result.Coverage.FilesCrashed) != 0 {
+		t.Errorf("a rule's panic cost its file every rule's verdict: %v", result.Coverage.FilesCrashed)
 	}
-	for _, crash := range result.Coverage.FilesCrashed {
+
+	reported := map[string]int{}
+	for _, diagnostic := range result.Diagnostics {
+		reported[filepath.Base(diagnostic.SourceFile.FileName())]++
+	}
+	for _, file := range []string{"main.ts", "other.ts"} {
+		if reported[file] != 1 {
+			t.Errorf("the rule beside the panicking ones reported %d times on %s, want 1", reported[file], file)
+		}
+	}
+
+	crashed := map[string]int{}
+	for _, crash := range result.Coverage.RulesCrashed {
 		if crash.FileName == "" {
-			t.Error("a crashed file was recorded without its name, so a reader cannot find it")
+			t.Error("a rule crash was recorded without its file, so a reader cannot find it")
 		}
-		if crash.Cause == nil {
-			t.Error("a crashed file was recorded without its cause, and the panic message is the defect")
+		if crash.Cause == nil || !strings.Contains(crash.Cause.Error(), "simulated") {
+			t.Errorf("rule %s crashed without its panic as the cause: %v", crash.RuleName, crash.Cause)
 		}
+		crashed[crash.RuleName]++
+	}
+	for _, name := range []string{panicsInAListener.Name, panicsInRun.Name} {
+		if crashed[name] != 2 {
+			t.Errorf("rule %s is named as crashing on %d files, want both", name, crashed[name])
+		}
+	}
+	if crashed[witness.Name] != 0 {
+		t.Errorf("the rule that never panicked is named as crashing")
 	}
 }
 
@@ -461,8 +504,8 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(t *testing.T) {
 		t.Fatalf("walking: %v", err)
 	}
 
-	if len(result.Coverage.FilesCrashed) != 0 {
-		t.Errorf("a clean walk reported %d crashed files", len(result.Coverage.FilesCrashed))
+	if len(result.Coverage.FilesCrashed) != 0 || len(result.Coverage.RulesCrashed) != 0 {
+		t.Errorf("a clean walk reported %d crashed files and %d rule crashes", len(result.Coverage.FilesCrashed), len(result.Coverage.RulesCrashed))
 	}
 }
 

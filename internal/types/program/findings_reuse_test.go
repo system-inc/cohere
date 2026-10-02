@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -248,6 +249,34 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(t *testing.T) {
 	}
 	if !reflect.DeepEqual(diagnosticKeys(plain.Diagnostics), diagnosticKeys(replayed.Diagnostics)) {
 		t.Errorf("findings differ:\n plain    %v\n replayed %v", diagnosticKeys(plain.Diagnostics), diagnosticKeys(replayed.Diagnostics))
+	}
+}
+
+// A file a rule crashed on is not recorded, so the next run walks it again and names the crash again.
+//
+// A rule's crash is contained to the rule, and the file's other verdicts are real (#qa9nttp). Recorded,
+// the file would replay those verdicts on the next run with the crash gone, and a cached run would
+// read as one where every rule finished the file.
+func TestAFileARuleCrashedOnIsWalkedAgainNotReplayed(t *testing.T) {
+	root := writeProject(t, map[string]string{
+		"tsconfig.json": minimalConfig,
+		"a.ts":          "export const a = 1;\n",
+	})
+	panicking := rule.Rule{
+		Name: "test-panics-on-every-declaration",
+		Run: func(ctx rule.Context, options any) rule.Listeners {
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) { panic("simulated") }}
+		},
+	}
+	rules := []rule.Rule{panicking}
+
+	first, recorded := walkAndRecord(t, root, rules, nil)
+	if len(first.Coverage.RulesCrashed) != 1 {
+		t.Fatalf("the first run named %d rule crashes, want 1, so the replay below proves nothing", len(first.Coverage.RulesCrashed))
+	}
+	second, _ := walkAndRecord(t, root, rules, recorded)
+	if second.FilesReplayed != 0 || len(second.Coverage.RulesCrashed) != 1 {
+		t.Errorf("the second run replayed %d files and named %d rule crashes, want 0 and 1", second.FilesReplayed, len(second.Coverage.RulesCrashed))
 	}
 }
 

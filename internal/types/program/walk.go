@@ -102,6 +102,15 @@ type Coverage struct {
 	// keeping those apart is the whole job of this struct.
 	FilesCrashed []FileCrash
 
+	// RulesCrashed names each rule that panicked on a file, with the file and the panic.
+	//
+	// A rule's panic is contained to that rule: it stops hearing about the file, and every other rule
+	// on the file runs to the end. Before this, one rule's panic cost every rule its verdict on the
+	// file. prefer-arrow-callback's shared arm crashed 71 files that way, and all 446 rules lost those
+	// files under an ordinary-looking summary (#qa9nttp). The crashed rule's verdict on the file is
+	// still missing, which is why it is named rather than counted.
+	RulesCrashed []RuleCrash
+
 	// FilesIgnored is how many files an ignorePattern excluded from linting entirely.
 	//
 	// A file skipped by configuration and a file with no findings produce identical output
@@ -185,6 +194,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	unconfigured := map[string]int{}
 	configFailures := []error{}
 	fileCrashes := []FileCrash{}
+	ruleCrashesAll := []RuleCrash{}
 
 	// Nil unless asked for, and every timing call below is guarded on it, so a run without --timing
 	// does not pay for the instrument at all.
@@ -218,6 +228,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			localUnconfigured := map[string]int{}
 			localFailures := []error{}
 			localCrashes := []FileCrash{}
+			localRuleCrashes := []RuleCrash{}
 
 			// Each worker accumulates locally and merges once under the mutex. Timing through a
 			// shared lock would measure contention rather than rule cost.
@@ -340,7 +351,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					listeningTarget, offeredTarget = fileListening, fileOffered
 				}
 				diagnosticsBefore := len(localDiagnostics)
-				visited, silenced, crashed := dispatchFileSafely(sourceFile, func(diagnostic rule.Diagnostic) {
+				visited, silenced, ruleCrashes, crashed := dispatchFileSafely(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
 					localReporting[diagnostic.RuleName]++
 				}, walkRules, g, fileChecker, listeningTarget, offeredTarget, ruleOptions, localTimings, catalog)
@@ -369,6 +380,14 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					// to keep those two apart.
 					localCrashes = append(localCrashes, FileCrash{FileName: sourceFile.FileName(), Cause: crashed})
 					continue
+				}
+
+				// A rule that crashed lost its verdict on this file and the rest of the file stands. The file
+				// is not recorded in the findings cache, so the next run walks it again and names the crash
+				// again rather than replaying a verdict with a hole in it.
+				localRuleCrashes = append(localRuleCrashes, ruleCrashes...)
+				if len(ruleCrashes) > 0 {
+					recording = false
 				}
 
 				// A replayed file counts the nodes its full walk visited. The walk counts nodes only when
@@ -419,6 +438,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			}
 			configFailures = append(configFailures, localFailures...)
 			fileCrashes = append(fileCrashes, localCrashes...)
+			ruleCrashesAll = append(ruleCrashesAll, localRuleCrashes...)
 			timings.merge(localTimings)
 			filesReplayed += localReplayed
 			mutex.Unlock()
@@ -453,6 +473,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			UnusedSuppressionsForUnrunRules: suppressed.unusedForUnrunRule,
 
 			FilesCrashed:      fileCrashes,
+			RulesCrashed:      ruleCrashesAll,
 			FilesIgnored:      filesIgnored,
 			RulesScopedOff:    scopedOff,
 			RulesUnconfigured: unconfigured,
@@ -573,12 +594,6 @@ func sortDiagnostics(diagnostics []rule.Diagnostic) {
 	})
 }
 
-// dispatchFile asks every rule what it wants to hear about in this file, merges those answers into
-// one dispatch table, and walks the tree once against it. It returns how many nodes it visited.
-//
-// Merging before walking is what makes the cost per node independent of the rule count: the walk
-// does one map lookup per node regardless of whether one rule or five hundred registered for that
-// kind.
 // FileCrash is a file a rule panicked on, and the panic it raised.
 //
 // The cause is carried rather than summarized because the panic message is the only evidence of what
@@ -589,18 +604,47 @@ type FileCrash struct {
 	Cause    error
 }
 
-// dispatchFileSafely is dispatchFile with a boundary around it.
-//
-// A rule is ordinary Go code walking a tree it did not build, and the compiler's own accessors panic
-// rather than error on shapes they do not handle. `Node.Text()` panics on any kind outside its
-// switch, and 220 call sites across the rules reach it. Kind-checking every one is the real fix and
-// this is not a substitute for it: this is what keeps the other 3,406 files reportable while that
-// work happens.
-//
-// The recovery is here rather than deeper because the file is the unit the coverage line already
-// speaks in. Recovering per node would leave a half-walked file reported as fully walked, which is
-// worse than losing it: a partial result that claims to be whole is the failure this package exists
-// to prevent.
+// RuleCrash is one rule that panicked on one file, and the panic it raised.
+type RuleCrash struct {
+	RuleName string
+	FileName string
+	Cause    error
+}
+
+// ruleContainment is the boundary around one rule on one file. The first panic is recorded and the
+// rule hears nothing more about the file; the other rules never notice.
+type ruleContainment struct {
+	ruleName string
+	fileName string
+	crash    *RuleCrash
+}
+
+// recoverPanic records the panic the deferring call raised, if any. It must be deferred directly, since
+// recover answers only in a function called by the deferral itself.
+func (c *ruleContainment) recoverPanic() {
+	if recovered := recover(); recovered != nil && c.crash == nil {
+		c.crash = &RuleCrash{RuleName: c.ruleName, FileName: c.fileName, Cause: fmt.Errorf("%v", recovered)}
+	}
+}
+
+// run calls the rule's Run inside the boundary.
+func (c *ruleContainment) run(subject rule.Rule, context rule.Context, options any) (listeners rule.Listeners) {
+	defer c.recoverPanic()
+	return subject.Run(context, options)
+}
+
+// listener wraps one of the rule's listeners in the boundary. Once the rule has crashed on this file
+// its listeners are skipped, because a rule past its panic is in a state nobody tested.
+func (c *ruleContainment) listener(listener func(node *ast.Node)) func(node *ast.Node) {
+	return func(node *ast.Node) {
+		if c.crash != nil {
+			return
+		}
+		defer c.recoverPanic()
+		listener(node)
+	}
+}
+
 // anyRuleNeedsTypeChecker reports whether any of these rules declared that it reads the checker.
 //
 // Asked per file against the applicable set rather than once against the whole catalog, because
@@ -615,6 +659,18 @@ func anyRuleNeedsTypeChecker(rules []rule.Rule) bool {
 	return false
 }
 
+// dispatchFileSafely is dispatchFile with a boundary around it.
+//
+// A rule is ordinary Go code walking a tree it did not build, and the compiler's own accessors panic
+// rather than error on shapes they do not handle. `Node.Text()` panics on any kind outside its
+// switch, and 220 call sites across the rules reach it. Kind-checking every one is the real fix and
+// this is not a substitute for it.
+//
+// Two boundaries, at two units. A rule's own panic, in its Run or in a listener, is contained to that
+// rule on that file by ruleContainment, and the file's other verdicts stand. This one catches what is
+// left, a panic outside any rule (reading the file's directives, say), and loses the file, because
+// then nothing in it can be trusted. A rule's findings from before its panic are kept: they are real,
+// and the crash is named beside them, so nothing claims the rule finished the file.
 func dispatchFileSafely(
 	sourceFile *ast.SourceFile,
 	report func(rule.Diagnostic),
@@ -626,21 +682,29 @@ func dispatchFileSafely(
 	ruleOptions map[string]any,
 	timings *Timings,
 	catalog *ruleNameCatalog,
-) (visited int, silenced suppressionTally, crashed error) {
+) (visited int, silenced suppressionTally, ruleCrashes []RuleCrash, crashed error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			// The visited count is discarded along with the file. A file that crashed halfway
 			// contributed nodes to a total that would then describe a walk nobody completed.
 			visited = 0
 			silenced = suppressionTally{}
+			ruleCrashes = nil
 			crashed = fmt.Errorf("%v", recovered)
 		}
 	}()
 
-	visited, silenced = dispatchFile(sourceFile, report, applicable, g, fileChecker,
+	visited, silenced, ruleCrashes = dispatchFile(sourceFile, report, applicable, g, fileChecker,
 		listeningCounts, offeredCounts, ruleOptions, timings, catalog)
-	return visited, silenced, nil
+	return visited, silenced, ruleCrashes, nil
 }
+
+// dispatchFile asks every rule what it wants to hear about in this file, merges those answers into
+// one dispatch table, and walks the tree once against it. It returns how many nodes it visited.
+//
+// Merging before walking is what makes the cost per node independent of the rule count: the walk
+// does one map lookup per node regardless of whether one rule or five hundred registered for that
+// kind.
 
 func dispatchFile(
 	sourceFile *ast.SourceFile,
@@ -653,7 +717,7 @@ func dispatchFile(
 	ruleOptions map[string]any,
 	timings *Timings,
 	catalog *ruleNameCatalog,
-) (visitedNodes int, silenced suppressionTally) {
+) (visitedNodes int, silenced suppressionTally, ruleCrashes []RuleCrash) {
 	// A kind may have listeners from several rules, so the merged table maps a kind to a slice rather
 	// than to one function.
 	merged := map[ast.Kind][]func(node *ast.Node){}
@@ -674,6 +738,8 @@ func dispatchFile(
 	// Which rule triggered each cache fill, so its cost can be moved off that rule's total.
 	fillPayer := map[string]string{}
 	seenFills := map[string]bool{}
+
+	containments := make([]*ruleContainment, 0, len(rules))
 
 	for _, subject := range rules {
 		ruleName := subject.Name
@@ -718,10 +784,17 @@ func dispatchFile(
 		// rule nobody wired never reaches this line at all.
 		offeredCounts[ruleName]++
 
+		containment := &ruleContainment{ruleName: ruleName, fileName: sourceFile.FileName()}
+		containments = append(containments, containment)
+
 		setupStart := timingNow(timing)
-		listeners := subject.Run(context, ruleOptions[ruleName])
+		listeners := containment.run(subject, context, ruleOptions[ruleName])
 		if timing != nil {
 			timing.SetupDuration += time.Since(setupStart)
+		}
+		if containment.crash != nil {
+			// Offered and crashed, so it neither declined nor listened.
+			continue
 		}
 
 		if len(listeners) == 0 {
@@ -741,7 +814,7 @@ func dispatchFile(
 			timing.FilesListened++
 		}
 		for kind, listener := range listeners {
-			merged[kind] = append(merged[kind], attributingListener(timing, listener, ruleName, fileCache, seenFills, fillPayer))
+			merged[kind] = append(merged[kind], containment.listener(attributingListener(timing, listener, ruleName, fileCache, seenFills, fillPayer)))
 		}
 	}
 
@@ -769,7 +842,13 @@ func dispatchFile(
 		ranRule[subject.Name] = true
 	}
 
-	return visitedNodes, tally(directives, ranRule)
+	for _, containment := range containments {
+		if containment.crash != nil {
+			ruleCrashes = append(ruleCrashes, *containment.crash)
+		}
+	}
+
+	return visitedNodes, tally(directives, ranRule), ruleCrashes
 }
 
 // suppressionTally is what one file's directives did, summed across the run.

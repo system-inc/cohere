@@ -293,6 +293,16 @@ func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
 		)
 	})
 
+	t.Run("a rule that could not finish a file", func(t *testing.T) {
+		coverage := cleanCoverage()
+		coverage.RulesCrashed = []program.RuleCrash{{RuleName: "prefer-arrow-callback", FileName: "/project/Broken.ts", Cause: fmt.Errorf("interface conversion")}}
+		output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"})
+		requireLines(t, output,
+			"  0 files crashed · 1 rule crashes, each costing one rule one file",
+			"  crashed: rule prefer-arrow-callback could not finish /project/Broken.ts, so its verdict on that file is missing and the file's other rules ran: interface conversion\n",
+		)
+	})
+
 	t.Run("unreadable files", func(t *testing.T) {
 		output, _, _ := renderRecords(t, swiftModeCheck, contractFixture(t, "Unreadable.jsonl"), 1)
 		requireLines(t, output, "  not checked: /project/Sources/Example/Latin1.swift (could not be read:")

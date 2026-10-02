@@ -853,8 +853,11 @@ func run() error {
 		// Every phase ran and a file still went unchecked. The phase line cannot express that, so the
 		// closing warning names it rather than letting a run that lost a file to a panic end on a clean
 		// bill of health. The Swift renderer says the same sentence for the same fact.
-		if len(result.Coverage.FilesCrashed) > 0 {
+		switch {
+		case len(result.Coverage.FilesCrashed) > 0:
 			report.incompleteBeyondPhases = namedGapsSentence
+		case len(result.Coverage.RulesCrashed) > 0:
+			report.incompleteBeyondPhases = namedRuleGapsSentence
 		}
 
 		if *showTiming {
