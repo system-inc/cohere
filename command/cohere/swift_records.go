@@ -12,7 +12,7 @@ import (
 )
 
 // swiftContractVersion is the version of swift/Contract.md this front door speaks.
-const swiftContractVersion = 1
+const swiftContractVersion = 2
 
 // swiftMode is which question a Swift run answers, and so which records it may carry.
 //
@@ -55,6 +55,14 @@ type swiftProjectRecord struct {
 		File   string `json:"file"`
 		Reason string `json:"reason"`
 	} `json:"excluded"`
+}
+
+// swiftUnreadableRecord is a file the engine could not read, so nothing in it was checked. Contract 2
+// made it a record: before, the engine said only on stderr that it had fallen short, and the front door
+// could believe it but not say which files.
+type swiftUnreadableRecord struct {
+	File  string `json:"file"`
+	Error string `json:"error"`
 }
 
 type swiftFindingRecord struct {
@@ -161,6 +169,7 @@ type swiftRun struct {
 	// files a rule crashed on. Each is already printed as a note; these count them for the summary.
 	filesWithoutRecord int
 	crashes            int
+	unreadable         []swiftUnreadableRecord
 
 	excludedPrinted bool
 }
@@ -199,6 +208,8 @@ func (r *swiftRun) accept(line []byte) error {
 		return decodeRecord(line, &swiftProvenanceRecord{}, r.acceptProvenance)
 	case "project":
 		return decodeRecord(line, &swiftProjectRecord{}, r.acceptProject)
+	case "unreadable":
+		return decodeRecord(line, &swiftUnreadableRecord{}, r.acceptUnreadable)
 	case "finding":
 		return decodeRecord(line, &swiftFindingRecord{}, r.acceptFinding)
 	case "fix":
@@ -266,6 +277,26 @@ func (r *swiftRun) acceptProject(record *swiftProjectRecord) error {
 	r.report.graph = elapsed
 	r.report.filesInScope = record.FilesInScope
 	r.report.filesInProgram = record.FilesOurs
+	return nil
+}
+
+// acceptUnreadable holds a file nothing checked, to be named with the excluded files and counted as a
+// gap. Its place is fixed, after the project and before the first phase, so the files a run could not
+// read are all known before any phase reports on the files it could.
+func (r *swiftRun) acceptUnreadable(record *swiftUnreadableRecord) error {
+	if r.mode != swiftModeCheck {
+		return fmt.Errorf("an unreadable record in a %s run", r.mode)
+	}
+	if r.project == nil {
+		return fmt.Errorf("an unreadable record before the project record")
+	}
+	if r.nextPhase > 0 {
+		return fmt.Errorf("an unreadable record after phase %s, and contract 2 places them before the first phase", phaseOrder[r.nextPhase-1])
+	}
+	if record.File == "" {
+		return fmt.Errorf("an unreadable record with no file")
+	}
+	r.unreadable = append(r.unreadable, *record)
 	return nil
 }
 
@@ -412,11 +443,19 @@ func (r *swiftRun) writeExcluded() {
 
 	filesByReason := map[string][]string{}
 	reasons := []string{}
-	for _, excluded := range r.project.Excluded {
-		if _, seen := filesByReason[excluded.Reason]; !seen {
-			reasons = append(reasons, excluded.Reason)
+	add := func(file string, reason string) {
+		if _, seen := filesByReason[reason]; !seen {
+			reasons = append(reasons, reason)
 		}
-		filesByReason[excluded.Reason] = append(filesByReason[excluded.Reason], excluded.File)
+		filesByReason[reason] = append(filesByReason[reason], file)
+	}
+	for _, excluded := range r.project.Excluded {
+		add(excluded.File, excluded.Reason)
+	}
+	// A file the engine could not read is printed the way an excluded file is, because to a reader it is
+	// the same fact: a file nothing checked, and why.
+	for _, unreadable := range r.unreadable {
+		add(unreadable.File, "could not be read: "+unreadable.Error)
 	}
 	sort.Strings(reasons)
 	for _, reason := range reasons {
@@ -478,21 +517,21 @@ func (r *swiftRun) acceptSummary(record *swiftSummaryRecord) error {
 
 	// The two views of completeness are compared in one direction only. Where the records show a gap
 	// and the summary claims none, the engine is printing green over work it did not do, which is the
-	// failure this tool exists to stop, and the run is refused. The other direction is allowed: the
-	// engine can see gaps no record carries (a file it could not read is a note on stderr), and an
-	// engine that says it fell short is believed.
+	// failure this tool exists to stop, and the run is refused. The other direction is allowed: an engine
+	// that says it fell short is believed, even where no record shows the gap.
 	//
 	// A run with nothing to check skipped every phase because there was nothing for any of them to
 	// look at, which recordNothingToCheck treats as a clean answer over zero files and so does this.
-	gapInRecords := (record.NothingToCheck == "" && !r.report.checkedEverything()) || r.filesWithoutRecord > 0 || r.crashes > 0
+	namedGaps := r.filesWithoutRecord > 0 || r.crashes > 0 || len(r.unreadable) > 0
+	gapInRecords := (record.NothingToCheck == "" && !r.report.checkedEverything()) || namedGaps
 	if gapInRecords && *record.Complete {
 		return fmt.Errorf("the summary calls the run complete, and its own records show what it did not check")
 	}
 	if !*record.Complete && r.report.checkedEverything() {
-		if r.filesWithoutRecord > 0 || r.crashes > 0 {
+		if namedGaps {
 			r.report.incompleteBeyondPhases = "the notes above name the files nothing checked"
 		} else {
-			r.report.incompleteBeyondPhases = "the Swift engine reported files it could not check, and its notes on stderr name them"
+			r.report.incompleteBeyondPhases = "the Swift engine reported that it fell short without a record saying where"
 		}
 	}
 

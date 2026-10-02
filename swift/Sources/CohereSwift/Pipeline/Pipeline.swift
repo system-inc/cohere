@@ -85,11 +85,10 @@ public struct Pipeline {
         for error in parsed.parseErrors {
             try writer.write(error)
         }
-        if !parsed.unreadable.isEmpty {
+        /* After `project` and before the first `phase`, as contract 2 places them, so the front door can name every file nothing checked. */
+        for crash in parsed.unreadable {
             complete = false
-            for crash in parsed.unreadable {
-                FileHandle.standardError.write(Data("note: \(crash.file) could not be read, so nothing in it was checked: \(crash.error)\n".utf8))
-            }
+            try writer.write(UnreadableRecord(file: crash.file, error: crash.error))
         }
         let filesThatDoNotParse = Set(parsed.parseErrors.map(\.file)).count
 

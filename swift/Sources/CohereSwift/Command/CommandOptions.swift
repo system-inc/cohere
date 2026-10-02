@@ -1,7 +1,7 @@
 import Foundation
 
 /*
- The command line, as the front door passes it: `cohere-swift --contract 1 --root <dir> [flags] [paths]`.
+ The command line, as the front door passes it: `cohere-swift --contract <version> --root <dir> [flags] [paths]`.
 
  Parsing refuses rather than guesses. An unknown flag, a flag with no Swift meaning yet, or a contract
  version this engine does not speak stops the run before any record is written. A flag accepted and

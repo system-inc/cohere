@@ -12,7 +12,7 @@ import Foundation
  sees `dev`, which is true.
  */
 public enum EngineVersion {
-    public static let contract = 1
+    public static let contract = 2
     public static let engine = "cohere-swift"
     public static let version = "0.1.0"
     public static let commit = "dev"

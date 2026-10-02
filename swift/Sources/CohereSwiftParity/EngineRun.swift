@@ -10,7 +10,7 @@ struct EngineRun {
     let root: URL
 
     func findings() async throws -> [RuleFinding] {
-        let options = try CommandOptions.parse(["--contract", "1", "--root", root.path, "--no-fix", "--lint"], workingDirectory: root)
+        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix", "--lint"], workingDirectory: root)
         var stream = Data()
         let writer = ContractWriter { stream.append($0) }
         _ = try await Pipeline(options: options, writer: writer, workingDirectory: root).run()

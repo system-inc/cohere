@@ -16,6 +16,11 @@ encoder's tests both read them, so neither side can drift without the other's te
 | `TypesBail.jsonl` | Under `--no-fix`, a compiler error cuts lint off as `notReached`. The run is incomplete. Exit 1. |
 | `CrashWithoutSummary.jsonl` | The stream stops after the fix phase. The front door must say nothing was checked and exit 1. |
 | `NothingChanged.jsonl` | `--changed` with nothing changed: no package described, every phase skipped, `0 files checked`, exit 0. |
+| `Unreadable.jsonl` | One file the engine could not read: named beside the excluded files, every phase ran, nothing found, and still incomplete with exit 1. |
+
+**Version 2** (2026-10-02) added the `unreadable` record. Before it, a file the engine could not read was a
+note on stderr: the summary said the run fell short and the front door believed it, but could not say
+which files. Both sides moved to 2 in one commit, and each refuses the other version.
 
 ## Why records and not text
 
@@ -34,7 +39,8 @@ the front door feeds that data to the printers it already has. A `phase` record 
   record is a protocol error. The front door stops and says the engine is broken; it does not skip
   the line, because a skipped line is a finding nobody sees.
 - **stderr:** prose for a human, passed through untouched. Notes that the TypeScript engine prints
-  to stderr (a submodule it could not read, a file lost from scope) go here.
+  to stderr (a submodule it could not read, a file lost from scope) go here. A file the engine could
+  not read is not one of them: it is an `unreadable` record, so the front door can name it.
 - **Records stream in pipeline order.** The front door prints each one as it arrives, so a slow
   types phase shows its fix line first, the way the TypeScript engine does.
 
@@ -44,7 +50,7 @@ The front door resolves the project root (the nearest directory holding `Package
 `tsconfig.json`, nearest wins), then runs:
 
 ```
-cohere-swift --contract 1 --root <absolute package root> [flags] [paths]
+cohere-swift --contract 2 --root <absolute package root> [flags] [paths]
 ```
 
 `--contract` is the version the front door speaks. An engine speaking a different version refuses
@@ -61,7 +67,7 @@ TypeScript.
 ### `provenance`, always first
 
 ```json
-{"kind":"provenance","contract":1,"engine":"cohere-swift","version":"0.1.0","commit":"<40 hex or dev>","sourceTreeModified":false,"toolchain":"swiftlang-6.4.0.34.1","swiftSyntax":"604.0.0","swiftFormat":"604.0.0"}
+{"kind":"provenance","contract":2,"engine":"cohere-swift","version":"0.1.0","commit":"<40 hex or dev>","sourceTreeModified":false,"toolchain":"swiftlang-6.4.0.34.1","swiftSyntax":"604.0.0","swiftFormat":"604.0.0"}
 ```
 
 `sourceTreeModified` drives the same warning the TypeScript run prints: this binary was built from a
@@ -99,6 +105,19 @@ package described in 412ms — 152 Swift files in the package, 149 of them ours,
 Excluded files print as coverage notes under the lint line, grouped by reason. Up to five files of a
 reason are named, `  not checked: <file> (<reason>)`; more are counted, `  not checked: <n> files
 (<reason>)`, because 107 vendored files named one per line buried the verdict on the first real run.
+
+### `unreadable`, between `project` and the first `phase`
+
+```json
+{"kind":"unreadable","file":"/…/Latin1.swift","error":"it is not valid UTF-8 or could not be opened (…)"}
+```
+
+One per file the engine could not read, so nothing in it was checked. `error` is a sentence. The front
+door prints each under the lint line with the excluded files, grouped and counted past five the same
+way, as `  not checked: <file> (could not be read: <error>)`, and counts it as a gap: a summary calling
+the run complete with any `unreadable` record is a protocol error. An `unreadable` record before
+`project` or after any `phase` is refused, so every file a run could not read is known before a phase
+reports on the files it could.
 
 ### `finding`
 
@@ -218,8 +237,10 @@ note goes to stderr, as it does for TypeScript.
 - `findings` is the sum of every `finding` record. The front door counts the findings it received
   and refuses a summary that disagrees. Two counts that should agree and do not are a defect.
 - `complete` is false when any file or phase that could have produced a finding did not run. The
-  front door prints `this run did not check everything` from its own phase records anyway, and a
-  disagreement here is a protocol error.
+  front door prints `this run did not check everything` from its own phase records anyway. A summary
+  calling the run complete over a gap its records show (a phase not run, a file without a compiler
+  record, a rule crash, an `unreadable` file) is a protocol error. The other direction is believed: an
+  engine that says it fell short where no record shows it is taken at its word.
 - `nothingToCheck` is the reason when the run had nothing to look at, such as `--changed` with
   nothing changed. That is a clean answer over zero files, printed as `<reason>: 0 files checked`.
 - `exitCode` is what the engine will exit with.

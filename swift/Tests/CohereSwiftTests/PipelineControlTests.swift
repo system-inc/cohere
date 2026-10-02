@@ -54,13 +54,16 @@ struct PipelineControlTests {
     }
 
     /* A fresh package per run, because the engine's build cache is keyed by the package's path. */
-    static func run(source: String, manifest: String = manifest) async throws -> Run {
+    static func run(source: String, manifest: String = manifest, otherFiles: [String: Data] = [:]) async throws -> Run {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-control-\(UUID().uuidString)", isDirectory: true)
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
         try manifest.write(to: root.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
         try configuration.write(to: root.appendingPathComponent(".swift-format"), atomically: true, encoding: .utf8)
         try source.write(to: sources.appendingPathComponent("Control.swift"), atomically: true, encoding: .utf8)
+        for (name, contents) in otherFiles {
+            try contents.write(to: sources.appendingPathComponent(name))
+        }
         defer {
             do {
                 try FileManager.default.removeItem(at: root)
@@ -69,7 +72,7 @@ struct PipelineControlTests {
             }
         }
 
-        let options = try CommandOptions.parse(["--contract", "1", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
         var lines = Data()
         let writer = ContractWriter { lines.append($0) }
         _ = try await Pipeline(options: options, writer: writer, workingDirectory: root).run()
@@ -108,6 +111,20 @@ struct PipelineControlTests {
         #expect(run.findings == [":5"], "the compiler's error, which carries no rule name")
         #expect(run.phase("lint") == "notReached")
         #expect(run.of("summary").first?["exitCode"] as? Int == 1)
+    }
+
+    /* Contract 2: a file the engine cannot read is a record, between `project` and the first `phase`, and the run is incomplete. */
+    @Test func anUnreadableFileIsNamedInARecord() async throws {
+        let latin1 = Data("// caf".utf8) + Data([0xE9, 0x0A])
+        let run = try await Self.run(source: Self.cleanSource, otherFiles: ["Latin1.swift": latin1])
+        let kinds = run.records.compactMap { $0["kind"] as? String }
+        let unreadable = try #require(run.of("unreadable").first)
+        #expect((unreadable["file"] as? String)?.hasSuffix("/Sources/Control/Latin1.swift") == true)
+        #expect((unreadable["error"] as? String)?.isEmpty == false)
+        let at = try #require(kinds.firstIndex(of: "unreadable"))
+        #expect(kinds.firstIndex(of: "project").map { $0 < at } == true)
+        #expect(kinds.firstIndex(of: "phase").map { at < $0 } == true)
+        #expect(run.of("summary").first?["complete"] as? Bool == false)
     }
 
     /*

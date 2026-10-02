@@ -56,7 +56,7 @@ public struct SourceParser: Sendable {
         do {
             source = try String(contentsOf: owned.url, encoding: .utf8)
         } catch {
-            return .unreadable(LintRecord.Crash(file: owned.url.path, error: "could not read the file as UTF-8: \(error)"))
+            return .unreadable(LintRecord.Crash(file: owned.url.path, error: "it is not valid UTF-8 or could not be opened (\(error))"))
         }
         let tree = Parser.parse(source: source)
         let counter = NodeCounter(viewMode: .sourceAccurate)

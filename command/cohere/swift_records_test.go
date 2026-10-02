@@ -120,6 +120,20 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 		forbidLines(t, output, "Int' [#")
 	})
 
+	// Contract 2: the file the engine could not read is named with the excluded files, and the run is
+	// incomplete with exit 1 though every phase ran and nothing was found.
+	t.Run("Unreadable", func(t *testing.T) {
+		output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Unreadable.jsonl"), 1)
+		if err != nil || exitCode != 1 {
+			t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+		}
+		requireLines(t, output,
+			"  not checked: /project/Sources/Example/Latin1.swift (could not be read: it is not valid UTF-8 or could not be opened (Foundation could not decode it as UTF-8))\n",
+			"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
+			"  this run did not check everything — the notes above name the files nothing checked\n",
+		)
+	})
+
 	t.Run("NothingChanged", func(t *testing.T) {
 		output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "NothingChanged.jsonl"), 0)
 		if err != nil || exitCode != 0 {
@@ -157,6 +171,7 @@ func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
 	findings := contractFixture(t, "Findings.jsonl")
 	clean := contractFixture(t, "Clean.jsonl")
 	bail := contractFixture(t, "TypesBail.jsonl")
+	unreadable := contractFixture(t, "Unreadable.jsonl")
 	last := len(findings) - 1
 
 	replace := func(lines []string, index int, line string) []string {
@@ -178,8 +193,8 @@ func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
 		{"a line that is not a record", replace(findings, 4, "warning: the build printed to stdout"), 1, "not a record"},
 		{"a record of unknown kind", replace(findings, 4, `{"kind":"telemetry"}`), 1, "unknown kind"},
 		{"provenance not first", without(findings, 0), 1, "provenance is always first"},
-		{"a contract the front door does not speak", replace(findings, 0, strings.Replace(findings[0], `"contract":1`, `"contract":2`, 1)), 1, "contract 2"},
-		{"a provenance with no contract", replace(findings, 0, strings.Replace(findings[0], `"contract":1,`, "", 1)), 1, "contract none"},
+		{"a contract the front door does not speak", replace(findings, 0, strings.Replace(findings[0], `"contract":2`, `"contract":3`, 1)), 1, "contract 3"},
+		{"a provenance with no contract", replace(findings, 0, strings.Replace(findings[0], `"contract":2,`, "", 1)), 1, "contract none"},
 		{"a finding the summary does not count", replace(findings, last, strings.Replace(findings[last], `"findings":2`, `"findings":1`, 1)), 1, "counts 1 findings and 2"},
 		{"a types record that disagrees with its findings", replace(findings, 5, strings.Replace(findings[5], `"diagnostics":1`, `"diagnostics":0`, 1)), 1, "types record counts 0"},
 		{"a lint record that disagrees with its findings", replace(findings, 8, strings.Replace(findings[8], `"findings":1`, `"findings":3`, 1)), 1, "lint record counts 3"},
@@ -192,6 +207,10 @@ func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
 		{"a summary whose exit code disagrees with its own findings", replace(findings, last, strings.Replace(findings[last], `"exitCode":1`, `"exitCode":0`, 1)), 0, "summary says exit 0"},
 		{"an engine whose exit disagrees with its summary", findings, 0, "said it would exit 1"},
 		{"a summary missing its fields", replace(findings, last, `{"kind":"summary"}`), 1, "missing findings"},
+		// Contract 2's unreadable record: a summary may not call the run complete over one, and it has one place.
+		{"a summary claiming complete over an unreadable file", replace(unreadable, len(unreadable)-1, `{"kind":"summary","findings":0,"complete":true,"nothingToCheck":"","exitCode":0}`), 0, "calls the run complete"},
+		{"an unreadable record after a phase", append(append(append([]string(nil), unreadable[:5]...), unreadable[2]), unreadable[5:]...), 1, "after phase fix"},
+		{"an unreadable record before the project", append([]string{unreadable[0], unreadable[2]}, unreadable[1:]...), 1, "before the project record"},
 	}
 
 	for _, testCase := range cases {
@@ -240,7 +259,7 @@ func TestSwiftRunBelievesAnEngineThatFellShort(t *testing.T) {
 	if err != nil || exitCode != 1 {
 		t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
 	}
-	requireLines(t, output, "  this run did not check everything — the Swift engine reported files it could not check, and its notes on stderr name them\n")
+	requireLines(t, output, "  this run did not check everything — the Swift engine reported that it fell short without a record saying where\n")
 }
 
 // TestSwiftRunListingModes holds the two runs that end without a summary on purpose.
@@ -306,7 +325,7 @@ func TestSwiftEngineArguments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "--contract 1 --root /work/macos --no-fix --lint-config /work/macos/sub/Local.json --fix-passes 4 /work/macos/sub/Thing.swift /abs/Other.swift"
+	want := "--contract 2 --root /work/macos --no-fix --lint-config /work/macos/sub/Local.json --fix-passes 4 /work/macos/sub/Thing.swift /abs/Other.swift"
 	if strings.Join(arguments, " ") != want || mode != swiftModeCheck {
 		// `--changed=false` was typed and is false, so it is not forwarded as a switch.
 		t.Errorf("arguments %q mode %s, want %q", strings.Join(arguments, " "), mode, want)
