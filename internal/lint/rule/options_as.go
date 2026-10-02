@@ -7,7 +7,9 @@ import (
 
 // OptionsAsReads counts every OptionsAs call, so the registry's decoder agreement test can tell a rule
 // whose options read was reached from one that ran without reaching it (#zwd43jn). One atomic add per
-// rule per file, which no run can measure.
+// options read, contended across the parallel file walk. Measured on ahra's full lint, five runs each:
+// a median lint phase of 3.88s with the counter and 4.07s without, against a run-to-run spread of 3.4s
+// to 5.8s, so its cost is below what a run resolves rather than shown to be zero.
 var OptionsAsReads atomic.Int64
 
 // OptionsAs reads the options a rule's Run is handed as the type its registration's decoder
