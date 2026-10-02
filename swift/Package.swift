@@ -53,6 +53,8 @@ let package = Package(
         .target(name: "ClangDiagnosticsShim"),
         /* The same, for the part of sourcekitd's C API the engine calls: the compiler as a library, loaded the same way. */
         .target(name: "SourcekitdShim"),
+        /* And for the index store the build writes: which declaration every name in every file resolves to. */
+        .target(name: "IndexStoreShim"),
         /*
          Everything the engine knows, as a library so the tests reach the same code the command runs.
          The command target is only the process boundary: arguments in, records out, an exit code.
@@ -62,6 +64,7 @@ let package = Package(
             dependencies: [
                 "ClangDiagnosticsShim",
                 "SourcekitdShim",
+                "IndexStoreShim",
                 .product(name: "SwiftSyntax", package: "swift-syntax"),
                 .product(name: "SwiftParser", package: "swift-syntax"),
                 .product(name: "SwiftParserDiagnostics", package: "swift-syntax"),

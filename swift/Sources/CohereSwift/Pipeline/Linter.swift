@@ -15,6 +15,9 @@ struct Linter {
 
     let configuration: RuleConfiguration
     let fileRules: [any FileRule]
+    var typedRules: [any TypedFileRule] = []
+    /* What names resolve to in the files some enabled typed rule applies to, fetched before the walk (`SymbolProvider`). */
+    var symbols = SymbolProvider.Result(symbols: [:], unavailable: [:], fromIndex: 0, fromSourcekitd: 0)
 
     /* `manifests` holds each owned package's parsed `Package.swift`, keyed by the package root's path; vendored packages are absent and never checked. */
     /* `reusable` holds, by path, what the fix phase's last walk found per rule in exactly the text being linted; those files are not walked again. */
@@ -46,6 +49,12 @@ struct Linter {
             scopedOff[rule.name] = files.count
         }
         rulesRun += enabled.count
+        let enabledTyped = typedRules.filter { configuration.severity(of: $0.name) != .off }
+        for rule in typedRules where configuration.severity(of: rule.name) == .off {
+            scopedOff[rule.name] = files.count
+        }
+        rulesRun += enabledTyped.count
+        let symbols = symbols
 
         /*
          Every file is walked on its own, so files are walked side by side. Each answers with what every enabled
@@ -59,7 +68,12 @@ struct Linter {
                         guard rule.applies(to: file) else { return nil }
                         return reusable[file.url.path]?[rule.name] ?? rule.findings(in: file)
                     }
-                    return (index, byRule)
+                    /* A typed rule with no symbols for a file it applies to judged nothing there; the crash list below says so. */
+                    let byTypedRule = enabledTyped.map { rule -> [FindingRecord]? in
+                        guard rule.applies(to: file), let found = symbols.symbols[file.url.path] else { return nil }
+                        return rule.findings(in: file, symbols: found)
+                    }
+                    return (index, byRule + byTypedRule)
                 }
             }
             var collected = [[[FindingRecord]?]](repeating: [], count: files.count)
@@ -68,18 +82,25 @@ struct Linter {
             }
             return collected
         }
-        for (ruleIndex, rule) in enabled.enumerated() {
-            let severity = configuration.severity(of: rule.name)
+        for (ruleIndex, name) in (enabled.map(\.name) + enabledTyped.map(\.name)).enumerated() {
+            let severity = configuration.severity(of: name)
             for fileIndex in files.indices {
                 guard let raw = perFile[fileIndex][ruleIndex] else { continue }
-                listening[rule.name, default: 0] += 1
+                listening[name, default: 0] += 1
                 let found = raw.map { Self.applying(severity, to: $0) }
-                reporting[rule.name, default: 0] += found.count
+                reporting[name, default: 0] += found.count
                 findings.append(contentsOf: found)
             }
         }
 
-        let ranNames = (RuleRegistry.packageRules.map(\.name) + fileRules.map(\.name)).filter { scopedOff[$0] == nil }
+        let ranNames = (RuleRegistry.packageRules.map(\.name) + fileRules.map(\.name) + typedRules.map(\.name)).filter { scopedOff[$0] == nil }
+        /* A file a typed rule applies to and no source of symbols described: nothing that rule would say about it was said. */
+        let unchecked = files.filter { file in
+            symbols.unavailable[file.url.path] != nil && enabledTyped.contains { $0.applies(to: file) }
+        }
+        let crashes = unchecked.map { file in
+            LintRecord.Crash(file: file.url.path, error: "the typed rules could not read what its names resolve to: \(symbols.unavailable[file.url.path] ?? "")")
+        }
         let silent = ranNames.filter { (listening[$0] ?? 0) == 0 }.sorted()
         let watchedAndQuiet = ranNames.filter { (listening[$0] ?? 0) > 0 && (reporting[$0] ?? 0) == 0 }.count
 
@@ -92,7 +113,7 @@ struct Linter {
             reusedFrom: "",
             rulesSilent: silent,
             rulesWatchedAndQuiet: watchedAndQuiet,
-            crashes: [],
+            crashes: crashes,
             rulesScopedOff: scopedOff,
             rulesNotConfigured: [],
             configurationNote: configuration.note

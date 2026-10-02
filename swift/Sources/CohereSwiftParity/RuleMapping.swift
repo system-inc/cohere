@@ -58,6 +58,7 @@ struct RuleMapping: Sendable {
         RuleMapping(incumbent: .swiftLint, incumbentRule: "legacy_nsgeometry_functions", rules: ["cohere-swift/legacy-constructors"], messageIds: ["legacyNSGeometryFunction"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "legacy_random", rules: ["cohere-swift/legacy-constructors"], messageIds: ["legacyRandom"]),
         RuleMapping(incumbent: .swiftFormat, incumbentRule: "NoLeadingUnderscores", rules: ["cohere-swift/no-leading-underscores"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "empty_count", rules: ["cohere-swift/empty-count"]),
     ]
 
     static func incumbentRules(of incumbent: Incumbent) -> [String] {

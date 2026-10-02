@@ -349,13 +349,36 @@ struct TypesPhase {
             for targetDirectory in try manager.contentsOfDirectory(at: configuration, includingPropertiesForKeys: nil) {
                 let name = targetDirectory.lastPathComponent
                 guard name.hasSuffix(".build"), !name.contains("-product-") else { continue }
-                /* The dash matters: `AhraOsServicesTests-p` must not count as a directory of `AhraOsServices`. */
-                if let target = targetNames.first(where: { name.hasPrefix("\($0)-") }) {
+                /*
+                 Matched by the directory's exact stem, never by prefix: `cohere-swift-` is a prefix of
+                 `cohere-swift-parity-p.build`, and `AhraOsServices-` of nothing it should not be only by luck.
+                 */
+                let stem = Self.directoryStem(name)
+                if let target = targetNames.contains(stem) ? stem : productTargets[stem], targetNames.contains(target) {
                     directories.append((target, targetDirectory))
                 }
             }
         }
         return directories
+    }
+
+    /* Every single-target product of every package this phase builds, to its target. */
+    private var productTargets: [String: String] {
+        package.allPackages.reduce(into: [:]) { merged, member in merged.merge(member.productTargets) { first, _ in first } }
+    }
+
+    /*
+     The target or product a build directory belongs to: `AhraOs-p.build` and `CohereSwift-t.build` drop their
+     last dash-separated part, and a testable variant, `AhraOsServices--36C56AD10F55DF70-testable-t.build`,
+     keeps what comes before its double dash.
+     */
+    static func directoryStem(_ name: String) -> String {
+        let base = String(name.dropLast(".build".count))
+        if let variant = base.range(of: "--") {
+            return String(base[..<variant.lowerBound])
+        }
+        guard let lastDash = base.lastIndex(of: "-") else { return base }
+        return String(base[..<lastDash])
     }
 
     private func diaFiles(in targetDirectory: URL) throws -> [URL] {

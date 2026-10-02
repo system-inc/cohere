@@ -18,7 +18,14 @@ struct DescribeOutput: Decodable {
         var path: String?
     }
 
+    /* A product and the targets it is built from. An executable's build directory is named for its product. */
+    struct Product: Decodable {
+        var name: String
+        var targets: [String]
+    }
+
     var name: String
     var targets: [Target]
+    var products: [Product]?
     var dependencies: [Dependency]?
 }

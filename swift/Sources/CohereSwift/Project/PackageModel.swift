@@ -64,6 +64,11 @@ public struct PackageModel: Equatable, Sendable {
     public var pathDependencyRoots: [URL] = []
     /* Those packages, loaded. Filled by `load`; empty when built from output alone. */
     public var localPackages: [PackageModel]
+    /*
+     Each single-target product's name, to its target's. The build names an executable's directory for its
+     product (`cohere-swift-p.build` for target `CohereSwiftCommand`), so this is how its records are found.
+     */
+    public var productTargets: [String: String] = [:]
 
     public init(name: String, root: URL, toolsVersion: String, targets: [Target], localDependencyRoots: [URL] = [], localPackages: [PackageModel] = []) {
         self.name = name
@@ -212,6 +217,10 @@ public struct PackageModel: Equatable, Sendable {
             .compactMap { $0.path.map { URL(fileURLWithPath: $0, isDirectory: true) } }
         self.localDependencyRoots = pathDependencyRoots.filter { PackageModel.isInside($0, root) }
         self.localPackages = []
+        self.productTargets = Dictionary(
+            (description.products ?? []).compactMap { product in product.targets.count == 1 ? product.targets.first.map { (product.name, $0) } : nil },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     /*

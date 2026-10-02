@@ -284,8 +284,13 @@ public struct Pipeline {
             try writer.write(PhaseRecord(name: .lint, outcome: .skipped, detail: "not requested"))
         } else {
             let lintStart = Date()
-            let lint = await Linter(configuration: configuration, fileRules: fileRules)
-                .run(package: package, manifests: await manifests(of: package), files: parsed.files, reusable: reusableFindings)
+            var linter = Linter(configuration: configuration, fileRules: fileRules)
+            linter.typedRules = RuleRegistry.typedRules
+            let typedCandidates = parsed.files.filter { file in
+                RuleRegistry.typedRules.contains { configuration.severity(of: $0.name) != .off && $0.applies(to: file) }
+            }
+            linter.symbols = SymbolProvider(scratchPaths: symbolScratchPaths(package: package, root: root), runner: runner).symbols(for: typedCandidates)
+            let lint = await linter.run(package: package, manifests: await manifests(of: package), files: parsed.files, reusable: reusableFindings)
             for finding in lint.findings {
                 try writer.write(finding)
             }
@@ -294,7 +299,7 @@ public struct Pipeline {
              because that is what the front door's line says. A run that reused some files and walked others
              still saves the walk, and says it ran.
              */
-            let reusedEverything = nothingRewritten && !parsed.files.isEmpty && parsed.files.allSatisfy { reusableFindings[$0.url.path] != nil }
+            let reusedEverything = nothingRewritten && typedCandidates.isEmpty && !parsed.files.isEmpty && parsed.files.allSatisfy { reusableFindings[$0.url.path] != nil }
             var record = lint.record
             record.elapsedMilliseconds = Self.milliseconds(since: lintStart)
             record.reusedFrom = reusedEverything ? "fix" : ""
@@ -375,6 +380,12 @@ public struct Pipeline {
         guard result.succeeded else { return root }
         let path = String(decoding: result.standardOutput, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         return URL(fileURLWithPath: path, isDirectory: true)
+    }
+
+    /* Every scratch a build of this package writes an index store into: the root's, and each local package's that the types phase builds for its tests. */
+    private func symbolScratchPaths(package: PackageModel, root: URL) -> [URL] {
+        let scratch = Self.scratchPath(for: root)
+        return [scratch] + package.localPackages.map { scratch.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true) }
     }
 
     /* Each owned package's manifest, parsed, so package rules can point at the line that would fix them. A manifest that cannot be read is absent, and its findings point at line 1. */

@@ -80,6 +80,33 @@ final class Sourcekitd: Sendable {
         }
     }
 
+    /* One name `indexsource` reports, and the names inside it: a declaration's body holds its references. */
+    private struct IndexedEntity: Decodable, Sendable {
+        var kind: String
+        var name: String?
+        var symbol: String?
+        var line: Int?
+        var column: Int?
+        var entities: [IndexedEntity]?
+
+        enum CodingKeys: String, CodingKey {
+            case kind = "key.kind"
+            case name = "key.name"
+            case symbol = "key.usr"
+            case line = "key.line"
+            case column = "key.column"
+            case entities = "key.entities"
+        }
+    }
+
+    private struct IndexResponse: Decodable, Sendable {
+        var entities: [IndexedEntity]?
+
+        enum CodingKeys: String, CodingKey {
+            case entities = "key.entities"
+        }
+    }
+
     /* An answer read only for whether it was an error: opening and closing a document. */
     private struct Acknowledgement: Decodable {}
 
@@ -185,6 +212,36 @@ final class Sourcekitd: Sendable {
             }
             return response.types ?? []
         }
+    }
+
+    /*
+     Every name in one file and the declaration it resolves to: what the build's index store records, asked of
+     the compiler here, for a file the build did not compile as it stands. A kind spelled `source.lang.swift.ref.`
+     is a reference; every other kind declares. An accessor reference is the implicit getter or setter call the
+     index store marks implicit, so it is marked the same way here.
+     */
+    func symbols(file: String, arguments: [String]) throws -> FileSymbols {
+        let response: IndexResponse = try asking.withLock { _ in
+            try send("source.request.indexsource") { request in
+                set(request, "key.sourcefile", file)
+                set(request, "key.compilerargs", arguments)
+            }
+        }
+        var occurrences: [FileSymbols.Occurrence] = []
+        var pending = response.entities ?? []
+        while let entity = pending.popLast() {
+            pending.append(contentsOf: entity.entities ?? [])
+            guard let symbol = entity.symbol, let line = entity.line, let column = entity.column else { continue }
+            occurrences.append(FileSymbols.Occurrence(
+                line: line,
+                column: column,
+                symbol: symbol,
+                name: entity.name ?? "",
+                isReference: entity.kind.hasPrefix("source.lang.swift.ref."),
+                isImplicit: entity.kind.contains(".accessor.")
+            ))
+        }
+        return FileSymbols(occurrences)
     }
 
     private func withOpenDocument<Answer: Sendable>(file: String, arguments: [String], text: String?, _ body: () throws -> Answer) throws -> Answer {

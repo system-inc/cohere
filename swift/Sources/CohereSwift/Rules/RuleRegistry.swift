@@ -38,6 +38,11 @@ public enum RuleRegistry {
         SwiftFormatRule.noLeadingUnderscores,
     ] }
 
+    /* The rules that read what names resolve to; see `TypedFileRule` for what a run fetches for them. */
+    public static let typedRules: [any TypedFileRule] = [
+        EmptyCount(),
+    ]
+
     public static let packageRules: [any PackageRule] = [
         RequireSwiftSixLanguageMode(),
         RequireUpcomingFeatures(),
@@ -46,6 +51,6 @@ public enum RuleRegistry {
     /* Sorted, so two binaries' lists can be compared with `diff`. */
     public static var allNames: [String] {
         /* Names only, so no vocabulary is read: `--rules` answers without one. */
-        (fileRules(vocabulary: AbbreviationVocabulary()).map(\.name) + packageRules.map(\.name)).sorted()
+        (fileRules(vocabulary: AbbreviationVocabulary()).map(\.name) + typedRules.map(\.name) + packageRules.map(\.name)).sorted()
     }
 }
