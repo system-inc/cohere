@@ -17,7 +17,7 @@ struct ContractFixtureTests {
         .deletingLastPathComponent()
         .appendingPathComponent("Contract", isDirectory: true)
 
-    static let fixtureNames = ["Clean", "Findings", "TypesBail", "CrashWithoutSummary", "NothingChanged", "Unreadable"]
+    static let fixtureNames = ["Clean", "Findings", "TypesBail", "CrashWithoutSummary", "NothingChanged", "Unreadable", "Unused"]
 
     @Test(arguments: fixtureNames)
     func everyRecordRoundTrips(fixture: String) throws {
@@ -60,6 +60,8 @@ struct ContractFixtureTests {
         case "rule": return try encoder.encode(decoder.decode(RuleRecord.self, from: data))
         case "summary": return try encoder.encode(decoder.decode(SummaryRecord.self, from: data))
         case "unreadable": return try encoder.encode(decoder.decode(UnreadableRecord.self, from: data))
+        case "unused": return try encoder.encode(decoder.decode(UnusedRecord.self, from: data))
+        case "unusedCoverage": return try encoder.encode(decoder.decode(UnusedCoverageRecord.self, from: data))
         default:
             Issue.record("a fixture holds a record kind the engine has no type for: \(kind)")
             return Data()

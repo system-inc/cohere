@@ -76,6 +76,31 @@ type swiftFindingRecord struct {
 	Message   string `json:"message"`
 }
 
+// swiftUnusedRecord is one item of the --unused report. It carries a finding's place and words but is
+// not a finding: the report is not a gate, so it is never counted and never moves the exit code, as the
+// TypeScript unused report never does.
+type swiftUnusedRecord struct {
+	File      string `json:"file"`
+	Line      int    `json:"line"`
+	Column    int    `json:"column"`
+	Rule      string `json:"rule"`
+	MessageId string `json:"messageId"`
+	Message   string `json:"message"`
+	Subject   string `json:"subject"`
+}
+
+// swiftUnusedCoverageRecord is what one rule of the --unused report looked at, so a report that checked
+// nothing never reads like one that found nothing.
+type swiftUnusedCoverageRecord struct {
+	Rule                string         `json:"rule"`
+	FilesChecked        int            `json:"filesChecked"`
+	FilesNotChecked     map[string]int `json:"filesNotChecked"`
+	Checked             int            `json:"checked"`
+	Skipped             map[string]int `json:"skipped"`
+	Found               *int           `json:"found"`
+	ElapsedMilliseconds int            `json:"elapsedMilliseconds"`
+}
+
 type swiftFixRecord struct {
 	FilesConsidered     int            `json:"filesConsidered"`
 	FilesRewritten      int            `json:"filesRewritten"`
@@ -184,6 +209,13 @@ type swiftRun struct {
 	unreadable         []swiftUnreadableRecord
 
 	excludedPrinted bool
+
+	// The --unused report: items held until their rule's coverage record says how many there are, so the
+	// section prints with its count first, in the TypeScript report's shape. unusedCoverage counts the
+	// coverage records, which an unused phase that ran must have.
+	unusedHeadingPrinted bool
+	unusedPending        []swiftUnusedRecord
+	unusedCoverage       int
 }
 
 func newSwiftRun(out io.Writer, mode swiftMode, rootNote string, processStart time.Time) *swiftRun {
@@ -234,6 +266,10 @@ func (r *swiftRun) accept(line []byte) error {
 		return decodeRecord(line, &swiftPhaseRecord{}, r.acceptPhase)
 	case "rule":
 		return decodeRecord(line, &swiftRuleRecord{}, r.acceptRule)
+	case "unused":
+		return decodeRecord(line, &swiftUnusedRecord{}, r.acceptUnused)
+	case "unusedCoverage":
+		return decodeRecord(line, &swiftUnusedCoverageRecord{}, r.acceptUnusedCoverage)
 	case "summary":
 		return decodeRecord(line, &swiftSummaryRecord{}, r.acceptSummary)
 	default:
@@ -342,6 +378,117 @@ func swiftFindingLine(record *swiftFindingRecord) string {
 		return line
 	}
 	return fmt.Sprintf("%s - %s [%s/%s]", position, message, record.Rule, record.MessageId)
+}
+
+// unusedPlace refuses an --unused report record anywhere but between the lint phase record and the
+// unused one, where the contract puts the report.
+func (r *swiftRun) unusedPlace(kind string) error {
+	if r.mode != swiftModeCheck {
+		return fmt.Errorf("an %s record in a %s run", kind, r.mode)
+	}
+	if r.nextPhase >= len(phaseOrder) || phaseOrder[r.nextPhase] != phaseUnused {
+		return fmt.Errorf("an %s record outside the unused phase, which comes after lint", kind)
+	}
+	return nil
+}
+
+func (r *swiftRun) acceptUnused(record *swiftUnusedRecord) error {
+	if err := r.unusedPlace("unused"); err != nil {
+		return err
+	}
+	if record.File == "" || record.Line < 1 || record.Column < 1 || record.Rule == "" || record.Subject == "" {
+		return fmt.Errorf("an unused record missing its file, position, rule or subject (file %q, line %d, column %d, rule %q)",
+			record.File, record.Line, record.Column, record.Rule)
+	}
+	r.unusedPending = append(r.unusedPending, *record)
+	return nil
+}
+
+// acceptUnusedCoverage prints one rule's section of the report: its items, counted and sorted, then what
+// it looked at and what it could not.
+func (r *swiftRun) acceptUnusedCoverage(record *swiftUnusedCoverageRecord) error {
+	if err := r.unusedPlace("unusedCoverage"); err != nil {
+		return err
+	}
+	if record.Rule == "" || record.Found == nil {
+		return fmt.Errorf("an unusedCoverage record missing its rule or found count")
+	}
+	items := []swiftUnusedRecord{}
+	for _, pending := range r.unusedPending {
+		if pending.Rule == record.Rule {
+			items = append(items, pending)
+		}
+	}
+	if len(items) != len(r.unusedPending) {
+		return fmt.Errorf("unused records of another rule arrived before the coverage record for %s", record.Rule)
+	}
+	if *record.Found != len(items) {
+		return fmt.Errorf("the unusedCoverage record for %s counts %d found and %d unused records came with it", record.Rule, *record.Found, len(items))
+	}
+	r.unusedPending = nil
+	r.unusedCoverage++
+
+	if !r.unusedHeadingPrinted {
+		r.unusedHeadingPrinted = true
+		fmt.Fprintf(r.out, "\nunused: a report, not a gate — nothing here fails a build\n")
+	}
+	// File, line, then column, so two items on one line print in the same order on every run.
+	sort.SliceStable(items, func(first, second int) bool {
+		if items[first].File != items[second].File {
+			return items[first].File < items[second].File
+		}
+		if items[first].Line != items[second].Line {
+			return items[first].Line < items[second].Line
+		}
+		return items[first].Column < items[second].Column
+	})
+	if len(items) > 0 {
+		fmt.Fprintf(r.out, "\n  %s — %d\n", swiftUnusedSection(record.Rule), len(items))
+		for _, item := range items {
+			fmt.Fprintf(r.out, "    %s:%d:%d — %s\n", item.File, item.Line, item.Column, item.Subject)
+		}
+	}
+	fmt.Fprintf(r.out, "  looked at %d files and %d %s (%s)\n", record.FilesChecked, record.Checked, swiftUnusedNoun(record.Rule), record.Rule)
+	for _, reason := range sortedKeys(record.FilesNotChecked) {
+		fmt.Fprintf(r.out, "  not checked for unused %s: %d files (%s)\n", swiftUnusedNoun(record.Rule), record.FilesNotChecked[reason], reason)
+	}
+	for _, reason := range sortedKeys(record.Skipped) {
+		fmt.Fprintf(r.out, "  never reported: %d %s (%s)\n", record.Skipped[reason], swiftUnusedNoun(record.Rule), reason)
+	}
+	return nil
+}
+
+// swiftUnusedWords holds each known rule's heading and the noun for what it judges, in the TypeScript
+// report's words. A rule not listed here prints under its own id and counts "items", so a new rule never
+// reads under another rule's heading.
+var swiftUnusedWords = map[string]struct{ section, noun string }{
+	"cohere-swift/unused-import":      {"imports nothing uses", "imports"},
+	"cohere-swift/unused-declaration": {"declarations nothing uses", "declarations"},
+}
+
+// swiftUnusedSection is the heading of one rule's items.
+func swiftUnusedSection(rule string) string {
+	if words, known := swiftUnusedWords[rule]; known {
+		return words.section
+	}
+	return rule
+}
+
+// swiftUnusedNoun names what a rule judges, for its coverage line.
+func swiftUnusedNoun(rule string) string {
+	if words, known := swiftUnusedWords[rule]; known {
+		return words.noun
+	}
+	return "items"
+}
+
+func sortedKeys(counts map[string]int) []string {
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func (r *swiftRun) acceptFix(record *swiftFixRecord) error {
@@ -548,6 +695,14 @@ func (r *swiftRun) acceptPhase(record *swiftPhaseRecord) error {
 	outcome, known := swiftOutcomes[record.Outcome]
 	if !known {
 		return fmt.Errorf("phase %s has outcome %q, which is not one of ran, skipped, notReached, reused", record.Name, record.Outcome)
+	}
+	if phaseOrder[r.nextPhase] == phaseUnused {
+		if len(r.unusedPending) > 0 {
+			return fmt.Errorf("%d unused records arrived with no unusedCoverage record to count them", len(r.unusedPending))
+		}
+		if record.Outcome == "ran" && r.unusedCoverage == 0 {
+			return fmt.Errorf("the unused phase ran and no unusedCoverage record said what it looked at")
+		}
 	}
 	r.nextPhase++
 	r.findingsInPhase = 0

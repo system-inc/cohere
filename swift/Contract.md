@@ -17,6 +17,7 @@ encoder's tests both read them, so neither side can drift without the other's te
 | `CrashWithoutSummary.jsonl` | The stream stops after the fix phase. The front door must say nothing was checked and exit 1. |
 | `NothingChanged.jsonl` | `--changed` with nothing changed: no package described, every phase skipped, `0 files checked`, exit 0. |
 | `Unreadable.jsonl` | One file the engine could not read: named beside the excluded files, every phase ran, nothing found, and still incomplete with exit 1. |
+| `Unused.jsonl` | `--unused`: two `unused` records and the `unusedCoverage` record after lint, the unused phase ran, and the summary counts no findings and exits 0, because the report is not a gate. |
 
 **Version 2** (2026-10-02) added the `unreadable` record. Before it, a file the engine could not read was a
 note on stderr: the summary said the run fell short and the front door believed it, but could not say
@@ -153,6 +154,59 @@ diagnostics have no number, so the compiler's warning group takes the place of t
 the way swiftc writes it, `[#Group]`. A compiler finding with no group has no bracket. For compiler
 findings, `rule` holds the group name without the `#`, or `""`.
 
+### `unused` and `unusedCoverage`, only under `--unused`
+
+```json
+{"kind":"unused","file":"/…/Main.swift","line":1,"column":1,"endLine":1,"endColumn":18,
+ "rule":"cohere-swift/unused-import","messageId":"unusedImport","message":"…why…","subject":"import Foundation",
+ "suggestions":[{"message":"Remove `import Foundation`","fixes":[{"start":0,"end":18,"text":""}]}]}
+{"kind":"unusedCoverage","rule":"cohere-swift/unused-import","filesChecked":217,
+ "filesNotChecked":{"it has #if, and the index describes only the configuration the build compiled":1},
+ "checked":471,"skipped":{"re-exported with @_exported, which is API":0},"found":15,"elapsedMilliseconds":2525}
+```
+
+The `--unused` report: code that was written and is never used. It is the Swift counterpart of the
+TypeScript unused report and keeps its rule, a report and not a gate. An `unused` record carries a
+finding's place and words, but it is not a `finding`: the summary does not count it and it never
+moves the exit code. Failing a build over code that is safe to remove and never breaks one would make
+the report something people route around rather than read.
+
+- Each `unused` record names one thing to remove. `subject` is that code as written and short
+  (`import Foundation`), for the report's one line per item. `suggestions` hold the removal, offered
+  and never applied: the report does not rewrite.
+- Exactly one `unusedCoverage` record follows a rule's `unused` records, and its `found` equals how
+  many came. It states the population beside the result, so a report that checked nothing never reads
+  like a report that found nothing: `filesChecked`, `filesNotChecked` by reason (a file the index
+  cannot vouch for), `checked` (the items judged), and `skipped` by reason (items never reported by
+  design).
+- Both come after the `lint` phase record and before the `unused` one. An `unused` phase that `ran`
+  without an `unusedCoverage` record is refused, as is a count that disagrees.
+
+Rendered after the lint line, in the TypeScript report's shape:
+
+```
+unused: a report, not a gate — nothing here fails a build
+
+  imports nothing uses — 2
+    /…/Main.swift:1:1 — import Foundation
+    /…/Tally.swift:2:1 — import Combine
+  looked at 2 files and 5 imports (cohere-swift/unused-import)
+  not checked for unused imports: 1 files (it has #if, and the index describes only the configuration the build compiled)
+  not checked for unused imports: 1 files (the build has not compiled it as it stands)
+  never reported: 1 imports (re-exported with @_exported, which is API)
+```
+
+Files not checked and items skipped are counted by reason, sorted by reason. The section header and its
+lines are left out when nothing was found.
+
+`unused-import` reads the build's index store. An import is used when something written in the file
+resolves into its module, or into a module it re-exports, or when a declaration the file refers to
+names that module in its signature (the index leaves out some member references, so a value of the
+module's type reached through a closure parameter is caught by the signature that hands it over). A
+file the index cannot vouch for is not checked: one the build has not compiled as it stands, one with
+`#if` (the index describes the configuration the build compiled), one with a reference no module
+claims. `@_exported` imports are API and never reported.
+
 ### `fix`, the fix and format phase's summary
 
 ```json
@@ -272,7 +326,7 @@ it where a run that did not finish prints green.
 | `--abbreviations <file>` | The abbreviation vocabulary the naming rules judge with, nexus's `abbreviations.json`. Optional: without it the engine reads the file beside its own source checkout, so the front door passes it only for a binary shipped without one. A vocabulary that is missing, unreadable or malformed refuses the run with exit 2, naming the path, before anything is checked. |
 | `--fix-passes <n>`, `--single-threaded` | As for TypeScript. |
 | `--rules`, `--rules-enabled`, `--version` | `rule` and `provenance` records. |
-| `--unused`, `--unused-all`, `--unused-deep` | Not implemented for Swift until phase 2. The engine records `unused` as `skipped (not implemented for Swift yet)`. It neither errors, because the phase is opt-in and its absence withholds nothing from the gate, nor stays silent. |
+| `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import`. It reads the index the types phase writes, so on a run without types it reads the last build's and counts every file that build did not compile as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report. |
 | `--timing`, `--explain <file>` | Not implemented for Swift yet. The engine refuses with exit 2 and names the flag. A flag that is accepted and ignored reads as a run that did what was asked. |
 | `--tsconfig` | Meaningless for Swift. The front door refuses it against a Swift root. |
 | `--directory` | Resolved by the front door into `--root`. |

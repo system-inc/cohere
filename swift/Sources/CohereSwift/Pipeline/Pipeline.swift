@@ -244,7 +244,7 @@ public struct Pipeline {
             let reason = "parsing bailed: \(filesThatDoNotParse) files do not parse, and checking a tree the parser could not read reports nonsense"
             try writer.write(PhaseRecord(name: .types, outcome: options.runTypes ? .notReached : .skipped, detail: options.runTypes ? reason : "not requested"))
             try writer.write(PhaseRecord(name: .lint, outcome: options.runLint ? .notReached : .skipped, detail: options.runLint ? reason : "not requested"))
-            try writer.write(unusedPhase())
+            try writer.write(unusedPhase(notReached: reason))
             return try writer.finish(complete: false)
         }
 
@@ -276,7 +276,7 @@ public struct Pipeline {
 
         if typeErrors > 0 && options.runLint {
             try writer.write(PhaseRecord(name: .lint, outcome: .notReached, detail: "types bailed: \(typeErrors) type errors — lint findings against wrong semantics are noise"))
-            try writer.write(unusedPhase())
+            try writer.write(unusedPhase(notReached: "types bailed: \(typeErrors) type errors, and the index of a package that does not compile is not the package"))
             return try writer.finish(complete: false)
         }
 
@@ -314,7 +314,11 @@ public struct Pipeline {
             }
         }
 
-        try writer.write(unusedPhase())
+        if options.unused {
+            try await runUnused(package: package, root: root, fileSet: fileSet, parsed: parsed.files)
+        } else {
+            try writer.write(PhaseRecord(name: .unused, outcome: .skipped, detail: Self.unusedNotRequested))
+        }
         return try writer.finish(complete: complete)
     }
 
@@ -322,14 +326,68 @@ public struct Pipeline {
         for name in [PhaseRecord.Name.fix, .types, .lint] {
             try writer.write(PhaseRecord(name: name, outcome: .skipped, detail: reason))
         }
-        try writer.write(unusedPhase())
+        try writer.write(PhaseRecord(name: .unused, outcome: .skipped, detail: options.unused ? reason : Self.unusedNotRequested))
         return try writer.finish(complete: true, nothingToCheck: reason)
     }
 
-    private func unusedPhase() -> PhaseRecord {
+    static let unusedNotRequested = "not requested — this is a report, ask for it with --unused"
+
+    /* The unused phase of a run cut off before it: not reached when it was asked for, not requested otherwise. */
+    private func unusedPhase(notReached reason: String) -> PhaseRecord {
         options.unused
-            ? PhaseRecord(name: .unused, outcome: .skipped, detail: "not implemented for Swift yet")
-            : PhaseRecord(name: .unused, outcome: .skipped, detail: "not requested — this is a report, ask for it with --unused")
+            ? PhaseRecord(name: .unused, outcome: .notReached, detail: reason)
+            : PhaseRecord(name: .unused, outcome: .skipped, detail: Self.unusedNotRequested)
+    }
+
+    /*
+     The unused report, over the whole package whatever the scope, since an import is used or not by the file
+     alone but the index that answers is the whole build's. It reads the index the types phase just refreshed,
+     or the last build's, and a file that index does not describe as it stands is counted as not checked
+     rather than guessed at. Its records are a report, not findings: the writer does not count them, so they
+     never fail a run, the way the TypeScript unused report never does.
+     */
+    private func runUnused(package: PackageModel, root: URL, fileSet: FileSet, parsed: [ParsedFile]) async throws {
+        let start = Date()
+        let stores: [IndexStore]
+        let demangler: SwiftDemangler
+        do {
+            let library = try IndexStore.toolchainLibraryPath(runner: runner)
+            stores = Self.symbolScratchPaths(package: package, root: root).compactMap {
+                try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(scratchPath: $0))
+            }
+            demangler = try SwiftDemangler.shared(runner: runner)
+        } catch {
+            try writer.write(PhaseRecord(name: .unused, outcome: .notReached, detail: "the index store or the demangler could not be loaded: \(error)"))
+            return
+        }
+        guard !stores.isEmpty else {
+            try writer.write(PhaseRecord(name: .unused, outcome: .notReached, detail: "no build has written an index store for this package yet; a run with the types phase writes one"))
+            return
+        }
+        /* Every file of ours, the out-of-scope ones parsed here: an `@_exported import` anywhere decides what a module re-exports. */
+        let parsedPaths = Set(parsed.map(\.url.path))
+        let missing = fileSet.owned.filter { !parsedPaths.contains($0.url.path) }
+        let files = missing.isEmpty ? parsed : parsed + (await SourceParser().parse(missing)).files
+        let result = UnusedImports(stores: stores, demangler: demangler).run(files: files)
+        let ordered = result.findings.sorted { ($0.finding.file, $0.finding.line, $0.finding.column) < ($1.finding.file, $1.finding.line, $1.finding.column) }
+        for found in ordered {
+            try writer.write(UnusedRecord(found.finding, subject: found.subject))
+        }
+        var notChecked: [String: Int] = [:]
+        for reason in result.filesUnchecked.values {
+            notChecked[reason, default: 0] += 1
+        }
+        let elapsed = Self.milliseconds(since: start)
+        try writer.write(UnusedCoverageRecord(
+            rule: UnusedImports.ruleName,
+            filesChecked: result.filesChecked,
+            filesNotChecked: notChecked,
+            checked: result.importsChecked,
+            skipped: result.importsExported > 0 ? ["re-exported with @_exported, which is API": result.importsExported] : [:],
+            found: ordered.count,
+            elapsedMilliseconds: elapsed
+        ))
+        try writer.write(PhaseRecord(name: .unused, outcome: .ran, elapsedMilliseconds: elapsed))
     }
 
     private func projectRecord(package: PackageModel, fileSet: FileSet, scope: FileScope, elapsed: Int) -> ProjectRecord {

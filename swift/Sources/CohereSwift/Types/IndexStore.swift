@@ -20,12 +20,50 @@ final class IndexStore {
         var description: String
     }
 
+    /* `INDEXSTORE_UNIT_DEPENDENCY_UNIT`: a module the unit's file imports, named by its module name. */
+    private static let unitDependency: Int32 = 1
     /* `INDEXSTORE_UNIT_DEPENDENCY_RECORD`: the dependency that names the record of the unit's own file. */
     private static let recordDependency: Int32 = 2
+    /* `INDEXSTORE_SYMBOL_ROLE_DECLARATION` and `INDEXSTORE_SYMBOL_ROLE_DEFINITION`. */
+    static let declarationRoles: UInt64 = 1 << 0 | 1 << 1
     /* `INDEXSTORE_SYMBOL_ROLE_REFERENCE`. */
-    private static let referenceRole: UInt64 = 1 << 2
+    static let referenceRole: UInt64 = 1 << 2
     /* `INDEXSTORE_SYMBOL_ROLE_IMPLICIT`. */
-    private static let implicitRole: UInt64 = 1 << 8
+    static let implicitRole: UInt64 = 1 << 8
+    /* `INDEXSTORE_SYMBOL_KIND_MODULE`: a module's own name, as an `import` line or a qualified name spells it. */
+    static let moduleKind: Int32 = 1
+
+    /*
+     One unit: one compile of one file of ours, or one module the build imported (a `.swiftinterface` or a
+     Clang `.pcm`, marked system). Its unit dependencies are what the file imports, the implicit standard
+     library modules among them; for a system module they are the modules it imports in turn.
+     */
+    struct Unit: Sendable {
+        var name: String
+        /* The compiled file, resolved, or the module's interface for a system unit. */
+        var mainFile: String
+        var module: String
+        var isSystem: Bool
+        var written: Date
+        var importedModules: [String]
+        /* The records holding the unit's own file's occurrences. */
+        var ownRecords: [String]
+        /* Every record the unit names: for a system module, the records declaring what it exports. */
+        var allRecords: [String]
+    }
+
+    /* One occurrence as the record holds it, roles and kind kept whole for questions `FileSymbols` does not ask. */
+    struct RecordOccurrence: Sendable {
+        var line: Int
+        var column: Int
+        var symbol: String
+        var name: String
+        var roles: UInt64
+        var kind: Int32
+
+        var isReference: Bool { roles & IndexStore.referenceRole != 0 }
+        var isDeclaration: Bool { roles & IndexStore.declarationRoles != 0 }
+    }
 
     private let store: CohereIndexStore
     private let storePath: URL
@@ -34,10 +72,13 @@ final class IndexStore {
     private let unitReaderCreate: CohereIndexUnitReaderCreate
     private let unitReaderDispose: CohereIndexUnitReaderDispose
     private let unitMainFile: CohereIndexUnitReaderGetMainFile
+    private let unitModuleName: CohereIndexUnitReaderGetModuleName
+    private let unitIsSystem: CohereIndexUnitReaderIsSystemUnit
     private let dependenciesApply: CohereIndexUnitReaderDependenciesApply
     private let dependencyKind: CohereIndexUnitDependencyGetKind
     private let dependencyName: CohereIndexUnitDependencyGetName
     private let dependencyFilePath: CohereIndexUnitDependencyGetFilePath
+    private let dependencyModuleName: CohereIndexUnitDependencyGetModuleName
     private let recordReaderCreate: CohereIndexRecordReaderCreate
     private let recordReaderDispose: CohereIndexRecordReaderDispose
     private let occurrencesApply: CohereIndexRecordReaderOccurrencesApply
@@ -46,9 +87,10 @@ final class IndexStore {
     private let occurrenceLineColumn: CohereIndexOccurrenceGetLineColumn
     private let symbolName: CohereIndexSymbolGetString
     private let symbolIdentifier: CohereIndexSymbolGetString
+    private let symbolKind: CohereIndexSymbolGetKind
 
-    /* Each file's records, by resolved path, with when the unit naming them was written. Read once, on first use. */
-    private var recordsByFile: [String: [(record: String, written: Date)]]?
+    /* Every unit in the store, read once, on first use. */
+    private var cachedUnits: [Unit]?
 
     init(libraryPath: String, storePath: URL) throws {
         guard let handle = dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL) else {
@@ -67,10 +109,13 @@ final class IndexStore {
         unitReaderCreate = try symbol("indexstore_unit_reader_create", as: CohereIndexUnitReaderCreate.self)
         unitReaderDispose = try symbol("indexstore_unit_reader_dispose", as: CohereIndexUnitReaderDispose.self)
         unitMainFile = try symbol("indexstore_unit_reader_get_main_file", as: CohereIndexUnitReaderGetMainFile.self)
+        unitModuleName = try symbol("indexstore_unit_reader_get_module_name", as: CohereIndexUnitReaderGetModuleName.self)
+        unitIsSystem = try symbol("indexstore_unit_reader_is_system_unit", as: CohereIndexUnitReaderIsSystemUnit.self)
         dependenciesApply = try symbol("indexstore_unit_reader_dependencies_apply_f", as: CohereIndexUnitReaderDependenciesApply.self)
         dependencyKind = try symbol("indexstore_unit_dependency_get_kind", as: CohereIndexUnitDependencyGetKind.self)
         dependencyName = try symbol("indexstore_unit_dependency_get_name", as: CohereIndexUnitDependencyGetName.self)
         dependencyFilePath = try symbol("indexstore_unit_dependency_get_filepath", as: CohereIndexUnitDependencyGetFilePath.self)
+        dependencyModuleName = try symbol("indexstore_unit_dependency_get_modulename", as: CohereIndexUnitDependencyGetModuleName.self)
         recordReaderCreate = try symbol("indexstore_record_reader_create", as: CohereIndexRecordReaderCreate.self)
         recordReaderDispose = try symbol("indexstore_record_reader_dispose", as: CohereIndexRecordReaderDispose.self)
         occurrencesApply = try symbol("indexstore_record_reader_occurrences_apply_f", as: CohereIndexRecordReaderOccurrencesApply.self)
@@ -79,6 +124,7 @@ final class IndexStore {
         occurrenceLineColumn = try symbol("indexstore_occurrence_get_line_col", as: CohereIndexOccurrenceGetLineColumn.self)
         symbolName = try symbol("indexstore_symbol_get_name", as: CohereIndexSymbolGetString.self)
         symbolIdentifier = try symbol("indexstore_symbol_get_usr", as: CohereIndexSymbolGetString.self)
+        symbolKind = try symbol("indexstore_symbol_get_kind", as: CohereIndexSymbolGetKind.self)
         guard FileManager.default.fileExists(atPath: storePath.appendingPathComponent("v5/units").path), let store = create(storePath.path, nil) else {
             throw Failure(description: "no index store at \(storePath.path): the build wrote none, or wrote it where this engine does not look")
         }
@@ -139,32 +185,42 @@ final class IndexStore {
         )
     }
 
+    /* Each file's records, by resolved path, with when the unit naming them was written. */
     private func records() -> [String: [(record: String, written: Date)]] {
-        if let recordsByFile {
-            return recordsByFile
+        var byFile: [String: [(record: String, written: Date)]] = [:]
+        for unit in units() where !unit.mainFile.isEmpty {
+            byFile[unit.mainFile, default: []].append(contentsOf: unit.ownRecords.map { ($0, unit.written) })
+        }
+        return byFile
+    }
+
+    /* Every unit in the store, read once. Measured on Presence: 2,531 units, listed in 9ms. */
+    func units() -> [Unit] {
+        if let cachedUnits {
+            return cachedUnits
         }
         final class Names {
             var values: [String] = []
         }
-        let units = Names()
-        _ = unitsApply(store, 0, Unmanaged.passUnretained(units).toOpaque()) { context, name in
+        let names = Names()
+        _ = unitsApply(store, 0, Unmanaged.passUnretained(names).toOpaque()) { context, name in
             guard let context else { return false }
             Unmanaged<Names>.fromOpaque(context).takeUnretainedValue().values.append(IndexStore.text(name))
             return true
         }
         let unitsDirectory = storePath.appendingPathComponent("v5/units", isDirectory: true)
-        var byFile: [String: [(record: String, written: Date)]] = [:]
-        for unit in units.values {
-            guard let reader = unitReaderCreate(store, unit, nil) else { continue }
+        var units: [Unit] = []
+        for name in names.values {
+            guard let reader = unitReaderCreate(store, name, nil) else { continue }
             defer { unitReaderDispose(reader) }
             let mainFile = Self.text(unitMainFile(reader))
-            guard !mainFile.isEmpty else { continue }
-            let written = (try? unitsDirectory.appendingPathComponent(unit).resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-            /* The record of the unit's own file, matched by path: a unit's other records belong to files it only read. */
+            let written = (try? unitsDirectory.appendingPathComponent(name).resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
             final class Dependencies {
                 let store: IndexStore
                 let mainFile: String
-                var records: [String] = []
+                var imported: [String] = []
+                var own: [String] = []
+                var all: [String] = []
                 init(store: IndexStore, mainFile: String) {
                     self.store = store
                     self.mainFile = mainFile
@@ -175,18 +231,68 @@ final class IndexStore {
                 guard let context, let dependency else { return true }
                 let dependencies = Unmanaged<Dependencies>.fromOpaque(context).takeUnretainedValue()
                 let store = dependencies.store
-                if store.dependencyKind(dependency) == IndexStore.recordDependency,
-                    IndexStore.text(store.dependencyFilePath(dependency)) == dependencies.mainFile
-                {
-                    dependencies.records.append(IndexStore.text(store.dependencyName(dependency)))
+                switch store.dependencyKind(dependency) {
+                case IndexStore.unitDependency:
+                    let module = IndexStore.text(store.dependencyModuleName(dependency))
+                    if !module.isEmpty {
+                        dependencies.imported.append(module)
+                    }
+                case IndexStore.recordDependency:
+                    let record = IndexStore.text(store.dependencyName(dependency))
+                    dependencies.all.append(record)
+                    /* The record of the unit's own file, matched by path: a unit's other records belong to files it only read. */
+                    if IndexStore.text(store.dependencyFilePath(dependency)) == dependencies.mainFile {
+                        dependencies.own.append(record)
+                    }
+                default:
+                    break
                 }
                 return true
             }
-            let path = URL(fileURLWithPath: mainFile).resolvingSymlinksInPath().path
-            byFile[path, default: []].append(contentsOf: dependencies.records.map { ($0, written) })
+            units.append(Unit(
+                name: name,
+                mainFile: mainFile.isEmpty ? "" : URL(fileURLWithPath: mainFile).resolvingSymlinksInPath().path,
+                module: Self.text(unitModuleName(reader)),
+                isSystem: unitIsSystem(reader),
+                written: written,
+                importedModules: dependencies.imported,
+                ownRecords: dependencies.own,
+                allRecords: dependencies.all
+            ))
         }
-        recordsByFile = byFile
-        return byFile
+        cachedUnits = units
+        return units
+    }
+
+    /* Every occurrence one record holds, or nil when the record cannot be read. */
+    func occurrences(inRecord record: String) -> [RecordOccurrence]? {
+        guard let reader = recordReaderCreate(store, record, nil) else { return nil }
+        defer { recordReaderDispose(reader) }
+        final class Collected {
+            var occurrences: [RecordOccurrence] = []
+            let store: IndexStore
+            init(store: IndexStore) { self.store = store }
+        }
+        let collected = Collected(store: self)
+        _ = occurrencesApply(reader, Unmanaged.passUnretained(collected).toOpaque()) { context, occurrence in
+            guard let context, let occurrence else { return true }
+            let collected = Unmanaged<Collected>.fromOpaque(context).takeUnretainedValue()
+            let store = collected.store
+            var line: UInt32 = 0
+            var column: UInt32 = 0
+            store.occurrenceLineColumn(occurrence, &line, &column)
+            let symbol = store.occurrenceSymbol(occurrence)
+            collected.occurrences.append(RecordOccurrence(
+                line: Int(line),
+                column: Int(column),
+                symbol: IndexStore.text(store.symbolIdentifier(symbol)),
+                name: IndexStore.text(store.symbolName(symbol)),
+                roles: store.occurrenceRoles(occurrence),
+                kind: Int32(store.symbolKind(symbol))
+            ))
+            return true
+        }
+        return collected.occurrences
     }
 
     static func text(_ string: CohereIndexString) -> String {

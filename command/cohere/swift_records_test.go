@@ -160,6 +160,49 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 		)
 	})
 
+	// The --unused report renders after lint and is not a gate: two items, and the summary still counts no
+	// findings and exits 0. Were the renderer to count them, the summary check would refuse the stream.
+	t.Run("Unused", func(t *testing.T) {
+		output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Unused.jsonl"), 0)
+		if err != nil || exitCode != 0 {
+			t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+		}
+		requireLines(t, output,
+			"\nunused: a report, not a gate — nothing here fails a build\n",
+			"\n  imports nothing uses — 3\n",
+			// Two items on one line arrive out of column order and print in it.
+			"    /project/Sources/Example/Main.swift:1:1 — import Foundation\n    /project/Sources/Example/Main.swift:1:20 — import Darwin\n",
+			"    /project/Sources/Example/Tally.swift:2:1 — import Combine\n",
+			"  looked at 2 files and 6 imports (cohere-swift/unused-import)\n",
+			"  not checked for unused imports: 1 files (it has #if, and the index describes only the configuration the build compiled)\n",
+			"  not checked for unused imports: 1 files (the build has not compiled it as it stands)\n",
+			"  never reported: 1 imports (re-exported with @_exported, which is API)\n",
+		)
+		forbidLines(t, output, "did not check everything", "Main.swift:1:1 - ")
+		if strings.Index(output, "imports nothing uses") < strings.Index(output, "lint: ") {
+			t.Errorf("the unused report printed before the lint line:\n%s", output)
+		}
+	})
+
+	// A rule the front door has no words for prints under its own id and counts items, never under
+	// another rule's heading.
+	t.Run("UnusedUnknownRule", func(t *testing.T) {
+		lines := []string{}
+		for _, line := range contractFixture(t, "Unused.jsonl") {
+			lines = append(lines, strings.ReplaceAll(line, "cohere-swift/unused-import", "cohere-swift/unused-parameter"))
+		}
+		output, exitCode, err := renderRecords(t, swiftModeCheck, lines, 0)
+		if err != nil || exitCode != 0 {
+			t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+		}
+		requireLines(t, output,
+			"\n  cohere-swift/unused-parameter — 3\n",
+			"  looked at 2 files and 6 items (cohere-swift/unused-parameter)\n",
+			"  not checked for unused items: 1 files (the build has not compiled it as it stands)\n",
+		)
+		forbidLines(t, output, "imports nothing uses", "declarations nothing uses")
+	})
+
 	t.Run("NothingChanged", func(t *testing.T) {
 		output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "NothingChanged.jsonl"), 0)
 		if err != nil || exitCode != 0 {
@@ -198,6 +241,7 @@ func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
 	clean := contractFixture(t, "Clean.jsonl")
 	bail := contractFixture(t, "TypesBail.jsonl")
 	unreadable := contractFixture(t, "Unreadable.jsonl")
+	unused := contractFixture(t, "Unused.jsonl")
 	last := len(findings) - 1
 
 	replace := func(lines []string, index int, line string) []string {
@@ -237,6 +281,13 @@ func TestSwiftRunRefusesBrokenStreams(t *testing.T) {
 		{"a summary claiming complete over an unreadable file", replace(unreadable, len(unreadable)-1, `{"kind":"summary","findings":0,"complete":true,"nothingToCheck":"","exitCode":0}`), 0, "calls the run complete"},
 		{"an unreadable record after a phase", append(append(append([]string(nil), unreadable[:5]...), unreadable[2]), unreadable[5:]...), 1, "after phase fix"},
 		{"an unreadable record before the project", append([]string{unreadable[0], unreadable[2]}, unreadable[1:]...), 1, "before the project record"},
+		// The --unused report: well-formed, in its place, and counted by its coverage record.
+		{"an unused record that does not decode", replace(unused, 8, `{"kind":"unused","line":"one"}`), 0, "does not decode"},
+		{"an unused record with no subject", replace(unused, 8, strings.Replace(unused[8], `"subject":`, `"unnamed":`, 1)), 0, "missing its file, position, rule or subject"},
+		{"an unused record before the lint phase", append(append(append([]string(nil), unused[:7]...), unused[8], unused[7]), unused[9:]...), 0, "outside the unused phase"},
+		{"an unused coverage count that disagrees", replace(unused, 11, strings.Replace(unused[11], `"found":3`, `"found":4`, 1)), 0, "counts 4 found and 3"},
+		{"unused records with no coverage record", without(unused, 11), 0, "with no unusedCoverage record"},
+		{"an unused phase that ran with no coverage", without(without(without(without(unused, 11), 10), 9), 8), 0, "no unusedCoverage record said"},
 	}
 
 	for _, testCase := range cases {

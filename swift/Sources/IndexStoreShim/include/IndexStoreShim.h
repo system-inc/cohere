@@ -34,10 +34,13 @@ typedef bool (*CohereIndexStoreUnitsApply)(CohereIndexStore store, unsigned sort
 typedef CohereIndexUnitReader (*CohereIndexUnitReaderCreate)(CohereIndexStore store, const char *unitName, CohereIndexError *error);
 typedef void (*CohereIndexUnitReaderDispose)(CohereIndexUnitReader reader);
 typedef CohereIndexString (*CohereIndexUnitReaderGetMainFile)(CohereIndexUnitReader reader);
+typedef CohereIndexString (*CohereIndexUnitReaderGetModuleName)(CohereIndexUnitReader reader);
+typedef bool (*CohereIndexUnitReaderIsSystemUnit)(CohereIndexUnitReader reader);
 typedef bool (*CohereIndexUnitReaderDependenciesApply)(CohereIndexUnitReader reader, void *context, bool (*applier)(void *context, CohereIndexUnitDependency dependency));
 typedef int (*CohereIndexUnitDependencyGetKind)(CohereIndexUnitDependency dependency);
 typedef CohereIndexString (*CohereIndexUnitDependencyGetName)(CohereIndexUnitDependency dependency);
 typedef CohereIndexString (*CohereIndexUnitDependencyGetFilePath)(CohereIndexUnitDependency dependency);
+typedef CohereIndexString (*CohereIndexUnitDependencyGetModuleName)(CohereIndexUnitDependency dependency);
 typedef CohereIndexRecordReader (*CohereIndexRecordReaderCreate)(CohereIndexStore store, const char *recordName, CohereIndexError *error);
 typedef void (*CohereIndexRecordReaderDispose)(CohereIndexRecordReader reader);
 typedef bool (*CohereIndexRecordReaderOccurrencesApply)(CohereIndexRecordReader reader, void *context, bool (*applier)(void *context, CohereIndexOccurrence occurrence));
@@ -45,5 +48,6 @@ typedef CohereIndexSymbol (*CohereIndexOccurrenceGetSymbol)(CohereIndexOccurrenc
 typedef uint64_t (*CohereIndexOccurrenceGetRoles)(CohereIndexOccurrence occurrence);
 typedef void (*CohereIndexOccurrenceGetLineColumn)(CohereIndexOccurrence occurrence, unsigned *line, unsigned *column);
 typedef CohereIndexString (*CohereIndexSymbolGetString)(CohereIndexSymbol symbol);
+typedef int (*CohereIndexSymbolGetKind)(CohereIndexSymbol symbol);
 
 #endif
