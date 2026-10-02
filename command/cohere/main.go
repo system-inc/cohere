@@ -508,6 +508,7 @@ func run() error {
 		}
 		graph.LintConfig = lintConfig
 		graph.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, location.Root))
+		graph.RegisteredRuleNames = registry.Names()
 	}
 
 	switch {
@@ -914,6 +915,7 @@ func rebuildGraph(
 	}
 	rebuilt.LintConfig = lintConfig
 	rebuilt.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, directory))
+	rebuilt.RegisteredRuleNames = registry.Names()
 	return rebuilt, time.Since(start), nil
 }
 

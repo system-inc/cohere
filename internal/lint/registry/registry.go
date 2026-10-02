@@ -49,6 +49,16 @@ func All() []rule.Rule {
 	return rules
 }
 
+// Names returns every registered rule's name, in the order All returns them.
+func Names() []string {
+	rules := All()
+	names := make([]string, 0, len(rules))
+	for _, registeredRule := range rules {
+		names = append(names, registeredRule.Name)
+	}
+	return names
+}
+
 // Count is how many rules exist, for the coverage line.
 func Count() int {
 	return len(All())

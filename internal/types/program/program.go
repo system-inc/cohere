@@ -69,6 +69,13 @@ type Graph struct {
 	// it. Empty means no rule takes options, which is what a test that did not set one expects.
 	RuleOptions configuration.OptionsRegistry
 
+	// RegisteredRuleNames is every rule the registry holds, whether or not this run selected it.
+	//
+	// The walk reads it to tell a suppression naming an unknown rule from one naming a real rule that
+	// is merely not running here. Nil turns that check off, which is what a test that did not set it
+	// expects: without a registry every name would read as unknown.
+	RegisteredRuleNames []string
+
 	// CollectTimings turns on per-rule cost measurement for the next Walk.
 	//
 	// Off by default and guarded at every timing site, so an ordinary run reads no clocks and

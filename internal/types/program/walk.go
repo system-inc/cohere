@@ -11,6 +11,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
@@ -154,6 +155,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 	workers := min(g.Workers(), len(files))
 
+	// Built once per walk, read by every worker. Nil when no registry was supplied.
+	catalog := newRuleNameCatalog(g.RegisteredRuleNames, g.LintConfig.RuleKeys())
+
 	var mutex sync.Mutex
 	diagnostics := []rule.Diagnostic{}
 	listeningCounts := make(map[string]int, len(rules))
@@ -272,7 +276,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				visited, silenced, crashed := dispatchFileSafely(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
 					localReporting[diagnostic.RuleName]++
-				}, applicable, g, fileChecker, localListening, localOffered, ruleOptions, localTimings)
+				}, applicable, g, fileChecker, localListening, localOffered, ruleOptions, localTimings, catalog)
 
 				release()
 
@@ -356,6 +360,84 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			RulesUnconfigured: unconfigured,
 		},
 	}, nil
+}
+
+// ruleNameCatalog answers whether a rule name a suppression comment wrote exists anywhere cohere can
+// see: a registered rule, or a key in the config at any severity (a decision recorded about a rule
+// cohere has not ported yet still proves the rule exists).
+//
+// "Exists" is deliberately the same test `suppression.Directive.Covers` applies: the name equals a
+// known one, or qualifies it with a plugin prefix on a `/` boundary. A looser test would stay silent
+// on a directive that silences nothing, which is the case this exists to report.
+type ruleNameCatalog struct {
+	names map[string]bool
+
+	// registeredByBareName maps a registered rule's name without its plugin prefix to the full name,
+	// so a directive written under a stale prefix (`structure/x` for `nexus/x`) can be told what it
+	// probably meant.
+	registeredByBareName map[string]string
+}
+
+// newRuleNameCatalog returns nil when no registry was supplied, which turns the check off: without
+// one, every name would read as unknown.
+func newRuleNameCatalog(registered []string, configKeys []string) *ruleNameCatalog {
+	if len(registered) == 0 {
+		return nil
+	}
+	catalog := &ruleNameCatalog{
+		names:                make(map[string]bool, len(registered)+len(configKeys)),
+		registeredByBareName: make(map[string]string, len(registered)),
+	}
+	for _, name := range registered {
+		catalog.names[name] = true
+		catalog.registeredByBareName[bareRuleName(name)] = name
+	}
+	for _, key := range configKeys {
+		catalog.names[key] = true
+	}
+	return catalog
+}
+
+func (c *ruleNameCatalog) exists(name string) bool {
+	if c.names[name] {
+		return true
+	}
+	for known := range c.names {
+		if strings.HasSuffix(name, "/"+known) {
+			return true
+		}
+	}
+	return false
+}
+
+// reportUnknownRuleReferences reports every rule name a disable or enable comment wrote that exists
+// nowhere, the way ESLint does: rule id the unknown name, anchored on the whole comment, message
+// beginning with ESLint's own sentence so the two engines read alike (measured on 10.8.1).
+//
+// Reported straight to the walk rather than through a rule's Report, so no directive can silence a
+// finding about a directive that silences nothing.
+func reportUnknownRuleReferences(sourceFile *ast.SourceFile, directives *suppression.Index,
+	catalog *ruleNameCatalog, report func(rule.Diagnostic)) {
+	if catalog == nil {
+		return
+	}
+	for _, reference := range directives.RuleReferences() {
+		if catalog.exists(reference.Name) {
+			continue
+		}
+		description := fmt.Sprintf("Definition for rule '%s' was not found. A suppression naming it "+
+			"silences nothing, so whatever it was written to allow is reported anyway or was never "+
+			"reported at all.", reference.Name)
+		if registered, found := catalog.registeredByBareName[bareRuleName(reference.Name)]; found {
+			description += fmt.Sprintf(" cohere registers this rule as '%s'.", registered)
+		}
+		report(rule.Diagnostic{
+			RuleName:   reference.Name,
+			Range:      core.NewTextRange(reference.Pos, reference.End),
+			Message:    rule.Message{Id: "ruleNotFound", Description: description},
+			SourceFile: sourceFile,
+		})
+	}
 }
 
 // sortDiagnostics puts a walk's findings in file order, then position, then rule and message.
@@ -445,6 +527,7 @@ func dispatchFileSafely(
 	offeredCounts map[string]int,
 	ruleOptions map[string]any,
 	timings *Timings,
+	catalog *ruleNameCatalog,
 ) (visited int, silenced suppressionTally, crashed error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -457,7 +540,7 @@ func dispatchFileSafely(
 	}()
 
 	visited, silenced = dispatchFile(sourceFile, report, applicable, g, fileChecker,
-		listeningCounts, offeredCounts, ruleOptions, timings)
+		listeningCounts, offeredCounts, ruleOptions, timings, catalog)
 	return visited, silenced, nil
 }
 
@@ -471,6 +554,7 @@ func dispatchFile(
 	offeredCounts map[string]int,
 	ruleOptions map[string]any,
 	timings *Timings,
+	catalog *ruleNameCatalog,
 ) (visitedNodes int, silenced suppressionTally) {
 	// A kind may have listeners from several rules, so the merged table maps a kind to a slice rather
 	// than to one function.
@@ -480,6 +564,7 @@ func dispatchFile(
 	// through the same index. Scanning is proportional to the file rather than to the rule count, so
 	// a file with no directives costs one pass and then answers every query with an empty slice.
 	directives := suppression.Build(sourceFile.Text())
+	reportUnknownRuleReferences(sourceFile, directives, catalog, report)
 
 	// One cache per file, shared by every rule that runs on it. Work a rule derives from the file
 	// outside the walk is paid for by that rule alone, so three rules deriving the same thing pay

@@ -96,6 +96,28 @@ type Config struct {
 	Root string
 }
 
+// RuleKeys returns every rule name the config mentions, in the base block or any override, at any
+// severity, `off` included.
+//
+// A key is evidence the rule exists somewhere even when cohere has not ported it: someone wrote a
+// decision about it. That is what lets a suppression naming an unported rule be told apart from one
+// naming a rule that exists nowhere.
+func (c *Config) RuleKeys() []string {
+	if c == nil {
+		return nil
+	}
+	keys := make([]string, 0, len(c.Rules))
+	for key := range c.Rules {
+		keys = append(keys, key)
+	}
+	for _, override := range c.Overrides {
+		for key := range override.Rules {
+			keys = append(keys, key)
+		}
+	}
+	return keys
+}
+
 // PluginDefaultRules are the rules a `plugins` declaration turns on without any rules block naming
 // them, keyed by rule name and valued by the plugin that contributes each.
 //

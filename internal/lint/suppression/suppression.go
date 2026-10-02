@@ -127,21 +127,53 @@ func matchesRuleName(named string, ruleName string) bool {
 	return false
 }
 
+// RuleReference is one rule name a disable or enable comment names, with the comment's byte range.
+//
+// Enables are included because ESLint checks them too: `/* eslint-enable no-such-rule */` reports
+// the unknown name exactly as a disable does, measured on 10.8.1.
+type RuleReference struct {
+	Name string
+	Pos  int
+	End  int
+}
+
 // Index is every directive in one file, ready to answer whether a finding is suppressed.
 type Index struct {
-	directives []*Directive
-	lineOf     func(offset int) int
+	directives     []*Directive
+	ruleReferences []RuleReference
+	lineOf         func(offset int) int
 }
 
 // Build scans source text once and resolves every directive in it.
 func Build(sourceText string) *Index {
 	lineOf := buildLineIndex(sourceText)
 	found := []*Directive{}
+	references := []RuleReference{}
 
 	for _, comment := range scanComments(sourceText) {
-		parsed := parseDirective(sourceText[comment.pos:comment.end])
+		commentText := sourceText[comment.pos:comment.end]
+
+		// ESLint reads a file-scope disable and an enable only in a block comment; as `//` they are
+		// prose to it (measured on 10.8.1: neither suppresses nor is reported). cohere honors them
+		// anyway, a recorded divergence (require_description_test.go). Their names are left out of
+		// the unknown-rule check, because a name ESLint never reads as a rule is one it can never
+		// report, and phi web's build scripts carry exactly such prose: `// eslint-disable +
+		// generated banner keep the linter and future readers out.`
+		eslintReadsAsDirective := !strings.HasPrefix(commentText, "//")
+
+		parsed := parseDirective(commentText)
 		if parsed == nil {
+			if names, isEnable := directives.ParseEnable(commentText); isEnable && eslintReadsAsDirective {
+				for _, name := range names {
+					references = append(references, RuleReference{Name: name, Pos: comment.pos, End: comment.end})
+				}
+			}
 			continue
+		}
+		if parsed.Kind != KindFile || eslintReadsAsDirective {
+			for _, name := range parsed.Rules {
+				references = append(references, RuleReference{Name: name, Pos: comment.pos, End: comment.end})
+			}
 		}
 
 		parsed.Pos = comment.pos
@@ -168,7 +200,15 @@ func Build(sourceText string) *Index {
 
 	resolveFileScopeEnds(found, sourceText, lineOf)
 
-	return &Index{directives: found, lineOf: lineOf}
+	return &Index{directives: found, ruleReferences: references, lineOf: lineOf}
+}
+
+// RuleReferences returns every rule name a disable or enable comment named, in source order.
+func (i *Index) RuleReferences() []RuleReference {
+	if i == nil {
+		return nil
+	}
+	return i.ruleReferences
 }
 
 // resolveFileScopeEnds closes each file-scope directive at the enable comment that matches it.
