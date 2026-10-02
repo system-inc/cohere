@@ -114,6 +114,11 @@ var EnforceConsistentClassOrder = rule.Rule{
 			return nil
 		}
 
+		// Read before the design system is resolved: reading is pure, and a run that declines for want
+		// of a Tailwind entry point must still reach it, or the registry's decoder agreement check
+		// never looks at this rule (#zwd43jn).
+		configured, isConfigured := rule.OptionsAs[EnforceConsistentClassOrderOptions](options)
+
 		// The design system is resolved once per file rather than once per literal, and before the
 		// listeners are built so a repository whose CSS will not parse costs one lookup rather than
 		// one per class attribute. `DesignSystemForProgram` is itself cached on the program, so this
@@ -135,7 +140,7 @@ var EnforceConsistentClassOrder = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := rule.OptionsAs[EnforceConsistentClassOrderOptions](options); isConfigured {
+		if isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

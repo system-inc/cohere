@@ -1,6 +1,14 @@
 package rule
 
-import "fmt"
+import (
+	"fmt"
+	"sync/atomic"
+)
+
+// OptionsAsReads counts every OptionsAs call, so the registry's decoder agreement test can tell a rule
+// whose options read was reached from one that ran without reaching it (#zwd43jn). One atomic add per
+// rule per file, which no run can measure.
+var OptionsAsReads atomic.Int64
 
 // OptionsAs reads the options a rule's Run is handed as the type its registration's decoder
 // returns, in the same two-value shape as the comma-ok assertion it replaces.
@@ -23,6 +31,7 @@ import "fmt"
 //
 // The message names both package-qualified types, which together name the rule.
 func OptionsAs[Options any](options any) (Options, bool) {
+	OptionsAsReads.Add(1)
 	var zero Options
 	if options == nil {
 		return zero, false

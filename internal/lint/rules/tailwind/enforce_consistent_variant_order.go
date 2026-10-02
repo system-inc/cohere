@@ -88,6 +88,11 @@ var EnforceConsistentVariantOrder = rule.Rule{
 			return nil
 		}
 
+		// Read before the design system is resolved: reading is pure, and a run that declines for want
+		// of a Tailwind entry point must still reach it, or the registry's decoder agreement check
+		// never looks at this rule (#zwd43jn).
+		configured, isConfigured := rule.OptionsAs[EnforceConsistentVariantOrderOptions](options)
+
 		designSystem := DesignSystemForProgram(ctx.Program)
 		if designSystem.Err != nil {
 			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) || ctx.Program == nil {
@@ -97,7 +102,7 @@ var EnforceConsistentVariantOrder = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := rule.OptionsAs[EnforceConsistentVariantOrderOptions](options); isConfigured {
+		if isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

@@ -84,6 +84,11 @@ var NoConflictingClasses = rule.Rule{
 			return nil
 		}
 
+		// Read before the design system is resolved: reading is pure, and a run that declines for want
+		// of a Tailwind entry point must still reach it, or the registry's decoder agreement check
+		// never looks at this rule (#zwd43jn).
+		configured, isConfigured := rule.OptionsAs[NoConflictingClassesOptions](options)
+
 		// Resolved once per file and before the listeners are built, matching the other migrated
 		// rules. A project with no Tailwind is silence with nothing wrong; a project whose CSS will
 		// not parse is reported once per file rather than swallowed.
@@ -96,7 +101,7 @@ var NoConflictingClasses = rule.Rule{
 		}
 
 		settings := DefaultClassLiteralSettings()
-		if configured, isConfigured := rule.OptionsAs[NoConflictingClassesOptions](options); isConfigured {
+		if isConfigured {
 			if len(configured.Attributes) > 0 {
 				settings.AttributeNames = configured.Attributes
 			}

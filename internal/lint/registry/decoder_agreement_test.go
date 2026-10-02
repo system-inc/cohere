@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
@@ -21,9 +22,16 @@ import (
 //
 // A decoder that refuses the empty input (a required key, a strict schema) is skipped and counted,
 // and the count has a floor, so a harness that silently decoded nothing cannot pass.
+//
+// Running a rule is not reaching its options read: a rule that calls OptionsAs only inside a listener
+// for a node kind the probe source lacks would run, pass, and check nothing (#zwd43jn). So each rule
+// must also move rule.OptionsAsReads, unless it is named in optionsReadUnreachableOnProbe. Measured
+// when this landed: 172 of 172 reach it. The counter is global, which is why this test is not
+// parallel: a parallel test calling OptionsAs at the same moment would make a rule look reached.
 func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(t *testing.T) {
 	exercised := 0
 	refused := 0
+	var unreached []string
 	for _, registration := range rule.Registered() {
 		decoded, decodeError, decodes := decodeEmptyOption(registration)
 		if !decodes {
@@ -35,6 +43,7 @@ func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(t *testing.T) {
 		}
 		exercised++
 		subject := registration.Rule
+		readsBefore := rule.OptionsAsReads.Load()
 		t.Run(subject.Name, func(t *testing.T) {
 			defer func() {
 				recovered := recover()
@@ -53,6 +62,23 @@ func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(t *testing.T) {
 			}
 			rule_testing.RunWithOptions(t, subject, "/repository/source/Probe.tsx", "export const value = 1;\n", decoded)
 		})
+		if rule.OptionsAsReads.Load() == readsBefore && !optionsReadUnreachableOnProbe[subject.Name] {
+			unreached = append(unreached, subject.Name)
+		}
+	}
+	if len(unreached) > 0 {
+		t.Errorf("%d rules ran with decoded options without reaching rule.OptionsAs on the probe source, "+
+			"so the agreement check never looked at them: %v. Read options at the top of Run, or name the "+
+			"rule in optionsReadUnreachableOnProbe with why", len(unreached), unreached)
+	}
+	registered := map[string]bool{}
+	for _, registration := range rule.Registered() {
+		registered[registration.Rule.Name] = true
+	}
+	for name := range optionsReadUnreachableOnProbe {
+		if !registered[name] {
+			t.Errorf("optionsReadUnreachableOnProbe names %s, which is not registered", name)
+		}
 	}
 	// About 110 registrations carry a decoder today. Under 80 exercised means the empty input stopped
 	// decoding for most of them, or the walk is reading the wrong list, rather than that the tree
@@ -78,4 +104,40 @@ func decodeEmptyOption(registration rule.Registration) (decoded any, decodeError
 		return decoded, decodeError, true
 	}
 	return nil, nil, false
+}
+
+// optionsReadUnreachableOnProbe names the rules whose options read cannot be reached on the probe
+// source, each with why. Empty when it landed: all 172 exercised rules read their options at the top
+// of Run. A rule added here is one the agreement check does not cover, so it needs its own decoder
+// test that drives a real fixture through its registration's Decode.
+var optionsReadUnreachableOnProbe = map[string]bool{}
+
+type optionsReachControlOptions struct {
+	Enabled bool
+}
+
+// optionsReachControl reads its options only inside a class listener, the shape the reach check
+// exists to catch.
+var optionsReachControl = rule.Rule{
+	Name: "control/options-read-inside-a-listener",
+	Run: func(ctx rule.Context, options any) rule.Listeners {
+		return rule.Listeners{ast.KindClassDeclaration: func(node *ast.Node) {
+			rule.OptionsAs[optionsReachControlOptions](options)
+		}}
+	},
+}
+
+// The reach counter can fail: a rule reading its options only in a class listener does not move it
+// on the probe source, and does on a class. Without this the reach assertion above could be passing
+// because the counter moves on every run.
+func TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions(t *testing.T) {
+	before := rule.OptionsAsReads.Load()
+	rule_testing.RunWithOptions(t, optionsReachControl, "/repository/source/Probe.tsx", "export const value = 1;\n", optionsReachControlOptions{})
+	if rule.OptionsAsReads.Load() != before {
+		t.Fatal("the control moved the counter on a source with no class, so the counter cannot tell reached from run")
+	}
+	rule_testing.RunWithOptions(t, optionsReachControl, "/repository/source/Probe.tsx", "export class Probe {}\n", optionsReachControlOptions{})
+	if rule.OptionsAsReads.Load() == before {
+		t.Fatal("the control did not move the counter on a class, so the counter is not counting")
+	}
 }
