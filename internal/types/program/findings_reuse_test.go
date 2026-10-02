@@ -250,3 +250,164 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(t *testing.T) {
 		t.Errorf("findings differ:\n plain    %v\n replayed %v", diagnosticKeys(plain.Diagnostics), diagnosticKeys(replayed.Diagnostics))
 	}
 }
+
+// typeAwareRule is a type-aware rule the findings cache now caches: it reads the checker and not the
+// program, and its finding on `-value` depends on value's type, which can come from another file.
+func typeAwareRule(t *testing.T) rule.Rule {
+	t.Helper()
+	for _, registered := range registry.All() {
+		if registered.Name == "@typescript-eslint/no-unsafe-unary-minus" {
+			if !registered.NeedsTypeChecker || registered.ReadsProgram {
+				t.Fatalf("%s is not a cacheable type-aware rule any more, so this test proves nothing", registered.Name)
+			}
+			return registered
+		}
+	}
+	t.Fatal("no-unsafe-unary-minus is not registered, so this test proves nothing")
+	return rule.Rule{}
+}
+
+// walkAndRecord walks a freshly built graph with the given previous cache and returns the result and
+// what it recorded.
+func walkAndRecord(t *testing.T, root string, rules []rule.Rule, previous *program.LintCache) (program.Result, *program.LintCache) {
+	t.Helper()
+	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous)
+	graph.FindingsReuse = reuse
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+	return result, reuse.Recorded()
+}
+
+func plainWalk(t *testing.T, root string, rules []rule.Rule) program.Result {
+	t.Helper()
+	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+	return result
+}
+
+// An edit to a file reaches the type-aware findings of every file that imports it, though their bytes
+// did not change.
+//
+// This is the property that let type-aware rules be cached at all. consumer.ts reads `-value`, and
+// whether that is a finding depends on value's type in lib.ts. Only lib.ts is edited, so consumer.ts
+// has the same bytes and its pure rules still replay; its type fingerprint changes, so its type-aware
+// rule runs again and its finding goes away. A cache keyed on consumer's bytes alone would replay the
+// finding over a tree where it is no longer true.
+func TestAnEditToADependencyReachesItsImportersTypeAwareFindings(t *testing.T) {
+	root := writeProject(t, map[string]string{
+		"tsconfig.json": minimalConfig,
+		"lib.ts":        "export const value: string = \"1\";\n",
+		"consumer.ts":   "import { value } from \"./lib\";\nexport const negated = -value;\n",
+	})
+	rules := append(findingsReuseRules(t), typeAwareRule(t))
+
+	before, recorded := walkAndRecord(t, root, rules, nil)
+	if len(before.Diagnostics) == 0 {
+		t.Fatal("consumer.ts produced no finding before the edit, so its disappearance would prove nothing")
+	}
+	consumerEntry := false
+	for _, entry := range recorded.Entries {
+		if filepath.Base(entry.Path) == "consumer.ts" && len(entry.TypedRules) > 0 && len(entry.Findings) > 0 {
+			consumerEntry = true
+		}
+	}
+	if !consumerEntry {
+		t.Fatal("consumer.ts was not recorded with a type-aware finding, so its replay is untested here")
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export const value: number = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	after, refreshed := walkAndRecord(t, root, rules, recorded)
+	truth := plainWalk(t, root, rules)
+
+	if len(truth.Diagnostics) != 0 {
+		t.Fatalf("the edit did not remove the finding even uncached, so the fixture proves nothing: %v", diagnosticKeys(truth.Diagnostics))
+	}
+
+	// The walk after that, with nothing changed, reads the entry the post-edit walk refreshed. A refresh
+	// that kept the old type-aware finding beside the fresh ones would bring a finding the edit removed
+	// back to life one run later, which only this third walk can see.
+	again, _ := walkAndRecord(t, root, rules, refreshed)
+	if !reflect.DeepEqual(diagnosticKeys(again.Diagnostics), diagnosticKeys(truth.Diagnostics)) {
+		t.Errorf("the run after the refresh replayed a finding the edit removed:\n cached %v\n truth  %v",
+			diagnosticKeys(again.Diagnostics), diagnosticKeys(truth.Diagnostics))
+	}
+	if !reflect.DeepEqual(again.Coverage, truth.Coverage) {
+		t.Errorf("coverage differs from an uncached walk on the run after the refresh")
+	}
+	if !reflect.DeepEqual(diagnosticKeys(after.Diagnostics), diagnosticKeys(truth.Diagnostics)) {
+		t.Errorf("a type-aware finding was replayed over the edit to its dependency:\n cached %v\n truth  %v",
+			diagnosticKeys(after.Diagnostics), diagnosticKeys(truth.Diagnostics))
+	}
+	if !reflect.DeepEqual(after.Coverage, truth.Coverage) {
+		t.Errorf("coverage differs from an uncached walk after the edit:\n cached %+v\n truth  %+v", after.Coverage, truth.Coverage)
+	}
+	if after.FilesReplayed == 0 {
+		t.Error("consumer.ts's pure rules were not replayed, so an importer of an edited file lost its whole saving")
+	}
+}
+
+// An edit to an ambient declaration reaches a file that imports nothing.
+//
+// A global declaration changes every file's types without being imported by any of them, so the import
+// closure cannot see it. That is what the global component of the fingerprint is for: globals.d.ts is a
+// declaration file, so it is in every fingerprint.
+func TestAnEditToAGlobalDeclarationReachesEveryTypeAwareFinding(t *testing.T) {
+	root := writeProject(t, map[string]string{
+		"tsconfig.json": minimalConfig,
+		"globals.d.ts":  "declare const ambient: string;\n",
+		"consumer.ts":   "export const negated = -ambient;\n",
+	})
+	rules := append(findingsReuseRules(t), typeAwareRule(t))
+
+	before, recorded := walkAndRecord(t, root, rules, nil)
+	if len(before.Diagnostics) == 0 {
+		t.Fatal("consumer.ts produced no finding before the edit, so this proves nothing")
+	}
+	if err := os.WriteFile(filepath.Join(root, "globals.d.ts"), []byte("declare const ambient: number;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := walkAndRecord(t, root, rules, recorded)
+	truth := plainWalk(t, root, rules)
+	if len(truth.Diagnostics) != 0 {
+		t.Fatalf("the edit did not remove the finding even uncached, so the fixture proves nothing: %v", diagnosticKeys(truth.Diagnostics))
+	}
+	if !reflect.DeepEqual(diagnosticKeys(after.Diagnostics), diagnosticKeys(truth.Diagnostics)) {
+		t.Errorf("a type-aware finding was replayed over an edit to a global declaration:\n cached %v\n truth  %v",
+			diagnosticKeys(after.Diagnostics), diagnosticKeys(truth.Diagnostics))
+	}
+}
+
+// CacheClasses puts each rule in exactly one class, and a rule that reads the program is never cached
+// even when it also reads the checker.
+func TestCacheClassesSplitsThreeWays(t *testing.T) {
+	pure, typeAware, never := program.CacheClasses([]rule.Rule{
+		{Name: "pure"},
+		{Name: "typed", NeedsTypeChecker: true},
+		{Name: "program", ReadsProgram: true},
+		{Name: "both", ReadsProgram: true, NeedsTypeChecker: true},
+	})
+	names := func(rules []rule.Rule) string {
+		joined := ""
+		for _, subject := range rules {
+			joined += subject.Name + " "
+		}
+		return joined
+	}
+	if names(pure) != "pure " || names(typeAware) != "typed " || names(never) != "program both " {
+		t.Errorf("pure [%s] typed [%s] never [%s]", names(pure), names(typeAware), names(never))
+	}
+}

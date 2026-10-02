@@ -18,11 +18,14 @@ func sampleLintCache() *program.LintCache {
 		Key: program.HashRuleSet([]string{"no-debugger", "no-empty"}),
 		Entries: []program.LintCacheEntry{
 			{
-				Path:         "/project/source/dirty.ts",
-				ContentHash:  program.HashContent("debugger;\n"),
-				Rules:        []string{"no-debugger", "no-empty"},
-				Listening:    []string{"no-debugger", "no-empty"},
-				VisitedNodes: 5,
+				Path:        "/project/source/dirty.ts",
+				ContentHash: program.HashContent("debugger;\n"),
+				Rules:       []string{"no-debugger", "no-empty"},
+				TypedRules:  []string{"await-thenable"},
+				// Not zero, so an encoder that dropped it could not match the zero a decode defaults to.
+				TypeFingerprint: program.HashContent("the types debugger; can see"),
+				Listening:       []string{"no-debugger", "no-empty", "await-thenable"},
+				VisitedNodes:    5,
 				Findings: []program.LintCacheFinding{
 					{
 						RuleName: "no-debugger", Start: 0, End: 9,
@@ -89,6 +92,12 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 		}
 		if strings.Join(got.Rules, ",") != strings.Join(want.Rules, ",") {
 			t.Errorf("entry %d Rules: %v against %v", index, got.Rules, want.Rules)
+		}
+		if strings.Join(got.TypedRules, ",") != strings.Join(want.TypedRules, ",") {
+			t.Errorf("entry %d TypedRules: %v against %v", index, got.TypedRules, want.TypedRules)
+		}
+		if got.TypeFingerprint != want.TypeFingerprint {
+			t.Errorf("entry %d TypeFingerprint: %x against %x", index, got.TypeFingerprint, want.TypeFingerprint)
 		}
 		if strings.Join(got.Listening, ",") != strings.Join(want.Listening, ",") {
 			t.Errorf("entry %d Listening: %v against %v", index, got.Listening, want.Listening)
@@ -309,7 +318,8 @@ func TestLintCacheFindingHasNoUncheckedFields(t *testing.T) {
 // pass, and a dropped VisitedNodes would change the coverage line of every replayed run.
 func TestLintCacheEntryHasNoUncheckedFields(t *testing.T) {
 	compared := map[string]struct{}{
-		"Path": {}, "ContentHash": {}, "Rules": {}, "Listening": {}, "VisitedNodes": {}, "Findings": {},
+		"Path": {}, "ContentHash": {}, "Rules": {}, "TypedRules": {}, "TypeFingerprint": {}, "Listening": {},
+		"VisitedNodes": {}, "Findings": {},
 	}
 	entryType := reflect.TypeOf(program.LintCacheEntry{})
 	for index := range entryType.NumField() {

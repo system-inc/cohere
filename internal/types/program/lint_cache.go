@@ -32,23 +32,28 @@ import (
 // under-declaring serves a stale finding silently and forever, over-declaring costs a cache
 // miss. One of those is a correctness failure and the other is a performance one.
 //
-// It is wired as the run cache's second layer: when a bare run's inputs are not all unchanged, files
+// It is wired as the run cache's second layer: when an eligible run's inputs are not all unchanged, files
 // whose bytes and configuration are unchanged are walked with only their uncacheable rules, and the
 // cacheable rules' findings and coverage are replayed. See FindingsReuse.
 //
 // It was measured and left unwired once, and the reversal is worth keeping because the measurement
 // method is the same and only the tree changed. On 2026-08-25, with 212 rules, walking with only the
 // uncacheable ones saved about 9%: the walk visits every node whatever the rule set, so with light
-// rules there was little left to skip. On 2026-10-02, with 464 rules, the same experiment in process
-// on ahra's real config:
+// rules there was little left to skip. On 2026-10-02, with 464 rules, the same experiment on ahra's real
+// config, each walk on a freshly built graph:
 //
-//	walk, all 464 rules                 about 1.8-2.6s
-//	walk, the 172 uncacheable           about 1.2-1.4s
-//	walk, the 44 ReadsProgram only      about 0.4s
+//	walk, all 464 rules                     about 2.56s
+//	walk, the 45 ReadsProgram rules only    about 1.37s
 //
-// The node count is identical in all three, so the walk still cannot be skipped; what grew is the work
-// rules do at each node. 164 of the 172 exclusions are type-aware only, which is what re-running
-// type-aware rules on a changed file's importers would reach.
+// The second line is the ceiling for a fully cached run, since ReadsProgram rules always run. It was
+// first published here as 0.4s, measured on a graph whose earlier walks had already paid for type
+// checking: the checker computes types lazily and whichever walk asks first pays, so a later walk looks
+// cheap for a reason that has nothing to do with its rules. Every walk is now on a fresh graph. A real
+// one-file-changed run on ahra saved about 1.1s of the fix phase, close to that ceiling.
+//
+// The node count is identical across rule sets, so the walk itself still cannot be skipped; what grew
+// is the work rules do at each node. Type-aware rules are cached on a type fingerprint as well as the
+// file's bytes; see CacheClasses and Graph.TypeFingerprints.
 //
 // Two kinds of file are never served from cache. A file with any suppression directive, because a
 // directive's accounting spans every rule in the file, cached and walked alike. A file with any
@@ -86,8 +91,16 @@ type LintCacheEntry struct {
 	// an unchanged key.
 	Rules []string
 
-	// Listening is the subset of Rules that registered a listener on this file. A replay counts them
-	// as listening, which is what keeps the coverage line identical to a walked run's.
+	// TypedRules is the type-aware rules applied to this file, in order. Their findings depend on the
+	// types the file can see as well as its bytes, so they replay only while TypeFingerprint matches
+	// too. See Graph.TypeFingerprints.
+	TypedRules []string
+
+	// TypeFingerprint is the file's type fingerprint when TypedRules' findings were produced.
+	TypeFingerprint [sha256.Size]byte
+
+	// Listening is the subset of Rules and TypedRules that registered a listener on this file. A replay
+	// counts them as listening, which is what keeps the coverage line identical to a walked run's.
 	Listening []string
 
 	// VisitedNodes is how many nodes the full walk of this file visited. The walk counts nodes only
@@ -184,12 +197,14 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 
 // lintCacheVersion is bumped whenever the format's meaning changes.
 //
+// 5: entries carry type-aware rules and the type fingerprint they were produced under.
+//
 // 4: rule lists are stored once and referenced by index, and hashes are hex. Version 3 wrote each
 // entry's applied and listening rules out in full; on ahra 3,605 entries shared 4 distinct rule lists
 // and 24 listening lists, and the file was 53 MB and 113ms to decode, a tenth of what the cache saves.
 // Versions 1 and 2 were a binary layout of offsets into an interned blob, replaced because adding
 // fields to it was where its "an encoder forgot a field" bug had shipped four times.
-const lintCacheVersion = 4
+const lintCacheVersion = 5
 
 // lintCacheWire is the format on disk. It is kept apart from LintCache so the walk's view of an entry
 // stays plain slices, and so the round-trip test, which compares LintCache's fields, proves this
@@ -202,12 +217,14 @@ type lintCacheWire struct {
 }
 
 type lintCacheWireEntry struct {
-	Path         string             `json:"path"`
-	ContentHash  string             `json:"contentHash"`
-	Rules        int                `json:"rules"`
-	Listening    int                `json:"listening"`
-	VisitedNodes int                `json:"visitedNodes"`
-	Findings     []LintCacheFinding `json:"findings,omitempty"`
+	Path            string             `json:"path"`
+	ContentHash     string             `json:"contentHash"`
+	Rules           int                `json:"rules"`
+	TypedRules      int                `json:"typedRules"`
+	TypeFingerprint string             `json:"typeFingerprint"`
+	Listening       int                `json:"listening"`
+	VisitedNodes    int                `json:"visitedNodes"`
+	Findings        []LintCacheFinding `json:"findings,omitempty"`
 }
 
 // Encode writes the cache.
@@ -225,12 +242,14 @@ func (c *LintCache) Encode() []byte {
 	}
 	for _, entry := range c.Entries {
 		wire.Entries = append(wire.Entries, lintCacheWireEntry{
-			Path:         entry.Path,
-			ContentHash:  hex.EncodeToString(entry.ContentHash[:]),
-			Rules:        intern(entry.Rules),
-			Listening:    intern(entry.Listening),
-			VisitedNodes: entry.VisitedNodes,
-			Findings:     entry.Findings,
+			Path:            entry.Path,
+			ContentHash:     hex.EncodeToString(entry.ContentHash[:]),
+			Rules:           intern(entry.Rules),
+			TypedRules:      intern(entry.TypedRules),
+			TypeFingerprint: hex.EncodeToString(entry.TypeFingerprint[:]),
+			Listening:       intern(entry.Listening),
+			VisitedNodes:    entry.VisitedNodes,
+			Findings:        entry.Findings,
 		})
 	}
 	encoded, err := json.Marshal(wire)
@@ -275,6 +294,12 @@ func DecodeLintCache(buffer []byte) (*LintCache, error) {
 		var err error
 		if entry.Rules, err = list(stored.Rules); err != nil {
 			return nil, fmt.Errorf("%w: entry %d rules: %v", ErrLintCacheUnreadable, position, err)
+		}
+		if entry.TypedRules, err = list(stored.TypedRules); err != nil {
+			return nil, fmt.Errorf("%w: entry %d typed rules: %v", ErrLintCacheUnreadable, position, err)
+		}
+		if err := decodeHash(stored.TypeFingerprint, &entry.TypeFingerprint); err != nil {
+			return nil, fmt.Errorf("%w: entry %d type fingerprint: %v", ErrLintCacheUnreadable, position, err)
 		}
 		if entry.Listening, err = list(stored.Listening); err != nil {
 			return nil, fmt.Errorf("%w: entry %d listening: %v", ErrLintCacheUnreadable, position, err)
@@ -438,38 +463,40 @@ func ReadLintCache(path string) (*LintCache, error) {
 	return DecodeLintCache(contents)
 }
 
-// CacheableRules splits a rule set into the rules whose findings may be cached per file and the
-// rules that must run on every file regardless.
+// CacheClasses splits a rule set three ways, in order: rules whose findings depend only on the file's
+// bytes, type-aware rules whose findings also depend on the types the file can see, and rules that may
+// never be cached.
 //
-// The property being tested is purity with respect to one file's bytes. This cache keys on a
-// content hash, so a rule that reads anything else can have its answer changed by an edit the key
-// cannot see, and replaying it then serves a stale finding forever: zero findings on a file that
-// now has one, indistinguishable from a clean tree.
+// ReadsProgram is the one disqualification left. A rule touching ctx.Program reaches every source
+// file in the run, and what it read is not something a per-file key can name, so its answer can
+// change while every key it could have is unmoved.
 //
-// Two declarations disqualify a rule.
+// NeedsTypeChecker used to disqualify too, on the reasoning that a type-aware rule's answer depends on
+// what the file imports. It does, and that is now in its key: Graph.TypeFingerprints hashes a file's
+// import closure and everything global, so an edit to anything the file's types come from changes
+// the fingerprint and re-runs the rule. Measured on ahra before the change: 164 of the 172 rules this
+// excluded were excluded for the type checker alone.
 //
-// ReadsProgram is the direct one. A rule touching ctx.Program reaches every source file in the run,
-// so another file changing invalidates its answer while this file's hash is unmoved. Eleven rules
-// declare it today, and a structural test in internal/dispatch fails any rule that reads the
-// program without saying so, which is what keeps this list honest as rules are added.
-//
-// NeedsTypeChecker is the less obvious one, and it is included deliberately. A type-aware rule's
-// answer depends on the types its file imports, so editing a dependency changes what the rule
-// should report while the importing file's bytes stay identical. That is the same staleness as
-// ReadsProgram arriving by a different route, and a per-file content hash cannot see either.
-//
-// The split is asymmetric on purpose, the same way the two declarations themselves are: including a
-// rule wrongly serves stale findings silently and forever, excluding one wrongly costs a cache
-// miss. Those are not comparable, so anything not provably pure is excluded. A future rule with a
-// new way of reading outside its file is excluded by default only if its property is declared, so
-// the declarations are the load-bearing part and this function is only the consequence.
-func CacheableRules(rules []rule.Rule) (cacheable []rule.Rule, uncacheable []rule.Rule) {
+// The asymmetry still holds. Including a rule wrongly serves stale findings silently and forever;
+// excluding one wrongly costs a cache miss. A rule that reads the program and the checker both is
+// excluded, since the program is the larger reach.
+func CacheClasses(rules []rule.Rule) (pure []rule.Rule, typeAware []rule.Rule, uncacheable []rule.Rule) {
 	for _, subject := range rules {
-		if subject.ReadsProgram || subject.NeedsTypeChecker {
+		switch {
+		case subject.ReadsProgram:
 			uncacheable = append(uncacheable, subject)
-			continue
+		case subject.NeedsTypeChecker:
+			typeAware = append(typeAware, subject)
+		default:
+			pure = append(pure, subject)
 		}
-		cacheable = append(cacheable, subject)
 	}
-	return cacheable, uncacheable
+	return pure, typeAware, uncacheable
+}
+
+// CacheableRules splits a rule set into the rules whose findings depend on nothing but the file's
+// bytes, and everything else. See CacheClasses for the three-way split the walk uses.
+func CacheableRules(rules []rule.Rule) (cacheable []rule.Rule, uncacheable []rule.Rule) {
+	pure, typeAware, never := CacheClasses(rules)
+	return pure, append(typeAware, never...)
 }

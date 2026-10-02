@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
@@ -167,6 +168,13 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	var mutex sync.Mutex
 	diagnostics := []rule.Diagnostic{}
 	filesReplayed := 0
+
+	// Computed once per walk, before any worker runs, and only when the findings cache is in use: about
+	// 47ms on ahra, the one cost type-aware caching adds over the walk.
+	var fingerprints map[tspath.Path][sha256.Size]byte
+	if g.FindingsReuse != nil && !g.CollectTimings {
+		fingerprints = g.TypeFingerprints()
+	}
 	listeningCounts := make(map[string]int, len(rules))
 	reportingCounts := make(map[string]int, len(rules))
 	offeredCounts := make(map[string]int, len(rules))
@@ -248,19 +256,28 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				if g.CollectTimings {
 					reuse = nil
 				}
+				//
+				// Type-aware rules replay only while the file's type fingerprint is unchanged too, so an
+				// importer of an edited file replays its pure rules and runs its type-aware ones again.
 				walkRules := applicable
 				var replayed *LintCacheEntry
-				var cacheableNames []string
-				var contentHash [sha256.Size]byte
+				typedReplayed := false
+				var pureNames, typedNames []string
+				var contentHash, fingerprint [sha256.Size]byte
 				if reuse != nil {
-					cacheableHere, uncacheableHere := CacheableRules(applicable)
-					cacheableNames = ruleNames(cacheableHere)
+					pureHere, typedHere, neverHere := CacheClasses(applicable)
+					pureNames, typedNames = ruleNames(pureHere), ruleNames(typedHere)
 					contentHash = HashContent(sourceFile.Text())
-					if entry, hit := reuse.lookup(sourceFile.FileName(), contentHash, cacheableNames); hit {
+					fingerprint = fingerprints[sourceFile.Path()]
+					if entry, pureHit, typedHit := reuse.lookup(sourceFile.FileName(), contentHash, pureNames, typedNames, fingerprint); pureHit {
 						replayed = &entry
-						walkRules = uncacheableHere
+						typedReplayed = typedHit
+						walkRules = neverHere
+						if !typedHit {
+							walkRules = append(append([]rule.Rule{}, typedHere...), neverHere...)
+						}
 						localReplayed++
-						replayEntry(entry, sourceFile, &localDiagnostics, localReporting, localOffered, localListening)
+						replayEntry(entry, typedHit, sourceFile, &localDiagnostics, localReporting, localOffered, localListening)
 						if len(walkRules) == 0 {
 							localNodes += entry.VisitedNodes
 							continue
@@ -314,7 +331,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// A file being recorded counts its listening and offered rules into maps of its own, so
 				// the entry can say which cacheable rules listened on this file; they are merged into the
 				// worker's totals at once, before the crash check, exactly as passing the totals in did.
-				recording := reuse != nil && replayed == nil
+				recording := reuse != nil && (replayed == nil || !typedReplayed)
 				listeningTarget, offeredTarget := localListening, localOffered
 				var fileListening, fileOffered map[string]int
 				if recording {
@@ -364,9 +381,15 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				}
 				localSuppressed.add(silenced)
 
-				if recording {
-					if entry, eligible := recordableEntry(sourceFile, contentHash, cacheableNames,
+				if recording && replayed == nil {
+					if entry, eligible := recordableEntry(sourceFile, contentHash, pureNames, typedNames, fingerprint,
 						localDiagnostics[diagnosticsBefore:], fileListening, visited, silenced); eligible {
+						reuse.keep(entry)
+					}
+				}
+				if recording && replayed != nil {
+					if entry, eligible := refreshTyped(*replayed, typedNames, fingerprint,
+						localDiagnostics[diagnosticsBefore:], fileListening); eligible {
 						reuse.keep(entry)
 					}
 				}
