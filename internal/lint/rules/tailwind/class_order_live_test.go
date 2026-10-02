@@ -201,7 +201,7 @@ func classOrderLiveMeasure(
 			continue
 		}
 
-		markers, placeable := partitionMarkers(classOrderLiveReversed(list.sorted))
+		unranked, placeable := partitionUnranked(classOrderLiveReversed(list.sorted), designSystem)
 		keys, _, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
 		if !resolved {
 			measurement.listsSkipped++
@@ -211,10 +211,17 @@ func classOrderLiveMeasure(
 		measurement.lists++
 		measurement.placedClasses += len(placeable)
 
-		ordered := append(markers, sortClassesByKey(placeable, keys)...)
+		ordered := append(unranked, sortClassesByKey(placeable, keys)...)
 		position := make(map[string]int, len(ordered))
 		for index, className := range ordered {
 			position[className] = index
+		}
+		// Two nulls keep source order, and the source here is the reversal, so the engine's order
+		// between them is no answer at all. Every other pair, a null against a ranked class
+		// included, is scored.
+		isUnranked := make(map[string]bool, len(unranked))
+		for _, className := range unranked {
+			isUnranked[className] = true
 		}
 
 		// Scored pairwise against the engine's own sequence rather than by string equality, so a
@@ -226,7 +233,7 @@ func classOrderLiveMeasure(
 				leftClass, rightClass := list.sorted[left], list.sorted[right]
 				leftPosition, leftPlaced := position[leftClass]
 				rightPosition, rightPlaced := position[rightClass]
-				if !leftPlaced || !rightPlaced {
+				if !leftPlaced || !rightPlaced || (isUnranked[leftClass] && isUnranked[rightClass]) {
 					continue
 				}
 				measurement.comparedPairs++
@@ -386,12 +393,12 @@ func TestClassOrderLiveStackedVariantsSortByMaskNotByDepth(t *testing.T) {
 	designSystem := classOrderLiveRepositorySystem(t)
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			markers, placeable := partitionMarkers(testCase.input)
+			unranked, placeable := partitionUnranked(testCase.input, designSystem)
 			keys, unplaceable, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
 			if !resolved {
 				t.Fatalf("the rule could not place %q, so this case proves nothing", unplaceable)
 			}
-			ordered := append(markers, sortClassesByKey(placeable, keys)...)
+			ordered := append(unranked, sortClassesByKey(placeable, keys)...)
 			if strings.Join(ordered, " ") != strings.Join(testCase.expected, " ") {
 				t.Errorf("got %v, engine says %v: %s", ordered, testCase.expected, testCase.why)
 			}
@@ -515,32 +522,40 @@ func TestClassOrderLiveVariantIndicesAreRanksWithinTheList(t *testing.T) {
 	t.Logf("`dark:flex` masks %s in the narrow list and %s in the wide one", narrow, wide)
 }
 
-// TestClassOrderLiveMarkersLeadInSourceOrder pins the one dimension the engine has no opinion on.
+// TestClassOrderLiveUnrankedLeadInSourceOrder pins the one dimension the engine has no opinion on.
 //
-// `getClassOrder` returns null for `group` and `peer`, so the corpus agreement above says nothing
-// about where they belong. The convention is the ecosystem's: Tailwind's own Prettier plugin and
-// `better-tailwindcss` hoist them and accept either order between them.
-func TestClassOrderLiveMarkersLeadInSourceOrder(t *testing.T) {
-	for _, input := range [][]string{
-		{"flex", "peer", "group", "items-center"},
-		{"flex", "group", "peer", "items-center"},
+// `getClassOrder` returns null for `group` and `peer` and for every class that compiles to nothing,
+// so the corpus agreement above says nothing about where they belong. The convention is Tailwind's
+// own Prettier plugin's: every null leads, and two nulls keep the order they were written in.
+//
+// The non-marker nulls are the case #vf1hd6j found missing. `text-dark` and `dark:bg-dark-2` are
+// classes the plugin ranked null on the committed trees, and `ahralia-splash` does not parse at all.
+// `ahra` declares no `dark` colour, which this asserts rather than assumes: the test is about nulls
+// and must not quietly turn into a test about two ranked classes.
+func TestClassOrderLiveUnrankedLeadInSourceOrder(t *testing.T) {
+	designSystem := classOrderLiveRepositorySystem(t)
+
+	for _, nullClass := range []string{"peer", "group", "text-dark", "dark:bg-dark-2", "ahralia-splash"} {
+		if !isMarkerClass(nullClass) && classCompilesIn(nullClass, designSystem) {
+			t.Fatalf("%q compiles in this repository, so it is not a null and this test proves nothing", nullClass)
+		}
+	}
+
+	for _, testCase := range []struct {
+		input, unranked []string
+	}{
+		{[]string{"flex", "peer", "group", "items-center"}, []string{"peer", "group"}},
+		{[]string{"flex", "group", "peer", "items-center"}, []string{"group", "peer"}},
+		{[]string{"flex", "text-dark", "peer", "items-center"}, []string{"text-dark", "peer"}},
+		{[]string{"items-center", "ahralia-splash", "dark:bg-dark-2", "flex"}, []string{"ahralia-splash", "dark:bg-dark-2"}},
 	} {
-		markers, placeable := partitionMarkers(input)
-		if len(markers) != 2 {
-			t.Fatalf("expected both markers to be partitioned out of %v, got %v", input, markers)
-		}
+		unranked, placeable := partitionUnranked(testCase.input, designSystem)
 		// Source order between them, which is what makes `peer group` and `group peer` both legal.
-		expected := []string{}
-		for _, className := range input {
-			if className == "peer" || className == "group" {
-				expected = append(expected, className)
-			}
-		}
-		if strings.Join(markers, " ") != strings.Join(expected, " ") {
-			t.Errorf("markers %v should keep source order %v", markers, expected)
+		if strings.Join(unranked, " ") != strings.Join(testCase.unranked, " ") {
+			t.Errorf("from %v the nulls are %v; they should be %v, in source order", testCase.input, unranked, testCase.unranked)
 		}
 		if len(placeable) != 2 {
-			t.Errorf("expected two placeable classes, got %v", placeable)
+			t.Errorf("expected two placeable classes from %v, got %v", testCase.input, placeable)
 		}
 	}
 }
@@ -579,7 +594,7 @@ func TestClassOrderLiveDeclinesOnlyTheKnownBoundary(t *testing.T) {
 		if !hasSystem || designSystem.Err != nil {
 			continue
 		}
-		_, placeable := partitionMarkers(classOrderLiveReversed(list.sorted))
+		_, placeable := partitionUnranked(classOrderLiveReversed(list.sorted), designSystem)
 		if _, unplaceable, resolved := classOrderKeys(
 			placeable, designSystem.System, designSystem.Table); !resolved {
 			declined[list.name] = unplaceable

@@ -167,6 +167,14 @@ func TestEnforceConsistentClassOrderReportsMisordering(t *testing.T) {
 			wantIds:  []string{"inconsistentClassOrder"},
 		},
 		{
+			// Every class the engine ranks null leads, not only the markers. This literal was declined
+			// until #vf1hd6j measured the plugin hoisting classes like `text-dark`.
+			name:     "unknown class written last",
+			fileName: "Component.tsx",
+			source:   `const element = <div className="items-center flex ahralia-splash" />;`,
+			wantIds:  []string{"inconsistentClassOrder"},
+		},
+		{
 			name:     "several classes out of order",
 			fileName: "Component.tsx",
 			source:   `const element = <div className="gap-2 items-center flex" />;`,
@@ -269,11 +277,11 @@ func TestEnforceConsistentClassOrderStaysSilent(t *testing.T) {
 			source:   `const element = <div className="items-center flex flex" />;`,
 		},
 		{
-			// A class outside the design system cannot be placed, so the literal is left alone and
-			// `no-unknown-classes` is the rule with something to say about it.
-			name:     "unknown class present",
+			// A class the engine ranks null leads, in source order, so this is already in order. It
+			// is `no-unknown-classes` that has something to say about `ahralia-splash`.
+			name:     "unknown class written first",
 			fileName: "Component.tsx",
-			source:   `const element = <div className="items-center flex ahralia-splash" />;`,
+			source:   `const element = <div className="ahralia-splash flex items-center" />;`,
 		},
 		{
 			name:     "unrelated attribute",
@@ -313,23 +321,74 @@ func TestClassOrderMessageNamesTheOrder(t *testing.T) {
 	}
 }
 
-// TestClassOrderProposesNoFix guards a deliberate absence, and this one is a closer call than the
-// other rules' fixes.
+// TestClassOrderFixMatchesThePlugin pins the rewrite, which is what Prettier's Tailwind plugin wrote
+// for every one of these lists until it left.
 //
-// The rule knows the correct order, so a fix is mechanically available. It is left out because real
-// class lists in this codebase wrap across lines with indentation, and a rewrite would reflow them:
-// the diff of the repair would be larger than the defect. Reordering is the one finding here where
-// the noise of fixing can exceed the cost of the problem.
-func TestClassOrderProposesNoFix(t *testing.T) {
-	result := runClassOrderFixture(t, "Component.tsx",
-		`const element = <div className="items-center flex" />;`)
-
-	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+// The rule shipped without a fix, on the reasoning that a rewrite would reflow wrapped lists. The
+// plugin never reflowed them: it permutes the classes between the same whitespace runs, and so does
+// this fix, which writes only the slots whose class changes. The wrapped and padded cases below are
+// that property, and the padding staying put is `no-unnecessary-whitespace`'s to remove.
+func TestClassOrderFixMatchesThePlugin(t *testing.T) {
+	testCases := []struct {
+		name, source, want string
+	}{
+		{
+			name:   "two classes reversed",
+			source: `const element = <div className="items-center flex" />;`,
+			want:   `const element = <div className="flex items-center" />;`,
+		},
+		{
+			name:   "several classes, only the moved slots rewritten",
+			source: `const element = <div className="gap-2 items-center flex" />;`,
+			want:   `const element = <div className="flex items-center gap-2" />;`,
+		},
+		{
+			name:   "a null leads in source order",
+			source: `const element = <div className="items-center peer flex ahralia-splash" />;`,
+			want:   `const element = <div className="peer ahralia-splash flex items-center" />;`,
+		},
+		{
+			name:   "a wrapped list stays wrapped",
+			source: "const element = <div\n  className=\"items-center\n    flex\n    gap-2\"\n/>;",
+			want:   "const element = <div\n  className=\"flex\n    items-center\n    gap-2\"\n/>;",
+		},
+		{
+			name:   "padding is left for the whitespace rule",
+			source: `const element = <div className="  items-center   flex " />;`,
+			want:   `const element = <div className="  flex   items-center " />;`,
+		},
 	}
-	if len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Fatal("this rule reports the order and leaves the rewrite alone, because reflowing a wrapped " +
-			"class list produces a diff larger than the defect")
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := runClassOrderFixture(t, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(t, result, testCase.want+"\n")
+		})
+	}
+}
+
+// TestClassOrderReportsWithoutAFixItCannotPlace covers the cases that keep the finding and drop the
+// fix: rewriting at source offsets needs the source to be the value, and a class the deprecation rule
+// renames is renamed before it is moved, since both edits would claim its bytes.
+func TestClassOrderReportsWithoutAFixItCannotPlace(t *testing.T) {
+	for _, testCase := range []struct {
+		name, source string
+	}{
+		{
+			name:   "an escape in the literal",
+			source: `const merged = mergeClassNames('items-center\u0020flex');`,
+		},
+		{
+			name:   "a deprecated class that moves",
+			source: `const element = <div className="items-center flex-grow" />;`,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := runClassOrderFixture(t, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, "inconsistentClassOrder")
+			if len(result.Diagnostics[0].Fixes) != 0 {
+				t.Fatalf("expected no fix, got %+v", result.Diagnostics[0].Fixes)
+			}
+		})
 	}
 }
 
@@ -626,13 +685,13 @@ func TestClassOrderMarkersKeepSourceOrder(t *testing.T) {
 func classOrderLiveSort(t *testing.T, designSystem DesignSystemResult, classes []string) []string {
 	t.Helper()
 
-	markers, placeable := partitionMarkers(classes)
+	unranked, placeable := partitionUnranked(classes, designSystem)
 	keys, unplaceable, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
 	if !resolved {
 		t.Fatalf("the rule could not place %q out of %v, so this case proves nothing",
 			unplaceable, classes)
 	}
-	return append(markers, sortClassesByKey(placeable, keys)...)
+	return append(unranked, sortClassesByKey(placeable, keys)...)
 }
 
 // TestClassOrderFixturesActuallyRan is what stops this file from going green on nothing.

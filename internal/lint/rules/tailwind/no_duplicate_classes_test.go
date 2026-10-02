@@ -1,7 +1,6 @@
 package tailwind
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -185,55 +184,47 @@ func TestNoDuplicateClassesStaysSilent(t *testing.T) {
 // was reported leaves the dangerous half untested. The two properties that matter: the surviving
 // classes are the distinct ones, and they keep the order the author wrote them in, because
 // reordering here would collide with `enforce-consistent-class-order`.
+//
+// Each repeat goes with the first byte of the separator before it and nothing more. The rest of a
+// long separator is `no-unnecessary-whitespace`'s, so on its own this rule leaves it, and the two
+// close the gap together in one pass (TestTailwindFixersComposeInOnePass).
 func TestNoDuplicateClassesFixIsCorrect(t *testing.T) {
 	testCases := []struct {
-		name     string
-		source   string
-		wantText string
+		name   string
+		source string
+		want   string
 	}{
 		{
-			name:     "removes the later repeat",
-			source:   `const element = <div className="flex items-center flex" />;`,
-			wantText: "flex items-center",
+			name:   "removes the later repeat",
+			source: `const element = <div className="flex items-center flex" />;`,
+			want:   `const element = <div className="flex items-center" />;`,
 		},
 		{
-			name:     "keeps original order",
-			source:   `const element = <div className="a b c a b" />;`,
-			wantText: "a b c",
+			name:   "keeps original order",
+			source: `const element = <div className="a b c a b" />;`,
+			want:   `const element = <div className="a b c" />;`,
 		},
 		{
-			name:     "collapses three into one",
-			source:   `const element = <div className="flex flex flex" />;`,
-			wantText: "flex",
+			name:   "collapses three into one",
+			source: `const element = <div className="flex flex flex" />;`,
+			want:   `const element = <div className="flex" />;`,
 		},
 		{
-			name:     "normalizes the gap it leaves behind",
-			source:   "const element = <div className=\"text-sm   text-sm\" />;",
-			wantText: "text-sm",
+			name:   "leaves the excess of a long separator to the whitespace rule",
+			source: "const element = <div className=\"text-sm   text-sm\" />;",
+			want:   "const element = <div className=\"text-sm  \" />;",
+		},
+		{
+			name:   "a repeat on its own line takes its newline with it",
+			source: "const element = <div className=\"flex\n  items-center\n  flex\" />;",
+			want:   "const element = <div className=\"flex\n  items-center  \" />;",
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
-			if len(result.Diagnostics) == 0 {
-				t.Fatal("expected a finding, got none")
-			}
-
-			fixes := result.Diagnostics[0].Fixes
-			if len(fixes) != 1 {
-				t.Fatalf("expected exactly one fix, got %d", len(fixes))
-			}
-			if fixes[0].Text != testCase.wantText {
-				t.Errorf("fix writes %q, want %q", fixes[0].Text, testCase.wantText)
-			}
-
-			// The fix must replace the class text and nothing else. If the range included the
-			// quotes, applying it would produce an unterminated string.
-			replaced := testCase.source[fixes[0].Range.Pos():fixes[0].Range.End()]
-			if strings.Contains(replaced, `"`) || strings.Contains(replaced, "'") {
-				t.Errorf("fix range covers a quote character: %q", replaced)
-			}
+			rule_testing.ExpectFixedSource(t, result, testCase.want)
 		})
 	}
 }

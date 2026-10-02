@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
 func messageInconsistentClassOrder(ordered string) rule.Message {
@@ -44,18 +45,27 @@ type EnforceConsistentClassOrderOptions struct {
 //
 // Unranked classes sort first, and their source order is preserved. `group` and `peer` generate no
 // CSS of their own and exist to be referenced by `group-hover:` on other elements, so the engine
-// ranks them null and expresses no opinion about where they go.
+// ranks them null and expresses no opinion about where they go. So does every class that compiles
+// to nothing: one that does not parse (`ahralia-splash`, `notavariant:flex`) and one whose value
+// does not resolve (`text-dark` where the theme has no `dark` colour).
 //
 // That the engine has no opinion is the whole point: this dimension is not ported from
 // `getClassOrder`, it is a convention chosen on top of it, and the corpus measurement below cannot
-// speak to it. The convention is taken from Tailwind's own Prettier plugin and
-// `better-tailwindcss`, verified against the latter directly: `flex peer group items-center` is
-// rewritten to `peer group flex items-center`, while both `peer group` and `group peer` are
-// accepted as written. Sorting the nulls alphabetically would reject `peer group`, so the
-// tiebreak is source order rather than any ordering of our own.
+// speak to it. The convention is Tailwind's own Prettier plugin's, whose comparator returns -1 for
+// any null against a ranked class and 0 for two nulls under a stable sort: `flex peer group
+// items-center` becomes `peer group flex items-center`, and both `peer group` and `group peer` stand
+// as written. Sorting the nulls alphabetically would reject `peer group`, so the tiebreak is source
+// order rather than any ordering of our own.
 //
 // This reversed a previous convention of sorting them last. Nothing measured it in either
-// direction; it was stated in this comment and then read back as though it had been.
+// direction; it was stated in this comment and then read back as though it had been. Then the
+// nulls were the two markers only, and a literal holding any other null was declined. That was
+// silent where the plugin reorders, and #vf1hd6j measured the plugin ranking six such classes null
+// on the committed trees (`text-dark`, `dark:bg-dark-2`, `hover:content`, and three more).
+//
+// A class that parses and resolves and that this port still cannot place is not treated as null.
+// The engine ranks it, so hoisting it would be a rewrite the plugin never makes, and the literal is
+// declined instead: a port gap stays a missing finding rather than becoming a wrong fix.
 //
 // Then variant position, because the engine groups by variant before anything else. Ordering by
 // root first agreed with the engine on 51% of the corpus; adding the variant dimension and taking
@@ -70,13 +80,28 @@ type EnforceConsistentClassOrderOptions struct {
 // literal containing one has no engine answer to be identical to, and the agreement was never
 // evidence about their placement in either direction.
 //
-// # No fix, and this one is a closer call than the others
+// # The fix moves classes and leaves every separator where it was
 //
-// Reordering a class list is mechanical and the rule knows the answer, so a fix is tempting. It is
-// left out because the rewrite has to preserve a literal's own formatting, and real class lists in
-// this codebase wrap across lines with indentation that carries intent. A fix that reflowed them
-// would produce diffs larger than the defect it repaired, and reordering is the one defect where
-// the noise of the repair can exceed the cost of the problem.
+// This rule shipped without a fix, on the reasoning that real class lists wrap across lines with
+// indentation that carries intent, and a rewrite would reflow them. That objection is to joining
+// the sorted classes with spaces, not to fixing. The plugin's own `sortClasses` splits the string
+// into classes and the whitespace runs between them, sorts the classes, and puts them back into the
+// same slots, so the third separator is still the third separator whatever moved around it. The
+// fix does exactly that, and a wrapped list stays wrapped.
+//
+// It rewrites only the class slots whose class changes. Collapsing whitespace is
+// `no-unnecessary-whitespace`'s finding and removing a repeat is `no-duplicate-classes`'s, and the
+// bytes those two edit are never ones this fix claims, so all three land in the same pass
+// (class_tokens.go). A literal with a repeat is not ordered at all until the repeat is gone.
+//
+// Prettier's plugin sorted every list in our trees until it left, which is why this fix exists: on
+// a tree the plugin sorted it must change nothing, and the rule reported nothing on ahra before or
+// after the null semantics above were widened.
+//
+// A literal whose source text differs from its value is reported and not fixed. An escape like
+// ` ` decodes to a space, so the decoded classes cannot be written back at the source's offsets
+// without rewriting the escape too, and a fix that silently decodes an author's escape is a change
+// they did not ask for. `reorderFixes` names the other two cases.
 var EnforceConsistentClassOrder = rule.Rule{
 	Name: "better-tailwindcss/enforce-consistent-class-order",
 	// Declared because the rule reaches ctx.Program to get the design system. The stylesheet graph
@@ -183,52 +208,125 @@ func reportClassOrder(ctx rule.Context, literal ClassLiteral, designSystem Desig
 		seen[className] = true
 	}
 
-	// The markers are separated out before anything is parsed, because the engine ranks them null
-	// and so expresses no opinion about where they go. `ParseCandidate` returns nothing for them for
-	// the same reason, so leaving them in the population would read as "this class is outside the
-	// design system" and silence the literal.
-	//
-	// Where they go is therefore this consumer's convention rather than a ported fact, and it is
-	// taken from the ecosystem: Tailwind's own Prettier plugin and `better-tailwindcss` both hoist
-	// them, and both accept `peer group` and `group peer` as written. So they lead, in source order.
-	markers, placeable := partitionMarkers(classes)
-
-	// The class that could not be placed is deliberately not reported here, only used to decide.
-	// `no-unknown-classes` is the rule that says which class is unknown, and two rules naming the
-	// same class in two different sentences is how an author ends up fixing it twice.
-	keys, _, resolved := classOrderKeys(placeable, designSystem.System, designSystem.Table)
-	if !resolved {
-		// A class this repository's design system cannot place means the literal holds something
-		// outside it. Ordering the rest around it would be guessing.
+	// The unknown classes are not reported here, only placed. `no-unknown-classes` is the rule that
+	// says which class is unknown, and two rules naming the same class in two different sentences is
+	// how an author ends up fixing it twice.
+	ordered, decided := orderClasses(classes, designSystem)
+	if !decided {
 		return
 	}
-
-	ordered := append(markers, sortClassesByKey(placeable, keys)...)
 	if strings.Join(ordered, " ") == strings.Join(classes, " ") {
 		return
 	}
 
-	ctx.ReportRange(literal.Range, messageInconsistentClassOrder(strings.Join(ordered, " ")))
+	message := messageInconsistentClassOrder(strings.Join(ordered, " "))
+
+	fixes, fixable := reorderFixes(ctx.SourceFile.Text(), literal, classes, ordered)
+	if !fixable {
+		ctx.ReportRange(literal.Range, message)
+		return
+	}
+
+	ctx.Report(rule.Diagnostic{
+		Range:      literal.Range,
+		Message:    message,
+		SourceFile: ctx.SourceFile,
+		Fixes:      fixes,
+	})
 }
 
-// partitionMarkers splits the deliberately-unranked markers off the front of a class list.
+// reorderFixes writes into each class slot the class that belongs there, and touches nothing else.
 //
-// `group` and `peer` generate no CSS of their own and exist to be referenced by `group-hover:` on
-// another element, so `getClassOrder` returns null for them and the engine's corpus agreement says
-// nothing about where they belong. Both slices keep source order, which is what makes the tiebreak
-// source order rather than an ordering of our own: sorting the markers alphabetically would rewrite
-// `peer group`, and the reference implementations accept it.
-func partitionMarkers(classes []string) (markers []string, placeable []string) {
-	markers = make([]string, 0, 2)
-	placeable = make([]string, 0, len(classes))
-	for _, className := range classes {
-		if isMarkerClass(className) {
-			markers = append(markers, className)
+// The plugin's `sortClasses` permutes the classes and puts them back between the same whitespace
+// runs, so the separators never move. Writing only the slots whose class changes is that same
+// result, with every separator byte left to `no-unnecessary-whitespace` and every unmoved class left
+// alone, so the fix composes with the other fixers in one pass (class_tokens.go).
+//
+// Not fixable, and reported without a fix, in three cases. The source is not the decoded value (an
+// escape), so slots cannot be found at source offsets. The slots are not the classes that were
+// ordered: `SplitClasses` splits on every Unicode space and drops a fragment holding `${`, and the
+// plugin's `[\t\r\f\n ]` splits on neither, so a `\v` inside a list would be two classes here and
+// one there. Or a class that moves is one `no-deprecated-classes` renames, whose rename claims the
+// same bytes: the order is settled on the pass after the rename lands.
+func reorderFixes(sourceText string, literal ClassLiteral, classes []string, ordered []string) ([]rule.Fix, bool) {
+	if strings.ContainsRune(literal.Text, '\v') {
+		return nil, false
+	}
+	tokens, tokenized := classTokensIn(sourceText, literal.Range, literal.Text)
+	if !tokenized {
+		return nil, false
+	}
+	slots := classesOf(tokens)
+	if len(slots) != len(classes) {
+		return nil, false
+	}
+	for index, slot := range slots {
+		if slot.Text != classes[index] {
+			return nil, false
+		}
+	}
+
+	fixes := []rule.Fix{}
+	for index, slot := range slots {
+		if slot.Text == ordered[index] {
 			continue
 		}
-		placeable = append(placeable, className)
+		if replacement, deprecated := deprecationFor(slot.Text); deprecated && replacement != "" {
+			return nil, false
+		}
+		fixes = append(fixes, rule.ReplaceRange(slot.Range, ordered[index]))
 	}
-	return markers, placeable
+	return fixes, true
+}
+
+// orderClasses is the plugin's order for one literal, or false when this port cannot decide it.
+//
+// The engine's nulls lead in source order and the ranked classes follow in the engine's order. A
+// class that parses and resolves and still cannot be placed is a gap in this port rather than a
+// null, so the literal is declined: ordering the rest around it would be guessing.
+func orderClasses(classes []string, designSystem DesignSystemResult) ([]string, bool) {
+	unranked, ranked := partitionUnranked(classes, designSystem)
+	keys, _, resolved := classOrderKeys(ranked, designSystem.System, designSystem.Table)
+	if !resolved {
+		return nil, false
+	}
+	return append(unranked, sortClassesByKey(ranked, keys)...), true
+}
+
+// partitionUnranked splits off every class the engine ranks null, keeping source order in both.
+//
+// `getClassOrder` returns null for a class that produces no CSS: the markers, which exist to be
+// referenced by `group-hover:` on another element, and any class that does not compile. Both slices
+// keep source order, which is what makes the tiebreak source order rather than an ordering of our
+// own: sorting the nulls alphabetically would rewrite `peer group`, and the plugin accepts it.
+func partitionUnranked(classes []string, designSystem DesignSystemResult) (unranked []string, ranked []string) {
+	unranked = make([]string, 0, 2)
+	ranked = make([]string, 0, len(classes))
+	for _, className := range classes {
+		if isMarkerClass(className) || !classCompilesIn(className, designSystem) {
+			unranked = append(unranked, className)
+			continue
+		}
+		ranked = append(ranked, className)
+	}
+	return unranked, ranked
+}
+
+// classCompilesIn reports whether the engine would emit CSS for a class, and so rank it.
+//
+// The same two questions `no-unknown-classes` asks, minus its allowances for markers and arbitrary
+// properties, which it accepts as known for its own reasons: a marker is known and still unranked.
+// Answering true for a nil system is the failing-safe direction, since a class wrongly read as
+// ranked is declined by `classOrderKeys`, while one wrongly read as null is moved.
+func classCompilesIn(className string, designSystem DesignSystemResult) bool {
+	if designSystem.System == nil {
+		return true
+	}
+	candidates := tailwindengine.ParseCandidate(className, designSystem.System)
+	if len(candidates) == 0 {
+		return false
+	}
+	return tailwindengine.ClassValueResolvesIn(&candidates[0], designSystem.System)
 }
 
 // isMarkerClass reports whether a class is one of the markers the engine ranks null.

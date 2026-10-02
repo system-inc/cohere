@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -128,6 +129,11 @@ func reportDuplicates(ctx rule.Context, literal ClassLiteral) {
 	// text must not be rewritten: the fix is built from the fragments the reader could see, and
 	// would drop the interpolation.
 	canFix := !strings.Contains(literal.Text, "${")
+	var tokens []classToken
+	tokenized := false
+	if canFix && ctx.SourceFile != nil {
+		tokens, tokenized = classTokensIn(ctx.SourceFile.Text(), literal.Range, literal.Text)
+	}
 
 	for _, className := range duplicated {
 		message := messageDuplicateClass(className)
@@ -136,20 +142,61 @@ func reportDuplicates(ctx rule.Context, literal ClassLiteral) {
 			continue
 		}
 
+		// Each class's diagnostic carries the deletions for its own repeats and nothing else. The
+		// whole-literal rewrite this replaced was attached to every duplicated class's diagnostic,
+		// so a literal with two duplicated classes proposed the same edit twice and the engine
+		// refused the second as an overlap.
+		fixes := []rule.Fix{deduplicateFix(literal)}
+		if tokenized {
+			fixes = repeatDeletions(tokens, className)
+		}
+
 		ctx.Report(rule.Diagnostic{
 			Range:      literal.Range,
 			Message:    message,
 			SourceFile: ctx.SourceFile,
-			Fixes:      []rule.Fix{deduplicateFix(literal)},
+			Fixes:      fixes,
 		})
 	}
 }
 
-// deduplicateFix rewrites the literal's contents with every repeat removed.
+// repeatDeletions deletes every occurrence of a class after its first, each with the first byte of
+// the separator before it.
 //
-// The first occurrence of each class is kept, in its original position, which is what makes the fix
-// invisible to `enforce-consistent-class-order`: the surviving classes are in the order the author
-// wrote them, minus the ones that were saying nothing.
+// The first occurrence is kept, in its original position, which is what makes the fix invisible to
+// `enforce-consistent-class-order`: the surviving classes are in the order the author wrote them,
+// minus the ones that were saying nothing.
+//
+// Only the separator's first byte, because the rest of a long run is `no-unnecessary-whitespace`'s
+// to delete, and the two edits then meet end to start rather than overlapping (class_tokens.go). A
+// repeat always has a separator before it, since the occurrence it repeats came first.
+func repeatDeletions(tokens []classToken, className string) []rule.Fix {
+	fixes := []rule.Fix{}
+	seen := false
+	for index, token := range tokens {
+		if token.Separator || token.Text != className {
+			continue
+		}
+		if !seen {
+			seen = true
+			continue
+		}
+		separator := tokens[index-1].Range
+		if separator.End() == separator.Pos()+1 {
+			// Adjacent, so one edit rather than two that touch.
+			fixes = append(fixes, rule.ReplaceRange(core.NewTextRange(separator.Pos(), token.Range.End()), ""))
+			continue
+		}
+		fixes = append(fixes,
+			rule.ReplaceRange(core.NewTextRange(separator.Pos(), separator.Pos()+1), ""),
+			rule.ReplaceRange(token.Range, ""),
+		)
+	}
+	return fixes
+}
+
+// deduplicateFix rewrites the literal's contents with every repeat removed, for a literal whose
+// source is not its decoded value and so cannot be tokenized at source offsets.
 func deduplicateFix(literal ClassLiteral) rule.Fix {
 	classes := strings.Fields(literal.Text)
 	seen := make(map[string]bool, len(classes))

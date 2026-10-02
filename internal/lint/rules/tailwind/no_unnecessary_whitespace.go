@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -76,11 +77,16 @@ var NoUnnecessaryWhitespace = rule.Rule{
 					continue
 				}
 
+				fixes, scoped := whitespaceDeletions(ctx.SourceFile.Text(), segment)
+				if !scoped {
+					fixes = []rule.Fix{rule.ReplaceRange(segment.Range, tidied)}
+				}
+
 				ctx.Report(rule.Diagnostic{
 					Range:      segment.Range,
 					Message:    messageUnnecessaryWhitespace(),
 					SourceFile: ctx.SourceFile,
-					Fixes:      []rule.Fix{rule.ReplaceRange(segment.Range, tidied)},
+					Fixes:      fixes,
 				})
 			}
 		}
@@ -145,4 +151,39 @@ func tidyWhitespace(segment ClassSegment) (string, bool) {
 
 	tidied := builder.String()
 	return tidied, tidied != segment.Text
+}
+
+// whitespaceDeletions is `tidyWhitespace`'s repair as one deletion per run, touching only whitespace.
+//
+// Rewriting the whole segment claimed every class in it too, so on a literal another rule was also
+// fixing, one of the two was refused and waited a pass. Deleting the padding and the excess past a
+// separator's first character leaves every class byte and every separator's first byte unclaimed,
+// which is what `no-duplicate-classes` and `enforce-consistent-class-order` edit. See class_tokens.go.
+//
+// Applied together the deletions produce exactly `tidyWhitespace`'s text: a run at an outer edge with
+// no hole beside it goes entirely, and any other run keeps its first character. False when the
+// segment's source is not its decoded value, and the caller falls back to rewriting the segment.
+func whitespaceDeletions(sourceText string, segment ClassSegment) ([]rule.Fix, bool) {
+	tokens, tokenized := classTokensIn(sourceText, segment.Range, segment.Text)
+	if !tokenized {
+		return nil, false
+	}
+
+	fixes := []rule.Fix{}
+	for index, token := range tokens {
+		if !token.Separator {
+			continue
+		}
+		atSegmentStart := index == 0
+		atSegmentEnd := index == len(tokens)-1
+
+		if (atSegmentStart && !segment.LeadingHole) || (atSegmentEnd && !segment.TrailingHole) {
+			fixes = append(fixes, rule.ReplaceRange(token.Range, ""))
+			continue
+		}
+		if token.Range.End()-token.Range.Pos() > 1 {
+			fixes = append(fixes, rule.ReplaceRange(core.NewTextRange(token.Range.Pos()+1, token.Range.End()), ""))
+		}
+	}
+	return fixes, true
 }

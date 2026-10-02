@@ -156,33 +156,58 @@ var NoDeprecatedClasses = rule.Rule{
 	},
 }
 
-// reportDeprecations finds renamed classes in one literal and proposes the rewritten string.
+// reportDeprecations finds renamed classes in one literal and proposes each rename at its own class.
 //
-// One fix per literal rather than one per class, for the same reason the duplicate rule does it:
-// two edits inside the same string are each computed against the original offsets, so applying the
-// first invalidates the second.
+// Each finding's fix rewrites its own class and nothing else. The whole-literal rewrite this replaced
+// was attached to every finding, so a literal with two deprecated classes proposed the same edit
+// twice and the engine refused the second, and the rewrite also claimed every separator, colliding
+// with `no-unnecessary-whitespace` in the same pass. See class_tokens.go.
+//
+// A repeat of an earlier class is reported and not renamed: `no-duplicate-classes` deletes it, and
+// a rename of the same bytes would be refused as an overlap. Once it is gone there is nothing left
+// to rename.
 func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) == 0 {
 		return
 	}
 
+	// The class tokens line up with `classes` one for one, or the per-class fix is not available and
+	// the whole-literal rewrite stands in for it.
+	var tokens []classToken
+	tokenized := false
+	if ctx.SourceFile != nil {
+		tokens, tokenized = classTokensIn(ctx.SourceFile.Text(), literal.Range, literal.Text)
+	}
+	classTokens := classesOf(tokens)
+	if tokenized && len(classTokens) == len(classes) {
+		for index, token := range classTokens {
+			if token.Text != classes[index] {
+				tokenized = false
+				break
+			}
+		}
+	} else {
+		tokenized = false
+	}
+
 	rewritten := make([]string, 0, len(classes))
 	type finding struct {
 		className   string
 		replacement string
+		index       int
 	}
 	var findings []finding
 	anyRewritten := false
 
-	for _, className := range classes {
+	for index, className := range classes {
 		replacement, isDeprecated := deprecationFor(className)
 		if !isDeprecated {
 			rewritten = append(rewritten, className)
 			continue
 		}
 
-		findings = append(findings, finding{className: className, replacement: replacement})
+		findings = append(findings, finding{className: className, replacement: replacement, index: index})
 		if replacement == "" {
 			// Removed outright: keep the class as written, because this rule has no rewrite to offer
 			// and dropping it would change what renders.
@@ -213,11 +238,19 @@ func reportDeprecations(ctx rule.Context, literal ClassLiteral) {
 			continue
 		}
 
+		fixes := []rule.Fix{rule.ReplaceRange(literal.Range, strings.Join(rewritten, " "))}
+		if tokenized {
+			fixes = nil
+			if !containsString(classes[:found.index], found.className) {
+				fixes = []rule.Fix{rule.ReplaceRange(classTokens[found.index].Range, found.replacement)}
+			}
+		}
+
 		ctx.Report(rule.Diagnostic{
 			Range:      literal.Range,
 			Message:    message,
 			SourceFile: ctx.SourceFile,
-			Fixes:      []rule.Fix{rule.ReplaceRange(literal.Range, strings.Join(rewritten, " "))},
+			Fixes:      fixes,
 		})
 	}
 }

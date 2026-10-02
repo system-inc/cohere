@@ -1,6 +1,7 @@
 package tailwind
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -214,6 +215,19 @@ func TestNoDeprecatedClassesFixMatchesUpstream(t *testing.T) {
 			wantText: "flex shrink-0 gap-2",
 		},
 		{
+			// Two findings, each renaming its own class. One rewrite of the whole literal attached to
+			// both proposed the same edit twice, and the engine refused the second.
+			name:     "two deprecated classes, two disjoint renames",
+			source:   `const element = <div className="flex-shrink-0 flex flex-grow" />;`,
+			wantText: "shrink-0 flex grow",
+		},
+		{
+			// A repeat is `no-duplicate-classes`'s to delete, so it is reported and not renamed.
+			name:     "a repeated deprecated class is renamed once",
+			source:   `const element = <div className="flex-shrink-0 flex-shrink-0" />;`,
+			wantText: "shrink-0 flex-shrink-0",
+		},
+		{
 			name:     "capture is carried into the replacement",
 			source:   `const element = <div className="flex-grow-2" />;`,
 			wantText: "grow-2",
@@ -226,13 +240,13 @@ func TestNoDeprecatedClassesFixMatchesUpstream(t *testing.T) {
 			if len(result.Diagnostics) == 0 {
 				t.Fatal("expected a finding, got none")
 			}
-			fixes := result.Diagnostics[0].Fixes
-			if len(fixes) != 1 {
-				t.Fatalf("expected one fix, got %d", len(fixes))
-			}
-			if fixes[0].Text != testCase.wantText {
-				t.Errorf("fix writes %q, want %q", fixes[0].Text, testCase.wantText)
-			}
+			// The literal's contents after the fix, read back out of the rewritten source so the
+			// cases stay about class text rather than about the JSX around it.
+			const opening = `className="`
+			start := strings.Index(testCase.source, opening) + len(opening)
+			end := strings.LastIndex(testCase.source, `"`)
+			want := testCase.source[:start] + testCase.wantText + testCase.source[end:]
+			rule_testing.ExpectFixedSource(t, result, want)
 		})
 	}
 }

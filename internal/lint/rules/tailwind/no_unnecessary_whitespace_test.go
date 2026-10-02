@@ -1,6 +1,7 @@
 package tailwind
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -171,58 +172,94 @@ func TestNoUnnecessaryWhitespaceStaysSilent(t *testing.T) {
 // produced.
 func TestNoUnnecessaryWhitespaceFixMatchesUpstream(t *testing.T) {
 	testCases := []struct {
-		name     string
-		source   string
-		wantText string
+		name   string
+		source string
+		want   string
 	}{
 		{
-			name:     "collapses a doubled space",
-			source:   `const element = <div className="flex  items-center" />;`,
-			wantText: "flex items-center",
+			name:   "collapses a doubled space",
+			source: `const element = <div className="flex  items-center" />;`,
+			want:   `const element = <div className="flex items-center" />;`,
 		},
 		{
-			name:     "drops a leading space",
-			source:   `const element = <div className=" flex" />;`,
-			wantText: "flex",
+			name:   "drops a leading space",
+			source: `const element = <div className=" flex" />;`,
+			want:   `const element = <div className="flex" />;`,
 		},
 		{
-			name:     "drops a trailing space",
-			source:   `const element = <div className="flex " />;`,
-			wantText: "flex",
+			name:   "drops a trailing space",
+			source: `const element = <div className="flex " />;`,
+			want:   `const element = <div className="flex" />;`,
 		},
 		{
-			name:     "empties a whitespace-only string",
-			source:   `const element = <div className="   " />;`,
-			wantText: "",
+			name:   "empties a whitespace-only string",
+			source: `const element = <div className="   " />;`,
+			want:   `const element = <div className="" />;`,
 		},
 		{
 			// The load-bearing case: one space survives at the hole.
-			name:     "keeps one space before a hole",
-			source:   "const element = <div className={`flex  ${extra}`} />;",
-			wantText: "flex ",
+			name:   "keeps one space before a hole",
+			source: "const element = <div className={`flex  ${extra}`} />;",
+			want:   "const element = <div className={`flex ${extra}`} />;",
 		},
 		{
-			name:     "keeps one space after a hole",
-			source:   "const element = <div className={`${extra}  flex`} />;",
-			wantText: " flex",
+			name:   "keeps one space after a hole",
+			source: "const element = <div className={`${extra}  flex`} />;",
+			want:   "const element = <div className={`${extra} flex`} />;",
+		},
+		{
+			// A separator keeps its own first character, so a wrapped list stays wrapped.
+			name:   "keeps a newline's first character",
+			source: "const element = <div className=\"flex\n    items-center\" />;",
+			want:   "const element = <div className=\"flex\nitems-center\" />;",
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
-			if len(result.Diagnostics) == 0 {
-				t.Fatal("expected a finding, got none")
-			}
-			fixes := result.Diagnostics[0].Fixes
-			if len(fixes) != 1 {
-				t.Fatalf("expected one fix, got %d", len(fixes))
-			}
-			if fixes[0].Text != testCase.wantText {
-				t.Errorf("fix writes %q, want %q", fixes[0].Text, testCase.wantText)
-			}
+			rule_testing.ExpectFixedSource(t, result, testCase.want)
 		})
 	}
+}
+
+// TestWhitespaceFixClaimsNoClassByte pins the property the other fixers depend on.
+//
+// Every edit this rule proposes deletes whitespace and nothing else, and never the first character
+// of a separator between two classes, because those bytes are what `no-duplicate-classes` and
+// `enforce-consistent-class-order` edit in the same pass (class_tokens.go). A rewrite of the whole
+// literal produces the same text and claims every byte, and the engine then refuses one of the two.
+func TestWhitespaceFixClaimsNoClassByte(t *testing.T) {
+	source := `const element = <div className="  flex   items-center  gap-2 " />;`
+	result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", source)
+	if len(result.Diagnostics) != 1 {
+		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+	}
+	fixes := result.Diagnostics[0].Fixes
+	for _, fix := range fixes {
+		removed := source[fix.Range.Pos():fix.Range.End()]
+		if fix.Text != "" || strings.TrimSpace(removed) != "" {
+			t.Errorf("a fix rewrites %q to %q, which is more than deleting whitespace", removed, fix.Text)
+		}
+	}
+
+	// The first byte of each separator that has a class on both sides: after `flex` and after
+	// `items-center`. Neither may sit inside any fix.
+	contentStart := strings.Index(source, `"`) + 1
+	contentEnd := strings.LastIndex(source, `"`)
+	content := source[contentStart:contentEnd]
+	for _, className := range []string{"flex", "items-center"} {
+		separatorStart := contentStart + strings.Index(content, className) + len(className)
+		for _, fix := range fixes {
+			if fix.Range.Pos() <= separatorStart && separatorStart < fix.Range.End() {
+				t.Errorf("a fix covers the separator's first byte after %q, which another rule may edit", className)
+			}
+		}
+	}
+	if len(fixes) != 4 {
+		t.Errorf("expected four deletions (two padding runs, two excesses), got %d", len(fixes))
+	}
+	rule_testing.ExpectFixedSource(t, result, `const element = <div className="flex items-center gap-2" />;`)
 }
 
 // TestWhitespaceFixNeverFusesClassesAcrossAHole is the known-dirty control.
