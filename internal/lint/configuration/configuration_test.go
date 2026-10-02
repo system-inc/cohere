@@ -485,3 +485,31 @@ func TestAnExplicitLineBeatsAPluginDefault(t *testing.T) {
 			"re-enable rules somebody decided to disable")
 	}
 }
+
+// TestTheFormatBlockLoadsAndAnUnknownKeyBesideItStillDoesNot: the formatter's options live in the
+// same file as the rules, under "format", and the linter must load around them. Accepting that one key
+// must not loosen the guard, so an unknown key next to it is still refused and still named.
+func TestTheFormatBlockLoadsAndAnUnknownKeyBesideItStillDoesNot(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "CohereSettings.json")
+
+	accepted := `{"rules": {"a-rule": "error"}, "format": {"printWidth": 120, "tabWidth": 4}}`
+	if err := os.WriteFile(path, []byte(accepted), 0o644); err != nil {
+		t.Fatalf("writing the config: %v", err)
+	}
+	if _, err := Load(path); err != nil {
+		t.Fatalf("a config carrying the formatter's options did not load: %v", err)
+	}
+
+	refused := `{"rules": {"a-rule": "error"}, "format": {"printWidth": 120}, "formatter": {}}`
+	if err := os.WriteFile(path, []byte(refused), 0o644); err != nil {
+		t.Fatalf("writing the config: %v", err)
+	}
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("an unknown top-level key beside \"format\" loaded, so accepting format loosened the guard")
+	}
+	if !strings.Contains(err.Error(), "formatter") {
+		t.Errorf("the refusal does not name the unknown key: %v", err)
+	}
+}

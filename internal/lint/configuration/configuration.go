@@ -305,6 +305,11 @@ var ignoredTopLevelKeys = map[string]string{
 		"honour. Ignored deliberately, and it stays in the config because oxlint still reads it " +
 		"while both tools run side by side.",
 
+	"format": "the formatter's options (printWidth, tabWidth and the rest), read by " +
+		"internal/format/formatoptions. They moved here from package.json's prettier block when cohere's " +
+		"native printers replaced Prettier, so the linter leaves them alone on purpose: they are the " +
+		"formatter's, not a rule's.",
+
 	"settings": "per-plugin configuration for the JavaScript plugins above, and it is the entry " +
 		"most worth re-reading. `settings.better-tailwindcss.entryPoint` names this repository's " +
 		"root stylesheet, and `findTailwindEntryPoint` does not read it -- it probes a hardcoded " +
