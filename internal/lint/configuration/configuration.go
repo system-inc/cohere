@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -323,13 +324,6 @@ func Load(path string) (*Config, error) {
 			loaded.Rules[name] = setting
 		}
 
-		for name := range layer.raw.Departures {
-			if !departed[name] {
-				return nil, fmt.Errorf("lint config %s names %q under \"departures\", but it sets that "+
-					"rule the same as the file it extends, or not at all: remove the entry", layer.path, name)
-			}
-		}
-
 		loaded.IgnorePatterns = append(loaded.IgnorePatterns, layer.raw.IgnorePatterns...)
 		for _, plugin := range layer.raw.Plugins {
 			if !declaredPlugins[plugin] {
@@ -340,14 +334,52 @@ func Load(path string) (*Config, error) {
 
 		for overrideIndex, rawOverride := range layer.raw.Overrides {
 			override := Override{Files: rawOverride.Files, Rules: map[string]RuleSetting{}}
+			coversEverything := coversEveryFileOfItsKind(rawOverride.Files)
 			for name, value := range rawOverride.Rules {
 				setting, err := parseRuleSetting(value)
 				if err != nil {
 					return nil, fmt.Errorf("override %d, rule %q in %s: %w", overrideIndex, name, layer.path, err)
 				}
 				override.Rules[name] = setting
+
+				// An override that matches every file of its kind is a top-level rule written in another
+				// place, so it departs from an inherited ruling exactly as a top-level entry would. api's
+				// `["**/*.ts", "**/*.tsx"]` block turned off thirteen rulings the Nexus tier holds at error,
+				// and with only top-level entries checked it loaded with no reason and printed nothing
+				// (#25benkk). A scoped override, `**/generated/**` or `**/*.test.ts`, stays a project's own
+				// business and needs no reason.
+				if !coversEverything {
+					continue
+				}
+				_, inherited, isInherited := inheritedRuleSetting(fromBases, name)
+				if !isInherited {
+					continue
+				}
+				compared := setting
+				if compared.Options == nil {
+					compared.Options = inherited.Options
+				}
+				if sameRuleSetting(compared, inherited) {
+					continue
+				}
+				departed[name] = true
+				reason := strings.TrimSpace(layer.raw.Departures[name])
+				if reason == "" {
+					return nil, fmt.Errorf("lint config %s overrides %q for every file (%s) differently from the "+
+						"file it extends and gives no reason: an override that matches every file is a "+
+						"top-level rule, so name it under \"departures\" with why this project differs",
+						layer.path, name, strings.Join(rawOverride.Files, ", "))
+				}
+				loaded.Departures[name] = Departure{File: layer.path, Reason: reason}
 			}
 			loaded.Overrides = append(loaded.Overrides, override)
+		}
+
+		for name := range layer.raw.Departures {
+			if !departed[name] {
+				return nil, fmt.Errorf("lint config %s names %q under \"departures\", but it sets that "+
+					"rule the same as the file it extends, or not at all: remove the entry", layer.path, name)
+			}
 		}
 	}
 
@@ -462,6 +494,26 @@ func inheritedRuleSetting(rules map[string]RuleSetting, name string) (string, Ru
 	// Sorted so two spellings in one base resolve the same way on every run.
 	sort.Strings(matches)
 	return matches[0], rules[matches[0]], true
+}
+
+// wholeTreePattern is a glob that names no directory and no file name, only an extension or nothing
+// at all: `**/*`, `**/*.ts`, `**/*.{ts,tsx}`. It matches every file of its kind wherever the file sits,
+// which is decided by its shape rather than guessed from a file listing. `**/*.test.ts` names part of a
+// file name and `source/**/*.ts` names a directory, so neither is one.
+var wholeTreePattern = regexp.MustCompile(`^\*\*/\*(\.[A-Za-z0-9]+|\.\{[A-Za-z0-9]+(,[A-Za-z0-9]+)*\})?$`)
+
+// coversEveryFileOfItsKind reports whether every pattern of an override is a whole-tree pattern, so
+// the override applies to every file of the kinds it names.
+func coversEveryFileOfItsKind(patterns []string) bool {
+	if len(patterns) == 0 {
+		return false
+	}
+	for _, pattern := range patterns {
+		if !wholeTreePattern.MatchString(pattern) {
+			return false
+		}
+	}
+	return true
 }
 
 // sameRuleSetting reports whether two settings run the rule identically: one severity, and options

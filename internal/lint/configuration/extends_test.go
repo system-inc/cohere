@@ -370,3 +370,84 @@ func TestABaseMayNotCarryKeysWhoseReadersIgnoreTheChain(t *testing.T) {
 		})
 	}
 }
+
+// An override that matches every file of its kind is a top-level rule written in another place, so
+// changing an inherited ruling there needs a stated reason too (#25benkk). api's
+// `["**/*.ts", "**/*.tsx"]` block turned off thirteen rulings the Nexus tier holds at error, and with
+// only top-level entries checked it would have loaded with no reason and printed nothing.
+func TestAWholeTreeOverrideDepartsLikeATopLevelRule(t *testing.T) {
+	base := `{"rules": {"no-const-assign": "error", "no-var": "error"}}`
+	wholeTree := `"overrides": [{"files": ["**/*.ts", "**/*.tsx"], "rules": {"no-const-assign": "off", "no-var": "error"}}]`
+
+	t.Run("without a reason it is refused", func(t *testing.T) {
+		directory := writeConfigs(t, map[string]string{
+			"base.json":           base,
+			"CohereSettings.json": `{"extends": "./base.json", ` + wholeTree + `}`,
+		})
+		refusedWith(t, filepath.Join(directory, "CohereSettings.json"), `overrides "no-const-assign" for every file`)
+	})
+
+	t.Run("with a reason it loads and the departure prints", func(t *testing.T) {
+		directory := writeConfigs(t, map[string]string{
+			"base.json": base,
+			"CohereSettings.json": `{"extends": "./base.json",
+				"departures": {"no-const-assign": "TypeScript's checker reports it here"}, ` + wholeTree + `}`,
+		})
+		loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+		if loaded.Departures["no-const-assign"].Reason != "TypeScript's checker reports it here" {
+			t.Errorf("the override's departure was not recorded: %+v", loaded.Departures)
+		}
+		// The restated no-var is not a departure, so it must not be recorded as one.
+		if _, recorded := loaded.Departures["no-var"]; recorded {
+			t.Error("a whole-tree override restating the inherited ruling was recorded as a departure")
+		}
+	})
+
+	t.Run("a reason for a restated rule is stale and refused", func(t *testing.T) {
+		directory := writeConfigs(t, map[string]string{
+			"base.json": base,
+			"CohereSettings.json": `{"extends": "./base.json",
+				"departures": {"no-const-assign": "checked by TypeScript", "no-var": "left over"}, ` + wholeTree + `}`,
+		})
+		refusedWith(t, filepath.Join(directory, "CohereSettings.json"), `names "no-var" under "departures"`)
+	})
+
+	// The other side, and the one a too-broad check would break: scoped overrides are a project's own
+	// business and need no reason, or every generated-code or test-file block would have to explain itself.
+	for _, files := range []string{`["**/generated/**/*.{ts,tsx}"]`, `["**/*.test.ts"]`, `["source/**/*.ts"]`, `["modules/**"]`} {
+		t.Run("a scoped override needs no reason: "+files, func(t *testing.T) {
+			directory := writeConfigs(t, map[string]string{
+				"base.json": base,
+				"CohereSettings.json": `{"extends": "./base.json",
+					"overrides": [{"files": ` + files + `, "rules": {"no-const-assign": "off"}}]}`,
+			})
+			if loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json")); len(loaded.Departures) != 0 {
+				t.Errorf("a scoped override was recorded as a departure: %+v", loaded.Departures)
+			}
+		})
+	}
+}
+
+// The shape test decides whole-tree from the pattern alone. Both directions, because a test of only
+// the matches passes a predicate that answers yes to everything.
+func TestWholeTreePatternsAreDecidedByShape(t *testing.T) {
+	cases := []struct {
+		patterns []string
+		want     bool
+	}{
+		{[]string{"**/*.ts", "**/*.tsx"}, true},
+		{[]string{"**/*.{ts,tsx}"}, true},
+		{[]string{"**/*"}, true},
+		{[]string{"**/*.ts", "source/**/*.ts"}, false},
+		{[]string{"**/*.test.ts"}, false},
+		{[]string{"**/generated/**/*.ts"}, false},
+		{[]string{"*.ts"}, false},
+		{[]string{"modules/**"}, false},
+		{nil, false},
+	}
+	for _, testCase := range cases {
+		if got := coversEveryFileOfItsKind(testCase.patterns); got != testCase.want {
+			t.Errorf("coversEveryFileOfItsKind(%v) = %v, want %v", testCase.patterns, got, testCase.want)
+		}
+	}
+}
