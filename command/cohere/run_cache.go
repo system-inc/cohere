@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -50,11 +49,6 @@ type runCacheSession struct {
 	path     string
 	key      string
 	recorder *program.InputRecorder
-
-	// scope is the format scope computed for the key, reused by the fix phase so a miss does not ask
-	// git the same question twice.
-	scope      formatScope
-	scopeError error
 
 	// declared is set once the build succeeds and the inputs are known. A session that never declares
 	// is never recorded.
@@ -154,17 +148,13 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	if !runCacheEligible() {
 		return nil
 	}
-	// The format scope is a fact the output depends on that no build input reveals: a commit makes a
-	// changed file unchanged and moves no source file's mtime, and a new untracked file outside the
-	// program lives in a directory the build never read. So the scope itself is recomputed here with
-	// the same function the fix phase calls, and hashed into the key.
-	scope, scopeError := changedFilesScope(location.Root)
-
+	// No format scope is in the key, because an eligible run never formats: a bare run and `--no-fix`
+	// configure no formatter, so their fix phase has no format scope and nothing they print depends on
+	// which files changed. It used to ask git here on every run, for a fact only formatting needed.
 	key, err := program.RunCacheKey(os.Args[1:], location.Root,
 		"root="+location.Root,
 		"tsconfig="+location.ConfigFileName,
 		"lint-config="+location.LintConfigFileName,
-		"scope="+scopeFact(scope, scopeError),
 	)
 	if err != nil {
 		return nil
@@ -176,11 +166,9 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	}
 
 	session := &runCacheSession{
-		path:       path,
-		key:        key,
-		recorder:   program.NewInputRecorder(),
-		scope:      scope,
-		scopeError: scopeError,
+		path:     path,
+		key:      key,
+		recorder: program.NewInputRecorder(),
 	}
 	if err := session.stdout.start(&os.Stdout); err != nil {
 		return nil
@@ -191,19 +179,6 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	}
 	activeRunCache = session
 	return session.recorder
-}
-
-// scopeFact renders a format scope as a fact. Every field that can reach the output is in it.
-func scopeFact(scope formatScope, scopeError error) string {
-	if scopeError != nil {
-		return "error: " + scopeError.Error()
-	}
-	names := append([]string(nil), scope.FileNames...)
-	sort.Strings(names)
-	unreadable := append([]string(nil), scope.UnreadableSubmodules...)
-	sort.Strings(unreadable)
-	return fmt.Sprintf("everything=%v|description=%q|files=%q|unreadable=%q",
-		scope.Everything, scope.Description, names, unreadable)
 }
 
 // runCachePath keeps the manifest out of the project: one per project root and invocation, in the user
@@ -241,15 +216,6 @@ func replayRunCache(stored *program.RunCache) {
 	fmt.Fprintf(os.Stdout, "phases: replayed the run at %s · fix, types and lint did not run\n", recorded)
 	fmt.Fprintf(os.Stdout, "  this run: %s, after checking %d inputs\n", round(time.Since(processStart)), len(stored.Inputs))
 	os.Exit(stored.ExitCode)
-}
-
-// runCacheScope hands the fix phase the scope the key was built from, when there is one, so a miss
-// does not ask git twice. Without a session it asks git itself, exactly as before.
-func runCacheScope(root string) (formatScope, error) {
-	if activeRunCache != nil && activeRunCache.recorder != nil {
-		return activeRunCache.scope, activeRunCache.scopeError
-	}
-	return changedFilesScope(root)
 }
 
 // declareRunCacheInputs marks the build as having succeeded, and adds inputs the command reads itself.

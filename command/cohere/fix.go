@@ -177,10 +177,20 @@ func applyProposedFixes(
 		firstPass := byFileName[fileName]
 		used := false
 
+		// A format candidate inside a nested repository is formatted and never fixed on a whole-tree run.
+		// Its first-pass proposals were withheld above, and without this its later passes re-linted the
+		// formatted text and applied them anyway: formatting one file in nexus rewrote it under
+		// nexus/consistency-no-multiline-arrow-function on a run that reported the repository's fixes as
+		// not applied.
+		fixesWithheld := writable.Everything && root != "" && formatfiles.NestedRepositoryContaining(root, fileName) != ""
+
 		propose := func(_ string, text string) ([]edit.Proposal, error) {
 			if !used {
 				used = true
 				return firstPass, nil
+			}
+			if fixesWithheld {
+				return nil, nil
 			}
 			return proposalsForText(fileName, text, graph, rules)
 		}

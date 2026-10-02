@@ -217,17 +217,6 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			},
 			func() { write("node_modules/dep/index.d.ts", "export declare const d: string;\n") },
 			func() { remove("source/u.ts"); remove("node_modules") }},
-		// A commit makes a changed file unchanged and moves no file's mtime: only the scope fact sees it.
-		{"an uncommitted change committed", true,
-			func() { write("source/a.ts", "export const a: number = 2;\n") },
-			func() { commit("commit the change") },
-			func() { write("source/a.ts", "export const a: number = 1;\n"); commit("restore") }},
-		// docs exists and is tracked, and the build reads nothing in it, so no watched directory moves:
-		// only the scope fact sees a file added here. Created as a new directory instead, it would move
-		// the project root, which is watched, and the case would pass with the fact switched off.
-		{"an untracked file in a directory the build never reads", true, nil,
-			func() { write("docs/notes.md", "notes\n") },
-			func() { remove("docs/notes.md") }},
 	}
 
 	for _, scenario := range scenarios {
@@ -270,6 +259,41 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			if replayBody(next) != verdict(cold) || nextExit != coldExit {
 				t.Fatalf("the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
 					nextExit, coldExit, replayBody(next), verdict(cold))
+			}
+		})
+	}
+
+	// Changes nothing an eligible run prints can depend on. They used to be seen only by a scope fact in the
+	// key, because the run printed git's changed set; it no longer asks git, and with no formatter its
+	// format scope is a constant, so a replay here is correct. The proof is that it equals the cold run.
+	for _, scenario := range []struct {
+		name          string
+		prepare, undo func()
+		change        func()
+	}{
+		// A commit makes a changed file unchanged and moves no file's mtime.
+		{"an uncommitted change committed",
+			func() { write("source/a.ts", "export const a: number = 2;\n") },
+			func() { write("source/a.ts", "export const a: number = 1;\n"); commit("restore") },
+			func() { commit("commit the change") }},
+		// docs exists and is tracked, and the build reads nothing in it, so no watched directory moves.
+		{"an untracked file in a directory the build never reads", nil,
+			func() { remove("docs/notes.md") },
+			func() { write("docs/notes.md", "notes\n") }},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			if scenario.prepare != nil {
+				scenario.prepare()
+			}
+			establishHit()
+			scenario.change()
+			defer scenario.undo()
+
+			replayed, replayedExit := run(true)
+			cold, coldExit := run(false)
+			if isReplay(replayed) && (replayBody(replayed) != verdict(cold) || replayedExit != coldExit) {
+				t.Fatalf("the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
+					replayedExit, coldExit, replayBody(replayed), verdict(cold))
 			}
 		})
 	}
