@@ -140,8 +140,20 @@ public struct Pipeline {
             var fixerFindings: [String: [String: [FindingRecord]]] = [:]
             if options.mutate {
                 let fixer = FileFixer(configuration: configuration, rules: fileRules, maximumPasses: options.fixPasses)
-                toFormat = parsed.files.map { file in
-                    let result = fixer.fix(file)
+                /* Each file is fixed on its own, so the files are fixed side by side; results are gathered back in input order. */
+                let files = parsed.files
+                let results = await withTaskGroup(of: (Int, FileFixer.Result).self) { group in
+                    for (index, file) in files.enumerated() {
+                        group.addTask { (index, fixer.fix(file)) }
+                    }
+                    var collected = [FileFixer.Result?](repeating: nil, count: files.count)
+                    for await (index, result) in group {
+                        collected[index] = result
+                    }
+                    return collected
+                }
+                toFormat = zip(files, results).map { file, result in
+                    guard let result else { return file }
                     fixesApplied += result.applied
                     refusals.merge(result.refusalsByReason, uniquingKeysWith: +)
                     if let found = result.findingsOfFinalText {
@@ -254,7 +266,7 @@ public struct Pipeline {
             try writer.write(PhaseRecord(name: .lint, outcome: .skipped, detail: "not requested"))
         } else {
             let lintStart = Date()
-            let lint = Linter(configuration: configuration, fileRules: fileRules)
+            let lint = await Linter(configuration: configuration, fileRules: fileRules)
                 .run(package: package, manifests: await manifests(of: package), files: parsed.files, reusable: reusableFindings)
             for finding in lint.findings {
                 try writer.write(finding)

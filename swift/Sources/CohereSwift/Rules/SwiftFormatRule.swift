@@ -1,6 +1,5 @@
 import Foundation
 import SwiftFormat
-import SwiftOperators
 import SwiftSyntax
 
 /*
@@ -13,10 +12,10 @@ import SwiftSyntax
  names), and `no-leading-underscores` is `NoLeadingUnderscores`. The house adds the reason to each message;
  the location and the name are swift-format's.
 
- The tree is folded with the standard operator table first, which `SwiftLinter` requires of a tree it is
- handed. Only the one rule is enabled and the pretty-printer is off, so this is a rule walk, not a second
- format. Neither rule reads `.swift-format`: a house rule applies whatever the repository's formatter
- configuration turns off.
+ The swift-format pass itself lives in `SwiftFormatPass`, run once per file for every wrapped rule, with
+ only those rules enabled and the pretty-printer off, so it is a rule walk, not a second format. Neither
+ rule reads `.swift-format`: a house rule applies whatever the repository's formatter configuration turns
+ off.
  */
 public struct SwiftFormatRule: FileRule {
     public let name: String
@@ -41,20 +40,13 @@ public struct SwiftFormatRule: FileRule {
         reason: "A leading underscore is a convention for \"private\", and access control says that in a way the compiler checks."
     )
 
-    public func findings(in file: ParsedFile) -> [FindingRecord] {
-        var configuration = Configuration()
-        for rule in configuration.rules.keys {
-            configuration.rules[rule] = false
-        }
-        configuration.rules[incumbentRule] = true
+    /* Every incumbent rule this wrapper runs, so one swift-format pass answers for all of them. */
+    static let incumbentRules = [requireLowerCamelCase.incumbentRule, noLeadingUnderscores.incumbentRule]
 
-        var reported: [Finding] = []
-        let linter = SwiftLinter(configuration: configuration) { reported.append($0) }
-        linter.debugOptions = [.disablePrettyPrint]
-        let folded = OperatorTable.standardOperators.foldAll(file.tree) { _ in }
-        guard let tree = folded.as(SourceFileSyntax.self) else { return [] }
+    public func findings(in file: ParsedFile) -> [FindingRecord] {
+        let reported: SwiftFormatPass.Outcome
         do {
-            try linter.lint(syntax: tree, source: file.source, operatorTable: .standardOperators, assumingFileURL: file.url)
+            reported = try SwiftFormatPass.shared.findings(in: file)
         } catch {
             /*
              Reported rather than dropped: a rule that threw checked nothing in this file, and an empty list
@@ -71,18 +63,16 @@ public struct SwiftFormatRule: FileRule {
                 message: "swift-format's \(incumbentRule) could not run on this file, so it was not checked: \(error)"
             )]
         }
-        return reported.compactMap { finding in
-            guard String(describing: finding.category) == incumbentRule, let location = finding.location else { return nil }
-            let text = finding.message.text
-            return FindingRecord(
+        return reported.filter { $0.rule == incumbentRule }.map { finding in
+            FindingRecord(
                 source: .rule,
                 file: file.url.path,
-                line: location.line,
-                column: location.column,
+                line: finding.line,
+                column: finding.column,
                 severity: .error,
                 rule: name,
                 messageId: incumbentRule,
-                message: text.prefix(1).uppercased() + text.dropFirst() + ". " + reason
+                message: finding.text.prefix(1).uppercased() + finding.text.dropFirst() + ". " + reason
             )
         }
     }

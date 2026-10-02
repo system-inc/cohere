@@ -17,7 +17,7 @@ struct Linter {
 
     /* `manifests` holds each owned package's parsed `Package.swift`, keyed by the package root's path; vendored packages are absent and never checked. */
     /* `reusable` holds, by path, what the fix phase's last walk found per rule in exactly the text being linted; those files are not walked again. */
-    func run(package: PackageModel, manifests: [String: ParsedFile], files: [ParsedFile], reusable: [String: [String: [FindingRecord]]] = [:]) -> Result {
+    func run(package: PackageModel, manifests: [String: ParsedFile], files: [ParsedFile], reusable: [String: [String: [FindingRecord]]] = [:]) async -> Result {
         let ownedPackages = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
         var findings: [FindingRecord] = []
         var listening: [String: Int] = [:]
@@ -40,16 +40,39 @@ struct Linter {
             }
         }
 
-        for rule in fileRules {
-            let severity = configuration.severity(of: rule.name)
-            guard severity != .off else {
-                scopedOff[rule.name] = files.count
-                continue
+        let enabled = fileRules.filter { configuration.severity(of: $0.name) != .off }
+        for rule in fileRules where configuration.severity(of: rule.name) == .off {
+            scopedOff[rule.name] = files.count
+        }
+        rulesRun += enabled.count
+
+        /*
+         Every file is walked on its own, so files are walked side by side. Each answers with what every enabled
+         rule found in it (nil where the rule does not apply), and the results are laid out rule by rule, file by
+         file, the order a sequential walk printed, so the stream is the same however the work was scheduled.
+         */
+        let perFile = await withTaskGroup(of: (Int, [[FindingRecord]?]).self) { group in
+            for (index, file) in files.enumerated() {
+                group.addTask {
+                    let byRule = enabled.map { rule -> [FindingRecord]? in
+                        guard rule.applies(to: file) else { return nil }
+                        return reusable[file.url.path]?[rule.name] ?? rule.findings(in: file)
+                    }
+                    return (index, byRule)
+                }
             }
-            rulesRun += 1
-            for file in files where rule.applies(to: file) {
+            var collected = [[[FindingRecord]?]](repeating: [], count: files.count)
+            for await (index, byRule) in group {
+                collected[index] = byRule
+            }
+            return collected
+        }
+        for (ruleIndex, rule) in enabled.enumerated() {
+            let severity = configuration.severity(of: rule.name)
+            for fileIndex in files.indices {
+                guard let raw = perFile[fileIndex][ruleIndex] else { continue }
                 listening[rule.name, default: 0] += 1
-                let found = (reusable[file.url.path]?[rule.name] ?? rule.findings(in: file)).map { Self.applying(severity, to: $0) }
+                let found = raw.map { Self.applying(severity, to: $0) }
                 reporting[rule.name, default: 0] += found.count
                 findings.append(contentsOf: found)
             }
