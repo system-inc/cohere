@@ -97,9 +97,15 @@ func getFrontMatter(text string) *FrontMatter {
 	// refused here.
 
 	raw := text[:frontMatterEndIndex]
+	// text.slice(firstLineBreakIndex + 1, endDelimiterIndex) is empty, not an error, when the end
+	// delimiter starts on the opening's line break (`---\n---`).
+	value := ""
+	if firstLineBreakIndex+1 < endDelimiterIndex {
+		value = text[firstLineBreakIndex+1 : endDelimiterIndex]
+	}
 	frontMatter := &FrontMatter{
 		Language:       language,
-		Value:          text[firstLineBreakIndex+1 : endDelimiterIndex],
+		Value:          value,
 		StartDelimiter: startDelimiter,
 		EndDelimiter:   raw[len(raw)-delimiterLength:],
 		Raw:            raw,

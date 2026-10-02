@@ -78,6 +78,22 @@ type Node struct {
 	// Front matter, added by parseMarkdown.
 	FrontMatter *FrontMatter
 
+	// Fields the printer's preprocess adds (src/language-markdown/print/preprocess.js). Raw is nil where
+	// upstream's is undefined: a text node made by merging two.
+	Raw                  *string
+	IsIndented           bool
+	IsAligned            bool
+	OriginalAltText      *string
+	HasIndentedCodeblock bool
+
+	// Sentence, word and whitespace nodes, made by splitText. UsesCJSpaces caches a sentence's answer
+	// once whitespace.js computes it, as upstream injects the property.
+	Kind                   string
+	IsCJ                   bool
+	HasLeadingPunctuation  bool
+	HasTrailingPunctuation bool
+	UsesCJSpaces           *bool
+
 	comments printing.CommentFields[*Node]
 }
 
