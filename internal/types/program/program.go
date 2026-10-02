@@ -129,6 +129,11 @@ type Options struct {
 	// buffer, so the graph describes the text about to be saved rather than the text being replaced.
 	// Nil reads everything from disk.
 	Overlay map[string]string
+
+	// Inputs, when set, is told every path the build reads or looks for on disk, so the run cache can
+	// record what this build depended on by observation rather than by a list. Nil records nothing and
+	// costs nothing.
+	Inputs *InputRecorder
 }
 
 // Build resolves a tsconfig and constructs the program and its checkers.
@@ -161,7 +166,14 @@ func Build(options Options) (*Graph, error) {
 	// resolves without anything being installed. cachedvfs memoizes stat and readdir: config
 	// resolution and module resolution ask the same directories about the same files repeatedly, and
 	// on a 9,530-file program that repetition is most of the syscall traffic.
-	var fileSystem vfs.FS = cachedvfs.From(bundled.WrapFS(osvfs.FS()))
+	//
+	// The input recorder wraps the real disk innermost: beneath the memoizing layer, so it sees each path
+	// about once, and beneath the lib overlay, so the embedded libs never reach it.
+	var disk vfs.FS = osvfs.FS()
+	if options.Inputs != nil {
+		disk = &recordingFS{FS: disk, recorder: options.Inputs}
+	}
+	var fileSystem vfs.FS = cachedvfs.From(bundled.WrapFS(disk))
 	if len(options.Overlay) > 0 {
 		fileSystem = newOverlayFS(fileSystem, options.Overlay)
 	}

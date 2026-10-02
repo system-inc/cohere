@@ -298,3 +298,57 @@ func TestRunCacheReplaysOutputAndExitCodeThroughDisk(t *testing.T) {
 		t.Errorf("the directory holds %d entries, want only the manifest: a temporary was left behind", len(entries))
 	}
 }
+
+// A directory handed in among the files is recorded as a directory, and the untouched tree still hits.
+//
+// The input recorder reports every path the compiler touched, and the compiler lists and probes
+// directories as well as reading files. An earlier Record stamped every entry of files as a file, so a
+// directory arrived as one and every check reported it "changed between file and directory". The cache
+// then never hit, which no other test here could see: they all handed in files only. Found by running
+// the untouched-tree check against the real ahra tree.
+func TestRunCacheRecordsADirectoryAmongTheFilesAsADirectory(t *testing.T) {
+	tree := newRunCacheTree(t)
+	withDirectory := append(append([]string(nil), tree.files...), tree.subdir, tree.root)
+	cache, err := program.RecordRunCache(tree.key, withDirectory, nil, tree.absent, []byte("x"), 0)
+	if err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	if err := cache.Check(tree.key); err != nil {
+		t.Fatalf("an untouched tree missed because a directory was recorded as a file: %v", err)
+	}
+	seen := map[string]int{}
+	for _, input := range cache.Inputs {
+		seen[input.Path]++
+	}
+	for path, count := range seen {
+		if count > 1 {
+			t.Errorf("%s recorded %d times, so every check stats it %d times", path, count, count)
+		}
+	}
+}
+
+// A fact the key ignores is a change the cache cannot see. The command hashes what git reports as
+// changed into a fact, so a commit or a new untracked file must move the key even when no source file
+// the build read has changed.
+func TestRunCacheKeyCoversEveryFact(t *testing.T) {
+	root := t.TempDir()
+	base, err := program.RunCacheKey(nil, root, "root=/a", "scope=x")
+	if err != nil {
+		t.Fatalf("key: %v", err)
+	}
+	for name, facts := range map[string][]string{
+		"a fact changed":            {"root=/a", "scope=y"},
+		"a fact removed":            {"root=/a"},
+		"a fact added":              {"root=/a", "scope=x", "extra"},
+		"facts reordered":           {"scope=x", "root=/a"},
+		"two facts joined into one": {"root=/ascope=x"},
+	} {
+		key, err := program.RunCacheKey(nil, root, facts...)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if key == base {
+			t.Errorf("%s left the key unchanged, so that change would replay a stale run", name)
+		}
+	}
+}

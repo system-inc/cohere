@@ -64,8 +64,16 @@ type RunCache struct {
 	// Inputs is every file and directory the run depended on, with the signature it had.
 	Inputs []RunCacheInput `json:"inputs"`
 
-	// Output is exactly what the run printed, replayed byte for byte on a hit.
+	// Output is exactly what the run printed to stdout, replayed byte for byte on a hit.
 	Output []byte `json:"output"`
+
+	// Errors is what it printed to stderr. Kept apart rather than interleaved, so each stream replays
+	// to the stream it was written to.
+	Errors []byte `json:"errors,omitempty"`
+
+	// RecordedUnixNanoseconds is when the replayed run happened. A replay prints that run's report,
+	// durations included, so it has to be able to say when those numbers are from.
+	RecordedUnixNanoseconds int64 `json:"recordedUnixNanoseconds"`
 
 	// ExitCode is the process exit code to return on a hit. A cache that replayed the output and
 	// exited zero on a failing tree would pass CI while printing a failure.
@@ -101,7 +109,11 @@ var ErrRunCacheMiss = errors.New("run cache miss")
 // The binary is keyed by its path, size and modification time rather than by hashing its bytes. It is
 // about 70 MB, and reading it on every run would spend the budget this cache exists to save. A rebuilt
 // binary has a new modification time, which is all this needs: any change to the tool is a miss.
-func RunCacheKey(arguments []string, workingDirectory string) (string, error) {
+//
+// facts is anything else the run's output depends on that is not a file the build reads: the project
+// root and config paths the command resolved, and results the command computes from sources the
+// build never sees, such as what git reports as changed. Order matters, and an empty fact still counts.
+func RunCacheKey(arguments []string, workingDirectory string, facts ...string) (string, error) {
 	executable, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("locating the running binary: %w", err)
@@ -127,16 +139,52 @@ func RunCacheKey(arguments []string, workingDirectory string) (string, error) {
 	for _, argument := range arguments {
 		write(argument)
 	}
+	write(fmt.Sprintf("%d facts", len(facts)))
+	for _, fact := range facts {
+		write(fact)
+	}
 	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 // RecordRunCache captures a run that just finished.
 //
-// files is every file the run depended on: every program source file, library declarations
-// included, plus the configs that shaped it. directories is filled in here from files, so a caller
-// cannot forget to watch the directories and quietly ship a cache that is blind to added files.
-// absent lists inputs the run looked for and did not find, which must stay absent for a hit.
+// files is every path the run depended on that existed, and directories among them are fine: whether
+// an entry is a file or a directory is read from the disk here, never inferred from which list it
+// arrived in. An earlier version stamped every entry of files as a file, so a directory the compiler
+// had probed was recorded as one and every check then reported it "changed between file and
+// directory". The cache never hit, which is the most deceptive way for a cache to fail: it runs, it
+// misses, and it looks merely cold. The probe that found it was the untouched-tree control.
+//
+// The directory holding each file is added here too, so a caller cannot forget them and quietly ship
+// a cache blind to added files. extraDirectories adds more, and absent lists paths the run looked for
+// and did not find, which must stay absent for a hit.
 func RecordRunCache(key string, files []string, extraDirectories []string, absent []string, output []byte, exitCode int) (*RunCache, error) {
+	cache := &RunCache{Version: runCacheVersion, Key: key, Output: output, ExitCode: exitCode}
+
+	// One entry per path. A path can arrive as a file read, a directory listed, and the parent of
+	// something else, and statting it three times would spend the budget on duplicates.
+	seen := map[string]bool{}
+	add := func(path string) error {
+		if seen[path] {
+			return nil
+		}
+		seen[path] = true
+		input, err := signatureOf(path)
+		if err != nil {
+			return err
+		}
+		cache.Inputs = append(cache.Inputs, input)
+		return nil
+	}
+
+	sortedFiles := append([]string(nil), files...)
+	sort.Strings(sortedFiles)
+	for _, file := range sortedFiles {
+		if err := add(file); err != nil {
+			return nil, err
+		}
+	}
+
 	directorySet := map[string]struct{}{}
 	for _, file := range files {
 		directorySet[filepath.Dir(file)] = struct{}{}
@@ -144,48 +192,41 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 	for _, directory := range extraDirectories {
 		directorySet[directory] = struct{}{}
 	}
-
-	cache := &RunCache{Version: runCacheVersion, Key: key, Output: output, ExitCode: exitCode}
-
-	for _, file := range files {
-		input, err := signatureOf(file, false)
-		if err != nil {
-			return nil, err
-		}
-		cache.Inputs = append(cache.Inputs, input)
-	}
-
 	directories := make([]string, 0, len(directorySet))
 	for directory := range directorySet {
 		directories = append(directories, directory)
 	}
 	sort.Strings(directories)
 	for _, directory := range directories {
-		input, err := signatureOf(directory, true)
-		if err != nil {
+		if err := add(directory); err != nil {
 			return nil, err
 		}
-		cache.Inputs = append(cache.Inputs, input)
 	}
 
 	for _, path := range absent {
+		if seen[path] {
+			// Probed absent once and found present another time is a contradiction within one run.
+			// The present reading wins, since the run did read it.
+			continue
+		}
+		seen[path] = true
 		cache.Inputs = append(cache.Inputs, RunCacheInput{Path: path, Exists: false})
 	}
 
 	return cache, nil
 }
 
-// signatureOf stats one input. A file that vanished between the run and the record is an error
-// rather than an absent entry: recording it as absent would make the next run's absence look like
-// a match, and the run that just finished did read it.
-func signatureOf(path string, directory bool) (RunCacheInput, error) {
+// signatureOf stats one input. A path that vanished between the run and the record is an error rather
+// than an absent entry: recording it as absent would make the next run's absence look like a match,
+// and the run that just finished did read it.
+func signatureOf(path string) (RunCacheInput, error) {
 	information, err := os.Stat(path)
 	if err != nil {
 		return RunCacheInput{}, fmt.Errorf("recording %s: %w", path, err)
 	}
 	return RunCacheInput{
 		Path:                path,
-		Directory:           directory,
+		Directory:           information.IsDir(),
 		Exists:              true,
 		Size:                information.Size(),
 		ModifiedNanoseconds: information.ModTime().UnixNano(),

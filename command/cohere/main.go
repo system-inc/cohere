@@ -34,9 +34,13 @@ var processStart = time.Now()
 
 func main() {
 	if err := run(); err != nil {
+		// A failure of the tool is never recorded by the run cache, and the recording stops before the
+		// error prints so the message reaches the terminal rather than a pipe nobody is reading.
+		abandonRunCache()
 		fmt.Fprintf(os.Stderr, "cohere: %v\n", err)
 		os.Exit(1)
 	}
+	finishRunCache(0)
 }
 
 func run() error {
@@ -358,11 +362,16 @@ func run() error {
 		}
 	}
 
+	// The run cache: a bare run whose every input is unchanged replays its recorded report here and
+	// exits, before the graph is built. Otherwise this starts recording. See run_cache.go.
+	runCacheInputs := beginRunCache(location)
+
 	buildStart := time.Now()
 	graph, err := program.Build(program.Options{
 		ConfigFileName:   location.ConfigFileName,
 		CurrentDirectory: location.Root,
 		SingleThreaded:   *singleThreaded,
+		Inputs:           runCacheInputs,
 	})
 	if err != nil {
 		// A program that fails to build is a loud failure and never an empty result. An empty file list
@@ -371,6 +380,10 @@ func run() error {
 		return fmt.Errorf("building the type graph: %w", err)
 	}
 	buildDuration := time.Since(buildStart)
+
+	// The build saw every file the compiler read. The lint config is read by the command, not the
+	// compiler, so it is named here.
+	declareRunCacheInputs(location.LintConfigFileName, location.ConfigFileName)
 
 	projectFiles := graph.ProjectFiles()
 	wholeProgramCount := len(projectFiles)
@@ -559,7 +572,7 @@ func run() error {
 			// Asked for by name, so it keeps the whole tree.
 
 		default:
-			resolved, scopeError := changedFilesScope(location.Root)
+			resolved, scopeError := runCacheScope(location.Root)
 			if scopeError != nil {
 				// Falling back to the whole tree would turn a failed subprocess into a five-minute
 				// surprise, so the scope becomes empty and says why. Fixing still runs; only formatting
@@ -615,6 +628,9 @@ func run() error {
 			// looked, which is the honest thing to print here.
 
 		default:
+			// The enumeration walks the whole tree through ignore layers, which are inputs the run cache
+			// does not observe. Declining here costs a miss in this configuration and never a stale hit.
+			declineRunCache("a formatter enumerated the tree")
 			enumeration, enumerateError := formatter.Enumerate(
 				graph.Config.GetCurrentDirectory(),
 				resolveStructureIgnorePath(location.Root),
@@ -647,6 +663,13 @@ func run() error {
 			return fmt.Errorf("fix: %w", err)
 		}
 		fmt.Println(fixSummary)
+
+		// A run that rewrote files must not be replayed. The run cache stats inputs when it records, which
+		// is after the rewrite, so the manifest would match the fixed tree and the next run would replay
+		// "files rewritten" over a tree it never touched.
+		if fixSummary.FilesChanged > 0 {
+			declineRunCache("the fix phase rewrote files")
+		}
 
 		// The scope is stated on every run rather than inferred from a file count. Working-tree
 		// changes, staged changes, and a base-branch diff are three different answers to "what
@@ -734,7 +757,7 @@ func run() error {
 				unusedRequest,
 			)
 			report.Write(os.Stdout)
-			os.Exit(1)
+			finishRunCache(1)
 		}
 	}
 
@@ -897,7 +920,7 @@ func run() error {
 	report.Write(os.Stdout)
 
 	if findings > 0 {
-		os.Exit(1)
+		finishRunCache(1)
 	}
 	return nil
 }
