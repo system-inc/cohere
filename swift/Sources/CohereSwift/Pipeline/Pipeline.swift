@@ -289,7 +289,7 @@ public struct Pipeline {
             let typedCandidates = parsed.files.filter { file in
                 RuleRegistry.typedRules.contains { configuration.severity(of: $0.name) != .off && $0.applies(to: file) }
             }
-            linter.symbols = SymbolProvider(scratchPaths: symbolScratchPaths(package: package, root: root), runner: runner).symbols(for: typedCandidates)
+            linter.symbols = SymbolProvider(scratchPaths: Self.symbolScratchPaths(package: package, root: root), runner: runner).symbols(for: typedCandidates)
             let lint = await linter.run(package: package, manifests: await manifests(of: package), files: parsed.files, reusable: reusableFindings)
             for finding in lint.findings {
                 try writer.write(finding)
@@ -383,7 +383,7 @@ public struct Pipeline {
     }
 
     /* Every scratch a build of this package writes an index store into: the root's, and each local package's that the types phase builds for its tests. */
-    private func symbolScratchPaths(package: PackageModel, root: URL) -> [URL] {
+    static func symbolScratchPaths(package: PackageModel, root: URL) -> [URL] {
         let scratch = Self.scratchPath(for: root)
         return [scratch] + package.localPackages.map { scratch.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true) }
     }

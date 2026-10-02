@@ -41,6 +41,7 @@ public enum RuleRegistry {
     /* The rules that read what names resolve to; see `TypedFileRule` for what a run fetches for them. */
     public static let typedRules: [any TypedFileRule] = [
         EmptyCount(),
+        ContainsOverFilter(),
     ]
 
     public static let packageRules: [any PackageRule] = [

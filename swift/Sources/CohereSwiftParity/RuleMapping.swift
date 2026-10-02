@@ -59,6 +59,8 @@ struct RuleMapping: Sendable {
         RuleMapping(incumbent: .swiftLint, incumbentRule: "legacy_random", rules: ["cohere-swift/legacy-constructors"], messageIds: ["legacyRandom"]),
         RuleMapping(incumbent: .swiftFormat, incumbentRule: "NoLeadingUnderscores", rules: ["cohere-swift/no-leading-underscores"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "empty_count", rules: ["cohere-swift/empty-count"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "contains_over_filter_count", rules: ["cohere-swift/contains-over-filter"], messageIds: ["filterCount"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "contains_over_filter_is_empty", rules: ["cohere-swift/contains-over-filter"], messageIds: ["filterIsEmpty"]),
     ]
 
     static func incumbentRules(of incumbent: Incumbent) -> [String] {
