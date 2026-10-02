@@ -63,7 +63,7 @@ struct BuildInputSnapshotTests {
     }
 
     /* The test that matters: after a warm run, a planted type error must be found. */
-    @Test func aChangeAfterAWarmRunIsBuiltAndFound() async throws {
+    @Test func aChangeAfterAWarmRunIsFound() async throws {
         let package = try Package()
         _ = try await package.run()
         _ = try await package.run()
@@ -131,5 +131,49 @@ struct BuildInputSnapshotTests {
         try package.write(PipelineControlTests.cleanSource + "// longer\n")
         #expect(take() != first)
         #expect(BuildInputSnapshot.take(roots: [package.root], resolved: package.root.appendingPathComponent("Package.resolved"), toolchain: "u", arguments: ["a"]) != take())
+    }
+
+    static let plantedError = PipelineControlTests.cleanSource.replacingOccurrences(of: "        value * 2", with: "        let text: Int = \"two\"\n        return value * text")
+
+    /*
+     An edit inside a function body is checked by sourcekitd in this process, never built, and its error is
+     found. It stays found on the run after (the stored snapshot is still the last build's, so the edit is
+     checked again rather than read from a record that predates it), and fixing it inside the body comes
+     back clean the same way.
+     */
+    @Test func aBodyOnlyEditIsCheckedInProcessAndFound() async throws {
+        let package = try Package()
+        _ = try await package.run()
+        try package.write(Self.plantedError)
+        let planted = try await package.run()
+        #expect(planted.build.contains(TypesPhase.checkedInProcessWords), "a body-only edit was built: \(planted.build)")
+        #expect(planted.compilerFindings.contains { $0.hasPrefix("5: cannot convert") }, "the planted error was not found: \(planted.compilerFindings)")
+        let again = try await package.run()
+        #expect(again.compilerFindings == planted.compilerFindings)
+        try package.write(PipelineControlTests.cleanSource + "\n")
+        let fixed = try await package.run()
+        #expect(fixed.build.contains(TypesPhase.checkedInProcessWords))
+        #expect(fixed.compilerFindings.isEmpty, "the fix was not seen: \(fixed.compilerFindings)")
+    }
+
+    /* An edit another file could see, a signature here, is never checked alone: it builds. */
+    @Test func anInterfaceEditBuilds() async throws {
+        let package = try Package()
+        _ = try await package.run()
+        try package.write(PipelineControlTests.cleanSource.replacingOccurrences(of: "func doubled() -> Int {\n        value * 2", with: "func doubled() -> Double {\n        Double(value) * 2"))
+        let edited = try await package.run()
+        #expect(!edited.build.contains(TypesPhase.checkedInProcessWords), "an interface edit was checked in process: \(edited.build)")
+        #expect(!edited.build.contains(Self.reusedWords))
+        #expect(edited.compilerFindings.isEmpty)
+    }
+
+    /* A file added is a new file list, which only a build knows how to compile. */
+    @Test func aNewFileBuilds() async throws {
+        let package = try Package()
+        _ = try await package.run()
+        try "struct Added {}\n".write(to: package.sources.appendingPathComponent("Added.swift"), atomically: true, encoding: .utf8)
+        let added = try await package.run()
+        #expect(!added.build.contains(TypesPhase.checkedInProcessWords))
+        #expect(!added.build.contains(Self.reusedWords))
     }
 }

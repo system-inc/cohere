@@ -23,18 +23,33 @@ import Foundation
  so the test that matters is warm-after-a-change (`BuildInputSnapshotTests`, and the pipeline control that
  plants a type error after a warm run).
  */
-struct BuildInputSnapshot: Equatable {
+struct BuildInputSnapshot: Equatable, Codable {
     let fingerprint: String
+    /* The toolchain, the build's arguments and the resolved pins, one line each. */
+    let settings: [String]
+    /* Every file the build reads, by path, to its size and modification time. */
+    let files: [String: String]
+    /*
+     Each owned Swift file's `InterfaceFingerprint` as the build about to run compiles it, by resolved path. The
+     types phase fills it in before building; it is what lets a later run tell that an edit stayed inside
+     function bodies.
+     */
+    var interfaces: [String: String] = [:]
+
+    /* Equal when the build would read the same inputs. The interfaces are derived from those inputs, so they never decide. */
+    static func == (left: BuildInputSnapshot, right: BuildInputSnapshot) -> Bool {
+        left.fingerprint == right.fingerprint
+    }
 
     static func take(roots: [URL], resolved: URL, toolchain: String, arguments: [String]) -> BuildInputSnapshot {
-        var lines: [String] = ["toolchain\t\(toolchain)", "arguments\t\(arguments.joined(separator: " "))"]
-        lines.append("resolved\t\(PackageDescriptionCache.fingerprint(of: resolved))")
+        let settings = ["toolchain\t\(toolchain)", "arguments\t\(arguments.joined(separator: " "))", "resolved\t\(PackageDescriptionCache.fingerprint(of: resolved))"]
+        var files: [String: String] = [:]
         let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey]
         for root in roots {
             let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])
             while let item = walker?.nextObject() as? URL {
                 guard let values = try? item.resourceValues(forKeys: Set(keys)) else {
-                    lines.append("unreadable\t\(item.path)")
+                    files[item.path] = "unreadable"
                     continue
                 }
                 if values.isDirectory == true {
@@ -44,28 +59,46 @@ struct BuildInputSnapshot: Equatable {
                     continue
                 }
                 let modified = values.contentModificationDate?.timeIntervalSinceReferenceDate ?? -1
-                lines.append("\(item.path)\t\(values.fileSize ?? -1)\t\(modified)")
+                files[item.path] = "\(values.fileSize ?? -1)\t\(modified)"
             }
         }
-        lines.sort()
+        let lines = settings + files.map { "\($0.key)\t\($0.value)" }.sorted()
         let digest = SHA256.hash(data: Data(lines.joined(separator: "\n").utf8))
-        return BuildInputSnapshot(fingerprint: digest.map { String(format: "%02x", $0) }.joined())
+        return BuildInputSnapshot(fingerprint: digest.map { String(format: "%02x", $0) }.joined(), settings: settings, files: files)
+    }
+
+    /*
+     The files that changed since `earlier`, when nothing else did: the same settings and the same set of
+     files, only some of them edited. Nil when anything else moved (a file added or removed, a pin, the
+     toolchain), because then only a build can say what the compiler thinks.
+     */
+    func filesChanged(since earlier: BuildInputSnapshot) -> Set<String>? {
+        guard settings == earlier.settings, files.count == earlier.files.count else { return nil }
+        var changed = Set<String>()
+        for (path, entry) in files {
+            guard let before = earlier.files[path] else { return nil }
+            if before != entry {
+                changed.insert(path)
+            }
+        }
+        return changed
     }
 
     /* Where the last successful build's snapshot is kept, beside that build in the engine's scratch. */
     static func storeFile(scratchPath: URL) -> URL {
-        scratchPath.appendingPathComponent("build-inputs.fingerprint")
+        scratchPath.appendingPathComponent("build-inputs.json")
     }
 
+    /* The last successful build's snapshot. An older engine's store, a bare digest, does not decode and reads as none: the next run builds. */
     static func stored(scratchPath: URL) -> BuildInputSnapshot? {
-        guard let text = try? String(contentsOf: storeFile(scratchPath: scratchPath), encoding: .utf8), !text.isEmpty else { return nil }
-        return BuildInputSnapshot(fingerprint: text)
+        guard let data = try? Data(contentsOf: storeFile(scratchPath: scratchPath)), !data.isEmpty else { return nil }
+        return try? JSONDecoder().decode(BuildInputSnapshot.self, from: data)
     }
 
     func store(scratchPath: URL) {
         do {
             try FileManager.default.createDirectory(at: scratchPath, withIntermediateDirectories: true)
-            try fingerprint.write(to: Self.storeFile(scratchPath: scratchPath), atomically: true, encoding: .utf8)
+            try JSONEncoder().encode(self).write(to: Self.storeFile(scratchPath: scratchPath), options: .atomic)
         } catch {
             /* Not stored, so the next run builds: slower, and still right. */
         }

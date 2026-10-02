@@ -6,6 +6,10 @@ import Foundation
  version of cohere's differential against oxlint.
 
      cohere-swift-parity [--package <dir>] [--swiftlint <path>] [--examples <n>]
+     cohere-swift-parity --types-oracle [--package <dir>] [--examples <n>]
+
+ `--types-oracle` compares a different incumbent: the build's own compiler records against sourcekitd in
+ this process, file by file (see `TypesOracle`). It builds the package into the engine's scratch.
 
  The file set is the engine's own (`FileSet`), so the incumbents read exactly the files cohere checks: the
  same vendored, git-ignored and generated exclusions, with no second list to drift. Nothing is written to
@@ -42,8 +46,13 @@ struct ParityCommand {
         var root = workingDirectory
         var swiftLint = pinnedSwiftLint
         var examples = defaultExamples
+        var typesOracle = false
         var remaining = arguments[...]
         while let argument = remaining.popFirst() {
+            if argument == "--types-oracle" {
+                typesOracle = true
+                continue
+            }
             guard let value = remaining.popFirst() else {
                 throw UsageFailure(description: "\(argument) needs a value")
             }
@@ -58,6 +67,10 @@ struct ParityCommand {
             default:
                 throw UsageFailure(description: "unknown argument \(argument)")
             }
+        }
+        if typesOracle {
+            try printTypesOracle(TypesOracle(root: root).run(), root: root, examples: examples)
+            return
         }
         guard FileManager.default.isExecutableFile(atPath: swiftLint.path) else {
             throw UsageFailure(description: "no SwiftLint at \(swiftLint.path); the parity task (#w9hkcza) installs 0.65.1 there")
@@ -96,5 +109,35 @@ struct ParityCommand {
             print("\n\(report.mapping.incumbent.rawValue) \(report.mapping.incumbentRule) against \(report.mapping.rules.joined(separator: " + ")), compared by \(report.mapping.comparison):")
             print(report.differences(root: root, examples: examples), terminator: "")
         }
+    }
+
+    static func printTypesOracle(_ report: TypesOracle.Report, root: URL, examples: Int) {
+        /* Coverage first, so a comparison over nothing cannot read as agreement. */
+        print("types oracle over \(report.filesOwned) files in \(root.path)")
+        print("asked sourcekitd about \(report.filesAsked); no compile command for \(report.filesWithoutCommand.count); unanswered \(report.filesUnanswered.count)")
+        print("build: \(report.build.count) diagnostics in \(report.buildMilliseconds)ms; sourcekitd: \(report.sourcekitd.count) in \(report.sourcekitdMilliseconds)ms")
+        print("control (an injected type error) in \(PackagePath.relative(report.controlFile, to: root)): \(report.controlFound ? "caught" : "MISSED")")
+        print("slowest: " + report.slowestFiles.map { "\(PackagePath.relative($0.0, to: root)) \($0.1)ms" }.joined(separator: ", "))
+        print("")
+        print("only the build: \(report.onlyBuild.count); only sourcekitd: \(report.onlySourcekitd.count); same diagnostic, different group: \(report.groupDifferences.count)")
+        func show(_ diagnostic: TypesOracle.Diagnostic) -> String {
+            "\(PackagePath.relative(diagnostic.file, to: root)):\(diagnostic.line):\(diagnostic.column) \(diagnostic.severity) \(diagnostic.message)"
+        }
+        for (title, diagnostics) in [("only the build", report.onlyBuild), ("only sourcekitd", report.onlySourcekitd)] where !diagnostics.isEmpty {
+            print("\n\(title):")
+            for diagnostic in diagnostics.prefix(examples) {
+                print("  \(show(diagnostic))")
+            }
+        }
+        for (diagnostic, built, asked) in report.groupDifferences.prefix(examples) {
+            print("  group \(built.isEmpty ? "(none)" : built) against \(asked.isEmpty ? "(none)" : asked): \(show(diagnostic))")
+        }
+        for file in report.filesWithoutCommand.prefix(examples) {
+            print("  no compile command: \(PackagePath.relative(file, to: root))")
+        }
+        for (file, reason) in report.filesUnanswered.sorted(by: { $0.key < $1.key }).prefix(examples) {
+            print("  unanswered: \(PackagePath.relative(file, to: root)): \(reason)")
+        }
+        print("\n\(report.agrees ? "AGREE" : "DISAGREE")")
     }
 }

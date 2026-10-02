@@ -253,14 +253,16 @@ public struct Pipeline {
             try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not requested"))
         } else {
             /* The whole package, whatever the scope: a change in one file changes what the rest of its module means. */
-            let types = try TypesPhase(
+            var typesPhase = TypesPhase(
                 package: package,
                 files: fileSet.owned,
                 scratchPath: Self.scratchPath(for: root),
                 resolutionAllowed: !options.noFix,
                 toolchain: toolchain,
                 runner: runner
-            ).run()
+            )
+            typesPhase.parsed = Dictionary(parsed.files.map { ($0.url.path, $0.tree) }, uniquingKeysWith: { first, _ in first })
+            let types = try typesPhase.run()
             for finding in types.findings {
                 try writer.write(finding)
             }
