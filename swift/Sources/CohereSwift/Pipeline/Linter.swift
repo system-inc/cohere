@@ -1,3 +1,4 @@
+import Foundation
 /*
  Runs every rule over the files in scope and accounts for what each rule did.
 

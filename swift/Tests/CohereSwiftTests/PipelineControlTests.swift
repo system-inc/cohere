@@ -18,7 +18,15 @@ struct PipelineControlTests {
         // swift-tools-version:6.0
         import PackageDescription
 
-        let package = Package(name: "Control", targets: [.target(name: "Control")])
+        let package = Package(
+            name: "Control",
+            targets: [
+                .target(
+                    name: "Control",
+                    swiftSettings: [.enableUpcomingFeature("ExistentialAny"), .enableUpcomingFeature("MemberImportVisibility")]
+                )
+            ]
+        )
 
         """
 
@@ -215,8 +223,8 @@ struct PipelineControlTests {
      */
     @Test func aBuildThatFailsBeforeCompilingSaysSo() async throws {
         let manifest = Self.manifest.replacingOccurrences(
-            of: #"Package(name: "Control", targets:"#,
-            with: #"Package(name: "Control", dependencies: [.package(url: "https://example.invalid/Missing.git", from: "1.0.0")], targets:"#
+            of: "name: \"Control\",\n    targets:",
+            with: "name: \"Control\",\n    dependencies: [.package(url: \"https://example.invalid/Missing.git\", from: \"1.0.0\")],\n    targets:"
         )
         await #expect {
             _ = try await Self.run(source: Self.cleanSource, manifest: manifest)

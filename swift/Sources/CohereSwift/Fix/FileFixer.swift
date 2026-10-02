@@ -1,4 +1,5 @@
 import SwiftParser
+import SwiftSyntax
 
 /*
  Runs every enabled rule that proposes fixes over one file, applies the fixes, parses the result, and goes

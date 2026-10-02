@@ -1,3 +1,4 @@
+import SwiftParser
 import SwiftSyntax
 
 /* Finds the `name: "<target>"` argument that declares a target in a manifest, so a package finding points at the line someone would edit. */

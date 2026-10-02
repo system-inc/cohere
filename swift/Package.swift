@@ -25,6 +25,12 @@ import PackageDescription
  */
 let sourceTreeModified = Context.gitInformation?.hasUncommittedChanges ?? true
 
+/* The compiler checks cohere-swift's own `require-upcoming-features` asks of every Swift target, held to here too. */
+let houseSettings: [SwiftSetting] = [
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableUpcomingFeature("MemberImportVisibility"),
+]
+
 let package = Package(
     name: "CohereSwift",
     platforms: [
@@ -60,11 +66,12 @@ let package = Package(
                 .product(name: "SwiftDiagnostics", package: "swift-syntax"),
                 .product(name: "SwiftFormat", package: "swift-format"),
             ],
-            swiftSettings: sourceTreeModified ? [.define("COHERE_SOURCE_TREE_MODIFIED")] : []
+            swiftSettings: houseSettings + (sourceTreeModified ? [.define("COHERE_SOURCE_TREE_MODIFIED")] : [])
         ),
         .executableTarget(
             name: "CohereSwiftCommand",
-            dependencies: ["CohereSwift"]
+            dependencies: ["CohereSwift"],
+            swiftSettings: houseSettings
         ),
         /*
          The parity harness: the engine beside SwiftLint and swift-format's linter, rule by rule. A separate
@@ -72,11 +79,13 @@ let package = Package(
          */
         .executableTarget(
             name: "CohereSwiftParity",
-            dependencies: ["CohereSwift"]
+            dependencies: ["CohereSwift"],
+            swiftSettings: houseSettings
         ),
         .testTarget(
             name: "CohereSwiftTests",
             dependencies: ["CohereSwift"],
+            swiftSettings: houseSettings,
             /*
              The contract fixtures live beside Contract.md, outside this target, so the Go renderer's tests
              read the same files. The tests find them by walking up from their own source path rather than

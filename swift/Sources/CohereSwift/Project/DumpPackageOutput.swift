@@ -22,7 +22,7 @@ struct DumpPackageOutput: Decodable {
         var settings: [Setting]?
     }
 
-    /* One build setting. Only the language-mode kind is decoded; every other kind decodes as empty. */
+    /* One build setting. Only the kinds the engine reads are decoded; every other kind decodes as empty. */
     struct Setting: Decodable {
         var kind: Kind
     }
@@ -30,7 +30,22 @@ struct DumpPackageOutput: Decodable {
     /* The setting's kind, keyed by its name. */
     struct Kind: Decodable {
         var swiftLanguageMode: LanguageMode?
+        /* `{"enableUpcomingFeature": {"_0": "ExistentialAny"}}`, measured on Swift 6.4. */
+        var enableUpcomingFeature: Feature?
+        /* `{"strictMemorySafety": {}}`: present means on. */
+        var strictMemorySafety: Empty?
     }
+
+    /* `{"_0": "ExistentialAny"}` */
+    struct Feature: Decodable {
+        var name: String
+
+        enum CodingKeys: String, CodingKey {
+            case name = "_0"
+        }
+    }
+
+    struct Empty: Decodable {}
 
     /* `{"_0": "6"}` */
     struct LanguageMode: Decodable {

@@ -28,13 +28,19 @@ public struct PackageModel: Equatable, Sendable {
         public var sources: [URL]
         /* The Swift language mode the target compiles in, as SwiftPM resolves it: "6", "5", "4.2". */
         public var languageMode: String
+        /* The upcoming features its settings enable, by name: `ExistentialAny`, `MemberImportVisibility`. */
+        public var upcomingFeatures: Set<String>
+        /* Whether its settings turn on strict memory safety (SE-0458). */
+        public var strictMemorySafety: Bool
 
-        public init(name: String, kind: String, directory: URL, sources: [URL], languageMode: String) {
+        public init(name: String, kind: String, directory: URL, sources: [URL], languageMode: String, upcomingFeatures: Set<String> = [], strictMemorySafety: Bool = false) {
             self.name = name
             self.kind = kind
             self.directory = directory
             self.sources = sources
             self.languageMode = languageMode
+            self.upcomingFeatures = upcomingFeatures
+            self.strictMemorySafety = strictMemorySafety
         }
     }
 
@@ -166,10 +172,18 @@ public struct PackageModel: Equatable, Sendable {
         let packageDefault = manifest.swiftLanguageVersions?.max(by: PackageModel.isOlderLanguageMode)
             ?? PackageModel.defaultLanguageMode(toolsVersion: toolsVersion)
         var modesByTarget: [String: String] = [:]
+        var featuresByTarget: [String: Set<String>] = [:]
+        var strictMemorySafetyTargets: Set<String> = []
         for target in manifest.targets {
             for setting in target.settings ?? [] {
                 if let mode = setting.kind.swiftLanguageMode?.mode {
                     modesByTarget[target.name] = mode
+                }
+                if let feature = setting.kind.enableUpcomingFeature?.name {
+                    featuresByTarget[target.name, default: []].insert(feature)
+                }
+                if setting.kind.strictMemorySafety != nil {
+                    strictMemorySafetyTargets.insert(target.name)
                 }
             }
         }
@@ -187,7 +201,9 @@ public struct PackageModel: Equatable, Sendable {
                 kind: target.type,
                 directory: directory,
                 sources: sources,
-                languageMode: modesByTarget[target.name] ?? packageDefault
+                languageMode: modesByTarget[target.name] ?? packageDefault,
+                upcomingFeatures: featuresByTarget[target.name] ?? [],
+                strictMemorySafety: strictMemorySafetyTargets.contains(target.name)
             )
         }
         .sorted { $0.name < $1.name }
