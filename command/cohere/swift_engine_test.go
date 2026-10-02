@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -86,4 +88,77 @@ func TestRunEngineBinaryEndings(t *testing.T) {
 			t.Errorf("waited %s for an engine that had already broken its contract", elapsed)
 		}
 	})
+
+	// The child is started before the broken record, so it is always alive when the engine is killed.
+	// Killing only the engine left it holding the pipes, and the front door waited out its 30 seconds.
+	t.Run("a broken engine's children die with it", func(t *testing.T) {
+		childFile := filepath.Join(t.TempDir(), "child")
+		start := time.Now()
+		_, _, exitCode, err := runFakeSwiftEngine(t,
+			"sleep 30 & echo $! > '"+childFile+"'; head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; wait",
+			swiftModeCheck)
+		if err == nil || exitCode != 1 || !strings.Contains(err.Error(), "the Swift engine is broken") {
+			t.Fatalf("exit %d, err %v", exitCode, err)
+		}
+		if elapsed := time.Since(start); elapsed > 10*time.Second {
+			t.Errorf("waited %s on a child of an engine that had already broken its contract", elapsed)
+		}
+		requireProcessEnded(t, childFile)
+	})
+
+	// SIGTERM rather than an interrupt, because a POSIX shell starts a background job with interrupts
+	// ignored, and the stand-in's child must be one the signal can end.
+	t.Run("a signal cohere receives is passed to the engine and everything it started", func(t *testing.T) {
+		childFile := filepath.Join(t.TempDir(), "child")
+		interrupts := make(chan os.Signal, 1)
+		var out, standardError bytes.Buffer
+		run := newSwiftRun(&out, swiftModeCheck, "", time.Now())
+		go func() {
+			waitForFile(t, childFile)
+			interrupts <- syscall.SIGTERM
+		}()
+		start := time.Now()
+		exitCode, err := runEngineBinaryUntil(
+			fakeSwiftEngine(t, "sleep 30 & echo $! > '"+childFile+"'; head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; wait"),
+			[]string{"--contract", "1"}, run, &standardError, interrupts)
+		if err == nil || exitCode != 1 || !strings.Contains(err.Error(), "was killed by") {
+			t.Fatalf("an engine signalled through cohere exited %d, err %v\n%s", exitCode, err, out.String())
+		}
+		if elapsed := time.Since(start); elapsed > 10*time.Second {
+			t.Errorf("the signal took %s to end the engine, so it was not passed on", elapsed)
+		}
+		requireProcessEnded(t, childFile)
+	})
+}
+
+// waitForFile waits for a stand-in engine to write a file, failing the test after ten seconds.
+func waitForFile(t *testing.T, path string) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if contents, err := os.ReadFile(path); err == nil && len(contents) > 0 {
+			return
+		}
+	}
+	t.Errorf("the stand-in engine never wrote %s", path)
+}
+
+// requireProcessEnded fails unless the process whose id a stand-in engine wrote to path is gone. An
+// orphan is reaped by launchd or init a moment after it dies, so it is given two seconds.
+func requireProcessEnded(t *testing.T, path string) {
+	t.Helper()
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("the stand-in engine never wrote its child's id: %v", err)
+	}
+	child, err := strconv.Atoi(strings.TrimSpace(string(contents)))
+	if err != nil {
+		t.Fatalf("the child id %q is not a number: %v", contents, err)
+	}
+	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if syscall.Kill(child, 0) == syscall.ESRCH {
+			return
+		}
+	}
+	_ = syscall.Kill(child, syscall.SIGKILL)
+	t.Errorf("the engine's child %d outlived it", child)
 }
