@@ -1165,3 +1165,36 @@ func TestABrokenSubmoduleBesideAHealthyOneLosesNeither(t *testing.T) {
 	}
 
 }
+
+// A failure listing submodules is an error, never a scope with every submodule quietly missing.
+//
+// The listing is asked alongside the status, and its error used to survive being swallowed: every test
+// still passed, because no repository can make `git ls-files --stage` fail while `git status` over the
+// same index succeeds. Swallowed, a failed listing means no submodules, so their edits leave the scope
+// and an incomplete change set reads as complete. Shown failing against exactly that mutation.
+//
+// Must stay sequential. It swaps a package variable, which is safe only because Go runs every test
+// that calls t.Parallel after the sequential ones have finished.
+func TestAFailedSubmoduleListingIsAnError(t *testing.T) {
+	root := repositoryWithSubmodule(t)
+
+	// The control: the same repository answers without error when the listing works, so the failure
+	// below is the listing's and not the fixture's.
+	if _, err := changedFilesScope(root); err != nil {
+		t.Fatalf("the fixture fails even with a working listing, so this test proves nothing: %v", err)
+	}
+
+	previous := listSubmodulePaths
+	listSubmodulePaths = func(string) (map[string]struct{}, error) {
+		return nil, errors.New("listing refused for the test")
+	}
+	defer func() { listSubmodulePaths = previous }()
+
+	scope, err := changedFilesScope(root)
+	if err == nil {
+		t.Fatalf("a failed submodule listing produced a scope, with every submodule silently missing: %v", scope.FileNames)
+	}
+	if !strings.Contains(err.Error(), "listing refused for the test") {
+		t.Errorf("the error does not carry the listing's failure: %v", err)
+	}
+}

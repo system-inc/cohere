@@ -274,7 +274,7 @@ func gitChangedFiles(workingDirectory string, since string) ([]string, []string,
 	}()
 	go func() {
 		defer questions.Done()
-		submodules, listErr = gitSubmodulePaths(workingDirectory)
+		submodules, listErr = listSubmodulePaths(workingDirectory)
 	}()
 	if since != "" {
 		questions.Add(1)
@@ -503,6 +503,12 @@ func gitOutput(directory string, arguments ...string) (string, error) {
 // Read from the index rather than from .gitmodules, because .gitmodules is a file someone edits and
 // the index is what git actually acts on. A submodule is mode 160000 there, a gitlink, which is the
 // same fact the formatter needs: this path is not a file to read.
+// listSubmodulePaths is how gitChangedFiles asks which paths are submodules. A variable so a test can
+// make this one question fail while every other git call succeeds, which no real repository arranges:
+// `git ls-files --stage` and `git status` read the same index. Without that, swallowing this error
+// passed every test, and a failed listing would silently drop every submodule from the scope.
+var listSubmodulePaths = gitSubmodulePaths
+
 func gitSubmodulePaths(workingDirectory string) (map[string]struct{}, error) {
 	command := exec.Command("git", "ls-files", "--stage")
 	command.Dir = workingDirectory
