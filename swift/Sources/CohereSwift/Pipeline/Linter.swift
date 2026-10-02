@@ -69,7 +69,7 @@ struct Linter {
             crashes: [],
             rulesScopedOff: scopedOff,
             rulesNotConfigured: [],
-            configNote: configuration.note
+            configurationNote: configuration.note
         )
         return Result(findings: findings, record: record)
     }

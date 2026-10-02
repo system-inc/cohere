@@ -16,6 +16,9 @@ public enum RuleRegistry {
         NoDiscardedTryOptional(),
         FatalErrorMessage(),
         NoTodoComment(),
+        NoAbbreviatedIdentifier(),
+        SwiftFormatRule.requireLowerCamelCase,
+        SwiftFormatRule.noLeadingUnderscores,
     ]
 
     public static let packageRules: [any PackageRule] = [

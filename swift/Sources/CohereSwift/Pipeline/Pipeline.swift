@@ -41,7 +41,7 @@ public struct Pipeline {
             return 0
         }
 
-        let configuration = try RuleConfiguration.load(packageRoot: options.root ?? workingDirectory, explicitPath: options.lintConfig)
+        let configuration = try RuleConfiguration.load(packageRoot: options.root ?? workingDirectory, explicitPath: options.lintConfiguration)
         if options.listRules || options.listRulesEnabled {
             for name in RuleRegistry.allNames {
                 let severity = configuration.severity(of: name)
@@ -224,6 +224,10 @@ public struct Pipeline {
         if !options.runLint {
             try writer.write(PhaseRecord(name: .lint, outcome: .skipped, detail: "not requested"))
         } else {
+            /* A vocabulary that did not load would leave the abbreviation rule judging nothing while the run reads clean, so the run is refused instead. */
+            if case let .failure(error) = AbbreviationVocabulary.shared, configuration.severity(of: NoAbbreviatedIdentifier().name) != .off {
+                throw RunFailure(description: "the abbreviation vocabulary could not be loaded, so naming could not be checked: \(error)")
+            }
             let lintStart = Date()
             let lint = Linter(configuration: configuration).run(package: package, manifests: await manifests(of: package), files: parsed.files)
             for finding in lint.findings {

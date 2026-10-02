@@ -40,8 +40,8 @@ struct TopLevelDeclarations {
     }
 
     private mutating func collect(_ item: CodeBlockItemSyntax.Item, seenTypes: inout Set<String>) {
-        if let ifConfig = item.as(IfConfigDeclSyntax.self) {
-            for clause in ifConfig.clauses {
+        if let conditionalCompilation = item.as(IfConfigDeclSyntax.self) {
+            for clause in conditionalCompilation.clauses {
                 guard let elements = clause.elements?.as(CodeBlockItemListSyntax.self) else { continue }
                 for element in elements {
                     collect(element.item, seenTypes: &seenTypes)
