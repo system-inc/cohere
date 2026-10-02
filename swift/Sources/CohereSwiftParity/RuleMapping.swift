@@ -43,6 +43,7 @@ struct RuleMapping: Sendable {
         RuleMapping(incumbent: .swiftLint, incumbentRule: "one_declaration_per_file", rules: ["cohere-swift/one-type-per-file"], comparison: .fileAndCount),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "file_name", rules: ["cohere-swift/file-named-for-type"], comparison: .file),
         RuleMapping(incumbent: .swiftFormat, incumbentRule: "AlwaysUseLowerCamelCase", rules: ["cohere-swift/require-lower-camel-case"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "unowned_variable_capture", rules: ["cohere-swift/no-unowned"]),
         RuleMapping(incumbent: .swiftFormat, incumbentRule: "NoLeadingUnderscores", rules: ["cohere-swift/no-leading-underscores"]),
     ]
 

@@ -22,6 +22,7 @@ public enum RuleRegistry {
         FatalErrorMessage(),
         NoTodoComment(),
         NoAbbreviatedIdentifier(vocabulary: vocabulary),
+        NoUnowned(),
         SwiftFormatRule.requireLowerCamelCase,
         SwiftFormatRule.noLeadingUnderscores,
     ] }
