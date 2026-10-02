@@ -180,3 +180,13 @@ func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(t *testing.T) {
 func cohereBinaryFormatOnly(path string, target Target) (int64, error) {
 	return 0, requireExecutableFormat(path, target)
 }
+
+func writeFile(t *testing.T, path string, contents string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}

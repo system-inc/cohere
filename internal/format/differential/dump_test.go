@@ -11,7 +11,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
-	release "github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // TestDumpDifferences is TestCorpora's working copy for a printer port: the same comparison against the
@@ -48,7 +47,7 @@ func TestDumpDifferences(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	digest, err := release.DigestBundleFiles(bundles.Files)
+	digest, err := prettier.DigestBundles(bundles.Files)
 	if err != nil {
 		t.Fatal(err)
 	}

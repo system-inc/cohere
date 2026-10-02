@@ -54,20 +54,6 @@ type Options struct {
 	// Targets are the platforms to build. Empty means every target.
 	Targets []Target
 
-	// EmbedFormatter requires a built fork, so a release can refuse to ship bundles it cannot vouch
-	// for.
-	//
-	// It no longer decides whether the bundles are embedded. They are vendored into the repository
-	// and pulled in by a `go:embed` directive with no build tag, so every binary carries them and
-	// every binary can format. The name is now narrower than it reads and the flag is kept because
-	// what it still controls is real: with it on, a fork that is absent, unbuilt or stale fails the
-	// release before any target is cross-compiled.
-	//
-	// Off by default because a release does not need a fork to produce a working formatter any
-	// more. The cost of off is a binary whose formatter stamp is empty, which says plainly that it
-	// cannot name the Prettier it formats with.
-	EmbedFormatter bool
-
 	// Signing configures macOS codesigning. A zero value stages unsigned binaries, which is a
 	// supported outcome rather than a failure: signing needs credentials a contributor may not
 	// have, and an npm install does not set the quarantine attribute that Gatekeeper checks. What
@@ -125,17 +111,10 @@ func Build(options Options) (Result, error) {
 		return Result{}, err
 	}
 
-	// Resolved once, before any target is built, so a stale or missing fork fails the release
-	// immediately rather than after six cross-compilations.
-	formatter, err := resolveFormatterStamp(options.EmbedFormatter, ResolveFormatterSource)
-	if err != nil {
-		return Result{}, err
-	}
-
 	result := Result{}
 
 	for _, target := range targets {
-		staged, err := buildPlatformPackage(options, target, pin, goToolchain, formatter)
+		staged, err := buildPlatformPackage(options, target, pin, goToolchain)
 		if err != nil {
 			return Result{}, fmt.Errorf("building %s: %w", target, err)
 		}
@@ -151,37 +130,8 @@ func Build(options Options) (Result, error) {
 	return result, nil
 }
 
-// resolveFormatterStamp decides what a build stamps about its formatter.
-//
-// It is a named function taking the resolve as a parameter, rather than four lines inside `Build`,
-// because the decision is the thing that was wrong and a decision buried in a cross-compiling
-// function cannot be tested. The defect it now pins shipped for an hour: the resolve sat inside
-// `if requireFork`, a binary built with the flag off formatted a file and reported no formatter at
-// all, and every line of that `--version` was true. A guard asserting `ResolveFormatterSource`
-// works passed the whole time, because that function was never broken -- the caller was.
-//
-// The stamp is resolved whatever `requireFork` says, because the bundles are embedded by a
-// `go:embed` directive with no build tag: every binary carries them and every binary can format.
-// The stamp describes the bytes that ship, so it follows the bytes rather than an option about
-// them.
-//
-// `requireFork` decides only what an unavailable fork means. With it set, a fork that is absent,
-// unbuilt or stale fails the release. Without it, the stamp is left empty, which reports honestly
-// that this binary cannot name its formatter rather than blocking a build for a fork the release
-// was not asking for.
-func resolveFormatterStamp(requireFork bool, resolve func() (FormatterSource, error)) (FormatterSource, error) {
-	formatter, err := resolve()
-	if err != nil {
-		if requireFork {
-			return FormatterSource{}, err
-		}
-		return FormatterSource{}, nil
-	}
-	return formatter, nil
-}
-
 // buildPlatformPackage cross-compiles one target and writes its package around the binary.
-func buildPlatformPackage(options Options, target Target, pin compilerPin, goToolchain string, formatter FormatterSource) (StagedPackage, error) {
+func buildPlatformPackage(options Options, target Target, pin compilerPin, goToolchain string) (StagedPackage, error) {
 	directory := filepath.Join(options.OutputDirectory, target.DirectoryName())
 	binaryPath := filepath.Join(directory, "bin", target.BinaryFileName())
 
@@ -189,7 +139,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		return StagedPackage{}, fmt.Errorf("creating the package directory: %w", err)
 	}
 
-	if err := compile(options, target, binaryPath, pin, goToolchain, formatter); err != nil {
+	if err := compile(options, target, binaryPath, pin, goToolchain); err != nil {
 		return StagedPackage{}, err
 	}
 
@@ -262,7 +212,7 @@ func buildDispatcherPackage(options Options) (StagedPackage, error) {
 }
 
 // compile cross-compiles one target, stamping the provenance in.
-func compile(options Options, target Target, binaryPath string, pin compilerPin, goToolchain string, formatter FormatterSource) error {
+func compile(options Options, target Target, binaryPath string, pin compilerPin, goToolchain string) error {
 	const packagePath = "github.com/system-inc/cohere/internal/release/packaging"
 
 	// Strip the symbol table and DWARF. Measured on a comparable binary: marginally faster to link
@@ -274,13 +224,6 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 		"-X", packagePath+".compilerUpstream="+pin.Upstream,
 		"-X", packagePath+".goToolchain="+goToolchain,
 	)
-
-	// Stamped only when a formatter is actually embedded. A binary carrying no formatter must not
-	// report a commit for one, because a reader would take that as the Prettier it formats with.
-	if formatter.Commit != "" {
-		stamps = append(stamps, "-X", packagePath+".formatterCommit="+formatter.Commit)
-		stamps = append(stamps, "-X", packagePath+".formatterDigest="+formatter.Digest)
-	}
 
 	linkerFlags := strings.Join(stamps, " ")
 

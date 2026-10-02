@@ -12,7 +12,6 @@ import (
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 	"github.com/system-inc/cohere/internal/format/prettier"
-	release "github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // The printer's acceptance test: the differential's comparison over every .yaml and .yml file under the
@@ -222,7 +221,7 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	digest, err := release.DigestBundleFiles(bundles.Files)
+	digest, err := prettier.DigestBundles(bundles.Files)
 	if err != nil {
 		t.Fatal(err)
 	}

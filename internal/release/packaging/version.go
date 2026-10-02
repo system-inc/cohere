@@ -12,7 +12,6 @@ package release
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -43,32 +42,6 @@ var (
 	// input to the behavior, not just to the build: it is recorded for the same reason the rebuild
 	// cache hashes it.
 	goToolchain = "unknown"
-
-	// formatterCommit is the commit of the Prettier fork whose bundles this binary embeds.
-	//
-	// The formatter is JavaScript built out of a separate repository and pulled in at build time
-	// from a path on the build machine, not a pinned dependency. Nothing else in the binary records
-	// which build that was, so without this stamp two binaries from the same cohere commit can
-	// format the same file differently and neither can say why. Formatting differences are the
-	// worst kind to debug from a report, because every diff after the first one is noise.
-	//
-	// It defaults to empty rather than "unknown", unlike every other stamp here, because a binary
-	// that embeds no formatter is a different thing from one whose stamp went missing. Defaulting
-	// to "unknown" would print a lost-stamp signal on every binary built before the formatter
-	// exists, and a warning that fires when nothing is wrong is a warning nobody reads later.
-	formatterCommit = ""
-
-	// formatterDigest is a sha256 over the bundle bytes this binary embeds, keyed by name.
-	//
-	// The commit above says which fork revision the bundles were built from. This says which bytes
-	// those actually were, and the two can disagree: the bundles are build output, so a checkout at
-	// the right commit can hold a stale build of it, and since vendoring nothing in a `git pull` of
-	// the fork updates the copy in this repository.
-	//
-	// Empty by the same reasoning as formatterCommit -- a binary that embeds no formatter is a
-	// different thing from one whose stamp went missing, and a warning that fires when nothing is
-	// wrong is a warning nobody reads later.
-	formatterDigest = ""
 )
 
 // Provenance is everything a shipped binary knows about where it came from.
@@ -98,15 +71,6 @@ type Provenance struct {
 
 	// GoToolchain is the Go version that compiled this binary.
 	GoToolchain string
-
-	// FormatterCommit is the commit of the Prettier fork whose bundles this binary embeds.
-	//
-	// Empty for a binary built before the formatter existed. That is distinct from "unknown", which
-	// means a build that should have stamped it and did not, so the two render differently.
-	FormatterCommit string
-
-	// FormatterDigest is a sha256 over the embedded bundle bytes, keyed by name.
-	FormatterDigest string
 
 	// SourceTreeModified reports whether the tree this binary was built from had uncommitted
 	// changes.
@@ -138,8 +102,6 @@ func Current() Provenance {
 		CompilerCommit:     resolveCompilerCommit(),
 		CompilerUpstream:   compilerUpstream,
 		GoToolchain:        resolveGoToolchain(),
-		FormatterCommit:    formatterCommit,
-		FormatterDigest:    formatterDigest,
 		SourceTreeModified: resolveSourceTreeModified(),
 		Platform:           runtime.GOOS + "/" + runtime.GOARCH,
 	}
@@ -170,20 +132,6 @@ func (provenance Provenance) String() string {
 	if provenance.SelfCommit != "" {
 		lines = append(lines, "  commit:         "+shortCommit(provenance.SelfCommit))
 	}
-	// Printed only when the binary carries a formatter, so a build that predates it does not grow a
-	// line reading "unknown" that looks like a lost stamp rather than a feature that did not exist.
-	if provenance.FormatterCommit != "" {
-		lines = append(lines, "  formatter:      "+provenance.describeFormatter())
-	}
-	// The override changes which bytes ran, so a binary that reports only what it embedded would be
-	// describing a formatter that did not format anything. It is checked at print time rather than
-	// stamped, because it is a property of this run and not of the build.
-	if forkPath := strings.TrimSpace(os.Getenv(FormatterForkPathVariable)); forkPath != "" {
-		lines = append(lines,
-			"  formatter note: "+FormatterForkPathVariable+" is set, so the embedded bundles above were not used",
-			"  formatter disk: "+describeForkAt(forkPath),
-		)
-	}
 	// Printed only when true, because "built from a clean tree" is the ordinary case and a line
 	// asserting it on every release would be noise that hides the one time it matters.
 	if provenance.SourceTreeModified {
@@ -193,41 +141,6 @@ func (provenance Provenance) String() string {
 		lines = append(lines, "  note:           a local build, so the rules are whatever was on disk when it was compiled")
 	}
 	return strings.Join(lines, "\n")
-}
-
-// describeFormatter renders the embedded bundles as a fork commit and the digest of the bytes.
-//
-// Both, because they answer different questions and a vendored copy needs both answers. The commit
-// says which revision of the fork the bundles were built from; the digest says which bytes those
-// were. A checkout at the right commit can hold a stale build of it, so a commit alone can be
-// correct about provenance while the bytes it names are not the bytes that shipped.
-//
-// The digest is abbreviated because a bug report quotes this line, and twelve hex characters is
-// enough to tell two builds apart while staying readable. The full value is in the stamp.
-func (provenance Provenance) describeFormatter() string {
-	if provenance.FormatterDigest == "" {
-		return provenance.FormatterCommit
-	}
-	digest := provenance.FormatterDigest
-	if len(digest) > 12 {
-		digest = digest[:12]
-	}
-	return provenance.FormatterCommit + " (bundles " + digest + ")"
-}
-
-// describeForkAt reports the fork a run was pointed at, for the override case.
-//
-// It reads the live checkout rather than any stamp, because the whole point of the override is that
-// the bytes came from somewhere this build knows nothing about. A failure to read it is reported in
-// place instead of returned: this is a provenance line in `--version`, and a binary that refuses to
-// say what it is because one of its facts is unavailable is less useful than one that says which
-// fact it could not get.
-func describeForkAt(forkPath string) string {
-	commit, err := readForkCommit(forkPath)
-	if err != nil {
-		return forkPath + " (its commit could not be read)"
-	}
-	return forkPath + "@" + commit
 }
 
 // describeCompiler renders the vendored compiler as a repository and a commit in it.

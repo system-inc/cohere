@@ -272,34 +272,13 @@ the pin was against `microsoft/typescript-go` until that repository was archived
 `microsoft/TypeScript`. Both spellings are forty hex characters and resolve in different places, so a
 hardcoded label would have survived the migration while quietly becoming false.
 
-### The formatter's bundles
+### The formatter carries no JavaScript
 
-The formatter runs our Prettier fork inside a JavaScript engine, and those bundles are build output
-of `~/Projects/system/prettier` rather than anything this repository pins. `--embed-formatter` pulls
-them in and stamps the fork's `HEAD` beside the compiler pin, so `--version` grows a `formatter:`
-line naming exactly which Prettier a binary formats with.
-
-That stamp exists because the fork is reached by a path on a build machine, not by a version. Without
-it, two binaries built from the same cohere commit can format the same file differently and neither
-can say why, and formatting differences are the worst kind to debug from a report: every diff after
-the first one is noise.
-
-The flag is off by default, because the formatter is not wired into cohere yet and a release should
-not demand a built fork for a feature nothing reaches. When it is on, the build refuses a fork that
-is absent, unbuilt, missing any required bundle, holding a zero-byte one, or whose bundles are older
-than its tracked source. It refuses before cross-compiling anything, so a stale fork costs a second
-rather than six builds. The bundle list is `prettier.BundleFiles` itself rather than a copy of it —
-eight bundles, 2.0 MB measured, against 12 MB for the fork's whole `dist/prettier`. Keeping a second
-list here was a real defect and not a hypothetical one: this file once named three bundles, chosen as
-the minimal set that formats TypeScript, while the engine hard-errors on any of its eight being
-absent. The guard would have passed a release missing five, and the binary would have died the first
-time anyone formatted markdown.
-
-Staleness is measured by modification time against the fork's newest tracked source file, not by
-recording a commit beside the bundles. A recorded commit only catches a rebuild someone remembered
-to re-record; the case that actually happens is an edited working tree that was never rebuilt, where
-the commit has not moved and the bundles are wrong anyway. `COHERE_PRETTIER_FORK` points at a
-checkout somewhere other than the default path.
+A released binary formats with cohere's native Go printers and embeds none of the Prettier fork's
+bundles, so `--version` names no formatter: there are no bytes in it for a stamp to vouch for. The
+bundles remain in `internal/format/prettier` as the test oracle the printers are measured against,
+and `prettier.DigestBundles` keys the oracle's cache so a rebuilt fork invalidates every cached
+answer rather than comparing against output from bundles nobody loads.
 
 `COHERE_BINARY=/path/to/cohere` points every `cohere` on the machine at a local build. A broken
 override is fatal rather than a fallback, even when a good install is sitting right there: someone

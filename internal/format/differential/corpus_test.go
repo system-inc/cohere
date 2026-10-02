@@ -11,7 +11,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
-	release "github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // TestCorpora is the acceptance test: the native printer against the embedded Prettier, over real trees.
@@ -42,7 +41,7 @@ func TestCorpora(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	digest, err := release.DigestBundleFiles(bundles.Files)
+	digest, err := prettier.DigestBundles(bundles.Files)
 	if err != nil {
 		t.Fatal(err)
 	}

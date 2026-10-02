@@ -102,7 +102,7 @@ func TestVersionSaysWhenTheBuildTreeWasDirty(t *testing.T) {
 	}
 
 	// And the ordinary case stays quiet. A line asserting "clean" on every release is noise that
-	// hides the one time it matters, which is the same reason the formatter line is conditional.
+	// hides the one time it matters.
 	clean := dirty
 	clean.SourceTreeModified = false
 	if strings.Contains(clean.String(), "uncommitted") {
