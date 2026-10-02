@@ -153,6 +153,9 @@ var EnforceConsistentClassOrder = rule.Rule{
 			for _, literal := range reader.ClassLiteralsIn(node) {
 				reportClassOrder(ctx, literal, designSystem)
 			}
+			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
+				reportTemplateClassOrder(ctx, segments, designSystem)
+			}
 		}
 
 		listeners := rule.Listeners{}
@@ -277,6 +280,97 @@ func reorderFixes(sourceText string, literal ClassLiteral, classes []string, ord
 		fixes = append(fixes, rule.ReplaceRange(slot.Range, ordered[index]))
 	}
 	return fixes, true
+}
+
+// reportTemplateClassOrder orders each static run of a template with holes, the way the plugin does.
+//
+// The plugin's `sortTemplateLiteral` sorts every run on its own, and a class glued to a hole stays
+// where it is: a run after a hole that does not start with whitespace keeps its first class in
+// place (`ignoreFirst`), and a run before a hole that does not end with whitespace keeps its last
+// (`ignoreLast`). In `px-${size} items-center flex` the `px-` is half of a class the hole completes,
+// and moving it would move the hole's value with it. Measured against the plugin on 2026-10-02:
+//
+//	`  items-center flex ${a} gap-2 block  `   ->  `flex items-center ${a} block gap-2`
+//	`px-${size} items-center flex`             ->  `px-${size} flex items-center`
+//	`${x}items-center flex block`              ->  `${x}items-center block flex`
+//
+// Only the slots whose class changes are rewritten, so the whitespace rule's edits in the same runs
+// land in the same pass. A run holding a repeat is left unordered: the plugin removes repeats in
+// templates and `no-duplicate-classes` does not read a template's runs, so ordering around one
+// would report a list the author still cannot make clean.
+func reportTemplateClassOrder(ctx rule.Context, segments []ClassSegment, designSystem DesignSystemResult) {
+	sourceText := ctx.SourceFile.Text()
+	for index, segment := range segments {
+		if strings.ContainsRune(segment.Text, '\v') {
+			continue
+		}
+		tokens, tokenized := classTokensIn(sourceText, segment.Range, segment.Text)
+		if !tokenized {
+			continue
+		}
+		slots := classesOf(tokens)
+		if len(slots) == 0 {
+			continue
+		}
+
+		first, last := 0, len(slots)
+		if index > 0 && !tokens[0].Separator {
+			first++
+		}
+		if index < len(segments)-1 && !tokens[len(tokens)-1].Separator {
+			last--
+		}
+		if last-first < 2 {
+			continue
+		}
+		sortable := slots[first:last]
+
+		classes := make([]string, 0, len(sortable))
+		seen := make(map[string]bool, len(sortable))
+		repeated := false
+		for _, slot := range sortable {
+			repeated = repeated || seen[slot.Text]
+			seen[slot.Text] = true
+			classes = append(classes, slot.Text)
+		}
+		if repeated {
+			continue
+		}
+
+		ordered, decided := orderClasses(classes, designSystem)
+		if !decided || strings.Join(ordered, " ") == strings.Join(classes, " ") {
+			continue
+		}
+
+		// The message names the whole run as it will read, glued classes included, so the author
+		// sees the order in place rather than a list that leaves out the class beside the hole.
+		shown := make([]string, 0, len(slots))
+		for _, slot := range slots[:first] {
+			shown = append(shown, slot.Text)
+		}
+		shown = append(shown, ordered...)
+		for _, slot := range slots[last:] {
+			shown = append(shown, slot.Text)
+		}
+
+		ctx.Report(rule.Diagnostic{
+			Range:      segment.Range,
+			Message:    messageInconsistentClassOrder(strings.Join(shown, " ")),
+			SourceFile: ctx.SourceFile,
+			Fixes:      slotFixes(sortable, ordered),
+		})
+	}
+}
+
+// slotFixes writes each ordered class into the slot it belongs in, skipping slots already right.
+func slotFixes(slots []classToken, ordered []string) []rule.Fix {
+	fixes := []rule.Fix{}
+	for index, slot := range slots {
+		if slot.Text != ordered[index] {
+			fixes = append(fixes, rule.ReplaceRange(slot.Range, ordered[index]))
+		}
+	}
+	return fixes
 }
 
 // orderClasses is the plugin's order for one literal, or false when this port cannot decide it.

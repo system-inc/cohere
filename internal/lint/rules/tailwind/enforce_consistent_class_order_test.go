@@ -726,3 +726,80 @@ func TestClassOrderFixturesActuallyRan(t *testing.T) {
 		`const element = <div className="items-center flex" />;`)
 	rule_testing.ExpectFindings(t, result, "inconsistentClassOrder")
 }
+
+// TestClassOrderSortsTemplateRunsLikeThePlugin pins the template half, each case quoted from what
+// Prettier's Tailwind plugin wrote for the same input on 2026-10-02 (ahra's pinned 0.8.1).
+//
+// Each static run sorts on its own, and a class glued to a hole stays put: `px-` is half of a class
+// the hole completes. Whitespace is left exactly where it was, since collapsing it is
+// `no-unnecessary-whitespace`'s, so the cases with padding show the order alone.
+func TestClassOrderSortsTemplateRunsLikeThePlugin(t *testing.T) {
+	testCases := []struct {
+		name, source, want string
+	}{
+		{
+			name:   "a run after a glued hole keeps its glued class",
+			source: "const element = <div className={`px-${size} items-center flex`} />;",
+			want:   "const element = <div className={`px-${size} flex items-center`} />;",
+		},
+		{
+			name:   "a run before a glued hole keeps its glued class",
+			source: "const element = <div className={`items-center flex px-${size}`} />;",
+			want:   "const element = <div className={`flex items-center px-${size}`} />;",
+		},
+		{
+			name:   "a class glued after a hole stays first",
+			source: "const element = <div className={`${x}items-center flex block`} />;",
+			want:   "const element = <div className={`${x}items-center block flex`} />;",
+		},
+		{
+			name:   "both runs, separators untouched",
+			source: "const merged = mergeClassNames(`items-center   flex ${x} gap-2   block`);",
+			want:   "const merged = mergeClassNames(`flex   items-center ${x} block   gap-2`);",
+		},
+		{
+			name:   "a template in a conditional's branch",
+			source: "const element = <div className={open ? `items-center flex ${x}` : 'flex'} />;",
+			want:   "const element = <div className={open ? `flex items-center ${x}` : 'flex'} />;",
+		},
+		{
+			name:   "a template inside another template's hole",
+			source: "const element = <div className={`flex ${a ? `items-center block ${b}` : ''}`} />;",
+			want:   "const element = <div className={`flex ${a ? `block items-center ${b}` : ''}`} />;",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := runClassOrderFixture(t, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(t, result, testCase.want+"\n")
+		})
+	}
+}
+
+// The template runs the plugin leaves alone, and so must this rule.
+func TestClassOrderLeavesTemplateRunsThePluginLeaves(t *testing.T) {
+	for _, testCase := range []struct {
+		name, source string
+	}{
+		{
+			// `flex-` is glued to `${grow}`, so `items-center` is the only sortable class before it,
+			// and `block flex` is already in order. The plugin returned this unchanged.
+			name:   "glued classes leave one sortable class",
+			source: "const element = <div className={`items-center flex-${grow} block flex ${x}`} />;",
+		},
+		{
+			name:   "already ordered on both sides of a hole",
+			source: "const element = <div className={`flex items-center ${x} block gap-2`} />;",
+		},
+		{
+			// The plugin removes the repeat and sorts; no rule here removes repeats from a template's
+			// runs, so ordering around one would leave a list the author still cannot make clean.
+			name:   "a run holding a repeat",
+			source: "const element = <div className={`items-center flex flex ${x}`} />;",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectClean(t, runClassOrderFixture(t, "Component.tsx", testCase.source))
+		})
+	}
+}

@@ -157,3 +157,28 @@ func TestAnEscapedTemplateIsReportedWithoutAFix(t *testing.T) {
 		t.Fatalf("expected no fix over an escape, got %+v", result.Diagnostics[0].Fixes)
 	}
 }
+
+// A template's runs are found at their tokens, so trivia in front of a delimiter does not shift
+// them. Before, a template after `? ` or a span after `${ x }` read as untokenizable, and every rule
+// that edits runs skipped it; the direct template, with nothing in front of its backtick, was fine.
+func TestTemplateRunsAfterTriviaAreFixed(t *testing.T) {
+	for _, testCase := range []struct {
+		name, source, want string
+	}{
+		{
+			name:   "a template after a conditional's question mark",
+			source: "const element = <div className={open ? `flex  block ${x}` : ''} />;",
+			want:   "const element = <div className={open ? `flex block ${x}` : ''} />;",
+		},
+		{
+			name:   "a run after a hole with spaces inside its braces",
+			source: "const element = <div className={`flex ${ x }  block  gap-2`} />;",
+			want:   "const element = <div className={`flex ${ x } block gap-2`} />;",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		})
+	}
+}

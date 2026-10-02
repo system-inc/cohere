@@ -150,75 +150,93 @@ func ListenerKinds() []ast.Kind {
 // Each literal stands alone, so a rule comparing classes within one literal never compares the two
 // branches of a conditional, which are never applied together. The static text of a template with
 // holes is not a literal here: a class assembled at runtime is `no-concatenated-classes`'s finding,
-// and `ClassSegmentsIn` reads that text for the rules that edit it.
+// and `ClassSegmentsIn` and `ClassTemplateSegmentsIn` read that text for the rules that edit it.
 func (r *ClassLiteralReader) ClassLiteralsIn(node *ast.Node) []ClassLiteral {
+	return r.classValuesIn(node).literals
+}
+
+// classValues is everything one surface carries in value positions: its strings, and its templates
+// with holes, each template with the position it was found in.
+type classValues struct {
+	literals  []ClassLiteral
+	templates []classTemplateValue
+}
+
+// classTemplateValue is one template with holes found in a value position.
+type classTemplateValue struct {
+	node   *ast.Node
+	origin ClassLiteralOrigin
+	// insideTemplateHole is set when the template is itself inside another template's hole, which
+	// makes its outer edges touch that template's text once substituted.
+	insideTemplateHole bool
+}
+
+// classValuesIn dispatches on the three class surfaces.
+func (r *ClassLiteralReader) classValuesIn(node *ast.Node) classValues {
 	if node == nil {
-		return nil
+		return classValues{}
 	}
 
 	switch node.Kind {
 	case ast.KindJsxAttribute:
-		return r.attributeLiterals(node)
+		return r.attributeValues(node)
 
 	case ast.KindCallExpression:
-		return r.calleeLiterals(node)
+		return r.calleeValues(node)
 
 	case ast.KindVariableDeclaration:
-		return r.variableLiterals(node)
+		return r.variableValues(node)
 	}
 
-	return nil
+	return classValues{}
 }
 
-func (r *ClassLiteralReader) attributeLiterals(node *ast.Node) []ClassLiteral {
+func (r *ClassLiteralReader) attributeValues(node *ast.Node) classValues {
 	attribute := node.AsJsxAttribute()
 	if attribute == nil {
-		return nil
+		return classValues{}
 	}
 
 	name := attribute.Name()
 	if name == nil || !r.attributeNames[name.Text()] {
-		return nil
+		return classValues{}
 	}
 
-	return classLiteralsUnder(attribute.Initializer, ClassLiteralOriginAttribute)
+	return classValuesUnder(attribute.Initializer, ClassLiteralOriginAttribute)
 }
 
-func (r *ClassLiteralReader) calleeLiterals(node *ast.Node) []ClassLiteral {
+func (r *ClassLiteralReader) calleeValues(node *ast.Node) classValues {
 	call := node.AsCallExpression()
 	if call == nil || call.Expression == nil {
-		return nil
+		return classValues{}
 	}
 
 	// The callee's own text, so `mergeClassNames(...)` matches and `theme.mergeClassNames(...)`
 	// does not. Matching on the trailing identifier instead would let any object with a similarly
 	// named method silently opt in.
 	if call.Expression.Kind != ast.KindIdentifier {
-		return nil
+		return classValues{}
 	}
-	if !r.calleeNames[call.Expression.Text()] {
-		return nil
+	if !r.calleeNames[call.Expression.Text()] || call.Arguments == nil {
+		return classValues{}
 	}
 
-	var literals []ClassLiteral
-	if call.Arguments == nil {
-		return nil
-	}
+	values := classValues{}
 	for _, argument := range call.Arguments.Nodes {
-		literals = append(literals, classLiteralsUnder(argument, ClassLiteralOriginCallee)...)
+		collectClassValues(argument, ClassLiteralOriginCallee, false, &values)
 	}
-	return literals
+	return values
 }
 
-func (r *ClassLiteralReader) variableLiterals(node *ast.Node) []ClassLiteral {
+func (r *ClassLiteralReader) variableValues(node *ast.Node) classValues {
 	declaration := node.AsVariableDeclaration()
 	if declaration == nil || declaration.Initializer == nil {
-		return nil
+		return classValues{}
 	}
 
 	name := declaration.Name()
 	if name == nil || name.Kind != ast.KindIdentifier {
-		return nil
+		return classValues{}
 	}
 
 	matches := false
@@ -229,27 +247,29 @@ func (r *ClassLiteralReader) variableLiterals(node *ast.Node) []ClassLiteral {
 		}
 	}
 	if !matches {
-		return nil
+		return classValues{}
 	}
 
-	return classLiteralsUnder(declaration.Initializer, ClassLiteralOriginVariable)
+	return classValuesUnder(declaration.Initializer, ClassLiteralOriginVariable)
 }
 
-// classLiteralsUnder collects every string literal in a value position under an expression.
-func classLiteralsUnder(node *ast.Node, origin ClassLiteralOrigin) []ClassLiteral {
-	literals := []ClassLiteral{}
-	collectClassLiterals(node, origin, false, &literals)
-	return literals
+// classValuesUnder collects every string and template with holes in a value position under an
+// expression.
+func classValuesUnder(node *ast.Node, origin ClassLiteralOrigin) classValues {
+	values := classValues{}
+	collectClassValues(node, origin, false, &values)
+	return values
 }
 
-// collectClassLiterals walks the shapes a class value can arrive through, keeping the strings.
+// collectClassValues walks the shapes a class value can arrive through, keeping the strings and the
+// templates with holes.
 //
 // `&&` contributes only its right side, because its left side is the result only when it is falsy,
 // and a class string is never falsy unless it is empty. `||` and `??` contribute both, since either
 // side can be the result. Anything else, a call, a member access, a comparison, is not a class list
 // and is not entered: in `cn(getSize('sm px-2'))` the string is an argument to a function nobody
 // named as a class callee.
-func collectClassLiterals(node *ast.Node, origin ClassLiteralOrigin, insideTemplateHole bool, literals *[]ClassLiteral) {
+func collectClassValues(node *ast.Node, origin ClassLiteralOrigin, insideTemplateHole bool, values *classValues) {
 	if node == nil {
 		return
 	}
@@ -258,11 +278,11 @@ func collectClassLiterals(node *ast.Node, origin ClassLiteralOrigin, insideTempl
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
 		literal := classLiteralFrom(node, origin)
 		literal.InsideTemplateHole = insideTemplateHole
-		*literals = append(*literals, literal)
+		values.literals = append(values.literals, literal)
 
 	case ast.KindJsxExpression:
 		if expression := node.AsJsxExpression(); expression != nil {
-			collectClassLiterals(expression.Expression, origin, insideTemplateHole, literals)
+			collectClassValues(expression.Expression, origin, insideTemplateHole, values)
 		}
 
 	// `className={('flex flex')}` is legal and means exactly what the unparenthesized form means.
@@ -278,19 +298,19 @@ func collectClassLiterals(node *ast.Node, origin ClassLiteralOrigin, insideTempl
 	// depends on the parse shape must not copy this.
 	case ast.KindParenthesizedExpression:
 		if parenthesized := node.AsParenthesizedExpression(); parenthesized != nil {
-			collectClassLiterals(parenthesized.Expression, origin, insideTemplateHole, literals)
+			collectClassValues(parenthesized.Expression, origin, insideTemplateHole, values)
 		}
 
 	case ast.KindAsExpression:
-		collectClassLiterals(node.AsAsExpression().Expression, origin, insideTemplateHole, literals)
+		collectClassValues(node.AsAsExpression().Expression, origin, insideTemplateHole, values)
 
 	case ast.KindSatisfiesExpression:
-		collectClassLiterals(node.AsSatisfiesExpression().Expression, origin, insideTemplateHole, literals)
+		collectClassValues(node.AsSatisfiesExpression().Expression, origin, insideTemplateHole, values)
 
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
-		collectClassLiterals(conditional.WhenTrue, origin, insideTemplateHole, literals)
-		collectClassLiterals(conditional.WhenFalse, origin, insideTemplateHole, literals)
+		collectClassValues(conditional.WhenTrue, origin, insideTemplateHole, values)
+		collectClassValues(conditional.WhenFalse, origin, insideTemplateHole, values)
 
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
@@ -299,27 +319,30 @@ func collectClassLiterals(node *ast.Node, origin ClassLiteralOrigin, insideTempl
 		}
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken:
-			collectClassLiterals(binary.Right, origin, insideTemplateHole, literals)
+			collectClassValues(binary.Right, origin, insideTemplateHole, values)
 		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			collectClassLiterals(binary.Left, origin, insideTemplateHole, literals)
-			collectClassLiterals(binary.Right, origin, insideTemplateHole, literals)
+			collectClassValues(binary.Left, origin, insideTemplateHole, values)
+			collectClassValues(binary.Right, origin, insideTemplateHole, values)
 		}
 
 	case ast.KindArrayLiteralExpression:
 		if elements := node.AsArrayLiteralExpression().Elements; elements != nil {
 			for _, element := range elements.Nodes {
-				collectClassLiterals(element, origin, insideTemplateHole, literals)
+				collectClassValues(element, origin, insideTemplateHole, values)
 			}
 		}
 
 	case ast.KindTemplateExpression:
+		values.templates = append(values.templates, classTemplateValue{
+			node: node, origin: origin, insideTemplateHole: insideTemplateHole,
+		})
 		template := node.AsTemplateExpression()
 		if template.TemplateSpans == nil {
 			return
 		}
 		for _, spanNode := range template.TemplateSpans.Nodes {
 			if span := spanNode.AsTemplateSpan(); span != nil {
-				collectClassLiterals(span.Expression, origin, true, literals)
+				collectClassValues(span.Expression, origin, true, values)
 			}
 		}
 	}

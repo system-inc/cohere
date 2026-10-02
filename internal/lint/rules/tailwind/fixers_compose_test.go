@@ -36,6 +36,15 @@ func TestTailwindFixersComposeInOnePass(t *testing.T) {
 			want:   `export const element = <div className="peer flex items-center p-2" />;`,
 		},
 		{
+			// A template with holes: each run sorted on its own, the hole's string sorted as a literal,
+			// and the padding at the template's outer edges gone. The plugin wrote, for the same input,
+			//	`flex items-center ${open ? "m-2 p-4" : ""} block gap-2`
+			// and the quotes are its formatter's choice, not its sorter's.
+			name:   "a padded, shuffled template with a string in its hole",
+			source: "export const element = <div className={`  items-center flex ${open ? 'p-4 m-2' : ''} gap-2 block  `} />;",
+			want:   "export const element = <div className={`flex items-center ${open ? 'm-2 p-4' : ''} block gap-2`} />;",
+		},
+		{
 			// A deprecated class that has to move: the rename lands first and the order after it.
 			name:   "a deprecated class that moves, beside a repeat and padding",
 			source: `export const element = <div className=" items-center flex-grow  flex flex" />;`,

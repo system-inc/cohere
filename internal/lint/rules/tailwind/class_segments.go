@@ -3,6 +3,7 @@ package tailwind
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 // ClassSegment is one run of static class text, with the range that would rewrite exactly it.
@@ -42,8 +43,9 @@ func (r *ClassLiteralReader) ClassSegmentsIn(node *ast.Node) []ClassSegment {
 	// A plain string literal is one segment with no holes on either side, unless it sits inside a
 	// template's hole, where both of its edges touch the template's text once substituted and its
 	// edge whitespace is a separator (see ClassLiteral.InsideTemplateHole).
+	values := r.classValuesIn(node)
 	var segments []ClassSegment
-	for _, literal := range r.ClassLiteralsIn(node) {
+	for _, literal := range values.literals {
 		segments = append(segments, ClassSegment{
 			Text:         literal.Text,
 			Range:        literal.Range,
@@ -53,70 +55,35 @@ func (r *ClassLiteralReader) ClassSegmentsIn(node *ast.Node) []ClassSegment {
 		})
 	}
 
-	// And a template, broken into its static runs, whether or not literals were found. They used to
-	// be alternatives, and once ClassLiteralsIn read the strings inside a template's holes, the
-	// template's own text would have been skipped whenever one of its holes held a string.
+	// And every template with holes, broken into its static runs, whether or not literals were
+	// found. They used to be alternatives, and once the strings inside a template's holes were read,
+	// the template's own text would have been skipped whenever one of its holes held a string.
 	//
 	// Deliberately not routed through ClassTemplatesIn. That reader answers "where does static text
 	// meet an interpolation without whitespace", so it returns nothing for a template whose seams
 	// are all clean. `flex  ${x}  gap-2` has no boundary defects and two segments that still need
 	// their doubled spaces collapsed, and reusing the boundary reader here would have silently
 	// skipped exactly the templates that are otherwise well written.
-	templateNode, origin := r.classTemplateNodeIn(node)
-	return append(segments, segmentsOfTemplate(templateNode, origin)...)
+	for _, template := range values.templates {
+		segments = append(segments, segmentsOfTemplate(template)...)
+	}
+	return segments
 }
 
-// classTemplateNodeIn finds the template literal on a class surface, whatever its boundaries look
-// like.
+// ClassTemplateSegmentsIn returns every template with holes a node carries, each as its static runs.
 //
-// Same surface dispatch as the other readers, so a rule built on segments covers the same three
-// places a rule built on literals does.
-func (r *ClassLiteralReader) classTemplateNodeIn(node *ast.Node) (*ast.Node, ClassLiteralOrigin) {
-	switch node.Kind {
-	case ast.KindJsxAttribute:
-		attribute := node.AsJsxAttribute()
-		if attribute == nil {
-			return nil, ClassLiteralOriginAttribute
+// Grouped per template rather than flattened, because a rule that orders classes orders each run on
+// its own and has to know which runs touch which holes, and that is the template's structure. Every
+// template in a value position is returned, including one inside a conditional or inside another
+// template's hole, which is where Prettier's Tailwind plugin finds them too.
+func (r *ClassLiteralReader) ClassTemplateSegmentsIn(node *ast.Node) [][]ClassSegment {
+	templates := [][]ClassSegment{}
+	for _, template := range r.classValuesIn(node).templates {
+		if segments := segmentsOfTemplate(template); len(segments) > 0 {
+			templates = append(templates, segments)
 		}
-		name := attribute.Name()
-		if name == nil || !r.attributeNames[name.Text()] {
-			return nil, ClassLiteralOriginAttribute
-		}
-		return templateExpressionOf(attribute.Initializer), ClassLiteralOriginAttribute
-
-	case ast.KindCallExpression:
-		call := node.AsCallExpression()
-		if call == nil || call.Expression == nil || call.Arguments == nil {
-			return nil, ClassLiteralOriginCallee
-		}
-		if call.Expression.Kind != ast.KindIdentifier || !r.calleeNames[call.Expression.Text()] {
-			return nil, ClassLiteralOriginCallee
-		}
-		for _, argument := range call.Arguments.Nodes {
-			if template := templateExpressionOf(argument); template != nil {
-				return template, ClassLiteralOriginCallee
-			}
-		}
-		return nil, ClassLiteralOriginCallee
-
-	case ast.KindVariableDeclaration:
-		declaration := node.AsVariableDeclaration()
-		if declaration == nil || declaration.Initializer == nil {
-			return nil, ClassLiteralOriginVariable
-		}
-		name := declaration.Name()
-		if name == nil || name.Kind != ast.KindIdentifier {
-			return nil, ClassLiteralOriginVariable
-		}
-		for _, pattern := range r.variablePatterns {
-			if pattern.MatchString(name.Text()) {
-				return templateExpressionOf(declaration.Initializer), ClassLiteralOriginVariable
-			}
-		}
-		return nil, ClassLiteralOriginVariable
 	}
-
-	return nil, ClassLiteralOriginAttribute
+	return templates
 }
 
 // segmentsOfTemplate walks a template's head and spans, recording each static run.
@@ -124,8 +91,10 @@ func (r *ClassLiteralReader) classTemplateNodeIn(node *ast.Node) (*ast.Node, Cla
 // The head has a hole on its right and nothing on its left. Every span has a hole on its left, and
 // one on its right unless it is the last. That asymmetry is exactly what LeadingHole and
 // TrailingHole record, so a rule can trim the outer edges of a template while leaving the single
-// space next to a hole intact.
-func segmentsOfTemplate(node *ast.Node, origin ClassLiteralOrigin) []ClassSegment {
+// space next to a hole intact. A template that is itself inside another template's hole has a hole
+// beyond both of its outer edges too, so neither edge is trimmed.
+func segmentsOfTemplate(value classTemplateValue) []ClassSegment {
+	node, origin := value.node, value.origin
 	if node == nil {
 		return nil
 	}
@@ -135,7 +104,15 @@ func segmentsOfTemplate(node *ast.Node, origin ClassLiteralOrigin) []ClassSegmen
 	}
 
 	var segments []ClassSegment
+	sourceFile := ast.GetSourceFileOfNode(node)
 
+	// Token ranges, not Loc. Loc starts before the whitespace in front of a token, which for a
+	// template on a surface's own brace is nothing, so trimming one backtick off it was right for
+	// every template the reader used to return. A template after `? ` or a span after `${ x }` has
+	// trivia there, and the trim then lands on the delimiter: the range no longer matches the text,
+	// the run reads as untokenizable, and every rule that edits runs skips it. The same defect
+	// c079219 fixed for string literals, found here when templates in conditionals were first read.
+	//
 	// The head's own range spans "`flex  ${", delimiters included, so it is trimmed by one leading
 	// backtick and two trailing characters. A fix written against the untrimmed range would rewrite
 	// the backtick and the interpolation opener out of the source, producing a file that no longer
@@ -143,8 +120,8 @@ func segmentsOfTemplate(node *ast.Node, origin ClassLiteralOrigin) []ClassSegmen
 	// [26,35) and covers exactly "`flex  ${".
 	segments = append(segments, ClassSegment{
 		Text:         template.Head.Text(),
-		Range:        trimDelimiters(template.Head.Loc, 1, 2),
-		LeadingHole:  false,
+		Range:        trimDelimiters(rule.TokenRange(sourceFile, template.Head), 1, 2),
+		LeadingHole:  value.insideTemplateHole,
 		TrailingHole: true,
 		Origin:       origin,
 	})
@@ -165,9 +142,9 @@ func segmentsOfTemplate(node *ast.Node, origin ClassLiteralOrigin) []ClassSegmen
 
 		segments = append(segments, ClassSegment{
 			Text:         span.Literal.Text(),
-			Range:        trimDelimiters(span.Literal.Loc, 1, trailing),
+			Range:        trimDelimiters(rule.TokenRange(sourceFile, span.Literal), 1, trailing),
 			LeadingHole:  true,
-			TrailingHole: index < len(spans)-1,
+			TrailingHole: index < len(spans)-1 || value.insideTemplateHole,
 			Origin:       origin,
 		})
 	}
