@@ -639,10 +639,12 @@ func versionLineFrom(output string) string {
 			compilerFallback = trimmed
 			continue
 		}
-		// A local build says so, in a `note:` line stating that its rules are whatever was on disk
-		// when it compiled. That qualification has to travel with the commit, because the commit
-		// alone reads as provenance: it is a real sha, it resolves, and it says nothing about the
-		// uncommitted rules that may have been linked in beside it.
+		// A local build says so in a `note:` line, and the note is what qualifies the commit. A
+		// dirty-tree build's note says its rules are whatever was on disk when it compiled; a clean
+		// committed build's note says its commit reproduces it. Either way it has to travel with the
+		// commit, because the commit alone reads as provenance: it is a real sha, it resolves, and it
+		// says nothing about whether uncommitted rules were linked in beside it. The match is on the
+		// `note:` prefix rather than the wording, so a reworded note is still carried.
 		//
 		// Three people quoted a rule count from a dev build in one night, each correct about the
 		// binary and wrong about what they said it measured, with this note one command away from
