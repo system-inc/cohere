@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -489,7 +490,34 @@ func writeLintReport(out io.Writer, report lintReport) {
 	fmt.Fprintln(out, summary.coverageFilesLine(report.Details))
 	writeParityCoverage(out, report.Rules, report.LintConfig)
 	writeOrphanedConfigKeys(out, report.Rules, report.LintConfig)
+	writeDepartures(out, report.LintConfig)
 	writeCoverageNotes(out, summary, report.Details)
+}
+
+// writeDepartures names every rule a config sets differently from a file it extends, with the reason it
+// gave, on every run and by default.
+//
+// A departure is a project choosing to differ from a house ruling (#rkm5a31). Loading already refuses
+// one with no reason; printing it is what stops a reasoned one becoming a quiet allowance, because a
+// reader of any run can see each place the project and the house disagree and judge whether the reason
+// still holds.
+func writeDepartures(out io.Writer, lintConfig *configuration.Config) {
+	if lintConfig == nil || len(lintConfig.Departures) == 0 {
+		return
+	}
+	names := make([]string, 0, len(lintConfig.Departures))
+	for name := range lintConfig.Departures {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		departure := lintConfig.Departures[name]
+		file := departure.File
+		if relative, err := filepath.Rel(lintConfig.Root, departure.File); err == nil {
+			file = relative
+		}
+		fmt.Fprintf(out, "  departure: %s is set differently from the house ruling in %s: %s\n", name, file, departure.Reason)
+	}
 }
 
 // writeCoverageNotes is the part of the coverage block after the two counted lines: crashed files in

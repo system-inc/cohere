@@ -366,3 +366,30 @@ func TestACleanRunPrintsTwoCoverageLines(t *testing.T) {
 		t.Errorf("a clean run printed:\n%s\nwant:\n%s", output, want)
 	}
 }
+
+// A departure from a house ruling prints on every run, with the file and the reason, so a reasoned one
+// can never become a quiet allowance (#rkm5a31). The control is a config with none, which prints no
+// departure line at all.
+func TestADepartureFromAHouseRulingPrintsByDefault(t *testing.T) {
+	root := "/repository"
+	withDeparture := &configuration.Config{
+		Rules: map[string]configuration.RuleSetting{"guard-for-in": {Severity: configuration.SeverityError}},
+		Root:  root,
+		Departures: map[string]configuration.Departure{
+			"guard-for-in": {File: root + "/CohereSettings.json", Reason: "no for-in replacement here yet"},
+		},
+	}
+	output := renderLintReport(lintReport{LintConfig: withDeparture})
+	want := "  departure: guard-for-in is set differently from the house ruling in CohereSettings.json: no for-in replacement here yet"
+	if !strings.Contains(output, want+"\n") {
+		t.Errorf("the departure did not print as\n%s\nin:\n%s", want, output)
+	}
+
+	without := &configuration.Config{
+		Rules: map[string]configuration.RuleSetting{"guard-for-in": {Severity: configuration.SeverityError}},
+		Root:  root,
+	}
+	if output := renderLintReport(lintReport{LintConfig: without}); strings.Contains(output, "departure:") {
+		t.Errorf("a config with no departures printed one:\n%s", output)
+	}
+}

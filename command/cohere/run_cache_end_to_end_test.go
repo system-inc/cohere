@@ -182,6 +182,21 @@ func TestRunCacheEndToEnd(t *testing.T) {
 				write("CohereSettings.json", `{"rules":{"no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
 			},
 			func() { write("CohereSettings.json", `{"rules":{"no-debugger":"error","no-var":"error"}}`) }},
+		// Only the base is edited, and it is untracked, so git reports the same changed files before and
+		// after and the scope fact cannot see it. The run cache's declared inputs and the findings
+		// cache's key must each name every file in the extends chain, or both replay the old verdict.
+		{"a base the lint config extends changed", false,
+			func() {
+				write("lint/base.json", `{"rules":{"no-debugger":"error","no-var":"error"}}`)
+				write("CohereSettings.json", `{"extends":"./lint/base.json","rules":{}}`)
+			},
+			func() {
+				write("lint/base.json", `{"rules":{"no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
+			},
+			func() {
+				write("CohereSettings.json", `{"rules":{"no-debugger":"error","no-var":"error"}}`)
+				remove("lint")
+			}},
 		{"the tsconfig changed", false, nil,
 			func() {
 				write("tsconfig.json", `{"compilerOptions":{"strict":false,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)

@@ -235,3 +235,35 @@ func TestAChangedLintConfigWidensTheScope(t *testing.T) {
 		t.Error("a scope holding no config reported one")
 	}
 }
+
+// A lint config reaches its base through `extends` (#rkm5a31), so a base edited alone changes what every
+// file means exactly as the project's own file does. The project's file is not in the scope here, only
+// the base, which is the case a guard reading the project's file alone would miss.
+func TestAChangedLintConfigBaseWidensTheScope(t *testing.T) {
+	directory := t.TempDir()
+	basePath := filepath.Join(directory, "libraries", "nexus", "CohereSettings.json")
+	if err := os.MkdirAll(filepath.Dir(basePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(basePath, []byte(`{"rules": {"no-var": "error"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	projectPath := filepath.Join(directory, "CohereSettings.json")
+	if err := os.WriteFile(projectPath, []byte(`{"extends": "./libraries/nexus/CohereSettings.json"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	graph := &program.Graph{ConfigFileName: filepath.Join(directory, "tsconfig.json")}
+
+	baseOnly := formatScope{FileNames: []string{basePath}, index: map[string]struct{}{basePath: {}}}
+	if changedConfiguration(baseOnly, graph, "CohereSettings.json") != basePath {
+		t.Error("a changed base of the lint config was not recognised, so a scoped run would miss what it turned on or off")
+	}
+
+	// The control: without the extends line the same base is an unrelated file, and must not widen.
+	if err := os.WriteFile(projectPath, []byte(`{"rules": {"no-var": "error"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if changedConfiguration(baseOnly, graph, "CohereSettings.json") != "" {
+		t.Error("a file the lint config does not extend widened the scope")
+	}
+}

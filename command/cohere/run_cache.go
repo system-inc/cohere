@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -437,7 +438,7 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 }
 
 // findingsCacheKey covers everything a cacheable rule's answer depends on beyond a file's own bytes:
-// the binary, the project root, the lint config's bytes, every file in the tsconfig's extends chain,
+// the binary, the project root, the bytes of every file in the lint config's and the tsconfig's extends chains,
 // and the rule set in order. Any change to one makes every entry a miss at once.
 //
 // The tsconfig chain is in it because it decides how a file parses, and a cacheable rule walks the
@@ -453,8 +454,16 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) ([sha256.S
 		facts = append(facts, fmt.Sprintf("%s %s=%x", label, path, sum))
 		return nil
 	}
-	if err := fileFact("lint-config", location.LintConfigFileName); err != nil {
+	// Every file in the lint config's extends chain, as the tsconfig's chain is below: a base edited
+	// alone changes which rules run and with what options.
+	lintConfigFiles, err := configuration.SourcesOf(location.LintConfigFileName)
+	if err != nil {
 		return [sha256.Size]byte{}, err
+	}
+	for _, lintConfigFile := range lintConfigFiles {
+		if err := fileFact("lint-config", lintConfigFile); err != nil {
+			return [sha256.Size]byte{}, err
+		}
 	}
 	if err := fileFact("tsconfig", location.ConfigFileName); err != nil {
 		return [sha256.Size]byte{}, err

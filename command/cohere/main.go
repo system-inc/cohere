@@ -383,8 +383,8 @@ func run() error {
 	buildDuration := time.Since(buildStart)
 
 	// The build saw every file the compiler read. The lint config is read by the command, not the
-	// compiler, so it is named here.
-	declareRunCacheInputs(location.LintConfigFileName, location.ConfigFileName)
+	// compiler, so it is named here, with every file it extends: a base edited alone changes what runs.
+	declareRunCacheInputs(append(lintConfigSources(location.LintConfigFileName), location.ConfigFileName)...)
 
 	projectFiles := graph.ProjectFiles()
 	wholeProgramCount := len(projectFiles)
@@ -1203,7 +1203,7 @@ func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFil
 		currentDirectory = filepath.Dir(graph.ConfigFileName)
 	}
 
-	candidates := []string{resolveLintConfigPath(lintConfigFileName, currentDirectory), graph.ConfigFileName}
+	candidates := append(lintConfigSources(resolveLintConfigPath(lintConfigFileName, currentDirectory)), graph.ConfigFileName)
 	if graph.Config != nil {
 		candidates = append(candidates, graph.Config.ExtendedSourceFiles()...)
 	}
@@ -1217,6 +1217,20 @@ func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFil
 		}
 	}
 	return ""
+}
+
+// lintConfigSources is the lint config and every file it extends, or the config alone when the chain
+// cannot be read.
+//
+// The fallback is not a way past a broken chain: configureLint loads the same chain and fails the run,
+// so a run with an unreadable base is never recorded or replayed. It only keeps the callers here,
+// which name inputs, from naming none.
+func lintConfigSources(path string) []string {
+	sources, err := configuration.SourcesOf(path)
+	if err != nil || len(sources) == 0 {
+		return []string{path}
+	}
+	return sources
 }
 
 // resolveLintConfigPath finds the lint config relative to the directory paths resolve against.

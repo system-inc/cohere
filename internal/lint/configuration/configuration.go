@@ -1,8 +1,10 @@
 package configuration
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -92,8 +94,27 @@ type Config struct {
 	// rules block naming them. See PluginDefaultRules.
 	Plugins []string
 
-	// Root is the directory glob patterns resolve against.
+	// Root is the directory glob patterns resolve against: the directory of the file cohere was
+	// pointed at, whichever file in its `extends` chain a pattern was written in.
 	Root string
+
+	// Sources is every file the configuration was read from, the one cohere was pointed at first and
+	// then each file it extends, in order. Anything keyed on the configuration's bytes (the findings
+	// cache, the run cache, the scoped-run widening guard) must read all of them: a base edited alone
+	// changes what runs exactly as an edit to the project's own file does.
+	Sources []string
+
+	// Departures are the rules a file in the chain sets differently from a file it extends, each with
+	// the reason that file gave, keyed by rule name. Coverage reports them, so a departure is always
+	// visible and never becomes a quiet allowance.
+	Departures map[string]Departure
+}
+
+// Departure is one rule a configuration sets differently from the file it extends, and why.
+type Departure struct {
+	// File is the configuration that departs, and Reason is the sentence it gave under `departures`.
+	File   string
+	Reason string
 }
 
 // RuleKeys returns every rule name the config mentions, in the base block or any override, at any
@@ -213,70 +234,263 @@ func RulesFromPlugins(plugins []string, named map[string]RuleSetting) map[string
 	return contributed
 }
 
-// Load reads a configuration file from disk.
+// Load reads a configuration file from disk, following its `extends` chain.
 //
 // A configuration that cannot be read is an error rather than an empty configuration. An empty config lints
 // everything with nothing configured, which is indistinguishable from a clean run and is precisely
 // the failure this project keeps finding: three configurations in the gate cohere replaces ran
-// successfully having loaded zero plugins.
+// successfully having loaded zero plugins. The same holds for every file the chain names: a base
+// that is missing, unreadable, or part of a cycle refuses the whole load.
+//
+// # How a chain merges
+//
+// House rulings live once, in a base each project extends (nexus, then structure or Base, then the
+// project), so a ruling is made in one place and cannot drift between copies (#rkm5a31). Layers apply
+// from the outermost base to the file cohere was pointed at:
+//
+//   - A rule entry replaces the inherited one. A bare severity keeps the inherited options, which is
+//     what ESLint does, so an author reading `"rule": "off"` or `"rule": "error"` gets the reading they
+//     already know.
+//   - `plugins` are a union, and plugin defaults are computed once, over the merged rules.
+//   - `ignorePatterns` and `overrides` concatenate, the base's first, so a later block still wins.
+//     Every pattern resolves against Root: a house pattern is a shape like `**/*.test.ts`, not a path.
+//   - A base may not carry `settings` or `format`, because their readers do not follow the chain and
+//     a value there would be ignored silently.
+//   - A rule set differently from the file it extends must be named under `departures` with a reason,
+//     and a `departures` entry that departs from nothing is refused, so the list cannot rot.
 func Load(path string) (*Config, error) {
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("reading lint config %s: %w", path, err)
-	}
-
-	if err := checkTopLevelKeys(contents, path); err != nil {
-		return nil, err
-	}
-
-	var raw rawConfig
-	if err := json.Unmarshal(contents, &raw); err != nil {
-		return nil, fmt.Errorf("parsing lint config %s: %w", path, err)
-	}
-
 	root, err := filepath.Abs(filepath.Dir(path))
 	if err != nil {
 		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, err)
 	}
 
+	layers, err := readConfigLayers(path, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	loaded := &Config{
-		Rules:          map[string]RuleSetting{},
-		IgnorePatterns: raw.IgnorePatterns,
-		Plugins:        raw.Plugins,
-		Root:           root,
+		Rules:      map[string]RuleSetting{},
+		Root:       root,
+		Departures: map[string]Departure{},
 	}
+	declaredPlugins := map[string]bool{}
 
-	for name, value := range raw.Rules {
-		setting, err := parseRuleSetting(value)
-		if err != nil {
-			return nil, fmt.Errorf("rule %q in %s: %w", name, path, err)
+	for index, layer := range layers {
+		isBase := index < len(layers)-1
+		if isBase {
+			for _, key := range []string{"settings", "format"} {
+				if layer.present[key] {
+					return nil, fmt.Errorf("lint config %s declares %q, and it is extended by %s: "+
+						"the reader of %q does not follow `extends`, so the value would be ignored "+
+						"silently. Keep %q in the project's own file",
+						layer.path, key, layers[len(layers)-1].path, key, key)
+				}
+			}
 		}
-		loaded.Rules[name] = setting
-	}
 
-	// Applied after the rules block, and reading it: an explicit line is a decision and a default is
-	// not, so `RulesFromPlugins` skips any rule already named. Seeding before would let a default
-	// overwrite a deliberate `off`.
-	for name, setting := range RulesFromPlugins(raw.Plugins, loaded.Rules) {
-		loaded.Rules[name] = setting
-	}
-
-	for index, rawOverride := range raw.Overrides {
-		override := Override{Files: rawOverride.Files, Rules: map[string]RuleSetting{}}
-		for name, value := range rawOverride.Rules {
+		// What the layers below wrote, frozen before this one writes anything. Comparing against the
+		// live map would let two spellings in this same file read as one inheriting from the other, in
+		// whichever order Go's map iteration happened to yield them.
+		fromBases := maps.Clone(loaded.Rules)
+		departed := map[string]bool{}
+		for name, value := range layer.raw.Rules {
 			setting, err := parseRuleSetting(value)
 			if err != nil {
-				return nil, fmt.Errorf("override %d, rule %q in %s: %w", index, name, path, err)
+				return nil, fmt.Errorf("rule %q in %s: %w", name, layer.path, err)
 			}
-			override.Rules[name] = setting
+
+			inheritedName, inherited, isInherited := inheritedRuleSetting(fromBases, name)
+			if isInherited {
+				if setting.Options == nil {
+					setting.Options = inherited.Options
+				}
+				if !sameRuleSetting(setting, inherited) {
+					departed[name] = true
+					reason := strings.TrimSpace(layer.raw.Departures[name])
+					if reason == "" {
+						return nil, fmt.Errorf("lint config %s sets %q differently from the file it extends "+
+							"and gives no reason: name it under \"departures\" with why this project "+
+							"differs, or remove the line so the house ruling applies",
+							layer.path, name)
+					}
+					loaded.Departures[name] = Departure{File: layer.path, Reason: reason}
+				}
+				// One key per ruling, so the resolver never holds two spellings of one rule and calls
+				// it ambiguous.
+				delete(loaded.Rules, inheritedName)
+			}
+			loaded.Rules[name] = setting
 		}
-		loaded.Overrides = append(loaded.Overrides, override)
+
+		for name := range layer.raw.Departures {
+			if !departed[name] {
+				return nil, fmt.Errorf("lint config %s names %q under \"departures\", but it sets that "+
+					"rule the same as the file it extends, or not at all: remove the entry", layer.path, name)
+			}
+		}
+
+		loaded.IgnorePatterns = append(loaded.IgnorePatterns, layer.raw.IgnorePatterns...)
+		for _, plugin := range layer.raw.Plugins {
+			if !declaredPlugins[plugin] {
+				declaredPlugins[plugin] = true
+				loaded.Plugins = append(loaded.Plugins, plugin)
+			}
+		}
+
+		for overrideIndex, rawOverride := range layer.raw.Overrides {
+			override := Override{Files: rawOverride.Files, Rules: map[string]RuleSetting{}}
+			for name, value := range rawOverride.Rules {
+				setting, err := parseRuleSetting(value)
+				if err != nil {
+					return nil, fmt.Errorf("override %d, rule %q in %s: %w", overrideIndex, name, layer.path, err)
+				}
+				override.Rules[name] = setting
+			}
+			loaded.Overrides = append(loaded.Overrides, override)
+		}
 	}
 
+	// Applied after every layer's rules, and reading them: an explicit line is a decision and a
+	// default is not, so `RulesFromPlugins` skips any rule already named. Seeding before would let a
+	// default overwrite a deliberate `off`.
+	for name, setting := range RulesFromPlugins(loaded.Plugins, loaded.Rules) {
+		loaded.Rules[name] = setting
+	}
+
+	for index := len(layers) - 1; index >= 0; index-- {
+		loaded.Sources = append(loaded.Sources, layers[index].path)
+	}
 	return loaded, nil
 }
 
+// SourcesOf returns every file the configuration at path reads, itself first and then each file it
+// extends, in order: what Config.Sources holds, for a caller that keys on the configuration's bytes
+// before or without building a Config.
+//
+// The run cache, the findings cache and the scoped-run widening guard each keyed on the project's
+// own file alone. With `extends`, an edit to a base changes what runs exactly as an edit to the
+// project's file does, and a key blind to the base replays the old verdict.
+func SourcesOf(path string) ([]string, error) {
+	layers, err := readConfigLayers(path, nil)
+	if err != nil {
+		return nil, err
+	}
+	sources := make([]string, 0, len(layers))
+	for index := len(layers) - 1; index >= 0; index-- {
+		sources = append(sources, layers[index].path)
+	}
+	return sources, nil
+}
+
+// configLayer is one file in an `extends` chain: what it says, and which top-level keys it wrote.
+type configLayer struct {
+	path    string
+	raw     rawConfig
+	present map[string]bool
+}
+
+// readConfigLayers reads path and everything it extends, outermost base first.
+//
+// chain is the files already being read, so a file that extends itself, directly or through others,
+// is refused by naming the loop rather than overflowing the stack.
+func readConfigLayers(path string, chain []string) ([]configLayer, error) {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolving lint config %s: %w", path, err)
+	}
+	for _, seen := range chain {
+		if seen == absolute {
+			return nil, fmt.Errorf("lint config %s extends itself: %s",
+				absolute, strings.Join(append(append([]string(nil), chain...), absolute), " -> "))
+		}
+	}
+
+	contents, err := os.ReadFile(absolute)
+	if err != nil {
+		return nil, fmt.Errorf("reading lint config %s: %w", absolute, err)
+	}
+	if err := checkTopLevelKeys(contents, absolute); err != nil {
+		return nil, err
+	}
+
+	var raw rawConfig
+	if err := json.Unmarshal(contents, &raw); err != nil {
+		return nil, fmt.Errorf("parsing lint config %s: %w", absolute, err)
+	}
+	var keyed map[string]json.RawMessage
+	if err := json.Unmarshal(contents, &keyed); err != nil {
+		return nil, fmt.Errorf("parsing lint config %s: %w", absolute, err)
+	}
+	present := make(map[string]bool, len(keyed))
+	for key := range keyed {
+		present[key] = true
+	}
+
+	layer := configLayer{path: absolute, raw: raw, present: present}
+	if raw.Extends == "" {
+		return []configLayer{layer}, nil
+	}
+
+	base := raw.Extends
+	if !filepath.IsAbs(base) {
+		base = filepath.Join(filepath.Dir(absolute), base)
+	}
+	layers, err := readConfigLayers(base, append(chain, absolute))
+	if err != nil {
+		return nil, fmt.Errorf("lint config %s extends %s: %w", absolute, raw.Extends, err)
+	}
+	return append(layers, layer), nil
+}
+
+// inheritedRuleSetting finds the entry an earlier layer wrote for the rule name, under its own
+// spelling or under one that reaches the same rule (`nexus/x` and `x`), so a project cannot step
+// around a house ruling by spelling the key differently.
+func inheritedRuleSetting(rules map[string]RuleSetting, name string) (string, RuleSetting, bool) {
+	if setting, found := rules[name]; found {
+		return name, setting, true
+	}
+	matches := make([]string, 0, 1)
+	for inheritedName := range rules {
+		if KeyReachesRule(inheritedName, name) || KeyReachesRule(name, inheritedName) {
+			matches = append(matches, inheritedName)
+		}
+	}
+	if len(matches) == 0 {
+		return "", RuleSetting{}, false
+	}
+	// Sorted so two spellings in one base resolve the same way on every run.
+	sort.Strings(matches)
+	return matches[0], rules[matches[0]], true
+}
+
+// sameRuleSetting reports whether two settings run the rule identically: one severity, and options
+// equal element by element after compaction, so whitespace in the JSON is not a departure.
+func sameRuleSetting(left RuleSetting, right RuleSetting) bool {
+	if left.Severity != right.Severity || len(left.Options) != len(right.Options) {
+		return false
+	}
+	for index := range left.Options {
+		if compactJson(left.Options[index]) != compactJson(right.Options[index]) {
+			return false
+		}
+	}
+	return true
+}
+
+// compactJson renders a raw element without insignificant whitespace, or as written if it does not
+// parse, which parseRuleSetting has already ruled out.
+func compactJson(raw json.RawMessage) string {
+	var buffer bytes.Buffer
+	if err := json.Compact(&buffer, raw); err != nil {
+		return string(raw)
+	}
+	return buffer.String()
+}
+
 type rawConfig struct {
+	Extends        string                     `json:"extends"`
+	Departures     map[string]string          `json:"departures"`
 	Plugins        []string                   `json:"plugins"`
 	Rules          map[string]json.RawMessage `json:"rules"`
 	IgnorePatterns []string                   `json:"ignorePatterns"`
@@ -285,6 +499,8 @@ type rawConfig struct {
 
 // parsedTopLevelKeys are the keys `rawConfig` decodes and the loader acts on.
 var parsedTopLevelKeys = map[string]bool{
+	"extends":        true,
+	"departures":     true,
 	"plugins":        true,
 	"rules":          true,
 	"ignorePatterns": true,
