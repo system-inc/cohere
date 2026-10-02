@@ -188,7 +188,7 @@ func run() error {
 			}
 			lintConfigPath = absoluteFrom(absoluteFrom(workingDirectory, *directory), *lintConfigFileName)
 		}
-		lintConfig, err := configuration.Load(lintConfigPath)
+		lintConfig, err := configuration.LoadFor(lintConfigPath, registeredRuleNames())
 		if err != nil {
 			return fmt.Errorf("reading %s: %w", lintConfigPath, err)
 		}
@@ -985,7 +985,7 @@ func configureLint(graph *program.Graph, location projectLocation) (*configurati
 	// A config that cannot be read is a hard failure and never a permissive default. Linting
 	// everything with nothing configured produces output indistinguishable from a clean run, and
 	// that exact confusion is what this tool exists to make impossible.
-	lintConfig, err := configuration.Load(location.LintConfigFileName)
+	lintConfig, err := configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
 	if err != nil {
 		return nil, fmt.Errorf("loading the lint config: %w", err)
 	}
@@ -1213,6 +1213,17 @@ func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFil
 		}
 	}
 	return ""
+}
+
+// registeredRuleNames is every rule this binary runs, by name, which the config loader needs to tell a
+// key spelled differently from the one it inherits apart from a twin rule's key.
+func registeredRuleNames() []string {
+	all := registry.All()
+	names := make([]string, 0, len(all))
+	for _, registered := range all {
+		names = append(names, registered.Name)
+	}
+	return names
 }
 
 // lintConfigSources is the lint config and every file it extends, or the config alone when the chain

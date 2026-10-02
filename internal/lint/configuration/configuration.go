@@ -259,7 +259,16 @@ func RulesFromPlugins(plugins []string, named map[string]RuleSetting) map[string
 //     a value there would be ignored silently.
 //   - A rule set differently from the file it extends must be named under `departures` with a reason,
 //     and a `departures` entry that departs from nothing is refused, so the list cannot rot.
+//
+// Load matches inherited rulings by exact key. LoadFor, which the command uses, also knows which rules
+// are registered, and that is what lets it tell a respelling from a twin; see sameRuling.
 func Load(path string) (*Config, error) {
+	return LoadFor(path, nil)
+}
+
+// LoadFor is Load knowing the registered rule names, so a key spelled differently from the one it
+// inherits is matched to it by the rules the two actually reach rather than by the shape of the names.
+func LoadFor(path string, registeredNames []string) (*Config, error) {
 	root, err := filepath.Abs(filepath.Dir(path))
 	if err != nil {
 		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, err)
@@ -301,7 +310,7 @@ func Load(path string) (*Config, error) {
 				return nil, fmt.Errorf("rule %q in %s: %w", name, layer.path, err)
 			}
 
-			inheritedName, inherited, isInherited := inheritedRuleSetting(fromBases, name)
+			inheritedName, inherited, isInherited, replacesInherited := inheritedRuleSetting(fromBases, name, registeredNames)
 			if isInherited {
 				if setting.Options == nil {
 					setting.Options = inherited.Options
@@ -317,9 +326,12 @@ func Load(path string) (*Config, error) {
 					}
 					loaded.Departures[name] = Departure{File: layer.path, Reason: reason}
 				}
-				// One key per ruling, so the resolver never holds two spellings of one rule and calls
-				// it ambiguous.
-				delete(loaded.Rules, inheritedName)
+				// The inherited key goes only when the new one reaches every rule it did: a respelling.
+				// A twin keeps its own key, or the rule only the inherited key reached would be left
+				// unconfigured and silently stop running.
+				if replacesInherited {
+					delete(loaded.Rules, inheritedName)
+				}
 			}
 			loaded.Rules[name] = setting
 		}
@@ -351,7 +363,7 @@ func Load(path string) (*Config, error) {
 				if !coversEverything {
 					continue
 				}
-				_, inherited, isInherited := inheritedRuleSetting(fromBases, name)
+				_, inherited, isInherited, _ := inheritedRuleSetting(fromBases, name, registeredNames)
 				if !isInherited {
 					continue
 				}
@@ -475,25 +487,68 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 	return append(layers, layer), nil
 }
 
-// inheritedRuleSetting finds the entry an earlier layer wrote for the rule name, under its own
-// spelling or under one that reaches the same rule (`nexus/x` and `x`), so a project cannot step
-// around a house ruling by spelling the key differently.
-func inheritedRuleSetting(rules map[string]RuleSetting, name string) (string, RuleSetting, bool) {
+// inheritedRuleSetting finds the entry an earlier layer wrote for the same ruling as name, and says
+// whether name replaces that entry outright.
+//
+// The same key is always the same ruling. A different spelling is the same ruling when the two keys
+// reach a registered rule in common (see sameRuling), so a project cannot step around a house ruling
+// by spelling the key differently. Without registered names only the same key matches.
+func inheritedRuleSetting(rules map[string]RuleSetting, name string, registeredNames []string) (string, RuleSetting, bool, bool) {
 	if setting, found := rules[name]; found {
-		return name, setting, true
+		return name, setting, true, true
 	}
 	matches := make([]string, 0, 1)
 	for inheritedName := range rules {
-		if KeyReachesRule(inheritedName, name) || KeyReachesRule(name, inheritedName) {
+		if sameRuling(inheritedName, name, registeredNames) {
 			matches = append(matches, inheritedName)
 		}
 	}
 	if len(matches) == 0 {
-		return "", RuleSetting{}, false
+		return "", RuleSetting{}, false, false
 	}
 	// Sorted so two spellings in one base resolve the same way on every run.
 	sort.Strings(matches)
-	return matches[0], rules[matches[0]], true
+	inheritedName := matches[0]
+	return inheritedName, rules[inheritedName], true, reachesEvery(name, inheritedName, registeredNames)
+}
+
+// rulesReached is the registered rules a config key configures, by the resolver's own test.
+func rulesReached(key string, registeredNames []string) map[string]bool {
+	reached := map[string]bool{}
+	for _, registered := range registeredNames {
+		if KeyReachesRule(key, registered) {
+			reached[registered] = true
+		}
+	}
+	return reached
+}
+
+// sameRuling reports whether two differently spelled keys configure a registered rule in common.
+//
+// Decided by the registry rather than by the names. `nexus/x` and `x` look like one ruling and are,
+// when only `x` is registered. `@typescript-eslint/no-invalid-this` and `no-invalid-this` look the same
+// way and are two rules, a core rule and its typescript-eslint twin; they still share a ruling, because
+// the resolver lets the qualified key configure the core rule when no key names it exactly (#hprjh4s).
+func sameRuling(left string, right string, registeredNames []string) bool {
+	leftReached := rulesReached(left, registeredNames)
+	for registered := range rulesReached(right, registeredNames) {
+		if leftReached[registered] {
+			return true
+		}
+	}
+	return false
+}
+
+// reachesEvery reports whether key reaches every registered rule inherited reaches, so that inherited
+// can be removed without leaving any rule it configured unconfigured.
+func reachesEvery(key string, inherited string, registeredNames []string) bool {
+	reached := rulesReached(key, registeredNames)
+	for registered := range rulesReached(inherited, registeredNames) {
+		if !reached[registered] {
+			return false
+		}
+	}
+	return true
 }
 
 // wholeTreePattern is a glob that names no directory and no file name, only an extension or nothing

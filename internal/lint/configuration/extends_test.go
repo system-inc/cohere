@@ -183,6 +183,8 @@ func TestADepartureFromAnInheritedRulingMustSayWhy(t *testing.T) {
 // A project cannot step around a house ruling by spelling the key differently. Both directions,
 // because the resolver's own matching is one-way and this check must not be.
 func TestADepartureCannotHideBehindAnotherSpelling(t *testing.T) {
+	// Only the bare name is registered, so the two spellings reach one rule: a respelling.
+	registered := []string{"consistency-no-enum"}
 	cases := []struct {
 		name    string
 		base    string
@@ -199,7 +201,10 @@ func TestADepartureCannotHideBehindAnotherSpelling(t *testing.T) {
 				"base.json":           `{"rules": {"` + testCase.base + `": "error"}}`,
 				"CohereSettings.json": `{"extends": "./base.json", "rules": {"` + testCase.project + `": "off"}}`,
 			})
-			refusedWith(t, filepath.Join(undeclared, "CohereSettings.json"), "differently")
+			if _, err := LoadFor(filepath.Join(undeclared, "CohereSettings.json"), registered); err == nil ||
+				!strings.Contains(err.Error(), "differently") {
+				t.Fatalf("a respelled departure with no reason loaded: %v", err)
+			}
 
 			declared := writeConfigs(t, map[string]string{
 				"base.json": `{"rules": {"` + testCase.base + `": "error"}}`,
@@ -207,7 +212,10 @@ func TestADepartureCannotHideBehindAnotherSpelling(t *testing.T) {
 					"departures": {"` + testCase.project + `": "enums are generated here"},
 					"rules": {"` + testCase.project + `": "off"}}`,
 			})
-			loaded := loadOrFail(t, filepath.Join(declared, "CohereSettings.json"))
+			loaded, err := LoadFor(filepath.Join(declared, "CohereSettings.json"), registered)
+			if err != nil {
+				t.Fatal(err)
+			}
 			// One key per ruling, or the resolver holds two spellings and calls the rule ambiguous.
 			if _, kept := loaded.Rules[testCase.dropped]; kept {
 				t.Errorf("the inherited spelling %q is still in the merged rules beside %q", testCase.dropped, testCase.written)
@@ -449,5 +457,53 @@ func TestWholeTreePatternsAreDecidedByShape(t *testing.T) {
 		if got := coversEveryFileOfItsKind(testCase.patterns); got != testCase.want {
 			t.Errorf("coversEveryFileOfItsKind(%v) = %v, want %v", testCase.patterns, got, testCase.want)
 		}
+	}
+}
+
+// A core rule and its typescript-eslint twin are two registered rules, and a project writing one must
+// not unconfigure the other (#hprjh4s). The Nexus tier holds the twin at error; api wrote the core key
+// off. The two still share a ruling, because the resolver lets the qualified key configure the core
+// rule when no key names it exactly, so a reason is required; but the twin keeps its own key.
+func TestATwinRuleKeepsItsOwnKeyWhenAProjectWritesTheOther(t *testing.T) {
+	registered := []string{"no-invalid-this", "@typescript-eslint/no-invalid-this"}
+	directory := writeConfigs(t, map[string]string{
+		"base.json": `{"rules": {"@typescript-eslint/no-invalid-this": "error"}}`,
+		"CohereSettings.json": `{"extends": "./base.json",
+			"departures": {"no-invalid-this": "the core rule is off here"},
+			"rules": {"no-invalid-this": "off"}}`,
+	})
+	loaded, err := LoadFor(filepath.Join(directory, "CohereSettings.json"), registered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved := loaded.Resolve("source/File.ts")
+	if !resolved.Enabled("@typescript-eslint/no-invalid-this") {
+		t.Error("the twin the project never wrote was unconfigured by the merge")
+	}
+	if resolved.Enabled("no-invalid-this") {
+		t.Error("the project's off did not reach the core rule")
+	}
+
+	// The control, so the departure demand is shown to come from the shared ruling: with no reason the
+	// same project is refused.
+	undeclared := writeConfigs(t, map[string]string{
+		"base.json":           `{"rules": {"@typescript-eslint/no-invalid-this": "error"}}`,
+		"CohereSettings.json": `{"extends": "./base.json", "rules": {"no-invalid-this": "off"}}`,
+	})
+	if _, err := LoadFor(filepath.Join(undeclared, "CohereSettings.json"), registered); err == nil {
+		t.Error("the core key changed the ruling the twin's key carried for it, and no reason was demanded")
+	}
+}
+
+// Without registered names only the same key is the same ruling, so two spellings are two entries and
+// neither is removed.
+func TestWithoutTheRegistryOnlyTheSameKeyIsTheSameRuling(t *testing.T) {
+	directory := writeConfigs(t, map[string]string{
+		"base.json":           `{"rules": {"nexus/consistency-no-enum": "error"}}`,
+		"CohereSettings.json": `{"extends": "./base.json", "rules": {"consistency-no-enum": "off"}}`,
+	})
+	loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+	if _, kept := loaded.Rules["nexus/consistency-no-enum"]; !kept {
+		t.Error("a key was removed on the strength of its spelling alone")
 	}
 }
