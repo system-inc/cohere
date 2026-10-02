@@ -151,6 +151,10 @@ type swiftRun struct {
 	out  io.Writer
 	mode swiftMode
 
+	// details is `--coverage`: name every rule once under its coverage fact rather than only counting.
+	// A front-door flag, never forwarded: the engine's records already carry what it names.
+	details bool
+
 	provenance *swiftProvenanceRecord
 	project    *swiftProjectRecord
 	summary    *swiftSummaryRecord
@@ -391,37 +395,89 @@ func (r *swiftRun) acceptLint(record *swiftLintRecord) error {
 	fmt.Fprintf(r.out, "lint: %d findings — %d rules over %d files, %d nodes visited, %s\n",
 		record.Findings, record.RulesRun, record.FilesWalked, record.NodesVisited, walkCost)
 
-	writeWatchedAndQuietNote(r.out, record.RulesWatchedAndQuiet)
-	silent := append([]string(nil), record.RulesSilent...)
-	sort.Strings(silent)
-	for _, name := range silent {
-		// The engine reports one silent set where the TypeScript walk can tell "offered nothing" from
-		// "declined everything". The sentence claims only what the record can back.
-		fmt.Fprintf(r.out, "  note: rule %s listened to no files — nothing gave it a file, or it declined every one, so its silence says nothing about the tree\n", name)
+	// The same coverage block a TypeScript run prints, from the same writer, so one fact reads the same
+	// whichever engine states it: one counted line whose terms add up, crashes in full, and each rule
+	// named once behind --coverage.
+	summary, err := classifySwiftCoverage(record)
+	if err != nil {
+		return err
 	}
-	for _, crash := range record.Crashes {
-		writeCrashedNote(r.out, crash.File, crash.Error)
-	}
+	writeCoverage(r.out, summary, r.details)
 	r.crashes += len(record.Crashes)
 
-	scopedOff := make([]string, 0, len(record.RulesScopedOff))
-	for name := range record.RulesScopedOff {
-		scopedOff = append(scopedOff, name)
-	}
-	sort.Strings(scopedOff)
-	for _, name := range scopedOff {
-		writeScopedOffNote(r.out, name, record.RulesScopedOff[name])
-	}
-	unconfigured := append([]string(nil), record.RulesNotConfigured...)
-	sort.Strings(unconfigured)
-	for _, name := range unconfigured {
-		writeUnconfiguredNote(r.out, name)
-	}
 	if record.ConfigNote != "" {
 		fmt.Fprintf(r.out, "  %s\n", record.ConfigNote)
 	}
 	r.writeExcluded()
 	return nil
+}
+
+// classifySwiftCoverage puts every rule the lint record accounts for into exactly one category.
+//
+// The record names its silent rules and only counts the rest: rulesRun is every rule, of which
+// rulesWatchedAndQuiet listened and reported nothing and rulesSilent listened to no file, so what
+// remains found something. A silent rule is described by why it was silent when the record says (not
+// configured, or off by the config), and otherwise by the one sentence the record can back: the engine
+// reports one silent set where the TypeScript walk can tell "offered nothing" from "declined
+// everything", so it claims neither.
+//
+// A record whose parts add up to more than its whole is refused, for the reason every count stated
+// twice is compared: the counted line would print arithmetic nobody can vouch for.
+func classifySwiftCoverage(record *swiftLintRecord) (coverageSummary, error) {
+	notConfigured := make(map[string]bool, len(record.RulesNotConfigured))
+	for _, name := range record.RulesNotConfigured {
+		notConfigured[name] = true
+	}
+
+	silent := append([]string(nil), record.RulesSilent...)
+	sort.Strings(silent)
+	isSilent := make(map[string]bool, len(silent))
+	summary := coverageSummary{Unnamed: map[coverageCategory]int{}}
+	for _, name := range silent {
+		if isSilent[name] {
+			return coverageSummary{}, fmt.Errorf("the lint record names rule %s as silent twice", name)
+		}
+		isSilent[name] = true
+		entry := ruleCoverageEntry{Name: name}
+		switch {
+		case notConfigured[name]:
+			entry.Category = coverageNotConfigured
+		case record.RulesScopedOff[name] > 0:
+			entry.Category = coverageOffByTheConfig
+			entry.Details = []string{fmt.Sprintf("%d files", record.RulesScopedOff[name])}
+		default:
+			entry.Category = coverageListenedToNothing
+		}
+		summary.Entries = append(summary.Entries, entry)
+	}
+
+	found := record.RulesRun - record.RulesWatchedAndQuiet - len(silent)
+	if record.RulesWatchedAndQuiet < 0 || found < 0 {
+		return coverageSummary{}, fmt.Errorf("the lint record counts %d rules run, and %d watched and quiet plus %d silent is more than that",
+			record.RulesRun, record.RulesWatchedAndQuiet, len(silent))
+	}
+	summary.Unnamed[coverageRanAndFoundNothing] = record.RulesWatchedAndQuiet
+	summary.Unnamed[coverageFoundSomething] = found
+
+	// A rule the record places among the counted ones and also names as off, or unconfigured, for some
+	// files ran on the rest. Its category is the counted one; the partial fact is said once, by name.
+	for name, files := range record.RulesScopedOff {
+		if !isSilent[name] {
+			summary.PartialFacts = append(summary.PartialFacts, fmt.Sprintf("%s is off by the config for %d files and ran on the rest", name, files))
+		}
+	}
+	for name := range notConfigured {
+		if !isSilent[name] {
+			summary.PartialFacts = append(summary.PartialFacts, fmt.Sprintf("%s is not in the config for some files and ran on the rest", name))
+		}
+	}
+	sort.Strings(summary.PartialFacts)
+
+	for _, crash := range record.Crashes {
+		summary.Crashes = append(summary.Crashes, coverageCrash{File: crash.File, Cause: crash.Error})
+	}
+	summary.sortEntries()
+	return summary, nil
 }
 
 // excludedNamedLimit is how many excluded files of one reason are named before they are counted.

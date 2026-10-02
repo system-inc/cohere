@@ -1,118 +1,368 @@
 package main
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// The coverage note distinguishes a rule nobody wired from a rule that is configured and satisfied.
+// renderLintReport writes a lint report to a string, in the default mode unless the report asks for
+// details.
+func renderLintReport(report lintReport) string {
+	var out strings.Builder
+	writeLintReport(&out, report)
+	return out.String()
+}
+
+// countedLineTerms parses the counted line back into its total and its terms, so a test can check the
+// arithmetic the reader is asked to check rather than the struct behind it.
+func countedLineTerms(t *testing.T, output string) (int, map[string]int) {
+	t.Helper()
+	for _, line := range strings.Split(output, "\n") {
+		if !strings.HasPrefix(line, "coverage: ") {
+			continue
+		}
+		head, tail, _ := strings.Cut(strings.TrimPrefix(line, "coverage: "), " = ")
+		total, err := strconv.Atoi(strings.TrimSuffix(head, " rules"))
+		if err != nil {
+			t.Fatalf("the counted line does not start with a rule total: %q", line)
+		}
+		terms := map[string]int{}
+		if tail == "" {
+			return total, terms
+		}
+		for _, term := range strings.Split(tail, " + ") {
+			count, label, _ := strings.Cut(term, " ")
+			value, err := strconv.Atoi(count)
+			if err != nil {
+				t.Fatalf("a term with no count: %q in %q", term, line)
+			}
+			terms[label] = value
+		}
+		return total, terms
+	}
+	t.Fatalf("no counted line in:\n%s", output)
+	return 0, nil
+}
+
+// The counts add up to the rule total, for every shape a rule's coverage can take.
 //
-// Both states produce zero findings and both used to print "listened to no files", so a passing
-// rule read exactly like a dead one. They are opposite defects: one means the tree is clean of what
-// the rule catches, the other means nothing was ever checked.
+// Every combination of the five per-rule numbers is a rule here, plus rules the config asks for that
+// the binary lacks, so a rule whose shape no case of the classifier names would fall out of the sum and
+// fail this rather than vanish from the line silently. The arithmetic is read back off the printed
+// line, because that line is what a reader checks.
+func TestCoverageCountsAddUpToTheRuleTotal(t *testing.T) {
+	rules := []rule.Rule{}
+	coverage := program.Coverage{
+		RulesOffered:      map[string]int{},
+		RulesListening:    map[string]int{},
+		RulesReporting:    map[string]int{},
+		RulesScopedOff:    map[string]int{},
+		RulesUnconfigured: map[string]int{},
+	}
+	for shape := range 32 {
+		name := fmt.Sprintf("rule-%02d", shape)
+		rules = append(rules, rule.Rule{Name: name})
+		for bit, counts := range []map[string]int{
+			coverage.RulesReporting, coverage.RulesListening, coverage.RulesOffered,
+			coverage.RulesScopedOff, coverage.RulesUnconfigured,
+		} {
+			if shape&(1<<bit) != 0 {
+				counts[name] = 7 + bit
+			}
+		}
+	}
+	config := &configuration.Config{Rules: map[string]configuration.RuleSetting{
+		"rule-00":         {Severity: configuration.SeverityError},
+		"unported-one":    {Severity: configuration.SeverityError},
+		"plugin/unported": {Severity: configuration.SeverityWarn},
+		"unported-off":    {Severity: configuration.SeverityOff},
+	}}
+
+	summary := classifyTypeScriptCoverage(rules, coverage, config, answersInRunUndeclared)
+	if summary.total() != len(rules)+2 {
+		t.Fatalf("the summary accounts for %d rules, want %d registered plus 2 not ported", summary.total(), len(rules))
+	}
+	sum := 0
+	for _, entry := range summary.Entries {
+		if _, known := coverageCategoryTerms[entry.Category]; !known {
+			t.Fatalf("rule %s landed in category %q, which the counted line has no term for", entry.Name, entry.Category)
+		}
+	}
+	for _, category := range coverageCategoryOrder {
+		sum += summary.count(category)
+	}
+	if sum != summary.total() {
+		t.Fatalf("the categories sum to %d and the total is %d", sum, summary.total())
+	}
+
+	output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, LintConfig: config, WalkCost: "in 1s"})
+	total, terms := countedLineTerms(t, output)
+	printedSum := 0
+	for _, value := range terms {
+		printedSum += value
+	}
+	if total != len(rules)+2 || printedSum != total {
+		t.Fatalf("the counted line says %d rules and its terms sum to %d, want %d both:\n%s", total, printedSum, len(rules)+2, output)
+	}
+
+	// The Swift record's parts add up to its whole the same way.
+	swift, err := classifySwiftCoverage(&swiftLintRecord{
+		RulesRun: 9, RulesWatchedAndQuiet: 3, RulesSilent: []string{"a", "b", "c"},
+		RulesNotConfigured: []string{"a"}, RulesScopedOff: map[string]int{"b": 2, "quiet-but-partly-off": 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if swift.total() != 9 || swift.count(coverageFoundSomething) != 3 {
+		t.Fatalf("the Swift summary accounts for %d rules with %d found something, want 9 and 3", swift.total(), swift.count(coverageFoundSomething))
+	}
+}
+
+// A Swift record whose parts add up to more than its whole is refused rather than printed, because the
+// counted line would state arithmetic nobody can vouch for.
+func TestSwiftCoverageRefusesPartsLargerThanTheWhole(t *testing.T) {
+	_, err := classifySwiftCoverage(&swiftLintRecord{RulesRun: 2, RulesWatchedAndQuiet: 2, RulesSilent: []string{"a"}})
+	if err == nil || !strings.Contains(err.Error(), "more than that") {
+		t.Fatalf("a record counting 3 rules among 2 was accepted: %v", err)
+	}
+}
+
+// The coverage categories distinguish a rule nobody wired from a rule that was offered files and
+// registered nothing.
 //
-// The pair was separable only because a second line about missing config happened to print for the
-// unwired case, and that line does not always appear. A guard that works by accident of which
-// sentence prints is not a guard, which is why this asserts the note itself rather than the pair.
-func TestCoverageNoteSeparatesUnwiredFromSatisfied(t *testing.T) {
+// Both states produce zero findings and both used to print "listened to no files", so a passing rule
+// read exactly like a dead one. They are opposite defects: one was handed files and declined them, the
+// other was never handed anything. The pair was once separable only because a second line about missing
+// config happened to print for one of them, which is why this asserts the categories themselves.
+func TestCoverageSeparatesUnwiredFromOfferedAndSilent(t *testing.T) {
 	rules := []rule.Rule{{Name: "satisfied-rule"}, {Name: "unwired-rule"}}
 	coverage := program.Coverage{
 		RulesOffered:   map[string]int{"satisfied-rule": 3407},
 		RulesListening: map[string]int{},
 	}
 
-	var out strings.Builder
-	writeRuleCoverage(&out, rules, coverage)
-	rendered := out.String()
+	output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s", Details: true})
+	requireLines(t, output,
+		"coverage: 2 rules = 1 registered no listener + 1 offered no files\n",
+		"  registered no listener (1): offered files and registered no listener on any",
+		"    satisfied-rule (offered 3407 files)\n",
+		"  offered no files (1): nothing wired it",
+		"    unwired-rule\n",
+	)
+}
 
-	// The sentence says "registered no listener" rather than "declined", because five rules here do
-	// all their work in Run and return nil. For those, "it ran and looked, and nothing matched" is
-	// true of the walk and false of the rule, and the two readings send a reader to different places.
-	if !strings.Contains(rendered, "satisfied-rule registered no listener on any of the 3407 files") {
-		t.Fatalf("a satisfied rule did not report the files it was offered:\n%s", rendered)
-	}
-	if !strings.Contains(rendered, "unwired-rule was offered no files") {
-		t.Fatalf("an unwired rule did not report that nothing wired it:\n%s", rendered)
+// A rule that ran is counted on the default line and not named there.
+//
+// Naming every rule that ran and found nothing is the wall this replaced: 370 of them on ahra, which
+// buried the lines a reader must act on. The count is the honest summary, and the names are one flag
+// away.
+func TestARuleThatRanIsCountedAndNotNamedByDefault(t *testing.T) {
+	rules := []rule.Rule{{Name: "quiet-rule"}, {Name: "working-rule"}, {Name: "eager-rule"}, {Name: "unconfigured-rule"}}
+	coverage := program.Coverage{
+		RulesOffered:      map[string]int{"quiet-rule": 3407, "working-rule": 3407, "eager-rule": 3407},
+		RulesListening:    map[string]int{"quiet-rule": 3407, "working-rule": 412},
+		RulesReporting:    map[string]int{"working-rule": 7},
+		RulesUnconfigured: map[string]int{"unconfigured-rule": 3407},
 	}
 
-	// The two must not be describable by one sentence, which is the defect this replaced.
-	for _, line := range strings.Split(strings.TrimSpace(rendered), "\n") {
-		if strings.Contains(line, "satisfied-rule") && strings.Contains(line, "offered no files") {
-			t.Fatalf("a satisfied rule was described as unwired: %q", line)
+	output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"})
+	requireLines(t, output,
+		"coverage: 4 rules = 1 found something + 1 ran and found nothing + 1 registered no listener + 1 nobody has configured\n",
+		"details: cohere --coverage",
+	)
+	forbidLines(t, output, "quiet-rule", "working-rule", "eager-rule", "unconfigured-rule", "coverage details")
+}
+
+// Under --coverage every rule is named exactly once, and no rule appears in two categories.
+//
+// The duplicates this replaced were per-rule: a rule nobody configured printed as "offered no files"
+// and again as "not in the config", and a rule the config turned off printed as "offered no files" and
+// again as "scoped off". The shapes here are the ones that used to print twice, plus the partial ones
+// whose second fact now rides beside the name.
+func TestCoverageDetailsNameEachRuleOnce(t *testing.T) {
+	rules := []rule.Rule{
+		{Name: "off-everywhere"}, {Name: "nobody-configured"}, {Name: "partly-off"},
+		{Name: "override-only"}, {Name: "off-and-unconfigured"}, {Name: "quiet"}, {Name: "eager"},
+	}
+	coverage := program.Coverage{
+		RulesOffered:      map[string]int{"partly-off": 3779, "override-only": 40, "quiet": 3785, "eager": 3785},
+		RulesListening:    map[string]int{"partly-off": 3779, "override-only": 40, "quiet": 3785},
+		RulesReporting:    map[string]int{"override-only": 2},
+		RulesScopedOff:    map[string]int{"off-everywhere": 3785, "partly-off": 6, "off-and-unconfigured": 3000},
+		RulesUnconfigured: map[string]int{"nobody-configured": 3785, "override-only": 3745, "off-and-unconfigured": 785},
+	}
+	config := &configuration.Config{Rules: map[string]configuration.RuleSetting{"not-ported": {Severity: configuration.SeverityError}}}
+
+	output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, LintConfig: config, WalkCost: "in 1s", Details: true})
+	lines := strings.Split(output, "\n")
+	for _, name := range []string{"off-everywhere", "nobody-configured", "partly-off", "override-only", "off-and-unconfigured", "quiet", "eager", "not-ported"} {
+		named := 0
+		for _, line := range lines {
+			if line == "    "+name || strings.HasPrefix(line, "    "+name+" (") {
+				named++
+			}
 		}
-		if strings.Contains(line, "unwired-rule") && strings.Contains(line, "registered no listener") {
-			t.Fatalf("an unwired rule was described as satisfied: %q", line)
+		if named != 1 {
+			t.Errorf("rule %s is named on %d lines under --coverage, want exactly 1:\n%s", name, named, output)
 		}
 	}
+	requireLines(t, output,
+		"    partly-off (off by the config for 6 files)\n",
+		"    override-only (2 findings, not in the config for 3745 files)\n",
+		"    off-and-unconfigured (3000 files, not in the config for 785 more)\n",
+	)
+	// The pointer is for the default mode; with details it would point at itself.
+	forbidLines(t, output, "details: cohere --coverage")
 }
 
-// A rule that listened to files is not silent and must not be named at all.
-//
-// Without this the note could satisfy the test above by naming every rule, which is the
-// flags-everything failure that makes a detector useless in the opposite direction.
-func TestCoverageNoteSaysNothingAboutARuleThatListened(t *testing.T) {
-	// The rule reports findings as well as listening. Leaving RulesReporting empty would make this
-	// a rule that watched and found nothing, which is a real third case with its own line, and the
-	// claim here is narrower: a rule doing its job is not named.
-	rules := []rule.Rule{{Name: "working-rule"}}
-	coverage := program.Coverage{
-		RulesOffered:   map[string]int{"working-rule": 3407},
-		RulesListening: map[string]int{"working-rule": 412},
-		RulesReporting: map[string]int{"working-rule": 7},
+// Every category that needs action prints in full on a default run, whatever else moved behind
+// --coverage. One subtest per category in the design, so dropping any of them from the default output
+// fails by name.
+func TestActionableCoverageAlwaysPrintsByDefault(t *testing.T) {
+	cleanCoverage := func() program.Coverage {
+		return program.Coverage{
+			RulesOffered:   map[string]int{"quiet-rule": 10},
+			RulesListening: map[string]int{"quiet-rule": 10},
+		}
 	}
+	rules := []rule.Rule{{Name: "quiet-rule"}}
 
-	var out strings.Builder
-	writeRuleCoverage(&out, rules, coverage)
-	if out.String() != "" {
-		t.Fatalf("a rule that listened to files was named in the coverage note: %q", out.String())
-	}
+	t.Run("findings", func(t *testing.T) {
+		coverage := cleanCoverage()
+		coverage.RulesReporting = map[string]int{"quiet-rule": 1}
+		output := renderLintReport(lintReport{
+			Result: program.Result{
+				Diagnostics: []rule.Diagnostic{{RuleName: "quiet-rule", Message: rule.Message{Id: "m", Description: "this is wrong"}}},
+				Coverage:    coverage,
+			},
+			Rules: rules, WalkCost: "in 1s",
+		})
+		requireLines(t, output, "error quiet-rule: this is wrong\n", "lint: 1 findings", "1 found something")
+	})
+
+	t.Run("crashed files", func(t *testing.T) {
+		coverage := cleanCoverage()
+		coverage.FilesCrashed = []program.FileCrash{{FileName: "/project/Broken.ts", Cause: fmt.Errorf("Node.Text on a kind it does not handle")}}
+		output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"})
+		requireLines(t, output,
+			"  1 files crashed",
+			"  crashed: /project/Broken.ts could not be linted, so nothing in it was checked: Node.Text on a kind it does not handle\n",
+		)
+	})
+
+	t.Run("unreadable files", func(t *testing.T) {
+		output, _, _ := renderRecords(t, swiftModeCheck, contractFixture(t, "Unreadable.jsonl"), 1)
+		requireLines(t, output, "  not checked: /project/Sources/Example/Latin1.swift (could not be read:")
+	})
+
+	t.Run("config keys that match no rule", func(t *testing.T) {
+		config := &configuration.Config{Rules: map[string]configuration.RuleSetting{
+			"quiet-rule":   {Severity: configuration.SeverityError},
+			"no-dupe-keys": {Severity: configuration.SeverityOff},
+		}}
+		output := renderLintReport(lintReport{Result: program.Result{Coverage: cleanCoverage()}, Rules: rules, LintConfig: config, WalkCost: "in 1s"})
+		requireLines(t, output, `  config: key "no-dupe-keys" matches no registered rule, so its off never applies`)
+	})
+
+	t.Run("a rule offered files that registered nothing when it should have", func(t *testing.T) {
+		coverage := cleanCoverage()
+		coverage.RulesOffered["inert-rule"] = 40
+		inertRules := append([]rule.Rule{{Name: "inert-rule"}}, rules...)
+		answersInRun := func(ruleName string) bool { return ruleName != "inert-rule" }
+		output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: inertRules, WalkCost: "in 1s", AnswersInRun: answersInRun})
+		requireLines(t, output, "  no listener: rule inert-rule was offered 40 files and registered no listener on any, and it does not answer in Run, so it checked nothing\n")
+
+		// And with details it is named once, under its category, rather than twice.
+		detailed := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: inertRules, WalkCost: "in 1s", AnswersInRun: answersInRun, Details: true})
+		if strings.Count(detailed, "inert-rule") != 1 {
+			t.Errorf("a rule needing action is named %d times under --coverage, want 1:\n%s", strings.Count(detailed, "inert-rule"), detailed)
+		}
+	})
+
+	t.Run("suppressions without a reason", func(t *testing.T) {
+		coverage := cleanCoverage()
+		coverage.Suppressed, coverage.SuppressedWithoutReason = 5, 2
+		output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"})
+		requireLines(t, output, "5 findings suppressed, 2 without a reason")
+	})
+
+	t.Run("disable comments that silenced nothing while their rule ran", func(t *testing.T) {
+		coverage := cleanCoverage()
+		coverage.UnusedSuppressions, coverage.UnusedSuppressionsForUnrunRules = 16, 13
+		output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"})
+		requireLines(t, output, "3 disable comments silenced nothing while their rule ran")
+		// The load-bearing ones are a detail, not an action.
+		forbidLines(t, output, "13 unused disable comments")
+	})
+
+	t.Run("parity", func(t *testing.T) {
+		config := &configuration.Config{Rules: map[string]configuration.RuleSetting{
+			"quiet-rule":    {Severity: configuration.SeverityError},
+			"not-yet-here":  {Severity: configuration.SeverityError},
+			"turned-off-be": {Severity: configuration.SeverityOff},
+		}}
+		output := renderLintReport(lintReport{Result: program.Result{Coverage: cleanCoverage()}, Rules: rules, LintConfig: config, WalkCost: "in 1s"})
+		requireLines(t, output,
+			"  parity: 1 of 2 rules the config asks for, so 1 were not checked by anything here\n",
+			"1 not ported",
+		)
+	})
+
+	t.Run("the modified-tree warning", func(t *testing.T) {
+		var out strings.Builder
+		(&pipelineReport{}).writeProvenanceWarning(&out, true)
+		requireLines(t, out.String(), "this binary was built from a modified tree")
+	})
+
+	t.Run("this run did not check everything", func(t *testing.T) {
+		for name, report := range map[string]*pipelineReport{
+			"a phase cut off": func() *pipelineReport {
+				report := &pipelineReport{}
+				report.record(phaseFix, outcomeSkipped, 0, "--no-fix")
+				report.record(phaseTypes, outcomeRan, 0, "")
+				report.markRemainingNotReached(phaseTypes, "a type diagnostic")
+				return report
+			}(),
+			"a file a rule crashed on": func() *pipelineReport {
+				report := &pipelineReport{incompleteBeyondPhases: namedGapsSentence}
+				report.record(phaseFix, outcomeSkipped, 0, "--no-fix")
+				report.record(phaseTypes, outcomeRan, 0, "")
+				report.record(phaseLint, outcomeRan, 0, "")
+				report.record(phaseUnused, outcomeSkipped, 0, "not requested")
+				return report
+			}(),
+		} {
+			var out strings.Builder
+			report.Write(&out)
+			if !strings.Contains(out.String(), "this run did not check everything") {
+				t.Errorf("%s: no warning:\n%s", name, out.String())
+			}
+		}
+	})
 }
 
-// A rule that watched files and reported nothing is the third case, and it was invisible.
-//
-// The two cases above it are about wiring: nothing offered the rule files, or it declined the ones
-// it got. This one looked at real code and had nothing to say, which is either a clean tree or a
-// rule that cannot see. Two false positives shipped past a full fixture pair tonight and were caught
-// only by running against the tree, so the distinction is worth a line of output rather than a habit.
-func TestARuleThatWatchedAndFoundNothingIsCounted(t *testing.T) {
-	rules := []rule.Rule{{Name: "watched-and-quiet"}, {Name: "found-something"}}
+// A clean run prints the counts and nothing per rule: the shape of the default output, held so a
+// later printer that adds a per-rule line to every run has to change this test to do it.
+func TestACleanRunPrintsTwoCoverageLines(t *testing.T) {
+	rules := []rule.Rule{{Name: "quiet-rule"}, {Name: "off-rule"}, {Name: "unconfigured-rule"}, {Name: "eager-rule"}}
 	coverage := program.Coverage{
-		RulesOffered:   map[string]int{"watched-and-quiet": 3407, "found-something": 3407},
-		RulesListening: map[string]int{"watched-and-quiet": 3407, "found-something": 3407},
-		RulesReporting: map[string]int{"found-something": 12},
+		RulesOffered:      map[string]int{"quiet-rule": 10, "eager-rule": 10},
+		RulesListening:    map[string]int{"quiet-rule": 10},
+		RulesScopedOff:    map[string]int{"off-rule": 10},
+		RulesUnconfigured: map[string]int{"unconfigured-rule": 10},
+		Suppressed:        4,
 	}
-
-	var out strings.Builder
-	writeRuleCoverage(&out, rules, coverage)
-
-	if !strings.Contains(out.String(), "1 rules watched files and reported nothing") {
-		t.Fatalf("a rule that watched and reported nothing was not counted:\n%s", out.String())
-	}
-	if strings.Contains(out.String(), "watched-and-quiet was offered no files") {
-		t.Errorf("a rule that listened was described as unwired:\n%s", out.String())
-	}
-}
-
-// The other direction: a run where every rule reported something says nothing about this case.
-//
-// Without it, a counter that incremented unconditionally would pass the test above while claiming
-// every rule was quiet, which is worse than not counting: it would tell a reader to distrust a run
-// that had nothing wrong with it.
-func TestARunWhereEveryRuleReportedCountsNoQuietRules(t *testing.T) {
-	rules := []rule.Rule{{Name: "found-something"}}
-	coverage := program.Coverage{
-		RulesOffered:   map[string]int{"found-something": 3407},
-		RulesListening: map[string]int{"found-something": 3407},
-		RulesReporting: map[string]int{"found-something": 12},
-	}
-
-	var out strings.Builder
-	writeRuleCoverage(&out, rules, coverage)
-
-	if strings.Contains(out.String(), "watched files and reported nothing") {
-		t.Errorf("a run where every rule reported claimed a quiet rule:\n%s", out.String())
+	output := renderLintReport(lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"})
+	want := "lint: 0 findings — 0 rules over 0 files, 0 nodes visited, in 1s\n" +
+		"coverage: 4 rules = 1 ran and found nothing + 1 registered no listener + 1 off by the config + 1 nobody has configured\n" +
+		"  0 files crashed · 4 findings suppressed, 0 without a reason · details: cohere --coverage\n"
+	if output != want {
+		t.Errorf("a clean run printed:\n%s\nwant:\n%s", output, want)
 	}
 }

@@ -43,7 +43,9 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 		return 1, err
 	}
 
-	return runEngineBinary(binaryPath, arguments, newSwiftRun(os.Stdout, mode, location.rootNote(), processStart), os.Stderr)
+	run := newSwiftRun(os.Stdout, mode, location.rootNote(), processStart)
+	run.details = given["coverage"] && flagValue("coverage") == "true"
+	return runEngineBinary(binaryPath, arguments, run, os.Stderr)
 }
 
 // resolveSwiftEngineBinary picks the engine: the one the caller named, or the one this module's

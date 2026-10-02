@@ -98,6 +98,10 @@ func run() error {
 	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	showTiming := flag.Bool("timing", false, "report what each rule cost, most expensive first")
 	explainFile := flag.String("explain", "", "report what every rule did on one file, and why it did or did not run")
+	// The counts print on every run; this names every rule once under the one coverage fact that
+	// describes it. Behind a flag because 170 per-rule notes on a clean run buried the lines that need
+	// action, and in front of nobody's habit because the counts that add up stay on the default line.
+	showCoverage := flag.Bool("coverage", false, "name every rule once under the coverage fact that describes it, rather than only counting them")
 	unusedReport := flag.Bool("unused", false, "report code that was written and never used: unreferenced exports, and statements nothing can reach")
 	unusedAll := flag.Bool("unused-all", false, "with --unused, list the findings already marked cohere-keep rather than only counting them")
 	// Opt-in on purpose. The closure's claim is strictly stronger than the flat one and it fails
@@ -792,25 +796,25 @@ func run() error {
 			lintWalkCost = "walked by the fix phase (nothing was rewritten, so its findings still hold)"
 		}
 
-		for _, diagnostic := range result.Diagnostics {
-			printRuleDiagnostic(diagnostic)
-		}
 		findings += len(result.Diagnostics)
 
-		// Coverage prints unconditionally, alongside the verdict rather than behind a flag. A run that
-		// checked nothing must not be able to look like a run that found nothing, and the only way to
-		// guarantee that is to make the population as visible as the findings.
-		fmt.Printf(
-			"lint: %d findings — %d rules over %d files, %d nodes visited, %s\n",
-			len(result.Diagnostics), result.Coverage.RulesRun, result.Coverage.FilesWalked,
-			result.Coverage.NodesVisited, lintWalkCost,
-		)
-		printParityCoverage(rules, lintConfig)
-		printRuleCoverage(rules, result.Coverage)
-		printCrashCoverage(result.Coverage)
-		printSuppressionCoverage(result.Coverage)
-		printConfigCoverage(result.Coverage)
-		printOrphanedConfigKeys(rules, lintConfig)
+		// The findings, the lint line, and the coverage block, which prints unconditionally. See
+		// writeLintReport.
+		writeLintReport(os.Stdout, lintReport{
+			Result:       result,
+			Rules:        rules,
+			LintConfig:   lintConfig,
+			WalkCost:     lintWalkCost,
+			Details:      *showCoverage,
+			AnswersInRun: answersInRunUndeclared,
+		})
+
+		// Every phase ran and a file still went unchecked. The phase line cannot express that, so the
+		// closing warning names it rather than letting a run that lost a file to a panic end on a clean
+		// bill of health. The Swift renderer says the same sentence for the same fact.
+		if len(result.Coverage.FilesCrashed) > 0 {
+			report.incompleteBeyondPhases = namedGapsSentence
+		}
 
 		if *showTiming {
 			printTimings(os.Stdout, result.Timings, lintDuration)
@@ -1074,8 +1078,6 @@ func diagnosticMessage(diagnostic *ast.Diagnostic) string {
 	return diagnostic.Localize(locale.Locale{})
 }
 
-// printRuleDiagnostic prints one rule finding in the same shape, with the rule name where the error
-// code goes — a reader should not have to learn two formats.
 // singleLineDescription collapses a message's internal newlines so one finding prints as one line.
 //
 // Named rather than inlined so a test can hold it. A test asserting `strings.ReplaceAll` on its own
@@ -1085,10 +1087,12 @@ func singleLineDescription(description string) string {
 	return strings.ReplaceAll(description, "\n", " ")
 }
 
-func printRuleDiagnostic(diagnostic rule.Diagnostic) {
+// printRuleDiagnostic prints one rule finding in the same shape, with the rule name where the error
+// code goes — a reader should not have to learn two formats.
+func printRuleDiagnostic(out io.Writer, diagnostic rule.Diagnostic) {
 	sourceFile := diagnostic.SourceFile
 	if sourceFile == nil {
-		fmt.Printf("error %s: %s\n", diagnostic.RuleName, diagnostic.Message.Description)
+		fmt.Fprintf(out, "error %s: %s\n", diagnostic.RuleName, diagnostic.Message.Description)
 		return
 	}
 
@@ -1106,178 +1110,11 @@ func printRuleDiagnostic(diagnostic rule.Diagnostic) {
 	// paragraph: the message is the rule's to write and the line discipline is the printer's to keep.
 	description := singleLineDescription(diagnostic.Message.Description)
 
-	fmt.Printf(
+	fmt.Fprintf(out,
 		"%s:%d:%d - %s [%s/%s]\n",
 		sourceFile.FileName(), line+1, character+1,
 		description, diagnostic.RuleName, diagnostic.Message.Id,
 	)
-}
-
-// printRuleCoverage names any rule that never listened to a single file.
-//
-// A rule that declines every file is indistinguishable, by finding count alone, from a rule that ran
-// and found nothing — and four rules in the gate this replaces were silently dead for months
-// underneath exactly that ambiguity. Naming them is the cheapest possible guard.
-func printRuleCoverage(rules []rule.Rule, coverage program.Coverage) {
-	writeRuleCoverage(os.Stdout, rules, coverage)
-}
-
-// writeRuleCoverage is printRuleCoverage against an arbitrary writer, so the note can be tested.
-//
-// This note has caught two dead rules tonight and had no fixture of its own, which is the same
-// shape as the rules it guards: a check nobody has proven can fail.
-func writeRuleCoverage(out io.Writer, rules []rule.Rule, coverage program.Coverage) {
-	silent := []string{}
-	watchedAndQuiet := 0
-	for _, subject := range rules {
-		if coverage.RulesListening[subject.Name] == 0 {
-			silent = append(silent, subject.Name)
-			continue
-		}
-		if coverage.RulesReporting[subject.Name] == 0 {
-			watchedAndQuiet++
-		}
-	}
-
-	// A rule that listened to thousands of files and reported nothing is the third case, and it was
-	// invisible until now. The two above are about wiring: nothing offered it files, or it declined
-	// the ones it got. This one looked at real code and had nothing to say, which is either a clean
-	// tree or a rule that cannot see.
-	//
-	// Counted rather than named. On this tree it is 69 of 79 rules, and printing 69 names every run
-	// would bury the two lines above it that a reader must act on. The count is the honest summary:
-	// most of what cohere checked was checked against code that already satisfies it, and a reader
-	// deciding whether a zero means anything needs to know how much of the zero is this.
-	//
-	// Two false positives shipped past a full fixture pair tonight and were caught only by running
-	// against the tree. That check was a habit rather than a line of output, and a habit is not a
-	// guard. This is the smallest version of it that survives being forgotten.
-	writeWatchedAndQuietNote(out, watchedAndQuiet)
-
-	if len(silent) == 0 {
-		return
-	}
-
-	sort.Strings(silent)
-	for _, name := range silent {
-		// Two opposite defects wore one sentence until now. A rule offered files that declined every
-		// one of them is configured and satisfied: nothing in the tree matches it, which is the
-		// result a passing rule produces. A rule offered nothing was never wired, and its silence
-		// says nothing about the tree at all.
-		//
-		// Both printed as "listened to no files", so a satisfied rule read exactly like a dead one.
-		// The pair was separable only because a second line about missing config happened to print
-		// for one of them, and that line does not always appear. A guard that works by accident of
-		// which sentence prints is not a guard.
-		if coverage.RulesOffered[name] == 0 {
-			fmt.Fprintf(out, "  note: rule %s was offered no files — nothing wired it, so its silence says nothing about the tree\n", name)
-			continue
-		}
-		// "Registered no listener" rather than "declined", because those are not the same thing and
-		// five rules here prove it. A rule whose whole job is answered from the file itself does all
-		// its work in Run and returns nil: network-require-hook-request-suffix inspects every hook
-		// declaration and reports before returning, and next-require-page-default-export is the same
-		// shape. Both were described by the old sentence as having "ran and looked, and nothing
-		// matched", which is true of the walk and false of the rule.
-		//
-		// The distinction matters because the two readings send a reader to different places. "Nothing
-		// matched" says look at the tree. "Registered no listener" says look at what the rule does,
-		// which for these five is where the answer is.
-		fmt.Fprintf(out, "  note: rule %s registered no listener on any of the %d files it was offered — either nothing matched, or it answered eagerly and had nothing to report\n",
-			name, coverage.RulesOffered[name])
-	}
-}
-
-// printSuppressionCoverage says what the run chose not to tell you.
-//
-// This is the coverage discipline pointed the other way. The line above stops a run that checked
-// nothing from printing the same green as a run that found nothing. This stops a run that withheld
-// forty findings from printing the same green as a run that had none to withhold. A suppression is
-// a decision someone made, and a decision that leaves no trace in the output is indistinguishable
-// from the tool being blind — which is the exact confusion that let seven real findings look like
-// agreement between two linters.
-//
-// The reasonless count is printed rather than enforced, deliberately. Measured across the codebase
-// cohere gates, 281 of the 306 suppressions naming one of our own rules state no reason, so
-// requiring one today turns working code red for no defect. Printing it every run puts the number
-// in front of us, which is what lets the convention be tightened later from evidence rather than
-// from a guess.
-// printCrashCoverage names the files a rule panicked on.
-//
-// Printed before findings rather than after, and named rather than counted. A crashed file produced
-// no findings, and a run that lost a file to a panic must not read as a run that found nothing in it.
-// That is the same rule the ignored, scoped-off and declined lines already follow.
-func printCrashCoverage(coverage program.Coverage) {
-	for _, crash := range coverage.FilesCrashed {
-		writeCrashedNote(os.Stdout, crash.FileName, crash.Cause)
-	}
-}
-
-// The coverage sentences both engines print, kept in one place so a Swift run and a TypeScript run
-// say the same thing about the same fact. The reasoning for each lives at the TypeScript printer that
-// calls it; these only hold the words.
-
-// writeWatchedAndQuietNote counts the rules that looked at real code and had nothing to say. See
-// writeRuleCoverage.
-func writeWatchedAndQuietNote(out io.Writer, watchedAndQuiet int) {
-	if watchedAndQuiet == 0 {
-		return
-	}
-	fmt.Fprintf(out,
-		"  note: %d rules watched files and reported nothing — a clean tree and a rule that cannot see look identical here\n",
-		watchedAndQuiet,
-	)
-}
-
-// writeCrashedNote names one file a rule could not finish. See printCrashCoverage.
-func writeCrashedNote(out io.Writer, fileName string, cause any) {
-	fmt.Fprintf(out, "  crashed: %s could not be linted, so nothing in it was checked: %v\n", fileName, cause)
-}
-
-// writeScopedOffNote names one rule the config turned off for some files. See printConfigCoverage.
-func writeScopedOffNote(out io.Writer, name string, files int) {
-	fmt.Fprintf(out, "  config: rule %s scoped off for %d files by the config\n", name, files)
-}
-
-// writeUnconfiguredNote names one rule the config never mentions. See printConfigCoverage.
-func writeUnconfiguredNote(out io.Writer, name string) {
-	fmt.Fprintf(out, "  config: rule %s is not in the config, so it ran on no files — nobody has said whether it should\n", name)
-}
-
-func printSuppressionCoverage(coverage program.Coverage) {
-	if coverage.Suppressed == 0 && coverage.UnusedSuppressions == 0 {
-		return
-	}
-
-	fmt.Printf(
-		"  suppressed: %d findings silenced by a disable comment, %d of them without a stated reason\n",
-		coverage.Suppressed, coverage.SuppressedWithoutReason,
-	)
-
-	if coverage.UnusedSuppressions > 0 {
-		// An unused suppression is a rule scoped off a file that no longer needs it, and it is how a
-		// codebase accumulates permanent exemptions nobody chose. It is a note rather than a finding
-		// because a filtered run makes every directive for an unselected rule look unused, and a
-		// number that is wrong under a common flag should not fail a build.
-		//
-		// The two halves are printed apart because they ask for opposite actions. A directive that
-		// silenced nothing while its rule ran is dead scaffolding, and deleting it is the right
-		// response. One naming only rules this run did not run silenced nothing because nothing
-		// looked, and deleting it would strip a suppression the gate still needs. Measured during
-		// the migration at 63 of 171 rules ported: 82 of 100 were the second kind, so the single
-		// number was telling a reader to delete comments that are load-bearing today.
-		dead := coverage.UnusedSuppressions - coverage.UnusedSuppressionsForUnrunRules
-		fmt.Printf(
-			"  note: %d disable comments silenced nothing while their rule ran — they may be scoping off a rule that no longer fires\n",
-			dead,
-		)
-		if coverage.UnusedSuppressionsForUnrunRules > 0 {
-			fmt.Printf(
-				"  note: %d more name only rules cohere has not ported yet, so nothing looked and they are not dead\n",
-				coverage.UnusedSuppressionsForUnrunRules,
-			)
-		}
-	}
 }
 
 // changedConfiguration names the configuration file in a changed-file scope, or empty when none is.
@@ -1349,60 +1186,10 @@ func resolveLintConfigPath(configPath string, directory string) string {
 	return filepath.Join(directory, configPath)
 }
 
-// printConfigCoverage says what the configuration excluded.
+// writeOrphanedConfigKeys says which config entries name a rule that does not exist. Printed in full
+// by default, because a decision that silently stopped applying needs action.
 //
-// A file skipped by an ignorePattern and a file with no findings produce identical output
-// otherwise, and a rule scoped off across a directory looks exactly like a rule with nothing to
-// report. Both are decisions someone made, and a decision that leaves no trace in the output is
-// indistinguishable from the tool never having looked.
-func printConfigCoverage(coverage program.Coverage) {
-	if coverage.FilesIgnored > 0 {
-		fmt.Printf("  config: %d files excluded by ignorePatterns\n", coverage.FilesIgnored)
-	}
-
-	scopedOff := make([]string, 0, len(coverage.RulesScopedOff))
-	for name := range coverage.RulesScopedOff {
-		scopedOff = append(scopedOff, name)
-	}
-	sort.Strings(scopedOff)
-	for _, name := range scopedOff {
-		writeScopedOffNote(os.Stdout, name, coverage.RulesScopedOff[name])
-	}
-
-	// Reported separately from scoped-off on purpose. "Someone turned this rule off" and "nobody has
-	// said whether this rule should run" are different facts, and a rule newly added to the registry
-	// is a decision waiting to be made rather than one already made. Collapsing them would describe
-	// a brand-new rule as though it had been deliberately excluded.
-	unconfigured := make([]string, 0, len(coverage.RulesUnconfigured))
-	for name := range coverage.RulesUnconfigured {
-		unconfigured = append(unconfigured, name)
-	}
-	sort.Strings(unconfigured)
-	for _, name := range unconfigured {
-		writeConfiguredElsewhereNote(os.Stdout, name, coverage.RulesUnconfigured[name], coverage.RulesOffered[name])
-	}
-}
-
-// writeConfiguredElsewhereNote says what an unconfigured count means for one rule, which depends on
-// whether anything configured it at all.
-//
-// A rule enabled only inside an override is unconfigured for every file the override does not reach,
-// so it lands in the unconfigured count and used to print "ran on no files" while it reported
-// thousands of findings in the files the override does reach. Found on the boundaries dry run by
-// @system_cohere_base_rules. A rule that was offered files ran on them, so its sentence says where it
-// did not run instead of claiming it ran nowhere.
-func writeConfiguredElsewhereNote(out io.Writer, name string, unconfiguredFiles int, offeredFiles int) {
-	if offeredFiles == 0 {
-		writeUnconfiguredNote(out, name)
-		return
-	}
-	fmt.Fprintf(out, "  config: rule %s ran on %d files and is not in the config for %d others, so it did not run there\n",
-		name, offeredFiles, unconfiguredFiles)
-}
-
-// printOrphanedConfigKeys says which config entries name a rule that does not exist.
-//
-// This is the inverse of the unconfigured line above, and it is the failure the rename of every
+// This is the inverse of the not-configured count, and it is the failure the rename of every
 // rule to its upstream spelling introduced. The resolver matches a config key exactly, or trims a
 // prefix off it on a `/` boundary, so a key that is LONGER than the rule name resolves and a key
 // that is SHORTER never can. `typescript/no-base-to-string` cannot reach a rule registered as
@@ -1416,7 +1203,7 @@ func writeConfiguredElsewhereNote(out io.Writer, name string, unconfiguredFiles 
 // Keys naming a rule cohere has not ported yet are the expected case and not an error: a decision
 // recorded ahead of the rule is how this migration is supposed to work. They are counted and named
 // separately so the two are never confused.
-func printOrphanedConfigKeys(rules []rule.Rule, config *configuration.Config) {
+func writeOrphanedConfigKeys(out io.Writer, rules []rule.Rule, config *configuration.Config) {
 	if config == nil {
 		return
 	}
@@ -1431,7 +1218,7 @@ func printOrphanedConfigKeys(rules []rule.Rule, config *configuration.Config) {
 	// with the resolver would report keys that work and miss keys that do not.
 	resolves := func(key string) bool {
 		for name := range registered {
-			if name == key || strings.HasSuffix(name, "/"+key) {
+			if configuration.KeyReachesRule(key, name) {
 				return true
 			}
 		}
@@ -1448,7 +1235,7 @@ func printOrphanedConfigKeys(rules []rule.Rule, config *configuration.Config) {
 
 	for _, key := range orphaned {
 		setting := config.Rules[key]
-		fmt.Printf(
+		fmt.Fprintf(out,
 			"  config: key %q matches no registered rule, so its %s never applies — either the rule is not ported yet, or the key is spelled for an older name\n",
 			key, setting.Severity,
 		)
@@ -1459,71 +1246,6 @@ func printOrphanedConfigKeys(rules []rule.Rule, config *configuration.Config) {
 // anything at.
 func round(duration time.Duration) time.Duration {
 	return duration.Round(time.Millisecond)
-}
-
-// printParityCoverage says how many of the rules the config asks for this binary can actually run.
-//
-// The lint line above reports how many rules ran, which is what this binary contains. It says nothing
-// about how many were wanted, and while a port is in progress those are different numbers. A reader
-// seeing a rule count has no way to learn whether the config asked for more, and the whole argument
-// of this tool is that a run which checked less than it appears to must say so.
-//
-// The gap this closes was once wide enough to quote, and quoting it here is what made this comment
-// wrong within weeks: the figures drift with every rule that lands, while the reason they matter
-// does not. The live numbers belong in the line this function prints, which is derived, and not in
-// a comment, which is remembered.
-//
-// This is the same omission the differential harness carried until `7b590f6`, in the line a reader
-// trusts most, and it is worth fixing in both places rather than only in the instrument that gets
-// read during a migration review.
-//
-// Names are compared on the `/` boundary the config resolver uses, for the reason stated there:
-// plain suffix matching would let a config entry for `no-enum` claim `consistency-no-enum`, and the
-// count would read better than the truth.
-//
-// **The rules block is not the whole config**, and the first version of this function read only that
-// and reported 166. Forty rules are enforced by the `plugins` declarations and named in no rules
-// block, so a denominator taken from the block alone understates by exactly the rules nobody wrote
-// down. Those forty are held in `configuration.PluginDefaultRules`, which is where that knowledge
-// lives now: this function once also merged a captured inventory of what the replaced tools
-// enforced, and that catalog was deleted once cohere passed it, since a denominator that can only
-// be met asserts nothing after it has been.
-func printParityCoverage(rules []rule.Rule, lintConfig *configuration.Config) {
-	if lintConfig == nil {
-		return
-	}
-
-	implemented := make(map[string]bool, len(rules))
-	for _, registered := range rules {
-		implemented[registered.Name] = true
-	}
-
-	wanted := map[string]bool{}
-	for name, setting := range lintConfig.Rules {
-		// A rule turned off ran over no files regardless, so it is not something this run failed to
-		// check. The `delete` this once carried was for a merged catalog that could have seeded the
-		// map before this loop; with the config as the only source, skipping is the whole of it.
-		if setting.Severity == configuration.SeverityOff {
-			continue
-		}
-		wanted[name] = true
-	}
-
-	missing := 0
-	for name := range wanted {
-		if !implementsConfiguredRule(name, implemented) {
-			missing++
-		}
-	}
-
-	if missing == 0 {
-		return
-	}
-
-	fmt.Printf(
-		"  parity: %d of %d rules the config asks for, so %d were not checked by anything here\n",
-		len(wanted)-missing, len(wanted), missing,
-	)
 }
 
 // implementsConfiguredRule reports whether a config entry names a rule this binary contains.

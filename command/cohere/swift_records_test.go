@@ -80,7 +80,8 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 			"format scope: changed files (working tree against HEAD): 0\n",
 			"types: 0 diagnostics over 2 files in 820ms\n",
 			"lint: 0 findings — 4 rules over 2 files, 512 nodes visited, walked by the fix phase (nothing was rewritten, so its findings still hold)\n",
-			"  note: 4 rules watched files and reported nothing",
+			"coverage: 4 rules = 4 ran and found nothing\n",
+			"  0 files crashed · details: cohere --coverage\n",
 			"  config: no CohereSettings.json beside Package.swift, so every house rule ran at error",
 			"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
 			"phases: fix ran in 31ms · types ran in 820ms · lint reused the fix phase's walk (nothing was rewritten) · unused skipped",
@@ -99,10 +100,35 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 			"/project/Sources/Example/Warning.swift:2:9 - warning: variable 'neverMutated' was never mutated; consider changing to 'let' constant [#VariableNeverMutated]\n",
 			// The message's newline is collapsed, so the rule tag stays on the line with the position.
 			"/project/Sources/Example/ByteRing.swift:159:61 - A force unwrap crashes the process when the value is nil. Say what happens on nil with guard let or if let. [cohere-swift/no-force-unwrap/forceUnwrap]\n",
-			"  note: rule cohere-swift/no-force-cast listened to no files",
+			"coverage: 4 rules = 1 found something + 2 ran and found nothing + 1 listened to no files\n",
 			"  this binary was built from a modified tree, so no commit reproduces these findings\n",
 		)
-		forbidLines(t, output, "did not check everything")
+		// The silent rule is counted by default and named behind --coverage, as a TypeScript run does.
+		forbidLines(t, output, "did not check everything", "cohere-swift/no-force-cast")
+	})
+
+	// --coverage names each rule the record names exactly once, under its category, and counts the
+	// ones the record only counts.
+	t.Run("FindingsWithCoverage", func(t *testing.T) {
+		var out bytes.Buffer
+		run := newSwiftRun(&out, swiftModeCheck, "", time.Now())
+		run.details = true
+		for _, line := range contractFixture(t, "Findings.jsonl") {
+			if err := run.accept([]byte(line)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		output := out.String()
+		requireLines(t, output,
+			"  listened to no files (1): nothing gave it a file, or it declined every one",
+			"    cohere-swift/no-force-cast\n",
+			"  ran and found nothing (2): ",
+			"    2 the engine's record counts and does not name\n",
+		)
+		if count := strings.Count(output, "cohere-swift/no-force-cast\n"); count != 1 {
+			t.Errorf("the silent rule is named %d times, want 1:\n%s", count, output)
+		}
+		forbidLines(t, output, "details: cohere --coverage")
 	})
 
 	t.Run("TypesBail", func(t *testing.T) {
