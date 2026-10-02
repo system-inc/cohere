@@ -8,14 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/format/native"
-	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
-)
-
-// The formatters --format-engine chooses between.
-const (
-	formatEnginePrettier = "prettier"
-	formatEngineNative   = "native"
 )
 
 // formatEngine formats one file's text, or says it could not.
@@ -142,43 +135,28 @@ func extensionOf(fileName string) string {
 // A nil engine skips with "no formatter is configured" and that reaches the coverage line, so a run
 // with no formatter reports as a run with no formatter rather than as a perfectly formatted tree.
 //
-// engineName picks cohere's native printers, the default, or the goja Prettier fork they replace,
-// which stays only as the differential's oracle until it leaves the binary. The native printers were
-// made the default when they matched the fork on every file of ahra, www-phi-health and
-// api-phi-health, and when a whole-tree run of each engine over the same ahra snapshot wrote the
-// same bytes. Both resolve each file's options from its own directory, so choosing one changes the
-// printers and nothing else.
-func configuredFormatter(enabled bool, engineName string) (formatEngine, error) {
+// The formatter is cohere's native printers. They replaced the goja Prettier fork when they matched it
+// on every file of ahra, www-phi-health and api-phi-health, and when a whole-tree run of each engine
+// over the same ahra snapshot wrote the same bytes. The fork stays in internal/format/prettier as the
+// differential's oracle, and is not linked into this binary.
+func configuredFormatter(enabled bool) (formatEngine, error) {
 	if !enabled {
 		return nil, nil
 	}
 
-	// Resolving, not one engine built from DefaultOptions: each file formats with the config Prettier
-	// would resolve for it. DefaultOptions is ahra's block, and running it over api-phi-health rewrote
-	// every multi-line JSX opening tag, because that repository sets bracketSameLine.
+	// Resolving, not one formatter built from formatoptions.Default: each file formats with the config
+	// its own directory resolves to. Default is ahra's block, and running it over api-phi-health
+	// rewrote every multi-line JSX opening tag, because that repository sets bracketSameLine.
 	workingDirectory, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("finding where to resolve the Prettier config from: %w", err)
+		return nil, fmt.Errorf("finding where to resolve the format options from: %w", err)
 	}
-
-	switch engineName {
-	case formatEngineNative:
-		engine, err := native.NewResolving(workingDirectory)
-		if err != nil {
-			return nil, fmt.Errorf("loading the native formatter: %w", err)
-		}
-		return engine, nil
-	case formatEnginePrettier:
-	default:
-		return nil, fmt.Errorf("--format-engine %q is not a formatter: use %s or %s", engineName, formatEnginePrettier, formatEngineNative)
-	}
-
-	engine, err := prettier.NewResolving(workingDirectory)
+	engine, err := native.NewResolving(workingDirectory)
 	if err != nil {
 		// Not a nil engine. Nil already means "nobody asked for a formatter", and the coverage line
-		// reports that as a deliberate absence. An engine that was asked for and could not load its
-		// bundles is a different fact, and collapsing the two would print a failure as a choice.
-		return nil, fmt.Errorf("loading the prettier engine: %w", err)
+		// reports that as a deliberate absence. A formatter that was asked for and could not resolve its
+		// options is a different fact, and collapsing the two would print a failure as a choice.
+		return nil, fmt.Errorf("loading the formatter: %w", err)
 	}
 	return engine, nil
 }

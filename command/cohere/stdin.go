@@ -22,7 +22,6 @@ type stdinRequest struct {
 	WorkingDirectory string
 	FilePath         string
 	Format           bool
-	FormatEngine     string
 	MaxPasses        int
 	SingleThreaded   bool
 }
@@ -59,7 +58,7 @@ func runStdin(ctx context.Context, request stdinRequest, input io.Reader, output
 	}
 	path = filepath.Clean(path)
 
-	formatter, err := configuredFormatter(request.Format, request.FormatEngine)
+	formatter, err := configuredFormatter(request.Format)
 	if err != nil {
 		return err
 	}

@@ -63,7 +63,7 @@ func TestStdinAnswersWhatTheGateWrites(t *testing.T) {
 			path := filepath.Join(root, testCase.name)
 			onDisk := readForTest(t, path)
 
-			arguments := []string{"--fix", "--format", "--format-engine", "native"}
+			arguments := []string{"--fix", "--format"}
 			saved, stderr, code := runCohereWithStdin(t, binary, root, testCase.buffer,
 				append(arguments, "--stdin-filepath", testCase.name)...)
 			if code != 0 {
@@ -101,7 +101,7 @@ func TestStdinDeclinesWithoutAComplaint(t *testing.T) {
 		"Data.txt":    "plain   text\n",
 	} {
 		saved, stderr, code := runCohereWithStdin(t, binary, root, buffer,
-			"--fix", "--format", "--format-engine", "native", "--stdin-filepath", name)
+			"--fix", "--format", "--stdin-filepath", name)
 		if code != 0 || saved != buffer {
 			t.Errorf("%s: exit %d, wanted the buffer back unchanged:\n%s\nstderr:\n%s", name, code, saved, stderr)
 		}

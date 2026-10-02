@@ -323,7 +323,7 @@ func TestTheEnginesRealParseErrorsAreRecognized(t *testing.T) {
 // are pinned: the matcher has to know the errors the engine actually emits, and switching engines
 // changes who emits them. Measured by formatting malformed source, never written by hand.
 func TestTheNativeEnginesParseErrorsAreRecognized(t *testing.T) {
-	engine, err := configuredFormatter(true, formatEngineNative)
+	engine, err := configuredFormatter(true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,15 +348,11 @@ func TestTheNativeEnginesParseErrorsAreRecognized(t *testing.T) {
 	}
 }
 
-// --format-engine refuses a name it does not know rather than falling back to either engine, since a
-// typo that quietly ran Prettier would measure the wrong formatter and report it as the native one.
-func TestAnUnknownFormatEngineIsRefused(t *testing.T) {
-	if _, err := configuredFormatter(true, "nativ"); err == nil {
-		t.Fatal("an unknown engine name was accepted")
-	}
-	engine, err := configuredFormatter(false, "nativ")
+// With formatting off there is no formatter, and saying so is the coverage line's job, not an error.
+func TestFormattingOffConfiguresNoFormatter(t *testing.T) {
+	engine, err := configuredFormatter(false)
 	if err != nil || engine != nil {
-		t.Fatalf("with formatting off, the engine name should not matter: %v, %v", engine, err)
+		t.Fatalf("formatting off configured %v, %v; want no formatter and no error", engine, err)
 	}
 }
 
