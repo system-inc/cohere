@@ -262,7 +262,7 @@ public struct NoDefaultForOwnedEnum: TypedFileRule {
                 switch element {
                 case .switchCase(let switchCase):
                     return [switchCase]
-                case .conditionalBlockDecl(let conditionalBlock):
+                case .ifConfigDecl(let conditionalBlock):
                     return conditionalBlock.clauses.flatMap { clause -> [SwitchCaseSyntax] in
                         guard case .switchCases(let nested) = clause.elements else { return [] }
                         return cases(nested)
