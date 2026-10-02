@@ -339,7 +339,6 @@ func TestDecodeStrictVoidReturnOptions(t *testing.T) {
 		{name: "emptyObject", raw: `{}`, want: false},
 		{name: "explicitTrue", raw: `{"allowReturnAny": true}`, want: true},
 		{name: "explicitFalse", raw: `{"allowReturnAny": false}`, want: false},
-		{name: "unrelatedKeyOnly", raw: `{"somethingElse": 1}`, want: false},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

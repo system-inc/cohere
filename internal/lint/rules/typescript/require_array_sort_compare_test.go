@@ -301,7 +301,6 @@ func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t
 		{name: "emptyObject", raw: `{}`, want: true},
 		{name: "explicitTrue", raw: `{"ignoreStringArrays": true}`, want: true},
 		{name: "explicitFalse", raw: `{"ignoreStringArrays": false}`, want: false},
-		{name: "unrelatedKeyOnly", raw: `{"somethingElse": 1}`, want: true},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

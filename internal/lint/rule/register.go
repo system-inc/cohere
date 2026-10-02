@@ -182,7 +182,7 @@ func DecodeOptionsInto[Options any]() func(raw []byte) (any, error) {
 		if len(raw) == 0 {
 			return decoded, fmt.Errorf("no options were configured")
 		}
-		if err := json.Unmarshal(raw, &decoded); err != nil {
+		if err := UnmarshalOptions(raw, &decoded); err != nil {
 			return decoded, fmt.Errorf("decoding %T: %w", decoded, err)
 		}
 		return decoded, nil

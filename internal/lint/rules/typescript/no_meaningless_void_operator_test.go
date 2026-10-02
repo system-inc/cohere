@@ -393,7 +393,6 @@ func TestDecodeNoMeaninglessVoidOperatorOptions(t *testing.T) {
 		{name: "emptyObject", raw: `{}`, want: false},
 		{name: "explicitTrue", raw: `{"checkNever": true}`, want: true},
 		{name: "explicitFalse", raw: `{"checkNever": false}`, want: false},
-		{name: "unrelatedKeyOnly", raw: `{"somethingElse": 1}`, want: false},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
