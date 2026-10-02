@@ -22,7 +22,7 @@ struct EngineRun {
             let object = try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any]
             guard object?["kind"] as? String == "finding" else { continue }
             let record = try decoder.decode(FindingRecord.self, from: Data(line))
-            findings.append(RuleFinding(file: PackagePath.relative(record.file, to: root), line: record.line, rule: record.rule))
+            findings.append(RuleFinding(file: PackagePath.relative(record.file, to: root), line: record.line, rule: record.rule, messageId: record.messageId))
         }
         return findings
     }

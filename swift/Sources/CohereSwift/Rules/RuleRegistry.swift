@@ -30,6 +30,7 @@ public enum RuleRegistry {
         DuplicateConditions(),
         UnusedOptionalBinding(),
         UnusedClosureParameter(),
+        LegacyConstructors(),
         SwiftFormatRule.requireLowerCamelCase,
         SwiftFormatRule.noLeadingUnderscores,
     ] }

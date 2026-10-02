@@ -4,4 +4,6 @@ struct RuleFinding: Hashable, Sendable {
     var file: String
     var line: Int
     var rule: String
+    /* The cohere finding's message id; empty for an incumbent's. Lets one cohere rule that covers several incumbent rules be compared family by family. */
+    var messageId = ""
 }

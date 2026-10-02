@@ -80,7 +80,7 @@ struct ParityCommand {
             let incumbentFindings = mapping.incumbent == .swiftLint ? swiftLintFindings : swiftFormatFindings
             reports.append(ParityReport(
                 mapping: mapping,
-                cohere: cohere.filter { mapping.rules.contains($0.rule) },
+                cohere: cohere.filter { mapping.rules.contains($0.rule) && (mapping.messageIds.isEmpty || mapping.messageIds.contains($0.messageId)) },
                 other: incumbentFindings.filter { $0.rule == mapping.incumbentRule }
             ))
         }

@@ -29,6 +29,8 @@ struct RuleMapping: Sendable {
     var incumbentRule: String
     var rules: [String]
     var comparison: Comparison = .line
+    /* When one cohere rule covers several incumbent rules, the message ids of the family this row compares; empty means every finding of the rules. */
+    var messageIds: [String] = []
 
     static let all: [RuleMapping] = [
         RuleMapping(incumbent: .swiftLint, incumbentRule: "force_unwrapping", rules: ["cohere-swift/no-force-unwrap"]),
@@ -51,6 +53,10 @@ struct RuleMapping: Sendable {
         RuleMapping(incumbent: .swiftLint, incumbentRule: "duplicate_conditions", rules: ["cohere-swift/duplicate-conditions"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "unused_optional_binding", rules: ["cohere-swift/unused-optional-binding"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "unused_closure_parameter", rules: ["cohere-swift/unused-closure-parameter"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "legacy_constructor", rules: ["cohere-swift/legacy-constructors"], messageIds: ["legacyConstructor"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "legacy_cggeometry_functions", rules: ["cohere-swift/legacy-constructors"], messageIds: ["legacyCGGeometryFunction"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "legacy_nsgeometry_functions", rules: ["cohere-swift/legacy-constructors"], messageIds: ["legacyNSGeometryFunction"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "legacy_random", rules: ["cohere-swift/legacy-constructors"], messageIds: ["legacyRandom"]),
         RuleMapping(incumbent: .swiftFormat, incumbentRule: "NoLeadingUnderscores", rules: ["cohere-swift/no-leading-underscores"]),
     ]
 
