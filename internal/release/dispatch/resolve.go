@@ -94,7 +94,7 @@ func ResolveWorkingTree(paths Paths, packagePath string) (string, bool, error) {
 		return binaryPath, false, nil
 	}
 
-	if err := build(paths, packagePath, binaryPath); err != nil {
+	if err := build(paths, packagePath, binaryPath, inputs.GoVersion); err != nil {
 		return "", false, err
 	}
 	if err := recordDevelopmentHash(paths, hash); err != nil {
@@ -146,8 +146,9 @@ func recordDevelopmentHash(paths Paths, hash string) error {
 	return nil
 }
 
-// build compiles the binary to binaryPath, with the cache pinned inside the module.
-func build(paths Paths, packagePath string, binaryPath string) error {
+// build compiles the binary to binaryPath, with the cache pinned inside the module, stamped with the
+// formatter's identity as a committed build is, so a `--dev` run reads and keeps the same format record.
+func build(paths Paths, packagePath string, binaryPath string, goVersion string) error {
 	if err := os.MkdirAll(paths.BinaryDirectory(), 0o755); err != nil {
 		return fmt.Errorf("creating the binary cache directory: %w", err)
 	}
@@ -155,7 +156,24 @@ func build(paths Paths, packagePath string, binaryPath string) error {
 		return fmt.Errorf("creating the Go build cache directory: %w", err)
 	}
 
-	arguments := append([]string{"build"}, ReleaseBuildFlags...)
+	formatter, err := FormatterIdentity(paths.ModuleDirectory, goVersion, []string{"GOCACHE=" + paths.GoCacheDirectory()})
+	if err != nil {
+		return err
+	}
+	stamp := "-X github.com/system-inc/cohere/internal/release/packaging.formatterIdentity=" + formatter
+	arguments := []string{"build"}
+	stamped := false
+	for _, flag := range ReleaseBuildFlags {
+		// Joined onto the release flags' own `-ldflags`, since Go keeps only the last one given.
+		if value, isLinkerFlags := strings.CutPrefix(flag, "-ldflags="); isLinkerFlags {
+			flag = "-ldflags=" + value + " " + stamp
+			stamped = true
+		}
+		arguments = append(arguments, flag)
+	}
+	if !stamped {
+		arguments = append(arguments, "-ldflags="+stamp)
+	}
 	arguments = append(arguments, "-o", binaryPath, packagePath)
 
 	command := exec.Command("go", arguments...)

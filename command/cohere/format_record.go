@@ -16,6 +16,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -40,10 +41,10 @@ import (
 //
 // # What makes the record say nothing
 //
-// The record is a section of the project's cache table (see run_cache.go), keyed by cohere's own
-// identity (the binary, the project root, the platform), and the table itself is discarded whole by a
-// cohere built from another commit. So a rebuilt cohere, whose printers may print differently, starts
-// with an empty record and formats every file once. Each entry carries the options its file formats with, so a config edit sends exactly the
+// The record is a section of the project's cache table (see run_cache.go), keyed by the formatter's
+// identity: a hash of the printers and everything they import, the pass loop, and the toolchain,
+// stamped at build time. A cohere whose formatter changed starts with an empty record and formats every
+// file once; one that changed only a lint rule keeps it. Each entry carries the options its file formats with, so a config edit sends exactly the
 // files it reaches back through the formatter. Any doubt, an unreadable record, a version it does not
 // know, is an empty record: the cost is one run that formats everything, never a file skipped on a
 // guess.
@@ -59,9 +60,9 @@ type formatRecord struct {
 	// root is the project root, whose cache table holds the record.
 	root string
 
-	// key is cohere's own identity, the binary and the root, empty when it could not be determined, in
+	// key is the formatter's identity (see formatRecordKey), empty when it could not be determined, in
 	// which case nothing is read or written and every file is in scope. A section under another key
-	// says nothing about this cohere.
+	// says nothing about this formatter.
 	key string
 
 	// absent says why no earlier check is on record, and is empty when one was read.
@@ -75,7 +76,7 @@ type formatRecord struct {
 // be read is an empty one, and absent says why.
 func loadFormatRecord(root string) *formatRecord {
 	record := &formatRecord{root: root, entries: map[string]program.FormatEntry{}}
-	key, err := program.RunCacheKey(nil, root, "format-record")
+	key, err := formatRecordKey(root)
 	if err != nil {
 		record.absent = fmt.Sprintf("cohere could not identify its own binary (%v)", firstLine(err.Error()))
 		return record
@@ -88,11 +89,26 @@ func loadFormatRecord(root string) *formatRecord {
 	case section == nil:
 		record.absent = "no earlier check is on record"
 	case section.Key != key:
-		record.absent = "cohere changed since the last check, so its record says nothing about this one"
+		record.absent = "the formatter changed since the last check, so its record says nothing about this one"
 	case section.Entries != nil:
 		record.entries = section.Entries
 	}
 	return record
+}
+
+// formatRecordKey is what the record's section must have been written under to be read: the formatter's
+// identity, stamped by the launcher at build time (see dispatch.FormatterIdentity), so a cohere commit
+// that leaves the formatter alone leaves the record valid.
+//
+// The cache table no longer guards this section against a cohere commit (it keeps the section across one
+// for this key to decide), so the key carries the whole claim. A build nobody stamped, such as a `go
+// build` or a test binary, cannot say what its formatter is, so its key is the binary itself, which no
+// other build shares.
+func formatRecordKey(root string) (string, error) {
+	if identity := release.Current().FormatterIdentity; identity != "" {
+		return "formatter " + identity, nil
+	}
+	return program.RunCacheKey(nil, root, "format-record")
 }
 
 // unformatted returns the files whose current bytes are not on record as formatted under the options

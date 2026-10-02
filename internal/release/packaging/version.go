@@ -51,6 +51,10 @@ var (
 	// dirty files and all. So the launcher turns stamping off and states the commit itself. It can,
 	// because it extracted the snapshot from that commit and nothing else.
 	selfCommit = ""
+
+	// formatterIdentity names everything that can change what the formatter prints, stamped by the
+	// launcher when it builds (see dispatch.FormatterIdentity). Empty for a build nobody stamped.
+	formatterIdentity = ""
 )
 
 // Provenance is everything a shipped binary knows about where it came from.
@@ -95,6 +99,12 @@ type Provenance struct {
 	// files in the tree at the time this was written.
 	SourceTreeModified bool
 
+	// FormatterIdentity is a hash of the formatter's inputs: its printers and everything they import,
+	// the pass loop that decides what formatted means, and the toolchain. The format record is keyed
+	// by it rather than by the binary, so a cohere commit that leaves the formatter alone leaves the
+	// record valid. Empty when the build was not stamped, and then the record keys by the binary.
+	FormatterIdentity string
+
 	// Platform is the operating system and architecture this binary was built for, as "os/arch".
 	//
 	// It is read from the runtime rather than stamped, because the runtime cannot be wrong about it
@@ -112,6 +122,7 @@ func Current() Provenance {
 		CompilerUpstream:   compilerUpstream,
 		GoToolchain:        resolveGoToolchain(),
 		SourceTreeModified: resolveSourceTreeModified(),
+		FormatterIdentity:  formatterIdentity,
 		Platform:           runtime.GOOS + "/" + runtime.GOARCH,
 	}
 }

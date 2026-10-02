@@ -311,9 +311,15 @@ func goBuildSnapshot(paths Paths, snapshot string, packagePath string, build com
 		}
 		arguments = append(arguments, flag)
 	}
+	workspace := "GOWORK=" + filepath.Join(snapshot, "go.work")
+	formatter, err := FormatterIdentity(snapshot, build.GoVersion, []string{"GOCACHE=" + paths.GoCacheDirectory(), workspace})
+	if err != nil {
+		return err
+	}
 	linkerFlags = append(linkerFlags,
 		"-X", packagingPath+".selfCommit="+build.Commit,
 		"-X", packagingPath+".compilerCommit="+build.CompilerCommit,
+		"-X", packagingPath+".formatterIdentity="+formatter,
 	)
 	arguments = append(arguments, "-ldflags="+strings.Join(linkerFlags, " "), "-o", outputPath, packagePath)
 
@@ -321,7 +327,7 @@ func goBuildSnapshot(paths Paths, snapshot string, packagePath string, build com
 	command.Dir = snapshot
 	command.Env = append(os.Environ(),
 		"GOCACHE="+paths.GoCacheDirectory(),
-		"GOWORK="+filepath.Join(snapshot, "go.work"),
+		workspace,
 		"CGO_ENABLED=0",
 	)
 	command.Stderr = os.Stderr

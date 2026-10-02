@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -224,7 +225,7 @@ func TestARecordFromAnotherCohereSaysNothing(t *testing.T) {
 
 	files, _, _, description := fixture.scope(t)
 	assertScope(t, files, "A.ts", "B.ts", "library/Inner.ts")
-	if !strings.Contains(description, "cohere changed since the last check") {
+	if !strings.Contains(description, "the formatter changed since the last check") {
 		t.Errorf("the scope line does not say why every file is in scope: %s", description)
 	}
 
@@ -283,5 +284,52 @@ func TestDeclaredSubmodulesReadsTheGitmodulesPaths(t *testing.T) {
 
 	if none, err := declaredSubmodules(t.TempDir()); err != nil || len(none) != 0 {
 		t.Fatalf("a repository with no .gitmodules declared %v (err %v)", none, err)
+	}
+}
+
+// The record follows the formatter, not the binary. Three builds of this command: two from different
+// commits stamped with the same formatter identity, and a third whose formatter differs. The second
+// must read what the first recorded, and the third must start over. This is the property that keeps a
+// lint-only cohere commit from reformatting the tree, and the one that must not keep a record across a
+// printer change.
+func TestTheRecordFollowsTheFormatterNotTheBinary(t *testing.T) {
+	stamped := func(selfCommit string, formatter string) string {
+		t.Helper()
+		binary := filepath.Join(t.TempDir(), "cohere")
+		const packaging = "github.com/system-inc/cohere/internal/release/packaging"
+		build := exec.Command("go", "build", "-o", binary,
+			"-ldflags=-X "+packaging+".selfCommit="+selfCommit+" -X "+packaging+".formatterIdentity="+formatter, ".")
+		if output, err := build.CombinedOutput(); err != nil {
+			t.Fatalf("cannot build cohere: %v\n%s", err, output)
+		}
+		return binary
+	}
+	first := stamped(strings.Repeat("1", 40), "formatterA")
+	lintOnly := stamped(strings.Repeat("2", 40), "formatterA")
+	printerChanged := stamped(strings.Repeat("2", 40), "formatterB")
+
+	root := t.TempDir()
+	home := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"tsconfig.json":       fixScopeTsconfig,
+		"CohereSettings.json": "{ \"rules\": {}, \"format\": {} }\n",
+		"Tidy.ts":             "export const tidy = 1;\n",
+		"Ugly.ts":             "export const ugly   =   1\n",
+	})
+	run := func(binary string, arguments ...string) string {
+		t.Helper()
+		command := exec.Command(binary, arguments...)
+		command.Dir = root
+		command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME=", "COHERE_RUN_CACHE=off")
+		output, _ := command.CombinedOutput()
+		return string(output)
+	}
+
+	run(first, "--fix", "--format")
+	if output := run(lintOnly, "--no-fix", "--format"); !strings.Contains(output, "0 of 4 files not on record as formatted") {
+		t.Fatalf("a build from another commit with the same formatter did not read the record:\n%s", output)
+	}
+	if output := run(printerChanged, "--no-fix", "--format"); !strings.Contains(output, "all 4 files, because the formatter changed since the last check") {
+		t.Fatalf("a build with another formatter trusted the record:\n%s", output)
 	}
 }
