@@ -433,6 +433,40 @@ return <div>{value}</div>;
 	}
 }
 
+// TestPreserveManualMemoizationGateSeesEscapedNames pins the backslash half of the text gate.
+//
+// `mayNameManualMemoization` skips a file or function whose text never spells `useMemo` or
+// `useCallback`, which is safe only because the pipeline recognises those names by cooked
+// `node.Text()`. An escape cooks to the name without spelling it, so each source below reaches the
+// pipeline, is recognised, and reports the same missing seed dependency as the plain spelling. None
+// of them contains the plain name anywhere. Dropping the file-level backslash clause, the syntax-tree
+// fallback, or the identifier or string-literal kind from that fallback each fails a case here.
+func TestPreserveManualMemoizationGateSeesEscapedNames(t *testing.T) {
+	t.Parallel()
+	const body = `function Component() {
+const field=useField();
+const seeded=%s(()=>field.value ? {value:field.value.value} : {value:undefined},[]);
+const [value]=React.useState(seeded.value);
+return <div>{value}</div>;
+}`
+	const imports = `import React from 'react'; import {useField} from './field';` + "\n"
+	for _, testCase := range []struct {
+		name, source string
+	}{
+		{"stringEscape", imports + fmt.Sprintf(body, `React['use\x4Demo']`)},
+		{"identifierEscape", strings.Replace(imports, "import React ", "import React, {use\x5cu004Demo} ", 1) +
+			fmt.Sprintf(body, "use\x5cu004Demo")},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			if strings.Contains(testCase.source, "useMemo") {
+				t.Fatalf("fixture spells the name plainly, so it cannot exercise the escape path")
+			}
+			result := runPreserveManualMemoization(t, testCase.name+".tsx", testCase.source)
+			rule_testing.ExpectFindings(t, result, "preserveManualMemoizationValueUnmemoized")
+		})
+	}
+}
+
 // TestFixturesMatchTheVendoredCorpus diffs every fixture above against the file it was copied from.
 //
 // The port brief's standing instruction is to cohere copied strings mechanically rather than by
