@@ -1,9 +1,10 @@
 package native
 
 import (
-	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 )
 
 // TestUnregisteredTypesAreRefused keeps an absent printer from reading as a perfect one.

@@ -1,11 +1,12 @@
 package native
 
 import (
-	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 )
 
 // TestResolvingFormatsEachFileWithItsOwnDirectorysOptions: two repositories with different configs,

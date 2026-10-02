@@ -2,10 +2,11 @@ package native
 
 import (
 	"fmt"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"path/filepath"
 	"sync"
+
+	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/formatoptions"
 )
 
 // Resolving formats each file with the options its own directory resolves to, the way
