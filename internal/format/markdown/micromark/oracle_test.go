@@ -207,15 +207,26 @@ func TestCorpusEventsMatchUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := upstreamEvents(t, inputs)
+	// Node reads its input and writes its events as one string each, capped at 512MB, and the events of a
+	// tree run to many times its text, so the oracle is asked in batches of about 4MB of input.
+	const batchBytes = 4 << 20
 	failures := 0
-	for index, input := range inputs {
-		if difference := firstEventDifference(expected[index], portEvents(input)); difference != "" {
-			failures++
-			if failures <= 40 {
-				t.Errorf("%s: %s", paths[index], difference)
+	for start := 0; start < len(inputs); {
+		end, size := start, 0
+		for end < len(inputs) && (end == start || size+len(inputs[end]) <= batchBytes) {
+			size += len(inputs[end])
+			end++
+		}
+		expected := upstreamEvents(t, inputs[start:end])
+		for index := start; index < end; index++ {
+			if difference := firstEventDifference(expected[index-start], portEvents(inputs[index])); difference != "" {
+				failures++
+				if failures <= 40 {
+					t.Errorf("%s: %s", paths[index], difference)
+				}
 			}
 		}
+		start = end
 	}
 	t.Logf("%d of %d files match upstream's events", len(inputs)-failures, len(inputs))
 }
