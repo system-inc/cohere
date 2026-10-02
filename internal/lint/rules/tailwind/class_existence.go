@@ -107,10 +107,18 @@ func classExistsIn(className string, system *tailwindengine.LoadedDesignSystem) 
 	// The whole class rather than its base, so the variants are parsed by the same design system
 	// that answers for the utility. A variant this repository never declared makes the class
 	// unreadable, which is correct: `notavariant:flex` compiles to nothing.
-	candidates := tailwindengine.ParseCandidate(className, system)
-	if len(candidates) == 0 {
-		return false
-	}
+	// Any candidate that resolves, not only the first. `shadow--0` is the repository's `shadow--*`
+	// first and the framework's `shadow` second, and only the second compiles.
+	return anyCandidateResolves(tailwindengine.ParseCandidate(className, system), system)
+}
 
-	return tailwindengine.ClassValueResolvesIn(&candidates[0], system)
+// anyCandidateResolves reports whether some reading of a class resolves to a value the design system
+// has, which is when the engine emits CSS for it.
+func anyCandidateResolves(candidates []tailwindengine.ParsedCandidate, system *tailwindengine.LoadedDesignSystem) bool {
+	for index := range candidates {
+		if tailwindengine.ClassValueResolvesIn(&candidates[index], system) {
+			return true
+		}
+	}
+	return false
 }

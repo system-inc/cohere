@@ -623,3 +623,55 @@ func TestClassOrderLiveDeclinesOnlyTheKnownBoundary(t *testing.T) {
 			"leaving the population", len(declined))
 	}
 }
+
+// A class ranks by the first of its readings that compiles, and a class none of whose readings
+// compile is a null. Both answers quoted from Prettier's Tailwind plugin over this repository's
+// theme on 2026-10-02, where literals holding either shape were declined until #vf1hd6j's
+// acceptance found them: 12 in ahra and 18 in www-phi-health.
+//
+// `shadow--0` reads first as the repository's `@utility shadow--*` with value `0`, needing a
+// `--shadow-0` nobody declared, and second as the framework's `shadow` with value `-0`, which finds
+// `--shadow--0`. `hover:content--0-4` reads as `@utility content--*` with value `0-4`, needing a
+// `--color-content-0-4` the theme does not have, and as nothing else.
+func TestClassOrderRanksByTheReadingThatCompiles(t *testing.T) {
+	designSystem := classOrderLiveRepositorySystem(t)
+
+	for _, testCase := range []struct {
+		input, want []string
+	}{
+		{[]string{"shadow--0", "background--0", "border--0", "border"}, []string{"border", "border--0", "background--0", "shadow--0"}},
+		{[]string{"shadow--6", "hover:shadow--3", "p-2", "rounded-md"}, []string{"rounded-md", "p-2", "shadow--6", "hover:shadow--3"}},
+		{[]string{"flex", "dark:bg-transparent", "hover:content--0-4"}, []string{"hover:content--0-4", "flex", "dark:bg-transparent"}},
+	} {
+		ordered, decided := orderClasses(testCase.input, designSystem)
+		if !decided {
+			t.Errorf("%v was declined; every class in it has an engine answer", testCase.input)
+			continue
+		}
+		if strings.Join(ordered, " ") != strings.Join(testCase.want, " ") {
+			t.Errorf("%v ordered as %v, the plugin writes %v", testCase.input, ordered, testCase.want)
+		}
+	}
+}
+
+// Existence asks the evaluator for a repository root rather than trusting it, and takes any reading
+// that resolves rather than only the first.
+//
+// The dead ones are classes the plugin ranks null over this theme: `content--0-4` has no
+// `--color-content-0-4`, and `background--2/50` puts a modifier on a utility that takes none. Both
+// sat on Structure sites with no-unknown-classes reporting nothing. The live ones are the controls,
+// and `shadow--0` is the one only a second reading reaches.
+func TestClassExistenceAsksTheEvaluatorForRepositoryRoots(t *testing.T) {
+	designSystem := classOrderLiveRepositorySystem(t)
+
+	for _, dead := range []string{"content--0-4", "hover:content--0-4", "background--2/50"} {
+		if classExistsIn(dead, designSystem.System) {
+			t.Errorf("%q generates no CSS and was read as existing", dead)
+		}
+	}
+	for _, live := range []string{"content--1", "content--4", "background--2", "shadow--0", "hover:shadow--3", "markdown-content"} {
+		if !classExistsIn(live, designSystem.System) {
+			t.Errorf("%q generates CSS and was read as unknown", live)
+		}
+	}
+}

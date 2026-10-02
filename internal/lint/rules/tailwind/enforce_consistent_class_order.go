@@ -417,11 +417,7 @@ func classCompilesIn(className string, designSystem DesignSystemResult) bool {
 	if designSystem.System == nil {
 		return true
 	}
-	candidates := tailwindengine.ParseCandidate(className, designSystem.System)
-	if len(candidates) == 0 {
-		return false
-	}
-	return tailwindengine.ClassValueResolvesIn(&candidates[0], designSystem.System)
+	return anyCandidateResolves(tailwindengine.ParseCandidate(className, designSystem.System), designSystem.System)
 }
 
 // isMarkerClass reports whether a class is one of the markers the engine ranks null.

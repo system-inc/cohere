@@ -105,6 +105,7 @@ func classOrderKeys(
 	// needs every class's variants, so a second parse per class would double the cost of the rule's
 	// hot path to recover something already in hand.
 	candidates := make(map[string]tailwindengine.ParsedCandidate, len(classes))
+	readings := make(map[string]tailwindengine.Reading, len(classes))
 	population := make([]tailwindengine.ParsedVariant, 0, len(classes))
 	for _, className := range classes {
 		parsed := tailwindengine.ParseCandidate(className, system)
@@ -114,11 +115,25 @@ func classOrderKeys(
 			// `no-unknown-classes` is the rule with something to say about it.
 			return nil, className, false
 		}
-		// The first candidate, matching `getClassOrder`'s own "take the position of the first one"
-		// at sort.ts:22. A class with several readings is compiled as the first that compiles, and
-		// ranking a later one would rank a class the engine never emits.
-		candidates[className] = parsed[0]
-		population = append(population, parsed[0].Variants...)
+		// The first candidate that compiles. The engine compiles every reading of a class and ranks
+		// it by what came out, so a reading that emits nothing has no say. This took parsed[0] until
+		// #vf1hd6j's acceptance: `shadow--0` parses first as the repository's `@utility shadow--*`
+		// with value `0`, which needs a `--shadow-0` nobody declared, and second as the framework's
+		// `shadow` with value `-0`, which finds `--shadow--0`. The first emits nothing and the second
+		// is what renders, so every literal holding one was declined.
+		chosen := -1
+		for index := range parsed {
+			if reading, hasReading := readingFor(&parsed[index], system, table); hasReading {
+				chosen = index
+				readings[className] = reading
+				break
+			}
+		}
+		if chosen < 0 {
+			return nil, className, false
+		}
+		candidates[className] = parsed[chosen]
+		population = append(population, parsed[chosen].Variants...)
 	}
 
 	// One order over the whole literal. `BuildVariantOrder` deduplicates, adds every nested
@@ -137,11 +152,7 @@ func classOrderKeys(
 			return nil, className, false
 		}
 
-		reading, hasReading := readingFor(&candidate, system, table)
-		if !hasReading {
-			return nil, className, false
-		}
-
+		reading := readings[className]
 		keys[className] = classOrderKey{mask: mask, order: reading.Order, count: reading.Count}
 	}
 	return keys, "", true

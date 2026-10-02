@@ -305,22 +305,28 @@ func ClassValueResolvesIn(candidate *ParsedCandidate, system *LoadedDesignSystem
 		root, negative = trimmed, true
 	}
 
-	// A root this repository declares is the evaluator's, and it answers shapes no framework
-	// description covers: `shadow--3` is `@utility shadow--*` with a `--shadow--3` scale behind it.
+	// A root this repository declares is the evaluator's, and the evaluator is asked.
+	//
+	// It used to be trusted: a repository root answered true without compiling, on the reasoning
+	// that declining is the safe direction. It hid a dead class. `content--0-4` reads as the
+	// repository's `@utility content--*` with value `0-4`, which needs a `--color-content-0-4` the
+	// theme never declares (it has `content-0` through `content-4` and `content--1` through
+	// `content--3`), so it emits nothing and Prettier's Tailwind plugin ranks it null, while
+	// no-unknown-classes reported nothing on the two Structure sites that carried it (#1hmzh0z).
+	// The evaluator compiles the block, so its answer is the engine's, and a candidate it cannot
+	// compile is one the engine cannot either.
+	//
+	// The comment this replaces cited `shadow--3` as a repository class. It is not: as the
+	// repository's root it needs `--shadow-3`, which does not exist, and it renders through the
+	// framework's `shadow` with value `-3`. That is a second candidate, which is why callers ask
+	// whether any candidate resolves rather than only the first.
 	//
 	// `DeclaresFunctionalUtility` rather than `HasUtility`, which answers whether a root exists at
 	// all and so says yes to every framework root. Measured with the wrong one: `text` reads as
-	// repository-declared, every class returns early, and the rule reports nothing at all.
-	//
-	// This guard is redundant on every root measured so far and is kept deliberately. `shadow--3`
-	// reads as root `shadow-`, which no framework description covers, so the decline below already
-	// answers it; removing this check leaves the whole suite green. It stays because the two reasons
-	// are not equally durable. The decline below is a side effect of nobody having written a
-	// description named `shadow-`; this states the actual rule, which is that a root the repository
-	// declared belongs to the evaluator. A repository declaring `@utility text-*` would collide with
-	// a framework description by name, and then only this would hold.
+	// repository-declared and every class goes to the evaluator.
 	if system.DeclaresFunctionalUtility(candidate.Root) || system.DeclaresFunctionalUtility(root) {
-		return true
+		_, compiles := system.Utilities().Reading(candidate)
+		return compiles
 	}
 
 	description := descriptionForRoot(root)
