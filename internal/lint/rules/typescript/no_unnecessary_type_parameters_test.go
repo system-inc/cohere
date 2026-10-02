@@ -1055,7 +1055,6 @@ type Equal<X, Y> =
 		{name: "an operand whose return is not a conditional", source: "type Same<L, R> = (<T>() => T) extends (<T>() => T) ? true : false;\n"},
 		{name: "an operand whose conditional checks another type", source: "type Same<L, R> = (<T>() => L extends T ? 1 : 2) extends (<T>() => R extends T ? 1 : 2) ? true : false;\n"},
 		{name: "a declaration returning the conditional", source: "declare function witness<T>(): T extends string ? 1 : 2;\n"},
-		{name: "a method signature inside a compared type literal", source: "type Same<L> = { m<T>(): T extends L ? 1 : 2 } extends {} ? true : false;\n"},
 	}
 	for _, testCase := range silent {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -1070,6 +1069,9 @@ type Equal<X, Y> =
 		ids    []string
 	}{
 		{name: "the conditional in a parameter of an operand", source: "type Same<L> = (<T>(input: T extends L ? 1 : 2) => void) extends (() => void) ? true : false;\n", ids: []string{"sole"}},
+		// A method signature has a receiver to cast from, so the witness principle no longer silences it
+		// (#gtgw3av), and it reports as it did when the idiom had its own recognizer and as upstream does.
+		{name: "a method signature inside a compared type literal", source: "type Same<L> = { m<T>(): T extends L ? 1 : 2 } extends {} ? true : false;\n", ids: []string{"sole"}},
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -1100,6 +1102,9 @@ declare class C {
   prop: <P>() => P;
 }
       `},
+		// OrmDrizzleConfiguration.ts:38 in api-phi-health: a free function reading the environment. The
+		// ruling's stated cost, a cast from the world rather than from an argument, kept silent (#gtgw3av).
+		{name: "a free function returning what it reads from the environment", source: "declare const process: { env: Record<string, string | undefined> };\nexport function credentialsFromEnvironment<CredentialsType>(): CredentialsType {\n    return JSON.parse(process.env.CREDENTIALS ?? '{}') as CredentialsType;\n}\n"},
 		{name: "invalid24", source: `declare function get<T>(): T;`},
 		{name: "invalid25", source: `declare function get<T extends object>(): T;`},
 		{name: "invalid36", source: `declare function makeReadonlyArray<T>(): readonly T[];`},
@@ -1140,6 +1145,12 @@ declare function f<T extends (A extends B ? C : D)>(): T | null;
 		{name: "never used is not a witness", source: "declare function nothing<T>(): void;\n", ids: []string{"sole"}},
 		{name: "used in another parameter's constraint, outside the return", source: "declare function pair<T, U extends T>(): U;\n", ids: []string{"sole"}},
 		{name: "a method with a parameter", source: "interface Store { read<T>(key: string): T }\n", ids: []string{"sole"}},
+		// A method's receiver is something to cast from, as a this parameter is (#gtgw3av). The three are
+		// api-phi-health's WorkerQueueProcessor.ts:67, OrmTrackingEntity.ts:70 and IntegrationTestEnvironment.ts:68.
+		{name: "a method returning a field as its type parameter", source: "export class Processor {\n    private message: unknown;\n    getMessage<MessageType = unknown>(): MessageType {\n        return this.message as MessageType;\n    }\n}\n", ids: []string{"sole"}},
+		{name: "a method cloning its receiver as its type parameter", source: "export class Entity {\n    clone<T extends this>(): T {\n        return Object.create(this) as T;\n    }\n}\n", ids: []string{"sole"}},
+		{name: "a method widening a field with its type parameter", source: "interface Base { a: string }\nexport class Environment {\n    private variables: Base = { a: '' };\n    getEnvironmentVariables<T>(): Base & T {\n        return this.variables as Base & T;\n    }\n}\n", ids: []string{"sole"}},
+		{name: "a parameterless method signature", source: "interface Store { current<T>(): T }\n", ids: []string{"sole"}},
 		// The default spelling of the row above. A use inside a parameter's OWN constraint has no control:
 		// the type walk counts every self-constrained shape (`<T extends Array<T>>(): T`) three times,
 		// past the threshold, so it is silent before the witness test is ever asked.

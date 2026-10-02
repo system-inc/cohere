@@ -236,6 +236,15 @@ func isTypeWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *as
 	if !ast.IsFunctionLike(owner) || len(owner.Parameters()) > 0 {
 		return false
 	}
+	// A method has a receiver whether or not it names `this` in its parameter list, and the table
+	// above counts `this` as a value parameter because a receiver can be cast from. Checking the
+	// parameter list alone left every method exempt: `getMessage<MessageType>(): MessageType` returning
+	// a field, `clone<T extends this>(): T` and `getEnvironmentVariables<T>(): Base & T` are casts from
+	// the receiver's state, which typescript-eslint reports and api-phi-health's parity sweep counted
+	// (#gtgw3av). The witnesses the ruling protects are free functions and function types.
+	if owner.Kind == ast.KindMethodDeclaration || owner.Kind == ast.KindMethodSignature {
+		return false
+	}
 	returnType := owner.Type()
 	if returnType == nil {
 		return false
