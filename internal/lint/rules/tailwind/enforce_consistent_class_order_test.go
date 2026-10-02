@@ -80,7 +80,7 @@ const classOrderFixtureStylesheetPath = "app/_theme/styles/theme.css"
 //
 // Empty when there is none, which every caller must handle rather than assume away.
 func classOrderFixturePackageRoot() string {
-	return findTailwindPackageRoot(classOrderFixtureSearchRoot)
+	return findTailwindPackageRoot(classOrderFixtureSearchRoot, diskFileExists)
 }
 
 // classOrderFixtureStylesheet is the fixture's root stylesheet.

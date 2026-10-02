@@ -153,12 +153,21 @@ func loadDesignSystemForProgram(program *compiler.Program) DesignSystemResult {
 		return DesignSystemResult{Err: fmt.Errorf("could not determine the project root from the program")}
 	}
 
-	entryPoint := findTailwindEntryPoint(projectRoot)
+	// Every question about the disk goes through the program's own filesystem rather than to `os`,
+	// because that filesystem is where the run cache's input recorder sits. A stylesheet read behind
+	// its back is an input the cache never signs, so editing an ignored or untracked stylesheet the
+	// theme imports replayed the old verdict (#ym4v8bc). Asked through it, each candidate entry point
+	// probed and missed is recorded absent, so creating one invalidates, and each probe of the
+	// package walk is recorded the same way.
+	fileSystem := program.Host().FS()
+	fileExists := fileSystem.FileExists
+
+	entryPoint := findTailwindEntryPoint(projectRoot, fileExists)
 	if entryPoint == "" {
 		return DesignSystemResult{Err: fmt.Errorf("%w: looked under %s", ErrNoTailwindEntryPoint, projectRoot)}
 	}
 
-	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint))
+	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), fileExists)
 	if packageRoot == "" {
 		return DesignSystemResult{
 			EntryPoint: entryPoint,
@@ -175,6 +184,13 @@ func loadDesignSystemForProgram(program *compiler.Program) DesignSystemResult {
 	})
 	if err != nil {
 		return DesignSystemResult{EntryPoint: entryPoint, Err: err}
+	}
+	// The stylesheets themselves are read by the engine, which does not take a filesystem, so each
+	// one in the `@import` graph is stated through the program's afterwards. That records it as a
+	// present input with its signature, which is all the cache needs: it re-signs the file on the
+	// next run and misses when the file moved.
+	for _, stylesheet := range system.Stylesheets {
+		fileSystem.Stat(stylesheet)
 	}
 	// The descriptor table is built here, on the counted path, rather than lazily on first use. A
 	// second build path would not be visible to TestDesignSystemIsBuiltOncePerProgram, and an
@@ -217,15 +233,23 @@ var tailwindEntryPointCandidates = []string{
 }
 
 // findTailwindEntryPoint returns the project's root stylesheet, or empty when there is none.
-func findTailwindEntryPoint(projectRoot string) string {
+//
+// fileExists answers for files only, never directories. The design system asks the program's
+// filesystem, so the run cache records each probe; see loadDesignSystemForProgram.
+func findTailwindEntryPoint(projectRoot string, fileExists func(path string) bool) string {
 	for _, candidate := range tailwindEntryPointCandidates {
 		path := filepath.Join(projectRoot, candidate)
-		info, err := os.Stat(path)
-		if err == nil && !info.IsDir() {
+		if fileExists(path) {
 			return path
 		}
 	}
 	return ""
+}
+
+// diskFileExists is fileExists for callers with no program to ask, which is the tests.
+func diskFileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 // findTailwindPackageRoot walks up from a directory looking for an installed `tailwindcss`.
@@ -233,11 +257,11 @@ func findTailwindEntryPoint(projectRoot string) string {
 // Upward from the stylesheet rather than from the project root, because that is how Node resolves
 // and because a monorepo hoists: this repository's stylesheet is several directories below the
 // `node_modules` that holds its Tailwind. The walk stops at the filesystem root.
-func findTailwindPackageRoot(start string) string {
+func findTailwindPackageRoot(start string, fileExists func(path string) bool) string {
 	directory := start
 	for {
 		candidate := filepath.Join(directory, "node_modules", "tailwindcss")
-		if info, err := os.Stat(filepath.Join(candidate, "index.css")); err == nil && !info.IsDir() {
+		if fileExists(filepath.Join(candidate, "index.css")) {
 			return candidate
 		}
 		parent := filepath.Dir(directory)

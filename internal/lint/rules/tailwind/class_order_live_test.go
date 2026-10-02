@@ -136,7 +136,7 @@ func classOrderLiveSystems(t *testing.T, lists []classOrderLiveList) map[string]
 			systems[list.entryPath] = DesignSystemResult{Err: err}
 			continue
 		}
-		packageRoot := findTailwindPackageRoot(filepath.Dir(list.entryPath))
+		packageRoot := findTailwindPackageRoot(filepath.Dir(list.entryPath), diskFileExists)
 		if packageRoot == "" {
 			systems[list.entryPath] = DesignSystemResult{
 				Err: fmt.Errorf("no installed tailwindcss beside %s", list.entryPath),
@@ -451,7 +451,7 @@ func classOrderLiveRepositorySystem(t *testing.T) DesignSystemResult {
 	if _, err := os.Stat(entryPoint); err != nil {
 		t.Skipf("the corpus repository is not on this machine: %v", err)
 	}
-	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint))
+	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
 	if packageRoot == "" {
 		t.Skip("no installed tailwindcss beside the corpus repository's stylesheet")
 	}

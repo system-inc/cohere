@@ -102,7 +102,7 @@ func livePlacementSystem(t *testing.T, entryPoint string) DesignSystemResult {
 	if _, err := os.Stat(entryPoint); err != nil {
 		return DesignSystemResult{Err: err}
 	}
-	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint))
+	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
 	if packageRoot == "" {
 		return DesignSystemResult{Err: os.ErrNotExist}
 	}

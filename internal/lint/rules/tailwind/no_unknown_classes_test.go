@@ -70,7 +70,7 @@ const unknownFixtureStylesheet = `@import "tailwindcss";
 
 // unknownFixturePackageRoot is the installed tailwindcss the fixture stylesheet imports.
 func unknownFixturePackageRoot() string {
-	return findTailwindPackageRoot(unknownFixtureSearchRoot)
+	return findTailwindPackageRoot(unknownFixtureSearchRoot, diskFileExists)
 }
 
 // runUnknownFixture runs the rule against a one-file program that has a real design system.
@@ -657,7 +657,7 @@ func independentLiveSystem(t *testing.T) *tailwindengine.LoadedDesignSystem {
 
 	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
-		TailwindPackageRoot: findTailwindPackageRoot(staging),
+		TailwindPackageRoot: findTailwindPackageRoot(staging, diskFileExists),
 	})
 	if err != nil {
 		t.Fatalf("loading the independent design system: %v", err)

@@ -520,7 +520,7 @@ func TestSelectorShapeCannotProduceAWrongFinding(t *testing.T) {
 
 	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
-		TailwindPackageRoot: findTailwindPackageRoot(staging),
+		TailwindPackageRoot: findTailwindPackageRoot(staging, diskFileExists),
 	})
 	if err != nil {
 		t.Fatalf("loading the nested-utility design system: %v", err)
