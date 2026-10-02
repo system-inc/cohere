@@ -56,6 +56,23 @@ struct FileShapeRuleTests {
         #expect(Self.messages(FileNamedForType(), "Pane.swift", source) == ["extensionOutsideItsFile"])
     }
 
+    @Test func aPrivateExtensionStaysBesideItsType() {
+        let source = "struct App {}\nprivate extension View { var windowEnvironment: Int { 0 } }\n"
+        #expect(Self.messages(FileNamedForType(), "App.swift", source).isEmpty)
+    }
+
+    /* The SwiftUI modifier idiom: the extension is the modifier's public face. */
+    @Test func anExtensionExposingTheFilesTypeStaysBesideIt() {
+        let source = "struct DelayWidthUntilIdle: ViewModifier {}\nextension View {\n    func delayWidthUntilIdle() -> some View { modifier(DelayWidthUntilIdle()) }\n}\n"
+        #expect(Self.messages(FileNamedForType(), "DelayWidthUntilIdle.swift", source).isEmpty)
+    }
+
+    /* One member that does not name the type is enough to send the extension to its own file. */
+    @Test func anExtensionWithUnrelatedMembersStillMoves() {
+        let source = "struct Pane {}\nextension View {\n    func pane() -> Pane { Pane() }\n    func unrelated() {}\n}\n"
+        #expect(Self.messages(FileNamedForType(), "Pane.swift", source) == ["extensionOutsideItsFile"])
+    }
+
     @Test func purposeFilesPass() {
         #expect(Self.messages(FileNamedForType(), "String+Trimming.swift", "extension String {}\n").isEmpty)
         #expect(Self.messages(FileNamedForType(), "Array+Chunks.swift", "extension Array where Element == Int {}\n").isEmpty)

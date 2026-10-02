@@ -14,6 +14,13 @@ import SwiftSyntax
    either way: `Outer.Inner+Purpose.swift` or `Outer+Purpose.swift`.
  - `main.swift` keeps its name, which SwiftPM gives meaning to (top-level code), so naming is not judged
    there. One-type-per-file still is.
+ - Two extensions of another type stay beside the file's type, because moving them would cost what the
+   ruling is for. Both were raised by @system_cohere_swift_ahraos_macos on real code:
+   - A `private` or `fileprivate` extension. It is used only in this file, and moving it out would force
+     it to `internal`, widening access to satisfy a naming rule.
+   - An extension whose every member names the file's type. `extension View { func delayWidthUntilIdle()
+     }` beside `struct DelayWidthUntilIdle: ViewModifier` is the modifier's public face, and putting it in
+     `View+Something.swift` separates the modifier from its only entry point, the opposite of findability.
  - A file with no types and no extensions (free functions, a script) has no name to match.
  */
 public struct FileNamedForType: FileRule {
@@ -45,6 +52,11 @@ public struct FileNamedForType: FileRule {
             if Self.isPurposeFile(stem: stem, for: extended.name) {
                 continue
             }
+            if let declaredName, let declaration = extended.extensionDeclaration,
+                Self.isFilePrivate(declaration) || Self.everyMemberNames(declaredName, in: declaration)
+            {
+                continue
+            }
             let suggestion = "\(extended.name.split(separator: ".").first.map(String.init) ?? extended.name)+Purpose.swift"
             let message = declaredName.map {
                 "An extension of \(extended.name) in the file for \($0). Extensions of another type belong in that type's own file, such as \(suggestion), so everything added to \(extended.name) is found together."
@@ -52,6 +64,19 @@ public struct FileNamedForType: FileRule {
             findings.append(file.finding(at: extended.token, rule: name, messageId: "extensionOutsideItsFile", message: message))
         }
         return findings
+    }
+
+    static func isFilePrivate(_ declaration: ExtensionDeclSyntax) -> Bool {
+        declaration.modifiers.contains { $0.name.tokenKind == .keyword(.private) || $0.name.tokenKind == .keyword(.fileprivate) }
+    }
+
+    /* Every member mentions the type by name, in its signature or its body: the extension exists to expose that type. */
+    static func everyMemberNames(_ typeName: String, in declaration: ExtensionDeclSyntax) -> Bool {
+        let members = declaration.memberBlock.members
+        guard !members.isEmpty else { return false }
+        return members.allSatisfy { member in
+            member.decl.tokens(viewMode: .sourceAccurate).contains { $0.tokenKind == .identifier(typeName) }
+        }
     }
 
     /* `Type+Purpose`, or `Outer+Purpose` for a nested `Outer.Inner`, or exactly the extended name. */

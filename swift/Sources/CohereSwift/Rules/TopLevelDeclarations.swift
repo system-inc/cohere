@@ -16,6 +16,8 @@ struct TopLevelDeclarations {
     struct Entry {
         var name: String
         var token: TokenSyntax
+        /* Set for extensions, so a rule can read the extension's access level and members. */
+        var extensionDeclaration: ExtensionDeclSyntax? = nil
     }
 
     var types: [Entry] = []
@@ -54,7 +56,11 @@ struct TopLevelDeclarations {
             return
         }
         if let extensionDeclaration = item.as(ExtensionDeclSyntax.self) {
-            extensions.append(Entry(name: Self.baseName(of: extensionDeclaration.extendedType), token: extensionDeclaration.extensionKeyword))
+            extensions.append(Entry(
+                name: Self.baseName(of: extensionDeclaration.extendedType),
+                token: extensionDeclaration.extensionKeyword,
+                extensionDeclaration: extensionDeclaration
+            ))
         }
     }
 
