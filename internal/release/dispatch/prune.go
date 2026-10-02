@@ -26,8 +26,16 @@ import (
 //   - Anything the prune does not recognise is kept and reported. A name it cannot classify is a name
 //     it has no business deleting.
 //
-// The patched compiler extractions are reported and never removed. Each is 66,000 files, so removing
-// one is a walk, and a pin bump is rare enough that the call belongs to whoever bumps it.
+// The compiler extractions follow the same policy. Each is about 400 MB, and they used to be reported
+// and never removed, on the reasoning that removing one is a walk of 66,000 files and a pin bump is
+// rare. The disk filled on 2026-10-02 with a stale one reported on every build since 06:41 and nobody
+// removing it, which is what a report with no owner turns into. So one not in use by the build just
+// made, and not used within the hour, is removed. A cache hit refreshes its extraction's modification
+// time (see ensureCompiler), so the hour counts from the last build that read it rather than from when
+// it was extracted, and a build still compiling against an older pin keeps it.
+//
+// Snapshot directories are removed by the build that made them. One survives only when that build was
+// killed before its deferred removal ran, so one older than the hour has no writer and is removed too.
 
 // pruneKeepNewest is how many of each kind of hash-named binary survive by recency. Generous on
 // purpose: the files are the cheap part, and an older one costs a rebuild only if it is ever asked for.
@@ -58,11 +66,15 @@ type PrunePlan struct {
 	// Unrecognised are names the prune kept because it could not classify them.
 	Unrecognised []string
 
-	// StaleCompilers are compiler extractions not in use by the current build, reported, never removed.
-	StaleCompilers []string
+	// StaleCompilers are compiler extractions to remove: not the current build's, and unused for the
+	// in-flight window. Bytes is the extraction's total size.
+	StaleCompilers []PrunedFile
+
+	// StaleSnapshots are snapshot directories a killed build left behind, older than the window.
+	StaleSnapshots []PrunedFile
 }
 
-// PrunedFile is one file a prune removes.
+// PrunedFile is one file, or one directory of the compiler or snapshot cache, that a prune removes.
 type PrunedFile struct {
 	Name  string
 	Bytes int64
@@ -71,8 +83,10 @@ type PrunedFile struct {
 // Bytes is the total a plan reclaims.
 func (plan PrunePlan) Bytes() int64 {
 	total := int64(0)
-	for _, file := range plan.Remove {
-		total += file.Bytes
+	for _, list := range [][]PrunedFile{plan.Remove, plan.StaleCompilers, plan.StaleSnapshots} {
+		for _, file := range list {
+			total += file.Bytes
+		}
 	}
 	return total
 }
@@ -150,16 +164,59 @@ func PlanPrune(paths Paths, keep []string, currentCompiler string, now time.Time
 	sort.Slice(plan.Remove, func(first int, second int) bool { return plan.Remove[first].Name < plan.Remove[second].Name })
 	sort.Strings(plan.Unrecognised)
 
-	compilers, err := os.ReadDir(paths.CompilerDirectory())
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return PrunePlan{}, fmt.Errorf("reading the compiler cache %s: %w", paths.CompilerDirectory(), err)
-	}
-	for _, compiler := range compilers {
-		if currentCompiler != "" && compiler.Name() != filepath.Base(currentCompiler) {
-			plan.StaleCompilers = append(plan.StaleCompilers, compiler.Name())
+	// Without the current compiler named, nothing says which extraction a build is reading, so none is
+	// removed.
+	if currentCompiler != "" {
+		plan.StaleCompilers, err = planStaleDirectories(paths.CompilerDirectory(), filepath.Base(currentCompiler), now)
+		if err != nil {
+			return PrunePlan{}, fmt.Errorf("reading the compiler cache: %w", err)
 		}
 	}
+	plan.StaleSnapshots, err = planStaleDirectories(paths.SnapshotDirectory(), "", now)
+	if err != nil {
+		return PrunePlan{}, fmt.Errorf("reading the snapshot cache: %w", err)
+	}
 	return plan, nil
+}
+
+// planStaleDirectories lists the directories under parent that are not current and were not touched
+// within the in-flight window, with each one's size. A missing parent holds nothing to remove.
+func planStaleDirectories(parent string, current string, now time.Time) ([]PrunedFile, error) {
+	entries, err := os.ReadDir(parent)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	stale := []PrunedFile{}
+	for _, entry := range entries {
+		if entry.Name() == current || !entry.IsDir() {
+			continue
+		}
+		information, err := entry.Info()
+		if err != nil || now.Sub(information.ModTime()) < pruneInFlightWindow {
+			continue
+		}
+		stale = append(stale, PrunedFile{Name: entry.Name(), Bytes: directoryBytes(filepath.Join(parent, entry.Name()))})
+	}
+	return stale, nil
+}
+
+// directoryBytes is the total size of the files under a directory, for the log. A file it cannot stat
+// counts as nothing, since the number reports what was reclaimed and decides nothing.
+func directoryBytes(directory string) int64 {
+	total := int64(0)
+	filepath.WalkDir(directory, func(_ string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return nil
+		}
+		if information, err := entry.Info(); err == nil {
+			total += information.Size()
+		}
+		return nil
+	})
+	return total
 }
 
 // ApplyPrune removes the plan's files, one named file at a time, and returns what it removed.
@@ -181,6 +238,37 @@ func ApplyPrune(paths Paths, plan PrunePlan) ([]PrunedFile, error) {
 			return removed, fmt.Errorf("removing %s from the binary cache: %w", file.Name, err)
 		}
 		removed = append(removed, file)
+	}
+
+	// A directory goes whole, which is the one walk the prune takes, and only by a name read from its
+	// parent's own listing: the same plain-name check as a file, joined to the one parent it was planned
+	// from.
+	for _, group := range []struct {
+		parent string
+		list   []PrunedFile
+	}{
+		{paths.CompilerDirectory(), plan.StaleCompilers},
+		{paths.SnapshotDirectory(), plan.StaleSnapshots},
+	} {
+		for _, directory := range group.list {
+			if directory.Name == "" || directory.Name == "." || directory.Name == ".." || directory.Name != filepath.Base(directory.Name) {
+				return removed, fmt.Errorf("refusing to remove %q from %s: it is not a plain directory name", directory.Name, group.parent)
+			}
+			path := filepath.Join(group.parent, directory.Name)
+			information, err := os.Lstat(path)
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			// Asked again at the moment of removal. The plan's size walk takes a moment, and a build that
+			// started meanwhile has marked the extraction in use; its compile must not lose it.
+			if err == nil && time.Since(information.ModTime()) < pruneInFlightWindow {
+				continue
+			}
+			if err := os.RemoveAll(path); err != nil {
+				return removed, fmt.Errorf("removing %s: %w", path, err)
+			}
+			removed = append(removed, PrunedFile{Name: filepath.Join(filepath.Base(group.parent), directory.Name), Bytes: directory.Bytes})
+		}
 	}
 	return removed, nil
 }
@@ -204,9 +292,6 @@ func RecordPrune(paths Paths, plan PrunePlan, removed []PrunedFile, now time.Tim
 	}
 	for _, name := range plan.Unrecognised {
 		fmt.Fprintf(&entry, "  kept unrecognised %s\n", name)
-	}
-	for _, name := range plan.StaleCompilers {
-		fmt.Fprintf(&entry, "  stale compiler %s (reported, not removed)\n", name)
 	}
 
 	log, err := os.OpenFile(paths.PruneLogPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)

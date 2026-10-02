@@ -106,25 +106,147 @@ func TestApplyPruneRefusesANameThatIsAPath(t *testing.T) {
 	}
 }
 
-func TestPruneReportsStaleCompilersAndNeverRemovesThem(t *testing.T) {
+// Compiler extractions and leftover snapshots are judged by the same rule as binaries: the current one
+// and anything used within the hour stay, the rest go. Ages are real (relative to now) rather than to
+// pruneNow, because ApplyPrune asks the clock again at the moment of removal.
+func TestPruneRemovesStaleExtractionsAndKeepsWhatABuildCanReach(t *testing.T) {
 	paths, _ := seedPruneCache(t)
-	current := filepath.Join(paths.CompilerDirectory(), "1f70213d4922-aaaaaaaaaaaaaaaa")
-	stale := filepath.Join(paths.CompilerDirectory(), "0000000000aa-bbbbbbbbbbbbbbbb")
-	writeFile(t, filepath.Join(current, "tsc", "go.mod"), "module current\n")
-	writeFile(t, filepath.Join(stale, "tsc", "go.mod"), "module stale\n")
+	now := time.Now()
+	directory := func(parent string, name string, age time.Duration) string {
+		path := filepath.Join(parent, name)
+		writeFile(t, filepath.Join(path, "tsc", "go.mod"), "module "+name+"\n")
+		stamp := now.Add(-age)
+		if err := os.Chtimes(path, stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	// Older than everything, and kept because the build just made reads it.
+	current := directory(paths.CompilerDirectory(), "currentcurrentcurrentcurrentcurrentcurren", 900*time.Hour)
+	// Another pin, read by a build within the hour.
+	inUse := directory(paths.CompilerDirectory(), "inuseinuseinuseinuseinuseinuseinuseinuse", 10*time.Minute)
+	stale := directory(paths.CompilerDirectory(), "stalestalestalestalestalestalestalestale", 5*time.Hour)
+	abandoned := directory(paths.CompilerDirectory(), "stalestalestalestalestalestalestalestale.partial-1", 5*time.Hour)
+	extracting := directory(paths.CompilerDirectory(), "freshfreshfreshfreshfreshfreshfreshfresh.partial-2", time.Minute)
+	killed := directory(paths.SnapshotDirectory(), "58cd5d457ebf-1999002027", 3*time.Hour)
+	building := directory(paths.SnapshotDirectory(), "58cd5d457ebf-1130357668", 2*time.Minute)
 
-	plan, err := PlanPrune(paths, nil, current, pruneNow)
+	plan, err := PlanPrune(paths, nil, current, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(plan.StaleCompilers, []string{filepath.Base(stale)}) {
-		t.Fatalf("stale compilers %v, expected only %s", plan.StaleCompilers, filepath.Base(stale))
+	names := func(list []PrunedFile) []string {
+		out := []string{}
+		for _, entry := range list {
+			if entry.Bytes == 0 {
+				t.Errorf("%s planned with no size, so the log would understate what was reclaimed", entry.Name)
+			}
+			out = append(out, entry.Name)
+		}
+		sort.Strings(out)
+		return out
+	}
+	wantCompilers := []string{filepath.Base(stale), filepath.Base(abandoned)}
+	sort.Strings(wantCompilers)
+	if got := names(plan.StaleCompilers); !reflect.DeepEqual(got, wantCompilers) {
+		t.Fatalf("stale compilers %v, expected %v", got, wantCompilers)
+	}
+	if got := names(plan.StaleSnapshots); !reflect.DeepEqual(got, []string{filepath.Base(killed)}) {
+		t.Fatalf("stale snapshots %v, expected only %s", got, filepath.Base(killed))
+	}
+
+	if _, err := ApplyPrune(paths, plan); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{stale, abandoned, killed} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("%s survived the prune: %v", path, err)
+		}
+	}
+	for _, path := range []string{current, inUse, extracting, building} {
+		if _, err := os.Stat(filepath.Join(path, "tsc", "go.mod")); err != nil {
+			t.Errorf("%s was removed, and a build can still reach it: %v", path, err)
+		}
+	}
+
+	// Without the current compiler named, nothing says which one a build reads, so none is planned.
+	if unknown, err := PlanPrune(paths, nil, "", now); err != nil || len(unknown.StaleCompilers) != 0 {
+		t.Fatalf("with no current compiler, planned %v (err %v)", unknown.StaleCompilers, err)
+	}
+}
+
+// A build that touches an extraction between the plan and its removal keeps it. The plan is made, the
+// extraction is marked used the way ensureCompiler marks it, and the apply must leave it.
+func TestApplyPruneKeepsAnExtractionTouchedSinceThePlan(t *testing.T) {
+	paths, _ := seedPruneCache(t)
+	now := time.Now()
+	current := filepath.Join(paths.CompilerDirectory(), "current")
+	writeFile(t, filepath.Join(current, "tsc", "go.mod"), "module current\n")
+	raced := filepath.Join(paths.CompilerDirectory(), "raced")
+	writeFile(t, filepath.Join(raced, "tsc", "go.mod"), "module raced\n")
+	old := now.Add(-5 * time.Hour)
+	if err := os.Chtimes(raced, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := PlanPrune(paths, nil, current, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.StaleCompilers) != 1 {
+		t.Fatalf("expected the raced extraction planned, got %v", plan.StaleCompilers)
+	}
+	if err := os.Chtimes(raced, time.Now(), time.Now()); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := ApplyPrune(paths, plan); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(stale, "tsc", "go.mod")); err != nil {
-		t.Fatalf("a stale compiler was removed, which is a walk the prune must not take: %v", err)
+	if _, err := os.Stat(filepath.Join(raced, "tsc", "go.mod")); err != nil {
+		t.Fatalf("an extraction a build marked in use after the plan was removed: %v", err)
+	}
+}
+
+// The other half of the race: a build reusing an extraction marks it, so the hour counts from that
+// build. Without the mark, a pin extracted yesterday is stale to the prune while a build compiles
+// against it.
+func TestEnsureCompilerMarksAReusedExtractionInUse(t *testing.T) {
+	paths := Paths{ModuleDirectory: t.TempDir(), CacheDirectory: t.TempDir()}
+	commit := "8d550c837c90bd1805b047b7eeccc2baac2d5e7a"
+	extraction := filepath.Join(paths.CompilerDirectory(), commit)
+	writeFile(t, filepath.Join(extraction, "tsc", "go.mod"), "module tsc\n")
+	old := time.Now().Add(-48 * time.Hour)
+	if err := os.Chtimes(extraction, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ensureCompiler(paths, commit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != extraction {
+		t.Fatalf("reused %s, expected %s", got, extraction)
+	}
+	information, err := os.Stat(extraction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(information.ModTime()) > time.Minute {
+		t.Fatalf("a reused extraction still reads as last used at %s, so a prune would take it mid-build", information.ModTime())
+	}
+}
+
+func TestApplyPruneRefusesADirectoryNameThatIsAPath(t *testing.T) {
+	paths, _ := seedPruneCache(t)
+	outside := filepath.Join(paths.CacheDirectory, "keep")
+	writeFile(t, filepath.Join(outside, "file"), "not in the compiler cache\n")
+
+	_, err := ApplyPrune(paths, PrunePlan{StaleCompilers: []PrunedFile{{Name: "../keep"}}})
+	if err == nil {
+		t.Fatal("a directory name that walks out of the compiler cache was accepted")
+	}
+	if _, statErr := os.Stat(filepath.Join(outside, "file")); statErr != nil {
+		t.Fatalf("the directory outside the compiler cache was removed: %v", statErr)
 	}
 }
 

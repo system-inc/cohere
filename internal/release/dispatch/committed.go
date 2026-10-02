@@ -236,15 +236,11 @@ func pruneAfterBuild(paths Paths, keep string, currentCompiler string) {
 		for _, file := range removed {
 			bytes += file.Bytes
 		}
-		fmt.Fprintf(os.Stderr, "cohere: pruned %d cached binaries (%.1f GB) unused for over an hour; names in %s\n",
+		fmt.Fprintf(os.Stderr, "cohere: pruned %d cached binaries and extractions (%.1f GB) unused for over an hour; names in %s\n",
 			len(removed), float64(bytes)/1e9, paths.PruneLogPath())
 	}
 	if applyErr != nil {
 		fmt.Fprintf(os.Stderr, "cohere: the prune stopped part way: %v\n", applyErr)
-	}
-	if len(plan.StaleCompilers) > 0 {
-		fmt.Fprintf(os.Stderr, "cohere: %d compiler extraction(s) under %s are no longer in use and were kept; each is 66,000 files, so removing one is a call for whoever moved the pin\n",
-			len(plan.StaleCompilers), paths.CompilerDirectory())
 	}
 }
 
@@ -256,6 +252,12 @@ func ensureCompiler(paths Paths, compilerCommit string) (string, error) {
 	compiler := filepath.Join(paths.CompilerDirectory(), key)
 
 	if _, err := os.Stat(compiler); err == nil {
+		// Marked as used, because the prune removes an extraction untouched for an hour and an
+		// extraction's own time is when it was made. A build against a pin extracted yesterday would
+		// otherwise compile against a directory the next prune is free to take.
+		if err := os.Chtimes(compiler, time.Now(), time.Now()); err != nil {
+			return "", fmt.Errorf("marking the compiler at %s in use: %w", release.ShortCommit(compilerCommit), err)
+		}
 		return compiler, nil
 	}
 
