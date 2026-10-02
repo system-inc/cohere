@@ -8,6 +8,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/system-inc/cohere/internal/format/printing"
 )
 
 // ParseJSON is Prettier's json parsers, src/language-json/parse/json.js: Babel's parseExpression over
@@ -26,7 +28,15 @@ import (
 // CommentLine and CommentBlock; the printer treats the two spellings identically everywhere.
 //
 // allowEmpty (jsonc) is not supported: no parser our files resolve to sets it.
+//
+// Every refusal is marked printing.Syntax, so the format phase skips a file that is not JSON rather
+// than reporting a broken formatter.
 func ParseJSON(text string, allowComments bool) (*Node, []*Node, error) {
+	root, comments, err := parseJSON(text, allowComments)
+	return root, comments, printing.Syntax(err)
+}
+
+func parseJSON(text string, allowComments bool) (*Node, []*Node, error) {
 	reader := &jsonReader{text: text}
 	reader.skipTrivia()
 	if reader.position >= len(text) {

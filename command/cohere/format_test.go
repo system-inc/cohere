@@ -331,6 +331,11 @@ func TestTheNativeEnginesParseErrorsAreRecognized(t *testing.T) {
 		"a.ts":  "const a = ;\n",
 		"a.tsx": "const a = <span>;\n",
 		"a.js":  "function (\n",
+		// Their parsers word failures their own way ("json: line 1: ...", graphql-js's "Syntax Error: ..."),
+		// so only printing.Syntax's mark tells the phase they are parse failures.
+		"a.json":       "{ \"a\": }\n",
+		"package.json": "{ \"a\": 1, // comments are not allowed in json-stringify\n}\n",
+		"a.graphql":    "query { a(b: ) }\n",
 	} {
 		_, formatError := engine.Format(fileName, malformed)
 		if formatError == nil {

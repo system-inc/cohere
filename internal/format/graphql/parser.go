@@ -1,6 +1,9 @@
 package graphql
 
-import "github.com/system-inc/cohere/internal/format/estree"
+import (
+	"github.com/system-inc/cohere/internal/format/estree"
+	"github.com/system-inc/cohere/internal/format/printing"
+)
 
 // graphql-js 17.0.2, language/parser.js: parse and the Parser class it drives, with parseComments
 // from Prettier's src/language-graphql/parser-graphql.js.
@@ -34,7 +37,9 @@ func Parse(text string) (document *estree.Node, comments []*estree.Node, err err
 			if !isSyntaxError {
 				panic(recovered)
 			}
-			document, comments, err = nil, nil, parseError
+			// Marked as a parse failure, so the format phase skips the file rather than reporting a broken
+			// formatter.
+			document, comments, err = nil, nil, printing.Syntax(parseError)
 		}
 	}()
 
