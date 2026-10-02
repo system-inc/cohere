@@ -76,10 +76,10 @@ var UnifiedSignatures = rule.Rule{
 		if ctx.SourceFile == nil {
 			return nil
 		}
-		settings, _ := options.(*UnifiedSignaturesOptions)
-		if settings == nil {
-			settings = &UnifiedSignaturesOptions{}
-		}
+		// The value type, because that is what `DecodeOptionsInto` hands over. This line asserted a
+		// pointer once, the comma-ok form swallowed the mismatch, and both options read false for
+		// every configuration; `TestUnifiedSignaturesOptionsArriveThroughTheDecoder` holds it.
+		settings, _ := options.(UnifiedSignaturesOptions)
 
 		// One listener that walks the file itself, rather than a listener per scope kind with an
 		// exit hook. Upstream pairs each `X` with an `X:exit` and checks a scope when it closes;
@@ -111,7 +111,7 @@ type UnifiedSignaturesOptions struct {
 // source text, and the two options.
 type unifiedSignaturesChecker struct {
 	ctx      rule.Context
-	settings *UnifiedSignaturesOptions
+	settings UnifiedSignaturesOptions
 }
 
 // checkScope groups the signatures directly inside one scope, compares each group pairwise, and

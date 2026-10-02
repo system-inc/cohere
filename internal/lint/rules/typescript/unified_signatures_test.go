@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -29,6 +30,15 @@ import (
 // bytes the rule saw.
 func asTheHarnessWroteIt(sourceText string) string {
 	return strings.TrimSpace(sourceText) + "\n"
+}
+
+// unifiedSignaturesOptionsAsDecoded hands the rule what the config layer hands it: the options struct
+// by value, or nil when nothing was configured. The table keeps pointers only so a row can say nil.
+func unifiedSignaturesOptionsAsDecoded(options *UnifiedSignaturesOptions) any {
+	if options == nil {
+		return nil
+	}
+	return *options
 }
 
 func unifiedSignaturesFileFor(isJsx bool) string {
@@ -322,7 +332,7 @@ func TestUnifiedSignaturesValid(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		result := rule_testing.RunWithOptions(t, UnifiedSignatures,
-			unifiedSignaturesFileFor(testCase.isJsx), testCase.sourceText, testCase.options)
+			unifiedSignaturesFileFor(testCase.isJsx), testCase.sourceText, unifiedSignaturesOptionsAsDecoded(testCase.options))
 		rule_testing.ExpectClean(t, result)
 	}
 }
@@ -867,7 +877,7 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		result := rule_testing.RunWithOptions(t, UnifiedSignatures,
-			unifiedSignaturesFileFor(testCase.isJsx), testCase.sourceText, testCase.options)
+			unifiedSignaturesFileFor(testCase.isJsx), testCase.sourceText, unifiedSignaturesOptionsAsDecoded(testCase.options))
 		rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 
 		if len(result.Diagnostics) != len(testCase.wantSpans) {
@@ -893,5 +903,64 @@ func TestUnifiedSignaturesInvalid(t *testing.T) {
 					findingIndex, reported.Message.Description, want)
 			}
 		}
+	}
+}
+
+// TestUnifiedSignaturesOptionsArriveThroughTheDecoder starts from JSON and the registration's own
+// Decode, which is the only path a configured option takes in a real run.
+//
+// Every other test here builds the options struct directly, so they all passed while the rule
+// asserted a pointer and the decoder returned a value: both options read false for every
+// configuration, and nothing in this file could see it. These rows pair each option's default with
+// its configured value on the same source, so a rule that ignores the option fails one of the pair.
+func TestUnifiedSignaturesOptionsArriveThroughTheDecoder(t *testing.T) {
+	t.Parallel()
+
+	var decode func(raw []byte) (any, error)
+	for _, registration := range rule.Registered() {
+		if registration.Rule.Name == UnifiedSignatures.Name {
+			decode = registration.Decode
+		}
+	}
+	if decode == nil {
+		t.Fatalf("%s is not registered with a Decode", UnifiedSignatures.Name)
+	}
+
+	cases := []struct {
+		name       string
+		sourceText string
+		option     string
+	}{
+		{
+			name:       "ignoreDifferentlyNamedParameters",
+			sourceText: "function f(a: number): void;\nfunction f(b: string): void;\nfunction f(a: number | string): void {}\n",
+			option:     "ignoreDifferentlyNamedParameters",
+		},
+		{
+			name:       "ignoreOverloadsWithDifferentJSDoc",
+			sourceText: "/** @deprecated */\ndeclare function f(x: number): unknown;\ndeclare function f(x: boolean): unknown;\n",
+			option:     "ignoreOverloadsWithDifferentJSDoc",
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, value := range []string{"false", "true"} {
+				raw := `{"` + testCase.option + `": ` + value + `}`
+				decoded, err := decode([]byte(raw))
+				if err != nil {
+					t.Fatalf("decoding %s: %v", raw, err)
+				}
+				result := rule_testing.RunWithOptions(t, UnifiedSignatures, "file.ts", testCase.sourceText, decoded)
+				if value == "false" {
+					// The baseline: without the option this source reports, so the true row below
+					// can only go quiet because the option reached the rule.
+					rule_testing.ExpectFindings(t, result, "singleParameterDifference")
+				} else {
+					rule_testing.ExpectClean(t, result)
+				}
+			}
+		})
 	}
 }
