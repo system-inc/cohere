@@ -136,7 +136,7 @@ func (probe *designSystemProbe) rule() rule.Rule {
 		// forever once a findings cache exists, which is the failure ReadsProgram was added for.
 		ReadsProgram: true,
 		Run: func(ctx rule.Context, _ any) rule.Listeners {
-			result := DesignSystemForProgram(ctx)
+			result := DesignSystemForProgram(ctx.Program)
 			probe.mutex.Lock()
 			probe.results = append(probe.results, result)
 			probe.files++
@@ -671,7 +671,7 @@ func TestDesignSystemIsSafeUnderTheParallelWalk(t *testing.T) {
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			systems[index] = DesignSystemForProgram(rule.Context{Program: graph.Program}).System
+			systems[index] = DesignSystemForProgram(graph.Program).System
 		}()
 	}
 	waitGroup.Wait()

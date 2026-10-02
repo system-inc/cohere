@@ -57,7 +57,6 @@ import (
 	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
-	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
@@ -115,23 +114,30 @@ var designSystemCache struct {
 // cache keyed on the linted file alone is stale whenever `theme.css` changes and the `.tsx` file
 // does not: zero findings, forever, indistinguishable from a clean tree.
 //
+// It takes the program rather than the rule's Context so that the declaration is enforced rather
+// than asked for. The guard in internal/release/dispatch is textual: a rule file that names
+// `ctx.Program` must declare. When this took the Context, a rule could call it without ever writing
+// `ctx.Program`, and the five rules that did passed the guard only because each also checked
+// `ctx.Program == nil` somewhere else in the file (#ym4v8bc). Now the call itself is what the guard
+// reads.
+//
 // A nil program is a hard miss rather than a shared entry. The harnesses that build a Context by
 // hand leave Program nil, and letting them share one cache slot would mean two unrelated fixtures
 // reading each other's design system, which is the same bug the pointer key exists to prevent.
-func DesignSystemForProgram(ctx rule.Context) DesignSystemResult {
-	if ctx.Program == nil {
+func DesignSystemForProgram(program *compiler.Program) DesignSystemResult {
+	if program == nil {
 		return DesignSystemResult{Err: fmt.Errorf("no program: a design system cannot be located without one")}
 	}
 
 	designSystemCache.Lock()
 	defer designSystemCache.Unlock()
 
-	if designSystemCache.program == ctx.Program {
+	if designSystemCache.program == program {
 		return designSystemCache.result
 	}
 
-	result := loadDesignSystemForProgram(ctx.Program)
-	designSystemCache.program = ctx.Program
+	result := loadDesignSystemForProgram(program)
+	designSystemCache.program = program
 	designSystemCache.result = result
 	return result
 }

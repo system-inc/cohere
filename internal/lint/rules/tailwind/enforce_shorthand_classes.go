@@ -194,7 +194,7 @@ var EnforceShorthandClasses = rule.Rule{
 		// nil when there is no design system to ask, and classExistsIn answers true for nil.
 		var system *tailwindengine.LoadedDesignSystem
 		if ctx.Program != nil {
-			if designSystem := DesignSystemForProgram(ctx); designSystem.Err == nil {
+			if designSystem := DesignSystemForProgram(ctx.Program); designSystem.Err == nil {
 				system = designSystem.System
 			}
 		}

@@ -97,7 +97,7 @@ var EnforceCanonicalClasses = rule.Rule{
 		// Resolved once per file and before the listeners are built, matching the other two migrated
 		// rules. A project with no Tailwind is silence with nothing wrong; a project whose CSS will
 		// not parse is reported once per file rather than swallowed.
-		designSystem := DesignSystemForProgram(ctx)
+		designSystem := DesignSystemForProgram(ctx.Program)
 		if designSystem.Err != nil {
 			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) || ctx.Program == nil {
 				return nil

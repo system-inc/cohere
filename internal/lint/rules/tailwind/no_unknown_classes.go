@@ -84,7 +84,7 @@ var NoUnknownClasses = rule.Rule{
 		// CSS will not parse is reported once per file. This rule needs that distinction more than
 		// the others do, because a design system that failed to load would otherwise make every
 		// class in the tree read as unknown.
-		designSystem := DesignSystemForProgram(ctx)
+		designSystem := DesignSystemForProgram(ctx.Program)
 		if designSystem.Err != nil {
 			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) || ctx.Program == nil {
 				return nil

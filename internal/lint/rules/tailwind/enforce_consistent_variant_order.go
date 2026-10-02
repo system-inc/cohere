@@ -88,7 +88,7 @@ var EnforceConsistentVariantOrder = rule.Rule{
 			return nil
 		}
 
-		designSystem := DesignSystemForProgram(ctx)
+		designSystem := DesignSystemForProgram(ctx.Program)
 		if designSystem.Err != nil {
 			if errors.Is(designSystem.Err, ErrNoTailwindEntryPoint) || ctx.Program == nil {
 				return nil
