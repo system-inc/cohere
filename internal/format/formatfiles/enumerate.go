@@ -191,11 +191,9 @@ func Enumerate(root string, structureIgnorePath string, handles func(fileName st
 			// paths, so nothing in .gitignore or .prettierignore mentions it. Tonight a whole-tree
 			// run wrote a line into libraries/structure, and the change was correct and still
 			// unrequested. A formatter should not edit a repository nobody asked it to touch.
-			if relative != "." {
-				if _, err := os.Stat(filepath.Join(path, ".git")); err == nil {
-					enumeration.NestedRepositories = append(enumeration.NestedRepositories, relative)
-					return filepath.SkipDir
-				}
+			if relative != "." && HasOwnRepository(path) {
+				enumeration.NestedRepositories = append(enumeration.NestedRepositories, relative)
+				return filepath.SkipDir
 			}
 
 			// Prune an ignored directory rather than descending and filtering its contents. This is
@@ -242,4 +240,38 @@ func Enumerate(root string, structureIgnorePath string, handles func(fileName st
 	}
 
 	return enumeration, nil
+}
+
+// HasOwnRepository reports whether a directory is the root of a git repository of its own: it holds a
+// `.git`, a directory for a clone or a file for a submodule's gitlink.
+//
+// This is the boundary both writing phases share. The format walk refuses to descend past it, and the
+// fix phase refuses to write past it on a whole-tree run, so neither edits a repository nobody asked
+// it to touch.
+func HasOwnRepository(directory string) bool {
+	_, err := os.Stat(filepath.Join(directory, ".git"))
+	return err == nil
+}
+
+// NestedRepositoryContaining returns the outermost repository of its own that holds fileName below
+// root, relative to root, or "" when the file belongs to root's repository or lies outside root.
+//
+// The outermost rather than the nearest, because that is the directory the format walk skips: a file
+// in libraries/structure/libraries/nexus is reported under libraries/structure, the repository a run
+// in the parent would have had to name.
+func NestedRepositoryContaining(root string, fileName string) string {
+	root = filepath.Clean(root)
+	nested := ""
+	for directory := filepath.Dir(filepath.Clean(fileName)); ; directory = filepath.Dir(directory) {
+		relative, err := filepath.Rel(root, directory)
+		if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return nested
+		}
+		if HasOwnRepository(directory) {
+			nested = relative
+		}
+		if parent := filepath.Dir(directory); parent == directory {
+			return nested
+		}
+	}
 }

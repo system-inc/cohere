@@ -176,3 +176,66 @@ func TestAFixRunWritesOnlyWhatWasNamed(t *testing.T) {
 		}
 	})
 }
+
+// A whole-tree fix run does not write into a repository of its own below the root, the boundary the
+// format walk already kept (#sqc145r). `cohere --fix --format --format-all` in api-phi-health applied
+// six return-await fixes inside Base, a nested repository nobody named, and they had to be reverted.
+//
+// Each case carries the project's own violations beside the nested one, so the project's files being
+// fixed is the control that proves the fixer ran, and the nested file staying byte-identical is the
+// boundary. Both shapes a nested repository takes are covered: a clone, whose `.git` is a directory,
+// and a submodule, whose `.git` is a gitlink file.
+func TestAFixRunDoesNotWriteIntoANestedRepository(t *testing.T) {
+	binary := buildCohere(t)
+	nestedViolation := "export function inside(): number {\n    debugger;\n    return 4;\n}\n"
+
+	shapes := []struct {
+		name  string
+		plant func(t *testing.T, nested string)
+	}{
+		{"a clone", func(t *testing.T, nested string) { gitIn(t, nested, "init", "--quiet") }},
+		{"a submodule's gitlink", func(t *testing.T, nested string) {
+			writeTree(t, nested, map[string]string{".git": "gitdir: ../.git/modules/nested\n"})
+		}},
+	}
+	for _, shape := range shapes {
+		t.Run(shape.name+": a whole-tree run leaves it alone and says so", func(t *testing.T) {
+			root := t.TempDir()
+			fixScopeProject(t, root, map[string]string{"nested/Inside.ts": nestedViolation})
+			shape.plant(t, filepath.Join(root, "nested"))
+
+			output, code := runCohere(t, binary, root, "--fix")
+			if code != 0 {
+				t.Fatalf("exit %d:\n%s", code, output)
+			}
+			for _, name := range []string{"Producer.ts", "Consumer.ts", "Sibling.ts"} {
+				if strings.Contains(readForTest(t, filepath.Join(root, name)), "debugger") {
+					t.Fatalf("the control failed: the project's own %s kept its violation, so the fixer never ran:\n%s", name, output)
+				}
+			}
+			if after := readForTest(t, filepath.Join(root, "nested", "Inside.ts")); after != nestedViolation {
+				t.Errorf("a file in a nested repository nobody named was rewritten:\n%s\noutput:\n%s", after, output)
+			}
+			if !strings.Contains(output, "1 fix not applied: in nested repository nested") {
+				t.Errorf("the withheld fix was not reported:\n%s", output)
+			}
+		})
+	}
+
+	t.Run("naming a path inside it writes it", func(t *testing.T) {
+		root := t.TempDir()
+		fixScopeProject(t, root, map[string]string{"nested/Inside.ts": nestedViolation})
+		gitIn(t, filepath.Join(root, "nested"), "init", "--quiet")
+
+		output, code := runCohere(t, binary, root, "--fix", "nested/Inside.ts")
+		if code != 0 {
+			t.Fatalf("exit %d:\n%s", code, output)
+		}
+		if strings.Contains(readForTest(t, filepath.Join(root, "nested", "Inside.ts")), "debugger") {
+			t.Errorf("a named file inside a nested repository was not written:\n%s", output)
+		}
+		if strings.Contains(output, "not applied: in nested repository") {
+			t.Errorf("a named file was reported as withheld:\n%s", output)
+		}
+	})
+}

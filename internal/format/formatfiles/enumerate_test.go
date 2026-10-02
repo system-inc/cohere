@@ -201,3 +201,46 @@ func handlesEveryLanguage(path string) bool {
 	}
 	return false
 }
+
+// NestedRepositoryContaining names the outermost repository of its own below the root, the one the
+// format walk skips and a run in the parent would have to name. Two levels deep, because one level
+// cannot tell the outermost from the nearest; and outside the root, and in the root's own repository,
+// it names nothing.
+func TestNestedRepositoryContainingNamesTheOutermostBelowTheRoot(t *testing.T) {
+	root := t.TempDir()
+	for _, directory := range []string{
+		filepath.Join(root, ".git"),
+		filepath.Join(root, "libraries", "structure", ".git"),
+		filepath.Join(root, "libraries", "structure", "libraries", "nexus"),
+		filepath.Join(root, "source"),
+	} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The inner repository is a submodule, whose `.git` is a gitlink file rather than a directory.
+	gitlink := filepath.Join(root, "libraries", "structure", "libraries", "nexus", ".git")
+	if err := os.WriteFile(gitlink, []byte("gitdir: ../../.git/modules/nexus\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		fileName string
+		want     string
+	}{
+		{filepath.Join(root, "libraries", "structure", "libraries", "nexus", "source", "Thing.ts"), filepath.Join("libraries", "structure")},
+		{filepath.Join(root, "libraries", "structure", "source", "Button.tsx"), filepath.Join("libraries", "structure")},
+		{filepath.Join(root, "source", "Own.ts"), ""},
+		{filepath.Join(root, "Root.ts"), ""},
+		{filepath.Join(filepath.Dir(root), "Elsewhere.ts"), ""},
+	}
+	for _, testCase := range cases {
+		if got := NestedRepositoryContaining(root, testCase.fileName); got != testCase.want {
+			t.Errorf("NestedRepositoryContaining(%s) = %q, want %q", testCase.fileName, got, testCase.want)
+		}
+	}
+
+	if !HasOwnRepository(filepath.Dir(gitlink)) {
+		t.Error("a submodule's gitlink file was not recognized as a repository of its own")
+	}
+}

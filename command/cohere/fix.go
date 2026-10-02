@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/edit"
+	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -82,8 +83,19 @@ func applyProposedFixes(
 	// importers of a named file, or the whole tree past the closure limit. Checking them is honest;
 	// rewriting them is not, because nobody asked for those files to change. The finding still
 	// reaches the lint phase, so a withheld repair is reported rather than lost.
+	//
+	// A whole-tree run has no stated set to filter against, so it is bounded the way the format walk is:
+	// nothing is written inside a repository of its own below the root (a submodule, or any directory
+	// with its own `.git`). The files are still checked and their findings still reported; only the
+	// write is withheld, and counted per repository so the run says what it did not apply. A run that
+	// names a path inside one has asked for it, and its stated scope admits the file as before.
 	byFileName := map[string][]edit.Proposal{}
 	withheld := map[string]struct{}{}
+	inNestedRepository := map[string]int{}
+	root := ""
+	if graph.Config != nil {
+		root = graph.Config.GetCurrentDirectory()
+	}
 	for _, diagnostic := range result.Diagnostics {
 		if diagnostic.SourceFile == nil || len(diagnostic.Fixes) == 0 {
 			continue
@@ -93,6 +105,12 @@ func applyProposedFixes(
 			withheld[fileName] = struct{}{}
 			continue
 		}
+		if writable.Everything && root != "" {
+			if nested := formatfiles.NestedRepositoryContaining(root, fileName); nested != "" {
+				inNestedRepository[nested] += len(diagnostic.Fixes)
+				continue
+			}
+		}
 		for _, proposed := range diagnostic.Fixes {
 			byFileName[fileName] = append(byFileName[fileName], edit.Proposal{
 				RuleName: diagnostic.RuleName,
@@ -101,6 +119,7 @@ func applyProposedFixes(
 		}
 	}
 	reportWithheld(withheld, writable)
+	reportInNestedRepositories(os.Stderr, inNestedRepository)
 
 	// The file set is the union of "something proposed a fix here" and "this file can be formatted",
 	// and the union rather than the intersection is the whole point. Fixing is driven by findings, so
@@ -241,6 +260,28 @@ func reportWithheld(withheld map[string]struct{}, writable formatScope) {
 	fmt.Fprintf(os.Stderr,
 		"note: %d file%s outside %s had fixable findings and %s not rewritten, because only what was stated is written: %s%s\n",
 		len(names), plural(len(names)), stated, verb, strings.Join(listed, ", "), more)
+}
+
+// reportInNestedRepositories says, per repository, how many fixes a whole-tree run did not apply
+// because they sit in a repository of its own below the root.
+//
+// Said every time there are any, because the alternative is the defect this replaces in reverse: a
+// run that quietly leaves fixable findings in place reads as a run that fixed everything it could.
+func reportInNestedRepositories(out io.Writer, fixesByRepository map[string]int) {
+	repositories := make([]string, 0, len(fixesByRepository))
+	for repository := range fixesByRepository {
+		repositories = append(repositories, repository)
+	}
+	sort.Strings(repositories)
+	for _, repository := range repositories {
+		count := fixesByRepository[repository]
+		noun := "fixes"
+		if count == 1 {
+			noun = "fix"
+		}
+		fmt.Fprintf(out, "note: %d %s not applied: in nested repository %s, which a run here does not write unless it is named\n",
+			count, noun, repository)
+	}
 }
 
 // proposalsForText re-runs the rules against rewritten text.
