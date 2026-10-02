@@ -27,6 +27,9 @@ public enum RuleRegistry {
         DuplicateImports(),
         DuplicatedDictionaryKey(),
         IdenticalOperands(),
+        DuplicateConditions(),
+        UnusedOptionalBinding(),
+        UnusedClosureParameter(),
         SwiftFormatRule.requireLowerCamelCase,
         SwiftFormatRule.noLeadingUnderscores,
     ] }

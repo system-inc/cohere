@@ -48,6 +48,9 @@ struct RuleMapping: Sendable {
         RuleMapping(incumbent: .swiftLint, incumbentRule: "duplicate_imports", rules: ["cohere-swift/duplicate-imports"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "duplicated_key_in_dictionary_literal", rules: ["cohere-swift/duplicated-dictionary-key"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "identical_operands", rules: ["cohere-swift/identical-operands"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "duplicate_conditions", rules: ["cohere-swift/duplicate-conditions"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "unused_optional_binding", rules: ["cohere-swift/unused-optional-binding"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "unused_closure_parameter", rules: ["cohere-swift/unused-closure-parameter"]),
         RuleMapping(incumbent: .swiftFormat, incumbentRule: "NoLeadingUnderscores", rules: ["cohere-swift/no-leading-underscores"]),
     ]
 
