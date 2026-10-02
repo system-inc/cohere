@@ -337,54 +337,148 @@ func CheckFile(fileName string, propose Propose, transform Transform, maxPasses 
 // An editor formatting a buffer before it saves needs exactly what a run would write for that file,
 // computed from text that is not on disk yet. Splitting the write off rather than copying the rest is
 // what keeps the two answers the same answer.
+//
+// The transform's output is linted again whenever it changed the text, because a printer can write
+// what a rule repairs. Breaking a one-line block-bodied arrow across lines is the case that found it:
+// 51 arrows in 23 of www-phi-health's files met consistency-no-multiline-arrow-function, whose fix then
+// waited for the next run, so one `--fix --format` left files its own `--no-fix` check flagged. When a
+// fixer fires on the printed text, the fixes land and the result is formatted again, up to
+// FormatFixRoundLimit rounds. A file still changing after that is left exactly as it was found and
+// reported as not converged, naming the rules and the formatter, never written half-settled.
 func FixAndTransformText(fileName string, text string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
 	result, err := FixText(fileName, text, propose, maxPasses)
-	if err != nil {
+	if err != nil || transform == nil {
 		return result, err
 	}
-
-	if transform != nil {
-		transformed, transformError := transform(fileName, result.Text)
-		switch {
-		case errors.Is(transformError, ErrSkipped):
-			// The transform declined this file on purpose — a file type it does not handle, or one it
-			// handles incorrectly today. Recorded rather than treated as a failure, because the two
-			// mean different things to a reader: a failure says the formatter broke, a skip says it
-			// chose not to look, and a run where a formatter skipped four hundred files must not read
-			// as a run where four hundred files were already correctly formatted.
-			result.TransformSkipped = true
-			result.TransformSkipReason = skipReasonOf(transformError)
-
-		case transformError != nil:
-			// A transform that failed says nothing about the fixes, which already converged and
-			// already passed the guard. They are kept and the transform is reported as refused, so a
-			// formatter that is broken today does not also block every correctness fix in the tree.
-			result.Rejected = append(result.Rejected, Rejection{
-				Proposal: Proposal{RuleName: transformRuleName},
-				Reason:   fmt.Sprintf("%s (%s)", ReasonTransformFailed, transformError),
-			})
-
-		case transformed == result.Text:
-			// Already in the shape the transform wants. Not an error and not a change.
-
-		default:
-			// The guard applies to the transform exactly as it applies to a fix pass. A whole-text
-			// rewrite has a wider blast radius than any single fix, so it earns the check more, not
-			// less.
-			if parses, reason := Parses(fileName, transformed); !parses {
-				result.Rejected = append(result.Rejected, Rejection{
-					Proposal: Proposal{RuleName: transformRuleName},
-					Reason:   fmt.Sprintf("%s (%s)", ReasonParseFailure, reason),
-				})
-			} else {
-				result.Text = transformed
-				result.Transformed = true
-				result.Changed = true
-			}
-		}
+	if !result.Converged {
+		// The fixes ran out of passes and were discarded, so the transform formats the text as found,
+		// once, as it always has. Re-linting what it printed would only meet the same arguing rules.
+		applyTransform(&result, fileName, transform)
+		return result, nil
 	}
 
-	return result, nil
+	for round := 1; ; round++ {
+		if !applyTransform(&result, fileName, transform) {
+			return result, nil
+		}
+
+		// Only a file the TypeScript parser reads has rules to ask. A markdown, css or json file the
+		// printer changed has nothing to re-lint, and handing it to the TypeScript parser crashed the
+		// run on the first `.md` a writing run formatted.
+		if !TypeScriptParsable(fileName) {
+			return result, nil
+		}
+
+		// The printer changed the text, so ask the rules about what it printed.
+		proposals, err := propose(fileName, result.Text)
+		if err != nil {
+			return result, fmt.Errorf("collecting fixes for %s after formatting: %w", fileName, err)
+		}
+		if len(proposals) == 0 {
+			return result, nil
+		}
+
+		if round == FormatFixRoundLimit {
+			// Still changing at the bound: two of them, a rule and the printer, are undoing each
+			// other. Writing the last round would call a file settled that the next run rewrites.
+			unsettled := Rejection{
+				Proposal: Proposal{RuleName: transformRuleName},
+				Reason:   fmt.Sprintf("%s (%d rounds)", ReasonFormatFixUnsettled, FormatFixRoundLimit),
+			}
+			return FileResult{
+				FileName:         fileName,
+				Text:             text,
+				Passes:           result.Passes,
+				Rejected:         append(result.Rejected, unsettled),
+				UnconvergedRules: append(ruleNamesOf(proposals), transformRuleName),
+			}, nil
+		}
+
+		// The proposals in hand were measured against exactly this text, so the next fixpoint starts
+		// from them rather than linting the same text a second time.
+		used := false
+		startingWith := func(name string, current string) ([]Proposal, error) {
+			if !used {
+				used = true
+				return proposals, nil
+			}
+			return propose(name, current)
+		}
+		next, err := FixText(fileName, result.Text, startingWith, maxPasses)
+		if err != nil {
+			return result, err
+		}
+		result.Passes += next.Passes
+		result.Rejected = append(result.Rejected, next.Rejected...)
+		if !next.Converged {
+			// The fix budget ran out on the printed text, which leaves the file as found, as FixText
+			// does for a file that never reached formatting.
+			return FileResult{
+				FileName:         fileName,
+				Text:             text,
+				Passes:           result.Passes,
+				Rejected:         result.Rejected,
+				UnconvergedRules: next.UnconvergedRules,
+			}, nil
+		}
+		if next.Changed {
+			result.Text = next.Text
+			result.Applied = append(result.Applied, next.Applied...)
+		}
+	}
+}
+
+// FormatFixRoundLimit bounds how many times a file goes back through fix and format when the
+// printer's output trips a fixer. The case that found it settles in two rounds, a fix and then a
+// format the fix leaves nothing for; a third that still changes something means a rule and the
+// printer are undoing each other.
+const FormatFixRoundLimit = 3
+
+// applyTransform runs the transform once over result.Text and records what happened, reporting
+// whether it changed the text. A skip, a failure, a result that does not parse, and text already in
+// the transform's shape all leave the text as it was and report false.
+func applyTransform(result *FileResult, fileName string, transform Transform) bool {
+	transformed, transformError := transform(fileName, result.Text)
+	switch {
+	case errors.Is(transformError, ErrSkipped):
+		// The transform declined this file on purpose — a file type it does not handle, or one it
+		// handles incorrectly today. Recorded rather than treated as a failure, because the two
+		// mean different things to a reader: a failure says the formatter broke, a skip says it
+		// chose not to look, and a run where a formatter skipped four hundred files must not read
+		// as a run where four hundred files were already correctly formatted.
+		result.TransformSkipped = true
+		result.TransformSkipReason = skipReasonOf(transformError)
+		return false
+
+	case transformError != nil:
+		// A transform that failed says nothing about the fixes, which already converged and
+		// already passed the guard. They are kept and the transform is reported as refused, so a
+		// formatter that is broken today does not also block every correctness fix in the tree.
+		result.Rejected = append(result.Rejected, Rejection{
+			Proposal: Proposal{RuleName: transformRuleName},
+			Reason:   fmt.Sprintf("%s (%s)", ReasonTransformFailed, transformError),
+		})
+		return false
+
+	case transformed == result.Text:
+		// Already in the shape the transform wants. Not an error and not a change.
+		return false
+	}
+
+	// The guard applies to the transform exactly as it applies to a fix pass. A whole-text
+	// rewrite has a wider blast radius than any single fix, so it earns the check more, not
+	// less.
+	if parses, reason := Parses(fileName, transformed); !parses {
+		result.Rejected = append(result.Rejected, Rejection{
+			Proposal: Proposal{RuleName: transformRuleName},
+			Reason:   fmt.Sprintf("%s (%s)", ReasonParseFailure, reason),
+		})
+		return false
+	}
+	result.Text = transformed
+	result.Transformed = true
+	result.Changed = true
+	return true
 }
 
 // Summary is what a whole fix run did, across every file.
@@ -543,7 +637,7 @@ func Summarize(results []FileResult) Summary {
 // A parse failure reason embeds the compiler's message so a reader can act on it, which makes every
 // one of them a distinct string and would turn a tally into a list of four hundred singletons.
 func reasonKey(reason string) string {
-	for _, known := range []string{ReasonParseFailure, ReasonOverlap, ReasonInvalidRange, ReasonNoProgress, ReasonPassesReached} {
+	for _, known := range []string{ReasonParseFailure, ReasonOverlap, ReasonInvalidRange, ReasonNoProgress, ReasonPassesReached, ReasonFormatFixUnsettled} {
 		if len(reason) >= len(known) && reason[:len(known)] == known {
 			return known
 		}

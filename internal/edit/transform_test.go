@@ -530,3 +530,78 @@ func TestCheckFileComputesTheWriteAndLeavesTheFile(t *testing.T) {
 		t.Fatalf("the writing run's line moved: %s", line)
 	}
 }
+
+// A fix the printer's output triggers lands in the same run. The printer here breaks a one-line
+// block-bodied arrow across lines, as Prettier does, and the rule repairs a multi-line arrow, as
+// nexus/consistency-no-multiline-arrow-function does. Formatted once and left, the file would fail
+// the next run's check; re-linting what was printed fixes it, and the fixed text is formatted again.
+func TestAFixThePrintedTextTriggersLandsInTheSameRun(t *testing.T) {
+	breakArrow := func(_ string, text string) (string, error) {
+		return strings.ReplaceAll(text, "() => { run(); }", "() => {\n    run();\n}"), nil
+	}
+	repairMultilineArrow := proposeWhileContains("() => {\n", "function() {\n", "no-multiline-arrow")
+
+	result, err := FixAndTransformText("probe.ts", "register(() => { run(); });\n", repairMultilineArrow, breakArrow, DefaultMaxPasses)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "register(function() {\n    run();\n});\n"
+	if result.Text != want || !result.Changed || !result.Transformed || !result.Converged {
+		t.Fatalf("one run did not settle:\n  got   %q (changed %v, transformed %v, converged %v)\n  want  %q",
+			result.Text, result.Changed, result.Transformed, result.Converged, want)
+	}
+	if len(result.Applied) != 1 || result.Applied[0].RuleName != "no-multiline-arrow" {
+		t.Fatalf("the fix on the printed text was not recorded as applied: %+v", result.Applied)
+	}
+}
+
+// A rule and the printer that undo each other are bounded: after FormatFixRoundLimit rounds the file
+// is left exactly as it was found and reported as not converged, naming the rule and the formatter,
+// rather than written half-settled.
+func TestFixAndFormatThatUndoEachOtherAreBounded(t *testing.T) {
+	toSingle := func(_ string, text string) (string, error) {
+		return strings.ReplaceAll(text, `"a"`, `'a'`), nil
+	}
+	toDouble := proposeWhileContains(`'a'`, `"a"`, "prefer-double")
+	source := "const value = \"a\";\n"
+
+	result, err := FixAndTransformText("probe.ts", source, toDouble, toSingle, DefaultMaxPasses)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Text != source || result.Changed || result.Converged {
+		t.Fatalf("an unsettled file was not left as found: %q (changed %v, converged %v)", result.Text, result.Changed, result.Converged)
+	}
+	if strings.Join(result.UnconvergedRules, ",") != "prefer-double,format" {
+		t.Fatalf("the unsettled pair was not named: %v", result.UnconvergedRules)
+	}
+	summary := Summarize([]FileResult{result})
+	if len(summary.FilesNotConverged) != 1 || summary.RefusalsByReason[ReasonFormatFixUnsettled] != 1 {
+		t.Fatalf("the summary does not report the unsettled file: %+v", summary)
+	}
+}
+
+// Only a file the TypeScript parser reads is linted again after formatting. A markdown file the
+// printer changed has no rules, and re-linting it handed it to the TypeScript parser, which panicked
+// on the first `.md` a writing run formatted.
+func TestAFormattedNonTypeScriptFileIsNotLintedAgain(t *testing.T) {
+	calls := 0
+	propose := func(string, string) ([]Proposal, error) {
+		calls++
+		if calls > 1 {
+			return nil, fmt.Errorf("a markdown file was handed back to the rules after formatting")
+		}
+		return nil, nil
+	}
+	tidy := func(_ string, text string) (string, error) {
+		return strings.ReplaceAll(text, "*  ", "- "), nil
+	}
+
+	result, err := FixAndTransformText("Notes.md", "*  one\n", propose, tidy, DefaultMaxPasses)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Text != "- one\n" || !result.Transformed {
+		t.Fatalf("the markdown file was not formatted: %q", result.Text)
+	}
+}

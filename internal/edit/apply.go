@@ -84,6 +84,11 @@ const (
 	// Distinct from a parse failure: one means the formatter broke, the other means it produced
 	// something that is not a program.
 	ReasonTransformFailed = "the whole-text transform failed"
+
+	// ReasonFormatFixUnsettled is a file whose formatted text kept tripping a fixer, and whose fixed
+	// text kept changing under the formatter, through every round FixAndTransformText allows: a rule
+	// and the printer undoing each other. The file is left as it was found.
+	ReasonFormatFixUnsettled = "fix and format did not settle"
 )
 
 // transformRuleName is what a transform's refusals are attributed to.
