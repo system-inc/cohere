@@ -44,7 +44,7 @@ func TestResolveFrozenNamesWhatItSelected(t *testing.T) {
 	// The caller prints the hash and the build time, and it can only do that if this reports them.
 	// A frozen run that could not say which binary it ran would be indistinguishable from an
 	// ordinary one, which is the whole thing being guarded against.
-	paths := newCacheWithBinaries(t, map[string]string{"cohere-darwin-arm64-abc123def4560000": "binary"})
+	paths := newCacheWithBinaries(t, map[string]string{platformBinaryPrefix() + "abc123def4560000": "binary"})
 
 	frozen, err := ResolveFrozen(paths)
 	if err != nil {
@@ -57,7 +57,7 @@ func TestResolveFrozenNamesWhatItSelected(t *testing.T) {
 	if frozen.ModifiedAt == "" {
 		t.Error("no build time, so a reader cannot judge how old the frozen binary is")
 	}
-	if !strings.HasSuffix(frozen.Path, "cohere-darwin-arm64-abc123def4560000") {
+	if !strings.HasSuffix(frozen.Path, platformBinaryPrefix()+"abc123def4560000") {
 		t.Errorf("selected %q, which is not the binary in the cache", frozen.Path)
 	}
 }
@@ -66,15 +66,15 @@ func TestResolveFrozenPicksTheNewestBinary(t *testing.T) {
 	// The most recent successful build is the closest thing to the rules on disk the cache can
 	// offer. Picking any other one would be arbitrarily staler for no reason a reader could predict.
 	paths := newCacheWithBinaries(t, map[string]string{
-		"cohere-darwin-arm64-1111111111111111": "old",
-		"cohere-darwin-arm64-2222222222222222": "newer",
-		"cohere-darwin-arm64-3333333333333333": "newest",
+		platformBinaryPrefix() + "1111111111111111": "old",
+		platformBinaryPrefix() + "2222222222222222": "newer",
+		platformBinaryPrefix() + "3333333333333333": "newest",
 	})
 
 	setModificationTimes(t, paths, []string{
-		"cohere-darwin-arm64-1111111111111111",
-		"cohere-darwin-arm64-2222222222222222",
-		"cohere-darwin-arm64-3333333333333333",
+		platformBinaryPrefix() + "1111111111111111",
+		platformBinaryPrefix() + "2222222222222222",
+		platformBinaryPrefix() + "3333333333333333",
 	})
 
 	frozen, err := ResolveFrozen(paths)
@@ -90,7 +90,7 @@ func TestResolveFrozenIgnoresNonExecutableEntries(t *testing.T) {
 	// The sidecar recording the development build's hash sits in the same directory and is not
 	// something to exec. Selecting it would produce an exec failure whose message is about file
 	// formats rather than about the cache.
-	paths := newCacheWithBinaries(t, map[string]string{"cohere-darwin-arm64-abc123def4560000": "binary"})
+	paths := newCacheWithBinaries(t, map[string]string{platformBinaryPrefix() + "abc123def4560000": "binary"})
 
 	hashSidecar := filepath.Join(paths.BinaryDirectory(), "cohere-dev.hash")
 	if err := os.WriteFile(hashSidecar, []byte("abc123def4560000\n"), 0o644); err != nil {

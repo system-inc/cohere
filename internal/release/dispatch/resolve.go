@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -48,12 +47,12 @@ func (paths Paths) GoCacheDirectory() string {
 	return filepath.Join(paths.CacheDirectory, "gocache")
 }
 
-// BinaryPath is where the binary with this hash lives.
+// BinaryPath is where the committed-tree binary with this hash lives.
 //
 // The name carries the platform as well as the hash. A cache directory can outlive a change of
 // machine, and a binary for the wrong architecture fails in a far more confusing way than a miss.
 func (paths Paths) BinaryPath(hash string) string {
-	return filepath.Join(paths.BinaryDirectory(), fmt.Sprintf("cohere-%s-%s-%s", runtime.GOOS, runtime.GOARCH, hash))
+	return filepath.Join(paths.BinaryDirectory(), platformBinaryPrefix()+hash)
 }
 
 // DevelopmentBinaryPath is the stable path used by `--dev`.
@@ -66,11 +65,15 @@ func (paths Paths) DevelopmentBinaryPath() string {
 	return filepath.Join(paths.BinaryDirectory(), "cohere-dev")
 }
 
-// Resolve returns the path to a binary matching the current inputs, building it if needed.
+// ResolveWorkingTree returns the `--dev` binary, built from the working tree as it is on disk.
+//
+// This is the explicit way to run uncommitted work, and only that. The binary holds every member's
+// uncommitted edits in the shared checkout, not just the caller's, so it is never what a gate runs:
+// ResolveCommitted is. The caller says so on every run.
 //
 // The returned boolean reports whether a build ran, so a caller can tell the user why a normally
 // instant command took a second.
-func Resolve(paths Paths, packagePath string, development bool) (string, bool, error) {
+func ResolveWorkingTree(paths Paths, packagePath string) (string, bool, error) {
 	inputs, err := CollectInputs(paths.ModuleDirectory, packagePath, ReleaseBuildFlags)
 	if err != nil {
 		return "", false, err
@@ -81,32 +84,21 @@ func Resolve(paths Paths, packagePath string, development bool) (string, bool, e
 		return "", false, err
 	}
 
-	binaryPath := paths.BinaryPath(hash)
-	if development {
-		binaryPath = paths.DevelopmentBinaryPath()
-	}
-
-	// In development the binary name never changes, so its existence says nothing about whether it
-	// is current. The hash is recorded beside it and compared instead. Skipping this would serve a
-	// stale binary from a stable path, which is the same lie as a wrong hash.
-	if development {
-		if upToDate, err := developmentBinaryIsCurrent(paths, hash); err != nil {
-			return "", false, err
-		} else if upToDate {
-			return binaryPath, false, nil
-		}
-	} else if _, err := os.Stat(binaryPath); err == nil {
+	// The binary name never changes, so its existence says nothing about whether it is current. The
+	// hash is recorded beside it and compared instead. Skipping this would serve a stale binary from
+	// a stable path, which is the same lie as a wrong hash.
+	binaryPath := paths.DevelopmentBinaryPath()
+	if upToDate, err := developmentBinaryIsCurrent(paths, hash); err != nil {
+		return "", false, err
+	} else if upToDate {
 		return binaryPath, false, nil
 	}
 
 	if err := build(paths, packagePath, binaryPath); err != nil {
 		return "", false, err
 	}
-
-	if development {
-		if err := recordDevelopmentHash(paths, hash); err != nil {
-			return "", false, err
-		}
+	if err := recordDevelopmentHash(paths, hash); err != nil {
+		return "", false, err
 	}
 
 	return binaryPath, true, nil

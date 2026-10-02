@@ -183,10 +183,13 @@ func compute(t *testing.T, inputs Inputs) string {
 	return hash
 }
 
-// writeFile writes contents, failing the test on error.
+// writeFile writes contents, creating its directory, failing the test on error.
 func writeFile(t *testing.T, path string, contents string) {
 	t.Helper()
 
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("creating the directory for %s: %v", path, err)
+	}
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 		t.Fatalf("writing %s: %v", path, err)
 	}

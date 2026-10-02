@@ -1,8 +1,9 @@
 // Command cohere-dispatch is the shim that `node_modules/.bin/cohere` runs.
 //
 // It decides which cohere binary should handle this invocation and execs it, so that the common
-// case costs one stat and one exec. When the rules have changed it rebuilds first, which is the
-// price of compiling rules in rather than loading them, paid automatically instead of by hand.
+// case costs one stat and one exec. When a new commit has landed it rebuilds first, which is the
+// price of compiling rules in rather than loading them, paid automatically instead of by hand. It
+// builds from the checkout's committed tree; `--dev` builds the working tree and says so.
 //
 // Every flag it does not own is passed through untouched, because it stands in front of the real
 // command rather than wrapping it.
@@ -109,11 +110,15 @@ func resolveFrozenBinary() (string, error) {
 // resolveBinary picks the binary to run.
 //
 // There are two worlds and the seam between them is the whole risk. In a source checkout with a Go
-// toolchain, the rules on disk are the truth and a stale binary is the defect, so the rebuild cache
+// toolchain, the committed rules are the truth and a stale binary is the defect, so the rebuild cache
 // decides. On an installed machine there is no source and no toolchain, so the shipped platform
 // binary is the only answer. Both halves are loud on failure; neither falls through to the other,
 // because "rebuild what I cannot see" and "ship a binary I did not build" are each a way of running
 // something other than what was asked for.
+//
+// In a checkout the committed tree is what gets built, not the files on disk. The checkout is shared,
+// and a gate that built from disk ran whatever any member had half-written. `--dev` is the explicit
+// way to run the working tree instead.
 //
 // The order is deliberate. An explicit override wins everywhere, including inside a source
 // checkout, because someone who names a binary has stated what they want to run and a rebuild that
@@ -139,13 +144,27 @@ func resolveBinary(development bool, verbose bool) (string, error) {
 
 	paths := dispatch.DefaultPaths(moduleDirectory)
 
-	binaryPath, built, err := dispatch.Resolve(paths, "./command/cohere", development)
+	if development {
+		binaryPath, built, err := dispatch.ResolveWorkingTree(paths, "./command/cohere")
+		if err != nil {
+			return "", err
+		}
+		// On every run, not only when it rebuilds. The binary carries every member's uncommitted edits
+		// in the shared checkout, and a reader of its findings has to know that before they read them.
+		fmt.Fprintf(os.Stderr, "cohere: --dev runs the working tree in %s, uncommitted edits included "+
+			"(anyone's, not only yours), so no commit reproduces these results\n", moduleDirectory)
+		if built && verbose {
+			fmt.Fprintf(os.Stderr, "cohere: working tree changed, rebuilt %s\n", filepath.Base(binaryPath))
+		}
+		return binaryPath, nil
+	}
+
+	binaryPath, commit, built, err := dispatch.ResolveCommitted(paths, "./command/cohere")
 	if err != nil {
 		return "", err
 	}
-
 	if built && verbose {
-		fmt.Fprintf(os.Stderr, "cohere: rules changed, rebuilt %s\n", filepath.Base(binaryPath))
+		fmt.Fprintf(os.Stderr, "cohere: built %s from commit %s\n", filepath.Base(binaryPath), commit)
 	}
 	return binaryPath, nil
 }

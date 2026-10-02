@@ -162,24 +162,33 @@ the intuitive reading beside the actual one so the next reader does not correct 
 ## The dispatcher
 
 Rules are compiled in rather than loaded, which is what makes them free to run. The cost is that
-adding a rule means rebuilding, so `command/cohere-dispatch` pays that cost automatically: it hashes
-everything the binary is built from, looks for `.cache/cohere/bin/cohere-<platform>-<hash>`, and
-execs it when present or builds it first when absent. Editing a rule costs one rebuild; every run
+adding a rule means rebuilding, so `command/cohere-dispatch` pays that cost automatically: it names
+the binary for the checkout's HEAD commit, looks for `.cache/cohere/bin/cohere-<platform>-<hash>`,
+and execs it when present or builds it first when absent. A new commit costs one rebuild; every run
 after it is a stat and an exec.
 
+**It builds from the committed tree, never the working tree.** The checkout is shared, and a gate
+that built from disk ran whatever any member had half-written: on 2026-10-02 one member's
+uncommitted rule work turned 22 findings on in ahra before it was classified. So a build extracts
+HEAD with `git archive`, extracts the compiler at the commit HEAD pins, applies HEAD's
+`patches/*.patch` to it, and builds that. The patched compiler is kept under
+`.cache/cohere/compiler/`, one per pin and patch set, because it is 66,000 files. Before a binary is
+cached, its own `--version` must name the commit and measure every patch present, or it is refused.
+
 ```sh
-cohere                    # resolve, rebuild if the rules moved, exec
-cohere --dev              # build to a stable path instead of a hash-named one
+cohere                    # build HEAD's committed tree if it has no binary yet, then exec
+cohere --dev              # build the working tree instead, uncommitted edits (anyone's) included
 cohere --dispatch-verbose # say so when a rebuild fires
 ```
 
 Anything the dispatcher does not own is forwarded to the real binary untouched.
 
-`--dev` exists because Go caches package compilation but not linking, so a hash-named binary is a
-new filename and therefore a full link on every change. Measured on a comparable binary: a leaf rule
-edit costs 2.03s, while a genuinely unchanged tree at a stable path costs 0.29s. The stable path is
-what makes that floor reachable during rule authoring. It records its hash beside the binary and
-compares it, so a stable name never means a stale binary.
+`--dev` is the explicit way to run uncommitted work, and it says so on every run. It builds to a
+stable path because Go caches package compilation but not linking, so a hash-named binary is a new
+filename and therefore a full link on every change. Measured on a comparable binary: a leaf rule edit
+costs 2.03s, while a genuinely unchanged tree at a stable path costs 0.29s. It records its hash beside
+the binary and compares it, so a stable name never means a stale binary. `go run ./command/cohere`
+in your own checkout works too, and its `--version` reports the uncommitted changes.
 
 The build flags are fixed at `-trimpath -ldflags="-s -w"`. They make the link marginally faster and
 the binary 29% smaller, and `-trimpath` is a build-input change rather than a link flag: turning it

@@ -42,6 +42,15 @@ var (
 	// input to the behavior, not just to the build: it is recorded for the same reason the rebuild
 	// cache hashes it.
 	goToolchain = "unknown"
+
+	// selfCommit is the commit of this repository the binary was built from, stamped by the launcher
+	// when it builds from a snapshot of that commit.
+	//
+	// A snapshot has no `.git`, so Go writes no `vcs.revision` for it, and building it with VCS
+	// stamping on would make Go walk up to the enclosing checkout and stamp that tree's state instead,
+	// dirty files and all. So the launcher turns stamping off and states the commit itself. It can,
+	// because it extracted the snapshot from that commit and nothing else.
+	selfCommit = ""
 )
 
 // Provenance is everything a shipped binary knows about where it came from.
@@ -197,9 +206,14 @@ func resolveCompilerCommit() string {
 // resolveSelfCommit reads this repository's commit from the stamp Go's linker writes.
 //
 // Go records `vcs.revision` on any build inside a version-controlled tree, so this needs no
-// `-ldflags` and works for a local `go build` as well as a release. Empty when the stamp is absent,
-// which is the honest answer for a build made outside a repository or with `-buildvcs=false`.
+// `-ldflags` and works for a local `go build` as well as a release. A launcher build from a committed
+// snapshot stamps selfCommit instead, and that wins, because it was stated deliberately by the only
+// process that knows which commit the snapshot holds. Empty when neither is present, which is the
+// honest answer for a build made outside a repository or with `-buildvcs=false` and no stamp.
 func resolveSelfCommit() string {
+	if selfCommit != "" {
+		return selfCommit
+	}
 	information, available := debug.ReadBuildInfo()
 	if !available {
 		return ""

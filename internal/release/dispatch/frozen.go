@@ -62,11 +62,7 @@ func ResolveFrozen(paths Paths) (FrozenBinary, error) {
 	candidates := []candidate{}
 
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasPrefix(entry.Name(), binaryNamePrefix) {
-			continue
-		}
-		// The recorded hash beside a development binary is metadata, not something to execute.
-		if strings.HasSuffix(entry.Name(), developmentHashSuffix) {
+		if entry.IsDir() || !isCohereBinaryName(entry.Name()) {
 			continue
 		}
 
@@ -113,11 +109,20 @@ func ResolveFrozen(paths Paths) (FrozenBinary, error) {
 	}, nil
 }
 
-// binaryNamePrefix is what every cached binary's filename starts with.
-const binaryNamePrefix = "cohere-"
-
-// developmentHashSuffix marks the sidecar recording what the development binary was built from.
-const developmentHashSuffix = ".hash"
+// isCohereBinaryName reports whether a file in the binary cache is a cohere binary.
+//
+// Matched against the exact names cohere binaries are given rather than a shared prefix, because the
+// cache holds other executables. A bare `cohere-` prefix also matched the Swift engine
+// (`cohere-swift-*`) and the launcher itself (`cohere-dispatch`). Measured 2026-10-02: the newest file
+// in the cache was `cohere-swift-current`, so `--frozen` would have exec'd the Swift engine as cohere.
+// A half-written build carries `.partial-` until it is proven and renamed, and the development
+// binary's recorded hash ends in `.hash`; neither is something to run.
+func isCohereBinaryName(name string) bool {
+	if strings.Contains(name, ".partial-") || strings.HasSuffix(name, ".hash") {
+		return false
+	}
+	return name == "cohere-dev" || strings.HasPrefix(name, platformBinaryPrefix())
+}
 
 // hashFromBinaryName reads the input hash back out of a cached binary's filename.
 //
