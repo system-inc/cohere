@@ -126,8 +126,11 @@ func main() {
 // boundary is here, at generation time, and never at lint time: the committed fixture is what the
 // test reads.
 func enumerate(packageRoot, stylesheets string) ([]byte, error) {
-	_, thisFile, _, _ := runtimeCaller()
-	script := filepath.Join(filepath.Dir(thisFile), "enumerate.mjs")
+	directory, err := toolDirectory()
+	if err != nil {
+		return nil, err
+	}
+	script := filepath.Join(directory, "enumerate.mjs")
 
 	arguments := []string{script, packageRoot}
 	if stylesheets != "" {

@@ -73,8 +73,11 @@ func main() {
 // failure mode this whole approach exists to prevent, and it would otherwise look like a passing
 // run.
 func enumerate(packageRoot string) ([]byte, error) {
-	_, thisFile, _, _ := runtimeCaller()
-	script := filepath.Join(filepath.Dir(thisFile), "enumerate.mjs")
+	directory, err := toolDirectory()
+	if err != nil {
+		return nil, err
+	}
+	script := filepath.Join(directory, "enumerate.mjs")
 
 	command := exec.Command("node", script, packageRoot)
 	command.Stderr = os.Stderr

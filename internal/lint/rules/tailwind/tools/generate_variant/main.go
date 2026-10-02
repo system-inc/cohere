@@ -143,8 +143,10 @@ type corpusEntry struct {
 // boundary is here, at generation time, and never at lint time: the committed fixture is what the
 // test reads.
 func enumerate(packageRoot, corpusPath string, maximumClassLists int) ([]byte, error) {
-	_, thisFile, _, _ := runtimeCaller()
-	directory := filepath.Dir(thisFile)
+	directory, err := toolDirectory()
+	if err != nil {
+		return nil, err
+	}
 	script := filepath.Join(directory, "enumerate.mjs")
 
 	arguments := []string{script, packageRoot}

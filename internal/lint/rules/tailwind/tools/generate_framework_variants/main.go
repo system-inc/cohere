@@ -86,6 +86,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/tools/tooldirectory"
 )
 
 // enumeration is what enumerate.mjs reports.
@@ -580,7 +581,11 @@ func enumerate(packageRoot string, designSystem string) (*enumeration, error) {
 	if !ok {
 		return nil, fmt.Errorf("cannot locate this tool's directory, so enumerate.mjs cannot be found")
 	}
-	script := filepath.Join(filepath.Dir(thisFile), "enumerate.mjs")
+	directory, err := tooldirectory.Of(thisFile)
+	if err != nil {
+		return nil, err
+	}
+	script := filepath.Join(directory, "enumerate.mjs")
 
 	// The design system is optional and defaults to a bare framework import, which is what every
 	// invocation did before it could be named. It is the argument that makes the invariance claim

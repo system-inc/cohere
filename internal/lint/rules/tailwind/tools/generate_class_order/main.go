@@ -62,7 +62,11 @@ func main() {
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
 
-	toolDirectory := filepath.Dir(thisFile())
+	toolDirectory, err := toolDirectory()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "locating this tool: %v\n", err)
+		os.Exit(1)
+	}
 	systemsPath := *systems
 	if systemsPath == "" {
 		systemsPath = filepath.Join(toolDirectory, "systems.json")
