@@ -434,3 +434,78 @@ func TestIframeMissingSandboxRequiresTheTypedHarness(t *testing.T) {
 	jsxUntyped := rule_testing.Run(t, IframeMissingSandbox, iframeMissingSandboxFile, `<iframe/>;`)
 	rule_testing.ExpectFindings(t, jsxUntyped, "attributeMissing")
 }
+
+// TestIframeMissingSandboxReportsThePairOnlyOnASameOriginFrame covers where cohere leaves upstream.
+//
+// Upstream reports `allow-scripts allow-same-origin` on every iframe. The escape needs the framed
+// document to share the page's origin, so a cross-origin embed is a false positive, and the first
+// three silent cases are the real phi web sites that showed it, written as they are in the tree
+// with the pair added. Every silent case here reports under upstream's reading, which is what makes
+// the table discriminate: deleting the origin check fails every one of them.
+func TestIframeMissingSandboxReportsThePairOnlyOnASameOriginFrame(t *testing.T) {
+	t.Parallel()
+
+	const pair = `sandbox="allow-scripts allow-same-origin"`
+	cases := []struct {
+		name       string
+		sourceText string
+		reports    bool
+	}{
+		// Silent: the frame is cross-origin, or nothing proves it is not.
+		{"HomePagePodcastSection.tsx:46, a template whose head fixes the origin", "declare const featuredEpisodeYouTubeVideoId: string;\n<iframe src={`https://www.youtube-nocookie.com/embed/${featuredEpisodeYouTubeVideoId}?rel=0`} " + pair + " />;", false},
+		{"PodcastEpisodePlayer.tsx:71, the same template through a const typed string", "declare const properties: { videoId: string };\nconst embedSource = `https://www.youtube-nocookie.com/embed/${properties.videoId}?rel=0&enablejsapi=1`;\n<iframe src={embedSource} " + pair + " />;", false},
+		{"YouTubeEmbed.tsx:23, a template off a props member", "declare const properties: { videoId: string };\n<iframe src={`https://www.youtube-nocookie.com/embed/${properties.videoId}?rel=0`} " + pair + " />;", false},
+		{"an https literal", `<iframe src="https://player.vimeo.com/video/1" ` + pair + ` />;`, false},
+		{"an uppercase scheme", `<iframe src="HTTPS://player.vimeo.com/video/1" ` + pair + ` />;`, false},
+		{"a protocol relative literal", `<iframe src="//player.vimeo.com/video/1" ` + pair + ` />;`, false},
+		{"a protocol relative literal behind leading space", `<iframe src="  //player.vimeo.com/video/1" ` + pair + ` />;`, false},
+		{"backslashes read as slashes", `<iframe src="\\player.vimeo.com/video/1" ` + pair + ` />;`, false},
+		{"a data url has an opaque origin", `<iframe src="data:text/html,hello" ` + pair + ` />;`, false},
+		{"a plain string proves nothing", "declare const url: string;\n<iframe src={url} " + pair + " />;", false},
+		{"a template with an empty head proves nothing", "declare const base: string;\n<iframe src={`${base}/embed`} " + pair + " />;", false},
+		{"a lone slash head may become protocol relative", "declare const path: string;\n<iframe src={`/${path}`} " + pair + " />;", false},
+		{"a scheme-shaped head with no delimiter yet", "declare const rest: string;\n<iframe src={`about${rest}`} " + pair + " />;", false},
+		{"a union of cross-origin literals", "declare const url: 'https://a.example/' | 'https://b.example/';\n<iframe src={url} " + pair + " />;", false},
+		{"a cross-origin template literal type", "declare const url: `https://www.youtube-nocookie.com/embed/${string}`;\n<iframe src={url} " + pair + " />;", false},
+		{"a spread after a relative src may replace it", "declare const props: {};\n<iframe src=\"/embed.html\" {...props} " + pair + " />;", false},
+		{"a spread with no src may supply one", "declare const props: {};\n<iframe {...props} " + pair + " />;", false},
+		{"a bare src has no readable value", `<iframe src ` + pair + ` />;`, false},
+		{"createElement with an https src", `React.createElement("iframe", { src: "https://player.vimeo.com/video/1", sandbox: "allow-scripts allow-same-origin" });`, false},
+		// The shorthand has to be read as `src`, or the frame looks src-less, which is `about:blank`
+		// and reports.
+		{"createElement with a shorthand typed cross-origin", "declare const src: 'https://a.example/';\nReact.createElement(\"iframe\", { src, sandbox: \"allow-scripts allow-same-origin\" });", false},
+		{"createElement with a spread after src", "declare const props: {};\nReact.createElement(\"iframe\", { src: \"/embed.html\", ...props, sandbox: \"allow-scripts allow-same-origin\" });", false},
+
+		// Reports: the frame provably shares the page's origin.
+		{"a relative path", `<iframe src="/embed/player.html" ` + pair + ` />;`, true},
+		{"a bare relative reference", `<iframe src="player.html" ` + pair + ` />;`, true},
+		// A scheme starts with a letter, so text before this colon is a relative path, not a scheme.
+		{"a colon after text that is no scheme", `<iframe src="1x:player.html" ` + pair + ` />;`, true},
+		{"an underscore is no scheme character either", `<iframe src="a_b:player.html" ` + pair + ` />;`, true},
+		{"a literal inside an expression container", `<iframe src={"/embed/player.html"} ` + pair + ` />;`, true},
+		{"an empty src", `<iframe src="" ` + pair + ` />;`, true},
+		{"about blank inherits the parent", `<iframe src="about:blank" ` + pair + ` />;`, true},
+		{"about blank in capitals", `<iframe src="ABOUT:blank" ` + pair + ` />;`, true},
+		{"a blob url inherits its creator", `<iframe src="blob:https://phi.health/1" ` + pair + ` />;`, true},
+		{"a template whose head is a relative path", "declare const id: string;\n<iframe src={`/embed/${id}`} " + pair + " />;", true},
+		{"srcDoc wins over a cross-origin src", `<iframe src="https://player.vimeo.com/video/1" srcDoc="<p>hi</p>" ` + pair + ` />;`, true},
+		{"a src after a spread is the one that renders", "declare const props: {};\n<iframe {...props} src=\"/embed.html\" " + pair + " />;", true},
+		{"one same-origin constituent is enough", "declare const url: '/embed.html' | 'https://a.example/';\n<iframe src={url} " + pair + " />;", true},
+		{"a same-origin template literal type", "declare const url: `/embed/${string}`;\n<iframe src={url} " + pair + " />;", true},
+		{"createElement with a relative src", `React.createElement("iframe", { src: "/embed.html", sandbox: "allow-scripts allow-same-origin" });`, true},
+		{"createElement with a quoted src key", `React.createElement("iframe", { 'src': "/embed.html", sandbox: "allow-scripts allow-same-origin" });`, true},
+		{"createElement with a shorthand typed same-origin", "declare const src: '/embed.html';\nReact.createElement(\"iframe\", { src, sandbox: \"allow-scripts allow-same-origin\" });", true},
+		{"createElement with srcDoc", `React.createElement("iframe", { src: "https://a.example/", srcDoc: "<p>hi</p>", sandbox: "allow-scripts allow-same-origin" });`, true},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
+			if !testCase.reports {
+				rule_testing.ExpectClean(t, result)
+				return
+			}
+			rule_testing.ExpectFindings(t, result, "invalidCombination")
+		})
+	}
+}
