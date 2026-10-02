@@ -157,10 +157,8 @@ func HashContent(content string) [sha256.Size]byte {
 //
 // Order is included deliberately, but not for the reason first written here. That reason was:
 // "the order they ran in is the order the findings come back in". It is false. Findings come
-// back in SCHEDULING order, not rule order: files are walked in parallel and each worker appends
-// its local diagnostics under a mutex in whatever order it finishes (walk.go, the worker merge).
-// Measured on the ahra tree, three runs of one binary produce three distinct output orderings
-// while the sorted set is byte-identical.
+// back in file-then-position order, which the walk imposes after its workers finish
+// (sortDiagnostics in walk.go); rule order never decided it.
 //
 // The conclusion survives the correction on different grounds. A reordered rule set can change
 // which findings EXIST rather than merely their sequence, because fixes applied by an earlier
@@ -168,12 +166,9 @@ func HashContent(content string) [sha256.Size]byte {
 // rules run. So a cache keyed without rule order could replay a set the current configuration
 // would not produce, which is what this hash prevents.
 //
-// A note for anyone reviving this cache, because it is a decision they must make explicitly
-// rather than inherit. LintCacheEntry.Findings is an ordered slice, so a warm run would replay
-// stored order while a cold run produces scheduling order: the same set, sequenced differently
-// depending on cache state. Output order is incidental today and nothing depends on it, which is
-// a deliberate ruling rather than an oversight. Wiring this cache is the moment that stops being
-// true, and the fix is to sort at the boundary rather than to let cache state decide sequence.
+// For anyone wiring this cache: LintCacheEntry.Findings is an ordered slice, and replayed findings
+// must reach the caller through the same sortDiagnostics the walk uses, so a warm run and a cold
+// run return one sequence and cache state cannot decide it.
 func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 	hash := sha256.New()
 	for _, name := range ruleNames {

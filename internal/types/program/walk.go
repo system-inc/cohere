@@ -1,8 +1,10 @@
 package program
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -293,25 +295,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				localSuppressed.add(silenced)
 			}
 
-			// Findings are appended in whichever order the workers finish, so `diagnostics` carries
-			// scheduling order rather than any property of the tree. The SET is stable — every finding
-			// is appended exactly once — and only the order moves. Measured on the shipped binary:
-			// three runs over ~/Projects/ahra gave three distinct raw hashes and one identical hash
-			// after sorting.
-			//
-			// Deliberately not sorted. Nobody depends on the order today and sorting costs something
-			// on a path that runs over 3,481 files, so this stays incidental rather than becoming a
-			// guarantee.
-			//
-			// Written down because the cost falls on the next reader, not on this code: anything
-			// comparing two runs MUST sort first, and a walk-order change will produce a diff that
-			// looks like a regression it did not cause. That already happened once, and it took three
-			// runs of the previous binary to establish the reordering was pre-existing.
-			//
-			// If anything ever depends on the order — a cache keyed on it, a golden file, a
-			// differential that reads position — this decision flips, because at that point the
-			// output stops being incidentally unsorted and becomes a silent dependency on goroutine
-			// scheduling.
+			// Appended in whichever order the workers finish. The order is fixed once, after the wait
+			// below, rather than here, where it would still depend on who took the lock first.
 			mutex.Lock()
 			diagnostics = append(diagnostics, localDiagnostics...)
 			for name, count := range localOffered {
@@ -339,6 +324,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 		}()
 	}
 	waitGroup.Wait()
+
+	sortDiagnostics(diagnostics)
 
 	if len(configFailures) > 0 {
 		// One error is enough to stop the run: they are all the same misconfiguration seen once per
@@ -369,6 +356,41 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			RulesUnconfigured: unconfigured,
 		},
 	}, nil
+}
+
+// sortDiagnostics puts a walk's findings in file order, then position, then rule and message.
+//
+// Without it the order was goroutine scheduling: three runs over one unchanged tree printed three
+// orderings of one identical set, so two runs could not be diffed and a walk-order change read as a
+// regression nobody caused (#zevtfkq). It was left unsorted once on the grounds that sorting costs
+// something on a path over 3,481 files. That cost was never measured and is not what this pays:
+// this sorts findings, not files, and the whole ahra tree returned 52 on 2026-10-01.
+//
+// File then position is the order ESLint and tsc print, so a reader comparing the engines reads the
+// same sequence in both. Rule name, message id and description only break ties at one range, and
+// they make the order total, so a rule that reports in map order cannot leak that order out.
+//
+// It is also the boundary the lint cache's note asks for (lint_cache.go, HashRuleSet): a warm run
+// replaying stored findings and a cold run walking fresh return one sequence, and cache state cannot
+// decide it. The fix phase is unaffected either way, because the edit engine orders its proposals
+// itself before resolving overlaps.
+func sortDiagnostics(diagnostics []rule.Diagnostic) {
+	fileName := func(diagnostic rule.Diagnostic) string {
+		if diagnostic.SourceFile == nil {
+			return ""
+		}
+		return diagnostic.SourceFile.FileName()
+	}
+	slices.SortStableFunc(diagnostics, func(first, second rule.Diagnostic) int {
+		return cmp.Or(
+			cmp.Compare(fileName(first), fileName(second)),
+			cmp.Compare(first.Range.Pos(), second.Range.Pos()),
+			cmp.Compare(first.Range.End(), second.Range.End()),
+			cmp.Compare(first.RuleName, second.RuleName),
+			cmp.Compare(first.Message.Id, second.Message.Id),
+			cmp.Compare(first.Message.Description, second.Message.Description),
+		)
+	})
 }
 
 // dispatchFile asks every rule what it wants to hear about in this file, merges those answers into
