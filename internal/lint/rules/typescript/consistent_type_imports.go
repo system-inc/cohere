@@ -20,12 +20,8 @@ const (
 	ConsistentTypeImportsPreferNoTypeImports ConsistentTypeImportsPrefer = "no-type-imports"
 )
 
-// ConsistentTypeImportsFixStyle selects where a repair would place the `type` keyword.
-//
-// This port proposes no repair, so the option changes nothing about what reports. It is decoded and
-// validated anyway rather than dropped, because dropping it would make a configuration that names
-// it silently mean something else, and because the option becomes load-bearing the moment a fix
-// lands here. See the fix section of the rule's doc comment for why there is none today.
+// ConsistentTypeImportsFixStyle selects where the repair places the `type` keyword. It changes the
+// repair only, never what reports.
 type ConsistentTypeImportsFixStyle string
 
 const (
@@ -50,8 +46,8 @@ type ConsistentTypeImportsOptions struct {
 	// corpus pass case exists only to pin the `false` setting.
 	DisallowTypeAnnotations bool
 
-	// FixStyle selects where a repair would put the keyword. Decoded, defaulted, and unused; see
-	// the type's own comment.
+	// FixStyle selects where the repair puts the keyword: a separate `import type` declaration, or
+	// `type` inline on each specifier.
 	FixStyle ConsistentTypeImportsFixStyle
 
 	// Prefer selects the direction. `type-imports` is the default and is what the live config sets.
@@ -178,30 +174,20 @@ func consistentTypeImportsSomeAreOnlyTypes(names []string) rule.Message {
 // files report and the differential harness compares against upstream. Named imports are not
 // exempt, only the default and namespace forms.
 //
-// # This port reports and does not repair, which is a deliberate subset
+// # The repair is upstream's, delivered as one edit
 //
-// Upstream ships seventy-three fix vectors and this rule proposes no fix at all. That is not an
-// omission and it is not laziness about a large fixer; it is the only subset that can be shown
-// correct here, and the reason is in our own fix engine rather than in the rewrite.
+// Upstream's fixer yields several primitive edits per report (an insertion before the declaration,
+// ` type` after `import`, a removal per moved specifier), and our engine refuses two insertions at
+// one point, measured at zero applied and 1024 rejections when those were proposed side by side. So
+// consistent_type_imports_fix.go computes the same primitive edits, applies them to the declaration's
+// own text, and proposes the result as one replacement. Against upstream's corpus that reproduces
+// its repair byte for byte, spacing included, on 69 of its 70 cases.
 //
-// Upstream's repair for the ordinary `import Default, { TypeName } from 'm'` shape emits two
-// insert-before edits at one offset, the declaration's start, splitting one statement into two new
-// ones. Measured against `internal/fix`, a diagnostic carrying that pair produces **zero applied
-// fixes and 1024 rejections**: `ProposalsFrom` flattens a diagnostic's fixes into independent
-// proposals, `Resolve` refuses two insertions at one point as a mutual overlap, and the engine then
-// re-proposes them once per pass until it hits the pass limit. That behavior is deliberate and
-// documented at `ProposalsFrom`, which states that a rule needing two edits to land together needs
-// grouping in the engine first and cannot get it by reporting them side by side, and notes that no
-// shipped rule emits more than one fix per report.
-//
-// The rest of the fixer is no more portable. Its output bytes are arithmetic on character offsets
-// rather than a rendering, which upstream's own vectors show: the same run writes
-// `import type { A} from 'foo';` for one specifier and `import type { C } from 'foo';` for another,
-// and merging into an existing declaration produces `import type { B , A} from 'foo';`. Reproducing
-// those spaces exactly is a requirement of a faithful fix and buys nothing a reader wants.
-//
-// So the finding ships and the repair does not. A wrong fix is applied unattended; a missing one is
-// visible in the report.
+// The seventieth is the one deliberate divergence: upstream merges moved names into an `import type`
+// that already exists elsewhere in the file, which is a second statement and so a second edit. Here
+// they go into a new declaration beside the reported one. The repair moves only names the report
+// found type-only, so a class decorator metadata serializes is never moved, and a declaration
+// carrying import attributes, which a type-only import cannot have, reports with no repair.
 var ConsistentTypeImports = rule.Rule{
 	Name: "@typescript-eslint/consistent-type-imports",
 
@@ -244,7 +230,7 @@ var ConsistentTypeImports = rule.Rule{
 				case ConsistentTypeImportsPreferNoTypeImports:
 					reportTypeKeywordsToRemove(ctx, sourceFile)
 				default:
-					reportImportsUsedOnlyAsTypes(ctx, sourceFile)
+					reportImportsUsedOnlyAsTypes(ctx, sourceFile, settings.FixStyle)
 				}
 			},
 		}
@@ -293,14 +279,16 @@ func reportTypeKeywordsToRemove(ctx rule.Context, sourceFile *ast.SourceFile) {
 			continue
 		}
 		if clause.AsImportClause().IsTypeOnly() {
-			ctx.ReportNode(statement, messageConsistentTypeImportsAvoidImportType)
+			reportConsistentTypeImportsWithFix(ctx, statement, messageConsistentTypeImportsAvoidImportType,
+				func() (rule.Fix, bool) { return consistentTypeImportsRemoveTypeFix(ctx.SourceFile, statement, nil) })
 			continue
 		}
 		// An inline `type` on a specifier is only reachable when the declaration itself is not
 		// type-only: `import type { type A }` is a syntax error, so the two forms never coexist.
 		for _, named := range imports.BindingsOf(statement).Named {
 			if named.Kind == ast.KindImportSpecifier && named.AsImportSpecifier().IsTypeOnly {
-				ctx.ReportNode(named, messageConsistentTypeImportsAvoidImportType)
+				reportConsistentTypeImportsWithFix(ctx, named, messageConsistentTypeImportsAvoidImportType,
+					func() (rule.Fix, bool) { return consistentTypeImportsRemoveTypeFix(ctx.SourceFile, statement, named) })
 			}
 		}
 	}
@@ -314,7 +302,7 @@ func reportTypeKeywordsToRemove(ctx rule.Context, sourceFile *ast.SourceFile) {
 // against the named specifiers: `import A, {} from 'foo'` has one specifier and one type-only name,
 // so it takes the whole-declaration message, which is what the corpus's `import A, {} from 'foo'`
 // case asserts.
-func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile) {
+func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile, fixStyle ConsistentTypeImportsFixStyle) {
 	// Built once and only when an import that could report actually exists, so a file with no
 	// value imports at all pays nothing for the index.
 	var byText map[string][]*ast.Node
@@ -344,8 +332,10 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile) 
 		bindings := imports.BindingsOf(statement)
 		specifierCount := 0
 		typeOnlyNames := []string{}
+		// The specifier nodes behind typeOnlyNames, which is what the repair moves.
+		typeOnlySpecifiers := map[*ast.Node]bool{}
 
-		consider := func(local *ast.Node, exemptReact bool, alreadyTypeOnly bool) {
+		consider := func(specifier *ast.Node, local *ast.Node, exemptReact bool, alreadyTypeOnly bool) {
 			if local == nil {
 				return
 			}
@@ -363,18 +353,22 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile) 
 			}
 			if isReferencedOnlyAsType(ctx, byText, metadataRoots, local) {
 				typeOnlyNames = append(typeOnlyNames, local.Text())
+				typeOnlySpecifiers[specifier] = true
 			}
 		}
 
-		consider(bindings.Default, true, false)
+		consider(bindings.Default, bindings.Default, true, false)
 		if bindings.Namespace != nil {
-			consider(bindings.Namespace.Name(), true, false)
+			consider(bindings.Namespace, bindings.Namespace.Name(), true, false)
 		}
 		for _, named := range bindings.Named {
 			if named.Kind != ast.KindImportSpecifier {
 				continue
 			}
-			consider(named.Name(), false, named.AsImportSpecifier().IsTypeOnly)
+			consider(named, named.Name(), false, named.AsImportSpecifier().IsTypeOnly)
+		}
+		fix := func() (rule.Fix, bool) {
+			return consistentTypeImportsTypeImportFix(sourceFile, statement, typeOnlySpecifiers, fixStyle)
 		}
 
 		if len(typeOnlyNames) == 0 {
@@ -387,13 +381,23 @@ func reportImportsUsedOnlyAsTypes(ctx rule.Context, sourceFile *ast.SourceFile) 
 			// than proposing something that cannot be written. Probed: an import with an `assert`
 			// clause is silent even when every name is type-only.
 			if declaration.Attributes == nil {
-				ctx.ReportNode(statement, messageConsistentTypeImportsTypeOverValue)
+				reportConsistentTypeImportsWithFix(ctx, statement, messageConsistentTypeImportsTypeOverValue, fix)
 			}
 			continue
 		}
 
-		ctx.ReportNode(statement, consistentTypeImportsSomeAreOnlyTypes(typeOnlyNames))
+		reportConsistentTypeImportsWithFix(ctx, statement, consistentTypeImportsSomeAreOnlyTypes(typeOnlyNames), fix)
 	}
+}
+
+// reportConsistentTypeImportsWithFix reports with the repair when one can be built, and bare when the
+// fixer declines, so a declaration it cannot rewrite safely is still named.
+func reportConsistentTypeImportsWithFix(ctx rule.Context, node *ast.Node, message rule.Message, fix func() (rule.Fix, bool)) {
+	if proposed, ok := fix(); ok {
+		ctx.ReportNodeWithFixes(node, message, proposed)
+		return
+	}
+	ctx.ReportNode(node, message)
 }
 
 // consistentTypeImportsIdentifiers indexes a file's identifiers by their text, once.

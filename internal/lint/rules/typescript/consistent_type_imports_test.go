@@ -1041,28 +1041,39 @@ func TestConsistentTypeImportsDecoderDefaults(t *testing.T) {
 	}
 }
 
-// TestConsistentTypeImportsProposesNoRepair pins the deliberate decision to report without a fix.
+// TestConsistentTypeImportsProposesOneEditPerFinding pins the shape the fix engine requires.
 //
-// Recorded as a test rather than only as prose because the reason is a property of our fix engine
-// rather than of this rule: upstream's repair for the common mixed-import shape emits two
-// insert-before edits at one offset, and internal/fix refuses two insertions at one point as a
-// mutual overlap, applying neither. See the rule's doc comment. If a fix lands here later this test
-// is what makes that a choice somebody made rather than something that happened.
-func TestConsistentTypeImportsProposesNoRepair(t *testing.T) {
+// The engine flattens a report's fixes into independent proposals and refuses two insertions at one
+// point, so upstream's repair proposed as its several primitive edits applied nothing at all. The
+// repair here is one replacement per finding, and this is what keeps a later change from splitting
+// it back up. The `import()` annotation finding carries no repair, as upstream's does not.
+func TestConsistentTypeImportsProposesOneEditPerFinding(t *testing.T) {
 	t.Parallel()
 
-	for _, source := range []string{"import Foo from 'foo';\nlet foo: Foo;\n", "import { A, B } from 'foo';\nconst foo: A = B();\n", "type T = import('foo');\n"} {
+	for _, source := range []string{"import Foo from 'foo';\nlet foo: Foo;\n", "import Foo, { Bar } from 'foo';\nlet foo: Foo;\nlet bar: Bar;\n", "import { A, B } from 'foo';\nconst foo: A = B();\n"} {
 		result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
 			"consistent_type_imports.tsx", source, DefaultConsistentTypeImportsOptions())
 		if len(result.Diagnostics) == 0 {
 			t.Fatalf("expected a finding on %q", source)
 		}
 		for _, diagnostic := range result.Diagnostics {
-			if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-				t.Errorf("%q proposed %d fixes and %d suggestions, want none",
+			if len(diagnostic.Fixes) != 1 || len(diagnostic.Suggestions) != 0 {
+				t.Errorf("%q proposed %d fixes and %d suggestions, want exactly one fix",
 					source, len(diagnostic.Fixes), len(diagnostic.Suggestions))
 			}
 		}
+	}
+
+	// And what that one edit writes, for the commonest shape. The full corpus of repairs, upstream's
+	// seventy, is in consistent_type_imports_fix_test.go.
+	mixed := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports, "consistent_type_imports.tsx",
+		"import Foo, { Bar } from 'foo';\nlet foo: Foo;\nconst bar = Bar;\n", DefaultConsistentTypeImportsOptions())
+	rule_testing.ExpectFixedSource(t, mixed, "import type Foo from 'foo';\nimport { Bar } from 'foo';\nlet foo: Foo;\nconst bar = Bar;\n")
+
+	annotation := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+		"consistent_type_imports.tsx", "type T = import('foo');\n", DefaultConsistentTypeImportsOptions())
+	if len(annotation.Diagnostics) != 1 || len(annotation.Diagnostics[0].Fixes) != 0 {
+		t.Errorf("the import() annotation finding should report once with no repair, got %+v", annotation.Diagnostics)
 	}
 }
 
