@@ -22,6 +22,7 @@ struct FileFixer {
     }
 
     let configuration: RuleConfiguration
+    let rules: [any FileRule]
     let maximumPasses: Int
 
     func fix(_ file: ParsedFile) -> Result {
@@ -29,7 +30,7 @@ struct FileFixer {
         var applied = 0
         var refusals: [String: Int] = [:]
         for _ in 0..<maximumPasses {
-            let edits = RuleRegistry.fileRules
+            let edits = rules
                 .filter { configuration.severity(of: $0.name) != .off && $0.applies(to: current) }
                 .flatMap { $0.findings(in: current) }
                 .flatMap(\.fixes)

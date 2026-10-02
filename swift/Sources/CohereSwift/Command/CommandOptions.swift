@@ -25,6 +25,8 @@ public struct CommandOptions: Equatable, Sendable {
     public var formatAll = false
     public var changedOnly = false
     public var lintConfiguration: URL?
+    /* The abbreviation vocabulary's file, which the front door passes to a binary with no source checkout beside it. */
+    public var abbreviations: URL?
     public var fixPasses = 10
     public var singleThreaded = false
     public var listRules = false
@@ -77,6 +79,8 @@ public struct CommandOptions: Equatable, Sendable {
             case "--changed": options.changedOnly = true
             case "--lint-config":
                 options.lintConfiguration = URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
+            case "--abbreviations":
+                options.abbreviations = URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
             case "--fix-passes":
                 let spelled = try value(for: flag)
                 guard let passes = Int(spelled), passes > 0 else {

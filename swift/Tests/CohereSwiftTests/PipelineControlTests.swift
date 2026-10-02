@@ -54,7 +54,7 @@ struct PipelineControlTests {
     }
 
     /* A fresh package per run, because the engine's build cache is keyed by the package's path. */
-    static func run(source: String, manifest: String = manifest, otherFiles: [String: Data] = [:]) async throws -> Run {
+    static func run(source: String, manifest: String = manifest, otherFiles: [String: Data] = [:], arguments: [String] = [], sink: ((Data) -> Void)? = nil) async throws -> Run {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-control-\(UUID().uuidString)", isDirectory: true)
         let sources = root.appendingPathComponent("Sources/Control", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
@@ -72,9 +72,12 @@ struct PipelineControlTests {
             }
         }
 
-        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"], workingDirectory: root)
+        let options = try CommandOptions.parse(["--contract", "\(EngineVersion.contract)", "--root", root.path, "--no-fix"] + arguments, workingDirectory: root)
         var lines = Data()
-        let writer = ContractWriter { lines.append($0) }
+        let writer = ContractWriter { data in
+            lines.append(data)
+            sink?(data)
+        }
         _ = try await Pipeline(options: options, writer: writer, workingDirectory: root).run()
         let records = try lines.split(separator: UInt8(ascii: "\n")).map { line in
             try #require(try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
@@ -111,6 +114,43 @@ struct PipelineControlTests {
         #expect(run.findings == [":5"], "the compiler's error, which carries no rule name")
         #expect(run.phase("lint") == "notReached")
         #expect(run.of("summary").first?["exitCode"] as? Int == 1)
+    }
+
+    /*
+     The naming rules' vocabulary, both ways. Missing or unreadable, the run is refused before the package is
+     described, naming the path, so a naming rule with no words can never read as a clean tree. Present at the
+     path `--abbreviations` names, it is the one the rule judges with.
+     */
+    @Test(arguments: ["missing", "malformed"])
+    func aVocabularyThatCannotBeLoadedRefusesTheRun(problem: String) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-vocabulary-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let path = directory.appendingPathComponent("abbreviations.json")
+        if problem == "malformed" {
+            try Data(#"{"abbreviations": [{"abbreviation": "val", "expansion": "value", "suffx": {}}]}"#.utf8).write(to: path)
+        }
+        var written = Data()
+        do {
+            _ = try await Self.run(source: Self.cleanSource, arguments: ["--abbreviations", path.path]) { written.append($0) }
+            Issue.record("a \(problem) vocabulary did not refuse the run")
+        } catch let failure as Pipeline.RunFailure {
+            #expect(failure.description.contains(path.path), "the refusal must name the path it looked at: \(failure)")
+            #expect(failure.description.contains("nothing was checked"))
+        }
+        let kinds = written.split(separator: UInt8(ascii: "\n")).compactMap { line in
+            (try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])?["kind"] as? String
+        }
+        #expect(kinds == ["provenance"], "nothing past provenance may be written before the refusal: \(kinds)")
+    }
+
+    @Test func theVocabularyAtTheGivenPathIsTheOneJudgedWith() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("cohere-swift-vocabulary-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let path = directory.appendingPathComponent("words.json")
+        try Data(#"{"abbreviations": [{"abbreviation": "qty", "expansion": "quantity", "whole": {"messageId": "noQty", "style": "plain"}}]}"#.utf8).write(to: path)
+        let source = Self.cleanSource.replacingOccurrences(of: "    let value: Int", with: "    let qty: Int")
+        let run = try await Self.run(source: source.replacingOccurrences(of: "value * 2", with: "qty * 2"), arguments: ["--abbreviations", path.path])
+        #expect(run.findings == ["cohere-swift/no-abbreviated-identifier:2"], "a word only the given file holds is the proof it was read")
     }
 
     /* Contract 2: a file the engine cannot read is a record, between `project` and the first `phase`, and the run is incomplete. */

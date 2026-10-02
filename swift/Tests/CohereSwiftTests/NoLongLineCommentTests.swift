@@ -16,7 +16,7 @@ struct NoLongLineCommentTests {
     }
 
     static func fixed(_ source: String) -> String {
-        FileFixer(configuration: RuleConfiguration(severities: [:], note: ""), maximumPasses: 10).fix(file(source)).file.source
+        FileFixer(configuration: RuleConfiguration(severities: [:], note: ""), rules: RuleRegistry.fileRules(vocabulary: AbbreviationVocabulary()), maximumPasses: 10).fix(file(source)).file.source
     }
 
     @Test func fourLinesStay() {

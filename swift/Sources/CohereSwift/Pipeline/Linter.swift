@@ -13,6 +13,7 @@ struct Linter {
     }
 
     let configuration: RuleConfiguration
+    let fileRules: [any FileRule]
 
     /* `manifests` holds each owned package's parsed `Package.swift`, keyed by the package root's path; vendored packages are absent and never checked. */
     func run(package: PackageModel, manifests: [String: ParsedFile], files: [ParsedFile]) -> Result {
@@ -38,7 +39,7 @@ struct Linter {
             }
         }
 
-        for rule in RuleRegistry.fileRules {
+        for rule in fileRules {
             let severity = configuration.severity(of: rule.name)
             guard severity != .off else {
                 scopedOff[rule.name] = files.count
@@ -53,7 +54,7 @@ struct Linter {
             }
         }
 
-        let ranNames = (RuleRegistry.packageRules.map(\.name) + RuleRegistry.fileRules.map(\.name)).filter { scopedOff[$0] == nil }
+        let ranNames = (RuleRegistry.packageRules.map(\.name) + fileRules.map(\.name)).filter { scopedOff[$0] == nil }
         let silent = ranNames.filter { (listening[$0] ?? 0) == 0 }.sorted()
         let watchedAndQuiet = ranNames.filter { (listening[$0] ?? 0) > 0 && (reporting[$0] ?? 0) == 0 }.count
 

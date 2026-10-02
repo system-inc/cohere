@@ -101,7 +101,7 @@ struct ForceRuleTests {
     }
 
     @Test func everyForceRuleIsRegistered() {
-        let names = Set(RuleRegistry.fileRules.map(\.name))
+        let names = Set(RuleRegistry.allNames)
         #expect(names.isSuperset(of: [NoForceUnwrap().name, NoForceTry().name, NoForceCast().name, NoImplicitlyUnwrappedOptional().name]))
     }
 }

@@ -29,15 +29,16 @@ import SwiftSyntax
  caller, and the suggestion in the message is applied by a reader with the scope in front of them.
  */
 public struct NoAbbreviatedIdentifier: FileRule {
-    public let name = "cohere-swift/no-abbreviated-identifier"
+    public static let ruleName = "cohere-swift/no-abbreviated-identifier"
+    public let name = ruleName
+    let vocabulary: AbbreviationVocabulary
 
-    public init() {}
+    /* The vocabulary is handed in, loaded by the pipeline before anything is checked, never looked up here. */
+    public init(vocabulary: AbbreviationVocabulary) {
+        self.vocabulary = vocabulary
+    }
 
     public func findings(in file: ParsedFile) -> [FindingRecord] {
-        guard case let .success(vocabulary) = AbbreviationVocabulary.shared else {
-            /* Unreachable in a run: `Pipeline` refuses to lint when the vocabulary did not load. */
-            return []
-        }
         let visitor = Visitor(viewMode: .sourceAccurate)
         visitor.walk(file.tree)
         return visitor.declared.compactMap { token in

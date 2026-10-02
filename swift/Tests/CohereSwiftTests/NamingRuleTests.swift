@@ -10,7 +10,7 @@ import Testing
  */
 struct NamingRuleTests {
     static func vocabulary() throws -> AbbreviationVocabulary {
-        try AbbreviationVocabulary.shared.get()
+        try AbbreviationVocabulary.load(contentsOf: AbbreviationVocabulary.defaultFile)
     }
 
     static func file(_ source: String, name: String = "Subject.swift") -> ParsedFile {
@@ -97,7 +97,7 @@ struct NamingRuleTests {
         #expect(throws: (any Error).self) { try AbbreviationVocabulary.load(data: Data(file.utf8)) }
     }
 
-    @Test func declaredNamesAreJudgedAndReferencesAreNot() {
+    @Test func declaredNamesAreJudgedAndReferencesAreNot() throws {
         let source = """
             struct Config {
                 let maxBytes: Int
@@ -107,11 +107,11 @@ struct NamingRuleTests {
                 }
             }
             """
-        #expect(Self.flagged(NoAbbreviatedIdentifier(), source) == ["Config:1", "maxBytes:2", "params:3", "idx:4"])
+        #expect(Self.flagged(NoAbbreviatedIdentifier(vocabulary: try Self.vocabulary()), source) == ["Config:1", "maxBytes:2", "params:3", "idx:4"])
     }
 
     /* An override's name and single-name labels are the superclass's; a separate label is API and only the name after it is ours. */
-    @Test func spellingsChosenElsewhereAreNotJudged() {
+    @Test func spellingsChosenElsewhereAreNotJudged() throws {
         let source = """
             class Pane: Base {
                 override func setConfig(params: Int) {}
@@ -123,7 +123,7 @@ struct NamingRuleTests {
                 }
             }
             """
-        #expect(Self.flagged(NoAbbreviatedIdentifier(), source).isEmpty)
+        #expect(Self.flagged(NoAbbreviatedIdentifier(vocabulary: try Self.vocabulary()), source).isEmpty)
     }
 
     @Test func lowerCamelCaseIsSwiftFormatsOwnRule() {

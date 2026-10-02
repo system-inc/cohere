@@ -269,6 +269,7 @@ it where a run that did not finish prints green.
 | `--format-all` | Accepted and changes nothing. Swift formats every file in scope by default, because formatting all of Presence costs a few seconds, not the minutes that made TypeScript format only changed files. Named paths and `--changed` still narrow the scope. |
 | `--changed`, `[paths]` | Narrow fix, format and lint to the scope. Types still reports the whole package (see `types`). |
 | `--lint-config <file>` | The `CohereSettings.json` whose `swift` block configures rules. |
+| `--abbreviations <file>` | The abbreviation vocabulary the naming rules judge with, nexus's `abbreviations.json`. Optional: without it the engine reads the file beside its own source checkout, so the front door passes it only for a binary shipped without one. A vocabulary that is missing, unreadable or malformed refuses the run with exit 2, naming the path, before anything is checked. |
 | `--fix-passes <n>`, `--single-threaded` | As for TypeScript. |
 | `--rules`, `--rules-enabled`, `--version` | `rule` and `provenance` records. |
 | `--unused`, `--unused-all`, `--unused-deep` | Not implemented for Swift until phase 2. The engine records `unused` as `skipped (not implemented for Swift yet)`. It neither errors, because the phase is opt-in and its absence withholds nothing from the gate, nor stays silent. |

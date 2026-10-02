@@ -61,6 +61,23 @@ public struct Pipeline {
         }
 
         /*
+         The abbreviation vocabulary, read before anything is checked. Missing or unreadable, it refuses the run
+         with exit 2 and the path it looked at: a naming rule with no words to judge would report nothing and
+         read as a clean tree, the silent green this tool exists to stop. A run with the rule turned off reads
+         nothing, and its rule list holds an empty vocabulary that is never consulted.
+         */
+        var vocabulary = AbbreviationVocabulary()
+        if configuration.severity(of: NoAbbreviatedIdentifier.ruleName) != .off && (options.runFix || options.runLint) {
+            let vocabularyFile = options.abbreviations ?? AbbreviationVocabulary.defaultFile
+            do {
+                vocabulary = try AbbreviationVocabulary.load(contentsOf: vocabularyFile)
+            } catch {
+                throw RunFailure(description: "the naming rules read their words from \(vocabularyFile.path), and it could not be loaded, so nothing was checked: \(error)")
+            }
+        }
+        let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary)
+
+        /*
          Unlike TypeScript, `--changed` cannot answer before the package is described: a changed `.swift` file
          counts only if a target compiles it, and only the description says which do. Describing costs about a
          second, cold.
@@ -117,7 +134,7 @@ public struct Pipeline {
             var refusals: [String: Int] = [:]
             var toFormat = parsed.files
             if options.mutate {
-                let fixer = FileFixer(configuration: configuration, maximumPasses: options.fixPasses)
+                let fixer = FileFixer(configuration: configuration, rules: fileRules, maximumPasses: options.fixPasses)
                 toFormat = parsed.files.map { file in
                     let result = fixer.fix(file)
                     fixesApplied += result.applied
@@ -223,12 +240,8 @@ public struct Pipeline {
         if !options.runLint {
             try writer.write(PhaseRecord(name: .lint, outcome: .skipped, detail: "not requested"))
         } else {
-            /* A vocabulary that did not load would leave the abbreviation rule judging nothing while the run reads clean, so the run is refused instead. */
-            if case let .failure(error) = AbbreviationVocabulary.shared, configuration.severity(of: NoAbbreviatedIdentifier().name) != .off {
-                throw RunFailure(description: "the abbreviation vocabulary could not be loaded, so naming could not be checked: \(error)")
-            }
             let lintStart = Date()
-            let lint = Linter(configuration: configuration).run(package: package, manifests: await manifests(of: package), files: parsed.files)
+            let lint = Linter(configuration: configuration, fileRules: fileRules).run(package: package, manifests: await manifests(of: package), files: parsed.files)
             for finding in lint.findings {
                 try writer.write(finding)
             }

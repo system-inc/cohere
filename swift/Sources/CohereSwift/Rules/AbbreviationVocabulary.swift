@@ -14,10 +14,11 @@ import Foundation
  Names are scanned as ASCII bytes, the way Go's regular expressions read them, rather than through
  Swift's Unicode-aware `Character`: `[a-z]` means those 26 bytes in both engines.
 
- The file is found beside the engine's own source, which the front door always builds from. A file that
- is missing or malformed stops the run with exit 2 (`Pipeline`), never a rule that quietly judges
- nothing. A binary shipped without its source checkout needs the front door to hand it the vocabulary,
- which is the release node's question, not this one's.
+ The file is `--abbreviations <path>` when the front door passes one, and otherwise the one beside the
+ engine's own source, which the front door builds from. A shipped binary has no source checkout, so the
+ front door will hand it the path (@system_cohere_release). A file that is missing, unreadable or malformed
+ refuses the run with exit 2, naming the path it looked at (`Pipeline`), never a rule that quietly judges
+ nothing.
  */
 public struct AbbreviationVocabulary: Sendable {
     /* One abbreviated word and the forms it is judged in. */
@@ -46,16 +47,13 @@ public struct AbbreviationVocabulary: Sendable {
     static let reasoning = "A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."
 
     /* `swift/Sources/CohereSwift/Rules/` up to cohere's root, then the Go rule's directory. */
-    static let defaultFile = URL(fileURLWithPath: #filePath)
+    public static let defaultFile = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .appendingPathComponent("internal/lint/rules/nexus/abbreviations.json")
-
-    /* Read once per process. A failure is kept, not swallowed, so the pipeline can refuse the run with it. */
-    public static let shared: Result<AbbreviationVocabulary, any Error> = Result { try load(contentsOf: defaultFile) }
 
     private(set) var wholeByName: [String: Entry] = [:]
     private(set) var earlyPrefixes: [Entry] = []
@@ -65,13 +63,23 @@ public struct AbbreviationVocabulary: Sendable {
     private(set) var allowedNames: Set<String> = []
     private(set) var allowedSegments: [String] = []
 
-    static func load(contentsOf file: URL) throws -> AbbreviationVocabulary {
+    /* An empty vocabulary judges nothing, which is right only where nothing is judged: listing rule names, or a run with the rule off. */
+    public init() {}
+
+    /* The reason alone, in words: the caller names the path once, in the sentence a person reads. */
+    public static func load(contentsOf file: URL) throws -> AbbreviationVocabulary {
+        let data: Data
         do {
-            return try load(data: Data(contentsOf: file))
-        } catch let failure as LoadFailure {
-            throw LoadFailure(description: "\(file.path): \(failure.description)")
+            data = try Data(contentsOf: file)
         } catch {
-            throw LoadFailure(description: "\(file.path) could not be read: \(error)")
+            throw LoadFailure(description: "it could not be read (\((error as NSError).localizedDescription))")
+        }
+        do {
+            return try load(data: data)
+        } catch let failure as LoadFailure {
+            throw failure
+        } catch {
+            throw LoadFailure(description: "it is not valid JSON (\((error as NSError).localizedDescription))")
         }
     }
 
