@@ -213,12 +213,49 @@ func TestCoverageDetailsNameEachRuleOnce(t *testing.T) {
 		}
 	}
 	requireLines(t, output,
-		"    partly-off (off by the config for 6 files)\n",
+		"    partly-off (ran on 3779 of 3785 files, off by the config on 6)\n",
 		"    override-only (2 findings, not in the config for 3745 files)\n",
 		"    off-and-unconfigured (3000 files, not in the config for 785 more)\n",
 	)
 	// The pointer is for the default mode; with details it would point at itself.
 	forbidLines(t, output, "details: cohere --coverage")
+}
+
+// A rule on at the top level and off by an override for most files is counted apart from a rule that
+// ran everywhere, and named with where it ran and where it did not.
+//
+// This is phi_api's shape (#7n4zxrb): core rules on in the base `rules`, an override turning them off
+// for `**/*.ts`, and a `.cjs` file still linted. They ran on 12 of 3,242 files and coverage counted
+// them with the rules that ran on all of them. The control is a rule that ran on every file, which
+// stays where it was; a rule that found something keeps that category and says where it did not run.
+func TestARuleOffByAnOverrideForMostFilesIsCountedApart(t *testing.T) {
+	rules := []rule.Rule{{Name: "eqeqeq"}, {Name: "no-var"}, {Name: "everywhere"}, {Name: "override-only"}}
+	coverage := program.Coverage{
+		RulesOffered:      map[string]int{"eqeqeq": 12, "no-var": 12, "everywhere": 3242, "override-only": 40},
+		RulesListening:    map[string]int{"eqeqeq": 12, "no-var": 9, "everywhere": 3242, "override-only": 40},
+		RulesReporting:    map[string]int{},
+		RulesScopedOff:    map[string]int{"eqeqeq": 3230, "no-var": 3230},
+		RulesUnconfigured: map[string]int{"override-only": 3202},
+	}
+
+	report := lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, WalkCost: "in 1s"}
+	requireLines(t, renderLintReport(report),
+		"coverage: 4 rules = 3 ran on part of the tree + 1 ran and found nothing\n",
+	)
+
+	report.Details = true
+	output := renderLintReport(report)
+	requireLines(t, output,
+		"  ran on part of the tree (3): ",
+		"    eqeqeq (ran on 12 of 3242 files, off by the config on 3230)\n",
+		// A rule offered files it declined says so, so the terms still add up to the files it could
+		// have run on.
+		"    no-var (ran on 9 of 3242 files, declined 3, off by the config on 3230)\n",
+		// A rule enabled only inside an override is the same fact with the other reason.
+		"    override-only (ran on 40 of 3242 files, not in the config for 3202)\n",
+		"  ran and found nothing (1): ",
+		"    everywhere\n",
+	)
 }
 
 // Every category that needs action prints in full on a default run, whatever else moved behind

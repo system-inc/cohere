@@ -35,6 +35,7 @@ type coverageCategory string
 
 const (
 	coverageFoundSomething     coverageCategory = "FoundSomething"
+	coverageRanOnPartOfTheTree coverageCategory = "RanOnPartOfTheTree"
 	coverageRanAndFoundNothing coverageCategory = "RanAndFoundNothing"
 	coverageNoListener         coverageCategory = "NoListener"
 	coverageListenedToNothing  coverageCategory = "ListenedToNothing"
@@ -48,6 +49,7 @@ const (
 // did not and why.
 var coverageCategoryOrder = []coverageCategory{
 	coverageFoundSomething,
+	coverageRanOnPartOfTheTree,
 	coverageRanAndFoundNothing,
 	coverageNoListener,
 	coverageListenedToNothing,
@@ -60,6 +62,7 @@ var coverageCategoryOrder = []coverageCategory{
 // coverageCategoryTerms is each category as a term in the counted line.
 var coverageCategoryTerms = map[coverageCategory]string{
 	coverageFoundSomething:     "found something",
+	coverageRanOnPartOfTheTree: "ran on part of the tree",
 	coverageRanAndFoundNothing: "ran and found nothing",
 	coverageNoListener:         "registered no listener",
 	coverageListenedToNothing:  "listened to no files",
@@ -78,6 +81,12 @@ var coverageCategoryMeanings = map[coverageCategory]string{
 	// cannot see. Two false positives shipped past a full fixture pair and were caught only by running
 	// against the tree, which is why this is counted on every run rather than left to a habit.
 	coverageRanAndFoundNothing: "a clean tree and a rule that cannot see look identical here",
+	// A rule on at the top level and turned off by an override for most files read as "ran and found
+	// nothing" if any file still ran it. phi_api's twelve core rules did: its whole-tree override kept
+	// them off for every .ts and .tsx file, they ran on the .cjs files alone, and coverage said they ran
+	// (#7n4zxrb). So a quiet rule the config kept from some files is counted apart, with the files it ran
+	// on beside the files it did not.
+	coverageRanOnPartOfTheTree: "ran and found nothing on the files it ran on, and the config turned it off or never enabled it for the rest, so its silence covers only those files",
 	// Three different rules look identical here, and the run cannot tell them apart. A rule whose whole
 	// job is answered from the file itself does its work in Run and returns no listener
 	// (network-require-hook-request-suffix inspects every hook and reports before returning). A rule
@@ -217,6 +226,9 @@ func classifyTypeScriptCoverage(
 		case coverage.RulesReporting[name] > 0:
 			entry.Category = coverageFoundSomething
 			entry.Details = append(entry.Details, fmt.Sprintf("%d findings", coverage.RulesReporting[name]))
+		case coverage.RulesListening[name] > 0 && scopedOff+unconfigured > 0:
+			entry.Category = coverageRanOnPartOfTheTree
+			entry.Details = append(entry.Details, partOfTheTreeDetail(coverage.RulesListening[name], offered, scopedOff, unconfigured))
 		case coverage.RulesListening[name] > 0:
 			entry.Category = coverageRanAndFoundNothing
 		case offered > 0:
@@ -237,7 +249,7 @@ func classifyTypeScriptCoverage(
 		// override does not reach, and it once printed "ran on no files" while reporting thousands of
 		// findings in the files the override does reach. Found on the boundaries dry run by
 		// @system_cohere_base_rules. A rule that ran keeps its category and says where it did not run.
-		if offered > 0 {
+		if offered > 0 && entry.Category != coverageRanOnPartOfTheTree {
 			if scopedOff > 0 {
 				entry.Details = append(entry.Details, fmt.Sprintf("off by the config for %d files", scopedOff))
 			}
@@ -263,6 +275,23 @@ func classifyTypeScriptCoverage(
 
 	summary.sortEntries()
 	return summary
+}
+
+// partOfTheTreeDetail says where a rule ran and where it did not, as terms that add up to every file it
+// could have run on: `ran on 12 of 3242 files, off by the config on 3230`. The files it was offered and
+// declined are a term of their own when there are any, so the sum still holds.
+func partOfTheTreeDetail(listening, offered, scopedOff, unconfigured int) string {
+	terms := []string{fmt.Sprintf("ran on %d of %d files", listening, offered+scopedOff+unconfigured)}
+	if declined := offered - listening; declined > 0 {
+		terms = append(terms, fmt.Sprintf("declined %d", declined))
+	}
+	if scopedOff > 0 {
+		terms = append(terms, fmt.Sprintf("off by the config on %d", scopedOff))
+	}
+	if unconfigured > 0 {
+		terms = append(terms, fmt.Sprintf("not in the config for %d", unconfigured))
+	}
+	return strings.Join(terms, ", ")
 }
 
 // sortEntries orders the entries by category, then by name, so the details read in the counted
