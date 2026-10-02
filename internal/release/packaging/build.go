@@ -2,6 +2,7 @@ package release
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -96,6 +97,10 @@ func Build(options Options) (Result, error) {
 		return Result{}, fmt.Errorf("a release needs a version")
 	}
 
+	if err := requireAncestor(options.ModuleDirectory, MinimumReleaseCommit, minimumReleaseReason); err != nil {
+		return Result{}, err
+	}
+
 	targets := options.Targets
 	if len(targets) == 0 {
 		targets = Targets
@@ -132,6 +137,51 @@ func Build(options Options) (Result, error) {
 	result.Packages = append(result.Packages, dispatcher)
 
 	return result, nil
+}
+
+// MinimumReleaseCommit is the oldest cohere commit a release may be built from.
+//
+// It is `1bd41fb1`, where formatting options started coming only from CohereSettings.json's format
+// block. An engine from before it does not know that block, and in a repository whose package.json
+// no longer has a prettier key it formats silently with Prettier's defaults rather than failing:
+// one printed 2-space indentation over api's GraphQL. A repository that pins a published version
+// gets that version's engine and nothing newer can intervene, so the only place to stop it is here,
+// before it is published.
+//
+// A launcher check was considered and rejected. Platform packages are pinned to the launcher's
+// exact version, so a normal install never pairs a new launcher with an old engine, and an old
+// published version carries an old launcher that no check written later can reach.
+//
+// Written out in full because an abbreviated hash is only unambiguous for the history it was
+// abbreviated against.
+const MinimumReleaseCommit = "1bd41fb1bdb465f4453c472bcb1e17da5d2d6cf1"
+
+const minimumReleaseReason = "older engines ignore CohereSettings.json's format block and format with Prettier's defaults"
+
+// requireAncestor refuses a release built from a commit that does not contain minimum.
+//
+// git answers with three exit codes, and only one of them is a pass. 0 means minimum is in the
+// history. 1 means it is not. Anything else means git could not decide, and the usual cause is a
+// shallow clone where minimum was never fetched; that is refused too, because a check that cannot
+// tell is not a check that passed.
+func requireAncestor(moduleDirectory string, minimum string, reason string) error {
+	command := exec.Command("git", "-C", moduleDirectory, "merge-base", "--is-ancestor", minimum, "HEAD")
+	output, err := command.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) && exitError.ExitCode() == 1 {
+		return fmt.Errorf(
+			"this release would be built from a commit that does not contain %s, and %s. Release from a checkout that includes it",
+			shortCommit(minimum), reason,
+		)
+	}
+	return fmt.Errorf(
+		"could not tell whether this release contains %s, so it is refused rather than assumed: %w\n%s\nA shallow clone is the usual cause; fetch full history and release again",
+		shortCommit(minimum), err, strings.TrimSpace(string(output)),
+	)
 }
 
 // requireCompilerPatches refuses a release whose vendored compiler is missing a patch cohere carries.
