@@ -18,7 +18,6 @@ public enum RuleRegistry {
         FileNamedForType(),
         NoPrint(),
         RequireEscapeHatchReason(),
-        NoDiscardedTryOptional(),
         FatalErrorMessage(),
         NoTodoComment(),
         NoAbbreviatedIdentifier(vocabulary: vocabulary),
@@ -51,6 +50,7 @@ public enum RuleRegistry {
         NoDefaultForOwnedEnum(),
         NoUnhandledThrowingTask(),
         RedundantTypeAnnotation(),
+        NoDiscardedTryOptional(),
     ]
 
     public static let packageRules: [any PackageRule] = [

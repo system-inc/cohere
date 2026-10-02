@@ -102,7 +102,7 @@ struct UnusedOptionalBindingTests {
             """
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
         let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
-        #expect(NoDiscardedTryOptional().findings(in: file).isEmpty)
+        #expect(NoDiscardedTryOptional().findings(in: file, symbols: FileSymbols([])).isEmpty)
         #expect(Self.positions(Self.findings(source)) == ["1:8"])
     }
 }
