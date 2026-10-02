@@ -91,7 +91,7 @@ func TestProseWrapMatchesOracle(t *testing.T) {
 	oracle := newOptionsOracle(t)
 	inputs := append(append(append([]string{}, proseWrapFixtures...), formatFixtures...), suiteInputs(t)...)
 	texts, byteOrderMarks, trees := parseInputs(t, inputs)
-	failures, compared := 0, 0
+	failures, fullStackFailures, compared := 0, 0, 0
 	for _, proseWrap := range []string{"always", "never"} {
 		for variantIndex, options := range formatVariants[:3] {
 			for index, input := range inputs {
@@ -100,6 +100,15 @@ func TestProseWrapMatchesOracle(t *testing.T) {
 					continue
 				}
 				compared++
+				// The full stack: the Go parser and the printer, from the text.
+				if fullStack, err := formatFullStack("fixture.yaml", input, options, proseWrap, nil); err != nil || fullStack != expected {
+					fullStackFailures++
+					if err != nil {
+						t.Errorf("%s, variant %d, %q: Format: %v", proseWrap, variantIndex, input, err)
+					} else {
+						t.Errorf("%s, variant %d, %q: Format: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, fullStack))
+					}
+				}
 				actual, err := formatParsed("fixture.yaml", trees[index], texts[index], byteOrderMarks[index], options, proseWrap, nil)
 				if err != nil {
 					failures++
@@ -113,7 +122,7 @@ func TestProseWrapMatchesOracle(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("%d proseWrap comparisons, %d differ", compared, failures)
+	t.Logf("%d proseWrap comparisons: full stack %d differ, tree loader %d differ", compared, fullStackFailures, failures)
 }
 
 // jsonTextToDoc stands in for the native JSON printer: the oracle formats the JSON, and the text comes
@@ -150,7 +159,15 @@ func TestPrettierRcEmbedsJSON(t *testing.T) {
 					if trees[index].err == "" {
 						t.Errorf("%s, %q: the oracle failed (%v) but the parser did not", fileName, input, err)
 					}
+					if _, fullStackErr := formatFullStack(fileName, input, options, "preserve", textToDoc); !printing.IsSyntax(fullStackErr) {
+						t.Errorf("%s, %q: the oracle failed (%v) but Format gave %v", fileName, input, err, fullStackErr)
+					}
 					continue
+				}
+				if fullStack, err := formatFullStack(fileName, input, options, "preserve", textToDoc); err != nil {
+					t.Errorf("%s, %q: Format: %v", fileName, input, err)
+				} else if fullStack != expected {
+					t.Errorf("%s, %q: Format: %s", fileName, input, differential.FirstDifference(expected, fullStack))
 				}
 				actual, err := formatParsed(fileName, trees[index], texts[index], byteOrderMarks[index], options, "preserve", textToDoc)
 				if err != nil {

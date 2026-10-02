@@ -32,13 +32,15 @@ const javaScriptSpaceText = "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u20
 // relocation maps a Swift build leaves in .build).
 const oracleSizeLimit = 1 << 20
 
-// yamlCandidate prints the trees parsed up front for each file. The parser is not ported yet, so the
-// trees come from Node in batches before the comparison starts; Format checks it is printing the text
-// the tree was parsed from.
+// yamlCandidate is the port, measured two ways. The full stack is Format: the Go parser and the printer,
+// from the text. The tree loader prints the trees the real parser built, parsed by Node in batches before
+// the comparison starts, so the printer is measured apart from the parser; Format then checks it is
+// printing the text the tree was parsed from.
 type yamlCandidate struct {
-	options prettier.Options
-	texts   map[string]string
-	trees   map[string]parsed
+	options   prettier.Options
+	fullStack bool
+	texts     map[string]string
+	trees     map[string]parsed
 }
 
 func (candidate yamlCandidate) Handles(fileName string) bool {
@@ -47,6 +49,9 @@ func (candidate yamlCandidate) Handles(fileName string) bool {
 }
 
 func (candidate yamlCandidate) Format(fileName string, text string) (string, error) {
+	if candidate.fullStack {
+		return formatFullStack(fileName, text, candidate.options, "preserve", nil)
+	}
 	normalized, hasByteOrderMark := normalizeInput(text)
 	if candidate.texts[fileName] != normalized {
 		return "", fmt.Errorf("the file changed after it was parsed")
@@ -90,7 +95,9 @@ func frontMatterBlock(formatted string, endDelimiter string) string {
 // (src/main/front-matter/embed.js): the value trimmed, printed with parser yaml through textToDoc,
 // which strips the trailing hardline, between the delimiters.
 type frontMatterCandidate struct {
-	options      prettier.Options
+	options prettier.Options
+	// fullStack embeds FormatDoc's doc, the Go parser's tree printed, instead of the loaded tree's.
+	fullStack    bool
 	frontMatters map[string]*mdast.FrontMatter
 	values       map[string]string
 	trees        map[string]parsed
@@ -102,11 +109,17 @@ func (candidate frontMatterCandidate) Handles(fileName string) bool {
 
 func (candidate frontMatterCandidate) Format(fileName string, _ string) (string, error) {
 	frontMatter := candidate.frontMatters[fileName]
-	tree := candidate.trees[fileName]
-	if tree.err != "" {
-		return "", fmt.Errorf("the parser failed: %s", tree.err)
+	var embedded doc.Doc
+	var err error
+	if candidate.fullStack {
+		embedded, err = FormatDoc(candidate.values[fileName], candidate.options, nil)
+	} else {
+		tree := candidate.trees[fileName]
+		if tree.err != "" {
+			return "", fmt.Errorf("the parser failed: %s", tree.err)
+		}
+		embedded, err = PrintDoc(tree.root, candidate.values[fileName], candidate.options, nil)
 	}
-	embedded, err := PrintDoc(tree.root, candidate.values[fileName], candidate.options, nil)
 	if err != nil {
 		return "", err
 	}
@@ -223,8 +236,12 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 	}
 
 	type tally struct{ identical, measured, rewriteIdentical, rewriteTotal, refused, oracleFailed int }
-	totals := map[string]*tally{"yaml files": {}, "front matter": {}}
-	syntaxErrors, tooLarge := 0, 0
+	measures := []string{"yaml files, full stack", "yaml files, tree loader", "front matter, full stack", "front matter, tree loader"}
+	totals := map[string]*tally{}
+	for _, name := range measures {
+		totals[name] = &tally{}
+	}
+	syntaxErrors, tooLarge, parseDisagreements := 0, 0, 0
 	var report strings.Builder
 	for _, corpus := range yamlCorpora(t, roots) {
 		options := corpus.options
@@ -232,6 +249,7 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 
 		// The YAML files.
 		candidate := yamlCandidate{options: options, texts: map[string]string{}, trees: map[string]parsed{}}
+		fullStack := yamlCandidate{options: options, fullStack: true}
 		var texts, yamlFiles []string
 		for _, path := range corpus.yamlFiles {
 			source, err := os.ReadFile(path)
@@ -251,12 +269,19 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 		for index, tree := range parseTrees(t, texts) {
 			candidate.trees[yamlFiles[index]] = tree
 		}
+		// TestCorpora's identity, character for character, so both share one cache.
+		yamlCache := &differential.OracleCache{Directory: directory, Identity: digest + "|" + string(bundles.Origin) + "|filepath|" + fmt.Sprintf("%+v", options)}
 		yamlReport, err := differential.Compare(corpus.root, yamlFiles,
 			func() (differential.Formatter, error) { return newEngine() },
 			func() (differential.Formatter, error) { return candidate, nil },
-			runtime.NumCPU(),
-			// TestCorpora's identity, character for character, so both share one cache.
-			&differential.OracleCache{Directory: directory, Identity: digest + "|" + string(bundles.Origin) + "|filepath|" + fmt.Sprintf("%+v", options)})
+			runtime.NumCPU(), yamlCache)
+		if err != nil {
+			t.Fatalf("comparing %s: %v", corpus.root, err)
+		}
+		yamlFullStackReport, err := differential.Compare(corpus.root, yamlFiles,
+			func() (differential.Formatter, error) { return newEngine() },
+			func() (differential.Formatter, error) { return fullStack, nil },
+			runtime.NumCPU(), yamlCache)
 		if err != nil {
 			t.Fatalf("comparing %s: %v", corpus.root, err)
 		}
@@ -286,6 +311,11 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 		var measuredFrontMatterFiles []string
 		for index, tree := range parseTrees(t, values) {
 			frontMatters.trees[frontMatterFiles[index]] = tree
+			// The Go parser must refuse exactly the values the real one refuses.
+			if _, err := parse(values[index]); (err != nil) != (tree.err != "") {
+				parseDisagreements++
+				report.WriteString(fmt.Sprintf("front matter: the Go parser disagrees (real: %q, Go: %v): %s\n", tree.err, err, frontMatterFiles[index]))
+			}
 			if tree.err != "" {
 				// Prettier prints such front matter as written, since the embed fails; there is no
 				// YAML output to compare.
@@ -295,15 +325,21 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 			}
 			measuredFrontMatterFiles = append(measuredFrontMatterFiles, frontMatterFiles[index])
 		}
-		frontMatterReport, err := differential.Compare(corpus.root, measuredFrontMatterFiles,
-			func() (differential.Formatter, error) {
-				engine, err := newEngine()
-				return frontMatterOracle{engine: engine}, err
-			},
-			func() (differential.Formatter, error) { return frontMatters, nil },
-			runtime.NumCPU(),
-			// Its own identity: this oracle keeps only the front matter of the output.
-			&differential.OracleCache{Directory: directory, Identity: digest + "|" + string(bundles.Origin) + "|yaml-front-matter-block|" + fmt.Sprintf("%+v", options)})
+		// Its own identity: this oracle keeps only the front matter of the output.
+		frontMatterCache := &differential.OracleCache{Directory: directory, Identity: digest + "|" + string(bundles.Origin) + "|yaml-front-matter-block|" + fmt.Sprintf("%+v", options)}
+		newFrontMatterOracle := func() (differential.Formatter, error) {
+			engine, err := newEngine()
+			return frontMatterOracle{engine: engine}, err
+		}
+		frontMatterReport, err := differential.Compare(corpus.root, measuredFrontMatterFiles, newFrontMatterOracle,
+			func() (differential.Formatter, error) { return frontMatters, nil }, runtime.NumCPU(), frontMatterCache)
+		if err != nil {
+			t.Fatalf("comparing %s: %v", corpus.root, err)
+		}
+		frontMatterFullStack := frontMatters
+		frontMatterFullStack.fullStack = true
+		frontMatterFullStackReport, err := differential.Compare(corpus.root, measuredFrontMatterFiles, newFrontMatterOracle,
+			func() (differential.Formatter, error) { return frontMatterFullStack, nil }, runtime.NumCPU(), frontMatterCache)
 		if err != nil {
 			t.Fatalf("comparing %s: %v", corpus.root, err)
 		}
@@ -311,7 +347,10 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 		for _, named := range []struct {
 			name   string
 			report differential.Report
-		}{{"yaml files", yamlReport}, {"front matter", frontMatterReport}} {
+		}{
+			{"yaml files, full stack", yamlFullStackReport}, {"yaml files, tree loader", yamlReport},
+			{"front matter, full stack", frontMatterFullStackReport}, {"front matter, tree loader", frontMatterReport},
+		} {
 			name, measured := named.name, named.report
 			total := measured.Total()
 			counts := totals[name]
@@ -336,15 +375,18 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 		}
 		return 100 * float64(part) / float64(whole)
 	}
-	for _, name := range []string{"yaml files", "front matter"} {
+	for _, name := range measures {
 		counts := totals[name]
 		t.Logf("%s: %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%), refused %d, oracle failed %d",
 			name, counts.identical, counts.measured, percent(counts.identical, counts.measured),
 			counts.rewriteIdentical, counts.rewriteTotal, percent(counts.rewriteIdentical, counts.rewriteTotal),
 			counts.refused, counts.oracleFailed)
 	}
-	t.Logf("front matter not measured, a YAML syntax error: %d; yaml files not measured, over %d bytes: %d",
-		syntaxErrors, oracleSizeLimit, tooLarge)
+	t.Logf("front matter not measured, a YAML syntax error: %d (the Go parser disagrees on %d); yaml files not measured, over %d bytes: %d",
+		syntaxErrors, parseDisagreements, oracleSizeLimit, tooLarge)
+	if parseDisagreements > 0 {
+		t.Errorf("the Go parser and the real one disagree on whether %d front matter values parse", parseDisagreements)
+	}
 	for index, line := range strings.SplitAfter(report.String(), "\n") {
 		if index == 30 || line == "" {
 			break

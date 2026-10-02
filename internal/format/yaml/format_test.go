@@ -140,6 +140,20 @@ func formatParsed(fileName string, tree parsed, text string, hasByteOrderMark bo
 	return formatted, nil
 }
 
+// formatFullStack is Format as native.Formatter calls it: the byte order mark removed and line endings
+// normalized before, the mark restored after.
+func formatFullStack(fileName string, input string, options prettier.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
+	text, hasByteOrderMark := normalizeInput(input)
+	formatted, err := formatWithProseWrap(fileName, text, options, proseWrap, textToDoc)
+	if err != nil {
+		return "", err
+	}
+	if hasByteOrderMark {
+		formatted = "\ufeff" + formatted
+	}
+	return formatted, nil
+}
+
 // parseInputs normalizes and parses every input.
 func parseInputs(t testing.TB, inputs []string) ([]string, []bool, []parsed) {
 	t.Helper()
@@ -151,11 +165,14 @@ func parseInputs(t testing.TB, inputs []string) ([]string, []bool, []parsed) {
 	return texts, byteOrderMarks, parseTrees(t, texts)
 }
 
-// compareFormat formats every input both ways under every variant and reports each difference.
+// compareFormat formats every input with Prettier and with the port under every variant, the port two
+// ways: the full stack (Format: the Go parser and the printer, from the text) and the printer alone on
+// the tree the real parser built (the tree loader). Each difference is reported. Where Prettier fails,
+// both must fail too, and Format with an error printing.IsSyntax recognizes.
 func compareFormat(t *testing.T, inputs []string) int {
 	t.Helper()
 	texts, byteOrderMarks, trees := parseInputs(t, inputs)
-	failures, compared, oracleFailures := 0, 0, 0
+	failures, fullStackFailures, compared, oracleFailures := 0, 0, 0, 0
 	for variantIndex, options := range formatVariants {
 		engine, err := prettier.New(options)
 		if err != nil {
@@ -163,6 +180,7 @@ func compareFormat(t *testing.T, inputs []string) int {
 		}
 		for index, input := range inputs {
 			expected, oracleErr := engine.Format("fixture.yaml", input)
+			fullStack, fullStackErr := formatFullStack("fixture.yaml", input, options, "preserve", nil)
 			if oracleErr != nil {
 				// Prettier cannot format it; the parser must refuse it too.
 				oracleFailures++
@@ -170,9 +188,20 @@ func compareFormat(t *testing.T, inputs []string) int {
 					failures++
 					t.Errorf("variant %d, %q: the oracle failed (%v) but the parser did not", variantIndex, input, oracleErr)
 				}
+				if fullStackErr == nil || !printing.IsSyntax(fullStackErr) {
+					fullStackFailures++
+					t.Errorf("variant %d, %q: the oracle failed (%v) but Format gave %q, %v", variantIndex, input, oracleErr, fullStack, fullStackErr)
+				}
 				continue
 			}
 			compared++
+			if fullStackErr != nil {
+				fullStackFailures++
+				t.Errorf("variant %d, %q: Format: %v", variantIndex, input, fullStackErr)
+			} else if fullStack != expected {
+				fullStackFailures++
+				t.Errorf("variant %d, %q: Format: %s", variantIndex, input, differential.FirstDifference(expected, fullStack))
+			}
 			actual, err := formatParsed("fixture.yaml", trees[index], texts[index], byteOrderMarks[index], options, "preserve", nil)
 			if err != nil {
 				failures++
@@ -185,9 +214,9 @@ func compareFormat(t *testing.T, inputs []string) int {
 			}
 		}
 	}
-	t.Logf("%d comparisons over %d fixtures and %d option sets, %d differ; %d oracle failures (syntax errors)",
-		compared, len(inputs), len(formatVariants), failures, oracleFailures)
-	return failures
+	t.Logf("%d comparisons over %d fixtures and %d option sets: full stack %d differ, tree loader %d differ; %d oracle failures (syntax errors)",
+		compared, len(inputs), len(formatVariants), fullStackFailures, failures, oracleFailures)
+	return failures + fullStackFailures
 }
 
 func TestFormatFixturesMatchOracle(t *testing.T) {
