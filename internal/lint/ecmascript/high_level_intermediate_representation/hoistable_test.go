@@ -1,10 +1,7 @@
 package high_level_intermediate_representation
 
 import (
-	"os"
 	"path/filepath"
-	"sort"
-	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -393,37 +390,16 @@ func TestHoistableConflictsAreReportedNotSwallowed(t *testing.T) {
 	}
 }
 
-// TestHoistableCorpusDistribution pins the shape over real code.
+// TestHoistableCorpusDistribution pins the shape over real code, read at a fixed commit so the exact
+// counts below move only when the analysis does (see pinnedCorpusFiles).
 func TestHoistableCorpusDistribution(t *testing.T) {
 	t.Parallel()
 
-	if _, err := os.Stat(corpusRoot); err != nil {
-		t.Skipf("the corpus at %s is not present on this machine", corpusRoot)
-	}
-	var files []string
-	filepath.Walk(corpusRoot, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
-		}
-		if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".tsx") {
-			files = append(files, path)
-		}
-		return nil
-	})
-	sort.Strings(files)
-	if len(files) > 150 {
-		files = files[:150]
-	}
-	if len(files) < 10 {
-		t.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
-	}
+	files, contentsOf := pinnedCorpusFiles(t, 150)
 
 	deep, flat, notConverged, maxIterations, conflicts := 0, 0, 0, 0, 0
 	for _, path := range files {
-		contents, readErr := os.ReadFile(path)
-		if readErr != nil {
-			continue
-		}
+		contents := contentsOf[path]
 		fileName := "/corpus/" + filepath.Base(path)
 		probe := rule.Rule{
 			Name:             "hoistable-corpus",
@@ -481,7 +457,7 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: string(contents)}, fileName)
+		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: contents}, fileName)
 	}
 
 	if deep == 0 {
@@ -796,8 +772,16 @@ func TestHoistableCorpusDistribution(t *testing.T) {
 	// moves 625/2841 to 631/3043; STATE_EFFECTS.md accounts for all added and removed scope inputs.
 	// Effect-hook freezing moves those to 649/3118, attributed in EFFECT_HOOK_EFFECTS.md. Immutable
 	// alias-edge refinement moves those to 685/3227; IMMUTABLE_ALIAS_EDGES.md lists the full delta.
-	if deep != 796 || flat != 3310 {
-		t.Errorf("got %d deep and %d flat dependencies, want 796 and 3310; a SMALL move here is "+
+	// # Frozen 2026-10-01: 769 deep / 3,320 flat, over Structure at pinnedCorpusCommit
+	//
+	// The live pin of 796 / 3,310 failed after every lint sweep of the directory, 800 / 3,322 and then
+	// 773 / 3,300, so the input is now a fixed commit rather than the working tree. The new figures are
+	// a corpus movement and not an analysis one, measured: the analysis at the old pin's own commit
+	// (04501c3) and at the commit after it that touched ranges (6f04852) both produce 769 / 3,320 over
+	// the frozen corpus. Discrimination survives the change: the immutability gate forced always true
+	// gives 832 / 3,295 with 3 iterations, and fails here.
+	if deep != 769 || flat != 3320 {
+		t.Errorf("got %d deep and %d flat dependencies, want 769 and 3320; a SMALL move here is "+
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}

@@ -2,7 +2,9 @@ package high_level_intermediate_representation
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -34,6 +36,65 @@ import (
 // itself wrong, so "no unsupported constructs" was measuring a corpus far narrower than intended.
 // Widening it is the cheap fix and it costs about a second.
 const corpusRoot = "/Users/kirkouimet/Projects/ahra/libraries/structure/source"
+
+// structureRepository is the repository corpusRoot sits in, and pinnedCorpusCommit is a commit in it
+// whose files can never change.
+//
+// # Why one test reads a frozen corpus while the rest read the live one
+//
+// The live directory is right for a test that asserts well-formedness: it is looking for a construct
+// nobody anticipated, and new code is where those arrive. It is wrong for a test that asserts exact
+// counts, because the counts then move whenever anyone edits the directory, and our own lint sweeps
+// edit it most. `TestHoistableCorpusDistribution` asserts exact counts on purpose (its comment records
+// the mutants only an exact count can see), and against the live tree it failed after every sweep in
+// both directions, 796 to 800 and then to 773. So it reads the same paths at this commit instead, and
+// its numbers move only when the analysis does.
+const (
+	structureRepository = "/Users/kirkouimet/Projects/ahra/libraries/structure"
+	pinnedCorpusCommit  = "9f40ee3e313a9c78b8e98da4cd214d45af4b7495"
+)
+
+// pinnedCorpusFiles returns the first count TypeScript paths under `source/` at pinnedCorpusCommit,
+// sorted, with each one's contents at that commit.
+//
+// It skips when the repository is not on this machine, as the live tests do. It fails when the
+// repository is present and the commit or a file is not, and when fewer than count files come back,
+// because each of those would otherwise measure a different corpus and still report a number.
+func pinnedCorpusFiles(t *testing.T, count int) ([]string, map[string]string) {
+	t.Helper()
+
+	if _, err := os.Stat(structureRepository); err != nil {
+		t.Skipf("the corpus repository at %s is not present on this machine", structureRepository)
+	}
+	listing, err := exec.Command("git", "-C", structureRepository, "ls-tree", "-r", "--name-only",
+		pinnedCorpusCommit, "--", "source").Output()
+	if err != nil {
+		t.Fatalf("listing %s at %s: %v; the repository is here and the pinned commit is not",
+			structureRepository, pinnedCorpusCommit, err)
+	}
+	var paths []string
+	for _, line := range strings.Split(string(listing), "\n") {
+		if strings.HasSuffix(line, ".ts") || strings.HasSuffix(line, ".tsx") {
+			paths = append(paths, line)
+		}
+	}
+	sort.Strings(paths)
+	if len(paths) < count {
+		t.Fatalf("the pinned corpus holds %d TypeScript files, want at least %d", len(paths), count)
+	}
+	paths = paths[:count]
+
+	contents := make(map[string]string, len(paths))
+	for _, path := range paths {
+		blob, err := exec.Command("git", "-C", structureRepository, "show",
+			pinnedCorpusCommit+":"+path).Output()
+		if err != nil {
+			t.Fatalf("reading %s at %s: %v", path, pinnedCorpusCommit, err)
+		}
+		contents[path] = string(blob)
+	}
+	return paths, contents
+}
 
 // TestLowerRealCodebase lowers every function in a real TypeScript tree and checks the invariants.
 //
