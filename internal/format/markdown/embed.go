@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -159,4 +160,44 @@ func embedFrontMatter(node *Node) embedPrint {
 			doc.Text(frontMatter.EndDelimiter),
 		}), nil
 	}
+}
+
+// EmbeddedParsers names the parsers Prettier formats parts of a markdown text with: each fenced code
+// block's inferred parser (or a ts/tsx file name, as embed passes it) and yaml or toml front matter with
+// content, in document order. A report uses it to attribute a difference to a missing printer by name.
+func EmbeddedParsers(text string) []string {
+	text = strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(text, "\ufeff"), "\r\n", "\n"), "\r", "\n")
+	ast, err := mdast.ParseMarkdown(text)
+	if err != nil {
+		return nil
+	}
+	var parsers []string
+	var walk func(node *Node)
+	walk = func(node *Node) {
+		switch node.NodeType {
+		case "code":
+			if node.Lang != nil {
+				switch *node.Lang {
+				case "angular-ts":
+					parsers = append(parsers, inferParserForLanguage("typescript"))
+				case "angular-html":
+					parsers = append(parsers, "angular")
+				default:
+					if parser := inferParserForLanguage(*node.Lang); parser != "" {
+						parsers = append(parsers, parser)
+					}
+				}
+			}
+		case "frontMatter":
+			if supportedEmbedFrontMatterLanguages[node.FrontMatter.Language] &&
+				strings.Trim(node.FrontMatter.Value, javaScriptSpaceText) != "" {
+				parsers = append(parsers, node.FrontMatter.Language)
+			}
+		}
+		for _, child := range node.Children {
+			walk(child)
+		}
+	}
+	walk(ast)
+	return parsers
 }

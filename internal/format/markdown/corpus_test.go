@@ -11,7 +11,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
 	release "github.com/system-inc/cohere/internal/release/packaging"
@@ -72,37 +71,9 @@ func (candidate markdownCandidate) Format(fileName string, text string) (string,
 	return Format(text, candidate.options, candidate.textToDoc)
 }
 
-// dependsOnEmbed reports whether Prettier formats part of the file as another language: a fenced code
-// block whose language infers a parser, or yaml or toml front matter with content. Those parts cannot
-// match until that language's printer exists, so the report separates them.
-func dependsOnEmbed(text string) bool {
-	text = strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(text, "\ufeff"), "\r\n", "\n"), "\r", "\n")
-	ast, err := mdast.ParseMarkdown(text)
-	if err != nil {
-		return false
-	}
-	found := false
-	var walk func(node *Node)
-	walk = func(node *Node) {
-		switch node.NodeType {
-		case "code":
-			if node.Lang != nil && (*node.Lang == "angular-html" || inferParserForLanguage(*node.Lang) != "" ||
-				(*node.Lang == "angular-ts")) {
-				found = true
-			}
-		case "frontMatter":
-			if supportedEmbedFrontMatterLanguages[node.FrontMatter.Language] &&
-				strings.Trim(node.FrontMatter.Value, javaScriptSpaceText) != "" {
-				found = true
-			}
-		}
-		for _, child := range node.Children {
-			walk(child)
-		}
-	}
-	walk(ast)
-	return found
-}
+// dependsOnEmbed reports whether Prettier formats part of the file as another language. Those parts
+// cannot match until that language's printer exists, so the report separates them.
+func dependsOnEmbed(text string) bool { return len(EmbeddedParsers(text)) > 0 }
 
 // markdownCorpus is one repository's markdown files and the options its config resolves to.
 type markdownCorpus struct {
