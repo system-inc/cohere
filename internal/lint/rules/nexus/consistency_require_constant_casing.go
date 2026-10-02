@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/module"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -29,6 +28,24 @@ func messageRequirePascalCaseExported(name string, suggestion string) rule.Messa
 		Description: "Constant \"" + name + "\" is exported and should be PascalCase (\"" +
 			suggestion + "\"). " + constantCasingScopeReasoning + " A camelCase export reads local " +
 			"at every call site while being importable from anywhere.",
+	}
+}
+
+// messageDropUnimportedExport is the exported-camelCase finding when nothing in the program imports
+// the name, so the export itself is the mistake rather than the casing.
+//
+// Telling the author to PascalCase a name nobody imports makes the export look intended and keeps a
+// public surface nobody uses. MediumConversationSource.ts exported two camelCase constants that only
+// its own file read; the honest repair is to drop the `export`, after which camelCase is already
+// right. The last sentence is there because the program is not the world: a library file can be
+// imported from another repository this run cannot see.
+func messageDropUnimportedExport(name string, suggestion string) rule.Message {
+	return rule.Message{
+		Id: "dropUnimportedExport",
+		Description: "Constant \"" + name + "\" is exported, and nothing in this program imports it. " +
+			"Drop the `export`: its camelCase is already right for a file-local constant. " +
+			constantCasingScopeReasoning + " If something outside this program does import it, make " +
+			"it PascalCase (\"" + suggestion + "\") instead.",
 	}
 }
 
@@ -88,11 +105,22 @@ func messageRequireCamelCaseInstance(name string, suggestion string) rule.Messag
 // consistency-no-screaming-snake-case already owns that shape with a better message and with the
 // exemptions it needs. Two rules, no overlap, each sharp at its own failure site.
 //
-// No fix. The rule knows the casing a name should have, but renaming a binding means updating every
-// reference, and an exported one crosses files the rule cannot see. It also cannot know whether the
-// new name collides with something already in scope. Report, and let the author rename.
+// A constant that is not exported is renamed by the fix, at its declaration and every reference the
+// checker resolves to it, as one edit; `fileLocalRenameFix` says when it declines and why. An
+// exported one is reported without a fix, because its references cross files and a rename there is
+// a change to every importer.
+//
+// An exported camelCase constant that nothing in the program imports is told to drop the export
+// instead of being told to PascalCase, since then the export is the mistake. "Nothing imports it"
+// is read from every module specifier in the program and refuses on any doubt; see
+// `constant_casing_importers.go`.
 var ConsistencyRequireConstantCasing = rule.Rule{
 	Name: "nexus/consistency-require-constant-casing",
+	// For the rename fix, which resolves references through the checker, and only at a finding.
+	NeedsTypeChecker: true,
+	// The drop-the-export advice reads every other file's imports, so a finding here changes when an
+	// importer does and this file does not.
+	ReadsProgram: true,
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		frameworkConstantNames := map[string]bool{}
 		if settings, hasSettings := options.(ConsistencyRequireConstantCasingOptions); hasSettings {
@@ -174,6 +202,12 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 
 				usage := usageIndexFor(ctx)
 
+				// Exported means a name crosses files, by the modifier or by a local export clause
+				// naming this binding. `export default X` does not count: the importer picks its own
+				// name, so the local spelling reaches no one.
+				exportedNames := exportedNamesOf(ctx, statement, name)
+				exported := len(exportedNames) > 0
+
 				// A function is named for what it does, not for how far it reaches, so like an
 				// instance it takes camelCase whatever its reach. Five shapes reach this: an inline
 				// function, an alias for one, a name the file itself calls, a factory call whose
@@ -200,7 +234,7 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 					if shadowsCamelCaseSource(declaration) {
 						return
 					}
-					ctx.ReportNode(name, messageRequireCamelCaseFunction(
+					reportCamelCase(ctx, exported, name, messageRequireCamelCaseFunction(
 						declaredName, constantNameToCamelCase(declaredName),
 					))
 					return
@@ -218,14 +252,21 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 					if isCamelCase(declaredName) {
 						return
 					}
-					ctx.ReportNode(name, messageRequireCamelCaseInstance(
+					reportCamelCase(ctx, exported, name, messageRequireCamelCaseInstance(
 						declaredName, constantNameToCamelCase(declaredName),
 					))
 					return
 				}
 
-				if module.IsExported(statement) {
+				if exported {
 					if isPascalCase(declaredName) || frameworkConstantNames[declaredName] {
+						return
+					}
+					if isCamelCase(declaredName) &&
+						importerIndexFor(ctx.Program).provablyUnimported(ctx.SourceFile, exportedNames...) {
+						ctx.ReportNode(name, messageDropUnimportedExport(
+							declaredName, constantNameToPascalCase(declaredName),
+						))
 						return
 					}
 					ctx.ReportNode(name, messageRequirePascalCaseExported(
@@ -245,12 +286,27 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 				if shadowsCamelCaseSource(declaration) {
 					return
 				}
-				ctx.ReportNode(name, messageRequireCamelCaseLocal(
+				reportCamelCase(ctx, exported, name, messageRequireCamelCaseLocal(
 					declaredName, constantNameToCamelCase(declaredName),
 				))
 			},
 		}
 	},
+}
+
+// reportCamelCase reports a constant that should be camelCase, with the rename fix when nothing
+// outside the file can name it.
+//
+// The suggestion inside the message is the rename the fix performs, so the two cannot disagree:
+// both come from `constantNameToCamelCase`.
+func reportCamelCase(ctx rule.Context, exported bool, name *ast.Node, message rule.Message) {
+	if !exported {
+		if fix, isSafe := fileLocalRenameFix(ctx, name, constantNameToCamelCase(name.Text())); isSafe {
+			ctx.ReportNodeWithFixes(name, message, fix)
+			return
+		}
+	}
+	ctx.ReportNode(name, message)
 }
 
 // hasDeclareModifier reports whether a statement carries the declare keyword.

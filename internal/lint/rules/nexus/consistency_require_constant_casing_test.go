@@ -441,3 +441,286 @@ func suggestionFrom(t *testing.T, description string) string {
 	}
 	return rest[:closing]
 }
+
+// The rename fix, against a real type graph, since references are resolved through the checker.
+// The first case is the shape of the pensieve batch that motivated it (PensieveRemember.ts:56,
+// `const MaximumDraftBytes = 512 * 1024;`, read further down the file).
+func TestConsistencyRequireConstantCasingRenamesAFileLocalConstant(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+		wantId     string
+		wantSource string
+	}{
+		{
+			"declaration and every read",
+			"const MaximumDraftBytes = 512 * 1024;\n" +
+				"export function isTooLong(text: string): boolean {\n" +
+				"    return text.length > MaximumDraftBytes;\n}\n" +
+				"export const Limits = [MaximumDraftBytes, MaximumDraftBytes / 2];\n",
+			"requireCamelCaseLocal",
+			"const maximumDraftBytes = 512 * 1024;\n" +
+				"export function isTooLong(text: string): boolean {\n" +
+				"    return text.length > maximumDraftBytes;\n}\n" +
+				"export const Limits = [maximumDraftBytes, maximumDraftBytes / 2];\n",
+		},
+		{
+			// The key is the property's name and is somebody else's contract, so it survives.
+			"a shorthand property keeps its key",
+			"const OrderColumns = [1, 2];\nexport const Table = { OrderColumns };\n",
+			"requireCamelCaseLocal",
+			"const orderColumns = [1, 2];\nexport const Table = { OrderColumns: orderColumns };\n",
+		},
+		{
+			// Spelled the same and not the constant: a property read, a type-literal key, an object
+			// key. Only the checker can tell these from a reference.
+			"same-spelled properties and keys are left alone",
+			"const OrderColumns = [1];\n" +
+				"export function count(row: { OrderColumns: number }): number {\n" +
+				"    return row.OrderColumns + OrderColumns.length;\n}\n" +
+				"export const Shape = { OrderColumns: 1 };\n",
+			"requireCamelCaseLocal",
+			"const orderColumns = [1];\n" +
+				"export function count(row: { OrderColumns: number }): number {\n" +
+				"    return row.OrderColumns + orderColumns.length;\n}\n" +
+				"export const Shape = { OrderColumns: 1 };\n",
+		},
+		{
+			// An inner binding with the same spelling shadows the constant inside its function, so
+			// those reads are not the constant's and must not move.
+			"a shadowing binding keeps its reads",
+			"const OrderColumns = [1];\n" +
+				"export function inner(): number {\n" +
+				"    let OrderColumns = 2;\n    OrderColumns += 1;\n    return { OrderColumns }.OrderColumns;\n}\n" +
+				"export const First = { OrderColumns };\n",
+			"requireCamelCaseLocal",
+			"const orderColumns = [1];\n" +
+				"export function inner(): number {\n" +
+				"    let OrderColumns = 2;\n    OrderColumns += 1;\n    return { OrderColumns }.OrderColumns;\n}\n" +
+				"export const First = { OrderColumns: orderColumns };\n",
+		},
+		{
+			"a type query is a reference too",
+			"const DefaultOptions = { retries: 3 };\nexport type Options = typeof DefaultOptions;\n" +
+				"export const Retries = DefaultOptions.retries;\n",
+			"requireCamelCaseLocal",
+			"const defaultOptions = { retries: 3 };\nexport type Options = typeof defaultOptions;\n" +
+				"export const Retries = defaultOptions.retries;\n",
+		},
+		{
+			// The function clause, when the constant is not exported, is file-local too.
+			"a file-local function",
+			"const FormatNumber = function (value: number) { return String(value); };\n" +
+				"export const Formatted = FormatNumber(1);\n",
+			"requireCamelCaseFunction",
+			"const formatNumber = function (value: number) { return String(value); };\n" +
+				"export const Formatted = formatNumber(1);\n",
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFixedSource(t, result, testCase.wantSource)
+		})
+	}
+}
+
+// Every refusal still reports. The fix is withheld where the rule cannot prove the rename keeps the
+// program's meaning, and the author renames by hand.
+func TestConsistencyRequireConstantCasingWithholdsAnUnsafeRename(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+		wantIds    []string
+	}{
+		{
+			// The new name is taken, so the rename would capture or be captured.
+			"the camelCase name already exists",
+			"const OrderColumns = [1];\nconst orderColumns = 2;\nexport const Total = OrderColumns.length + orderColumns;\n",
+			[]string{"requireCamelCaseLocal"},
+		},
+		{
+			// Taken further in: any identifier spelled that way, even a parameter in another scope.
+			"the camelCase name exists in a nested scope",
+			"const OrderColumns = [1];\nexport function f(orderColumns: number): number {\n" +
+				"    return orderColumns + OrderColumns.length;\n}\n",
+			[]string{"requireCamelCaseLocal"},
+		},
+		{
+			// A default export through a clause is not an export of the spelling, so the constant is
+			// file-local; the clause still names it, and this fix declines to rewrite a clause.
+			"named by a default-export clause",
+			"const OrderColumns = [1];\nexport { OrderColumns as default };\n",
+			[]string{"requireCamelCaseLocal"},
+		},
+		{
+			// A type alias merged into the same name answers to the old spelling in type positions.
+			"a type shares the name",
+			"const OrderColumns = [1];\ntype OrderColumns = number[];\n" +
+				"export function first(columns: OrderColumns): number[] {\n    return columns.concat(OrderColumns);\n}\n",
+			[]string{"requireCamelCaseLocal"},
+		},
+		{
+			// A legal identifier that would redefine a built-in every reader assumes.
+			"the camelCase name is a built-in value",
+			"const Undefined = 1;\nexport const Total = Undefined + 1;\n",
+			[]string{"requireCamelCaseLocal"},
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTyped(t, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			for _, diagnostic := range result.Diagnostics {
+				if len(diagnostic.Fixes) != 0 {
+					t.Fatalf("expected no fix, got %q", diagnostic.Fixes[0].Text)
+				}
+			}
+		})
+	}
+}
+
+// An exported constant is never renamed by the fix: its references cross files.
+func TestConsistencyRequireConstantCasingDoesNotRenameAnExport(t *testing.T) {
+	t.Parallel()
+
+	result := rule_testing.RunTyped(t, ConsistencyRequireConstantCasing, constantCasingFile,
+		"export const FormatNumber = (value: number) => String(value);\n")
+	rule_testing.ExpectFindings(t, result, "requireCamelCaseFunction")
+	if len(result.Diagnostics[0].Fixes) != 0 {
+		t.Fatalf("expected no fix on an export, got %q", result.Diagnostics[0].Fixes[0].Text)
+	}
+}
+
+// An exported camelCase constant nothing imports is told to drop the export; one something imports,
+// or might, keeps the PascalCase advice. The shape is MediumConversationSource.ts:73
+// (`defaultMediumArchiveDirectory`, exported and read only in its own file) against
+// StructureLinter.ts:66 (`printConfigFlagName`, imported by Structure.ts).
+func TestConsistencyRequireConstantCasingTellsAnUnimportedExportToDropTheExport(t *testing.T) {
+	t.Parallel()
+
+	const subject = "source/MediumConversationSource.ts"
+	const subjectText = "export const defaultMediumArchiveDirectory = '/archive';\n" +
+		"export const ArchivePath = defaultMediumArchiveDirectory + '/medium';\n"
+
+	cases := []struct {
+		name     string
+		consumer string
+		wantId   string
+	}{
+		{"no importer at all", "", "dropUnimportedExport"},
+		{"an importer that takes a different name", "import { ArchivePath } from './MediumConversationSource';\nexport const Path = ArchivePath;\n", "dropUnimportedExport"},
+		{"an import run only for its effects", "import './MediumConversationSource';\n", "dropUnimportedExport"},
+		{"a named import", "import { defaultMediumArchiveDirectory } from './MediumConversationSource';\nexport const Path = defaultMediumArchiveDirectory;\n", "requirePascalCaseExported"},
+		{"an aliased import", "import { defaultMediumArchiveDirectory as directory } from './MediumConversationSource';\nexport const Path = directory;\n", "requirePascalCaseExported"},
+		{"a namespace import", "import * as Medium from './MediumConversationSource';\nexport const Path = Medium.ArchivePath;\n", "requirePascalCaseExported"},
+		{"a named re-export", "export { defaultMediumArchiveDirectory } from './MediumConversationSource';\n", "requirePascalCaseExported"},
+		{"a star re-export", "export * from './MediumConversationSource';\n", "requirePascalCaseExported"},
+		{"a dynamic import", "export async function load(): Promise<string> {\n    const medium = await import('./MediumConversationSource');\n    return medium.ArchivePath;\n}\n", "requirePascalCaseExported"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			files := map[string]string{subject: subjectText}
+			if testCase.consumer != "" {
+				files["source/Consumer.ts"] = testCase.consumer
+			}
+			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, files, subject)
+			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		})
+	}
+}
+
+// A file a test runner or framework loads with no import is never told to drop an export, because
+// the absence of an importer proves nothing about it.
+func TestConsistencyRequireConstantCasingTrustsAFileLoadedWithoutAnImport(t *testing.T) {
+	t.Parallel()
+
+	const subject = "source/Medium.test.ts"
+	result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing,
+		map[string]string{subject: "export const fixtureDirectory = '/archive';\n"}, subject)
+	rule_testing.ExpectFindings(t, result, "requirePascalCaseExported")
+}
+
+// A constant exported by a local `export { ... }` clause is exported, matched to the clause through
+// the checker. The false finding this fixes: PensieveCommandBoundary.ts declares
+// `const IdentitySafePensieveCommandPaths = new Set([...])` and exports it on line 39 with
+// `export { IdentitySafePensieveCommandPaths };`, and the rule told it to become camelCase.
+func TestConsistencyRequireConstantCasingCountsALocalExportClause(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+		wantIds    []string
+	}{
+		{
+			"PascalCase exported through a clause is clean",
+			"const IdentitySafePensieveCommandPaths = new Set(['a']);\nexport { IdentitySafePensieveCommandPaths };\n",
+			nil,
+		},
+		{
+			"PascalCase exported under another name is clean",
+			"const OrderColumns = [1];\nexport { OrderColumns as Columns };\n",
+			nil,
+		},
+		{
+			// Nothing imports it here, so the exported judgment is the drop-export one.
+			"camelCase exported through a clause gets the exported judgment",
+			"const orderColumns = [1];\nexport { orderColumns };\n",
+			[]string{"dropUnimportedExport"},
+		},
+		{
+			// A default export never reaches anyone by this spelling, so camelCase is right.
+			"camelCase named by export default is clean",
+			"const orderColumns = [1];\nexport default orderColumns;\n",
+			nil,
+		},
+		{
+			"PascalCase named by export default is file-local",
+			"const OrderColumns = [1];\nexport default OrderColumns;\n",
+			[]string{"requireCamelCaseLocal"},
+		},
+		{
+			// The clause re-exports another module's name; the same spelling here is a different
+			// binding and stays file-local.
+			"a re-export of another module's same-named binding does not count",
+			"import { first } from './Other';\nconst OrderColumns = [first];\nexport const Total = OrderColumns.length;\n" +
+				"export { OrderColumns as Columns } from './Other';\n",
+			[]string{"requireCamelCaseLocal"},
+		},
+		{
+			// Matched by binding, not spelling: the clause names the outer constant, so the inner
+			// same-spelled constant is still file-local.
+			"a same-spelled inner binding is not the exported one",
+			"const OrderColumns = [1];\nexport function f(): number {\n    const OrderColumns = 2;\n    return OrderColumns;\n}\n" +
+				"export { OrderColumns };\n",
+			[]string{"requireCamelCaseLocal"},
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, map[string]string{
+				"source/Thing.ts": testCase.sourceText,
+				"source/Other.ts": "export const first = 1;\nexport const OrderColumns = [2];\n",
+			}, "source/Thing.ts")
+			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		})
+	}
+}
+
+// The importer check reads the name the clause exports, not the local one. Here the consumer imports
+// `Columns`, the clause's name for `orderColumns`, so it is imported and keeps the PascalCase advice.
+func TestConsistencyRequireConstantCasingChecksTheExportedNameForImporters(t *testing.T) {
+	t.Parallel()
+
+	result := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, map[string]string{
+		"source/Thing.ts":    "const orderColumns = [1];\nexport { orderColumns as Columns };\n",
+		"source/Consumer.ts": "import { Columns } from './Thing';\nexport const Total = Columns.length;\n",
+	}, "source/Thing.ts")
+	rule_testing.ExpectFindings(t, result, "requirePascalCaseExported")
+}
