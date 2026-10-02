@@ -104,6 +104,66 @@ func dependsOnEmbed(text string) bool {
 	return found
 }
 
+// markdownCorpus is one repository's markdown files and the options its config resolves to.
+type markdownCorpus struct {
+	root    string
+	files   []string
+	options prettier.Options
+}
+
+// markdownCorpora enumerates the .md files of each root the way TestCorpora does: through the
+// engine's ignore layers, and into each nested repository as a corpus of its own, with its own config.
+func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
+	t.Helper()
+	enumerator, err := prettier.New(prettier.DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var corpora []markdownCorpus
+	pending := strings.Split(roots, ":")
+	seen := map[string]bool{}
+	for len(pending) > 0 {
+		root := strings.TrimSpace(pending[0])
+		pending = pending[1:]
+		if strings.HasPrefix(root, "~/") {
+			home, _ := os.UserHomeDir()
+			root = filepath.Join(home, root[2:])
+		}
+		if root == "" || seen[root] {
+			continue
+		}
+		seen[root] = true
+
+		structureIgnore := filepath.Join(root, "libraries", "structure", "code-quality", "PrettierIgnoreDefaults.ts")
+		enumeration, err := enumerator.Enumerate(root, structureIgnore)
+		if err != nil {
+			t.Fatalf("enumerating %s: %v", root, err)
+		}
+		for _, nested := range enumeration.NestedRepositories {
+			if !filepath.IsAbs(nested) {
+				nested = filepath.Join(root, nested)
+			}
+			pending = append(pending, nested)
+		}
+		var files []string
+		for _, file := range enumeration.Files {
+			if strings.EqualFold(filepath.Ext(file), ".md") {
+				if !filepath.IsAbs(file) {
+					file = filepath.Join(root, file)
+				}
+				files = append(files, file)
+			}
+		}
+
+		resolution, err := prettier.ResolveOptions(root)
+		if err != nil {
+			t.Fatalf("resolving the Prettier config for %s: %v", root, err)
+		}
+		corpora = append(corpora, markdownCorpus{root: root, files: files, options: resolution.Options})
+	}
+	return corpora
+}
+
 func TestCorpusFormatMatchesOracle(t *testing.T) {
 	roots := os.Getenv("COHERE_MARKDOWN_CORPORA")
 	if roots == "" {
@@ -126,39 +186,9 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
-	enumerator, err := prettier.New(prettier.DefaultOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var report strings.Builder
-	for _, root := range strings.Split(roots, ":") {
-		root = strings.TrimSpace(root)
-		if strings.HasPrefix(root, "~/") {
-			home, _ := os.UserHomeDir()
-			root = filepath.Join(home, root[2:])
-		}
-		if root == "" {
-			continue
-		}
-
-		structureIgnore := filepath.Join(root, "libraries", "structure", "code-quality", "PrettierIgnoreDefaults.ts")
-		enumeration, err := enumerator.Enumerate(root, structureIgnore)
-		if err != nil {
-			t.Fatalf("enumerating %s: %v", root, err)
-		}
-		var files []string
-		for _, file := range enumeration.Files {
-			if strings.EqualFold(filepath.Ext(file), ".md") {
-				files = append(files, file)
-			}
-		}
-
-		resolution, err := prettier.ResolveOptions(root)
-		if err != nil {
-			t.Fatalf("resolving the Prettier config for %s: %v", root, err)
-		}
-		options := resolution.Options
+	for _, corpus := range markdownCorpora(t, roots) {
+		root, files, options := corpus.root, corpus.files, corpus.options
 		cache := &differential.OracleCache{
 			Directory: directory,
 			// TestCorpora's identity, character for character, so both share one cache.
