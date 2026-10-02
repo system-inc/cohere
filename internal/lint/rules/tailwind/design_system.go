@@ -119,7 +119,8 @@ var designSystemCache struct {
 // `ctx.Program` must declare. When this took the Context, a rule could call it without ever writing
 // `ctx.Program`, and the five rules that did passed the guard only because each also checked
 // `ctx.Program == nil` somewhere else in the file (#ym4v8bc). Now the call itself is what the guard
-// reads.
+// reads, and the guard refuses a helper outside a rule that reads `ctx.Program` on its callers'
+// behalf, which is the shape this had.
 //
 // A nil program is a hard miss rather than a shared entry. The harnesses that build a Context by
 // hand leave Program nil, and letting them share one cache slot would mean two unrelated fixtures
