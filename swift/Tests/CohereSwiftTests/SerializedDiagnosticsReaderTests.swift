@@ -56,7 +56,7 @@ struct SerializedDiagnosticsReaderTests {
 
     @Test func aCleanFileIsEmpty() throws {
         let record = try Self.serializedDiagnostics(for: "let fine = 1\n")
-        #expect(try Self.reader().read(record).filter { $0.severity != nil }.isEmpty)
+        #expect(try !Self.reader().read(record).contains { $0.severity != nil })
     }
 
     @Test func notesAreNotFindings() {

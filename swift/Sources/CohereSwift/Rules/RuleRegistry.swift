@@ -42,6 +42,12 @@ public enum RuleRegistry {
     public static let typedRules: [any TypedFileRule] = [
         EmptyCount(),
         ContainsOverFilter(),
+        ContainsOverFirstNotNil(),
+        SortedFirstLast(),
+        FirstWhere(),
+        LastWhere(),
+        IsDisjoint(),
+        ReduceInto(),
     ]
 
     public static let packageRules: [any PackageRule] = [

@@ -61,6 +61,12 @@ struct RuleMapping: Sendable {
         RuleMapping(incumbent: .swiftLint, incumbentRule: "empty_count", rules: ["cohere-swift/empty-count"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "contains_over_filter_count", rules: ["cohere-swift/contains-over-filter"], messageIds: ["filterCount"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "contains_over_filter_is_empty", rules: ["cohere-swift/contains-over-filter"], messageIds: ["filterIsEmpty"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "contains_over_first_not_nil", rules: ["cohere-swift/contains-over-first-not-nil"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "sorted_first_last", rules: ["cohere-swift/sorted-first-last"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "first_where", rules: ["cohere-swift/first-where"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "last_where", rules: ["cohere-swift/last-where"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "is_disjoint", rules: ["cohere-swift/is-disjoint"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "reduce_into", rules: ["cohere-swift/reduce-into"]),
     ]
 
     static func incumbentRules(of incumbent: Incumbent) -> [String] {
