@@ -133,6 +133,9 @@ type pipelineReport struct {
 	// existed.
 	processStart time.Time
 
+	// cacheOff is `--no-cache`, said on every such run so a cold number cannot pass for a warm one.
+	cacheOff bool
+
 	// rootNote says which project was checked when that is not the directory the run started in.
 	// Empty otherwise. See projectLocation.rootNote.
 	rootNote string
@@ -338,6 +341,9 @@ func (r *pipelineReport) Write(out io.Writer) {
 
 	if r.rootNote != "" {
 		fmt.Fprintf(out, "  %s\n", r.rootNote)
+	}
+	if r.cacheOff {
+		fmt.Fprintln(out, "  cache: off, by --no-cache: nothing was read from or written to this project's cache table or its incremental build info")
 	}
 
 	// A clean answer over zero files says exactly that, and nothing else about coverage. The scope

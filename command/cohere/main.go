@@ -29,6 +29,10 @@ import (
 	"github.com/system-inc/cohere/internal/unused_exports"
 )
 
+// cacheOff is `--no-cache`: no cache is read or written for the project. Package-level because the
+// run cache, the format record and the types phase each consult it, and it has one writer, the flag.
+var cacheOff bool
+
 // processStart is stamped before anything else runs, so the phase line can say how much of the run
 // its own numbers explain. A package-level variable rather than a parameter because `run` already
 // takes none, and the value has exactly one writer, at initialization.
@@ -68,15 +72,21 @@ func run() error {
 		"the config that says which rules apply to which files (default: the one at the project root)")
 	singleThreaded := flag.Bool("single-threaded", false, "use one checker instead of several")
 	fixOnly := flag.Bool("fix", false, "fix and format only, running no other phase")
-	// The promise is about the project being checked, and it is stated with its boundary because one
-	// write sits outside it on purpose: the launcher rebuilds cohere itself when its rules changed,
-	// into the gitignored `.cache/cohere/` of the cohere checkout. That is cohere's own build rather
-	// than the checked tree, and withholding it would run a binary that does not match the rules on
-	// disk. See recordDevelopmentHash in internal/release/dispatch.
+	// The promise is about the project's source, and it is stated with its boundary because two writes sit
+	// outside it on purpose. cohere keeps its cache for the project in `<root>/.cache/cohere/`, which is its
+	// own and which `--no-cache` turns off. And the launcher rebuilds cohere itself when its rules
+	// changed, into the gitignored `.cache/cohere/` of the cohere checkout; withholding that would run a
+	// binary that does not match the rules on disk. See recordDevelopmentHash in internal/release/dispatch.
 	noFix := flag.Bool("no-fix", false,
-		"mutate nothing in the checked project: report what would change without writing a byte to it, "+
-			"its source or its caches (cohere may still rebuild itself in its own checkout's .cache/cohere)")
-	formatAll := flag.Bool("format-all", false, "format every file rather than only the ones that changed")
+		"mutate no source in the checked project: report what would change without writing a byte of it "+
+			"(cohere still keeps its own cache in the project's .cache/cohere, unless --no-cache)")
+	formatAll := flag.Bool("format-all", false, "format every file rather than only the ones not on record as formatted")
+	// A cold run on purpose: for measuring one, and for anyone who suspects a cache. Every cache cohere
+	// keeps for a project is named here, so a cold number cannot be read as a warm one: the cache table
+	// (the run replay, the per-file findings, the signatures, the format record) and the tsconfig's
+	// incremental build info.
+	noCache := flag.Bool("no-cache", false,
+		"read nothing from and write nothing to this project's caches (the cache table and the tsconfig's incremental build info), so every phase computes from source")
 	// A binary that implements no rule and a binary whose rule found nothing produce the same empty
 	// finding list, and the differential harness cannot tell them apart from the outside. This is how
 	// it asks.
@@ -122,6 +132,7 @@ func run() error {
 	// or `--no-fix` is.
 	profilePath := flag.String("profile", "", "write a Go CPU profile of the run to this file, for `go tool pprof`")
 	flag.Parse()
+	cacheOff = *noCache
 	if *profilePath != "" {
 		if err := startProfile(*profilePath); err != nil {
 			return err
@@ -438,6 +449,7 @@ func run() error {
 		filesInScope:   len(projectFiles),
 		filesInProgram: wholeProgramCount,
 		rootNote:       location.rootNote(),
+		cacheOff:       cacheOff,
 	}
 
 	// Phase 2: fix and format. Mutation runs before anything reports, so every phase downstream sees
@@ -488,7 +500,10 @@ func run() error {
 		// The format record: which bytes cohere has already seen formatted. Every formatting run adds to
 		// it, and the default scope is read from it. See format_record.go.
 		var record *formatRecord
-		if formatter != nil {
+		switch {
+		case formatter != nil && cacheOff:
+			record = formatRecordOff("the cache is off (--no-cache)")
+		case formatter != nil:
 			record = loadFormatRecord(location.Root)
 		}
 		// Every file the default scope was drawn from, so the record can drop entries outside it. Nil for a
@@ -674,7 +689,7 @@ func run() error {
 		// `--no-fix` promises not to write a byte, and the incremental build info is a byte. It was
 		// rewritten on every run regardless, which made the flag's own help text false: measured, the
 		// mtime of ahra's tsconfig.tsbuildinfo moved across a `--no-fix` run.
-		typeDiagnostics := collectTypeDiagnostics(ctx, graph, projectFiles, !*noFix)
+		typeDiagnostics := collectTypeDiagnostics(ctx, graph, projectFiles, !cacheOff, !*noFix)
 		typesDuration := time.Since(typesStart)
 
 		for _, diagnostic := range typeDiagnostics {
@@ -967,12 +982,15 @@ func optionsBase(lintConfig *configuration.Config, projectRoot string) rule.Opti
 // the one a person hits while iterating on an error, which is exactly the loop where the pause
 // costs most.
 //
+// incremental is false under `--no-cache`, and then the build info is neither read nor written: the
+// whole program is checked, as it is for a tsconfig that is not incremental.
+//
 // persist is false under `--no-fix`. The build info is still read, so the run is as warm as the last
 // writing run left it, and only the write is withheld. A `--no-fix` run is therefore warm against a
 // slightly older snapshot rather than cold, which costs it the files changed since then and nothing
 // else; reading costs nothing the promise forbids, and refusing to read would make every CI run cold
 // for no reason.
-func collectTypeDiagnostics(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, persist bool) []*ast.Diagnostic {
+func collectTypeDiagnostics(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, incremental bool, persist bool) []*ast.Diagnostic {
 	ours := make(map[*ast.SourceFile]struct{}, len(files))
 	for _, sourceFile := range files {
 		ours[sourceFile] = struct{}{}
@@ -983,7 +1001,11 @@ func collectTypeDiagnostics(ctx context.Context, graph *program.Graph, files []*
 	// files were checked, and emitting from a second one writes a build info that skips nothing
 	// while looking correct. See program.IncrementalSession.
 	var checked []*ast.Diagnostic
-	if session := graph.NewIncrementalSession(); session != nil {
+	var session *program.IncrementalSession
+	if incremental {
+		session = graph.NewIncrementalSession()
+	}
+	if session != nil {
 		checked = session.Diagnostics(ctx)
 		// The read already happened inside NewIncrementalSession; only the write is conditional.
 		if persist {

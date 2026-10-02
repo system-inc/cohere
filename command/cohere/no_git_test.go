@@ -85,7 +85,7 @@ func runNoGitSequence(t *testing.T, binary string, path string) []string {
 		t.Helper()
 		command := exec.Command(binary, arguments...)
 		command.Dir = root
-		command.Env = append(os.Environ(), path, "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, ".cache"), "COHERE_RUN_CACHE=off")
+		command.Env = append(os.Environ(), path, "HOME="+home, "XDG_CACHE_HOME="+filepath.Join(home, ".cache"))
 		output, err := command.CombinedOutput()
 		code := 0
 		if exitError, isExit := err.(*exec.ExitError); isExit {

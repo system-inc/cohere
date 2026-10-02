@@ -96,6 +96,12 @@ func loadFormatRecord(root string) *formatRecord {
 	return record
 }
 
+// formatRecordOff is a record that holds nothing and keeps nothing, for a run that reads and writes no
+// cache: every file is in scope, absent says why, and save writes nothing because there is no key.
+func formatRecordOff(reason string) *formatRecord {
+	return &formatRecord{absent: reason, entries: map[string]program.FormatEntry{}}
+}
+
 // formatRecordKey is what the record's section must have been written under to be read: the formatter's
 // identity, stamped by the launcher at build time (see dispatch.FormatterIdentity), so a cohere commit
 // that leaves the formatter alone leaves the record valid.

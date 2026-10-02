@@ -231,13 +231,13 @@ func TestTheTypePhaseReadsButDoesNotWriteWhenAskedNotTo(t *testing.T) {
 	}
 
 	graph := build()
-	collectTypeDiagnostics(context.Background(), graph, graph.ProjectFiles(), false)
+	collectTypeDiagnostics(context.Background(), graph, graph.ProjectFiles(), true, false)
 	if _, err := os.Stat(buildInfo); !os.IsNotExist(err) {
 		t.Fatalf("persist=false wrote the build info (stat: %v)", err)
 	}
 
 	graph = build()
-	collectTypeDiagnostics(context.Background(), graph, graph.ProjectFiles(), true)
+	collectTypeDiagnostics(context.Background(), graph, graph.ProjectFiles(), true, true)
 	before, err := os.ReadFile(buildInfo)
 	if err != nil {
 		t.Fatalf("persist=true wrote nothing, so the assertion above cannot distinguish the flag: %v", err)
@@ -245,7 +245,7 @@ func TestTheTypePhaseReadsButDoesNotWriteWhenAskedNotTo(t *testing.T) {
 
 	writeTree(t, root, map[string]string{"index.ts": "export const value: number = \"planted\";\n"})
 	graph = build()
-	diagnostics := collectTypeDiagnostics(context.Background(), graph, graph.ProjectFiles(), false)
+	diagnostics := collectTypeDiagnostics(context.Background(), graph, graph.ProjectFiles(), true, false)
 	if len(diagnostics) == 0 {
 		t.Error("a planted type error was not found by a run that read a build info and did not write one")
 	}

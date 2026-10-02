@@ -131,7 +131,6 @@ func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(t *testing.T) {
 func TestRunCacheEligibility(t *testing.T) {
 	previous := os.Args
 	defer func() { os.Args = previous }()
-	t.Setenv("COHERE_RUN_CACHE", "")
 
 	for _, testCase := range []struct {
 		arguments []string
@@ -150,9 +149,11 @@ func TestRunCacheEligibility(t *testing.T) {
 		}
 	}
 
+	// `--no-cache` is refused by name, so it holds even for an argument shape that is otherwise admitted.
 	os.Args = []string{"cohere"}
-	t.Setenv("COHERE_RUN_CACHE", "off")
+	cacheOff = true
+	defer func() { cacheOff = false }()
 	if runCacheEligible() {
-		t.Error("COHERE_RUN_CACHE=off left a bare run eligible, so there is no way to force a cold run")
+		t.Error("--no-cache left a bare run eligible, so a cold run could read or record the cache")
 	}
 }

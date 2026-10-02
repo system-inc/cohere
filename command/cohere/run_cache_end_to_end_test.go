@@ -9,17 +9,22 @@ import (
 	"testing"
 )
 
-// TestMain turns the run cache off for every binary this package's tests launch.
+// TestMain gives every binary this package's tests launch a user cache of its own.
 //
-// A bare `cohere` became eligible for the run cache, and child processes inherit the test process's
-// environment. Without this, every test here that runs the binary bare would record into the
-// developer's real user cache, and one that ran it twice over an unchanged fixture would get a replay
-// instead of the run it exists to test, while still passing. Off here keeps each of those tests
-// meaning exactly what it meant before the cache existed. TestRunCacheEndToEnd turns it back on for
-// its own runs, against an isolated home.
+// Child processes inherit the test process's environment, so without this every test that runs the
+// binary would read and write the developer's real cache table. Each fixture is a fresh directory and
+// the table is keyed by the project root, so no two tests share a table; a test that needs a cold run
+// says `--no-cache`, and TestRunCacheEndToEnd sets a home of its own for its runs.
 func TestMain(m *testing.M) {
-	os.Setenv("COHERE_RUN_CACHE", "off")
-	os.Exit(m.Run())
+	home, err := os.MkdirTemp("", "cohere-test-home-")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("HOME", home)
+	os.Setenv("XDG_CACHE_HOME", "")
+	code := m.Run()
+	os.RemoveAll(home)
+	os.Exit(code)
 }
 
 // TestRunCacheEndToEnd is the run cache's proof against the real binary over a real git repository.
@@ -87,12 +92,12 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		command.Dir = root
 		environment := []string{"HOME=" + home}
 		for _, variable := range os.Environ() {
-			if !strings.HasPrefix(variable, "COHERE_RUN_CACHE=") && !strings.HasPrefix(variable, "HOME=") {
+			if !strings.HasPrefix(variable, "HOME=") {
 				environment = append(environment, variable)
 			}
 		}
 		if !cached {
-			environment = append(environment, "COHERE_RUN_CACHE=off")
+			command.Args = append(command.Args, "--no-cache")
 		}
 		command.Env = environment
 		output, err := command.CombinedOutput()
@@ -111,8 +116,10 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// The findings cache's clause says how much of the verdict was remembered; a cold run never has it,
 	// so it comes off before a comparison and is required or forbidden separately per scenario.
 	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?`)
+	// A cold run is a `--no-cache` run, which says so in a line no cached run prints.
+	cacheOffLine := regexp.MustCompile(`(?m)^  cache: off, by --no-cache.*\n`)
 	normalized := func(output string) string {
-		return layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), "")
+		return cacheOffLine.ReplaceAllString(layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""), "")
 	}
 	isReplay := func(output string) bool { return strings.HasPrefix(output, "cached: ") }
 	keepLines := func(output string, drop ...string) string {
@@ -131,7 +138,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// A replay must equal the cold run's verdict: its lines minus the ones that describe that
 	// invocation, which a replay deliberately does not print. Its own framing comes off first.
 	verdict := func(cold string) string {
-		return keepLines(cold, "graph built in ", "types: ", "lint: ", "phases: ", "  total ", "  memory: ")
+		return keepLines(cold, "graph built in ", "types: ", "lint: ", "phases: ", "  total ", "  memory: ", "  cache: off, by --no-cache")
 	}
 	// A replay says which run a phase's line came from; that label comes off before the comparison,
 	// and is required separately below so a replay that lost it fails.
@@ -347,16 +354,17 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// rather than deleted, because a missing table is a first run and proves nothing about the discard.
 	t.Run("a corrupt cache table is discarded, said so, and rewritten", func(t *testing.T) {
 		establishHit()
-		tables := []string{}
+		// The table is the project's own, and the isolated home holds none.
+		tables := []string{cacheTablePath(root)}
+		if _, err := os.Stat(tables[0]); err != nil {
+			t.Fatalf("no cache table in the project: %v", err)
+		}
 		filepath.WalkDir(home, func(path string, entry os.DirEntry, err error) error {
-			if err == nil && !entry.IsDir() && strings.HasPrefix(entry.Name(), "table-") && strings.HasSuffix(entry.Name(), ".gob") {
-				tables = append(tables, path)
+			if err == nil && !entry.IsDir() && strings.HasSuffix(entry.Name(), ".gob") {
+				t.Errorf("a cache table landed in the user's home: %s", path)
 			}
 			return nil
 		})
-		if len(tables) != 1 {
-			t.Fatalf("expected one cache table under the isolated home, found %v", tables)
-		}
 		if dump, _ := run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "(bare): recorded ") {
 			t.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
 		}

@@ -14,6 +14,11 @@ func treeSnapshot(t *testing.T, root string) map[string]string {
 	t.Helper()
 	snapshot := map[string]string{}
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
+		// cohere's own cache for the project is outside `--no-fix`'s promise, which is about source: it is
+		// cohere's to keep, and `--no-cache` is the flag that writes none of it.
+		if walkError == nil && entry.IsDir() && path == cacheDirectory(root) {
+			return filepath.SkipDir
+		}
 		if walkError != nil || entry.IsDir() {
 			return walkError
 		}

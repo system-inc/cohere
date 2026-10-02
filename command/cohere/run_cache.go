@@ -11,8 +11,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/system-inc/cohere/internal/format/formatfiles"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -141,16 +143,21 @@ func (t *teeStream) stop(target **os.File) {
 // report, which suits a cache better than the bare run does; it is what a real-tree measurement uses,
 // so the probe asks to write nothing as well as being sandboxed. The key covers the arguments, so the
 // two never replay each other.
+//
+// `--no-cache` is refused by name rather than left to the argument shape. Any flag makes a run
+// ineligible today, but the promise that flag makes, nothing read and nothing written, should not rest
+// on which arguments happen to be admitted next.
 func runCacheEligible() bool {
+	if cacheOff {
+		return false
+	}
 	switch {
 	case len(os.Args) == 1:
 	case len(os.Args) == 2 && os.Args[1] == "--no-fix":
 	default:
 		return false
 	}
-	// An escape hatch, for measuring a cold run and for anyone who suspects the cache. It has to be
-	// reachable without a flag, because any flag already makes the run ineligible.
-	return os.Getenv("COHERE_RUN_CACHE") != "off"
+	return true
 }
 
 // beginRunCache replays a recorded run and exits if every input is unchanged, and otherwise starts
@@ -172,6 +179,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		return nil
 	}
 
+	prepareCacheDirectory(location.Root)
 	tablePath := cacheTablePath(location.Root)
 	table, err := program.ReadCacheTable(tablePath, cacheTableIdentity())
 	if errors.Is(err, program.ErrCacheTableUnreadable) || errors.Is(err, program.ErrCacheTablePartlyKept) {
@@ -202,22 +210,54 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	return session.recorder
 }
 
-// cacheTablePath keeps the cache table out of the project: one per project root, in the user cache. Every
-// eligible invocation shares it. Their recorded runs sit side by side under their own invocation, since a
-// bare run and `--no-fix` print different reports under different keys, and their findings are the same
-// findings: each walks the same rules over the same files under the same configuration.
+// cacheTablePath is the project's cache table, in the project: `<root>/.cache/cohere/table.gob`.
+//
+// It lived in the user cache under a hash of the root path, which nothing ever reclaimed. A moved or
+// deleted project left its table behind for good, and 38 of them had piled up by 2026-10-02. In the
+// project it is one folder per project that deleting is always a correct answer for, and a worktree has
+// its own because it is its own root. Every eligible invocation shares it; their recorded runs sit side
+// by side under their own invocation, and their findings are the same findings.
 func cacheTablePath(root string) string {
-	directory, err := os.UserCacheDir()
-	if err != nil {
-		directory = os.TempDir()
-	}
-	sum := sha256.Sum256([]byte(root))
-	return filepath.Join(directory, "cohere", fmt.Sprintf("table-%x.gob", sum[:8]))
+	return filepath.Join(cacheDirectory(root), "table.gob")
+}
+
+// cacheDirectory is where cohere keeps what it caches for one project.
+func cacheDirectory(root string) string {
+	return filepath.Join(root, ".cache", "cohere")
+}
+
+// prepareCacheDirectory creates the project's cache directory before anything is read or recorded, and
+// warns once when the project's .gitignore does not ignore it.
+//
+// Created first because the run cache records the project root's directory as an input, at modification
+// time. Creating `.cache` moves the root's time, and doing it after the inputs were recorded would make
+// the first replay of every project a miss that looks merely cold. Writes inside `.cache/cohere` move only
+// that directory's time, which no tsconfig enumerates, since a wildcard never matches a dot directory.
+//
+// The warning is a warning rather than a refusal: the cache is still the project's to keep, and the line
+// to add is named so it is one edit away. What it must never be is a silent write into tracked space.
+var prepareCacheDirectoryOnce sync.Once
+
+func prepareCacheDirectory(root string) {
+	prepareCacheDirectoryOnce.Do(func() {
+		if err := os.MkdirAll(cacheDirectory(root), 0o755); err != nil {
+			fmt.Fprintf(os.Stderr, "note: the cache directory %s could not be created: %v\n", cacheDirectory(root), firstLine(err.Error()))
+			return
+		}
+		ignoreFile := filepath.Join(root, ".gitignore")
+		if line, _, err := formatfiles.IgnoringLine(ignoreFile, filepath.Join(".cache", "cohere", "table.gob")); err == nil && line == 0 {
+			fmt.Fprintf(os.Stderr, "note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
+				ignoreFile, cacheDirectory(root))
+		}
+	})
 }
 
 // readFormatSection is the format record's section of this root's table, nil when there is none or the
 // table was discarded. The caller decides whether its key still holds.
 func readFormatSection(root string) *program.FormatSection {
+	if cacheOff {
+		return nil
+	}
 	table, _ := program.ReadCacheTable(cacheTablePath(root), cacheTableIdentity())
 	return table.Formatted
 }
@@ -225,6 +265,10 @@ func readFormatSection(root string) *program.FormatSection {
 // writeFormatSection replaces the format record's section and keeps every other section as it is on disk.
 // It stands alone because a run that formats is never a recorded run, so no session is there to carry it.
 func writeFormatSection(root string, section *program.FormatSection) error {
+	if cacheOff {
+		return nil
+	}
+	prepareCacheDirectory(root)
 	path := cacheTablePath(root)
 	identity := cacheTableIdentity()
 	table, _ := program.ReadCacheTable(path, identity)
