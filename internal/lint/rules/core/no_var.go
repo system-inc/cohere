@@ -78,6 +78,16 @@ var NoVar = rule.Rule{
 				if hasDeclareModifier(node) {
 					return
 				}
+				// Directly inside `declare global { }`, only `var` types a property of `globalThis`:
+				// `let` and `const` there declare a global the runtime never puts on the object. ESLint
+				// skips exactly this shape and nothing wider (a `declare module` or `declare namespace`
+				// block, or a namespace nested inside the global block, still reports), so the check is
+				// the immediate parent, not any ambient ancestor. Found as a false positive on Base's
+				// GraphQlMetadataStorage.ts (#hzhs9f8).
+				if parent := node.Parent; parent != nil && parent.Kind == ast.KindModuleBlock &&
+					parent.Parent != nil && ast.IsGlobalScopeAugmentation(parent.Parent) {
+					return
+				}
 				reportIfVar(node.AsVariableStatement().DeclarationList)
 			},
 

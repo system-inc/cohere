@@ -24,6 +24,11 @@ func TestNoVarFires(t *testing.T) {
 		{"a for initializer", "export function run() {\n    for(var index = 0; index < 3; index++) {}\n}\n"},
 		{"a for-of binding", "export function run(list: number[]) {\n    for(var item of list) { void item; }\n}\n"},
 		{"a for-in binding", "export function run(record: object) {\n    for(var key in record) { void key; }\n}\n"},
+		// The nearest shapes to the declare global exemption, each of which ESLint 10.8.1 still reports
+		// (probed with lintText): only a var directly in the global block is exempt (#hzhs9f8).
+		{"a var in a declare module block", "declare module 'thing' {\n    var value: number;\n}\n"},
+		{"a var in a declare namespace block", "declare namespace Space {\n    var value: number;\n}\nexport {};\n"},
+		{"a var in a namespace nested inside declare global", "declare global {\n    namespace Space {\n        var value: number;\n    }\n}\nexport {};\n"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -52,6 +57,9 @@ func TestNoVarStaysSilent(t *testing.T) {
 		// An ambient declaration describes a runtime this file does not control, so the keyword is
 		// not a scoping choice the author made.
 		{"declare var", "declare var globalThing: number;\nexport const Use = globalThing;\n"},
+		// Base's GraphQlMetadataStorage.ts: only a var in declare global types a property of
+		// globalThis, and ESLint skips exactly this shape (#hzhs9f8).
+		{"a var directly in declare global", "declare global {\n    var BaseGraphQlMetadataStorage: unknown;\n}\nexport {};\n"},
 		// `using` carries its own flag and is block-scoped, so reading var as "no let and no const"
 		// must not sweep it up.
 		{"a using declaration", "export function run(resource: { [Symbol.dispose](): void }) {\n    using held = resource;\n    void held;\n}\n"},
