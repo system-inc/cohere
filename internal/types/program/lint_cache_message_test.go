@@ -135,10 +135,11 @@ func TestStoredDescriptionSurvivesForAnInterpolatedMessage(t *testing.T) {
 	interpolated := "Argument of unary negation should be assignable to number | bigint but is string instead."
 
 	cache := &program.LintCache{
-		RuleSetHash: program.HashRuleSet([]string{"no-unsafe-unary-minus"}),
+		Key: program.HashRuleSet([]string{"no-unsafe-unary-minus"}),
 		Entries: []program.LintCacheEntry{{
 			Path:        "/project/source/negate.ts",
 			ContentHash: program.HashContent("-\"text\";\n"),
+			Rules:       []string{"no-unsafe-unary-minus"},
 			Findings: []program.LintCacheFinding{{
 				RuleName:           "no-unsafe-unary-minus",
 				Start:              0,
@@ -153,14 +154,16 @@ func TestStoredDescriptionSurvivesForAnInterpolatedMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decoding: %v", err)
 	}
-	findings, hit := decoded.Lookup(
+	entry, hit := decoded.Lookup(
 		"/project/source/negate.ts",
 		program.HashContent("-\"text\";\n"),
 		program.HashRuleSet([]string{"no-unsafe-unary-minus"}),
+		[]string{"no-unsafe-unary-minus"},
 	)
 	if !hit {
 		t.Fatal("the entry just encoded did not come back as a hit")
 	}
+	findings := entry.Findings
 	if len(findings) != 1 {
 		t.Fatalf("findings: %d back from 1", len(findings))
 	}

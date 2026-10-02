@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -13,11 +14,14 @@ import (
 
 func sampleLintCache() *program.LintCache {
 	return &program.LintCache{
-		RuleSetHash: program.HashRuleSet([]string{"no-debugger", "no-empty"}),
+		Key: program.HashRuleSet([]string{"no-debugger", "no-empty"}),
 		Entries: []program.LintCacheEntry{
 			{
-				Path:        "/project/source/dirty.ts",
-				ContentHash: program.HashContent("debugger;\n"),
+				Path:         "/project/source/dirty.ts",
+				ContentHash:  program.HashContent("debugger;\n"),
+				Rules:        []string{"no-debugger", "no-empty"},
+				Listening:    []string{"no-debugger", "no-empty"},
+				VisitedNodes: 5,
 				Findings: []program.LintCacheFinding{
 					{
 						RuleName: "no-debugger", Start: 0, End: 9,
@@ -38,17 +42,20 @@ func sampleLintCache() *program.LintCache {
 			{
 				// A clean file is the case worth caching: most files produce nothing, and an
 				// empty finding list is a real answer rather than an absence.
-				Path:        "/project/source/clean.ts",
-				ContentHash: program.HashContent("export const value = 1;\n"),
-				Findings:    nil,
+				Path:         "/project/source/clean.ts",
+				ContentHash:  program.HashContent("export const value = 1;\n"),
+				Rules:        []string{"no-debugger", "no-empty"},
+				VisitedNodes: 8,
+				Findings:     nil,
 			},
 		},
 	}
 }
 
-// TestLintCacheRoundTripsEveryField compares every field rather than spot-checking, because
-// this format is raw offsets into a blob: a field the encoder forgets decodes to empty while
-// everything around it looks correct. I shipped exactly that bug twice while writing the
+// TestLintCacheRoundTripsEveryField compares every field rather than spot-checking, because a field
+// the encoder forgets decodes to empty while everything around it looks correct. The format was once
+// raw offsets into a blob, where that was easy; it is JSON now, where a missing tag or a lowercase
+// field does the same thing silently. I shipped exactly that bug twice while writing the
 // resolution cache, and once more here before this test existed.
 //
 // It then happened a fourth time, in the way this test could not see. The comparisons below were
@@ -64,8 +71,8 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 		t.Fatalf("decoding what we just encoded: %v", err)
 	}
 
-	if decoded.RuleSetHash != original.RuleSetHash {
-		t.Errorf("rule set hash did not survive: %x against %x", decoded.RuleSetHash, original.RuleSetHash)
+	if decoded.Key != original.Key {
+		t.Errorf("key did not survive: %x against %x", decoded.Key, original.Key)
 	}
 	if len(decoded.Entries) != len(original.Entries) {
 		t.Fatalf("entries: %d back from %d", len(decoded.Entries), len(original.Entries))
@@ -78,6 +85,15 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 		}
 		if got.ContentHash != want.ContentHash {
 			t.Errorf("entry %d ContentHash: %x against %x", index, got.ContentHash, want.ContentHash)
+		}
+		if strings.Join(got.Rules, ",") != strings.Join(want.Rules, ",") {
+			t.Errorf("entry %d Rules: %v against %v", index, got.Rules, want.Rules)
+		}
+		if strings.Join(got.Listening, ",") != strings.Join(want.Listening, ",") {
+			t.Errorf("entry %d Listening: %v against %v", index, got.Listening, want.Listening)
+		}
+		if got.VisitedNodes != want.VisitedNodes {
+			t.Errorf("entry %d VisitedNodes: %d against %d", index, got.VisitedNodes, want.VisitedNodes)
 		}
 		if len(got.Findings) != len(want.Findings) {
 			t.Fatalf("entry %d findings: %d back from %d", index, len(got.Findings), len(want.Findings))
@@ -125,7 +141,7 @@ func TestLintCacheRejectsBadArtifacts(t *testing.T) {
 		{"empty", nil},
 		{"shorter than the header", valid[:10]},
 		{"truncated mid-record", valid[:len(valid)/2]},
-		{"wrong magic", append([]byte("NOTVFYLI"), valid[8:]...)},
+		{"a different format version", []byte(strings.Replace(string(valid), `"version":3`, `"version":2`, 1))},
 		{"trailing garbage", append(append([]byte{}, valid...), 0, 0, 0, 0)},
 	}
 
@@ -155,23 +171,24 @@ func TestLintCacheLookupDistinguishesCleanFromUnknown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	ruleSet := program.HashRuleSet([]string{"no-debugger", "no-empty"})
+	key := program.HashRuleSet([]string{"no-debugger", "no-empty"})
+	rules := []string{"no-debugger", "no-empty"}
 
 	t.Run("a cached clean file is a hit with no findings", func(t *testing.T) {
-		findings, hit := cache.Lookup("/project/source/clean.ts",
-			program.HashContent("export const value = 1;\n"), ruleSet)
+		entry, hit := cache.Lookup("/project/source/clean.ts",
+			program.HashContent("export const value = 1;\n"), key, rules)
 		if !hit {
 			t.Fatal("a file that was linted and found clean reported as a miss, so its result " +
 				"is recomputed forever and the cache never pays for the common case")
 		}
-		if len(findings) != 0 {
-			t.Fatalf("expected no findings, got %d", len(findings))
+		if len(entry.Findings) != 0 {
+			t.Fatalf("expected no findings, got %d", len(entry.Findings))
 		}
 	})
 
 	t.Run("an unknown file is a miss, not a clean hit", func(t *testing.T) {
 		_, hit := cache.Lookup("/project/source/never-seen.ts",
-			program.HashContent("whatever"), ruleSet)
+			program.HashContent("whatever"), key, rules)
 		if hit {
 			t.Fatal("a file the cache has never seen reported as a hit; every unlinted file " +
 				"would read as clean and the tool would report a green tree it never checked")
@@ -180,35 +197,46 @@ func TestLintCacheLookupDistinguishesCleanFromUnknown(t *testing.T) {
 
 	t.Run("changed contents under a known path is a miss", func(t *testing.T) {
 		_, hit := cache.Lookup("/project/source/dirty.ts",
-			program.HashContent("something completely different\n"), ruleSet)
+			program.HashContent("something completely different\n"), key, rules)
 		if hit {
 			t.Fatal("an edited file matched its stale entry by path; the cache would replay " +
 				"yesterday's findings for today's code")
 		}
 	})
 
-	t.Run("a changed rule set invalidates every entry", func(t *testing.T) {
+	t.Run("a changed key invalidates every entry", func(t *testing.T) {
 		_, hit := cache.Lookup("/project/source/clean.ts",
 			program.HashContent("export const value = 1;\n"),
-			program.HashRuleSet([]string{"no-debugger"}))
+			program.HashRuleSet([]string{"no-debugger"}), rules)
 		if hit {
-			t.Fatal("removing a rule left the cache serving results produced when it ran; " +
-				"adding or removing a rule must invalidate everything at once")
+			t.Fatal("a changed key left the cache serving results produced under the old one; a new " +
+				"binary, config or rule set must invalidate everything at once")
+		}
+	})
+
+	// An override can change which rules reach one file while the key, built from the whole config's
+	// bytes, would also change. This guards the narrower case of the rule list itself differing, so a
+	// file never replays findings from a rule set it is not offered now.
+	t.Run("a different applied rule list is a miss", func(t *testing.T) {
+		_, hit := cache.Lookup("/project/source/clean.ts",
+			program.HashContent("export const value = 1;\n"), key, []string{"no-debugger"})
+		if hit {
+			t.Fatal("an entry recorded under two rules was served to a file offered one")
 		}
 	})
 
 	t.Run("a nil cache is always a miss", func(t *testing.T) {
 		var nilCache *program.LintCache
-		if _, hit := nilCache.Lookup("anything", program.HashContent("x"), ruleSet); hit {
+		if _, hit := nilCache.Lookup("anything", program.HashContent("x"), key, rules); hit {
 			t.Fatal("a nil cache reported a hit")
 		}
 	})
 }
 
-// TestRuleSetHashIsOrderSensitive pins a property that looks like pedantry and is not. Two
-// rules can report on the same range, and the order they ran in is the order findings come
-// back in. A hash that ignored order would let a reordered rule set replay a finding sequence
-// the current configuration would not produce.
+// TestRuleSetHashIsOrderSensitive pins a property that looks like pedantry and is not. A reordered
+// rule set can change which findings exist, because a fix applied by an earlier rule changes the text
+// a later rule reads. This doc once said rule order decides the order findings come back in; it does
+// not, the walk sorts them, and HashRuleSet's own comment says so.
 func TestRuleSetHashIsOrderSensitive(t *testing.T) {
 	forward := program.HashRuleSet([]string{"alpha", "beta"})
 	backward := program.HashRuleSet([]string{"beta", "alpha"})
@@ -272,24 +300,46 @@ func TestLintCacheFindingHasNoUncheckedFields(t *testing.T) {
 	}
 }
 
+// TestLintCacheEntryHasNoUncheckedFields is the same structural guard over the entry, which gained
+// three fields at once when coverage started being replayed with findings: Rules, Listening and
+// VisitedNodes. An entry field the round trip does not compare can be dropped by the encoder and still
+// pass, and a dropped VisitedNodes would change the coverage line of every replayed run.
+func TestLintCacheEntryHasNoUncheckedFields(t *testing.T) {
+	compared := map[string]struct{}{
+		"Path": {}, "ContentHash": {}, "Rules": {}, "Listening": {}, "VisitedNodes": {}, "Findings": {},
+	}
+	entryType := reflect.TypeOf(program.LintCacheEntry{})
+	for index := range entryType.NumField() {
+		name := entryType.Field(index).Name
+		if _, checked := compared[name]; !checked {
+			t.Errorf("LintCacheEntry.%s is not compared by TestLintCacheRoundTripsEveryField", name)
+		}
+		delete(compared, name)
+	}
+	for name := range compared {
+		t.Errorf("this check names %q but LintCacheEntry has no such field, so the list is stale", name)
+	}
+}
+
 // TestLintCacheStoreReplacesRatherThanAppends pins the property Lookup depends on.
 //
 // A path stored twice must leave one entry, not two. Two entries make Lookup's answer depend on
 // which copy the index happened to keep, and the stale one would win or lose by insertion order,
 // which is exactly the kind of nondeterminism that reads as a flaky cache rather than a bug.
 func TestLintCacheStoreReplacesRatherThanAppends(t *testing.T) {
-	cache := &program.LintCache{RuleSetHash: program.HashRuleSet([]string{"no-debugger"})}
+	cache := &program.LintCache{Key: program.HashRuleSet([]string{"no-debugger"})}
 	path := "/project/source/edited.ts"
+	rules := []string{"no-debugger"}
 
 	first := program.HashContent("debugger;\n")
-	cache.Store(path, first, []program.LintCacheFinding{{
+	cache.Store(program.LintCacheEntry{Path: path, ContentHash: first, Rules: rules, Findings: []program.LintCacheFinding{{
 		RuleName: "no-debugger", Start: 0, End: 9,
 		MessageId: "unexpectedDebugger", MessageDescription: "Unexpected debugger statement.",
-	}})
+	}}})
 
 	// The same file, edited clean. The second store must supersede the first.
 	second := program.HashContent("export const value = 1;\n")
-	cache.Store(path, second, nil)
+	cache.Store(program.LintCacheEntry{Path: path, ContentHash: second, Rules: rules})
 
 	if len(cache.Entries) != 1 {
 		t.Fatalf("entries: %d, so Store appended instead of replacing", len(cache.Entries))
@@ -297,16 +347,16 @@ func TestLintCacheStoreReplacesRatherThanAppends(t *testing.T) {
 
 	// The superseded content hash must no longer be a hit, or the cache would serve findings for
 	// bytes that are gone.
-	if _, hit := cache.Lookup(path, first, cache.RuleSetHash); hit {
+	if _, hit := cache.Lookup(path, first, cache.Key, rules); hit {
 		t.Error("the replaced content hash is still a hit, so stale findings survived a Store")
 	}
 
-	findings, hit := cache.Lookup(path, second, cache.RuleSetHash)
+	entry, hit := cache.Lookup(path, second, cache.Key, rules)
 	if !hit {
 		t.Fatal("the current content hash is a miss, so the replacement did not take")
 	}
-	if len(findings) != 0 {
-		t.Errorf("findings: %d, want 0 for the cleaned file", len(findings))
+	if len(entry.Findings) != 0 {
+		t.Errorf("findings: %d, want 0 for the cleaned file", len(entry.Findings))
 	}
 }
 
@@ -316,16 +366,17 @@ func TestLintCacheStoreReplacesRatherThanAppends(t *testing.T) {
 // forever and the cache would save nothing on exactly the population it exists for, while looking
 // like it worked.
 func TestLintCacheStoreRecordsCleanFiles(t *testing.T) {
-	cache := &program.LintCache{RuleSetHash: program.HashRuleSet([]string{"no-debugger"})}
+	cache := &program.LintCache{Key: program.HashRuleSet([]string{"no-debugger"})}
 	contentHash := program.HashContent("export const value = 1;\n")
-	cache.Store("/project/source/clean.ts", contentHash, nil)
+	rules := []string{"no-debugger"}
+	cache.Store(program.LintCacheEntry{Path: "/project/source/clean.ts", ContentHash: contentHash, Rules: rules})
 
-	findings, hit := cache.Lookup("/project/source/clean.ts", contentHash, cache.RuleSetHash)
+	entry, hit := cache.Lookup("/project/source/clean.ts", contentHash, cache.Key, rules)
 	if !hit {
 		t.Fatal("a stored clean file is a miss, so clean files would never be cached")
 	}
-	if len(findings) != 0 {
-		t.Errorf("findings: %d, want 0", len(findings))
+	if len(entry.Findings) != 0 {
+		t.Errorf("findings: %d, want 0", len(entry.Findings))
 	}
 }
 
@@ -349,11 +400,12 @@ func TestLintCacheSurvivesDisk(t *testing.T) {
 
 	// The interpolated description is the one that cannot be rebuilt, so it is the one worth
 	// asserting survived a real write.
-	findings, hit := decoded.Lookup(
-		original.Entries[0].Path, original.Entries[0].ContentHash, original.RuleSetHash)
+	entry, hit := decoded.Lookup(
+		original.Entries[0].Path, original.Entries[0].ContentHash, original.Key, original.Entries[0].Rules)
 	if !hit {
 		t.Fatal("an entry written to disk came back as a miss")
 	}
+	findings := entry.Findings
 	if len(findings) != 2 {
 		t.Fatalf("findings: %d back from 2", len(findings))
 	}

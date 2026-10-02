@@ -3,6 +3,7 @@ package program
 import (
 	"cmp"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"slices"
 	"strings"
@@ -133,6 +134,11 @@ type Result struct {
 	// Timings is per-rule cost, populated only when the caller asked for it by setting
 	// Graph.CollectTimings. Nil otherwise, so an ordinary run pays nothing for the instrument.
 	Timings *Timings
+
+	// FilesReplayed is how many files this walk served from the findings cache rather than walking
+	// with every rule. Zero without a cache. The lint line reports it, so a reader can tell a walked
+	// verdict from a remembered one.
+	FilesReplayed int
 }
 
 // Walk visits every file in the given set once, dispatching every rule's listeners as it goes.
@@ -160,6 +166,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 
 	var mutex sync.Mutex
 	diagnostics := []rule.Diagnostic{}
+	filesReplayed := 0
 	listeningCounts := make(map[string]int, len(rules))
 	reportingCounts := make(map[string]int, len(rules))
 	offeredCounts := make(map[string]int, len(rules))
@@ -192,6 +199,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			defer waitGroup.Done()
 
 			localDiagnostics := []rule.Diagnostic{}
+			localReplayed := 0
 			localListening := make(map[string]int, len(rules))
 			localReporting := make(map[string]int, len(rules))
 			localOffered := make(map[string]int, len(rules))
@@ -231,6 +239,35 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					continue
 				}
 
+				// The findings cache. A file whose bytes, key and applied cacheable rules all match the
+				// last run's entry is walked with only its uncacheable rules, and the cacheable rules'
+				// findings and coverage are replayed. Every other file is walked in full and, if it is
+				// eligible, recorded. Off under --timing, since per-rule cost comes from the walk and a
+				// replayed rule would time as free. See FindingsReuse.
+				reuse := g.FindingsReuse
+				if g.CollectTimings {
+					reuse = nil
+				}
+				walkRules := applicable
+				var replayed *LintCacheEntry
+				var cacheableNames []string
+				var contentHash [sha256.Size]byte
+				if reuse != nil {
+					cacheableHere, uncacheableHere := CacheableRules(applicable)
+					cacheableNames = ruleNames(cacheableHere)
+					contentHash = HashContent(sourceFile.Text())
+					if entry, hit := reuse.lookup(sourceFile.FileName(), contentHash, cacheableNames); hit {
+						replayed = &entry
+						walkRules = uncacheableHere
+						localReplayed++
+						replayEntry(entry, sourceFile, &localDiagnostics, localReporting, localOffered, localListening)
+						if len(walkRules) == 0 {
+							localNodes += entry.VisitedNodes
+							continue
+						}
+					}
+				}
+
 				// The checker is acquired only when an applicable rule declares it reads one.
 				//
 				// CheckerForFile hands out an exclusive lock held until release, and it is held across
@@ -267,18 +304,40 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// declaration is legible at both ends and cannot deadlock by being used twice.
 				var fileChecker *checker.Checker
 				release := func() {}
-				if anyRuleNeedsTypeChecker(applicable) {
+				if anyRuleNeedsTypeChecker(walkRules) {
 					fileChecker, release = g.CheckerForFile(ctx, sourceFile)
 				}
 
 				// A rule's Report closure captures the rule it belongs to, so a rule cannot report under
 				// another rule's name even by accident.
+				//
+				// A file being recorded counts its listening and offered rules into maps of its own, so
+				// the entry can say which cacheable rules listened on this file; they are merged into the
+				// worker's totals at once, before the crash check, exactly as passing the totals in did.
+				recording := reuse != nil && replayed == nil
+				listeningTarget, offeredTarget := localListening, localOffered
+				var fileListening, fileOffered map[string]int
+				if recording {
+					fileListening = make(map[string]int, len(walkRules))
+					fileOffered = make(map[string]int, len(walkRules))
+					listeningTarget, offeredTarget = fileListening, fileOffered
+				}
+				diagnosticsBefore := len(localDiagnostics)
 				visited, silenced, crashed := dispatchFileSafely(sourceFile, func(diagnostic rule.Diagnostic) {
 					localDiagnostics = append(localDiagnostics, diagnostic)
 					localReporting[diagnostic.RuleName]++
-				}, applicable, g, fileChecker, localListening, localOffered, ruleOptions, localTimings, catalog)
+				}, walkRules, g, fileChecker, listeningTarget, offeredTarget, ruleOptions, localTimings, catalog)
 
 				release()
+
+				if recording {
+					for name, count := range fileListening {
+						localListening[name] += count
+					}
+					for name, count := range fileOffered {
+						localOffered[name] += count
+					}
+				}
 
 				if crashed != nil {
 					// One file is lost rather than the run. Without this, a panic in any rule on any
@@ -295,8 +354,22 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 					continue
 				}
 
-				localNodes += visited
+				// A replayed file counts the nodes its full walk visited. The walk counts nodes only when
+				// some rule listens, so the uncacheable rules alone could count none and change the
+				// coverage line.
+				if replayed != nil {
+					localNodes += replayed.VisitedNodes
+				} else {
+					localNodes += visited
+				}
 				localSuppressed.add(silenced)
+
+				if recording {
+					if entry, eligible := recordableEntry(sourceFile, contentHash, cacheableNames,
+						localDiagnostics[diagnosticsBefore:], fileListening, visited, silenced); eligible {
+						reuse.keep(entry)
+					}
+				}
 			}
 
 			// Appended in whichever order the workers finish. The order is fixed once, after the wait
@@ -324,6 +397,7 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 			configFailures = append(configFailures, localFailures...)
 			fileCrashes = append(fileCrashes, localCrashes...)
 			timings.merge(localTimings)
+			filesReplayed += localReplayed
 			mutex.Unlock()
 		}()
 	}
@@ -338,8 +412,9 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	}
 
 	return Result{
-		Diagnostics: diagnostics,
-		Timings:     timings,
+		Diagnostics:   diagnostics,
+		Timings:       timings,
+		FilesReplayed: filesReplayed,
 		Coverage: Coverage{
 			FilesInProgram: len(g.Program.GetSourceFiles()),
 			FilesWalked:    len(files),

@@ -81,6 +81,10 @@ type Graph struct {
 	// Off by default and guarded at every timing site, so an ordinary run reads no clocks and
 	// allocates no accumulators. The instrument should cost nothing when nobody asked for it.
 	CollectTimings bool
+
+	// FindingsReuse, when set, lets Walk serve unchanged files' cacheable findings from the last run
+	// and records this run's for the next. Nil walks everything, exactly as before it existed.
+	FindingsReuse *FindingsReuse
 }
 
 // configHost adapts a filesystem and a working directory to what tsconfig parsing wants.

@@ -2,7 +2,7 @@ package program
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -30,54 +30,40 @@ import (
 // under-declaring serves a stale finding silently and forever, over-declaring costs a cache
 // miss. One of those is a correctness failure and the other is a performance one.
 //
-// THIS CACHE IS BUILT AND DELIBERATELY NOT WIRED. The reachable saving was measured at about 9%
-// of total wall clock, which does not pay for the failure mode. Read the verdict below before
-// wiring it, because everything above describes a correct cache and none of it argues that the
-// cache is worth having.
+// It is wired as the run cache's second layer: when a bare run's inputs are not all unchanged, files
+// whose bytes and configuration are unchanged are walked with only their uncacheable rules, and the
+// cacheable rules' findings and coverage are replayed. See FindingsReuse.
 //
-// The measurement, 2026-08-25 on the ahra tree at load 4.2-4.4, cohere at 5603f83. A perfect cache
-// skips exactly the cacheable rules and still runs the uncacheable ones, so running with only the
-// 50 uncacheable enabled is the upper bound on any cache here: no build cost, no invalidation, no
-// read or write. Strictly better than the real thing could be.
+// It was measured and left unwired once, and the reversal is worth keeping because the measurement
+// method is the same and only the tree changed. On 2026-08-25, with 212 rules, walking with only the
+// uncacheable ones saved about 9%: the walk visits every node whatever the rule set, so with light
+// rules there was little left to skip. On 2026-10-02, with 464 rules, the same experiment in process
+// on ahra's real config:
 //
-//	lint phase, all 212 rules       1.496 / 1.517 / 1.557s
-//	lint phase, only the 50         1.353 / 1.353 / 1.353s
-//	total wall clock, all 212       median ~2.98s
-//	total wall clock, only the 50   median ~2.71s
+//	walk, all 464 rules                 about 1.8-2.6s
+//	walk, the 172 uncacheable           about 1.2-1.4s
+//	walk, the 44 ReadsProgram only      about 0.4s
 //
-// About 170ms off the phase and 270ms off the total.
+// The node count is identical in all three, so the walk still cannot be skipped; what grew is the work
+// rules do at each node. 164 of the 172 exclusions are type-aware only, which is what re-running
+// type-aware rules on a changed file's importers would reach.
 //
-// The reason is the one worth carrying, and it is this package's own architecture working as
-// designed: nodesVisited is IDENTICAL in both runs, 2,096,943. Dropping 162 of 212 rules did not
-// remove a single node from the walk. That is not a coincidence in the data, it falls out of the
-// traversal by construction: `walk` increments its count unconditionally and recurses over every
-// child, so nodesVisited is a property of the tree rather than of which listeners registered. One traversal serves every rule, so the tree is walked
-// because any rule listens, and 50 still listen on every file; a rule's per-node cost is a map
-// lookup. The walk is the cost, and a findings cache cannot touch the walk. It can only skip
-// lookups the design already made nearly free.
-//
-// So a cache that pays here has to reach the walk rather than the findings. That is a different
-// design with a different coverage story, and it should carry its own measured number before any
-// of it is built. Do not revive this one by assuming the prize grew.
-//
-// Two earlier prize figures in this comment were both wrong, in opposite directions, which is why
-// the verdict is stated as a measurement rather than a conclusion. It first read 323ms of a 1.57s
-// run over 95 rules and 3,407 files, which had drifted stale as parity doubled the rule count. It
-// then read 635ms of a ~3s run, which was accurate about the PHASE and irrelevant to the CACHE,
-// because most of that phase is a walk no findings cache can skip.
-//
-// Re-measure before pricing work against this. A cost recorded next to a cache is read as the
-// reason the cache exists, so a stale one argues for building something the tree no longer wants.
-// Measure with a plain run: `--timing` bills roughly a second of its own instrumentation to this
-// phase, which is enough to invert which phase looks largest.
+// Two kinds of file are never served from cache. A file with any suppression directive, because a
+// directive's accounting spans every rule in the file, cached and walked alike. A file with any
+// finding that carries a fix or a suggestion, because a cached finding stores neither and the fix
+// phase needs the edit itself.
 type LintCache struct {
-	// RuleSetHash covers which rules ran and their order. A rule added, removed, or renamed
-	// changes what the tree should report, and every stored entry becomes wrong at once. This
-	// is what makes that a cache miss rather than a silent stale pass.
-	RuleSetHash [sha256.Size]byte
+	// Version is the format. A different version is a miss, never a best-effort read.
+	Version int `json:"version"`
+
+	// Key covers everything a cacheable rule's answer depends on beyond the file's own bytes: the
+	// binary, the lint config, the tsconfig chain, the project root and the rule set in order. Any
+	// change to one invalidates every entry at once, which is what makes it a miss rather than a
+	// stale pass. It was called RuleSetHash when the rule set was all it covered.
+	Key [sha256.Size]byte `json:"key"`
 
 	// Entries is one record per cached file.
-	Entries []LintCacheEntry
+	Entries []LintCacheEntry `json:"entries"`
 
 	// index maps path to position in Entries, built lazily on the first Lookup. Not serialized:
 	// it is derived from Entries and rebuilding it costs less than storing it.
@@ -88,14 +74,28 @@ type LintCache struct {
 type LintCacheEntry struct {
 	// Path identifies the file. Kept for debugging and for eviction; the hash is what decides
 	// a hit.
-	Path string
+	Path string `json:"path"`
 
 	// ContentHash is the hash of the file's bytes when these findings were produced.
-	ContentHash [sha256.Size]byte
+	ContentHash [sha256.Size]byte `json:"contentHash"`
 
-	// Findings is what the pure rules reported. Empty is a real answer: it means the rules ran
+	// Rules is the cacheable rules the configuration applied to this file, in order. A hit requires
+	// the same list now, so an override that changes which rules reach this file is a miss even under
+	// an unchanged key.
+	Rules []string `json:"rules"`
+
+	// Listening is the subset of Rules that registered a listener on this file. A replay counts them
+	// as listening, which is what keeps the coverage line identical to a walked run's.
+	Listening []string `json:"listening,omitempty"`
+
+	// VisitedNodes is how many nodes the full walk of this file visited. The walk counts nodes only
+	// when some rule listens, so a cached file whose remaining rules listen to nothing would otherwise
+	// contribute zero and change the coverage line.
+	VisitedNodes int `json:"visitedNodes"`
+
+	// Findings is what the cacheable rules reported. Empty is a real answer: it means the rules ran
 	// and found nothing, which is exactly the case worth caching since most files are clean.
-	Findings []LintCacheFinding
+	Findings []LintCacheFinding `json:"findings,omitempty"`
 }
 
 // LintCacheFinding is one finding, flattened.
@@ -129,18 +129,18 @@ type LintCacheEntry struct {
 // replacement over a byte range, and replaying one computed against different bytes would corrupt
 // the file it claims to repair. A cached finding is a report, never an edit.
 type LintCacheFinding struct {
-	RuleName string
-	Start    int32
-	End      int32
+	RuleName string `json:"rule"`
+	Start    int32  `json:"start"`
+	End      int32  `json:"end"`
 
 	// MessageId identifies the message within its rule. Not unique across rules; see above.
-	MessageId string
+	MessageId string `json:"messageId"`
 
 	// MessageDescription is the rendered sentence, stored because nothing can rebuild it.
-	MessageDescription string
+	MessageDescription string `json:"messageDescription"`
 
-	FixCount        int32
-	SuggestionCount int32
+	FixCount        int32 `json:"fixCount,omitempty"`
+	SuggestionCount int32 `json:"suggestionCount,omitempty"`
 }
 
 // MessageKey is the honest identity of a message: the pair, never the id alone.
@@ -180,252 +180,90 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 	return result
 }
 
-// lintCacheMagic identifies the format and its version.
+// lintCacheVersion is bumped whenever the format's meaning changes.
 //
-// Same reasoning as the resolution cache: this is read back as offsets into a blob, so a file
-// from an older layout parses into strings from the wrong places rather than failing. The
-// version byte is what makes that loud.
-var lintCacheMagic = [8]byte{'v', 'f', 'y', 'l', 'i', 'n', 't', 2}
+// 3: JSON, with each entry's applied rules, listening rules and node count. Versions 1 and 2 were a
+// binary layout of offsets into an interned blob; adding three fields to it was where its own "an
+// encoder forgot a field" bug had shipped four times, so it was replaced rather than extended.
+const lintCacheVersion = 3
 
-const (
-	lintEntryHeaderSize = sha256.Size + 12 // content hash, path offset+length, finding count
-	lintFindingSize     = 40               // rule offset+length, start, end, message id offset+length, description offset+length, fix and suggestion counts
-)
-
-// Encode writes the cache as a flat binary artifact.
+// Encode writes the cache.
 func (c *LintCache) Encode() []byte {
-	var blob []byte
-	table := make(map[string]int32)
-	intern := func(value string) (int32, int32) {
-		if value == "" {
-			return -1, 0
-		}
-		if offset, seen := table[value]; seen {
-			return offset, int32(len(value))
-		}
-		offset := int32(len(blob))
-		blob = append(blob, value...)
-		table[value] = offset
-		return offset, int32(len(value))
+	c.Version = lintCacheVersion
+	encoded, err := json.Marshal(c)
+	if err != nil {
+		// Every field is a plain value, so this cannot fail; if it ever does, an empty artifact
+		// decodes as unreadable, which is a miss.
+		return nil
 	}
-
-	// Two passes: intern everything to build the blob, then lay out fixed-width records whose
-	// offsets point into it.
-	type entryLayout struct {
-		contentHash            [sha256.Size]byte
-		pathOffset, pathLength int32
-		findings               []LintCacheFinding
-		findingOffsets         [][6]int32 // rule offset+length, message id offset+length, description offset+length
-	}
-	layouts := make([]entryLayout, 0, len(c.Entries))
-	totalFindings := 0
-	for _, entry := range c.Entries {
-		pathOffset, pathLength := intern(entry.Path)
-		layout := entryLayout{
-			contentHash: entry.ContentHash,
-			pathOffset:  pathOffset,
-			pathLength:  pathLength,
-			findings:    entry.Findings,
-		}
-		for _, finding := range entry.Findings {
-			ruleOffset, ruleLength := intern(finding.RuleName)
-			messageOffset, messageLength := intern(finding.MessageId)
-			descriptionOffset, descriptionLength := intern(finding.MessageDescription)
-			layout.findingOffsets = append(layout.findingOffsets,
-				[6]int32{ruleOffset, ruleLength, messageOffset, messageLength,
-					descriptionOffset, descriptionLength})
-		}
-		totalFindings += len(entry.Findings)
-		layouts = append(layouts, layout)
-	}
-
-	headerSize := 8 + sha256.Size + 8
-	body := len(layouts)*lintEntryHeaderSize + totalFindings*lintFindingSize
-	buffer := make([]byte, headerSize+body+len(blob))
-
-	copy(buffer[0:], lintCacheMagic[:])
-	copy(buffer[8:], c.RuleSetHash[:])
-	cursor := 8 + sha256.Size
-	binary.LittleEndian.PutUint32(buffer[cursor:], uint32(len(layouts)))
-	binary.LittleEndian.PutUint32(buffer[cursor+4:], uint32(len(blob)))
-	cursor += 8
-
-	for _, layout := range layouts {
-		copy(buffer[cursor:], layout.contentHash[:])
-		binary.LittleEndian.PutUint32(buffer[cursor+sha256.Size:], uint32(layout.pathOffset))
-		binary.LittleEndian.PutUint32(buffer[cursor+sha256.Size+4:], uint32(layout.pathLength))
-		binary.LittleEndian.PutUint32(buffer[cursor+sha256.Size+8:], uint32(len(layout.findings)))
-		cursor += lintEntryHeaderSize
-
-		for index, finding := range layout.findings {
-			offsets := layout.findingOffsets[index]
-			binary.LittleEndian.PutUint32(buffer[cursor+0:], uint32(offsets[0]))
-			binary.LittleEndian.PutUint32(buffer[cursor+4:], uint32(offsets[1]))
-			binary.LittleEndian.PutUint32(buffer[cursor+8:], uint32(finding.Start))
-			binary.LittleEndian.PutUint32(buffer[cursor+12:], uint32(finding.End))
-			binary.LittleEndian.PutUint32(buffer[cursor+16:], uint32(offsets[2]))
-			binary.LittleEndian.PutUint32(buffer[cursor+20:], uint32(offsets[3]))
-			binary.LittleEndian.PutUint32(buffer[cursor+24:], uint32(offsets[4]))
-			binary.LittleEndian.PutUint32(buffer[cursor+28:], uint32(offsets[5]))
-			binary.LittleEndian.PutUint32(buffer[cursor+32:], uint32(finding.FixCount))
-			binary.LittleEndian.PutUint32(buffer[cursor+36:], uint32(finding.SuggestionCount))
-			cursor += lintFindingSize
-		}
-	}
-
-	copy(buffer[cursor:], blob)
-	return buffer
+	return encoded
 }
 
 // ErrLintCacheUnreadable means the artifact is not one this build can use. Never a reason to
-// fail a run, only a reason to lint from source and write a fresh cache.
+// fail a run: the answer to an unreadable cache is to run cold.
 var ErrLintCacheUnreadable = errors.New("lint cache is not readable by this build")
 
-// DecodeLintCache reads an artifact written by Encode.
-//
-// Every offset and length is checked against the buffer before use. A truncated or foreign
-// file must error rather than produce findings assembled from the wrong bytes, because a
-// finding pointing at the wrong rule name and range is worse than no finding at all.
+// DecodeLintCache reads an artifact written by Encode. Anything else, including a valid artifact of
+// another version, is ErrLintCacheUnreadable.
 func DecodeLintCache(buffer []byte) (*LintCache, error) {
-	headerSize := 8 + sha256.Size + 8
-	if len(buffer) < headerSize {
-		return nil, fmt.Errorf("%w: %d bytes is shorter than the header", ErrLintCacheUnreadable, len(buffer))
-	}
-	if string(buffer[0:8]) != string(lintCacheMagic[:]) {
-		return nil, fmt.Errorf("%w: magic or version does not match", ErrLintCacheUnreadable)
-	}
-
 	cache := &LintCache{}
-	copy(cache.RuleSetHash[:], buffer[8:8+sha256.Size])
-	cursor := 8 + sha256.Size
-	entryCount := int(binary.LittleEndian.Uint32(buffer[cursor:]))
-	blobLength := int(binary.LittleEndian.Uint32(buffer[cursor+4:]))
-	cursor += 8
-
-	if entryCount < 0 || blobLength < 0 {
-		return nil, fmt.Errorf("%w: header counts are negative", ErrLintCacheUnreadable)
+	if err := json.Unmarshal(buffer, cache); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrLintCacheUnreadable, err)
 	}
-
-	// The blob sits at the end, and its start is only known after walking the records. Walk
-	// them once to find it, bounds-checking as we go, before reading a single string.
-	scan := cursor
-	for index := 0; index < entryCount; index++ {
-		if scan+lintEntryHeaderSize > len(buffer) {
-			return nil, fmt.Errorf("%w: entry %d runs past the buffer", ErrLintCacheUnreadable, index)
-		}
-		findingCount := int(binary.LittleEndian.Uint32(buffer[scan+sha256.Size+8:]))
-		if findingCount < 0 {
-			return nil, fmt.Errorf("%w: entry %d claims %d findings", ErrLintCacheUnreadable, index, findingCount)
-		}
-		scan += lintEntryHeaderSize + findingCount*lintFindingSize
-		if scan > len(buffer) {
-			return nil, fmt.Errorf("%w: entry %d's findings run past the buffer", ErrLintCacheUnreadable, index)
-		}
+	if cache.Version != lintCacheVersion {
+		return nil, fmt.Errorf("%w: format version %d, this build reads %d", ErrLintCacheUnreadable, cache.Version, lintCacheVersion)
 	}
-	if scan+blobLength != len(buffer) {
-		return nil, fmt.Errorf("%w: records end at %d with a %d-byte blob, which does not fill %d bytes",
-			ErrLintCacheUnreadable, scan, blobLength, len(buffer))
-	}
-	blob := buffer[scan : scan+blobLength]
-
-	read := func(offset, length int32) (string, error) {
-		if offset < 0 {
-			return "", nil
-		}
-		if length < 0 || int(offset)+int(length) > len(blob) {
-			return "", fmt.Errorf("%w: string at %d+%d falls outside the %d-byte blob",
-				ErrLintCacheUnreadable, offset, length, len(blob))
-		}
-		return string(blob[offset : offset+length]), nil
-	}
-
-	cache.Entries = make([]LintCacheEntry, 0, entryCount)
-	for index := 0; index < entryCount; index++ {
-		var entry LintCacheEntry
-		copy(entry.ContentHash[:], buffer[cursor:cursor+sha256.Size])
-		path, err := read(
-			int32(binary.LittleEndian.Uint32(buffer[cursor+sha256.Size:])),
-			int32(binary.LittleEndian.Uint32(buffer[cursor+sha256.Size+4:])))
-		if err != nil {
-			return nil, err
-		}
-		entry.Path = path
-		findingCount := int(binary.LittleEndian.Uint32(buffer[cursor+sha256.Size+8:]))
-		cursor += lintEntryHeaderSize
-
-		entry.Findings = make([]LintCacheFinding, 0, findingCount)
-		for findingIndex := 0; findingIndex < findingCount; findingIndex++ {
-			ruleName, err := read(
-				int32(binary.LittleEndian.Uint32(buffer[cursor+0:])),
-				int32(binary.LittleEndian.Uint32(buffer[cursor+4:])))
-			if err != nil {
-				return nil, err
-			}
-			messageId, err := read(
-				int32(binary.LittleEndian.Uint32(buffer[cursor+16:])),
-				int32(binary.LittleEndian.Uint32(buffer[cursor+20:])))
-			if err != nil {
-				return nil, err
-			}
-			description, err := read(
-				int32(binary.LittleEndian.Uint32(buffer[cursor+24:])),
-				int32(binary.LittleEndian.Uint32(buffer[cursor+28:])))
-			if err != nil {
-				return nil, err
-			}
-			entry.Findings = append(entry.Findings, LintCacheFinding{
-				RuleName:           ruleName,
-				Start:              int32(binary.LittleEndian.Uint32(buffer[cursor+8:])),
-				End:                int32(binary.LittleEndian.Uint32(buffer[cursor+12:])),
-				MessageId:          messageId,
-				MessageDescription: description,
-				FixCount:           int32(binary.LittleEndian.Uint32(buffer[cursor+32:])),
-				SuggestionCount:    int32(binary.LittleEndian.Uint32(buffer[cursor+36:])),
-			})
-			cursor += lintFindingSize
-		}
-		cache.Entries = append(cache.Entries, entry)
-	}
-
 	return cache, nil
 }
 
-// Lookup returns the cached findings for a file, and whether the cache had a usable answer.
+// Lookup returns a file's cached entry, and whether the cache had a usable answer.
 //
-// The second return distinguishes "cached, no findings" from "not cached", and that
-// distinction is the whole correctness of this cache: a clean file and an unknown file both
-// produce an empty slice, and treating them the same is how a cache silently reports a clean
-// tree.
+// The second return distinguishes "cached, no findings" from "not cached", and that distinction is
+// the whole correctness of this cache: a clean file and an unknown file both produce no findings, and
+// treating them the same is how a cache silently reports a clean tree.
 //
-// The index is built on first use rather than at decode, so a caller that decodes a cache and
-// then discards it on a rule-set mismatch never pays for it. A linear scan here would be
-// 3,407 lookups against 3,407 entries on this tree, which is the kind of quadratic that hides
-// until the tree doubles.
-func (c *LintCache) Lookup(path string, contentHash [sha256.Size]byte, ruleSetHash [sha256.Size]byte) ([]LintCacheFinding, bool) {
-	if c == nil {
-		return nil, false
+// A hit needs the key, the path, the bytes and the applied rule list all to match. The index is built
+// on first use, so a caller that loads a cache and discards it on a key mismatch never pays for it.
+func (c *LintCache) Lookup(path string, contentHash [sha256.Size]byte, key [sha256.Size]byte, rules []string) (LintCacheEntry, bool) {
+	if c == nil || c.Key != key {
+		return LintCacheEntry{}, false
 	}
-	// A changed rule set invalidates everything at once. Checking it per lookup rather than
-	// once at load keeps the caller from having to remember to.
-	if c.RuleSetHash != ruleSetHash {
-		return nil, false
-	}
-	if c.index == nil {
-		c.index = make(map[string]int, len(c.Entries))
-		for position := range c.Entries {
-			c.index[c.Entries[position].Path] = position
-		}
-	}
+	c.ensureIndex()
 	position, found := c.index[path]
 	if !found {
-		return nil, false
+		return LintCacheEntry{}, false
 	}
-	// The path matching is not enough. A file whose contents changed has a stale entry under
-	// the same path, and returning it is precisely the silent failure this cache must not have.
-	if c.Entries[position].ContentHash != contentHash {
-		return nil, false
+	entry := c.Entries[position]
+	// The path matching is not enough. A file whose contents changed has a stale entry under the same
+	// path, and returning it is precisely the silent failure this cache must not have.
+	if entry.ContentHash != contentHash || !equalStrings(entry.Rules, rules) {
+		return LintCacheEntry{}, false
 	}
-	return c.Entries[position].Findings, true
+	return entry, true
+}
+
+// ensureIndex builds the path index if it is missing. A caller about to share the cache across
+// goroutines calls it first, since building it lazily inside concurrent lookups would race.
+func (c *LintCache) ensureIndex() {
+	if c.index != nil {
+		return
+	}
+	c.index = make(map[string]int, len(c.Entries))
+	for position := range c.Entries {
+		c.index[c.Entries[position].Path] = position
+	}
+}
+
+func equalStrings(first []string, second []string) bool {
+	if len(first) != len(second) {
+		return false
+	}
+	for index := range first {
+		if first[index] != second[index] {
+			return false
+		}
+	}
+	return true
 }
 
 // Store records one file's findings, replacing any earlier entry for the same path.
@@ -439,24 +277,24 @@ func (c *LintCache) Lookup(path string, contentHash [sha256.Size]byte, ruleSetHa
 // because most files are clean, and an entry saying "these bytes produce nothing" is a real answer.
 // Skipping it would make a clean file indistinguishable from an unknown one, which is the exact
 // ambiguity Lookup's second return exists to destroy.
-func (c *LintCache) Store(path string, contentHash [sha256.Size]byte, findings []LintCacheFinding) {
+func (c *LintCache) Store(entry LintCacheEntry) {
 	if c == nil {
 		return
 	}
 	if c.index != nil {
-		if position, found := c.index[path]; found {
-			c.Entries[position] = LintCacheEntry{Path: path, ContentHash: contentHash, Findings: findings}
+		if position, found := c.index[entry.Path]; found {
+			c.Entries[position] = entry
 			return
 		}
 	}
 	for position := range c.Entries {
-		if c.Entries[position].Path == path {
-			c.Entries[position] = LintCacheEntry{Path: path, ContentHash: contentHash, Findings: findings}
+		if c.Entries[position].Path == entry.Path {
+			c.Entries[position] = entry
 			c.index = nil
 			return
 		}
 	}
-	c.Entries = append(c.Entries, LintCacheEntry{Path: path, ContentHash: contentHash, Findings: findings})
+	c.Entries = append(c.Entries, entry)
 	c.index = nil
 }
 
@@ -465,7 +303,7 @@ func (c *LintCache) Store(path string, contentHash [sha256.Size]byte, findings [
 // Written to a temporary file in the same directory and renamed into place, because several cohere
 // runs can share a tree and a reader must never see a half-written artifact. Rename is atomic
 // within a filesystem; writing directly to the destination is not, and a truncated cache is the
-// shape that decodes into offsets pointing at the wrong strings.
+// shape that fails to decode, turning every file into a miss for no reason.
 //
 // A failure here is returned rather than swallowed. The next run being cold is a cost someone
 // should be told about, since the symptom otherwise is a saving that quietly never appears.
