@@ -475,8 +475,9 @@ func writeLintReport(out io.Writer, report lintReport) {
 	}
 	coverage := report.Result.Coverage
 	fmt.Fprintf(invocationOutput(out),
-		"lint: %d findings — %d rules over %d files, %d nodes visited, %s\n",
+		"lint: %d findings — %d rules over %d files, %d nodes visited, %s%s\n",
 		len(report.Result.Diagnostics), coverage.RulesRun, coverage.FilesWalked, coverage.NodesVisited, report.WalkCost,
+		replayedFromCache(report.Result),
 	)
 
 	answersInRun := report.AnswersInRun
@@ -508,4 +509,13 @@ func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 		fmt.Fprintf(out, "  no listener: rule %s was %s and registered no listener on any, and it does not answer in Run, so it checked nothing\n",
 			entry.Name, strings.Join(entry.Details, ", "))
 	}
+}
+
+// replayedFromCache says how much of a verdict was remembered rather than walked, so a reader can always
+// tell the two apart. Empty when nothing was replayed.
+func replayedFromCache(result program.Result) string {
+	if result.FilesReplayed == 0 {
+		return ""
+	}
+	return fmt.Sprintf("; %d of %d files replayed from cache", result.FilesReplayed, result.Coverage.FilesWalked)
 }

@@ -124,3 +124,35 @@ func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(t *testing.T) {
 		t.Error("a tag survived into the replay")
 	}
 }
+
+// Exactly two invocations may use the run cache: a bare run and `--no-fix` alone. Any other argument
+// widens what the output could depend on, and one admitted by accident would be cached on a key that
+// covers it but by a cache never shown to be correct for it.
+func TestRunCacheEligibility(t *testing.T) {
+	previous := os.Args
+	defer func() { os.Args = previous }()
+	t.Setenv("COHERE_RUN_CACHE", "")
+
+	for _, testCase := range []struct {
+		arguments []string
+		eligible  bool
+	}{
+		{nil, true},
+		{[]string{"--no-fix"}, true},
+		{[]string{"--fix"}, false},
+		{[]string{"--lint"}, false},
+		{[]string{"--no-fix", "--lint"}, false},
+		{[]string{"source/a.ts"}, false},
+	} {
+		os.Args = append([]string{"cohere"}, testCase.arguments...)
+		if got := runCacheEligible(); got != testCase.eligible {
+			t.Errorf("cohere %v: eligible %v, want %v", testCase.arguments, got, testCase.eligible)
+		}
+	}
+
+	os.Args = []string{"cohere"}
+	t.Setenv("COHERE_RUN_CACHE", "off")
+	if runCacheEligible() {
+		t.Error("COHERE_RUN_CACHE=off left a bare run eligible, so there is no way to force a cold run")
+	}
+}

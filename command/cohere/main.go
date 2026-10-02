@@ -533,6 +533,8 @@ func run() error {
 			return err
 		}
 		lintConfig = loaded
+		// The run cache's second layer, attached once the config is known and before anything walks.
+		attachFindingsCache(graph, location)
 	}
 
 	switch {

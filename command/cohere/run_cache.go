@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -23,9 +24,9 @@ import (
 //
 // # Which runs
 //
-// Only a bare `cohere`: no arguments at all. That is the run people repeat, and every flag widens the
-// set of things the output could depend on. The key covers arguments anyway, so admitting more later
-// is a change to one condition rather than to the proof.
+// A bare `cohere`, or `cohere --no-fix`, and nothing else. Those are the runs people repeat, and every
+// other flag widens the set of things the output could depend on. The key covers arguments anyway, so
+// admitting more later is a change to one condition rather than to the proof.
 //
 // # Which exits
 //
@@ -61,6 +62,11 @@ type runCacheSession struct {
 
 	// declined is the reason this run must not be recorded, empty while it may be.
 	declined string
+
+	// findings is the findings cache this run consults and records, the run cache's second layer, and
+	// findingsPath where it is kept. Nil when the graph never reached a walk.
+	findings     *program.FindingsReuse
+	findingsPath string
 
 	stdout, stderr teeStream
 }
@@ -123,8 +129,16 @@ func (t *teeStream) stop(target **os.File) {
 }
 
 // runCacheEligible reports whether this invocation may use the run cache at all.
+//
+// A bare run, and `--no-fix` alone. `--no-fix` runs every phase and writes nothing, so it is a pure
+// report, which suits a cache better than the bare run does; it is what a real-tree measurement uses,
+// so the probe asks to write nothing as well as being sandboxed. The key covers the arguments, so the
+// two never replay each other.
 func runCacheEligible() bool {
-	if len(os.Args) != 1 {
+	switch {
+	case len(os.Args) == 1:
+	case len(os.Args) == 2 && os.Args[1] == "--no-fix":
+	default:
 		return false
 	}
 	// An escape hatch, for measuring a cold run and for anyone who suspects the cache. It has to be
@@ -155,7 +169,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		return nil
 	}
 
-	path := runCachePath(location.Root)
+	path := runCachePath(location.Root, os.Args[1:])
 	if stored, err := program.ReadRunCache(path); err == nil && stored.Check(key) == nil {
 		replayRunCache(stored)
 	}
@@ -191,14 +205,27 @@ func scopeFact(scope formatScope, scopeError error) string {
 		scope.Everything, scope.Description, names, unreadable)
 }
 
-// runCachePath keeps the manifest out of the project: one per project root, in the user cache.
-func runCachePath(root string) string {
+// runCachePath keeps the manifest out of the project: one per project root and invocation, in the user
+// cache. The invocation is part of the name because a bare run and `--no-fix` print different reports
+// under different keys: sharing one file, each overwrote the other's, and alternating between them was
+// a miss every time.
+func runCachePath(root string, arguments []string) string {
+	return cacheFilePath("run", root+"\x00"+strings.Join(arguments, "\x00"))
+}
+
+// findingsCachePath is one per project root, shared by every eligible invocation. Each walks the same
+// rules over the same files under the same configuration, so their findings are the same findings.
+func findingsCachePath(root string) string {
+	return cacheFilePath("lint", root)
+}
+
+func cacheFilePath(prefix string, identity string) string {
 	directory, err := os.UserCacheDir()
 	if err != nil {
 		directory = os.TempDir()
 	}
-	sum := sha256.Sum256([]byte(root))
-	return filepath.Join(directory, "cohere", fmt.Sprintf("run-%x.json", sum[:8]))
+	sum := sha256.Sum256([]byte(identity))
+	return filepath.Join(directory, "cohere", fmt.Sprintf("%s-%x.json", prefix, sum[:8]))
 }
 
 // replayRunCache prints a recorded run, framed so its durations cannot be read as this run's, and
@@ -263,6 +290,13 @@ func finishRunCache(exitCode int) {
 		session.stderr.stop(&os.Stderr)
 		if session.declared && session.declined == "" {
 			session.record(exitCode)
+		}
+		// Saved even when the run itself was declined. Its entries are keyed on each file's bytes, so a
+		// file the fix phase rewrote left an entry for bytes that no longer exist, which can never match.
+		if session.findings != nil {
+			if err := program.WriteLintCache(session.findingsPath, session.findings.Recorded()); err != nil {
+				fmt.Fprintf(os.Stderr, "note: the findings cache could not be written: %v\n", firstLine(err.Error()))
+			}
 		}
 	}
 	os.Exit(exitCode)
@@ -379,4 +413,68 @@ func replayLines(output []byte, recorded string) []byte {
 		fmt.Fprintf(&replayed, "%s (from the cached run at %s): %s", label, recorded, detail)
 	}
 	return replayed.Bytes()
+}
+
+// attachFindingsCache gives this run's graph the findings cache, the run cache's second layer: when
+// the run as a whole cannot be replayed, files whose bytes are unchanged replay their cacheable rules'
+// findings and coverage, and only their uncacheable rules are walked. See program.FindingsReuse.
+//
+// Only a run being recorded gets one, so it is exactly as narrow as the run cache.
+func attachFindingsCache(graph *program.Graph, location projectLocation) {
+	session := activeRunCache
+	if session == nil || graph == nil {
+		return
+	}
+	key, err := findingsCacheKey(graph, location)
+	if err != nil {
+		// Without a key nothing can be proven unchanged, so nothing is replayed or recorded.
+		return
+	}
+	session.findingsPath = findingsCachePath(location.Root)
+	previous, _ := program.ReadLintCache(session.findingsPath)
+	session.findings = program.NewFindingsReuse(key, previous)
+	graph.FindingsReuse = session.findings
+}
+
+// findingsCacheKey covers everything a cacheable rule's answer depends on beyond a file's own bytes:
+// the binary, the project root, the lint config's bytes, every file in the tsconfig's extends chain,
+// and the rule set in order. Any change to one makes every entry a miss at once.
+//
+// The tsconfig chain is in it because it decides how a file parses, and a cacheable rule walks the
+// parse. Rule options come from the lint config and the root, both already here.
+func findingsCacheKey(graph *program.Graph, location projectLocation) ([sha256.Size]byte, error) {
+	facts := []string{}
+	fileFact := func(label string, path string) error {
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(contents)
+		facts = append(facts, fmt.Sprintf("%s %s=%x", label, path, sum))
+		return nil
+	}
+	if err := fileFact("lint-config", location.LintConfigFileName); err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	if err := fileFact("tsconfig", location.ConfigFileName); err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	if graph.Config != nil {
+		for _, extended := range graph.Config.ExtendedSourceFiles() {
+			if err := fileFact("extends", extended); err != nil {
+				return [sha256.Size]byte{}, err
+			}
+		}
+	}
+	names := make([]string, 0, len(registry.All()))
+	for _, registered := range registry.All() {
+		names = append(names, registered.Name)
+	}
+	facts = append(facts, "rules="+strings.Join(names, "\x00"))
+
+	key, err := program.RunCacheKey(nil, location.Root, facts...)
+	if err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	return sha256.Sum256([]byte(key)), nil
 }

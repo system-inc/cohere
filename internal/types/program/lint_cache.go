@@ -2,11 +2,13 @@ package program
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -54,16 +56,16 @@ import (
 // phase needs the edit itself.
 type LintCache struct {
 	// Version is the format. A different version is a miss, never a best-effort read.
-	Version int `json:"version"`
+	Version int
 
 	// Key covers everything a cacheable rule's answer depends on beyond the file's own bytes: the
 	// binary, the lint config, the tsconfig chain, the project root and the rule set in order. Any
 	// change to one invalidates every entry at once, which is what makes it a miss rather than a
 	// stale pass. It was called RuleSetHash when the rule set was all it covered.
-	Key [sha256.Size]byte `json:"key"`
+	Key [sha256.Size]byte
 
 	// Entries is one record per cached file.
-	Entries []LintCacheEntry `json:"entries"`
+	Entries []LintCacheEntry
 
 	// index maps path to position in Entries, built lazily on the first Lookup. Not serialized:
 	// it is derived from Entries and rebuilding it costs less than storing it.
@@ -74,28 +76,28 @@ type LintCache struct {
 type LintCacheEntry struct {
 	// Path identifies the file. Kept for debugging and for eviction; the hash is what decides
 	// a hit.
-	Path string `json:"path"`
+	Path string
 
 	// ContentHash is the hash of the file's bytes when these findings were produced.
-	ContentHash [sha256.Size]byte `json:"contentHash"`
+	ContentHash [sha256.Size]byte
 
 	// Rules is the cacheable rules the configuration applied to this file, in order. A hit requires
 	// the same list now, so an override that changes which rules reach this file is a miss even under
 	// an unchanged key.
-	Rules []string `json:"rules"`
+	Rules []string
 
 	// Listening is the subset of Rules that registered a listener on this file. A replay counts them
 	// as listening, which is what keeps the coverage line identical to a walked run's.
-	Listening []string `json:"listening,omitempty"`
+	Listening []string
 
 	// VisitedNodes is how many nodes the full walk of this file visited. The walk counts nodes only
 	// when some rule listens, so a cached file whose remaining rules listen to nothing would otherwise
 	// contribute zero and change the coverage line.
-	VisitedNodes int `json:"visitedNodes"`
+	VisitedNodes int
 
 	// Findings is what the cacheable rules reported. Empty is a real answer: it means the rules ran
 	// and found nothing, which is exactly the case worth caching since most files are clean.
-	Findings []LintCacheFinding `json:"findings,omitempty"`
+	Findings []LintCacheFinding
 }
 
 // LintCacheFinding is one finding, flattened.
@@ -182,15 +184,56 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 
 // lintCacheVersion is bumped whenever the format's meaning changes.
 //
-// 3: JSON, with each entry's applied rules, listening rules and node count. Versions 1 and 2 were a
-// binary layout of offsets into an interned blob; adding three fields to it was where its own "an
-// encoder forgot a field" bug had shipped four times, so it was replaced rather than extended.
-const lintCacheVersion = 3
+// 4: rule lists are stored once and referenced by index, and hashes are hex. Version 3 wrote each
+// entry's applied and listening rules out in full; on ahra 3,605 entries shared 4 distinct rule lists
+// and 24 listening lists, and the file was 53 MB and 113ms to decode, a tenth of what the cache saves.
+// Versions 1 and 2 were a binary layout of offsets into an interned blob, replaced because adding
+// fields to it was where its "an encoder forgot a field" bug had shipped four times.
+const lintCacheVersion = 4
+
+// lintCacheWire is the format on disk. It is kept apart from LintCache so the walk's view of an entry
+// stays plain slices, and so the round-trip test, which compares LintCache's fields, proves this
+// encoding carries every one of them.
+type lintCacheWire struct {
+	Version int                  `json:"version"`
+	Key     string               `json:"key"`
+	Lists   [][]string           `json:"lists"`
+	Entries []lintCacheWireEntry `json:"entries"`
+}
+
+type lintCacheWireEntry struct {
+	Path         string             `json:"path"`
+	ContentHash  string             `json:"contentHash"`
+	Rules        int                `json:"rules"`
+	Listening    int                `json:"listening"`
+	VisitedNodes int                `json:"visitedNodes"`
+	Findings     []LintCacheFinding `json:"findings,omitempty"`
+}
 
 // Encode writes the cache.
 func (c *LintCache) Encode() []byte {
-	c.Version = lintCacheVersion
-	encoded, err := json.Marshal(c)
+	wire := lintCacheWire{Version: lintCacheVersion, Key: hex.EncodeToString(c.Key[:]), Lists: [][]string{}}
+	positions := map[string]int{}
+	intern := func(list []string) int {
+		joined := strings.Join(list, "\x00")
+		if position, seen := positions[joined]; seen {
+			return position
+		}
+		positions[joined] = len(wire.Lists)
+		wire.Lists = append(wire.Lists, append([]string{}, list...))
+		return len(wire.Lists) - 1
+	}
+	for _, entry := range c.Entries {
+		wire.Entries = append(wire.Entries, lintCacheWireEntry{
+			Path:         entry.Path,
+			ContentHash:  hex.EncodeToString(entry.ContentHash[:]),
+			Rules:        intern(entry.Rules),
+			Listening:    intern(entry.Listening),
+			VisitedNodes: entry.VisitedNodes,
+			Findings:     entry.Findings,
+		})
+	}
+	encoded, err := json.Marshal(wire)
 	if err != nil {
 		// Every field is a plain value, so this cannot fail; if it ever does, an empty artifact
 		// decodes as unreadable, which is a miss.
@@ -204,16 +247,53 @@ func (c *LintCache) Encode() []byte {
 var ErrLintCacheUnreadable = errors.New("lint cache is not readable by this build")
 
 // DecodeLintCache reads an artifact written by Encode. Anything else, including a valid artifact of
-// another version, is ErrLintCacheUnreadable.
+// another version, a hash of the wrong length or a list index out of range, is ErrLintCacheUnreadable:
+// an index trusted past its table would hand an entry another file's rule list.
 func DecodeLintCache(buffer []byte) (*LintCache, error) {
-	cache := &LintCache{}
-	if err := json.Unmarshal(buffer, cache); err != nil {
+	var wire lintCacheWire
+	if err := json.Unmarshal(buffer, &wire); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrLintCacheUnreadable, err)
 	}
-	if cache.Version != lintCacheVersion {
-		return nil, fmt.Errorf("%w: format version %d, this build reads %d", ErrLintCacheUnreadable, cache.Version, lintCacheVersion)
+	if wire.Version != lintCacheVersion {
+		return nil, fmt.Errorf("%w: format version %d, this build reads %d", ErrLintCacheUnreadable, wire.Version, lintCacheVersion)
+	}
+	cache := &LintCache{Version: wire.Version, Entries: make([]LintCacheEntry, 0, len(wire.Entries))}
+	if err := decodeHash(wire.Key, &cache.Key); err != nil {
+		return nil, fmt.Errorf("%w: key: %v", ErrLintCacheUnreadable, err)
+	}
+	list := func(index int) ([]string, error) {
+		if index < 0 || index >= len(wire.Lists) {
+			return nil, fmt.Errorf("list %d of %d", index, len(wire.Lists))
+		}
+		return wire.Lists[index], nil
+	}
+	for position, stored := range wire.Entries {
+		entry := LintCacheEntry{Path: stored.Path, VisitedNodes: stored.VisitedNodes, Findings: stored.Findings}
+		if err := decodeHash(stored.ContentHash, &entry.ContentHash); err != nil {
+			return nil, fmt.Errorf("%w: entry %d: %v", ErrLintCacheUnreadable, position, err)
+		}
+		var err error
+		if entry.Rules, err = list(stored.Rules); err != nil {
+			return nil, fmt.Errorf("%w: entry %d rules: %v", ErrLintCacheUnreadable, position, err)
+		}
+		if entry.Listening, err = list(stored.Listening); err != nil {
+			return nil, fmt.Errorf("%w: entry %d listening: %v", ErrLintCacheUnreadable, position, err)
+		}
+		cache.Entries = append(cache.Entries, entry)
 	}
 	return cache, nil
+}
+
+func decodeHash(text string, into *[sha256.Size]byte) error {
+	decoded, err := hex.DecodeString(text)
+	if err != nil {
+		return err
+	}
+	if len(decoded) != sha256.Size {
+		return fmt.Errorf("%d bytes, want %d", len(decoded), sha256.Size)
+	}
+	copy(into[:], decoded)
+	return nil
 }
 
 // Lookup returns a file's cached entry, and whether the cache had a usable answer.

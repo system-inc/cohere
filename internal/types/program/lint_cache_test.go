@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -141,7 +142,9 @@ func TestLintCacheRejectsBadArtifacts(t *testing.T) {
 		{"empty", nil},
 		{"shorter than the header", valid[:10]},
 		{"truncated mid-record", valid[:len(valid)/2]},
-		{"a different format version", []byte(strings.Replace(string(valid), `"version":3`, `"version":2`, 1))},
+		// Whatever the current version is, not a number someone has to remember: this case once wrote
+		// version 3 to version 2 and went vacuous the moment the format became version 4.
+		{"a different format version", regexp.MustCompile(`"version":\d+`).ReplaceAll(valid, []byte(`"version":0`))},
 		{"trailing garbage", append(append([]byte{}, valid...), 0, 0, 0, 0)},
 	}
 

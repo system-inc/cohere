@@ -79,11 +79,11 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	git("config", "user.name", "fixture")
 	commit("initial")
 
-	// run launches the binary bare, which is the only shape the run cache serves. cached false is the
-	// cold truth every cached result is held against.
-	run := func(cached bool) (string, int) {
+	// run launches the binary bare unless arguments are given; bare and `--no-fix` are the shapes the
+	// run cache serves. cached false is the cold truth every cached result is held against.
+	run := func(cached bool, arguments ...string) (string, int) {
 		t.Helper()
-		command := exec.Command(binary)
+		command := exec.Command(binary, arguments...)
 		command.Dir = root
 		environment := []string{"HOME=" + home}
 		for _, variable := range os.Environ() {
@@ -107,7 +107,12 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	}
 
 	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs)\b`)
-	normalized := func(output string) string { return durations.ReplaceAllString(output, "T") }
+	// The findings cache's clause says how much of the verdict was remembered; a cold run never has it,
+	// so it comes off before a comparison and is required or forbidden separately per scenario.
+	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache`)
+	normalized := func(output string) string {
+		return layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), "")
+	}
 	isReplay := func(output string) bool { return strings.HasPrefix(output, "cached: ") }
 	keepLines := func(output string, drop ...string) string {
 		kept := []string{}
@@ -146,46 +151,50 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		}
 	}
 
+	// layerTwo says whether the run after the change should serve unchanged files from the findings
+	// cache. A change to the lint config or the tsconfig changes the cache's key, so nothing may be
+	// replayed; any other change leaves the untouched files replayable.
 	scenarios := []struct {
-		name    string
-		prepare func()
-		change  func()
-		undo    func()
+		name     string
+		layerTwo bool
+		prepare  func()
+		change   func()
+		undo     func()
 	}{
 		// Type errors rather than lint findings: a finding with a fixer is rewritten by the run that
 		// sees it, which is the fix-run case below and a different property.
-		{"a source file edited to add a finding", nil,
+		{"a source file edited to add a finding", true, nil,
 			func() { write("source/a.ts", "export const a: number = \"x\";\n") },
 			func() { write("source/a.ts", "export const a: number = 1;\n") }},
-		{"a file added at the top level", nil,
+		{"a file added at the top level", true, nil,
 			func() { write("source/z.ts", "export const z: number = \"x\";\n") },
 			func() { remove("source/z.ts") }},
 		// The case the design first missed: a file added one directory down moves only that
 		// directory's mtime.
-		{"a file added in a nested directory", nil,
+		{"a file added in a nested directory", true, nil,
 			func() { write("source/nested/y.ts", "export const y: number = \"x\";\n") },
 			func() { remove("source/nested/y.ts") }},
-		{"a file deleted", nil,
+		{"a file deleted", true, nil,
 			func() { remove("source/nested/b.ts") },
 			func() { write("source/nested/b.ts", "import { a } from \"../a\";\nexport const b = a + 1;\n") }},
-		{"the lint config changed", nil,
+		{"the lint config changed", false, nil,
 			func() {
 				write("CohereSettings.json", `{"rules":{"no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
 			},
 			func() { write("CohereSettings.json", `{"rules":{"no-debugger":"error","no-var":"error"}}`) }},
-		{"the tsconfig changed", nil,
+		{"the tsconfig changed", false, nil,
 			func() {
 				write("tsconfig.json", `{"compilerOptions":{"strict":false,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
 			},
 			func() {
 				write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
 			}},
-		{"package.json edited in place", nil,
+		{"package.json edited in place", true, nil,
 			func() { write("package.json", `{"name":"fixture","private":true,"type":"commonjs"}`) },
 			func() { write("package.json", `{"name":"fixture","private":true,"type":"module"}`) }},
 		// node_modules is ignored, so git never mentions it and the scope fact cannot see this. Only
 		// the input recorder can: the build read this declaration, so its signature is an input.
-		{"a dependency's declaration changed",
+		{"a dependency's declaration changed", true,
 			func() {
 				write("node_modules/dep/package.json", `{"name":"dep","types":"index.d.ts"}`)
 				write("node_modules/dep/index.d.ts", "export declare const d: number;\n")
@@ -194,14 +203,14 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			func() { write("node_modules/dep/index.d.ts", "export declare const d: string;\n") },
 			func() { remove("source/u.ts"); remove("node_modules") }},
 		// A commit makes a changed file unchanged and moves no file's mtime: only the scope fact sees it.
-		{"an uncommitted change committed",
+		{"an uncommitted change committed", true,
 			func() { write("source/a.ts", "export const a: number = 2;\n") },
 			func() { commit("commit the change") },
 			func() { write("source/a.ts", "export const a: number = 1;\n"); commit("restore") }},
 		// docs exists and is tracked, and the build reads nothing in it, so no watched directory moves:
 		// only the scope fact sees a file added here. Created as a new directory instead, it would move
 		// the project root, which is watched, and the case would pass with the fact switched off.
-		{"an untracked file in a directory the build never reads", nil,
+		{"an untracked file in a directory the build never reads", true, nil,
 			func() { write("docs/notes.md", "notes\n") },
 			func() { remove("docs/notes.md") }},
 	}
@@ -219,6 +228,17 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			cold, coldExit := run(false)
 			if isReplay(afterChange) {
 				t.Fatalf("the change was not noticed: the recorded run was replayed as current:\n%s", afterChange)
+			}
+			// The clause rides on the lint line, and a run whose types bail prints no lint line at all, as a
+			// cold run does not either: the walk still replayed, but no lint verdict is reported to be
+			// remembered. So it is required only where a lint line was printed.
+			replayedAny := layerTwoClause.MatchString(afterChange)
+			printedLint := regexp.MustCompile(`(?m)^lint: `).MatchString(afterChange)
+			if scenario.layerTwo && printedLint && !replayedAny {
+				t.Errorf("the run after the change served nothing from the findings cache, though its other files were unchanged:\n%s", afterChange)
+			}
+			if !scenario.layerTwo && replayedAny {
+				t.Fatalf("the findings cache served files after a change to its key:\n%s", afterChange)
 			}
 			if normalized(afterChange) != normalized(cold) || afterChangeExit != coldExit {
 				t.Fatalf("the run after the change differs from a cold run (exit %d against %d):\n--- after the change\n%s\n--- cold\n%s",
@@ -258,6 +278,28 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		}
 		if normalized(next) != normalized(cold) {
 			t.Fatalf("the run after the fix differs from a cold run:\n--- next\n%s\n--- cold\n%s", next, cold)
+		}
+	})
+
+	// `--no-fix` is cached on its own key: it records and replays, and it never replays a bare run's
+	// verdict or hands its own to one. The two print different reports, since `--no-fix` reports what a
+	// writing run would rewrite, so either one replayed as the other would be a wrong report.
+	t.Run("--no-fix is cached apart from a bare run", func(t *testing.T) {
+		establishHit()
+		if output, _ := run(true, "--no-fix"); isReplay(output) {
+			t.Fatalf("the first --no-fix run replayed, so it was served the bare run's recording:\n%s", output)
+		}
+		replayed, replayedExit := run(true, "--no-fix")
+		if !isReplay(replayed) {
+			t.Fatalf("an unchanged --no-fix run did not replay its own recording:\n%s", replayed)
+		}
+		cold, coldExit := run(false, "--no-fix")
+		if replayBody(replayed) != verdict(cold) || replayedExit != coldExit {
+			t.Fatalf("the --no-fix replay is not the cold --no-fix verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
+				replayedExit, coldExit, replayBody(replayed), verdict(cold))
+		}
+		if bare, _ := run(true); !isReplay(bare) {
+			t.Fatalf("the bare run lost its own recording to the --no-fix one:\n%s", bare)
 		}
 	})
 }
