@@ -264,10 +264,13 @@ func (scanner *superScanner) scanStatements(node *ast.Node) bool {
 			}
 		}
 
-		// An absent else is an arm that did not call, which is why `if (foo) { super(); }` leaves
-		// the state false and `this.a()` after it reports.
-		scanner.superCalled = thenScanner.superCalled &&
-			statement.ElseStatement != nil && elseScanner.superCalled
+		// An absent else is an arm that runs nothing, so it keeps the entry state: `if (foo) {
+		// super(); }` entered without a call leaves the state false and `this.a()` after it
+		// reports, while an `if` entered after `super()` leaves it true. This read `then && else !=
+		// nil && else` once, which reset the state to false after every else-less `if` whatever
+		// held on entry, so a second such `if` after `super()` reported its `this`: 9 false findings
+		// on api-phi-health (#7t7c7g7).
+		scanner.superCalled = thenScanner.superCalled && elseScanner.superCalled
 		return false
 
 	case ast.KindTryStatement:

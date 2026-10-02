@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -541,6 +542,40 @@ func TestNoThisBeforeSuperStaysSilentOnCasesUpstreamOmits(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			rule_testing.ExpectClean(t,
 				rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText))
+		})
+	}
+}
+
+// TestNoThisBeforeSuperKeepsTheCallAcrossElselessIfs holds #7t7c7g7: an `if` with no `else` keeps
+// the state it was entered with. It reset the state to "not called" after every such `if`, so a
+// constructor calling `super()` first and then assigning `this` in two or more sequential `if` blocks
+// reported: BaseError.ts:174 and eight FormComponentData constructors in api-phi-health. The
+// reporter's repro at one, two and six blocks stays silent; the nearest real violations still report.
+func TestNoThisBeforeSuperKeepsTheCallAcrossElselessIfs(t *testing.T) {
+	t.Parallel()
+
+	constructor := func(blocks int) string {
+		source := "class A extends B { constructor(flag) { super();"
+		for index := 0; index < blocks; index++ {
+			source += " if (flag) { this.name = 'n'; }"
+		}
+		return source + " } }"
+	}
+	for _, blocks := range []int{1, 2, 6} {
+		t.Run(fmt.Sprintf("super first, then %d else-less ifs", blocks), func(t *testing.T) {
+			rule_testing.ExpectClean(t, rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, constructor(blocks)))
+		})
+	}
+
+	reporting := []struct{ name, sourceText string }{
+		// `this` inside the second if, with super() only after both.
+		{"this in the second if, before super", "class A extends B { constructor(flag) { if (flag) { this.a = 1; } if (flag) { this.b = 2; } super(); } }"},
+		// super() only in an else-less if, so the second if's this may run without it.
+		{"super in an else-less if, this in the next", "class A extends B { constructor(flag) { if (flag) { super(); } if (flag) { this.b = 2; } } }"},
+	}
+	for _, testCase := range reporting {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText), "thisBeforeSuper")
 		})
 	}
 }
