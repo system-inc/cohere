@@ -4,8 +4,7 @@ import (
 	"go/ast"
 	goparser "go/parser"
 	"go/token"
-	"path/filepath"
-	"runtime"
+	"os"
 	"sort"
 	"testing"
 )
@@ -245,13 +244,17 @@ func typeSwitchCases(t *testing.T, fileName, functionName string) map[string]boo
 	return cases
 }
 
+// forEachPackageFile parses this package's own source.
+//
+// Located by the working directory, which `go test` sets to the package's directory under any flags.
+// It was runtime.Caller, whose path is the import path under -trimpath, so the scan opened a directory
+// that does not exist and every test built on it failed on a machine that builds with -trimpath.
 func forEachPackageFile(t *testing.T, visit func(*ast.File)) {
 	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot locate the package source")
+	directory, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("cannot locate the package source: %v", err)
 	}
-	directory := filepath.Dir(thisFile)
 
 	fileSet := token.NewFileSet()
 	packages, err := goparser.ParseDir(fileSet, directory, nil, 0)
