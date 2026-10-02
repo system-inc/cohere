@@ -44,6 +44,10 @@ struct RuleMapping: Sendable {
         RuleMapping(incumbent: .swiftLint, incumbentRule: "file_name", rules: ["cohere-swift/file-named-for-type"], comparison: .file),
         RuleMapping(incumbent: .swiftFormat, incumbentRule: "AlwaysUseLowerCamelCase", rules: ["cohere-swift/require-lower-camel-case"]),
         RuleMapping(incumbent: .swiftLint, incumbentRule: "unowned_variable_capture", rules: ["cohere-swift/no-unowned"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "private_over_fileprivate", rules: ["cohere-swift/private-over-fileprivate"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "duplicate_imports", rules: ["cohere-swift/duplicate-imports"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "duplicated_key_in_dictionary_literal", rules: ["cohere-swift/duplicated-dictionary-key"]),
+        RuleMapping(incumbent: .swiftLint, incumbentRule: "identical_operands", rules: ["cohere-swift/identical-operands"]),
         RuleMapping(incumbent: .swiftFormat, incumbentRule: "NoLeadingUnderscores", rules: ["cohere-swift/no-leading-underscores"]),
     ]
 

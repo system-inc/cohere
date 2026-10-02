@@ -23,6 +23,10 @@ public enum RuleRegistry {
         NoTodoComment(),
         NoAbbreviatedIdentifier(vocabulary: vocabulary),
         NoUnowned(),
+        PrivateOverFileprivate(),
+        DuplicateImports(),
+        DuplicatedDictionaryKey(),
+        IdenticalOperands(),
         SwiftFormatRule.requireLowerCamelCase,
         SwiftFormatRule.noLeadingUnderscores,
     ] }
