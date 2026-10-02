@@ -29,7 +29,8 @@ import (
 var allowedUppercaseTokens = map[string]bool{
 	"AAB": true, "AAC": true, "ACH": true, "ACID": true, "AES": true, "AI": true, "AKA": true, "ANN": true,
 	"ANSI": true, "AOV": true, "API": true, "APK": true, "APNS": true, "ARIA": true, "ARN": true,
-	"ARR": true, "ASAP": true, "ASCII": true, "ASIN": true, "ASN": true, "AST": true, "AVI": true,
+	"ARP": true, "ARR": true, "ASAP": true, "ASCII": true, "ASIN": true, "ASN": true,
+	"AST": true, "AVI": true,
 	"AVIF": true, "AWS": true, "B2B": true, "BCP": true, "BEL": true, "BEM": true, "BOM": true, "BTC": true,
 	// The six filename and environment tokens below arrived from the TypeScript original after this
 	// port was written. They are separated out because they are the one group here that is not an
@@ -42,7 +43,8 @@ var allowedUppercaseTokens = map[string]bool{
 	// system entries already pass; the home directory, shell and terminal variables are deliberately
 	// absent because those are read for their value instead of named as a thing.
 	"AGENTS": true, "CHANGELOG": true, "CLAUDE": true, "LICENSE": true, "PATH": true, "README": true,
-	"CAC": true, "CAPI": true, "CCPA": true, "CD": true, "CDN": true, "CDT": true, "CFA": true, "CFO": true,
+	"CAC": true, "CAF": true, "CAPI": true, "CCPA": true, "CD": true, "CDATA": true, "CDN": true,
+	"CDT": true, "CFA": true, "CFO": true,
 	"CGI": true, "CHIPS": true, "CI": true, "CJS": true, "CLI": true, "CMYK": true, "COA": true,
 	"COGS": true, "CORS": true, "CPA": true, "CPM": true, "CPU": true, "CRUD": true, "CSS": true,
 	"CST": true, "CSV": true, "CTA": true, "CTE": true, "CTR": true, "CUSIP": true, "DB": true, "DEL": true,
@@ -50,8 +52,9 @@ var allowedUppercaseTokens = map[string]bool{
 	"DSHEA": true, "DTO": true, "EBML": true, "EBU": true, "ECDH": true, "ECDSA": true, "ECE": true,
 	"ECMA": true, "EDT": true, "EIN": true, "EKG": true, "ENV": true, "EOD": true, "EOF": true, "EOL": true,
 	"ESC": true, "ESM": true, "EST": true, "ETA": true, "ETH": true, "EXIF": true, "FAQ": true,
-	"FBAN": true, "FCM": true, "FDA": true, "FFE": true, "FICA": true, "FIFO": true, "FIXME": true,
-	"FK": true, "FSA": true, "FSI": true, "FTC": true, "FTP": true, "FYI": true, "GA4": true, "GAQL": true,
+	"FBAN": true, "FCM": true, "FDA": true, "FFE": true, "FHIR": true, "FICA": true, "FIFO": true,
+	"FIXME": true, "FK": true,
+	"FSA": true, "FSI": true, "FTC": true, "FTP": true, "FYI": true, "GA4": true, "GAQL": true,
 	"GCLID": true, "GDPR": true, "GIF": true, "GIT": true, "GPU": true, "GUI": true, "GUID": true,
 	"HAST": true, "HEIC": true, "HEIF": true, "HEVC": true, "HEX": true, "HIPAA": true, "HMAC": true,
 	"HSA": true, "HSLA": true, "HTML": true, "HTTP": true, "HTTPS": true, "IAM": true, "IANA": true,
@@ -73,7 +76,8 @@ var allowedUppercaseTokens = map[string]bool{
 	"SGR": true, "SHA": true, "SID": true, "SKU": true, "SLA": true, "SNS": true, "SOI": true, "SPA": true,
 	"SPKI": true, "SQL": true, "SRE": true, "SSD": true, "SSE": true, "SSH": true, "SSL": true, "SSN": true,
 	"SSO": true, "STS": true, "SVG": true, "TIFF": true, "TL": true, "TLS": true, "TODO": true,
-	"TOML": true, "TS": true, "TSX": true, "TTL": true, "TTY": true, "UDID": true, "UGC": true, "UI": true,
+	"TOML": true, "TS": true, "TSX": true, "TTL": true, "TTY": true, "TUI": true, "UDID": true,
+	"UGC": true, "UI": true,
 	"UPC": true, "UPS": true, "URI": true, "URL": true, "URN": true, "US": true, "USPS": true, "UTC": true,
 	"UTF": true, "UTM": true, "UUID": true, "UX": true, "VINT": true, "WAL": true, "WASM": true,
 	"WCAG": true, "WEBM": true, "WEBP": true, "WEBVTT": true, "WIP": true, "XML": true, "YAML": true,
@@ -151,6 +155,8 @@ var (
 	// Quoted strings, for the same reason backticks are masked: a quote marks the text inside it as
 	// a literal rather than as the writer's voice. Prose about strings needs to show them, and a
 	// sentence discussing "ORDER STATUS" is about a value, not shouting it.
+	//
+	// One line at a time here; a pair that wraps onto the next line is maskWrappedDoubleQuotes's.
 	doubleQuoted = regexp.MustCompile(`"[^"\n]*"`)
 
 	// Single-quoted tokens, deliberately narrower than the double-quote rule, because an apostrophe
@@ -158,6 +164,15 @@ var (
 	// would start at a possessive and swallow the rest of the sentence, blinding the rule to
 	// whatever followed. So only a pair that looks like a token is masked: no spaces inside.
 	singleQuotedToken = regexp.MustCompile(`'[A-Za-z0-9_.\-/]+'`)
+
+	// A single-quoted phrase in capitals, such as 'RENAME COLUMN' or 'ON CONFLICT DO NOTHING'. The
+	// token pattern above stops at the first space, so before this a quoted keyword phrase was read
+	// as shouting even though the writer had quoted it, which is exactly the repair the rule asks for.
+	//
+	// No lowercase letter is allowed inside, and that is what keeps it from repeating the apostrophe
+	// failure: a possessive or a contraction is followed by lowercase prose before any closing quote,
+	// so it can never form a match. The boundary half lives in maskSingleQuotedCapitalPhrases.
+	singleQuotedCapitalPhrase = regexp.MustCompile(`'[A-Z0-9_][A-Z0-9_ .,:=\-/]*[A-Z0-9_]'`)
 
 	notNewline  = regexp.MustCompile(`[^\n]`)
 	jsDocGutter = regexp.MustCompile(`^\s*\*?\s?`)
@@ -177,7 +192,9 @@ func maskCodeAndCommands(text string) string {
 	masked := blankKeepingNewlines(fencedBlock, text)
 	masked = blankKeepingNewlines(inlineBackticks, masked)
 	masked = blankAll(doubleQuoted, masked)
+	masked = maskWrappedDoubleQuotes(masked)
 	masked = blankAll(singleQuotedToken, masked)
+	masked = maskSingleQuotedCapitalPhrases(masked)
 	masked = maskJsDocExamples(masked)
 	masked = maskCommandLines(masked)
 	return masked
@@ -196,6 +213,84 @@ func blankAll(pattern *regexp.Regexp, text string) string {
 	return pattern.ReplaceAllStringFunc(text, func(match string) string {
 		return strings.Repeat(" ", len(match))
 	})
+}
+
+// maskWrappedDoubleQuotes blanks a double-quoted phrase that a block comment wrapped onto the next
+// line, which the one-line pattern cannot see.
+//
+// A comment reflows like prose, so `"the caller's job and you must NOT"` ends up as its opening half
+// on one line and its closing half behind the next line's gutter (ahra's Shouting.ts did exactly
+// this), and the capitals inside a quote the writer closed read as shouting. The backtick mask
+// already spans a wrap for the same reason.
+//
+// It runs after the one-line pass, which pairs every two quotes sharing a line, so each line has at
+// most one quote left. Only those leftovers pair, and only across one wrap: the leftover on a line
+// with the leftover on the very next line. Pairing quotes freely across lines would let a stray
+// inch mark (`a 5" board`) open a span that eats a later quote's opening, leaving the phrase that
+// quote protected unmasked; confined to leftovers on adjacent lines, the pass can only blank text,
+// never unblank what the one-line pass already masked.
+func maskWrappedDoubleQuotes(text string) string {
+	if !strings.Contains(text, "\n") || strings.Count(text, `"`) < 2 {
+		return text
+	}
+
+	lines := strings.Split(text, "\n")
+	for index := 0; index+1 < len(lines); index++ {
+		opening := strings.IndexByte(lines[index], '"')
+		if opening < 0 {
+			continue
+		}
+		closing := strings.IndexByte(lines[index+1], '"')
+		if closing < 0 {
+			continue
+		}
+		lines[index] = lines[index][:opening] + strings.Repeat(" ", len(lines[index])-opening)
+		// The closing quote is blanked with the rest, so it cannot also open a pair with the line
+		// after it.
+		lines[index+1] = strings.Repeat(" ", closing+1) + lines[index+1][closing+1:]
+	}
+	return strings.Join(lines, "\n")
+}
+
+// maskSingleQuotedCapitalPhrases blanks a capital phrase the writer set in single quotes.
+//
+// A quote is only a quote at a word boundary: the opening one must not follow a letter or a digit,
+// and the closing one must not be followed by one. Without that, the plural possessive in "the
+// users' 'NOT NULL'" could open a pair, and a quote glued to a suffix ('RENAME COLUMN'd) would mask
+// a phrase the writer never closed. RE2 has no lookaround, so the boundary is checked on the match
+// indices rather than in the pattern.
+func maskSingleQuotedCapitalPhrases(text string) string {
+	// Two quotes and a space between them are the least a phrase can be, and almost no comment holds
+	// a quote at all, so the common case pays one byte scan.
+	if strings.Count(text, "'") < 2 {
+		return text
+	}
+
+	matches := singleQuotedCapitalPhrase.FindAllStringIndex(text, -1)
+	if matches == nil {
+		return text
+	}
+
+	masked := []byte(text)
+	for _, match := range matches {
+		start, end := match[0], match[1]
+		if start > 0 && isAsciiLetterOrDigit(text[start-1]) {
+			continue
+		}
+		if end < len(text) && isAsciiLetterOrDigit(text[end]) {
+			continue
+		}
+		for index := start; index < end; index++ {
+			masked[index] = ' '
+		}
+	}
+	return string(masked)
+}
+
+// isAsciiLetterOrDigit reports whether a byte is a word character a quote could be glued to.
+func isAsciiLetterOrDigit(character byte) bool {
+	return (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+		(character >= '0' && character <= '9')
 }
 
 // maskJsDocExamples blanks the lines under an @example tag, which are code whatever they look like.
