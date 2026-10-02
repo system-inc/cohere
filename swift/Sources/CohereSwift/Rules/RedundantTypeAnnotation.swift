@@ -1,3 +1,4 @@
+import Foundation
 import SwiftSyntax
 
 /*
@@ -36,20 +37,46 @@ import SwiftSyntax
  front of the initializer change no type and are looked through, as is `try?` in an optional binding, which
  unwraps the optional it adds; SwiftLint reads none of them, and this is a difference in the direction of finding more of the same thing.
 
- Of the members SwiftLint reads off the type, this rule flags only an enum case of the annotation's own enum
- (`Direction.up`, `Direction.moved(by: 1)`), whose value is always that enum. The rest are misses, accepted: the
- index says which member a name is, not what type it has, and a static member of a class can hold a subclass, a
- protocol extension's `Self` member (`Int.random(in:)`) names no type at all, and a chain's type is its last
- member's, whether it hangs off the type or off an initializer (`URL(fileURLWithPath: path).standardized`). Misses too: an Objective-C initializer (`NSView()`, and the initializers of our own `@objc`
- classes), whose symbol does not say whether it can return nil, flagged only when force unwrapped or bound; a
- Swift initializer that takes or names an optional anywhere (`DispatchQueue(label:)`, whose `target` is one),
- which its symbol cannot tell from a failable one; and a generic spelled differently on the two sides
- (`Set<Int>` against `Set<Swift.Int>`).
+ A member read from the type, or a chain hanging off the type or off an initializer of it, is SwiftLint's too
+ (`CharacterSet.alphanumerics`, `Int.random(in:)`, `Direction.up`, `A.b.c.d`, `A.f().b`,
+ `URL(fileURLWithPath: path).deletingLastPathComponent()`): SwiftLint flags it when any link, read from the
+ left through member reads, calls and generic arguments, spells the annotation. This rule asks the same of the
+ chain, a link that names the annotation's type, and then asks what SwiftLint does not, the chain's type, which
+ is its last member's. An enum case of the annotation's own enum (`Direction.up`, `Direction.moved(by: 1)`) is
+ always that enum. Any other last member is read from its declaration, demangled into the compiler's own words
+ by the toolchain's demangler (`Foundation.URL.deletingLastPathComponent() -> Foundation.URL`), with the
+ signature reading `no-discarded-try-optional` uses, and its result must be the annotation's own declaration as
+ the demangler prints it, or `Self` on it. `Self` is printed two ways: `Self` for a class's dynamic `Self`, and
+ `A` for a protocol's (`static (extension in Swift):Swift.FixedWidthInteger.random(in: Swift.ClosedRange<A>) -> A`),
+ where `A` is `Self` only because the member is a protocol's; on a type, `A` is the member's own generic
+ parameter (`static func decode<T>() -> T`), which the annotation chooses. So an `A` counts only when the
+ demangler confirms the member's context is a protocol, by printing a prefix of the member's symbol as both
+ that type and a protocol descriptor for it. `Self` is the type of the link the member is read from, so that link must be the
+ annotated type, named (`UInt64.random(in:)`) or shown to have it (`Circle().again()`). A static member of a
+ class that holds a subclass is read by its declared type, which is the type the binding takes without the
+ annotation (`static let shared: Base = Derived()` makes `Base.shared` a `Base`). An optional result counts
+ only where a force unwrap or an optional binding takes it unwrapped, so an implicitly unwrapped member
+ (`static var current: Session!`), whose annotation is what unwraps it, is never flagged. An annotation that is
+ a protocol is never read this way, since the demangler prints an existential as its protocol's bare name.
+
+ What SwiftLint stops at, this rule stops at: an optional chain, a force unwrap or a subscript inside the chain
+ (`A.b?.c`, `A.b!.c`, `A.b[0]`), parentheses, and a chain whose link spells another name, even one the
+ types could judge (`items.count`). Misses, accepted: a result spelled with generic arguments (`Set<A>`,
+ `Control.Box<A>`), an alias's member or a member returning an alias, which print a different declaration, `Self`
+ from a constrained protocol extension, whose context prints its constraints, a property of function type that
+ is called (`Circle.factory()`), a member read off the sugar (`[Int]().reversed()`), and an Objective-C member,
+ whose symbol does not demangle. Misses too: an Objective-C initializer (`NSView()`, and the initializers of
+ our own `@objc` classes), whose symbol does not say whether it can return nil, flagged only when force
+ unwrapped or bound; a Swift initializer that takes or names an optional anywhere (`DispatchQueue(label:)`,
+ whose `target` is one), which its symbol cannot tell from a failable one; and a generic spelled differently on
+ the two sides (`Set<Int>` against `Set<Swift.Int>`). A toolchain without its demangler leaves the members
+ other than enum cases unjudged.
 
  The one thing this rule trusts and does not check: that the annotation does not choose between two
- initializers of the same type, one failable and one not, that the same arguments fit. Only the non-failable one
- could bind to the annotation, and without it the failable one might win. No type we have read declares such a
- pair.
+ declarations of the same name that the same arguments fit, an initializer failable and not, or a member
+ returning the annotated type and another returning something else. Only the one that fits the annotation
+ could bind to it, and without it the other might win, or the call be ambiguous. No type we have read declares
+ such a pair.
 
  No sibling rule reads this shape.
  */
@@ -69,8 +96,10 @@ public struct RedundantTypeAnnotation: TypedFileRule {
     public func findings(in file: ParsedFile, symbols: FileSymbols) -> [FindingRecord] {
         let visitor = Visitor(viewMode: .sourceAccurate)
         visitor.walk(file.tree)
+        /* Loaded only when a binding needs it. A toolchain without the demangler leaves the members unjudged, a miss and never a finding. */
+        let demangler = visitor.found.isEmpty ? nil : try? SwiftDemangler.shared()
         return visitor.found.compactMap { candidate in
-            guard Self.isRedundant(candidate, in: file, symbols: symbols) else { return nil }
+            guard Self.isRedundant(candidate, in: file, symbols: symbols, demangler: demangler) else { return nil }
             return file.finding(
                 at: candidate.annotation,
                 rule: name,
@@ -87,7 +116,7 @@ public struct RedundantTypeAnnotation: TypedFileRule {
         var isOptionalBinding: Bool
     }
 
-    static func isRedundant(_ candidate: Candidate, in file: ParsedFile, symbols: FileSymbols) -> Bool {
+    static func isRedundant(_ candidate: Candidate, in file: ParsedFile, symbols: FileSymbols, demangler: SwiftDemangler?) -> Bool {
         var expression = candidate.initializer
         var isForced = false
         while true {
@@ -127,10 +156,145 @@ public struct RedundantTypeAnnotation: TypedFileRule {
         if let construction = Self.construction(expression), namesTheAnnotatedType(construction.type) {
             return Self.buildsWithoutNil(construction, in: file, symbols: symbols, mayReturnNil: mayReturnNil)
         }
-        if let enumCase = Self.enumCase(expression), namesTheAnnotatedType(enumCase.type), let resolvedCase = Self.reference(at: enumCase.member, in: file, symbols: symbols) {
-            return Self.isCase(resolvedCase.symbol, named: enumCase.member, of: annotationResolved.symbol)
+        if let enumCase = Self.enumCase(expression), namesTheAnnotatedType(enumCase.type), let resolvedCase = Self.reference(at: enumCase.member, in: file, symbols: symbols), Self.isCase(resolvedCase.symbol, named: enumCase.member, of: annotationResolved.symbol) {
+            return true
+        }
+
+        /*
+         A member or a chain, judged by its last member's result. The annotation must be a Swift type that is not a
+         protocol: the demangler prints a protocol descriptor only for a protocol's symbol.
+         */
+        guard let demangler, Self.isRooted(expression, namesTheAnnotatedType), let annotatedType = demangler.declaration(ofSymbol: annotationResolved.symbol), demangler.demangle("$s\(annotationResolved.symbol.dropFirst(2))Mp") == nil else {
+            return false
+        }
+        let chain = Chain(file: file, symbols: symbols, demangler: demangler, annotatedType: annotatedType, namesTheAnnotatedType: namesTheAnnotatedType)
+        return chain.hasAnnotatedType(expression, isUnwrapped: mayReturnNil)
+    }
+
+    /*
+     Whether a link of the chain, read from the left as SwiftLint reads it (through member reads, calls and
+     generic arguments, and nothing else), names the annotation's type: `URL` in `URL(fileURLWithPath: path).standardized`,
+     `UInt64` in `UInt64.random(in: range)`.
+     */
+    static func isRooted(_ expression: ExprSyntax, _ namesTheAnnotatedType: (ExprSyntax) -> Bool) -> Bool {
+        var link: ExprSyntax? = expression
+        while let current = link {
+            if namesTheAnnotatedType(current) {
+                return true
+            }
+            if let call = current.as(FunctionCallExprSyntax.self) {
+                link = call.calledExpression
+            } else if let member = current.as(MemberAccessExprSyntax.self) {
+                link = member.base
+            } else if let specialization = current.as(GenericSpecializationExprSyntax.self) {
+                link = specialization.expression
+            } else {
+                link = nil
+            }
         }
         return false
+    }
+
+    /* The type of a chain's links, read from each member's demangled declaration and compared with the annotated type as the demangler prints it (`Foundation.URL`). */
+    struct Chain {
+        let file: ParsedFile
+        let symbols: FileSymbols
+        let demangler: SwiftDemangler
+        let annotatedType: String
+        let namesTheAnnotatedType: (ExprSyntax) -> Bool
+
+        /*
+         Whether the expression's value has the annotated type: a construction of it, or a member whose result is
+         it, or is `Self` read from a link that is the type. Where the binding unwraps the value, an optional of it
+         counts too.
+         */
+        func hasAnnotatedType(_ expression: ExprSyntax, isUnwrapped: Bool) -> Bool {
+            if let construction = RedundantTypeAnnotation.construction(expression), namesTheAnnotatedType(construction.type) {
+                return true
+            }
+            guard let link = Self.link(expression), let member = RedundantTypeAnnotation.reference(at: link.member, in: file, symbols: symbols), let declaration = demangler.declaration(ofSymbol: member.symbol), let reading = Member(demangled: declaration, name: member.name, isCalled: link.isCalled) else {
+                return false
+            }
+            var result = reading.result
+            if isUnwrapped, result.hasSuffix("?") {
+                result.removeLast()
+            }
+            if result == annotatedType {
+                return true
+            }
+            let isSelf = result == "Self" || (result == "A" && isProtocol(reading.context, declaring: member.symbol))
+            return isSelf && (namesTheAnnotatedType(link.base) || hasAnnotatedType(link.base, isUnwrapped: false))
+        }
+
+        /* The last link: a member read from a base, `A.b`, or called, `A.f()`. Never `init`, which is a construction, nor an implicit member, which has no base. */
+        static func link(_ expression: ExprSyntax) -> (base: ExprSyntax, member: TokenSyntax, isCalled: Bool)? {
+            let call = expression.as(FunctionCallExprSyntax.self)
+            guard let access = (call?.calledExpression ?? expression).as(MemberAccessExprSyntax.self), let base = access.base, access.declName.argumentNames == nil, access.declName.baseName.tokenKind != .keyword(.`init`) else {
+                return nil
+            }
+            return (base, access.declName.baseName, call != nil)
+        }
+
+        /*
+         Whether a member's context is a protocol: some prefix of the member's symbol is the protocol's type, which
+         the demangler prints both as a type (`$sSzD`, `Swift.BinaryInteger`) and as a protocol descriptor (`$sSzMp`,
+         `protocol descriptor for Swift.BinaryInteger`), each naming the context exactly. Both, because each alone
+         is lenient: a protocol descriptor also accepts a bare name with no kind after it (`$s7Control6CircleMp` is
+         `protocol descriptor for Control.Circle`, found by this rule's own test), which is no type, and a struct's
+         type (`$s7Control6CircleVD`) is no protocol.
+         */
+        func isProtocol(_ context: String, declaring symbol: String) -> Bool {
+            guard symbol.hasPrefix("s:") else { return false }
+            let mangled = Array(symbol.dropFirst(2))
+            let descriptor = "protocol descriptor for \(context)"
+            return (1..<mangled.count).contains { end in
+                let prefix = String(mangled[..<end])
+                return demangler.demangle("$s\(prefix)D") == context && demangler.demangle("$s\(prefix)Mp") == descriptor
+            }
+        }
+    }
+
+    /*
+     A member's declaration as the demangler prints it, read for its context and its result: a function's result
+     after its arrow, read by `no-discarded-try-optional`'s signature, which checks the labels against the index's
+     name (`random(in:)`), or a property's type after its colon (`static Foundation.CharacterSet.alphanumerics :
+     Foundation.CharacterSet`). A call must be of a function and a read must be of a property: a called property
+     of function type, or a function read without a call, is not read.
+     */
+    struct Member {
+        let context: String
+        let result: String
+
+        init?(demangled: String, name: String, isCalled: Bool) {
+            let characters = Array(demangled)
+            guard let depths = NoDiscardedTryOptional.Signature.depths(characters) else { return nil }
+            let baseName = name.firstIndex(of: "(").map { String(name[..<$0]) } ?? name
+            guard isCalled == (baseName != name) else { return nil }
+            let needle = Array(".\(baseName)")
+            let followers: [Character] = isCalled ? ["(", "<"] : [" "]
+            let starts = characters.indices.filter { start in
+                let after = start + needle.count
+                return depths[start] == 0 && after < characters.count && Array(characters[start..<after]) == needle && followers.contains(characters[after])
+            }
+            guard starts.count == 1, let start = starts.first else { return nil }
+            if isCalled {
+                guard let signature = NoDiscardedTryOptional.Signature(demangled: demangled, name: name) else { return nil }
+                result = signature.result
+            } else {
+                let colon = Array(" : ")
+                let after = start + needle.count
+                guard after + colon.count < characters.count, Array(characters[after..<(after + colon.count)]) == colon else { return nil }
+                result = String(characters[(after + colon.count)...])
+            }
+            var context = Substring(String(characters[..<start]))
+            if context.hasPrefix("static ") {
+                context = context.dropFirst("static ".count)
+            }
+            if context.hasPrefix("(extension in "), let close = context.range(of: "):") {
+                context = context[close.upperBound...]
+            }
+            self.context = String(context)
+        }
     }
 
     /*

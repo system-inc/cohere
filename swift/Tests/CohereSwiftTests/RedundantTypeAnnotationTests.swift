@@ -8,8 +8,10 @@ import Testing
 /*
  `redundant-type-annotation` both ways. The unit cases parse a source string and hand the rule symbols built by
  position, as the index records them: every name in `types` or `members` resolves at every place it is written,
- and an initializer from `initializers` is recorded where a call builds its type (the type's name, the `init` of
+ a member under the name the index gives it (`random(in:)` for a function, from `memberNames`), and an
+ initializer from `initializers` is recorded where a call builds its type (the type's name, the `init` of
  `URL.init`, the bracket of `[Int]()`), keyed by the type's name or by `Array` and `Dictionary` for the sugar.
+ The members are real mangled names, which the rule reads through the toolchain's demangler.
  A type left out of `initializers` records none, as a literal the compiler coerces does. The triggering cases
  are SwiftLint's documented examples for `redundant_type_annotation` in its default configuration, each
  asserting its line and column at the annotation's colon; the non-triggering cases are SwiftLint's own and the
@@ -29,6 +31,9 @@ struct RedundantTypeAnnotationTests {
     static let characterSet = "s:10Foundation12CharacterSetV"
     static let alphanumerics = "s:10Foundation12CharacterSetV13alphanumericsACvpZ"
     static let random = "s:s17FixedWidthIntegerPsE6random2inxSnyxG_tFZ"
+    static let closedRandom = "s:s17FixedWidthIntegerPsE6random2inxSNyxG_tFZ"
+    static let deletingLastPathComponent = "s:10Foundation3URLV25deletingLastPathComponentACyF"
+    static let unsigned = "s:s6UInt64V"
     static let direction = "s:7Control9DirectionO"
     static let up = "s:7Control9DirectionO2upyA2CmF"
     static let moved = "s:7Control9DirectionO5movedyACSi_tcACmF"
@@ -45,9 +50,10 @@ struct RedundantTypeAnnotationTests {
     static let incumbentTypes = ["URL": url, "Int": integer, "Set": set, "CharacterSet": characterSet, "Direction": direction, "A": outer, "B": inner]
     static let incumbentInitializers = ["URL": urlInitializer, "Set": setInitializer, "Array": arrayInitializer, "B": innerInitializer]
     static let incumbentMembers = ["alphanumerics": alphanumerics, "random": random, "up": up, "moved": moved, "shared": shared]
+    static let incumbentMemberNames = ["random": "random(in:)", "moved": "moved(by:)", "deletingLastPathComponent": "deletingLastPathComponent()", "f": "f()"]
 
     /* The findings, as `line:column`, with the names resolved as the maps say. */
-    static func findings(_ source: String, types: [String: String] = incumbentTypes, initializers: [String: String] = incumbentInitializers, members: [String: String] = incumbentMembers) -> [String] {
+    static func findings(_ source: String, types: [String: String] = incumbentTypes, initializers: [String: String] = incumbentInitializers, members: [String: String] = incumbentMembers, memberNames: [String: String] = incumbentMemberNames) -> [String] {
         let url = URL(fileURLWithPath: "/fixture/Subject.swift")
         let file = ParsedFile(url: url, targetName: "Fixture", targetKind: "library", source: source, tree: Parser.parse(source: source), nodeCount: 0)
         var occurrences: [FileSymbols.Occurrence] = []
@@ -60,7 +66,7 @@ struct RedundantTypeAnnotationTests {
                 record(token, symbol, token.text)
             }
             if let symbol = members[token.text] {
-                record(token, symbol, token.text)
+                record(token, symbol, memberNames[token.text] ?? token.text)
                 record(token, symbol.replacingOccurrences(of: "vpZ", with: "vgZ"), "getter:\(token.text)")
                 occurrences[occurrences.count - 1].isImplicit = true
             }
@@ -159,19 +165,111 @@ struct RedundantTypeAnnotationTests {
     }
 
     /*
-     SwiftLint's member-read examples the index cannot judge: a static member of the type may hold any type
-     convertible to it, and a chain's type is its last member's. Misses, accepted.
+     SwiftLint's member-read examples, judged by the last member's demangled declaration: a static property of
+     the type, a protocol extension's `Self` read from the type, a chain whose last property is the type, and a
+     chain through a call.
      */
-    @Test func incumbentMemberReadExamplesAreMisses() {
+    @Test func incumbentMemberReadExamplesAreFound() {
+        let types = Self.incumbentTypes.merging(["C": "s:7Control1CV"]) { first, _ in first }
+        let staticChain = ["b": "s:7Control1AV1bAA1CVvpZ", "c": "s:7Control1CV1cAA1DVvp", "d": "s:7Control1DV1dAA1AVvp"]
+        let callChain = ["f": "s:7Control1AV1fAA1CVyFZ", "b": "s:7Control1CV1bAA1AVvp"]
+        #expect(Self.findings("let alphanumerics: CharacterSet = CharacterSet.alphanumerics\n") == ["1:18"])
+        #expect(Self.findings("var num: Int = Int.random(0..<10)\n") == ["1:8"])
+        #expect(Self.findings("let a: A = A.b.c.d\n", types: types, members: staticChain) == ["1:6"])
+        #expect(Self.findings("let a: A = A.f().b\n", types: types, members: callChain) == ["1:6"])
+        #expect(Self.findings("let shared: Direction = Direction.shared\n") == ["1:11"])
+    }
+
+    /* The two Presence found that SwiftLint finds: a chain off an initializer whose last member returns the type, and a `Self` member read from the type. */
+    @Test func aChainOffAnInitializerAndASelfMemberAreFound() {
         let source = """
-            let alphanumerics: CharacterSet = CharacterSet.alphanumerics
-            var num: Int = Int.random(0..<10)
-            let a: A = A.b.c.d
-            let a: A = A.f().b
-            let shared: Direction = Direction.shared
+            static let root: URL = URL(fileURLWithPath: path)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+            @Published var seed: UInt64 = UInt64.random(in: 1...9_999_999_999)
 
             """
-        #expect(Self.findings(source).isEmpty)
+        let types = Self.incumbentTypes.merging(["UInt64": Self.unsigned]) { first, _ in first }
+        let members = ["deletingLastPathComponent": Self.deletingLastPathComponent, "random": Self.closedRandom]
+        #expect(Self.findings(source, types: types, members: members) == ["1:16", "4:20"])
+    }
+
+    /*
+     A member whose result is another type, a subclass, the member's own generic parameter (which the annotation
+     chooses), a protocol extension's generic parameter, a generic result, a called property of function type, a
+     `Self` read from another type, and an annotation that is a protocol, which the demangler prints like its
+     existential.
+     */
+    @Test func membersOfAnotherTypeAreNotFound() {
+        let source = """
+            let other: Direction = Direction.other
+            let base: Base = Base.derived
+            let decoded: Circle = Circle.decode(Circle.self)
+            let inferred: Circle = Circle.make()
+            let box: Box<Int> = Box<Int>.empty()
+            let made: Circle = Circle.factory()
+            let fresh: Circle = Square.fresh()
+            let shape: Shape = Shape.standard
+            let subclass: Base = Derived.build()
+
+            """
+        let types = Self.incumbentTypes.merging(["Base": Self.base, "Derived": Self.derived, "Circle": "s:7Control6CircleV", "Square": "s:7Control6SquareV", "Box": "s:7Control3BoxV", "Shape": "s:7Control5ShapeP"]) { first, _ in first }
+        let members = [
+            "other": "s:7Control9DirectionO5otherAA4SideOvpZ",
+            "derived": "s:7Control4BaseC7derivedAA7DerivedCvpZ",
+            "decode": "s:7Control6CircleV6decodeyxxmlFZ",
+            "make": "s:7Control5ShapePAAE6decodeqd__ylFZ",
+            "empty": "s:7Control3BoxV5emptyACyxGyFZ",
+            "factory": "s:7Control6CircleV7factoryACycvpZ",
+            "fresh": "s:7Control5ShapePAAE5freshxyFZ",
+            "standard": "s:7Control5ShapePAAE8standardAaB_pvpZ",
+            "build": "s:7Control4BaseC5buildACXDyFZ",
+        ]
+        let names = ["decode": "decode(_:)", "make": "decode()", "empty": "empty()", "fresh": "fresh()", "build": "build()"]
+        #expect(Self.findings(source, types: types, members: members, memberNames: names).isEmpty)
+    }
+
+    /* `Self` both ways it prints: a class's dynamic `Self`, and a protocol's `A`, read from the type or from a value of it. */
+    @Test func selfMembersOfTheTypeAreFound() {
+        let source = """
+            let built: Base = Base.build()
+            let fresh: Circle = Circle.fresh()
+            let again: Circle = Circle().again()
+            let twice: Circle = Circle.fresh().again()
+
+            """
+        let types = Self.incumbentTypes.merging(["Base": Self.base, "Circle": "s:7Control6CircleV"]) { first, _ in first }
+        let initializers = Self.incumbentInitializers.merging(["Circle": "s:7Control6CircleVACycfc"]) { first, _ in first }
+        let members = ["build": "s:7Control4BaseC5buildACXDyFZ", "fresh": "s:7Control5ShapePAAE5freshxyFZ", "again": "s:7Control5ShapePAAE5againxyF"]
+        let names = ["build": "build()", "fresh": "fresh()", "again": "again()"]
+        #expect(Self.findings(source, types: types, initializers: initializers, members: members, memberNames: names) == ["1:10", "2:10", "3:10", "4:10"])
+    }
+
+    /* An optional result binds unwrapped only through a force unwrap or an optional binding; an implicitly unwrapped one needs its annotation. */
+    @Test func anOptionalResultIsFoundOnlyUnwrappedOrBound() {
+        let source = """
+            let maybe: Circle = Circle.maybe
+            let forced: Circle = Circle.maybe!
+            if let bound: Circle = Circle.maybe { return }
+
+            """
+        let types = Self.incumbentTypes.merging(["Circle": "s:7Control6CircleV"]) { first, _ in first }
+        #expect(Self.findings(source, types: types, members: ["maybe": "s:7Control6CircleV5maybeACSgvpZ"]) == ["2:11", "3:13"])
+    }
+
+    /* What SwiftLint stops at: a link that is an optional chain, a force unwrap, a subscript or parentheses, a chain off another name, and an implicit member. */
+    @Test func chainsSwiftLintStopsAtAreNotFound() {
+        let source = """
+            let chained: URL = URL(fileURLWithPath: path).optional?.deletingLastPathComponent()
+            let forced: URL = URL(fileURLWithPath: path).optional!.deletingLastPathComponent()
+            let indexed: URL = URL.list[0].deletingLastPathComponent()
+            let wrapped: URL = (URL(fileURLWithPath: path)).deletingLastPathComponent()
+            let other: URL = url.deletingLastPathComponent()
+            let implicit: URL = .init(fileURLWithPath: path).deletingLastPathComponent()
+
+            """
+        let members = ["deletingLastPathComponent": Self.deletingLastPathComponent, "optional": "s:10Foundation3URLV8optionalACSgvp"]
+        #expect(Self.findings(source, members: members).isEmpty)
     }
 
     /* SwiftLint's `URL(string: "")` example does not compile: the initializer is failable, so it binds only to an optional unless unwrapped. */
@@ -333,12 +431,11 @@ struct RedundantTypeAnnotationTests {
         #expect(Self.findings(source, types: types, members: members) == ["1:7", "2:10", "3:14", "4:12"])
     }
 
-    /* A member read from the type that is not one of its own cases: another enum's case, a nested type, a static member. */
+    /* A member read from the type that is not one of its own cases: another enum's case, a nested type. */
     @Test func membersThatAreNotTheEnumsCasesAreNotFound() {
         let source = """
             let other: Direction = Direction.left
             let nested: Direction = Direction.Inner
-            let shared: Direction = Direction.shared
 
             """
         let members = Self.incumbentMembers.merging(["left": "s:7Control4SideO4leftyA2CmF", "Inner": "s:7Control9DirectionO5InnerV"]) { first, _ in first }
@@ -384,13 +481,17 @@ struct RedundantTypeAnnotationTests {
 
     /*
      End to end on a real package, symbols from the index the build wrote: Foundation's `URL`, a struct of ours, an
-     enum case and a coerced literal are found, and a subclass, an `init!`, an optional annotation and an implicit
-     `.init` are not.
+     enum case, a coerced literal, a chain off an initializer, a `Self` member read from the type and a static
+     property declared as the type are found, and a subclass, an `init!`, an optional annotation, an implicit
+     `.init`, a static property declared as a subclass and a generic method's own parameter are not.
      */
     static let packageSource = """
         import Foundation
 
         class Base {
+            static var shared: Base { Derived() }
+            static var derived: Derived { Derived() }
+
             init() {}
         }
 
@@ -407,6 +508,10 @@ struct RedundantTypeAnnotationTests {
         enum Direction {
             case up
             case down
+
+            static func decode<T>(_ type: T.Type) -> T {
+                fatalError("not called")
+            }
         }
 
         func checks(path: String) -> [Any] {
@@ -418,7 +523,12 @@ struct RedundantTypeAnnotationTests {
             let optional: URL? = URL(string: path)
             let implicit: URL = .init(fileURLWithPath: path)
             let count: Int = Int(5)
-            return [url, base, same, lenient, direction, optional as Any, implicit, count]
+            let root: URL = URL(fileURLWithPath: path).deletingLastPathComponent().deletingLastPathComponent()
+            let seed: UInt64 = UInt64.random(in: 1...9_999)
+            let shared: Base = Base.shared
+            let derived: Base = Base.derived
+            let decoded: Direction = Direction.decode(Direction.self)
+            return [url, base, same, lenient, direction, optional as Any, implicit, count, root, seed, shared, derived, decoded]
         }
 
         """
@@ -442,6 +552,6 @@ struct RedundantTypeAnnotationTests {
         let found = candidates.flatMap { file in
             RedundantTypeAnnotation().findings(in: file, symbols: symbols.symbols[file.url.path] ?? FileSymbols([])).map { "\($0.line)" }
         }
-        #expect(found == ["23", "25", "27", "30"], "expected the URL, the struct of ours, the enum case and the coerced literal, and not the subclass, the init!, the optional or the implicit init: \(found)")
+        #expect(found == ["30", "32", "34", "37", "38", "39", "40"], "expected the URL, the struct of ours, the enum case, the coerced literal, the chain, the Self member and the static declared as the type, and not the subclass, the init!, the optional, the implicit init, the static declared as a subclass or the generic method: \(found)")
     }
 }
