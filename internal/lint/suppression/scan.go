@@ -26,12 +26,34 @@ type commentSpan struct {
 // read in one sitting.
 func scanComments(text string) []commentSpan {
 	comments := []commentSpan{}
+	scanCode(text, 0, false, &comments)
+	return comments
+}
 
+// scanCode lexes code from index, appending every comment it passes, and returns where it stopped:
+// the end of the text, or, inside an interpolation, just past the `}` that closes the `${`.
+//
+// One loop for top-level code and for an interpolation body, because the body of `${...}` is code: it
+// holds strings, templates, regular expressions and comments exactly as the file does. An earlier
+// interpolation skipper knew strings and nested templates and nothing else, so in
+//
+//	return `"${key.replace(/"/g, '""')}"`;
+//
+// it read the regex's `"` as a string, paired the wrong quotes, and left the scan inside a phantom
+// template for the rest of the file. Base's SqliteAdapter.ts lost every directive after that line that
+// way: its block enable, so a disable for one rule ran to the end of the file, and two next-line
+// disables, so their findings were reported (#59rmvb5).
+func scanCode(text string, index int, inInterpolation bool, comments *[]commentSpan) int {
 	// previousToken is the last significant character seen, which is the only way to tell a regular
-	// expression from a division: `/` after a value divides, `/` after an operator opens a regex.
+	// expression from a division: `/` after a value divides, `/` after an operator opens a regex. An
+	// interpolation starts an expression, so it starts as the start of the file does.
 	previousToken := byte(0)
 
-	for index := 0; index < len(text); {
+	// depth counts the braces opened inside an interpolation, so `${ {a: 1}.a }` closes on its own
+	// brace rather than the object literal's.
+	depth := 0
+
+	for index < len(text) {
 		character := text[index]
 
 		switch {
@@ -41,7 +63,7 @@ func scanComments(text string) []commentSpan {
 			for index < len(text) && text[index] != '\n' {
 				index++
 			}
-			comments = append(comments, commentSpan{pos: start, end: index})
+			*comments = append(*comments, commentSpan{pos: start, end: index})
 
 		case character == '/' && index+1 < len(text) && text[index+1] == '*':
 			start := index
@@ -54,21 +76,30 @@ func scanComments(text string) []commentSpan {
 			} else {
 				index = len(text)
 			}
-			comments = append(comments, commentSpan{pos: start, end: index})
+			*comments = append(*comments, commentSpan{pos: start, end: index})
 
 		case character == '"' || character == '\'':
 			index = skipQuoted(text, index, character)
 			previousToken = character
 
 		case character == '`':
-			index = skipTemplate(text, index)
+			index = skipTemplate(text, index, comments)
 			previousToken = character
 
 		case character == '/' && opensRegularExpression(previousToken):
 			index = skipRegularExpression(text, index)
 			previousToken = '/'
 
+		case character == '}' && inInterpolation && depth == 0:
+			return index + 1
+
 		default:
+			switch character {
+			case '{':
+				depth++
+			case '}':
+				depth--
+			}
 			if !isSpace(character) {
 				previousToken = character
 			}
@@ -76,7 +107,7 @@ func scanComments(text string) []commentSpan {
 		}
 	}
 
-	return comments
+	return index
 }
 
 // enableSpan is one enable directive, resolved to the line it sits on and the rules it names.
@@ -152,9 +183,9 @@ func skipQuoted(text string, index int, quote byte) int {
 	return index
 }
 
-// skipTemplate advances past a template literal, descending into `${...}` because a comment can
-// live inside an interpolation.
-func skipTemplate(text string, index int) int {
+// skipTemplate advances past a template literal, lexing each `${...}` as code, because a comment,
+// a string or a regular expression can live inside an interpolation.
+func skipTemplate(text string, index int, comments *[]commentSpan) int {
 	index++
 	for index < len(text) {
 		switch {
@@ -164,34 +195,10 @@ func skipTemplate(text string, index int) int {
 		case text[index] == '`':
 			return index + 1
 		case text[index] == '$' && index+1 < len(text) && text[index+1] == '{':
-			index = skipInterpolation(text, index+2)
+			index = scanCode(text, index+2, true, comments)
 			continue
 		}
 		index++
-	}
-	return index
-}
-
-// skipInterpolation advances past a `${...}` body, tracking nested braces and nested strings.
-//
-// The nesting matters: `${object.method('}')}` closes on the wrong brace without it.
-func skipInterpolation(text string, index int) int {
-	depth := 1
-	for index < len(text) && depth > 0 {
-		switch character := text[index]; character {
-		case '{':
-			depth++
-			index++
-		case '}':
-			depth--
-			index++
-		case '"', '\'':
-			index = skipQuoted(text, index, character)
-		case '`':
-			index = skipTemplate(text, index)
-		default:
-			index++
-		}
 	}
 	return index
 }

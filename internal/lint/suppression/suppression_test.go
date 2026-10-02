@@ -491,3 +491,72 @@ func TestALineCommentFileDisableSuppressesNothing(t *testing.T) {
 		t.Fatal("a `//` enable closed a block, which ESLint does not do")
 	}
 }
+
+// An interpolation body is code, and the scan has to read it as code or lose its place for the rest of
+// the file (#59rmvb5). Base's SqliteAdapter.ts quotes identifiers with the first case's line: the
+// regex's `"` was read as a string, the quotes paired wrongly, and every directive after it vanished,
+// so a block disable ran to the end of the file and two next-line disables suppressed nothing.
+//
+// Each case puts something inside `${...}` and then, on later lines, a block enable and a next-line
+// disable, so a scan that loses sync anywhere inside the interpolation loses both.
+func TestAnInterpolationIsLexedAsCode(t *testing.T) {
+	cases := map[string]string{
+		"a regex holding a quote":    "    return `\"${key.replace(/\"/g, '\"\"')}\"`;",
+		"an object literal's braces": "    return `${ {width: 1}.width } and ${ {a: {b: 2}}.a.b }`;",
+		"a nested template":          "    return `outer ${ `inner ${key} '` } done`;",
+		"a division then a regex":    "    return `${total / count} ${/'/.test(key)}`;",
+		"a comment holding a quote":  "    return `${key /* it's a key */}`;",
+	}
+
+	for name, line := range cases {
+		t.Run(name, func(t *testing.T) {
+			source := strings.Join([]string{
+				"/* eslint-disable nexus/consistency-no-enum -- the block under test */",
+				"function quote(key: string): string {",
+				line,
+				"}",
+				"/* eslint-enable nexus/consistency-no-enum -- the block ends here */",
+				"enum Reported {}",
+				"// eslint-disable-next-line nexus/performance-no-independent-await-in-loop -- sequential by design.",
+				"for(const item of items) { await work(item); }",
+			}, "\n")
+
+			index := Build(source)
+
+			if !index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 3)) {
+				t.Fatal("the control failed: the block disable does not cover its own body, so nothing below proves anything")
+			}
+			if index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 5)) {
+				t.Errorf("the block enable was lost after the interpolation, so the disable ran past it: %+v", index.Directives())
+			}
+			if !index.Suppresses("nexus/performance-no-independent-await-in-loop", offsetOfLine(source, 7)) {
+				t.Errorf("the next-line disable after the interpolation was lost: %+v", index.Directives())
+			}
+		})
+	}
+}
+
+// A directive's text inside a string in an interpolation is still a string. Lexing the body as code
+// must not turn its literals into comments.
+func TestCommentTextInsideAnInterpolatedStringIsNotADirective(t *testing.T) {
+	source := "const sample = `${'// eslint-disable-next-line nexus/consistency-no-enum'}`;\nenum Reported {}"
+	if directives := Build(source).Directives(); len(directives) != 0 {
+		t.Fatalf("found a directive inside a string inside an interpolation: %+v", directives)
+	}
+}
+
+// The interpolation closes on its own brace, not an object literal's. The fixture for this needs a
+// comment after the object literal: a scan that left the interpolation at the literal's `}` reads the
+// rest as template text and resynchronizes by the end of the line, so a later directive alone cannot
+// tell the two apart, and an earlier fixture built only that way let the brace count be deleted.
+func TestAnInterpolationClosesOnItsOwnBrace(t *testing.T) {
+	source := strings.Join([]string{
+		"const label = `${ {width: 1}.width /* eslint-disable-next-line nexus/consistency-no-enum -- inside the interpolation */ }`;",
+		"enum Suppressed {}",
+	}, "\n")
+
+	index := Build(source)
+	if !index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 1)) {
+		t.Fatalf("a comment after an object literal inside an interpolation was read as template text: %+v", index.Directives())
+	}
+}
