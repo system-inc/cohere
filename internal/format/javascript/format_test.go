@@ -77,6 +77,33 @@ var formatCases = []formatCase{
 			"{properties.title ? <h1>{properties.title}</h1> : null}{\" \"}some text that is long enough to make the children fill across lines and wrap at the width\n" +
 			"{properties.items.map((item) => <span key={item}>{item}</span>)}<></></div> }\nconst generic = <T,>(value: T) => value;\n",
 	},
+	{
+		name:     "a byte order mark is kept and carriage returns become newlines (main/core.js)",
+		fileName: "Probe.ts",
+		source:   "\xef\xbb\xbfconst a = { b: 1 }\r\n// comment\r\nconst c = `line\r\nline`\r",
+		contains: []string{"\xef\xbb\xbfconst a = { b: 1 };\n// comment\n", "`line\nline`"},
+	},
+	{
+		name:     "json: comments, trailing commas, quoting and numbers through the JavaScript printer",
+		fileName: "settings.json",
+		source: "// leading\n{ unquoted: 1, 'single': 'it\\'s', \"nested\": { \"array\": [1.50, -2, +3, 0x1F, 1e3,], /* inside */ \"empty\": {} },\n" +
+			"  \"long\": [\"a value long enough\", \"to make this array break across lines\", \"at the print width of one hundred twenty\"], 10: true, n: null, }\n",
+		contains: []string{`"unquoted": 1`, `"single": "it's"`, `"10": true`, "/* inside */"},
+	},
+	{
+		name:     "json-stringify: package.json breaks every object and array",
+		fileName: "package.json",
+		source:   "{\"name\":\"probe\",\"private\":true,\"files\":[],\"scripts\":{\"build\":\"tsc\"},\"keywords\":[\"a\",\"b\"],\"version\":1.50}\n",
+		contains: []string{"{\n    \"name\": \"probe\",", "\"files\": [],", "\"keywords\": [\n        \"a\",", "\"version\": 1.50"},
+	},
+}
+
+// formatFor is the native entry point a file name reaches through internal/format/native.
+func formatFor(fileName string) func(string, string, prettier.Options) (string, error) {
+	if strings.HasSuffix(fileName, ".json") {
+		return FormatJSON
+	}
+	return Format
 }
 
 func TestFormatMatchesTheFork(t *testing.T) {
@@ -100,7 +127,7 @@ func TestFormatMatchesTheFork(t *testing.T) {
 					t.Errorf("%s: the fork's output lacks %q:\n%s", testCase.name, substring, expected)
 				}
 			}
-			actual, err := Format(testCase.fileName, testCase.source, options)
+			actual, err := formatFor(testCase.fileName)(testCase.fileName, testCase.source, options)
 			if err != nil {
 				t.Errorf("%s (bracketSameLine %v): %v", testCase.name, options.BracketSameLine, err)
 				continue

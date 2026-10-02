@@ -138,10 +138,17 @@ func makeString(rawText string, enclosingQuote string) string {
 	return enclosingQuote + raw + enclosingQuote
 }
 
-// printString is upstream's printString for the JavaScript parsers we run (never json here).
+// printString is upstream's printString, utilities/print-string.js. The JSON parsers always print
+// double quotes; json5 and the HTML-attribute case are parsers and embeds we never run.
 func printString(raw string, options *Options) string {
 	rawContent := raw[1 : len(raw)-1]
-	enclosingQuote := getPreferredQuote(rawContent, settingsOf(options).SingleQuote)
+	var enclosingQuote string
+	switch settingsOf(options).Parser {
+	case "json", "jsonc", "json-stringify":
+		enclosingQuote = `"`
+	default:
+		enclosingQuote = getPreferredQuote(rawContent, settingsOf(options).SingleQuote)
+	}
 	if raw[:1] == enclosingQuote {
 		return raw
 	}

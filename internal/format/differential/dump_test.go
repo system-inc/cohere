@@ -120,7 +120,8 @@ func TestDumpDifferences(t *testing.T) {
 		}
 		t.Log(report.Summary())
 
-		corpus := filepath.Join(output, filepath.Base(root))
+		// The whole root names the directory, because nested corpora share basenames (three are nexus).
+		corpus := filepath.Join(output, strings.ReplaceAll(strings.Trim(root, string(filepath.Separator)), string(filepath.Separator), "_"))
 		var summary strings.Builder
 		summary.WriteString(report.Summary())
 		results := append([]FileResult(nil), report.Files...)

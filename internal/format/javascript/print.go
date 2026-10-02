@@ -97,6 +97,8 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 	}
 
 	switch current.Type() {
+	case "JsonRoot":
+		return concat(printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}), print("node", nil), hardline)
 	case "ExpressionStatement":
 		return printExpressionStatement(path, options, print)
 	case "ChainExpression":
@@ -165,6 +167,9 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		if isMethod(current) {
 			return printMethod(path, options, print)
 		}
+		return printProperty(path, options, print)
+	// Babel, which the JSON parsers produce.
+	case "ObjectProperty":
 		return printProperty(path, options, print)
 	case "Decorator":
 		return concat("@", print("expression", nil))

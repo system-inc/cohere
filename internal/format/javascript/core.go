@@ -47,6 +47,10 @@ type settings struct {
 	prettier.Options
 	FilePath string
 
+	// Parser is upstream's options.parser: "typescript", or "json" or "json-stringify" for JSON files.
+	// Only print/key.js and utilities/print-string.js read it.
+	Parser string
+
 	callArguments      map[Node][]Node
 	functionParameters map[Node][]Node
 	strippedText       string

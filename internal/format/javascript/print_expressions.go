@@ -1,9 +1,7 @@
 package javascript
 
 import (
-	"encoding/json"
 	"regexp"
-	"strconv"
 	"unicode"
 
 	"github.com/system-inc/cohere/internal/format/printing"
@@ -177,7 +175,7 @@ func printProperty(path *Path, options *Options, print PrintFunc) Doc {
 	return printAssignment(path, options, print, printKey(path, options, print), ":", "value")
 }
 
-// print/key.js. Our parser is always "typescript" and quoteProps is always "as-needed".
+// print/key.js. Our parsers are "typescript" and the JSON ones, and quoteProps is always "as-needed".
 
 func isTsEnumMember(node Node) bool { return node.Is("TSEnumMember") }
 
@@ -197,8 +195,35 @@ var simpleNumber = regexp.MustCompile(`^(?:\d+|\d+\.\d+)$`)
 // isSimpleNumber is upstream's isSimpleNumber.
 func isSimpleNumber(numberString string) bool { return simpleNumber.MatchString(numberString) }
 
-// isKeySafeToUnquote is upstream's isKeySafeToUnquote for parser "typescript".
+// isTypeScript is upstream's isTypeScript(options): of its parsers, ours is "typescript".
+func isTypeScript(options *Options) bool { return settingsOf(options).Parser == "typescript" }
+
+// isKeySafeToQuote is upstream's isKeySafeToQuote.
+func isKeySafeToQuote(node Node, options *Options) bool {
+	key := getKey(node)
+	if key.Is("Identifier") {
+		return true
+	}
+	if !isNumericLiteral(key) {
+		return false
+	}
+	// Quoting number keys is safe in JS and Flow, but not in TypeScript (as
+	// mentioned in `isKeySafeToUnquote`).
+	if isTypeScript(options) {
+		return false
+	}
+	printedNumber := printNumber(getRaw(key))
+	// Avoid converting 999999999999999999999 to 1e+21, 0.99999999999999999 to 1 and 1.0 to 1.
+	return javaScriptNumberString(key.Get("value").(float64)) == printedNumber && isSimpleNumber(printedNumber)
+}
+
+// isKeySafeToUnquote is upstream's isKeySafeToUnquote. Of its parsers, ours are "typescript" and the
+// JSON ones, so the unquote-as-number branch (the JavaScript parsers only) never applies.
 func isKeySafeToUnquote(node Node, options *Options) bool {
+	switch settingsOf(options).Parser {
+	case "json", "jsonc":
+		return false
+	}
 	key := getKey(node)
 	if !isStringLiteral(key) {
 		return false
@@ -212,15 +237,20 @@ func isKeySafeToUnquote(node Node, options *Options) bool {
 		return false
 	}
 	// With --strictPropertyInitialization, TypeScript treats quoted property names differently.
-	if !node.Is("PropertyDefinition") && isEs5IdentifierName(value) {
+	if !(isTypeScript(options) && node.Is("PropertyDefinition")) && isEs5IdentifierName(value) {
 		return true
 	}
 	// Unquoting as a number is only for the JavaScript parsers.
 	return false
 }
 
-// shouldQuoteKey is upstream's shouldQuoteKey: only json, jsonc and quoteProps "consistent" quote.
+// shouldQuoteKey is upstream's shouldQuoteKey. quoteProps is always "as-needed", so only the JSON
+// parsers quote.
 func shouldQuoteKey(path *Path, options *Options) bool {
+	switch settingsOf(options).Parser {
+	case "json", "jsonc":
+		return isKeySafeToQuote(node(path), options)
+	}
 	return false
 }
 
@@ -239,13 +269,15 @@ func printKey(path *Path, options *Options, print PrintFunc) Doc {
 		return concat("[", print(property, nil), "]")
 	}
 	if shouldQuoteKey(path, options) {
+		// a -> "a"
+		// 1 -> "1"
+		// 1.5 -> "1.5"
 		key := getKey(current)
 		name := key.String("name")
 		if !key.Is("Identifier") {
-			name = strconv.FormatFloat(key.Get("value").(float64), 'f', -1, 64)
+			name = javaScriptNumberString(key.Get("value").(float64))
 		}
-		encoded, _ := json.Marshal(name)
-		printed := printString(string(encoded), options)
+		printed := printString(jsonStringify(name), options)
 		return call(path, func(path *Path) Doc { return printing.PrintComments(path, concat(printed), options, nil) }, property)
 	}
 	if shouldUnquoteKey(path, options) {
