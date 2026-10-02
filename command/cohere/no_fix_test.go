@@ -57,7 +57,7 @@ func TestNoFixReportsWhatFixAndFormatWouldChange(t *testing.T) {
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{
 		"tsconfig.json":       fixScopeTsconfig,
-		"CohereSettings.json": `{"rules":{"no-debugger":"error"}}`,
+		"CohereSettings.json": `{"rules":{"no-debugger":"error"},"format":{}}`,
 		"Clean.ts":            "export const clean = 1;\n",
 	})
 

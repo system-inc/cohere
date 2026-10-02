@@ -1,6 +1,7 @@
 package differential
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -98,12 +99,19 @@ func TestCorpora(t *testing.T) {
 			pending = append(pending, nested)
 		}
 
-		// Each corpus formats with its own resolved config, the way Prettier resolves it for that
-		// tree. One set of options for every repository is how api-phi-health's bracketSameLine went
-		// unmeasured on the first run.
+		// Each corpus formats with its own resolved options. One set of options for every repository is
+		// how api-phi-health's bracketSameLine went unmeasured on the first run.
+		//
+		// A nested repository still carrying Prettier config is one pinned to its own adoption (www-ahra-ai,
+		// #j3nk2zk): measuring it would mean guessing its options, so it is named and skipped. A named
+		// corpus refusing is a migration that did not happen, and stops the run.
 		resolution, err := formatoptions.Resolve(root)
+		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) && !named[root] {
+			t.Logf("skipping %s, a nested repository not yet adopted: %v", root, err)
+			continue
+		}
 		if err != nil {
-			t.Fatalf("resolving the Prettier config for %s: %v", root, err)
+			t.Fatalf("resolving the format options for %s: %v", root, err)
 		}
 		options := resolution.Options
 		newOracle := func() (Formatter, error) { return prettier.New(options) }
@@ -119,9 +127,9 @@ func TestCorpora(t *testing.T) {
 		if err != nil {
 			t.Fatalf("comparing %s: %v", root, err)
 		}
-		t.Logf("walked %d, offered %d, nested repositories %v\nconfig %s, not applied %v\n%s",
+		t.Logf("walked %d, offered %d, nested repositories %v\nconfig %s\n%s",
 			enumeration.Walked, len(enumeration.Files), enumeration.NestedRepositories,
-			resolution.Source, resolution.NotApplied, report.Summary())
+			resolution.Source, report.Summary())
 		logSampleDifferences(t, report)
 	}
 }

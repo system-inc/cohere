@@ -24,8 +24,8 @@ func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(t *testing.T) {
 		if err := os.MkdirAll(directory, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		manifest := `{"prettier": {"printWidth": ` + printWidth + `}}`
-		if err := os.WriteFile(filepath.Join(root, name, "package.json"), []byte(manifest), 0o644); err != nil {
+		settings := `{"format": {"printWidth": ` + printWidth + `}}`
+		if err := os.WriteFile(filepath.Join(root, name, "CohereSettings.json"), []byte(settings), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -41,7 +41,7 @@ func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got != want {
-			t.Fatalf("%s formatted with printWidth %s, want %s from its own package.json", name, got, want)
+			t.Fatalf("%s formatted with printWidth %s, want %s from its own CohereSettings.json", name, got, want)
 		}
 	}
 }
@@ -85,6 +85,6 @@ func TestResolvingRefusesAConfigItCannotApplyAtConstruction(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := NewResolving(root); err == nil {
-		t.Fatal("NewResolving accepted a shared config cohere does not resolve")
+		t.Fatal("NewResolving accepted Prettier config left in package.json")
 	}
 }

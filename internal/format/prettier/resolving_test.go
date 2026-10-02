@@ -26,8 +26,8 @@ func TestResolvingFormatsEachFileWithItsOwnConfig(t *testing.T) {
 	root := t.TempDir()
 	apart := filepath.Join(root, "apart")
 	together := filepath.Join(root, "together")
-	writeFile(t, filepath.Join(apart, "package.json"), `{"prettier": {"printWidth": 60, "tabWidth": 4, "singleQuote": true}}`)
-	writeFile(t, filepath.Join(together, "package.json"), `{"prettier": {"printWidth": 60, "tabWidth": 4, "singleQuote": true, "bracketSameLine": true}}`)
+	writeFile(t, filepath.Join(apart, "CohereSettings.json"), `{"format": {"printWidth": 60, "tabWidth": 4, "singleQuote": true}}`)
+	writeFile(t, filepath.Join(together, "CohereSettings.json"), `{"format": {"printWidth": 60, "tabWidth": 4, "singleQuote": true, "bracketSameLine": true}}`)
 
 	resolving, err := NewResolving(apart)
 	if err != nil {

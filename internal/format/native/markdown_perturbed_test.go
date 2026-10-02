@@ -1,6 +1,7 @@
 package native
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -128,8 +129,14 @@ func markdownCorpora(t *testing.T, roots string) []markdownCorpus {
 			}
 		}
 		resolution, err := formatoptions.Resolve(root)
+		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
+			// A repository still carrying Prettier config, pinned to its own adoption (www-ahra-ai). The
+			// differential's TestCorpora refuses this for a named corpus; here it is named and skipped.
+			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			continue
+		}
 		if err != nil {
-			t.Fatalf("resolving the Prettier config for %s: %v", root, err)
+			t.Fatalf("resolving the format options for %s: %v", root, err)
 		}
 		corpora = append(corpora, markdownCorpus{root: root, files: files, options: resolution.Options})
 	}
