@@ -356,8 +356,14 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		if len(tables) != 1 {
 			t.Fatalf("expected one cache table under the isolated home, found %v", tables)
 		}
+		if dump, _ := run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "(bare): recorded ") {
+			t.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
+		}
 		if err := os.WriteFile(tables[0], []byte("not a cache table"), 0o600); err != nil {
 			t.Fatal(err)
+		}
+		if dump, _ := run(true, "--cache-dump"); !strings.Contains(dump, "cache table discarded") {
+			t.Fatalf("--cache-dump printed a table this build would discard as though it were in use:\n%s", dump)
 		}
 
 		discarded, discardedExit := run(true)

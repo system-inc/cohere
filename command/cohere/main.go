@@ -113,6 +113,7 @@ func run() error {
 	// read against each other before the bigger one is trusted.
 	unusedDeep := flag.Bool("unused-deep", false, "with --unused, also compute the transitive closure and group the dead code into islands")
 	showVersion := flag.Bool("version", false, "print the version and exit")
+	cacheDump := flag.Bool("cache-dump", false, "print what the cache table for this project holds, and exit")
 	// The editor's save: the buffer arrives on stdin and what --fix (and --format) would write for this
 	// path leaves on stdout, with nothing written to disk. See stdin.go.
 	stdinFilePath := flag.String("stdin-filepath", "",
@@ -264,6 +265,13 @@ func run() error {
 		// independently of the version. A bug report that names all of it is reproducible.
 		fmt.Println(release.Current())
 		return nil
+	}
+
+	if *cacheDump {
+		if locateError != nil {
+			return locateError
+		}
+		return dumpCacheTable(location)
 	}
 
 	// A bare `cohere` runs the whole pipeline. The phase flags isolate one phase for someone
