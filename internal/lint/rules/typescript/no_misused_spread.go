@@ -23,7 +23,7 @@ type NoMisusedSpreadOptions struct {
 //	valid:   const a = [...[1, 2]]
 //	valid:   const a = { ...{ x: 1 } }
 //	valid:   declare const m: Map<string, number>; const a = Object.fromEntries(m)
-//	invalid: const a = [...'string']
+//	valid:   const a = [...'string']  (upstream reports this; cohere does not, see below)
 //	invalid: declare const m: Map<string, number>; const a = { ...m }
 //	invalid: declare const p: Promise<{ a: 1 }>; const a = { ...p }
 //	invalid: declare const arr: number[]; const a = { ...arr }
@@ -34,11 +34,22 @@ type NoMisusedSpreadOptions struct {
 // `{0: ..., 1: ...}`. Spreading a Promise produces its own properties, which are none. Spreading a
 // class instance drops the prototype, so every method disappears.
 //
-// # Two listeners asking two different questions
+// # The string branch upstream has and this rule does not
 //
-// A spread in an ARRAY or a CALL is only ever wrong one way: a string spreads into Unicode code
-// points, which splits a complex emoji into its components and breaks graphemes in many writing
-// systems. Everything else spreads into an array correctly, so that arm asks one question.
+// Upstream also reports a string spread into an array or a call (`noStringSpread`), because spread
+// yields Unicode code points and so splits a family emoji or a combining sequence that a reader
+// sees as one glyph, and it asks for `Intl.Segmenter`. Cohere drops that branch on purpose, by
+// Kirk's ruling of 2026-10-01. Whether a string should be walked by code point or by grapheme is
+// intent the rule cannot see, and spread is the CORRECT code-point iteration (it is what
+// `.split("")`, which the upstream message lumps it with, gets wrong). Every string spread ahra
+// had wanted code points on purpose, and upstream's only repair, `Array.from(text)`, is the same
+// iteration under another name, which launders the finding rather than fixing anything. A finding
+// whose fix is a synonym is a false positive. That arm was the rule's only interest in a spread
+// element, so the rule now listens to object spreads and JSX spread attributes alone, and the
+// divergence is recorded in no_misused_spread.md and as gate-side entries in the differential's
+// acknowledged list.
+//
+// # The object cascade
 //
 // A spread in an OBJECT, or a JSX attribute, which is the same operation with different syntax, is
 // wrong in eight ways, and the order they are asked in is the rule rather than an implementation
@@ -54,8 +65,8 @@ type NoMisusedSpreadOptions struct {
 //
 // `isIterable` excludes strings, and upstream says why at the line: TypeScript already errors on
 // spreading a string into an object, so reporting it here would double up on a diagnostic the
-// compiler gives. That exclusion is NOT shared with the array-and-call arm, where a string spread is
-// the entire point of the rule.
+// compiler gives. Upstream's array-and-call arm did not share the exclusion, but that arm is gone
+// here (see above), so a string is now silent everywhere this rule looks.
 //
 // # Where a finding points
 //
@@ -123,17 +134,6 @@ var NoMisusedSpread = rule.Rule{
 			return type_checking.TypeMatchesSomeSpecifier(t, settings.Allow, settings.AllowInline, ctx.Program)
 		}
 
-		// checkArrayOrCallSpread is the one-question arm: a string spread into an array or a call.
-		checkArrayOrCallSpread := func(spread *ast.Node, argument *ast.Node) {
-			argumentType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
-			if argumentType == nil || allowed(argumentType) {
-				return
-			}
-			if noMisusedSpreadIsString(argumentType) {
-				ctx.ReportNode(spread, buildNoStringSpreadMessage())
-			}
-		}
-
 		// checkObjectSpread is the cascade. Every arm returns, so the first match wins.
 		checkObjectSpread := func(spread *ast.Node, argument *ast.Node) {
 			argumentType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
@@ -167,8 +167,7 @@ var NoMisusedSpread = rule.Rule{
 
 			// The string exclusion is upstream's and it is not an optimisation: TypeScript already
 			// errors on spreading a string into an object, so reporting here would double a
-			// diagnostic the compiler already gives. It is absent from the array-and-call arm above,
-			// where a string spread is the whole point.
+			// diagnostic the compiler already gives.
 			if noMisusedSpreadIsIterable(ctx.TypeChecker, argumentType) && !noMisusedSpreadIsString(argumentType) {
 				ctx.ReportNode(spread, buildNoIterableSpreadInObjectMessage())
 				return
@@ -185,38 +184,17 @@ var NoMisusedSpread = rule.Rule{
 		}
 
 		return rule.Listeners{
-			// Upstream writes four selectors. Ours are three listeners, because our parser gives an
-			// object spread and an array-or-call spread two different KINDS rather than one kind
-			// discriminated by its parent: a spread inside an object literal is a
-			// KindSpreadAssignment, and one inside an array or a call is a KindSpreadElement.
-			//
-			// That difference removes upstream's parent test rather than replacing it, and it is
-			// why there is no `if parent is ObjectExpression` anywhere here.
+			// Upstream writes four selectors; two of them (`ArrayExpression > SpreadElement` and
+			// `CallExpression > SpreadElement`) fed only the string branch dropped above, so a
+			// KindSpreadElement has no listener here. The remaining two are the object spread and
+			// the JSX spread attribute. Our parser gives an object spread its own KIND, a
+			// KindSpreadAssignment, which is why there is no `if parent is ObjectExpression`.
 			ast.KindSpreadAssignment: func(node *ast.Node) {
 				argument := node.AsSpreadAssignment().Expression
 				if argument == nil {
 					return
 				}
 				checkObjectSpread(node, argument)
-			},
-
-			ast.KindSpreadElement: func(node *ast.Node) {
-				argument := node.AsSpreadElement().Expression
-				if argument == nil {
-					return
-				}
-				// A spread element appears in an array literal, a call, and a new expression.
-				// Upstream registers the first two; a spread in a NEW expression is a call for this
-				// purpose and upstream's `CallExpression > SpreadElement` selector does not match
-				// it. Reproduced as silence, and pinned by a fixture.
-				parent := node.Parent
-				if parent == nil {
-					return
-				}
-				switch parent.Kind {
-				case ast.KindArrayLiteralExpression, ast.KindCallExpression:
-					checkArrayOrCallSpread(node, argument)
-				}
 			},
 
 			ast.KindJsxSpreadAttribute: func(node *ast.Node) {
@@ -464,17 +442,6 @@ func noMisusedSpreadMapSuggestions(ctx rule.Context, spread *ast.Node, argument 
 		Message: buildReplaceMapSpreadInObjectMessage(),
 		Fixes:   []rule.Fix{rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, inner), replacement)},
 	}}
-}
-
-func buildNoStringSpreadMessage() rule.Message {
-	return rule.Message{
-		Id: "noStringSpread",
-		Description: "Using the spread operator on a string can mishandle special characters, as can `.split(\"\")`.\n" +
-			"- `...` produces Unicode code points, which will decompose complex emojis into individual emojis\n" +
-			"- .split(\"\") produces UTF-16 code units, which breaks rich characters in many languages\n" +
-			"Consider using `Intl.Segmenter` for locale-aware string decomposition.\n" +
-			"Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
-	}
 }
 
 func buildNoArraySpreadInObjectMessage() rule.Message {

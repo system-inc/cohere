@@ -88,7 +88,10 @@ func TestNoMisusedSpreadStaysSilent(t *testing.T) {
 
 // TestNoMisusedSpreadFires is upstream's invalid list, with the ids it records per case.
 //
-// Eight of the rule's ten message ids appear here; the other two are the suggestion ids, which no
+// Upstream invalid 0 through 13 are absent: they are the string branch, which cohere drops on
+// purpose, and they sit in TestNoMisusedSpreadLeavesStringSpreadAlone as must-stay-silent rows.
+//
+// Seven of the rule's nine message ids appear here; the other two are the suggestion ids, which no
 // finding carries and which the suggestion test below asserts instead.
 //
 // The ordering of the object cascade is what most of these rows really pin. A Map is iterable, an
@@ -104,20 +107,6 @@ func TestNoMisusedSpreadFires(t *testing.T) {
 		options    any
 		wantIds    []string
 	}{
-		{"upstream invalid 0", "file.ts", "const a = [...'test'];", nil, []string{"noStringSpread"}},
-		{"upstream invalid 1", "file.ts", "\nfunction withText<Text extends string>(text: Text) {\n  return [...text];\n}\n      ", nil, []string{"noStringSpread"}},
-		{"upstream invalid 2", "file.ts", "\nconst test = 'hello';\nconst a = [...test];\n      ", nil, []string{"noStringSpread"}},
-		{"upstream invalid 3", "file.ts", "\nconst test = `he${'ll'}o`;\nconst a = [...test];\n      ", nil, []string{"noStringSpread"}},
-		{"upstream invalid 4", "file.ts", "\ndeclare const test: string;\nconst a = [...test];\n      ", nil, []string{"noStringSpread"}},
-		{"upstream invalid 5", "file.ts", "\ndeclare const test: string | number[];\nconst a = [...test];\n      ", nil, []string{"noStringSpread"}},
-		{"upstream invalid 6", "file.ts", "\ndeclare const test: string & { __brand: 'test' };\nconst a = [...test];\n      ", nil, []string{"noStringSpread"}},
-		{"upstream invalid 7", "file.ts", "\ndeclare const test: number | (boolean | (string & { __brand: true }));\nconst a = [...test];\n      ", nil, []string{"noStringSpread"}},
-		{"upstream invalid 8", "file.ts", "\ndeclare function getString(): string;\nconst a = [...getString()];\n      ", nil, []string{"noStringSpread"}},
-		{"upstream invalid 9", "file.ts", "\ndeclare function textIdentity(...args: string[]);\n\ndeclare const text: string;\n\ntextIdentity(...text);\n      ", nil, []string{"noStringSpread"}},
-		{"upstream invalid 10", "file.ts", "\ndeclare function textIdentity(...args: string[]);\n\ndeclare const text: string;\n\ntextIdentity(...text, 'and', ...text);\n      ", nil, []string{"noStringSpread", "noStringSpread"}},
-		{"upstream invalid 11", "file.ts", "\ndeclare function textIdentity(...args: string[]);\n\nfunction withText<Text extends string>(text: Text) {\n  textIdentity(...text);\n}\n      ", nil, []string{"noStringSpread"}},
-		{"upstream invalid 12", "file.ts", "\ndeclare function getString<T extends string>(): T;\nconst a = [...getString()];\n      ", nil, []string{"noStringSpread"}},
-		{"upstream invalid 13", "file.ts", "\ndeclare function getString(): string & { __brand: 'test' };\nconst a = [...getString()];\n      ", nil, []string{"noStringSpread"}},
 		{"upstream invalid 14", "file.ts", "const o = { ...[1, 2, 3] };", nil, []string{"noArraySpreadInObject"}},
 		{"upstream invalid 15", "file.ts", "\nconst arr = [1, 2, 3];\nconst o = { ...arr };\n      ", nil, []string{"noArraySpreadInObject"}},
 		{"upstream invalid 16", "file.ts", "\nconst arr = [1, 2, 3] as const;\nconst o = { ...arr };\n      ", nil, []string{"noArraySpreadInObject"}},
@@ -200,6 +189,60 @@ func TestNoMisusedSpreadFires(t *testing.T) {
 			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
 		})
 	}
+}
+
+// TestNoMisusedSpreadLeavesStringSpreadAlone pins cohere's one deliberate divergence from upstream:
+// the string branch is gone, so a string spread into an array, a call or a constructor is silent.
+//
+// Upstream's `noStringSpread` asks for `Intl.Segmenter` because `[...text]` yields code points
+// rather than graphemes. That is a preference about intent the rule cannot see. Spread is the
+// correct way to walk a string by code point (it is what the `.split("")` the message lumps it with
+// gets wrong), and every string spread in ahra wants code points on purpose: ISO letters mapped to
+// regional indicators, a Latin-1 filter, quote-mark scanning. Each of those findings was
+// intent-false, and the only repair upstream offers is `Array.from(text)`, the same iteration in a
+// different hat, which launders the finding rather than fixing anything. Kirk's ruling, 2026-10-01.
+//
+// The rows are upstream's invalid 0 through 13 verbatim, then the four ahra sites the gate reports
+// (Countries.ts, PngTextMetadata.ts, two in PensieveDailies.ts), then the constructor shape the old
+// arm deliberately skipped. The last group is the control: the object cascade in the same harness
+// still reports, so silence above is the dropped branch and not a rule that stopped running.
+func TestNoMisusedSpreadLeavesStringSpreadAlone(t *testing.T) {
+	t.Parallel()
+
+	silent := []struct {
+		name       string
+		sourceText string
+	}{
+		{"upstream invalid 0", "const a = [...'test'];"},
+		{"upstream invalid 1", "\nfunction withText<Text extends string>(text: Text) {\n  return [...text];\n}\n      "},
+		{"upstream invalid 2", "\nconst test = 'hello';\nconst a = [...test];\n      "},
+		{"upstream invalid 3", "\nconst test = `he${'ll'}o`;\nconst a = [...test];\n      "},
+		{"upstream invalid 4", "\ndeclare const test: string;\nconst a = [...test];\n      "},
+		{"upstream invalid 5", "\ndeclare const test: string | number[];\nconst a = [...test];\n      "},
+		{"upstream invalid 6", "\ndeclare const test: string & { __brand: 'test' };\nconst a = [...test];\n      "},
+		{"upstream invalid 7", "\ndeclare const test: number | (boolean | (string & { __brand: true }));\nconst a = [...test];\n      "},
+		{"upstream invalid 8", "\ndeclare function getString(): string;\nconst a = [...getString()];\n      "},
+		{"upstream invalid 9", "\ndeclare function textIdentity(...args: string[]);\n\ndeclare const text: string;\n\ntextIdentity(...text);\n      "},
+		{"upstream invalid 10", "\ndeclare function textIdentity(...args: string[]);\n\ndeclare const text: string;\n\ntextIdentity(...text, 'and', ...text);\n      "},
+		{"upstream invalid 11", "\ndeclare function textIdentity(...args: string[]);\n\nfunction withText<Text extends string>(text: Text) {\n  textIdentity(...text);\n}\n      "},
+		{"upstream invalid 12", "\ndeclare function getString<T extends string>(): T;\nconst a = [...getString()];\n      "},
+		{"upstream invalid 13", "\ndeclare function getString(): string & { __brand: 'test' };\nconst a = [...getString()];\n      "},
+		{"ahra Countries.ts:13, ISO letters to regional indicators", "export function getCountryEmojiByCountryCode(countryCode: string): string {\n    return [...countryCode.toUpperCase()]\n        .map(function(character) {\n            return String.fromCodePoint(0x1f1e6 + character.charCodeAt(0) - 0x41);\n        })\n        .join('');\n}\n"},
+		{"ahra PngTextMetadata.ts:64, a Latin-1 filter by code point", "function toLatin1Safe(value: string): string {\n    return [...value].filter((character) => character.charCodeAt(0) <= 0xff).join('');\n}\n"},
+		{"ahra PensieveDailies.ts:288, quote marks scanned by code point", "declare const quoteMarkCharacters: Set<string>;\nfunction leadingQuoteCount(anchor: string): number {\n    const characters = [...anchor.trim()];\n    let count = 0;\n    while(count < characters.length && quoteMarkCharacters.has(characters[count]!)) count++;\n    return count;\n}\n"},
+		{"ahra PensieveDailies.ts:326, ignored characters filtered by code point", "declare const anchorIgnoredCharacters: Set<string>;\ndeclare function normalizeMomentText(text: string): string;\nfunction normalize(text: string): string {\n    return normalizeMomentText([...text].filter((character) => !anchorIgnoredCharacters.has(character)).join(''));\n}\n"},
+		{"a string spread into a constructor", "class C {\n  constructor(...a: string[]) {}\n}\ndeclare const s: string;\nconst x = new C(...s);"},
+	}
+	for _, testCase := range silent {
+		t.Run(testCase.name, func(t *testing.T) {
+			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil))
+		})
+	}
+
+	t.Run("control: an array spread into an object in the same harness still reports", func(t *testing.T) {
+		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
+			"declare const s: string;\nconst x = [...s];\nconst o = { ...[...s] };", nil), "noArraySpreadInObject")
+	})
 }
 
 // TestNoMisusedSpreadSuggestions applies each suggested repair and compares the whole rewritten file
@@ -294,7 +337,6 @@ func TestNoMisusedSpreadSpans(t *testing.T) {
 		sourceText string
 		wantSpans  []string
 	}{
-		{"upstream invalid 0", "file.ts", "const a = [...'test'];", []string{"...'test'"}},
 		{"upstream invalid 14", "file.ts", "const o = { ...[1, 2, 3] };", []string{"...[1, 2, 3]"}},
 		{"upstream invalid 23", "file.ts", "const o = { ...new Set([1, 2, 3]) };", []string{"...new Set([1, 2, 3])"}},
 		{"upstream invalid 26", "file.ts", "\ndeclare const set: WeakSet<object>;\nconst o = { ...set };\n      ", []string{"...set"}},
@@ -435,9 +477,9 @@ func TestNoMisusedSpreadRequiresTheTypedHarness(t *testing.T) {
 		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
 
-	const source = "const a = [...'test'];"
+	const source = "const o = { ...[1, 2, 3] };"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoMisusedSpread, noMisusedSpreadFile, source), "noStringSpread")
+	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoMisusedSpread, noMisusedSpreadFile, source), "noArraySpreadInObject")
 	rule_testing.ExpectClean(t, rule_testing.Run(t, NoMisusedSpread, noMisusedSpreadFile, source))
 }
 
@@ -523,63 +565,14 @@ func TestNoMisusedSpreadDecoder(t *testing.T) {
 	})
 
 	t.Run("the decoded allow list reaches the rule and changes its verdict", func(t *testing.T) {
-		// Byte-identical source, opposite verdicts, separated only by what came off the wire.
-		//
-		// The subject is a string-TYPED binding rather than a string literal, and that is not
-		// incidental. An inline specifier matches by the type's NAME, and a literal's type is
-		// `"test"` rather than `string`, so `allow: ["string"]` does not silence `[...'test']`.
-		// Measured against the installed rule, which reports that input under exactly this option
-		// and is silent on the binding below, so the narrowness is upstream's rather than ours.
-		const source = "const str: string = 'test';\nconst a = [...str];"
+		// Byte-identical source, opposite verdicts, separated only by what came off the wire. The
+		// subject is upstream valid 38's class instance, which an inline specifier names by type.
+		const source = "class A {\n  a = 1;\n}\nconst a = new A();\nconst o = { ...a };"
 
 		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source,
-			decode(t, `{}`)), "noStringSpread")
+			decode(t, `{}`)), "noClassInstanceSpreadInObject")
 		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile, source,
-			decode(t, `{"allow": ["string"]}`)))
-	})
-
-	t.Run("an inline specifier matches by type name, so a literal is not covered", func(t *testing.T) {
-		// The other half of the measurement above, kept because it is the surprising direction and
-		// a later reader would otherwise assume `allow: ["string"]` covers every string.
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
-			"const a = [...'test'];", decode(t, `{"allow": ["string"]}`)), "noStringSpread")
-	})
-}
-
-// TestNoMisusedSpreadNewExpressionIsSilent pins a narrowness upstream's corpus never writes.
-//
-// Upstream registers `ArrayExpression > SpreadElement` and `CallExpression > SpreadElement`, and a
-// NEW expression is neither, so a string spread into a constructor call is silent there. Our parser
-// gives an array spread, a call spread and a new spread the same node kind, so reproducing that
-// needs an explicit parent test, and a port written from the node kind alone would report a shape
-// upstream passes.
-//
-// Nothing in the imported corpus can see this: no case writes a spread inside a `new`. It was found
-// by mutation, where widening the parent test to accept a new expression survived all 151 rows, and
-// then settled against the installed rule rather than by reading the selectors. Measured:
-//
-//	new C(...s)  SILENT upstream
-//	[...s]       reports
-//	f(...s)      reports
-//
-// The two reporting rows are the controls, and they are what make the silence a measurement rather
-// than an absence: without them a rule that had simply stopped working would pass this test.
-func TestNoMisusedSpreadNewExpressionIsSilent(t *testing.T) {
-	t.Parallel()
-
-	t.Run("a string spread in a new expression is silent, matching upstream", func(t *testing.T) {
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
-			"class C {\n  constructor(...a: string[]) {}\n}\ndeclare const s: string;\nconst x = new C(...s);", nil))
-	})
-
-	t.Run("the same spread in an array reports", func(t *testing.T) {
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
-			"declare const s: string;\nconst x = [...s];", nil), "noStringSpread")
-	})
-
-	t.Run("the same spread in a call reports", func(t *testing.T) {
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoMisusedSpread, noMisusedSpreadFile,
-			"declare function f(...a: string[]): void;\ndeclare const s: string;\nf(...s);", nil), "noStringSpread")
+			decode(t, `{"allow": ["A"]}`)))
 	})
 }
 
