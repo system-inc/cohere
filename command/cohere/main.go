@@ -6,12 +6,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -91,6 +93,8 @@ func run() error {
 	// finally checked against the real resolver. ESLint has had `--print-config` for this reason.
 	listRulesEnabled := flag.Bool("rules-enabled", false,
 		"print the rules the lint config actually resolves, with severity, and exit")
+	printConfig := flag.Bool("print-config", false,
+		"print, as JSON in ESLint's --print-config shape, every registered rule's resolved severity and options for a file, and exit")
 	// Off by default until the engine is shown to agree with the existing gate across the real
 	// corpus. Reformatting the tree away from what the gate produces is worse than not formatting,
 	// so enabling is a separate decision from wiring.
@@ -180,7 +184,7 @@ func run() error {
 		return nil
 	}
 
-	if *listRulesEnabled {
+	if *listRulesEnabled || *printConfig {
 		lintConfigPath := location.LintConfigFileName
 		if locateError != nil {
 			if !given["lint-config"] {
@@ -211,6 +215,9 @@ func run() error {
 			fmt.Fprintf(os.Stderr, "note: %s is excluded by ignore pattern %q, so no rule applies to it\n",
 				probePath, resolved.IgnoredBy)
 			return nil
+		}
+		if *printConfig {
+			return writeResolvedConfig(os.Stdout, resolved)
 		}
 
 		// Only rules the binary actually implements. A config key naming a rule this build does not
@@ -1213,6 +1220,39 @@ func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFil
 		}
 	}
 	return ""
+}
+
+// writeResolvedConfig prints every registered rule's resolved setting for one file, as JSON in the shape
+// ESLint's `--print-config` uses: `{"rules": {"name": [severity, ...options]}}`, severity 0, 1 or 2.
+//
+// Resolved per registered rule by the resolver's own question, not read from the config's keys. A key
+// can configure a rule spelled differently (`@typescript-eslint/no-invalid-this` configures core
+// `no-invalid-this` when no key names it exactly), so the keys are the wrong answer to "what runs",
+// which is the answer a parity check against ESLint needs (#mnmx9s4). A rule nobody configured is
+// left out, as ESLint leaves out a rule no config names.
+func writeResolvedConfig(out io.Writer, resolved configuration.Resolved) error {
+	rules := map[string][]json.RawMessage{}
+	for _, registered := range registry.All() {
+		status, setting := resolved.StatusOf(registered.Name)
+		var severity int
+		switch status {
+		case configuration.StatusEnabled:
+			severity = int(setting.Severity)
+		case configuration.StatusScopedOff:
+			severity = 0
+		default:
+			continue
+		}
+		entry := []json.RawMessage{json.RawMessage(strconv.Itoa(severity))}
+		entry = append(entry, setting.Options...)
+		rules[registered.Name] = entry
+	}
+	encoded, err := json.MarshalIndent(map[string]any{"rules": rules}, "", "  ")
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(out, string(encoded))
+	return err
 }
 
 // registeredRuleNames is every rule this binary runs, by name, which the config loader needs to tell a
