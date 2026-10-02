@@ -78,7 +78,7 @@ type NoUnusedExpressionsOptions struct {
 // parser leaves directives as ordinary expression statements, so without the exemption written here
 // every `'use client'` at the top of a component file would report.
 var NoUnusedExpressions = rule.Rule{
-	Name: "no-unused-expressions",
+	Name: "@typescript-eslint/no-unused-expressions",
 	Run: func(ctx rule.Context, options any) rule.Listeners {
 		verdict := unusedExpressionVerdict{}
 		if parsed, ok := options.(NoUnusedExpressionsOptions); ok {

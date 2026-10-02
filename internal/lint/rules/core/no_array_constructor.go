@@ -130,7 +130,7 @@ var messageUseAnArrayLiteral = rule.Message{
 // Acceptable only because this is a suggestion a human reads before accepting; it would be a defect
 // in a fix.
 var NoArrayConstructor = rule.Rule{
-	Name: "no-array-constructor",
+	Name: "@typescript-eslint/no-array-constructor",
 
 	// See the doc above: a local binding named `Array` makes the reported shapes correct code, and
 	// two of upstream's clean cases are exactly that. Nothing structural answers it.

@@ -144,7 +144,7 @@ func noUnusedVarsMessage(name string, assigned bool, underscoreSilences bool) ru
 // undertaken to recover type-declaration coverage would be recovering coverage that is already
 // here.
 var NoUnusedVars = rule.Rule{
-	Name: "no-unused-vars",
+	Name: "@typescript-eslint/no-unused-vars",
 
 	// Symbol identity, not name matching. Two bindings can share a name across scopes and a read of
 	// one must not keep the other alive: `let x; { let x; log(x); }` reads the inner binding only,
