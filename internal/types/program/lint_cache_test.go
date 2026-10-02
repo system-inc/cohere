@@ -1,11 +1,7 @@
 package program_test
 
 import (
-	"errors"
-	"os"
-	"path/filepath"
 	"reflect"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -56,11 +52,35 @@ func sampleLintCache() *program.LintCache {
 	}
 }
 
+// testIdentity is the build a test's tables are written and read by.
+var testIdentity = program.CacheTableIdentity{SelfCommit: "test", CompilerCommit: "test", GoToolchain: "go-test", Platform: "test/test"}
+
+// roundTripLintCache sends a findings cache through the cache table's encoding and back, the only way
+// one reaches disk.
+func roundTripLintCache(t *testing.T, cache *program.LintCache) *program.LintCache {
+	t.Helper()
+	table := program.NewCacheTable()
+	table.Findings = cache
+	encoded, err := program.EncodeCacheTable(table, testIdentity)
+	if err != nil {
+		t.Fatalf("encoding: %v", err)
+	}
+	decoded, err := program.DecodeCacheTable(encoded, testIdentity)
+	if err != nil {
+		t.Fatalf("decoding what we just encoded: %v", err)
+	}
+	if decoded.Findings == nil {
+		t.Fatal("the findings section came back absent")
+	}
+	return decoded.Findings
+}
+
 // TestLintCacheRoundTripsEveryField compares every field rather than spot-checking, because a field
 // the encoder forgets decodes to empty while everything around it looks correct. The format was once
 // raw offsets into a blob, where that was easy; it is JSON now, where a missing tag or a lowercase
 // field does the same thing silently. I shipped exactly that bug twice while writing the
-// resolution cache, and once more here before this test existed.
+// resolution cache, and once more here before this test existed. The encoding is gob now, which cannot
+// forget a field it was given, but the interning of rule lists is still written by hand.
 //
 // It then happened a fourth time, in the way this test could not see. The comparisons below were
 // written out by hand, so `MessageDescription` was added to the struct and this test kept passing
@@ -69,11 +89,7 @@ func sampleLintCache() *program.LintCache {
 // field exists that the comparison does not name, so the next field cannot be added silently.
 func TestLintCacheRoundTripsEveryField(t *testing.T) {
 	original := sampleLintCache()
-
-	decoded, err := program.DecodeLintCache(original.Encode())
-	if err != nil {
-		t.Fatalf("decoding what we just encoded: %v", err)
-	}
+	decoded := roundTripLintCache(t, original)
 
 	if decoded.Key != original.Key {
 		t.Errorf("key did not survive: %x against %x", decoded.Key, original.Key)
@@ -138,51 +154,13 @@ func TestLintCacheRoundTripsEveryField(t *testing.T) {
 	}
 }
 
-// TestLintCacheRejectsBadArtifacts proves the decoder fails loudly rather than assembling
-// findings out of the wrong bytes. A finding pointing at the wrong rule and range is worse
-// than no finding, because it reads as a real result.
-func TestLintCacheRejectsBadArtifacts(t *testing.T) {
-	valid := sampleLintCache().Encode()
-
-	cases := []struct {
-		name   string
-		buffer []byte
-	}{
-		{"empty", nil},
-		{"shorter than the header", valid[:10]},
-		{"truncated mid-record", valid[:len(valid)/2]},
-		// Whatever the current version is, not a number someone has to remember: this case once wrote
-		// version 3 to version 2 and went vacuous the moment the format became version 4.
-		{"a different format version", regexp.MustCompile(`"version":\d+`).ReplaceAll(valid, []byte(`"version":0`))},
-		{"trailing garbage", append(append([]byte{}, valid...), 0, 0, 0, 0)},
-	}
-
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			decoded, err := program.DecodeLintCache(testCase.buffer)
-			if err == nil {
-				t.Fatalf("a %s artifact decoded without error into %d entries; the decoder cannot "+
-					"detect corruption and every clean read from it is vacuous",
-					testCase.name, len(decoded.Entries))
-			}
-			if !errors.Is(err, program.ErrLintCacheUnreadable) {
-				t.Errorf("error should be ErrLintCacheUnreadable so a caller treats it as a cold "+
-					"cache rather than a failure, got: %v", err)
-			}
-		})
-	}
-}
-
 // TestLintCacheLookupDistinguishesCleanFromUnknown is the correctness heart of this cache.
 //
 // A clean file and an unknown file both have zero findings. If Lookup cannot tell them apart,
 // every uncached file reads as clean and the tool reports a green tree it never linted. That
 // is the exact silent failure this whole domain exists to prevent, and it is one boolean away.
 func TestLintCacheLookupDistinguishesCleanFromUnknown(t *testing.T) {
-	cache, err := program.DecodeLintCache(sampleLintCache().Encode())
-	if err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	cache := roundTripLintCache(t, sampleLintCache())
 	key := program.HashRuleSet([]string{"no-debugger", "no-empty"})
 	rules := []string{"no-debugger", "no-empty"}
 
@@ -390,84 +368,6 @@ func TestLintCacheStoreRecordsCleanFiles(t *testing.T) {
 	}
 	if len(entry.Findings) != 0 {
 		t.Errorf("findings: %d, want 0", len(entry.Findings))
-	}
-}
-
-// TestLintCacheSurvivesDisk round-trips through the real filesystem rather than through Encode
-// alone, because the write path is where a cache is truncated or half-visible.
-func TestLintCacheSurvivesDisk(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "nested", "lint.cache")
-	original := sampleLintCache()
-
-	if err := program.WriteLintCache(path, original); err != nil {
-		t.Fatalf("writing: %v", err)
-	}
-
-	decoded, err := program.ReadLintCache(path)
-	if err != nil {
-		t.Fatalf("reading back: %v", err)
-	}
-	if len(decoded.Entries) != len(original.Entries) {
-		t.Fatalf("entries: %d back from %d", len(decoded.Entries), len(original.Entries))
-	}
-
-	// The interpolated description is the one that cannot be rebuilt, so it is the one worth
-	// asserting survived a real write.
-	entry, hit := decoded.Lookup(
-		original.Entries[0].Path, original.Entries[0].ContentHash, original.Key, original.Entries[0].Rules)
-	if !hit {
-		t.Fatal("an entry written to disk came back as a miss")
-	}
-	findings := entry.Findings
-	if len(findings) != 2 {
-		t.Fatalf("findings: %d back from 2", len(findings))
-	}
-	if findings[1].MessageDescription != original.Entries[0].Findings[1].MessageDescription {
-		t.Errorf("description did not survive disk:\n  got  %q\n  want %q",
-			findings[1].MessageDescription, original.Entries[0].Findings[1].MessageDescription)
-	}
-}
-
-// TestLintCacheWriteLeavesNoPartialArtifact pins the atomic-rename property.
-//
-// Several cohere runs can share a tree, so a reader must never observe a half-written cache. The
-// temporary file is written in the destination directory and renamed, and this asserts the
-// directory holds exactly the finished artifact afterward: a leftover temporary is the tell that a
-// failure path forgot to clean up, and it accumulates silently across runs.
-func TestLintCacheWriteLeavesNoPartialArtifact(t *testing.T) {
-	directory := t.TempDir()
-	path := filepath.Join(directory, "lint.cache")
-
-	if err := program.WriteLintCache(path, sampleLintCache()); err != nil {
-		t.Fatalf("writing: %v", err)
-	}
-
-	entries, err := os.ReadDir(directory)
-	if err != nil {
-		t.Fatalf("listing %s: %v", directory, err)
-	}
-	if len(entries) != 1 || entries[0].Name() != "lint.cache" {
-		names := make([]string, 0, len(entries))
-		for _, entry := range entries {
-			names = append(names, entry.Name())
-		}
-		t.Errorf("the directory holds %v, want exactly [lint.cache]: a leftover temporary means a "+
-			"failure path did not clean up", names)
-	}
-}
-
-// TestReadLintCacheTreatsAMissingFileAsAMiss pins that a first run is not an error.
-//
-// A missing cache and an unparseable one both mean run cold. Reporting either as fatal would make
-// the first run in a fresh checkout fail, which is the loudest possible way to be wrong about
-// something harmless.
-func TestReadLintCacheTreatsAMissingFileAsAMiss(t *testing.T) {
-	cache, err := program.ReadLintCache(filepath.Join(t.TempDir(), "absent.cache"))
-	if err == nil {
-		t.Error("reading an absent cache returned no error, so a caller cannot say why it was cold")
-	}
-	if cache != nil {
-		t.Error("reading an absent cache returned a cache, which would be used as if it were real")
 	}
 }
 

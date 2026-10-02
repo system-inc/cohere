@@ -2,13 +2,6 @@ package program
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -144,18 +137,18 @@ type LintCacheEntry struct {
 // replacement over a byte range, and replaying one computed against different bytes would corrupt
 // the file it claims to repair. A cached finding is a report, never an edit.
 type LintCacheFinding struct {
-	RuleName string `json:"rule"`
-	Start    int32  `json:"start"`
-	End      int32  `json:"end"`
+	RuleName string
+	Start    int32
+	End      int32
 
 	// MessageId identifies the message within its rule. Not unique across rules; see above.
-	MessageId string `json:"messageId"`
+	MessageId string
 
 	// MessageDescription is the rendered sentence, stored because nothing can rebuild it.
-	MessageDescription string `json:"messageDescription"`
+	MessageDescription string
 
-	FixCount        int32 `json:"fixCount,omitempty"`
-	SuggestionCount int32 `json:"suggestionCount,omitempty"`
+	FixCount        int32
+	SuggestionCount int32
 }
 
 // MessageKey is the honest identity of a message: the pair, never the id alone.
@@ -204,122 +197,11 @@ func HashRuleSet(ruleNames []string) [sha256.Size]byte {
 // and 24 listening lists, and the file was 53 MB and 113ms to decode, a tenth of what the cache saves.
 // Versions 1 and 2 were a binary layout of offsets into an interned blob, replaced because adding
 // fields to it was where its "an encoder forgot a field" bug had shipped four times.
+//
+// The encoding itself is no longer this version's business. The cache is the findings section of the
+// cache table (cache_table.go), encoded with gob behind the table's header, so a change to the encoded
+// shape moves cacheTableVersion. This one moves when what an entry means changes.
 const lintCacheVersion = 5
-
-// lintCacheWire is the format on disk. It is kept apart from LintCache so the walk's view of an entry
-// stays plain slices, and so the round-trip test, which compares LintCache's fields, proves this
-// encoding carries every one of them.
-type lintCacheWire struct {
-	Version int                  `json:"version"`
-	Key     string               `json:"key"`
-	Lists   [][]string           `json:"lists"`
-	Entries []lintCacheWireEntry `json:"entries"`
-}
-
-type lintCacheWireEntry struct {
-	Path            string             `json:"path"`
-	ContentHash     string             `json:"contentHash"`
-	Rules           int                `json:"rules"`
-	TypedRules      int                `json:"typedRules"`
-	TypeFingerprint string             `json:"typeFingerprint"`
-	Listening       int                `json:"listening"`
-	VisitedNodes    int                `json:"visitedNodes"`
-	Findings        []LintCacheFinding `json:"findings,omitempty"`
-}
-
-// Encode writes the cache.
-func (c *LintCache) Encode() []byte {
-	wire := lintCacheWire{Version: lintCacheVersion, Key: hex.EncodeToString(c.Key[:]), Lists: [][]string{}}
-	positions := map[string]int{}
-	intern := func(list []string) int {
-		joined := strings.Join(list, "\x00")
-		if position, seen := positions[joined]; seen {
-			return position
-		}
-		positions[joined] = len(wire.Lists)
-		wire.Lists = append(wire.Lists, append([]string{}, list...))
-		return len(wire.Lists) - 1
-	}
-	for _, entry := range c.Entries {
-		wire.Entries = append(wire.Entries, lintCacheWireEntry{
-			Path:            entry.Path,
-			ContentHash:     hex.EncodeToString(entry.ContentHash[:]),
-			Rules:           intern(entry.Rules),
-			TypedRules:      intern(entry.TypedRules),
-			TypeFingerprint: hex.EncodeToString(entry.TypeFingerprint[:]),
-			Listening:       intern(entry.Listening),
-			VisitedNodes:    entry.VisitedNodes,
-			Findings:        entry.Findings,
-		})
-	}
-	encoded, err := json.Marshal(wire)
-	if err != nil {
-		// Every field is a plain value, so this cannot fail; if it ever does, an empty artifact
-		// decodes as unreadable, which is a miss.
-		return nil
-	}
-	return encoded
-}
-
-// ErrLintCacheUnreadable means the artifact is not one this build can use. Never a reason to
-// fail a run: the answer to an unreadable cache is to run cold.
-var ErrLintCacheUnreadable = errors.New("lint cache is not readable by this build")
-
-// DecodeLintCache reads an artifact written by Encode. Anything else, including a valid artifact of
-// another version, a hash of the wrong length or a list index out of range, is ErrLintCacheUnreadable:
-// an index trusted past its table would hand an entry another file's rule list.
-func DecodeLintCache(buffer []byte) (*LintCache, error) {
-	var wire lintCacheWire
-	if err := json.Unmarshal(buffer, &wire); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrLintCacheUnreadable, err)
-	}
-	if wire.Version != lintCacheVersion {
-		return nil, fmt.Errorf("%w: format version %d, this build reads %d", ErrLintCacheUnreadable, wire.Version, lintCacheVersion)
-	}
-	cache := &LintCache{Version: wire.Version, Entries: make([]LintCacheEntry, 0, len(wire.Entries))}
-	if err := decodeHash(wire.Key, &cache.Key); err != nil {
-		return nil, fmt.Errorf("%w: key: %v", ErrLintCacheUnreadable, err)
-	}
-	list := func(index int) ([]string, error) {
-		if index < 0 || index >= len(wire.Lists) {
-			return nil, fmt.Errorf("list %d of %d", index, len(wire.Lists))
-		}
-		return wire.Lists[index], nil
-	}
-	for position, stored := range wire.Entries {
-		entry := LintCacheEntry{Path: stored.Path, VisitedNodes: stored.VisitedNodes, Findings: stored.Findings}
-		if err := decodeHash(stored.ContentHash, &entry.ContentHash); err != nil {
-			return nil, fmt.Errorf("%w: entry %d: %v", ErrLintCacheUnreadable, position, err)
-		}
-		var err error
-		if entry.Rules, err = list(stored.Rules); err != nil {
-			return nil, fmt.Errorf("%w: entry %d rules: %v", ErrLintCacheUnreadable, position, err)
-		}
-		if entry.TypedRules, err = list(stored.TypedRules); err != nil {
-			return nil, fmt.Errorf("%w: entry %d typed rules: %v", ErrLintCacheUnreadable, position, err)
-		}
-		if err := decodeHash(stored.TypeFingerprint, &entry.TypeFingerprint); err != nil {
-			return nil, fmt.Errorf("%w: entry %d type fingerprint: %v", ErrLintCacheUnreadable, position, err)
-		}
-		if entry.Listening, err = list(stored.Listening); err != nil {
-			return nil, fmt.Errorf("%w: entry %d listening: %v", ErrLintCacheUnreadable, position, err)
-		}
-		cache.Entries = append(cache.Entries, entry)
-	}
-	return cache, nil
-}
-
-func decodeHash(text string, into *[sha256.Size]byte) error {
-	decoded, err := hex.DecodeString(text)
-	if err != nil {
-		return err
-	}
-	if len(decoded) != sha256.Size {
-		return fmt.Errorf("%d bytes, want %d", len(decoded), sha256.Size)
-	}
-	copy(into[:], decoded)
-	return nil
-}
 
 // Lookup returns a file's cached entry, and whether the cache had a usable answer.
 //
@@ -401,66 +283,6 @@ func (c *LintCache) Store(entry LintCacheEntry) {
 	}
 	c.Entries = append(c.Entries, entry)
 	c.index = nil
-}
-
-// WriteLintCache persists the cache, creating the directory if it is missing.
-//
-// Written to a temporary file in the same directory and renamed into place, because several cohere
-// runs can share a tree and a reader must never see a half-written artifact. Rename is atomic
-// within a filesystem; writing directly to the destination is not, and a truncated cache is the
-// shape that fails to decode, turning every file into a miss for no reason.
-//
-// A failure here is returned rather than swallowed. The next run being cold is a cost someone
-// should be told about, since the symptom otherwise is a saving that quietly never appears.
-func WriteLintCache(path string, cache *LintCache) error {
-	if cache == nil {
-		return fmt.Errorf("writing the lint cache: no cache to write")
-	}
-	directory := filepath.Dir(path)
-	if err := os.MkdirAll(directory, 0o755); err != nil {
-		return fmt.Errorf("creating %s: %w", directory, err)
-	}
-
-	temporary, err := os.CreateTemp(directory, ".lintcache-*")
-	if err != nil {
-		return fmt.Errorf("creating a temporary file in %s: %w", directory, err)
-	}
-	temporaryName := temporary.Name()
-	// Best-effort cleanup on every failure path below, so a failed write does not leave the
-	// directory filling with partial artifacts across runs.
-	defer func() {
-		if temporaryName != "" {
-			os.Remove(temporaryName)
-		}
-	}()
-
-	if _, err := temporary.Write(cache.Encode()); err != nil {
-		temporary.Close()
-		return fmt.Errorf("writing %s: %w", temporaryName, err)
-	}
-	if err := temporary.Close(); err != nil {
-		return fmt.Errorf("closing %s: %w", temporaryName, err)
-	}
-	if err := os.Rename(temporaryName, path); err != nil {
-		return fmt.Errorf("renaming %s into place at %s: %w", temporaryName, path, err)
-	}
-	temporaryName = ""
-	return nil
-}
-
-// ReadLintCache loads a cache from disk.
-//
-// A missing file and an unreadable one are both reported as a miss with no error, because neither
-// is a failure: the first run has no cache, and an artifact this build cannot parse is exactly what
-// the version byte exists to produce. Both mean the same thing to the caller, which is to run cold.
-//
-// The error is returned anyway, for a caller that wants to say why. Nothing may treat it as fatal.
-func ReadLintCache(path string) (*LintCache, error) {
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return DecodeLintCache(contents)
 }
 
 // CacheClasses splits a rule set three ways, in order: rules whose findings depend only on the file's

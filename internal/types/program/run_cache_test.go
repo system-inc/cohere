@@ -233,16 +233,11 @@ func TestRunCacheDoubtIsAMiss(t *testing.T) {
 			t.Fatalf("an empty manifest hit, so it would match any tree: %v", err)
 		}
 	})
-	t.Run("an unreadable file on disk", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), "run.cache")
-		writeFile(t, path, "{not json")
-		if _, err := program.ReadRunCache(path); !errors.Is(err, program.ErrRunCacheMiss) {
-			t.Fatalf("a corrupt manifest was not a miss: %v", err)
-		}
-	})
-	t.Run("a missing file on disk", func(t *testing.T) {
-		if _, err := program.ReadRunCache(filepath.Join(t.TempDir(), "absent")); !errors.Is(err, program.ErrRunCacheMiss) {
-			t.Fatalf("a missing manifest was not a miss: %v", err)
+	// What a table holds when no run was recorded under an invocation, so the caller's lookup must miss.
+	t.Run("no recorded run", func(t *testing.T) {
+		var absent *program.RunCache
+		if err := absent.Check(tree.key); !errors.Is(err, program.ErrRunCacheMiss) {
+			t.Fatalf("a missing record was not a miss: %v", err)
 		}
 	})
 }
@@ -275,14 +270,17 @@ func TestRunCacheRecordWatchesEveryDirectoryItself(t *testing.T) {
 // exited zero would pass CI while describing a failure.
 func TestRunCacheReplaysOutputAndExitCodeThroughDisk(t *testing.T) {
 	tree := newRunCacheTree(t)
-	path := filepath.Join(t.TempDir(), "nested", "run.cache")
-	if err := program.WriteRunCache(path, tree.record(t)); err != nil {
+	path := filepath.Join(t.TempDir(), "nested", "table.gob")
+	table := program.NewCacheTable()
+	table.Runs["--no-fix"] = tree.record(t)
+	if err := program.WriteCacheTable(path, table, testIdentity); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	loaded, err := program.ReadRunCache(path)
+	read, err := program.ReadCacheTable(path, testIdentity)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
+	loaded := read.Runs["--no-fix"]
 	if err := loaded.Check(tree.key); err != nil {
 		t.Fatalf("a cache read back from disk did not hit: %v", err)
 	}

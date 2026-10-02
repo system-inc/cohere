@@ -2,7 +2,6 @@ package program
 
 import (
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -54,46 +53,46 @@ import (
 type RunCache struct {
 	// Version is the manifest format. A manifest written by a different format is a miss, never a
 	// best-effort read: the fields would be read from the wrong places and still parse.
-	Version int `json:"version"`
+	Version int
 
 	// Key covers everything about the run that is not a file on disk: the flags, the binary's
 	// identity, the working directory. Two runs that differ in any of those are different runs even
 	// over identical files, and must not replay each other.
-	Key string `json:"key"`
+	Key string
 
 	// Inputs is every file and directory the run depended on, with the signature it had.
-	Inputs []RunCacheInput `json:"inputs"`
+	Inputs []RunCacheInput
 
 	// Output is exactly what the run printed to stdout, replayed byte for byte on a hit.
-	Output []byte `json:"output"`
+	Output []byte
 
 	// Errors is what it printed to stderr. Kept apart rather than interleaved, so each stream replays
 	// to the stream it was written to.
-	Errors []byte `json:"errors,omitempty"`
+	Errors []byte
 
 	// RecordedUnixNanoseconds is when the replayed run happened. A replay prints that run's report,
 	// durations included, so it has to be able to say when those numbers are from.
-	RecordedUnixNanoseconds int64 `json:"recordedUnixNanoseconds"`
+	RecordedUnixNanoseconds int64
 
 	// ExitCode is the process exit code to return on a hit. A cache that replayed the output and
 	// exited zero on a failing tree would pass CI while printing a failure.
-	ExitCode int `json:"exitCode"`
+	ExitCode int
 }
 
 // RunCacheInput is one input's signature.
 type RunCacheInput struct {
-	Path string `json:"path"`
+	Path string
 
 	// Directory is true for an entry recorded to catch files added beneath it. Kept explicit
 	// rather than inferred, because a path that was a directory and is now a file is a change.
-	Directory bool `json:"directory,omitempty"`
+	Directory bool
 
 	// Exists is false for an input that was absent when recorded and must stay absent. A config the
 	// run looked for and did not find is still an input: creating it changes the run.
-	Exists bool `json:"exists"`
+	Exists bool
 
-	Size                int64 `json:"size"`
-	ModifiedNanoseconds int64 `json:"modifiedNanoseconds"`
+	Size                int64
+	ModifiedNanoseconds int64
 }
 
 // runCacheVersion is bumped whenever the manifest's meaning changes, not only its shape.
@@ -315,52 +314,4 @@ func (input RunCacheInput) stillMatches() error {
 		return fmt.Errorf("%w: %s was modified", ErrRunCacheMiss, input.Path)
 	}
 	return nil
-}
-
-// WriteRunCache persists a run, atomically: a temporary in the destination directory, then a rename.
-// Two runs can share a tree, and a reader must never see half a manifest.
-func WriteRunCache(path string, cache *RunCache) error {
-	encoded, err := json.Marshal(cache)
-	if err != nil {
-		return fmt.Errorf("encoding the run cache: %w", err)
-	}
-	directory := filepath.Dir(path)
-	if err := os.MkdirAll(directory, 0o755); err != nil {
-		return fmt.Errorf("creating %s: %w", directory, err)
-	}
-	temporary, err := os.CreateTemp(directory, ".runcache-*")
-	if err != nil {
-		return fmt.Errorf("creating a temporary in %s: %w", directory, err)
-	}
-	temporaryName := temporary.Name()
-	defer func() {
-		if temporaryName != "" {
-			os.Remove(temporaryName)
-		}
-	}()
-	if _, err := temporary.Write(encoded); err != nil {
-		temporary.Close()
-		return fmt.Errorf("writing %s: %w", temporaryName, err)
-	}
-	if err := temporary.Close(); err != nil {
-		return fmt.Errorf("closing %s: %w", temporaryName, err)
-	}
-	if err := os.Rename(temporaryName, path); err != nil {
-		return fmt.Errorf("renaming the run cache into place: %w", err)
-	}
-	temporaryName = ""
-	return nil
-}
-
-// ReadRunCache loads a stored run. Any failure is a miss to the caller.
-func ReadRunCache(path string) (*RunCache, error) {
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrRunCacheMiss, err)
-	}
-	var cache RunCache
-	if err := json.Unmarshal(contents, &cache); err != nil {
-		return nil, fmt.Errorf("%w: unreadable manifest: %v", ErrRunCacheMiss, err)
-	}
-	return &cache, nil
 }

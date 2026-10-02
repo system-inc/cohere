@@ -341,4 +341,39 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			t.Fatalf("the bare run lost its own recording to the --no-fix one:\n%s", bare)
 		}
 	})
+
+	// A cache table that cannot be trusted is thrown away whole, said so once, and replaced. Overwritten
+	// rather than deleted, because a missing table is a first run and proves nothing about the discard.
+	t.Run("a corrupt cache table is discarded, said so, and rewritten", func(t *testing.T) {
+		establishHit()
+		tables := []string{}
+		filepath.WalkDir(home, func(path string, entry os.DirEntry, err error) error {
+			if err == nil && !entry.IsDir() && strings.HasPrefix(entry.Name(), "table-") && strings.HasSuffix(entry.Name(), ".gob") {
+				tables = append(tables, path)
+			}
+			return nil
+		})
+		if len(tables) != 1 {
+			t.Fatalf("expected one cache table under the isolated home, found %v", tables)
+		}
+		if err := os.WriteFile(tables[0], []byte("not a cache table"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		discarded, discardedExit := run(true)
+		cold, coldExit := run(false)
+		if isReplay(discarded) {
+			t.Fatalf("a corrupt table replayed:\n%s", discarded)
+		}
+		if !strings.Contains(discarded, "note: cache table discarded") {
+			t.Fatalf("the discard was silent, so a table thrown away every run would look merely cold:\n%s", discarded)
+		}
+		withoutNote := keepLines(discarded, "note: cache table discarded")
+		if normalized(withoutNote) != normalized(cold) || discardedExit != coldExit {
+			t.Fatalf("the run after the discard differs from a cold run:\n--- after discard\n%s\n--- cold\n%s", discarded, cold)
+		}
+		if again, _ := run(true); !isReplay(again) || strings.Contains(again, "discarded") {
+			t.Fatalf("the run after the discard did not write a table the next run could replay:\n%s", again)
+		}
+	})
 }

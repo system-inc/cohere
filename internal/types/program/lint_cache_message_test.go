@@ -150,10 +150,7 @@ func TestStoredDescriptionSurvivesForAnInterpolatedMessage(t *testing.T) {
 		}},
 	}
 
-	decoded, err := program.DecodeLintCache(cache.Encode())
-	if err != nil {
-		t.Fatalf("decoding: %v", err)
-	}
+	decoded := roundTripLintCache(t, cache)
 	entry, hit := decoded.Lookup(
 		"/project/source/negate.ts",
 		program.HashContent("-\"text\";\n"),

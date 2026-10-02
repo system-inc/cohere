@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
+	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -46,7 +48,12 @@ import (
 var activeRunCache *runCacheSession
 
 type runCacheSession struct {
-	path     string
+	// tablePath is where this root's cache table lives, invocation the name this run's record goes under
+	// in it, and table what was read from it when the run began.
+	tablePath  string
+	invocation string
+	table      *program.CacheTable
+
 	key      string
 	recorder *program.InputRecorder
 
@@ -58,10 +65,9 @@ type runCacheSession struct {
 	// declined is the reason this run must not be recorded, empty while it may be.
 	declined string
 
-	// findings is the findings cache this run consults and records, the run cache's second layer, and
-	// findingsPath where it is kept. Nil when the graph never reached a walk.
-	findings     *program.FindingsReuse
-	findingsPath string
+	// findings is the findings cache this run consults and records, the run cache's second layer. Nil
+	// when the graph never reached a walk.
+	findings *program.FindingsReuse
 
 	stdout, stderr teeStream
 }
@@ -148,9 +154,9 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	if !runCacheEligible() {
 		return nil
 	}
-	// No format scope is in the key, because an eligible run never formats: a bare run and `--no-fix`
-	// configure no formatter, so their fix phase has no format scope and nothing they print depends on
-	// which files changed. It used to ask git here on every run, for a fact only formatting needed.
+	// No format scope is in the key, and that is only sound because an eligible run never formats: with
+	// no formatter its scope is the constant "formatting was not requested", so nothing it prints depends
+	// on which files changed. A run that formats is never eligible.
 	key, err := program.RunCacheKey(os.Args[1:], location.Root,
 		"root="+location.Root,
 		"tsconfig="+location.ConfigFileName,
@@ -160,15 +166,24 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		return nil
 	}
 
-	path := runCachePath(location.Root, os.Args[1:])
-	if stored, err := program.ReadRunCache(path); err == nil && stored.Check(key) == nil {
+	tablePath := cacheTablePath(location.Root)
+	table, err := program.ReadCacheTable(tablePath, cacheTableIdentity())
+	if errors.Is(err, program.ErrCacheTableUnreadable) {
+		// Said once, before the recording starts, so it reaches the terminal and never a replay. A table
+		// thrown away on every run would otherwise look like a cache that is merely cold.
+		fmt.Fprintf(os.Stderr, "note: %v; this run starts cold and writes a new one\n", err)
+	}
+	invocation := program.CacheTableInvocation(os.Args[1:])
+	if stored := table.Runs[invocation]; stored.Check(key) == nil {
 		replayRunCache(stored)
 	}
 
 	session := &runCacheSession{
-		path:     path,
-		key:      key,
-		recorder: program.NewInputRecorder(),
+		tablePath:  tablePath,
+		invocation: invocation,
+		table:      table,
+		key:        key,
+		recorder:   program.NewInputRecorder(),
 	}
 	if err := session.stdout.start(&os.Stdout); err != nil {
 		return nil
@@ -181,18 +196,17 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	return session.recorder
 }
 
-// runCachePath keeps the manifest out of the project: one per project root and invocation, in the user
-// cache. The invocation is part of the name because a bare run and `--no-fix` print different reports
-// under different keys: sharing one file, each overwrote the other's, and alternating between them was
-// a miss every time.
-func runCachePath(root string, arguments []string) string {
-	return cacheFilePath("run", root+"\x00"+strings.Join(arguments, "\x00"))
-}
-
-// findingsCachePath is one per project root, shared by every eligible invocation. Each walks the same
-// rules over the same files under the same configuration, so their findings are the same findings.
-func findingsCachePath(root string) string {
-	return cacheFilePath("lint", root)
+// cacheTablePath keeps the cache table out of the project: one per project root, in the user cache. Every
+// eligible invocation shares it. Their recorded runs sit side by side under their own invocation, since a
+// bare run and `--no-fix` print different reports under different keys, and their findings are the same
+// findings: each walks the same rules over the same files under the same configuration.
+func cacheTablePath(root string) string {
+	directory, err := os.UserCacheDir()
+	if err != nil {
+		directory = os.TempDir()
+	}
+	sum := sha256.Sum256([]byte(root))
+	return filepath.Join(directory, "cohere", fmt.Sprintf("table-%x.gob", sum[:8]))
 }
 
 func cacheFilePath(prefix string, identity string) string {
@@ -202,6 +216,52 @@ func cacheFilePath(prefix string, identity string) string {
 	}
 	sum := sha256.Sum256([]byte(identity))
 	return filepath.Join(directory, "cohere", fmt.Sprintf("%s-%x.json", prefix, sum[:8]))
+}
+
+// readFormatSection is the format record's section of this root's table, nil when there is none or the
+// table was discarded. The caller decides whether its key still holds.
+func readFormatSection(root string) *program.FormatSection {
+	table, _ := program.ReadCacheTable(cacheTablePath(root), cacheTableIdentity())
+	return table.Formatted
+}
+
+// writeFormatSection replaces the format record's section and keeps every other section as it is on disk.
+// It stands alone because a run that formats is never a recorded run, so no session is there to carry it.
+func writeFormatSection(root string, section *program.FormatSection) error {
+	path := cacheTablePath(root)
+	identity := cacheTableIdentity()
+	table, _ := program.ReadCacheTable(path, identity)
+	table.Formatted = section
+	return program.WriteCacheTable(path, table, identity)
+}
+
+// dumpCacheTable is `--cache-dump`: what this project's table holds, read by the same build that would use
+// it, so a table this binary would discard says so rather than printing as though it were in use.
+func dumpCacheTable(location projectLocation) error {
+	path := cacheTablePath(location.Root)
+	table, err := program.ReadCacheTable(path, cacheTableIdentity())
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Printf("no cache table for %s (looked at %s)\n", location.Root, path)
+			return nil
+		}
+		fmt.Printf("%v\n", err)
+		return nil
+	}
+	program.DumpCacheTable(os.Stdout, path, table, cacheTableIdentity())
+	return nil
+}
+
+// cacheTableIdentity is the build a table must have been written by to be read. Anything about the binary
+// that can change what a cached answer means is in it, and the keys inside the table cover the rest.
+func cacheTableIdentity() program.CacheTableIdentity {
+	provenance := release.Current()
+	return program.CacheTableIdentity{
+		SelfCommit:     provenance.SelfCommit,
+		CompilerCommit: provenance.CompilerCommit,
+		GoToolchain:    provenance.GoToolchain,
+		Platform:       provenance.Platform,
+	}
 }
 
 // replayRunCache prints a recorded run, framed so its durations cannot be read as this run's, and
@@ -255,21 +315,17 @@ func finishRunCache(exitCode int) {
 		activeRunCache = nil
 		session.stdout.stop(&os.Stdout)
 		session.stderr.stop(&os.Stderr)
+		var recorded *program.RunCache
 		if session.declared && session.declined == "" {
-			session.record(exitCode)
+			recorded = session.record(exitCode)
 		}
-		// Saved even when the run itself was declined. Its entries are keyed on each file's bytes, so a
-		// file the fix phase rewrote left an entry for bytes that no longer exist, which can never match.
-		if session.findings != nil {
-			if err := program.WriteLintCache(session.findingsPath, session.findings.Recorded()); err != nil {
-				fmt.Fprintf(os.Stderr, "note: the findings cache could not be written: %v\n", firstLine(err.Error()))
-			}
-		}
+		session.write(recorded)
 	}
 	os.Exit(exitCode)
 }
 
-func (session *runCacheSession) record(exitCode int) {
+// record captures this run, or returns nil when it cannot.
+func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	present, absent := session.recorder.Inputs()
 	files := append(present, session.extraFiles...)
 	cache, err := program.RecordRunCache(session.key, files, nil, absent,
@@ -278,12 +334,37 @@ func (session *runCacheSession) record(exitCode int) {
 		// Not recording is always safe. Said on stderr because a cache that silently never records is
 		// a saving that quietly never appears.
 		fmt.Fprintf(os.Stderr, "note: the run cache did not record this run: %v\n", firstLine(err.Error()))
-		return
+		return nil
 	}
 	cache.Errors = session.stderr.buffer.Bytes()
 	cache.RecordedUnixNanoseconds = time.Now().UnixNano()
-	if err := program.WriteRunCache(session.path, cache); err != nil {
-		fmt.Fprintf(os.Stderr, "note: the run cache could not be written: %v\n", firstLine(err.Error()))
+	return cache
+}
+
+// write puts this run's record and findings into the table, once.
+//
+// The table is read again here rather than reused from when the run began, because another invocation can
+// have recorded into it since: a bare run and `--no-fix` started together each own their own entry, and
+// writing back the copy read seconds ago would erase the other's. What is lost to a race is a record,
+// which costs a miss; nothing here can make a stale entry match, since every entry carries its own proof.
+//
+// The findings are saved even when the run itself was declined. Their entries are keyed on each file's
+// bytes, so a file the fix phase rewrote left an entry for bytes that no longer exist, which can never
+// match.
+func (session *runCacheSession) write(recorded *program.RunCache) {
+	if recorded == nil && session.findings == nil {
+		return
+	}
+	identity := cacheTableIdentity()
+	table, _ := program.ReadCacheTable(session.tablePath, identity)
+	if recorded != nil {
+		table.Runs[session.invocation] = recorded
+	}
+	if session.findings != nil {
+		table.Findings = session.findings.Recorded()
+	}
+	if err := program.WriteCacheTable(session.tablePath, table, identity); err != nil {
+		fmt.Fprintf(os.Stderr, "note: the cache table could not be written: %v\n", firstLine(err.Error()))
 	}
 }
 
@@ -397,9 +478,7 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 		// Without a key nothing can be proven unchanged, so nothing is replayed or recorded.
 		return
 	}
-	session.findingsPath = findingsCachePath(location.Root)
-	previous, _ := program.ReadLintCache(session.findingsPath)
-	session.findings = program.NewFindingsReuse(key, previous)
+	session.findings = program.NewFindingsReuse(key, session.table.Findings)
 	graph.FindingsReuse = session.findings
 }
 
