@@ -37,9 +37,12 @@ Both are silent here and reported by ESLint.
 This replaced a narrower recognizer that matched the equality idiom by shape. Every case it silenced
 has no value parameters and uses `T` only in its return, so the principle subsumes it.
 
-What it costs: a parameterless function that reads the world and returns `T` (`readConfig<T>(): T`
-over `JSON.parse`) is a cast from I/O rather than from an argument, and the principle stays silent on
-it. On ahra no such function exists today.
+A witness never produces a value of `T` (Kirk's ruling of 2026-10-02). When the function has a body,
+every value it returns must be `null`, `undefined` or `void`, read through `as`, `!`, `satisfies` and
+parentheses. A parameterless function that reads the world and returns it as `T` (`readConfig<T>(): T`
+over `JSON.parse`, or api-phi-health's `ormDrizzleCredentialsFromEnvironment<CredentialsType>()`) is a
+cast from I/O, and it reports, as ESLint does. A signature with no body, a function type or a
+`declare`, has nothing to read and stays silent.
 
 The real sites are `libraries/structure/libraries/nexus/source/types/UnionFromClasses.test.ts:23`
 (columns 7 and 49) and `ObjectTypes.ts:93`. Upstream's own corpus pins the idiom as reporting

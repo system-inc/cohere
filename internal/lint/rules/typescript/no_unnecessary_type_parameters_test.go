@@ -1102,9 +1102,12 @@ declare class C {
   prop: <P>() => P;
 }
       `},
-		// OrmDrizzleConfiguration.ts:38 in api-phi-health: a free function reading the environment. The
-		// ruling's stated cost, a cast from the world rather than from an argument, kept silent (#gtgw3av).
-		{name: "a free function returning what it reads from the environment", source: "declare const process: { env: Record<string, string | undefined> };\nexport function credentialsFromEnvironment<CredentialsType>(): CredentialsType {\n    return JSON.parse(process.env.CREDENTIALS ?? '{}') as CredentialsType;\n}\n"},
+		// A witness body hands back nothing, however it spells it (Kirk's ruling of 2026-10-02).
+		{name: "typeOnly returning undefined", source: "export function typeOnly<Shape>(): Shape {\n    return undefined as unknown as Shape;\n}\n"},
+		{name: "typeOnly returning void 0 through a non-null assertion", source: "export function typeOnly<Shape>(): Shape {\n    return (void 0)!;\n}\n"},
+		{name: "an arrow whose expression body is null", source: "export const typeOnly = <Shape,>(): Shape => null as unknown as Shape;\n"},
+		{name: "a body that only throws", source: "export function unreachable<Shape>(): Shape {\n    throw new Error('never called');\n}\n"},
+		{name: "a nested function's value return is not the witness's", source: "export function typeOnly<Shape>(): Shape {\n    const unused = () => 1;\n    unused();\n    return null as unknown as Shape;\n}\n"},
 		{name: "invalid24", source: `declare function get<T>(): T;`},
 		{name: "invalid25", source: `declare function get<T extends object>(): T;`},
 		{name: "invalid36", source: `declare function makeReadonlyArray<T>(): readonly T[];`},
@@ -1156,6 +1159,12 @@ declare function f<T extends (A extends B ? C : D)>(): T | null;
 		// past the threshold, so it is silent before the witness test is ever asked.
 		{name: "used in another parameter's default, outside the return", source: "declare function pick<T, U = T>(): U;\n", ids: []string{"sole"}},
 		{name: "no return annotation to witness through", source: "export function inferred<T>() { return null as unknown as T; }\n", ids: []string{"sole"}},
+		// A body that returns a real value cast to the caller's type is a cast from the world, not a
+		// witness (Kirk's ruling of 2026-10-02). The first row is api-phi-health's
+		// OrmDrizzleConfiguration.ts:38, ormDrizzleCredentialsFromEnvironment, which ESLint reports.
+		{name: "a free function returning what it reads from the environment", source: "declare const process: { env: Record<string, string | undefined> };\nexport function credentialsFromEnvironment<CredentialsType>(): CredentialsType {\n    return JSON.parse(process.env.CREDENTIALS ?? '{}') as CredentialsType;\n}\n", ids: []string{"sole"}},
+		{name: "an arrow whose expression body is a real value", source: "export const fromStorage = <Shape,>(): Shape => JSON.parse('{}') as Shape;\n", ids: []string{"sole"}},
+		{name: "one null return beside one real return", source: "export function maybe<Shape>(): Shape {\n    if(Math.random() > 0.5) {\n        return null as unknown as Shape;\n    }\n    return {} as Shape;\n}\n", ids: []string{"sole"}},
 	}
 	for _, testCase := range reporting {
 		t.Run(testCase.name, func(t *testing.T) {

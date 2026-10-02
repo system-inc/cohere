@@ -226,10 +226,13 @@ func checkTypeParameterOwner(ctx rule.Context, node *ast.Node, descriptor string
 //     has no value parameters and uses `T` only in its return, so the principle subsumes it and the
 //     narrower check was removed rather than kept as dead weight.
 //
-// What it costs, stated so nobody rediscovers it as a surprise: a parameterless function that reads
-// I/O and returns `T` (`readConfig<T>(): T` over `JSON.parse`) is a cast from the world rather than
-// from an argument, and the principle stays silent on it. On ahra no such function exists today; the
-// rule's only finding there was `typeOnly`.
+// A witness never produces a value of `T`, and a body that can is a cast from the world. Kirk's ruling
+// of 2026-10-02 narrowed the principle to that: `typeOnly` returns null, but
+// `ormDrizzleCredentialsFromEnvironment<CredentialsType>(): CredentialsType` in api-phi-health returns
+// parsed JSON from the environment cast to whatever the caller names, which is exactly the unchecked
+// assertion the rule exists for. So when the owner has a body, every value it returns must be one that
+// carries no data (see bodyNeverYieldsAValue). A signature with no body, a function type or a
+// `declare`, has nothing to read and keeps the exemption.
 //
 // typescript-eslint reports every one of these (its own corpus pins `Equal<X, Y>` as invalid57).
 func isTypeWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *ast.Node) bool {
@@ -243,6 +246,9 @@ func isTypeWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *as
 	// the receiver's state, which typescript-eslint reports and api-phi-health's parity sweep counted
 	// (#gtgw3av). The witnesses the ruling protects are free functions and function types.
 	if owner.Kind == ast.KindMethodDeclaration || owner.Kind == ast.KindMethodSignature {
+		return false
+	}
+	if !bodyNeverYieldsAValue(owner) {
 		return false
 	}
 	returnType := owner.Type()
@@ -283,6 +289,60 @@ func isTypeWitnessParameter(ctx rule.Context, owner *ast.Node, typeParameter *as
 	// `[T]`, `Record<string, T>`, a template literal, `= T`; all silent with and without the clause).
 	// Kept because that is two other layers' arithmetic agreeing, not a property of this test.
 	return insideReturn && !outsideReturn
+}
+
+// bodyNeverYieldsAValue reports whether a function's own body can only ever hand back null, undefined
+// or nothing, so the `T` its signature promises is never a real value at runtime.
+//
+// An arrow's expression body is its one return. A block is read for every `return`, stopping at a
+// nested function or class, whose returns belong to it. A body with no `return` at all, or one that
+// only throws, yields undefined, which is the shape of `<T,>(): T => {}` (upstream's invalid3). An
+// expression wrapped in `as`, `<T>`, `!`, `satisfies` or parentheses is read through the wrapper,
+// since `null as unknown as Shape` is null at runtime whatever it claims. A bodyless owner answers
+// true: there is nothing here to read.
+func bodyNeverYieldsAValue(owner *ast.Node) bool {
+	body := owner.Body()
+	if body == nil {
+		return true
+	}
+	if body.Kind != ast.KindBlock {
+		return yieldsNoValue(body)
+	}
+
+	yieldsValue := false
+	var visit func(node *ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if yieldsValue {
+			return true
+		}
+		if ast.IsFunctionLike(node) || ast.IsClassLike(node) {
+			return false
+		}
+		if node.Kind == ast.KindReturnStatement {
+			if expression := node.Expression(); expression != nil && !yieldsNoValue(expression) {
+				yieldsValue = true
+				return true
+			}
+			return false
+		}
+		node.ForEachChild(visit)
+		return yieldsValue
+	}
+	body.ForEachChild(visit)
+	return !yieldsValue
+}
+
+// yieldsNoValue reports whether an expression evaluates to null or undefined whatever its type claims.
+func yieldsNoValue(expression *ast.Node) bool {
+	expression = ast.SkipOuterExpressions(expression, ast.OEKParentheses|ast.OEKAssertions)
+	switch expression.Kind {
+	case ast.KindNullKeyword, ast.KindVoidExpression:
+		return true
+	case ast.KindIdentifier:
+		return expression.Text() == "undefined"
+	default:
+		return false
+	}
 }
 
 // usesCountedBefore is upstream's `node.body?.range[0] ?? node.returnType?.range[1]`.
